@@ -184,8 +184,10 @@ describe('mix-verify — intent → dispatch existence parity (#1351)', () => {
     });
 
     it('humanization/swing within a step bin (±1) still matches; a full two-step slip does not', () => {
-        // Bass humanize is ±14 ms and swing tops out near a third of a step —
-        // both land inside the ±1-bin window at any plausible tempo. Bracket it.
+        // Bass humanize is ±22 ms at the top of the knob (#1068 widened it from
+        // ±14 ms, which was under the perceptual floor at the default), and swing
+        // tops out near a third of a step — both land inside the ±1-bin window at
+        // any plausible tempo. Bracket it.
         const one = intent({ step: 4 });
         const nudged = verifyIntentParity([one], [dispatchFor(one, 120)], META, ['bass']);
         expect(nudged.missing).toHaveLength(0);

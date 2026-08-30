@@ -49,7 +49,23 @@ pocket (§4). The corollary is the design rule:
 - **Drum-kit character:** per-voice `instTimeOffset` inside each `grooves/*.ts` strategy
   (e.g. Neo-Soul: snare +6–18 ms drag, hats −8–20 ms push, kick +8 ms weight). Relative *within*
   the kit → audible → stays in genre strategies, not in engine plumbing.
-- **Humanization:** seeded per-note wobble (`humanizeDraw`, `groove.humanize`).
+- **Humanization:** seeded per-lane/per-note wobble, owned by `public/engine/humanize.ts`
+  (`humanizePlacement` / `humanizeColor`, scaled by `humanizeScale(groove.humanize)`). Squarely
+  tier 3 and re-modelled as such in #1068 — it is a *differential*: each lane draws its own value,
+  the drums draw one per kit piece, and nothing band-global is added (the pre-#1068 shape, a single
+  `Math.random()` per tick handed unchanged to the comp + harmony + chart visuals, was the §2
+  uniform-shift mistake in miniature, and inaudible for the same reason). Two invariants worth
+  keeping: **timing PLACEMENT is bar-independent** — keyed on `(barStep, lane, voice)` so a lane's
+  lean at a given 16th repeats every bar and reads as settled placement rather than per-hit noise
+  (the same seam `grooves/utils.ts` draws between `placementSkew` and `humanizeDraw`); and
+  **placement is position-weighted** (`PLACEMENT_WEIGHTS`: downbeat 0.35 → offbeat 1.0), so the
+  band's lock points stay near the grid while the subdivisions carry the character. At
+  `groove.humanize === 0` every term is exactly zero and playback is bit-for-bit grid-locked, which
+  is the metronome-core identity stated purely (cf. §4's note on the gravity-era deletion).
+  Each lane has exactly one placement authority: the scheduler for bass/chords/soloist, per drum
+  piece inside `scheduleDrums`, and `finalizeHarmonyNotes` for harmony (which bakes its offset into
+  the note, so it is also the only lane whose humanization reaches the `.mid` export by that route
+  — every other lane's export placement is drawn in `midi-worker-logic.ts` with the same key).
 - **Swing:** tier-1 grid geometry; guarded by the swing-ratio audit.
 - **Tempo domain:** end-of-song ritardando (`resolution.ts`); tempo breathing is #1010's job.
 

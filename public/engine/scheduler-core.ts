@@ -56,6 +56,15 @@ import {
 } from './engine.js';
 import { calculateStepDuration } from './groove-engine.js';
 import { stringHash31 } from './hash-utils.js';
+import {
+    detuneRatio,
+    HUMANIZE_PROFILES,
+    humanizeColor,
+    humanizePlacement,
+    humanizeScale,
+    humanizeSeed,
+    placementWeight,
+} from './humanize.js';
 import { DRUM_MAP } from './midi-constants.js';
 import {
     dispatchMidiAutomation,
@@ -82,7 +91,6 @@ import {
     sectionAtStep,
 } from './section-overrides.js';
 import { isSoloistMonophonicMode } from './soloist-mode-policy.js';
-import { HUMANIZE_PROFILES, humanizeNote, humanizeSeed } from './synth-utils.js';
 import { bassMacroGain, soloistIntensityGain } from './velocity-shaping.js';
 import { getChordAtStep as _getChordAtStep, type ChordAtStep } from './worker-utils.js';
 
@@ -704,13 +712,18 @@ function expireMutedDrumFillAtStep(
 /**
  * Schedules drum sounds for a specific step.
  * Applies pocket/timing offsets, handles fills, and pushes events to the visualizer queue.
+ *
+ * Exported for the same reason `scheduleBass`/`scheduleChords`/`scheduleSoloist`
+ * are: it owns a decision worth asserting directly — here, the per-piece
+ * humanize placement/colour draws (#1068), which are otherwise reachable only
+ * through a full `scheduleGlobalEvent` tick.
  */
-function scheduleDrums(
+export function scheduleDrums(
     state: EnsembleState,
     params: any,
     dispatch: Dispatch | undefined = undefined,
 ): void {
-    const { time, absoluteStep, chartStep = absoluteStep } = params;
+    const { time, absoluteStep, chartStep = absoluteStep, mStep = absoluteStep } = params;
 
     const { playback, groove, vizState, arranger } = state;
 
@@ -759,21 +772,38 @@ function scheduleDrums(
         queueVisualizerFillEvent(playback, finalTime, false);
     }
 
-    // Seeded per-note humanization (synth-audit Epic 0 S6): each drum piece
-    // gets its own independent micro-timing + velocity wobble, replacing the
-    // shared per-tick `Math.random()` jitter that moved the whole kit in
-    // lockstep. Seeded on (step, piece) so looped playback reproduces exactly.
-    // `humanize` is normally a 0–100 slider value; guard the divide so a
-    // malformed dispatch can't fan a NaN into every drum's playTime/velocity.
-    const humanizeScale = Number.isFinite(groove.humanize) ? groove.humanize / 100 : 0;
+    // Seeded per-piece humanization (#1068). Each drum piece is a different
+    // limb, so each gets its OWN draws — never a shared per-tick value.
+    //   * PLACEMENT is keyed on `(mStep, piece)` — bar-independent, so the hat
+    //     on the "a" of 2 leans the same way every bar (a player's consistent
+    //     placement) instead of re-rolling into white noise each pass. It is
+    //     position-weighted, so the downbeat stays near the grid and the
+    //     subdivisions carry the lean — drums ARE the clock (timing-model tier 1),
+    //     and smearing their downbeat is what reads as "sloppy" rather than "human".
+    //   * COLOUR (velocity) is keyed on the absolute step, because a drummer's
+    //     dynamics genuinely do vary bar to bar.
+    // `humanizeScale` returns exactly 0 for a 0/malformed knob, so `humanize: 0`
+    // is bit-identical and no NaN can fan into playTime/velocity.
+    const humanizeAmt = humanizeScale(groove.humanize);
+    const posWeight = placementWeight(params);
+    const drumBarStep = Number.isFinite(mStep) ? mStep : absoluteStep;
 
     tickResult.drumHits.forEach((hit: any) => {
-        const h = humanizeNote(
-            humanizeSeed(absoluteStep, 'drums', stringHash31(hit.soundName)),
-            HUMANIZE_PROFILES.drums,
-            humanizeScale,
+        const pieceIndex = stringHash31(hit.soundName);
+        const skew = humanizePlacement(
+            drumBarStep,
+            'drums',
+            pieceIndex,
+            HUMANIZE_PROFILES.drums.timeSpread,
+            humanizeAmt,
+            posWeight,
         );
-        const playTime = finalTime + hit.instTimeOffset + h.timeOffset;
+        const h = humanizeColor(
+            humanizeSeed(absoluteStep, 'drums', pieceIndex),
+            HUMANIZE_PROFILES.drums,
+            humanizeAmt,
+        );
+        const playTime = finalTime + hit.instTimeOffset + skew;
         const velocity = hit.velocity * conductorVel * h.velocityMult;
         playDrumSound(state, hit.soundName, playTime, velocity);
 
@@ -846,13 +876,13 @@ export function scheduleBass(
     const notes = bass.buffer.get(step);
     bass.buffer.delete(step);
 
-    // Seeded per-note humanization (synth-audit Epic 5 S5): replaces the
-    // shared per-tick `t` jitter for the bass voice. Tight `bass` profile —
-    // bass is a steady instrument, so the spreads are small (±14 ms timing,
-    // ±10% velocity, ±3¢ detune). Seeded on `(step, 'bass')` so looped
-    // playback and critique tests reproduce exactly. Guard the divide so a
-    // malformed dispatch can't fan a NaN into the bass timing/velocity/pitch.
-    const humanizeScale = Number.isFinite(groove.humanize) ? groove.humanize / 100 : 0;
+    // Seeded per-note COLOUR humanization (#1068): velocity + detune, keyed on
+    // the absolute step so the bass breathes bar to bar. The lane's micro-timing
+    // PLACEMENT is not applied here — it is drawn once per tick in
+    // `scheduleGlobalEvent` (bar-independent, position-weighted) and is already
+    // folded into the `time` this function receives, so a bassist's placement is
+    // one decision per note rather than a second independent wobble per property.
+    const humanizeAmt = humanizeScale(groove.humanize);
 
     if (notes && notes.length > 0) {
         notes.forEach((noteEntry: any) => {
@@ -860,17 +890,17 @@ export function scheduleBass(
                 const { freq, durationSteps, velocity, timingOffset, muted, bendStartInterval } =
                     noteEntry;
                 const { chord } = chordData;
-                const h = humanizeNote(
+                const h = humanizeColor(
                     humanizeSeed(step, 'bass', 0),
                     HUMANIZE_PROFILES.bass,
-                    humanizeScale,
+                    humanizeAmt,
                 );
-                const adjustedTime = time + (timingOffset || 0) + h.timeOffset;
+                const adjustedTime = time + (timingOffset || 0);
                 // Apply detune by nudging the frequency itself — `playBassNote`
                 // takes no detune param, and ±3¢ is far below any perceptual
                 // pitch-class boundary so this can't accidentally bend the note.
                 const detunedFreq = Number.isFinite(freq)
-                    ? freq * 2 ** (h.detuneCents / 1200)
+                    ? freq * detuneRatio(h.detuneCents)
                     : freq;
                 (bass as Mutable<typeof bass>).lastPlayedFreq = freq; // @direct-mutation
                 const midiNum = getMidi(freq || 0) || 0;
@@ -960,10 +990,17 @@ export function scheduleSoloist(
     step: number,
     playTime: number,
 ): void {
-    const { soloist, playback, vizState } = state;
+    const { soloist, playback, vizState, groove } = state;
     const notes = soloist.audio.buffer.get(step);
     soloist.audio.buffer.delete(step);
     const soloistStepSec = secondsPerStepFor(playback.bpm);
+    // #1068: the lead is the loosest lane in the band and until now got NO
+    // humanization at all — `HUMANIZE_PROFILES.soloist` was declared and never
+    // consumed. Its PLACEMENT is drawn once per tick in `scheduleGlobalEvent`
+    // (already folded into `playTime`); this is the per-note COLOUR — velocity
+    // and a few cents of pitch, which is most of what makes a lead line sound
+    // blown/plucked rather than sequenced.
+    const humanizeAmt = humanizeScale(groove?.humanize);
 
     if (notes && notes.length > 0) {
         // Optimization: Avoid allocation if we only play one note (Common case)
@@ -1023,7 +1060,22 @@ export function scheduleSoloist(
                 // formula stops the CURVE from drifting; it does not make the two
                 // paths land on the same number. Reconciling the two competing
                 // intensity→velocity curves is an open decision, filed separately.
-                const vel = baseVel * polyphonyComp * soloistIntensityGain(playback.bandIntensity);
+                const hSolo = humanizeColor(
+                    humanizeSeed(step, 'soloist', voiceIndex),
+                    HUMANIZE_PROFILES.soloist,
+                    humanizeAmt,
+                );
+                const vel =
+                    baseVel *
+                    polyphonyComp *
+                    soloistIntensityGain(playback.bandIntensity) *
+                    hSolo.velocityMult;
+                // ±7¢ at full knob — well under any pitch-class boundary, and the
+                // MIDI/visualizer paths keep the exact `midiNum` above, so this
+                // colours the audible voice only (same treatment as the bass).
+                const playFreq = Number.isFinite(freq)
+                    ? freq * detuneRatio(hSolo.detuneCents)
+                    : freq;
                 const finalTime = playTime + offsetS;
 
                 // Legato detection (epic-3-soloist S1): a note that begins
@@ -1047,7 +1099,7 @@ export function scheduleSoloist(
 
                 playSoloNote(
                     state,
-                    freq,
+                    playFreq,
                     finalTime,
                     duration,
                     vel,
@@ -1184,9 +1236,15 @@ export function scheduleChords(
     step: number,
     time: number,
 ): void {
-    const { chords, playback, vizState } = state;
+    const { chords, playback, vizState, groove } = state;
     const notes = chords.buffer.get(step);
     chords.buffer.delete(step);
+    // #1068: per-note COLOUR humanization for the comp. `HUMANIZE_PROFILES.chords`
+    // declared `velSpread`/`detuneSpread` that nothing consumed — the only chords
+    // consumer was the strum's timing draw. A comper's voices are struck by
+    // different fingers, so each note gets its own draw (`voiceIndex = ni`); the
+    // lane's shared PLACEMENT is already folded into `time` by `scheduleGlobalEvent`.
+    const humanizeAmt = humanizeScale(groove?.humanize);
 
     if (notes && notes.length > 0) {
         // #691 — release the previous voicing when the harmony changes so a
@@ -1299,8 +1357,16 @@ export function scheduleChords(
                 }
                 const midiNum = getMidi(freq) || 0;
                 const { name, octave } = midiToNote(midiNum);
-                const voiceHandle = playNote(state, freq, playTime, duration, {
-                    vol: safeVelocity,
+                const hChord = humanizeColor(
+                    humanizeSeed(step, 'chords', ni),
+                    HUMANIZE_PROFILES.chords,
+                    humanizeAmt,
+                );
+                // Detune nudges the audible frequency only — MIDI out and the
+                // visualizer keep the exact `freq`/`midiNum` (same split as bass).
+                const voicedFreq = freq * detuneRatio(hChord.detuneCents);
+                const voiceHandle = playNote(state, voicedFreq, playTime, duration, {
+                    vol: safeVelocity * hChord.velocityMult,
                     index: strumRank[ni],
                     instrument: instrument || 'Piano',
                     numVoices: numVoices,
@@ -1539,11 +1605,30 @@ export function scheduleGlobalEvent(
     const sectionStart = chordDataForDrums?.sectionStart ?? 0;
     const drumCycle = groove.measures * spm;
     const drumStep = getSectionPhaseStep(chartStep, sectionStart, drumCycle);
-    // Legacy shared per-tick timing jitter. Drums no longer use this — S6 gave
-    // them independent seeded humanization (`humanizeNote`). Bass, chords,
-    // harmonies and the soloist still ride this shared `t` until Epics 5/2/1/3
-    // migrate each to `humanizeNote`; remove this line once they have.
-    const t = swungTime + (Math.random() - 0.5) * (groove.humanize / 100) * 0.025;
+    // #1068 — per-lane micro-timing PLACEMENT. This replaced a single unseeded
+    // `Math.random()` draw per tick that was handed to the comp, the harmony AND
+    // the chart visuals *unchanged*, so those three moved in exact lockstep —
+    // precisely the whole-band-shifts-together artifact the Epic 0 S6 note in
+    // `synth-utils.ts` claimed had already been eliminated. Each lane now draws
+    // its own value, keyed on `(mStep, lane)`: bar-INDEPENDENT, so a lane's lean
+    // at a given 16th is the same every bar (a player's settled placement, not
+    // per-pass noise), and position-weighted so downbeats stay near the grid.
+    //
+    // Two lanes deliberately take the un-jittered grid time:
+    //   * HARMONY — its humanization authority is `finalizeHarmonyNotes`
+    //     (`harmonies.ts`), which places each voice individually and bakes the
+    //     offset into the note, so it reaches the `.mid` export as well. One
+    //     authority per domain (docs/design/timing-model.md §5).
+    //   * The chart VISUALS — a chord-chart highlight is not a player. Ensemble
+    //     is "a fancy metronome at its core"; the reader's visual reference must
+    //     stay grid-locked, and no one can see ±10 ms anyway.
+    const humanizeAmt = humanizeScale(groove.humanize);
+    const posWeight = placementWeight(stepInfo);
+    const lanePlacement = (lane: string, spread: number): number =>
+        humanizePlacement(stepInfo.mStep, lane, 0, spread, humanizeAmt, posWeight);
+    const bassTime = swungTime + lanePlacement('bass', HUMANIZE_PROFILES.bass.timeSpread);
+    const chordsTime = swungTime + lanePlacement('chords', HUMANIZE_PROFILES.chords.timeSpread);
+    const soloistTime = swungTime + lanePlacement('soloist', HUMANIZE_PROFILES.soloist.timeSpread);
 
     if (playback.metronome && stepInfo.isBeatStart && playback.audio) {
         let freq = stepInfo.isMeasureStart ? 1000 : stepInfo.isGroupStart ? 800 : 600;
@@ -1595,6 +1680,11 @@ export function scheduleGlobalEvent(
                 isBackbeat: stepInfo.isBackbeat,
                 absoluteStep: musicalStep,
                 chartStep,
+                // #1068: the BAR-relative step keys the bar-independent placement
+                // skew inside `scheduleDrums` — never the monotonic counter.
+                mStep: stepInfo.mStep,
+                isPulseStart: stepInfo.isPulseStart,
+                isMeasureStart: stepInfo.isMeasureStart,
                 isGroupStart: stepInfo.isGroupStart,
                 sectionId,
                 beatIndex: stepInfo.beatIndex,
@@ -1619,13 +1709,9 @@ export function scheduleGlobalEvent(
                 new CustomEvent('key-change', { detail: { key: playback.currentKey } }),
             );
         }
-        scheduleChordVisuals(state, chordData, t);
+        scheduleChordVisuals(state, chordData, swungTime);
         if (bassActive) {
-            // S5: bass migrated to per-note `humanizeNote` inside `scheduleBass`,
-            // so it takes the un-jittered `swungTime` (riding the shared `t`
-            // would double up). Chords/harmonies/soloist still ride `t` until
-            // their respective humanize stories migrate them.
-            scheduleBass(state, chordData, step, swungTime);
+            scheduleBass(state, chordData, step, bassTime);
         }
         if (soloistActive) {
             // #1066: the soloist takes the same swung grid time as bass — no
@@ -1635,13 +1721,15 @@ export function scheduleGlobalEvent(
             // instead of locking with it. The soloist's own lane pocket
             // (`bandPocket` in `soloist-phrase-first.ts`) still layers on top via
             // its per-note `timingOffset`, exactly like every other melodic lane.
-            scheduleSoloist(state, chordData, step, swungTime);
+            // #1068 layers the lane's humanize placement on top of that pocket
+            // (added, never replacing it).
+            scheduleSoloist(state, chordData, step, soloistTime);
         }
         if (chordsActive) {
-            scheduleChords(state, chordData, step, t);
+            scheduleChords(state, chordData, step, chordsTime);
         }
         if (harmonyActive) {
-            scheduleHarmonies(state, chordData, step, t);
+            scheduleHarmonies(state, chordData, step, swungTime);
         }
     }
 }

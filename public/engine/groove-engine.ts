@@ -26,6 +26,7 @@ import * as rock from './grooves/rock.js';
 import * as skaPunk from './grooves/ska-punk.js';
 import { DEFAULT_CONFIG, isBackbeatAdjacentStep } from './grooves/utils.js';
 import { deriveSectionSeed, scrambleHash, stringHash31, stringHash33 } from './hash-utils.js';
+import { humanizeScale } from './humanize.js';
 import {
     isInstrumentActiveAtStep,
     isPracticeLooping,
@@ -372,7 +373,19 @@ function getStrategy(groove: any): any {
     return strategies[groove.genreFeel] || null;
 }
 
+/**
+ * Seeded per-hit velocity wobble for the kit.
+ *
+ * #1068: `amount` is now the knob-scaled spread, so an `amount` of 0 (which is
+ * what `humanizeScale(0)` returns) is an exact identity rather than a
+ * multiply-by-zero that still returns a freshly-computed float. This is the
+ * drum lane's *baked* colour term — it rides the note into the worker buffer,
+ * so it reaches the `.mid` export as well as live playback.
+ */
 function humanizeVelocity(vel: number, seed: number, amount = 0.05): number {
+    if (!(amount > 0)) {
+        return vel;
+    }
     return vel * (1.0 + (scrambleHash(seed) - 0.5) * amount);
 }
 
@@ -1101,7 +1114,12 @@ export function applyGrooveOverrides(
             currentState.velocity *= 1.15;
         }
 
-        const jitterAmount = inst.name === 'Kick' ? 0.04 : 0.08;
+        // #1068: gated on the `humanize` knob. This jitter used to fire at full
+        // strength regardless of the slider, so `humanize: 0` never actually meant
+        // "off" for the kit — the knob's own promise was broken at the one lane a
+        // listener notices first. The Kick stays half as loose as the rest of the
+        // kit: it is the foundation the whole band's dynamics are read against.
+        const jitterAmount = (inst.name === 'Kick' ? 0.04 : 0.08) * humanizeScale(groove.humanize);
         // why: seed by (step, full instrument name hash) so each instrument's
         // jitter is independent but reproducible. Folding the full string is
         // required because charCodeAt(0) alone collides on real lane pairs:

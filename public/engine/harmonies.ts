@@ -7,6 +7,15 @@ import { getBestInversion } from './chords-engine.js';
 import { getBandPocket } from './coordination-engine.js';
 import { type HarmonyPatternKey, resolveHarmonyProfile } from './harmony-styles.js';
 import { scrambleHash } from './hash-utils.js';
+import {
+    HUMANIZE_PROFILES,
+    humanizeColor,
+    humanizePlacement,
+    humanizeScale,
+    humanizeSeed,
+    type PlacementPosition,
+    placementWeight,
+} from './humanize.js';
 import { isInstrumentActiveAtStep } from './section-overrides.js';
 import {
     isTensionChordQuality,
@@ -828,6 +837,12 @@ function finalizeHarmonyNotes(
     coordination: any,
     octave: number,
     sectionBarIndex: number,
+    // #1068 — bar-relative step + metric position, so the humanize placement
+    // below can be bar-independent and position-weighted. Optional so the
+    // partial-state call shapes in the harmony unit tests keep working; the
+    // fallbacks degrade to "unknown position" (full weight), never to a crash.
+    measureStep = 0,
+    position?: PlacementPosition,
 ): HarmonyNote[] {
     const { playback, harmony, groove, chords } = activeState;
     const { duration: baseDuration, isLatched, isBloom, isGhost, anchorMidi } = behavior;
@@ -1137,6 +1152,32 @@ function finalizeHarmonyNotes(
             : [],
     );
 
+    // #1068 — harmony owns its OWN humanization authority (the scheduler hands
+    // this lane the un-jittered grid time; see the note in `scheduleGlobalEvent`),
+    // because harmony bakes its offsets into the note and so is the one lane whose
+    // humanization also reaches the `.mid` export. Two composed terms:
+    //   * `sectionSkew` — the whole section leaning together at this bar position,
+    //     bar-independent so the lean is a consistent placement rather than noise;
+    //   * a per-voice spread, keyed on the voice index, so the voices aren't
+    //     welded into a single block (a real section is never that tight).
+    // Both are exactly 0 at `humanize: 0`.
+    const humanizeAmt = humanizeScale(groove?.humanize);
+    const posWeight = placementWeight(position);
+    const sectionSkew = humanizePlacement(
+        measureStep,
+        'harmonies',
+        0,
+        HUMANIZE_PROFILES.harmonies.timeSpread,
+        humanizeAmt,
+        posWeight,
+    );
+    // The style's own `timingJitter` is the per-voice character (stabs tight at
+    // 0.002 s, pads loose at 0.03 s) and stays the spread here. It used to be
+    // `scrambleHash(...) * jitter` — a [0, jitter] range, so every harmony voice
+    // was ALWAYS late, never early, regardless of the humanize knob. Centered now
+    // (same total width, no systematic drag) and knob-gated.
+    const voiceJitterSpread = (styleConfig.timingJitter || 0.008) / 2;
+
     for (let i = 0; i < currentMidis.length; i++) {
         let midi = currentMidis[i];
         if (midi < safetyFloor) {
@@ -1162,10 +1203,9 @@ function finalizeHarmonyNotes(
         }
 
         const stagger = (i - (currentMidis.length - 1) / 2) * 0.005;
-        // why: tag 8 — per-voice timing jitter. Seeded by (chord.rootMidi, step,
-        // voice index i) so each voice gets a distinct but reproducible offset.
-        // Original Math.random() * jitter produced [0, jitter] (asymmetric, always
-        // pushes notes late); preserved literally for behavioral parity.
+        // why: tag 8 — per-voice timing jitter, now the seeded, knob-gated,
+        // bar-independent `humanizePlacement` (#1068) instead of a hand-rolled
+        // always-late scrambleHash draw that ignored the humanize knob entirely.
         // #1005: harmony joins the single band-wide pocket authority —
         // getBandPocket(feel) is the ONE per-genre lean every melodic lane shares
         // (was a harmony-only Neo-Soul `+= 0.02` Dilla special-case — now folded into
@@ -1175,14 +1215,33 @@ function finalizeHarmonyNotes(
         const offset =
             getBandPocket(feel, chord?.sectionLabel ?? null) +
             stagger +
-            scrambleHash(chord.rootMidi * 100 + step * 31 + i * 7 + 8) *
-                (styleConfig.timingJitter || 0.008);
+            sectionSkew +
+            humanizePlacement(
+                measureStep,
+                'harmonies-voice',
+                i,
+                voiceJitterSpread,
+                humanizeAmt,
+                posWeight,
+            );
+
+        // Per-voice COLOUR: keyed on the absolute step so the section's dynamics
+        // breathe bar to bar (the `humanizeDraw` half of the split). Detune is
+        // deliberately unused here — harmony emits a MIDI number the scheduler
+        // turns back into a frequency post-register-clamp, so a cents offset
+        // applied at this layer would be discarded downstream (see
+        // public/engine/CLAUDE.md #31).
+        const hVoice = humanizeColor(
+            humanizeSeed(step, 'harmonies', i),
+            HUMANIZE_PROFILES.harmonies,
+            humanizeAmt,
+        );
 
         const isLegato = priorMidiSet.has(midi);
         notes.push({
             midi,
             freq: getFrequency(midi),
-            velocity: baseVol * polyphonyComp,
+            velocity: baseVol * polyphonyComp * hVoice.velocityMult,
             durationSteps: Math.max(0.1, duration),
             timingOffset: offset,
             style: styleConfig.activeStyle,
@@ -1485,5 +1544,7 @@ export function getHarmonyNotes(
         coordination,
         octave,
         sectionBarIndex,
+        measureStep,
+        stepInfo,
     );
 }

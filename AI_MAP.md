@@ -106,7 +106,8 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/engine/platform-orchestrator.ts` | Platform specific lifecycle management. | `initPlatformHacks`, `startPlatformAudioAndWakeLock` |
 | `public/engine/engine.ts` | Audio synthesis and instrument setup. | `initAudio`, `playNote` (re-export from `synth-chords`) |
 | `public/engine/reverb.ts` | Algorithmic Schroeder/Freeverb reverb (shared reverb return). | `createAlgorithmicReverb`, `REVERB_PRESETS` |
-| `public/engine/synth-utils.ts` | Shared WebAudio boilerplate (ramping, voices, seeded humanization). | `rampGain`, `killActiveVoices`, `humanizeNote` |
+| `public/engine/synth-utils.ts` | Shared WebAudio boilerplate (ramping, voices, velocity→timbre). | `rampGain`, `killActiveVoices`, `velocityTimbre` |
+| `public/engine/humanize.ts` | Leaf module (imports only `hash-utils.ts`) owning the seeded humanization primitives every lane shares — bar-independent timing placement, bar-varying velocity/detune colour, the knob curve, and the position weighting. Consumed by both main-thread synth and worker-side engines. | `humanizePlacement`, `humanizeColor`, `humanizeScale`, `placementWeight`, `HUMANIZE_PROFILES` |
 | `public/engine/audio-graph-utils.ts` | Leaf Web Audio graph helpers — imports nothing from the engine, so `synth-utils.ts` and `sample-voice.ts` can both use them without an import cycle. | `safeDisconnect`, `createSoftClipCurve`, `clampFreq` |
 | `public/engine/coordination-engine.ts` | Inter-instrument rhythmic yielding. | `createCoordinationContext` |
 | `public/engine/section-overrides.ts` | Per-section intensity + instrument-enabled override lookup. | `sectionAtStep`, `effectiveTargetIntensity`, `isInstrumentActiveAtStep` |

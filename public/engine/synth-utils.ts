@@ -1,7 +1,6 @@
 import type { AudioGraph, EnsembleState } from '../types.js';
 import { getMidi } from '../utils.js';
 import { safeDisconnect } from './audio-graph-utils.js';
-import { scrambleHash, stringHash31 } from './hash-utils.js';
 import { getPackZones } from './pack-runtime.js';
 import { foldToSampledCeiling, pickZone, type SampleZone } from './sample-voice.js';
 
@@ -366,92 +365,6 @@ export function playResonantTone(
         /* ignore audio errors */
         onEnded?.();
     }
-}
-
-// --- Shared seeded humanization (synth-audit Epic 0 S6) ---------------------
-//
-// Real players never repeat a note byte-identically: micro-timing, velocity
-// and pitch all wander a little. Before S6 the only humanization was a single
-// shared `Math.random()` timing jitter computed once per scheduler tick in
-// `scheduler-core.ts` and reused by the whole rhythm section — so every
-// instrument shifted in lockstep and repeated notes within a voice were
-// uniform. `humanizeNote` replaces that with independent, *seeded* per-note
-// draws so each instrument breathes on its own and looped playback / critique
-// tests still reproduce exactly.
-
-/**
- * Per-instrument humanization character. Each spread is the ± maximum at full
- * strength (the `groove.humanize` knob = 100); the caller passes
- * `groove.humanize / 100` as the `scale` argument to `humanizeNote`.
- */
-export interface HumanizeProfile {
-    /** ± timing deviation, in seconds. */
-    readonly timeSpread: number;
-    /** ± velocity deviation, as a fraction (0.08 = ±8%). */
-    readonly velSpread: number;
-    /** ± pitch detune, in cents. */
-    readonly detuneSpread: number;
-}
-
-/** One note's humanization offsets — three independent seeded draws. */
-export interface HumanizedNote {
-    /** Seconds to add to the scheduled start time. */
-    readonly timeOffset: number;
-    /** Factor to multiply the note velocity by (centered on 1.0). */
-    readonly velocityMult: number;
-    /** Cents to add to the note's detune. */
-    readonly detuneCents: number;
-}
-
-/**
- * Per-instrument feel profiles. A drummer plays tighter than a soloist, so the
- * spreads widen across `drums → bass → chords → harmonies → soloist`. Drums
- * carry no detune (the kit voices have no meaningful pitch in this sense).
- *
- * S6 wires `drums` as the first consumer; the soloist and bass profiles are
- * applied by Epics 3 and 5, chords/harmonies by Epics 2 and 1.
- */
-export const HUMANIZE_PROFILES: Record<string, HumanizeProfile> = {
-    drums: { timeSpread: 0.01, velSpread: 0.08, detuneSpread: 0 },
-    bass: { timeSpread: 0.014, velSpread: 0.1, detuneSpread: 3 },
-    chords: { timeSpread: 0.016, velSpread: 0.1, detuneSpread: 4 },
-    harmonies: { timeSpread: 0.018, velSpread: 0.1, detuneSpread: 5 },
-    soloist: { timeSpread: 0.022, velSpread: 0.12, detuneSpread: 7 },
-};
-
-/**
- * Compose a deterministic integer seed from a note's identity. Distinct
- * `(step, instrument, voiceIndex)` triples map to well-separated seeds, so
- * each instrument — and each voice within it — draws an independent stream.
- * `voiceIndex` is any integer discriminator (a chord-tone index, or a hashed
- * drum-piece name).
- */
-export const humanizeSeed = (step: number, instrument: string, voiceIndex: number): number =>
-    (Math.imul(step + 1, 0x9e3779b1) ^
-        stringHash31(instrument) ^
-        Math.imul(voiceIndex + 1, 0x85ebca77)) |
-    0;
-
-/**
- * Seeded per-note humanization. Returns three *independent* offsets — timing,
- * velocity, detune — drawn from `seed` via `scrambleHash`.
- *
- * `scale` (default 1) is the `groove.humanize / 100` knob: at 0 the result is
- * a no-op (`timeOffset` 0, `velocityMult` 1, `detuneCents` 0). Deterministic —
- * the same seed always yields the same offsets, so looped playback and
- * critique tests reproduce exactly.
- */
-export function humanizeNote(seed: number, profile: HumanizeProfile, scale = 1): HumanizedNote {
-    // Three independent draws off one seed: XOR with distinct constants so
-    // timing, velocity and detune don't move in lockstep.
-    const rTime = scrambleHash(seed);
-    const rVel = scrambleHash(seed ^ 0x9e3779b9);
-    const rDetune = scrambleHash(seed ^ 0x85ebca6b);
-    return {
-        timeOffset: (rTime - 0.5) * 2 * profile.timeSpread * scale,
-        velocityMult: 1 + (rVel - 0.5) * 2 * profile.velSpread * scale,
-        detuneCents: (rDetune - 0.5) * 2 * profile.detuneSpread * scale,
-    };
 }
 
 // --- Shared velocity → timbre mapping (synth-audit Epic 0 S7) ---------------
