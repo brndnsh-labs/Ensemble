@@ -1130,9 +1130,17 @@ export function calculateStepDuration(step: number, bpm: number, ts: any, groove
                 if (groove.swingSub === '16th') {
                     duration += step % 2 === 0 ? shift : -shift;
                 } else {
-                    // 8th note swing logic: Weighted 'Loping' distribution across 4 subdivisions
+                    // 8th note swing logic: the beat's two swung EIGHTH-note pulses are
+                    // subIndex {0,1} (the "1"+"e") and {2,3} (the "&"+"a"). #1067: each
+                    // pulse's own two 16ths must split evenly (w0===w1, w2===w3) so the
+                    // "e"/"a" sit at the true midpoint of their swung eighth — [1.5, 0.5,
+                    // -0.5, -1.5] gave a 3:1 internal split instead of 1:1, over-displacing
+                    // the inner 16th by an extra 50% and landing like a dotted-eighth +
+                    // sixteenth rather than a genuine shuffle. w0+w1 (=2) is what the OUTER
+                    // 2:1 pulse-to-pulse ratio depends on (swing-ratio-audit.test.ts), and
+                    // is unchanged by this fix — only the even split within each pulse is.
                     const subIndex = step % ts.stepsPerBeat;
-                    const weights = [1.5, 0.5, -0.5, -1.5];
+                    const weights = [1, 1, -1, -1];
                     duration += shift * weights[subIndex];
                 }
                 break;

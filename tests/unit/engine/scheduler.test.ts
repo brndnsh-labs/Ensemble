@@ -394,7 +394,10 @@ describe('Scheduler Core System', () => {
             scheduler(state);
 
             expect(state.playback.step).toBe(15);
-            expect(state.playback.nextNoteTime - 10.0).toBeCloseTo(0.1875);
+            // #1067: 8th-swing subIndex 0 ("1") weight is 1 (was 1.5 pre-fix), so at
+            // swing:100 duration is stepSec*(4/3) — see the mirrored assertion in
+            // midi-worker-deep.test.ts.
+            expect(state.playback.nextNoteTime - 10.0).toBeCloseTo(0.125 * (4 / 3), 10);
         });
     });
 
