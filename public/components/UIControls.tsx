@@ -112,15 +112,17 @@ interface SelectProps {
     onChange: (value: string) => void;
     options: SelectOption[];
     ariaLabel?: string;
+    disabled?: boolean;
 }
 
-export function Select({ id, value, onChange, options, ariaLabel }: SelectProps) {
+export function Select({ id, value, onChange, options, ariaLabel, disabled }: SelectProps) {
     return (
         <select
             id={id}
             value={value}
             onChange={(e) => onChange((e.target as HTMLSelectElement).value)}
             aria-label={ariaLabel || id}
+            disabled={disabled}
         >
             {options.map((opt) => (
                 <option key={opt.value} value={opt.value}>

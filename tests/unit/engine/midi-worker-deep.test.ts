@@ -107,7 +107,10 @@ describe('MIDI Worker Logic Deep Dive', () => {
         const durationAt = (step) => mixed.stepTimes[step + 1] - mixed.stepTimes[step];
 
         expect(durationAt(0)).toBeGreaterThan(0.125);
-        expect(durationAt(16)).toBeCloseTo(0.125);
+        // #1065: 7/8 (stepsPerBeat:2, not flagged isCompound) now swings — same
+        // alternating +/- shift as the stepsPerBeat:4 16th-swing branch, just one
+        // pair per beat. At swing:100 that's stepSec*(4/3) on the even (mStep 0) step.
+        expect(durationAt(16)).toBeCloseTo(0.125 * (4 / 3), 10);
         expect(durationAt(30)).toBeCloseTo(durationAt(0));
         expect(durationAt(46)).toBeCloseTo(durationAt(16));
     });

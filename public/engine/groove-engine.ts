@@ -1122,28 +1122,47 @@ export function calculateStepDuration(step: number, bpm: number, ts: any, groove
     let duration = stepSec;
 
     if (groove.swing > 0) {
-        if (ts.stepsPerBeat === 4) {
-            const shift = (stepSec / 3) * (groove.swing / 100);
-            if (groove.swingSub === '16th') {
-                duration += step % 2 === 0 ? shift : -shift;
-            } else {
-                // 8th note swing logic: Weighted 'Loping' distribution across 4 subdivisions
-                const subIndex = step % ts.stepsPerBeat;
-                const weights = [1.5, 0.5, -0.5, -1.5];
-                duration += shift * weights[subIndex];
+        // Exhaustive over the real TIME_SIGNATURES keyspace (config.ts): every meter is
+        // stepsPerBeat 4 (2/4, 3/4, 4/4, 5/4, 7/4) or 2 (6/8, 7/8, 12/8) — see #1065.
+        switch (ts.stepsPerBeat) {
+            case 4: {
+                const shift = (stepSec / 3) * (groove.swing / 100);
+                if (groove.swingSub === '16th') {
+                    duration += step % 2 === 0 ? shift : -shift;
+                } else {
+                    // 8th note swing logic: Weighted 'Loping' distribution across 4 subdivisions
+                    const subIndex = step % ts.stepsPerBeat;
+                    const weights = [1.5, 0.5, -0.5, -1.5];
+                    duration += shift * weights[subIndex];
+                }
+                break;
             }
-        } else if (ts.stepsPerBeat === 3) {
-            const shift = (stepSec / 3) * (groove.swing / 100);
-            duration +=
-                groove.swingSub === '16th'
-                    ? step % 2 === 0
-                        ? shift
-                        : -shift // 16th note swing over compound meters doesn't map exactly to '8th note' logic the same way
-                    : step % ts.stepsPerBeat === 0
-                      ? shift // on macro beat
-                      : step % ts.stepsPerBeat === 2
-                        ? -shift // 3rd triplet part
-                        : 0; // middle triplet stays same or slightly nudged based on deeper logic, simple offset for now
+            case 2: {
+                // 6/8, 7/8, and 12/8 all share stepsPerBeat:2 (one beat = two steps), but
+                // only 7/8 actually swings here. 6/8 and 12/8 are TRUE compound meters
+                // (`isCompound: true` in TIME_SIGNATURES) — their dotted-quarter pulse
+                // already IS the shuffle, so a second swing interpretation on top would
+                // double up on a feel the meter itself already notates. The Swing UI
+                // control is disabled for those two (InstrumentSettings.tsx
+                // GrooveControls) so this branch is a behavior-freeze, not just a
+                // formula choice. 7/8 is NOT flagged compound, so it gets real swing:
+                // the alternating +/- shift on this period-2 group is the same math as
+                // the stepsPerBeat===4 16th-swing branch above, just one pair per beat
+                // instead of two.
+                if (!ts.isCompound) {
+                    const shift = (stepSec / 3) * (groove.swing / 100);
+                    duration += step % 2 === 0 ? shift : -shift;
+                }
+                break;
+            }
+            default:
+                // Unreachable today — TIME_SIGNATURES only defines stepsPerBeat 4 or 2, and
+                // tests/standards/swing-ratio-audit.test.ts asserts that exhaustively over the
+                // live table, so adding a meter with a new stepsPerBeat value without a case
+                // here fails loudly at test time. At runtime (a shared per-step hot path) this
+                // defaults to straight/unswung rather than throwing mid-playback (#1065; see
+                // public/engine/CLAUDE.md's "prefer a safe default over a hot-path throw" rule).
+                break;
         }
     }
 
