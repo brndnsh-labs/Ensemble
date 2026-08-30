@@ -1,8 +1,8 @@
-function getAttribute(tag, name) {
+function getAttribute(tag: string, name: string): string | null {
     return tag.match(new RegExp(`(?:^|\\s)${name}\\s*=\\s*["']([^"']+)["']`, 'i'))?.[1] ?? null;
 }
 
-function toDistPath(reference) {
+function toDistPath(reference: string): string {
     if (!reference.startsWith('/') || reference.startsWith('//')) {
         throw new Error(`Initial JavaScript reference must be root-relative: ${reference}`);
     }
@@ -23,7 +23,7 @@ function toDistPath(reference) {
  * entry scripts first, then their modulepreload graph. Dynamic chunks are absent
  * from index.html and therefore deliberately excluded.
  */
-export function getInitialJavaScriptPaths(html) {
+export function getInitialJavaScriptPaths(html: string): string[] {
     if (typeof html !== 'string') {
         throw new TypeError('Built index HTML must be a string.');
     }

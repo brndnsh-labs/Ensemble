@@ -1,7 +1,7 @@
 {
     "extends": "./tsconfig.json",
     "compilerOptions": {
-        "types": ["vitest/globals", "chai"]
+        "types": ["vitest/globals", "chai", "node"]
     },
     "include": ["public/**/*.ts", "public/**/*.tsx", "env.d.ts", "tests/**/*.ts", "tests/**/*.tsx"],
     "exclude": ["node_modules", "dist"]
