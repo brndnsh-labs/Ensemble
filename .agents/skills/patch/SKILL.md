@@ -2,7 +2,7 @@
 name: patch
 description: Address /review findings on the uncommitted Ensemble diff. Reads the most-recent review output from context, triages (fix-now is the DEFAULT for any finding about this diff — P0/P1/bounded-P2; escalate to Brandon if it needs a decision or is too big), presents a fix plan, then patches inline — no agent spawn, the orchestrator already holds the diff + findings. Re-runs the gates after. Use after /review, before /done. Plan-first.
 ---
-<!-- cycle:rendered template=skills/patch.md.tmpl hash=7109b7d9c2de — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/patch.md.tmpl hash=631915fa0749 — managed by the-cycle; edit the template, not this file -->
 
 # /patch — address reviewer findings
 
@@ -15,9 +15,9 @@ stays in progress.
 
 ## Workflow
 
-1. **Load findings** from the most-recent `/review` output in context (severity, `file:line`,
-   verbatim quote, suggested direction). If not in context (new session), ask Brandon to
-   re-run `/review`.
+1. **Load findings** from the most-recent `/review` output in context (stable ID, severity,
+   `file:line`, verbatim quote, suggested direction). If not in context (new session), ask
+   Brandon to re-run `/review`.
 2. **Triage:**
 
    | Triage | Criteria | Action |
@@ -29,9 +29,9 @@ stays in progress.
    **Bias to fix now.** Deferring a real finding to a list is the thing we're eliminating — the
    open `finding` issues should trend to *empty* (§2). A fix that's genuinely too big to do
    in-cycle is an **escalation** (with Brandon's nod), not a silent defer.
-3. **Present the patch plan** (Fix-now / Escalate, each with
-   `file:line` + a fix sketch + any directly required companion file and why + the §4 gates) — a
-   status update, not a gate (§5).
+3. **Present the patch plan** (Fix-now / Escalate, each keyed
+   by finding ID with `file:line` + a fix sketch + any directly required companion file and why +
+   the §4 gates) — a status update, not a gate (§5).
 4. **Patch inline immediately** in the same turn, with Edit/Write — no "Apply?" wait, unless a
    finding needed escalation (§5). **No spawn**: the orchestrator's context already holds the diff
    and the findings; a subagent would re-derive both and get them subtly wrong. Add a `**Why:**`
@@ -44,12 +44,14 @@ stays in progress.
    npm run test:browser  # Vitest browser-mode audio guards (real OfflineAudioContext, headless Chromium)
    npm run test:e2e      # Playwright vs a `vite preview` build (Desktop Chrome, Mobile Chrome, Mobile Safari)
    ```
-   Re-spawn a specific reviewer if the patch landed in their lane. If a Fix-now patch fails a gate,
-   stop and surface — don't pile on.
-6. **Report:** a table of patches applied (finding → fix), any **escalated** findings, and gate
-   status. The default expectation is that real findings were *fixed*, not parked — call out
-   anything that wasn't, and why. Then suggest `/done` (if green) or `/review` again (if the
-   patches were substantive).
+   If a Fix-now patch fails a gate, stop and surface — don't pile on.
+6. **Report:** an outcome table with one row per original finding ID: `fixed`, `remaining`, or
+   `escalated`, the evidence for that outcome, and every file changed by the patch (including why
+   any companion file was required). Include gate status. The default expectation is that real
+   findings were *fixed*, not parked — call out anything that wasn't, and why.
+7. **Hand off to `/review` in finding-closure mode** whenever this patch changed the tree. `/patch`
+   never hands its own repair directly to `/done`; the closure pass independently checks the
+   original findings and direct patch delta (§5).
 
 ## Safety
 
@@ -59,11 +61,12 @@ stays in progress.
   plan before editing. This exception never permits opportunistic cleanup or new ideas.
 - Never silently downgrade a P0 to avoid escalation; if you think it's overblown, say so and let
   Brandon decide.
-- Don't run reviewers here — that's `/review`'s job.
+- Don't run reviewers inside `/patch` — the mandatory handoff to `/review` owns finding closure.
 
 ## Edge cases
 
-- **No findings:** report; suggest `/done` directly.
+- **No findings:** report; the existing clean `/review` can proceed to `/done` because no patch
+  changed the tree.
 - **All findings are P0 design calls:** patch none; surface the questions; recommend
   `/implement #<n>`.
 - **Findings conflict** (one says tighten, one says loosen the same threshold): present both; ask —

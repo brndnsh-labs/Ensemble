@@ -2,7 +2,7 @@
 name: review
 description: Review the current uncommitted Ensemble diff. Inspects git status + diff --stat to route reviewers — an inline correctness pass for any non-trivial change, plus `/security-review` whenever the diff touches an always-brake surface (Track `synth` and genuinely-subjective musical work (no critique-test oracle for the idiom, the Needs-ear stop), destructive data ops (drops/rewrites persisted sessions, share-URL schema, preset data, or a state-slice migration that breaks saved state), the state/worker contract (a `@direct-mutation` outside the sanctioned categories, a half-synced worker field)), and optionally a second-model angle on a meaty diff. Presents the reviewer plan before running. Does NOT change Status — review happens within status:in-progress. Use after /implement, before /done.
 ---
-<!-- cycle:rendered template=skills/review.md.tmpl hash=342ba215f104 — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/review.md.tmpl hash=a19dd12b9fd2 — managed by the-cycle; edit the template, not this file -->
 
 # /review — review the uncommitted tree
 
@@ -15,13 +15,21 @@ story stays `status:in-progress` through review and patch.
 
 ## Workflow
 
-1. **Check for a fast-path receipt** (§5). If `/implement`'s `## Verification receipt` is in
+1. **Choose the review mode.** Use the normal full review unless this invocation immediately
+   follows `/patch` and both the original consolidated findings and `/patch`'s outcome table are in
+   context. In that case use **finding-closure mode** below. Missing original context is not a
+   reason to guess: run the normal full review.
+2. **Check for a fast-path receipt** (§5). In normal mode, if `/implement`'s
+   `## Verification receipt` is in
    context, recompute its diff fingerprint over the same file list. A match (and every gate in it
    still PASS) means the issue read and the file list already stand proven — skip straight to step
-   2's routing with that instead of re-surveying. A stale fingerprint or no receipt: proceed
+   4's routing with that instead of re-surveying. A stale fingerprint or no receipt: proceed
    normally below, without comment.
-2. **Survey the diff.** `git status` + `git diff --stat`. If the diff is empty, say so and stop.
-3. **Route reviewers.** Rows are **additive** — union the reviewers and run each once.
+3. **Survey the diff.** `git status` + `git diff --stat`. In finding-closure mode, also identify the
+   direct patch delta and the files declared in `/patch`'s plan/report. If the diff is empty, say so
+   and stop.
+4. **Route reviewers.** In normal mode, rows are **additive** — union the reviewers and run each
+   once.
 
    | If the diff touches... | Run |
    | :- | :- |
@@ -126,28 +134,48 @@ story stays `status:in-progress` through review and patch.
    No specialized reviewer, no automatic gate rerun — this lens is deliberately light because §4's
    gates already proved the deterministic part.
 
-4. **Present the plan** (a status update, not a gate — §5):
+   ### Finding-closure mode
+
+   This is a narrow independent check, not `/patch` grading its own work and not an automatic second
+   full review:
+   - Re-read every original finding by its stable ID (`F1`, `F2`, …) and `/patch`'s claimed outcome.
+   - Verify each `fixed` claim against the current code and inspect the direct patch delta for a
+     nearby regression. Confirm each `escalated` claim has the explicit disposition §5 requires;
+     `remaining` is not clean.
+   - Re-run the specific specialized reviewer that originated a finding when its repair remains in
+     that reviewer's lane. The orchestrator performs the inline closure check for all other findings.
+   - A declared test, fixture, shared type, or generated companion that is directly required by the
+     finding remains eligible for targeted closure. An undeclared file, broader behavior change,
+     missing original context, or newly discovered finding ends targeted closure and triggers the
+     normal full review over the current diff.
+
+5. **Present the plan** (a status update, not a gate — §5):
 
    ```
    ## Review plan
+   **Mode:** normal full review | finding closure
    **Diff:** <N files, +<n>/-<m>>
    **Files:** <key files + scope>
    **Reviewers:** <those firing> — <why each>
    ```
 
-5. **Run them immediately** in the same turn — no "Run them?" wait.
-6. **Present consolidated findings,** each with severity (P0/P1/P2) + `file:line` + a **verbatim
-   quote** of the offending line, then a recommendation:
+6. **Run them immediately** in the same turn — no "Run them?" wait.
+7. **Present the result.** In normal mode, assign every actionable finding a stable in-context ID
+   (`F1`, `F2`, …) and include severity (P0/P1/P2) + `file:line` + a **verbatim quote** of the
+   offending line. In finding-closure mode, report every original ID as `fixed`, `remaining`, or
+   `escalated`, plus any new finding. Then give the matching recommendation:
 
    ```
    ### Recommendation
    - ✅ Clean → /done
-   - ⚠️ Mechanical findings → /patch, then /done
+   - ✅ Closure clean → /done
+   - ⚠️ Mechanical findings → /patch, then /review in finding-closure mode
    - ❌ Design-level findings → /implement #<n> with a fix-focused prompt
+   - 🔄 Closure scope expanded or found a new issue → normal full /review
    - 🛑 A finding contradicts a project memory note → memory wins by default; surface it
    ```
 
-7. **Suggest the next step** from the recommendation.
+8. **Suggest the next step** from the recommendation.
 
 ## Safety
 
@@ -162,6 +190,8 @@ story stays `status:in-progress` through review and patch.
 - **Empty diff:** report; suggest `/next`. Don't run reviewers.
 - **Fast-path receipt present but stale or missing a PASS** (§5): treat it as absent — survey and
   route normally, without flagging the mismatch as a finding.
+- **Finding-closure context is missing:** run the normal full review; never reconstruct IDs or
+  outcomes from memory.
 - **Diff mixes story work + unrelated drift:** flag the drift; ask whether to revert before
   reviewing.
 - **Finding contradicts a memory note** (an architecture rule, an invariant): the memory wins
