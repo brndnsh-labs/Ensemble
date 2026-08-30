@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { getInitialJavaScriptPaths } from './scripts/initial-js-assets.js';
+import { getInitialJavaScriptPaths } from './scripts/initial-js-assets.ts';
 
 const outputHtmlPath = 'dist/index.html';
 if (!existsSync(outputHtmlPath)) {
