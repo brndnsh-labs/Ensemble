@@ -13,8 +13,8 @@ export default defineConfig({
     forbidOnly: !!process.env.CI,
     /* Retry on CI only */
     retries: process.env.CI ? 2 : 0,
-    /* Opt out of parallel tests on CI. */
-    workers: process.env.CI ? 1 : undefined,
+    /* Two CI workers cut the measured suite nearly in half without sharing page state. */
+    workers: process.env.CI ? 2 : undefined,
     /* Reporter to use. See https://playwright.dev/docs/test-reporters
      * On CI the `html` reporter writes `playwright-report/` (uploaded as an
      * artifact in ci.yml) so a failed run is debuggable after the fact;
@@ -60,7 +60,7 @@ export default defineConfig({
                 },
             },
             // Don't run mobile-specific tests on desktop
-            grepInvert: /@mobile/,
+            grepInvert: /@mobile|@ipad/,
         },
         {
             name: 'Mobile Chrome',
