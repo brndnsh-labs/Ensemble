@@ -377,6 +377,8 @@ async function renderSceneReports({
                         initAudio,
                         loadDrumPreset,
                         scheduleGlobalEvent,
+                        calculateStepDuration,
+                        getEffectiveMeterAtStep,
                         generateNotesForStep,
                         generateSessionSeed,
                         generateSoloistAccents,
@@ -1215,7 +1217,36 @@ async function renderSceneReports({
                         const stepsPerLoop = state.arranger.totalSteps;
                         const loopCount = Math.max(1, loops || 1);
                         const totalRenderSteps = stepsPerLoop * loopCount;
-                        const renderSeconds = renderLeadIn + totalRenderSteps * sixteenth + 2;
+                        // Walk the swing-aware per-step durations up front via
+                        // `calculateStepDuration` — the same shared swing authority
+                        // production's live scheduler and MIDI exporter use — rather
+                        // than a fixed straight sixteenth-note grid multiple, so this
+                        // tool's evidence matches what a shuffle/swing chart actually
+                        // renders (#1063). `sixteenth` above stays the nominal
+                        // straight-grid unit for the analysis helpers below (schedule
+                        // step-indexing, per-loop RMS windows, event metadata), which
+                        // is unaffected by this fix.
+                        const swungStepDurations = new Array(totalRenderSteps);
+                        let totalSwungSeconds = 0;
+                        for (
+                            let absoluteStep = 0;
+                            absoluteStep < totalRenderSteps;
+                            absoluteStep++
+                        ) {
+                            const { stepInfo, ts } = getEffectiveMeterAtStep(
+                                state.arranger,
+                                absoluteStep,
+                            );
+                            const duration = calculateStepDuration(
+                                stepInfo.mStep,
+                                state.playback.bpm,
+                                ts,
+                                state.groove,
+                            );
+                            swungStepDurations[absoluteStep] = duration;
+                            totalSwungSeconds += duration;
+                        }
+                        const renderSeconds = renderLeadIn + totalSwungSeconds + 2;
                         const offlineCtx = new OfflineAudioContext(
                             2,
                             Math.ceil(renderSeconds * sampleRate),
@@ -1238,6 +1269,15 @@ async function renderSceneReports({
                                 lastActiveSoloistMidi: 0,
                                 lastActiveSoloistStep: 0,
                             };
+
+                            // Walk both clocks in parallel exactly as production's
+                            // `advanceGlobalStep` does for live playback: `swungTime`
+                            // accumulates the precomputed swing-aware durations,
+                            // `unswungTime` accumulates the plain 16th grid — so
+                            // `unswungNextNoteTime` stays genuinely unswung here too
+                            // (#1063).
+                            let swungTime = renderLeadIn;
+                            let unswungTime = renderLeadIn;
 
                             for (let loopIndex = 0; loopIndex < loopCount; loopIndex++) {
                                 const timelineStartStep = loopIndex * stepsPerLoop;
@@ -1293,10 +1333,12 @@ async function renderSceneReports({
                                 }
                                 for (let step = 0; step < stepsPerLoop; step++) {
                                     const absoluteStep = timelineStartStep + step;
-                                    const time = renderLeadIn + absoluteStep * sixteenth;
-                                    state.playback.nextNoteTime = time;
-                                    state.playback.unswungNextNoteTime = time;
-                                    scheduleGlobalEvent(state, absoluteStep, time);
+                                    state.playback.nextNoteTime = swungTime;
+                                    state.playback.unswungNextNoteTime = unswungTime;
+                                    scheduleGlobalEvent(state, absoluteStep, swungTime);
+
+                                    swungTime += swungStepDurations[absoluteStep];
+                                    unswungTime += sixteenth;
                                 }
                             }
 

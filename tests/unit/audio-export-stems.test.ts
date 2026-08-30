@@ -19,6 +19,8 @@
  * actual synthesis path is out of scope for a flag+non-silence contract test.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { calculateStepDuration } from '../../public/engine/groove-engine.js';
+import { getEffectiveMeterAtStep } from '../../public/meter.js';
 
 const initAudioMock = vi.fn();
 const scheduleGlobalEventMock = vi.fn();
@@ -412,5 +414,88 @@ describe('renderStemsToWav (#1018 stem export)', () => {
         });
         expect(resetSoloistStateMock).not.toHaveBeenCalled();
         expect(resetBassStateMock).not.toHaveBeenCalled();
+    });
+
+    // #1063 — the WAV/stems renderer used to compute a strictly straight 16th
+    // grid (`leadIn + absoluteStep * sixteenth`) and never called
+    // `calculateStepDuration`, so a shuffle/swing chart exported as straight
+    // eighths. `calculateStepDuration`/`getEffectiveMeterAtStep` are the real
+    // (unmocked) `groove-engine.ts`/`meter.ts` implementations here — the
+    // point is to prove the export path now walks the same shared swing
+    // authority the live scheduler and MIDI exporter use, not a re-derived
+    // parallel formula.
+    describe('WAV export swing timing (#1063)', () => {
+        it('keeps straight-grid step times unchanged when groove.swing is 0 (regression)', async () => {
+            const liveState = makeLiveState();
+            liveState.arranger.timeSignature = '4/4';
+            (liveState.groove as any).swing = 0;
+            (liveState.groove as any).swingSub = '16th';
+            vi.doMock('../../public/state.js', () => ({ getState: () => liveState }));
+            const { renderCurrentSessionToWav } = await import(
+                '../../public/export/audio-export.js'
+            );
+
+            const observedTimes: number[] = [];
+            scheduleGlobalEventMock.mockImplementation(
+                (_state: any, _step: number, time: number) => {
+                    observedTimes.push(time);
+                },
+            );
+
+            await renderCurrentSessionToWav();
+
+            const leadIn = 0.25;
+            const stepSec = 60 / liveState.playback.bpm / 4;
+            expect(observedTimes).toHaveLength(liveState.arranger.totalSteps);
+            observedTimes.forEach((time, step) => {
+                expect(time).toBeCloseTo(leadIn + step * stepSec, 10);
+            });
+        });
+
+        it('applies swing to step timing, matching calculateStepDuration exactly, and keeps unswungNextNoteTime genuinely unswung', async () => {
+            const liveState = makeLiveState();
+            liveState.arranger.timeSignature = '4/4';
+            (liveState.groove as any).swing = 100;
+            (liveState.groove as any).swingSub = '16th';
+            vi.doMock('../../public/state.js', () => ({ getState: () => liveState }));
+            const { renderCurrentSessionToWav } = await import(
+                '../../public/export/audio-export.js'
+            );
+
+            const observed: Array<{ time: number; unswung: number }> = [];
+            scheduleGlobalEventMock.mockImplementation(
+                (state: any, _step: number, time: number) => {
+                    observed.push({ time, unswung: state.playback.unswungNextNoteTime });
+                },
+            );
+
+            await renderCurrentSessionToWav();
+
+            const leadIn = 0.25;
+            const bpm = liveState.playback.bpm;
+            const stepSec = 60 / bpm / 4;
+            let expectedSwungTime = leadIn;
+            let expectedUnswungTime = leadIn;
+
+            expect(observed).toHaveLength(liveState.arranger.totalSteps);
+            for (let step = 0; step < liveState.arranger.totalSteps; step++) {
+                expect(observed[step].time).toBeCloseTo(expectedSwungTime, 10);
+                expect(observed[step].unswung).toBeCloseTo(expectedUnswungTime, 10);
+
+                // Cross-check against the real shared swing authority directly,
+                // per the #1063 acceptance criteria — step times must match what
+                // `calculateStepDuration` would produce for the live scheduler.
+                const { stepInfo, ts } = getEffectiveMeterAtStep(liveState.arranger, step);
+                const duration = calculateStepDuration(stepInfo.mStep, bpm, ts, liveState.groove);
+                expectedSwungTime += duration;
+                expectedUnswungTime += stepSec;
+            }
+
+            // Swing > 0 must make the swung and unswung clocks genuinely diverge
+            // — this is what keeps the soloist's `straightness` blend
+            // (scheduler-core.ts) from silently collapsing to a no-op on this
+            // export path.
+            expect(observed.some((o) => Math.abs(o.time - o.unswung) > 1e-9)).toBe(true);
+        });
     });
 });

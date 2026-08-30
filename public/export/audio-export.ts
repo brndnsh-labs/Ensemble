@@ -2,11 +2,14 @@ import { validateProgression } from '../engine/chords-engine.js';
 import type { CoordinationCarryover } from '../engine/coordination-engine.js';
 import { initAudio } from '../engine/engine.js';
 import { resetHiddenGenerationMemory } from '../engine/generation-run.js';
+import { calculateStepDuration } from '../engine/groove-engine.js';
 import { scheduleGlobalEvent } from '../engine/scheduler-core.js';
 import { generateNotesForStep } from '../engine/tick-logic.js';
 import { encodeWav } from '../engine/wav-encoder.js';
+import { getEffectiveMeterAtStep } from '../meter.js';
 import { getState } from '../state.js';
 import type { EnsembleState, Mutable } from '../types.js';
+import { secondsPerStepFor } from '../utils.js';
 import { cloneStateForDetachedGeneration } from './detached-generation-state.js';
 
 export interface AudioExportOptions {
@@ -160,14 +163,35 @@ async function renderClonedStateToWav(
     resetHiddenGenerationMemory(state);
     validateProgression(state);
 
-    const sixteenth = 60 / state.playback.bpm / 4;
     const leadIn = 0.25;
     const stepsPerLoop = state.arranger.totalSteps;
     if (stepsPerLoop <= 0) {
         throw new Error('Cannot export audio: arranger has no steps to render');
     }
     const totalSteps = stepsPerLoop * loops;
-    const renderSeconds = leadIn + totalSteps * sixteenth + 2;
+
+    // Walk the swing-aware per-step durations up front via `calculateStepDuration`
+    // — the single shared swing authority the live scheduler
+    // (`advanceGlobalStep` in scheduler-core.ts) and the MIDI exporter
+    // (`ExportProcessor` in midi-worker-logic.ts) both already use — rather
+    // than a fixed straight sixteenth-note grid multiple. #1063: a shuffle
+    // (`groove.swing: 100`) or jazz chart export must land on the same step
+    // times the user heard live, not straight eighths.
+    const stepSec = secondsPerStepFor(state.playback.bpm);
+    const swungStepDurations: number[] = new Array(totalSteps);
+    let totalSwungSeconds = 0;
+    for (let absoluteStep = 0; absoluteStep < totalSteps; absoluteStep++) {
+        const { stepInfo, ts } = getEffectiveMeterAtStep(state.arranger, absoluteStep);
+        const duration = calculateStepDuration(
+            stepInfo.mStep,
+            state.playback.bpm,
+            ts,
+            state.groove,
+        );
+        swungStepDurations[absoluteStep] = duration;
+        totalSwungSeconds += duration;
+    }
+    const renderSeconds = leadIn + totalSwungSeconds + 2;
     const frameCount = Math.ceil(renderSeconds * sampleRate);
 
     const offlineCtx = new OfflineAudioContext(2, frameCount, sampleRate);
@@ -186,6 +210,15 @@ async function renderClonedStateToWav(
         lastActiveSoloistStep: 0,
     };
 
+    // Walk both clocks in parallel exactly as `advanceGlobalStep` does for
+    // live playback: `swungTime` accumulates `calculateStepDuration` (the
+    // swing-aware grid), `unswungTime` accumulates the plain 16th grid. That
+    // keeps `unswungNextNoteTime` genuinely unswung on this path too, so the
+    // soloist's `straightness` blend (scheduler-core.ts) behaves the same as
+    // it does live instead of silently collapsing to a no-op (#1063).
+    let swungTime = leadIn;
+    let unswungTime = leadIn;
+
     for (let loopIndex = 0; loopIndex < loops; loopIndex++) {
         const timelineStartStep = loopIndex * stepsPerLoop;
         state.playback.currentLoopCount = loopIndex; // @direct-mutation — throwaway clone
@@ -193,13 +226,15 @@ async function renderClonedStateToWav(
 
         for (let step = 0; step < stepsPerLoop; step++) {
             const absoluteStep = timelineStartStep + step;
-            const time = leadIn + absoluteStep * sixteenth;
             // Throwaway cloned state, not the live deepSignal — no reactivity to
             // route through. Absolute steps match live/MIDI seed framing; buffers
             // are refilled per loop because the scheduler consumes each entry.
-            state.playback.nextNoteTime = time; // @direct-mutation
-            state.playback.unswungNextNoteTime = time; // @direct-mutation
-            scheduleGlobalEvent(state, absoluteStep, time);
+            state.playback.nextNoteTime = swungTime; // @direct-mutation
+            state.playback.unswungNextNoteTime = unswungTime; // @direct-mutation
+            scheduleGlobalEvent(state, absoluteStep, swungTime);
+
+            swungTime += swungStepDurations[absoluteStep];
+            unswungTime += stepSec;
         }
     }
 
