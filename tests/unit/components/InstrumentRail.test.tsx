@@ -128,6 +128,16 @@ describe('InstrumentRail — band settings surface (#1070)', () => {
         expect(humanize.getAttribute('aria-valuetext')).toBe('40%');
     });
 
+    it('exposes genre choices as a labeled toggle group', () => {
+        const surface = openBandSurface();
+        const grid = surface.querySelector('.workspace-studio-genre-grid');
+
+        expect(grid).not.toBeNull();
+        expect(grid.getAttribute('role')).toBe('group');
+        expect(grid.getAttribute('aria-label')).toBe('Genre');
+        expect(grid.querySelector('[aria-pressed]')).not.toBeNull();
+    });
+
     it('disables Swing in meters whose notation already carries the shuffle (#1065)', () => {
         mockState.current = baseState({ arranger: { timeSignature: '12/8' } });
         const surface = openBandSurface();

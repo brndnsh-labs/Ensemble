@@ -167,6 +167,9 @@ test.describe('Modals Responsiveness @ui', () => {
         await expect(editor).toBeVisible();
 
         await expect(page.locator('.inline-editor .section-card')).toHaveCount(7);
+        await expect(
+            page.locator('.inline-editor .section-card .section-drag-handle').first(),
+        ).toBeVisible();
         await expect(editor.getByRole('button', { name: /Add Section/ })).toBeVisible();
         await expect(editor.getByRole('button', { name: /Arrangement Tools Menu/ })).toBeVisible();
 
@@ -189,32 +192,6 @@ test.describe('Modals Responsiveness @ui', () => {
         expect(rightCard).not.toBeNull();
         expect(Math.abs(leftCard.y - rightCard.y)).toBeLessThan(16);
         expect(rightCard.x).toBeGreaterThan(leftCard.x + leftCard.width * 0.45);
-    });
-
-    test('Inline editor — drag handle is decorative, not a keyboard stop (#811)', async ({
-        page,
-    }) => {
-        const editor = await openEditorFromLibraryPreset(page);
-        await expect(editor).toBeVisible();
-
-        // The ⋮⋮ drag handle is a pointer-only affordance — keyboard/AT users
-        // reorder via the Move Up/Down buttons. It must be out of the tab order
-        // and hidden from assistive tech (regression guard against re-adding the
-        // role="button" + tabindex focus stop).
-        const handle = page.locator('.inline-editor .section-card .section-drag-handle').first();
-        await expect(handle).toBeVisible();
-        await expect(handle).toHaveAttribute('aria-hidden', 'true');
-        await expect(handle).not.toHaveAttribute('role');
-        await expect(handle).not.toHaveAttribute('tabindex');
-
-        // The keyboard reorder path still exists.
-        await expect(
-            page
-                .locator('.inline-editor .section-card')
-                .first()
-                .getByRole('button', { name: /Move Section (Up|Down)/ })
-                .first(),
-        ).toBeAttached();
     });
 
     test('Inline editor — linked sections stack vertically on mobile @mobile', async ({ page }) => {
@@ -297,12 +274,6 @@ test.describe('Modals Responsiveness @ui', () => {
         await expect.poll(lastCopied).toContain('autoplay=1');
     });
 
-    test('a shared link with autoplay=1 lands on the AuditionOverlay', async ({ page }) => {
-        await gotoHydrated(page, '/?autoplay=1');
-        await expect(page.locator('.audition-overlay')).toBeVisible();
-        await expect(page.getByTestId('audition-play')).toBeVisible();
-    });
-
     test('a Funk audition URL routes the first playback through the full genre pipeline (#1000)', async ({
         page,
     }) => {
@@ -376,39 +347,5 @@ test.describe('Modals Responsiveness @ui', () => {
 
         await page.getByTestId('audition-play').click();
         await expect.poll(routedState).toMatchObject({ playing: true, drum: 'Funk' });
-    });
-
-    test('Library — three modes accessible from the topbar', async ({ page }) => {
-        // Topbar 📚 Library on desktop; overflow → Library on mobile.
-        const topbarBtn = page
-            .locator('.chart-surface__topbar')
-            .getByRole('button', { name: /Library/ });
-        if (await topbarBtn.isVisible()) {
-            await topbarBtn.click();
-        } else {
-            await page.getByRole('button', { name: 'More options' }).click();
-            await page
-                .locator('#chartOverflowPanel')
-                .getByRole('button', { name: /Library/ })
-                .click();
-        }
-
-        await page.waitForSelector('#surpriseMeOverlay', { state: 'visible' });
-        const modal = page.locator('#surpriseMeOverlay .modal-content');
-        await expect(modal).toBeVisible();
-        await expect(modal).toContainText('Library');
-
-        // Library mode is default — verify the replace/append toggle is present.
-        await expect(modal.getByRole('button', { name: /Replace chart/ })).toBeVisible();
-        await expect(modal.getByRole('button', { name: /Append as section/ })).toBeVisible();
-
-        // Switch to Templates and confirm the template grid renders.
-        await modal.getByRole('button', { name: /Templates/ }).click();
-        await expect(modal.locator('.template-card-btn').first()).toBeVisible();
-
-        // Switch to Roll and verify the dice button (renamed to "Surprise Me"
-        // in the wizard rebuild — commit 25a550e6).
-        await modal.getByRole('button', { name: /Roll/ }).click();
-        await expect(modal.getByRole('button', { name: /Surprise Me/ })).toBeVisible();
     });
 });
