@@ -68,9 +68,10 @@ esac
 log() { [ "$QUIET" = false ] && echo "$@"; }
 
 # The live rev, read off the running site's asset filenames (the source of truth
-# for what's actually deployed). Empty if the site is unreachable.
+# for what's actually deployed). Returns nonzero if the site or revision is unavailable.
 live_rev() {
-    curl -fsS "${ORIGIN_URL}/?cb=$(date +%s)" 2>/dev/null |
+    local cache_nonce="$1"
+    curl -fsS "${ORIGIN_URL}/?cb=${cache_nonce}" 2>/dev/null |
         grep -oE 'index\.[0-9a-f]{7,}(-[0-9a-f]+)?\.js' | head -1 |
         sed -E 's/^index\.//; s/\.js$//'
 }
@@ -88,9 +89,9 @@ fi
 [ "$DRY_RUN" = true ] && log "🚧 DRY RUN: build only, no deploy."
 log "${ICON} Building for ${LABEL}..."
 
-LOG_LEVEL_FLAG=""
-[ "$QUIET" = true ] && LOG_LEVEL_FLAG="--logLevel warn"
-npx vite build --mode "$MODE" $LOG_LEVEL_FLAG
+LOG_LEVEL_ARGS=()
+[ "$QUIET" = true ] && LOG_LEVEL_ARGS=(--logLevel warn)
+npx vite build --mode "$MODE" "${LOG_LEVEL_ARGS[@]}"
 
 # The rev the build baked into the asset filenames — the exact identity of what
 # shipped, including the `-<sig>` suffix a dirty (test-only) build appends.
@@ -102,7 +103,8 @@ if [ "$QUIET" = false ]; then
     find dist -type f -not -name "*.map" -exec du -ch {} + | grep total$
 
     # Show what this deploy actually changes vs. what's live right now.
-    BEFORE_REV=$(live_rev || true)
+    BEFORE_CACHE_NONCE="before-$(date +%s)"
+    BEFORE_REV=$(live_rev "$BEFORE_CACHE_NONCE" || true)
     if [ -n "${BEFORE_REV:-}" ]; then
         echo "📦 Currently live on ${LABEL}: ${BEFORE_REV}"
         BEFORE_SHA="${BEFORE_REV%%-*}" # strip any dirty -<sig> suffix to a bare SHA
@@ -110,7 +112,8 @@ if [ "$QUIET" = false ]; then
             PENDING=$(git log --oneline "${BEFORE_SHA}..HEAD" 2>/dev/null || true)
             if [ -n "$PENDING" ]; then
                 echo "🆕 This deploy adds:"
-                echo "$PENDING" | sed 's/^/    /'
+                INDENTED_PENDING=${PENDING//$'\n'/$'\n    '}
+                echo "    $INDENTED_PENDING"
             else
                 echo "    (no new commits since the live build)"
             fi
@@ -128,15 +131,21 @@ fi
 
 log "🚚 Syncing to ${LABEL} (scoped 'claude' account)..."
 rsync -avz --delete -e ssh dist/ "${RSYNC_HOST}:/var/www/html/"
-rm -rf dist
 
 # Verify the running site now serves exactly what we built.
-AFTER_REV=$(live_rev || true)
+AFTER_CACHE_NONCE="after-$(date +%s)"
+AFTER_REV=""
+if ! AFTER_REV=$(live_rev "$AFTER_CACHE_NONCE"); then
+    echo "❌ Deployment verification failed: couldn't read a live revision from ${ORIGIN_URL}."
+    exit 1
+fi
 if [ -z "${AFTER_REV:-}" ]; then
-    log "✅ Deployment complete (couldn't reach ${ORIGIN_URL} to verify — check manually)."
+    echo "❌ Deployment verification failed: ${ORIGIN_URL} returned no live revision."
+    exit 1
 elif [ "$AFTER_REV" = "$BUILT_REV" ]; then
+    rm -rf dist
     log "✅ Verified live on ${LABEL}: ${AFTER_REV}"
 else
-    echo "⚠️  Live rev (${AFTER_REV}) != built rev (${BUILT_REV}) — rsync may not have landed, or an edge/browser cache is in front."
+    echo "❌ Deployment verification failed: live rev (${AFTER_REV}) != built rev (${BUILT_REV})."
     exit 1
 fi
