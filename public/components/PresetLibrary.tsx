@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'preact/hooks';
 import { appendSections, refreshArrangerUI } from '../controllers/arranger-controller.js';
 import { CHORD_PRESETS } from '../data/chord-presets.js';
 import type { Section } from '../state/arranger.js';
-import { decompressSections, generateId } from '../state/share-codec.js';
+import { decompressSections, generateId, tryDecompressSections } from '../state/share-codec.js';
 import { dispatch } from '../state.js';
 import { track } from '../telemetry.js';
 import { ACTIONS } from '../types.js';
@@ -55,6 +55,71 @@ interface LibraryEntry {
     isFavorite: boolean;
 }
 
+const PROTOTYPE_MEMBER_NAMES: ReadonlySet<string> = new Set(
+    Object.getOwnPropertyNames(Object.prototype),
+);
+
+function hasOptionalType(
+    record: Record<string, unknown>,
+    key: string,
+    type: 'boolean' | 'string',
+): boolean {
+    return record[key] === undefined || typeof record[key] === type;
+}
+
+function hasOptionalFiniteNumber(record: Record<string, unknown>, key: string): boolean {
+    const value = record[key];
+    return value === undefined || (typeof value === 'number' && Number.isFinite(value));
+}
+
+function hasValidOptionalRepeat(record: Record<string, unknown>): boolean {
+    const repeat = record.repeat;
+    return (
+        repeat === undefined ||
+        (typeof repeat === 'number' && Number.isInteger(repeat) && repeat >= 1 && repeat <= 64)
+    );
+}
+
+function isPresetSection(value: unknown): value is PresetSection {
+    if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+        return false;
+    }
+
+    const section = value as Record<string, unknown>;
+    const id = section.id;
+    const instruments = section.instruments;
+
+    return (
+        (id === undefined || (typeof id === 'string' && !!id && !PROTOTYPE_MEMBER_NAMES.has(id))) &&
+        ['label', 'value', 'key', 'timeSignature'].every((key) =>
+            hasOptionalType(section, key, 'string'),
+        ) &&
+        ['isMinor', 'seamless'].every((key) => hasOptionalType(section, key, 'boolean')) &&
+        hasValidOptionalRepeat(section) &&
+        ['keyShift', 'targetIntensity'].every((key) => hasOptionalFiniteNumber(section, key)) &&
+        (instruments === undefined ||
+            (instruments !== null &&
+                typeof instruments === 'object' &&
+                !Array.isArray(instruments) &&
+                Object.values(instruments).every((enabled) => typeof enabled === 'boolean')))
+    );
+}
+
+function isStoredUserPreset(candidate: unknown): candidate is LibraryPreset {
+    if (candidate === null || typeof candidate !== 'object' || Array.isArray(candidate)) {
+        return false;
+    }
+
+    const preset = candidate as Record<string, unknown>;
+    return (
+        typeof preset.name === 'string' &&
+        ((typeof preset.sections === 'string' && tryDecompressSections(preset.sections) !== null) ||
+            (Array.isArray(preset.sections) &&
+                preset.sections.length <= 500 &&
+                preset.sections.every(isPresetSection)))
+    );
+}
+
 function formatPresetCount(count: number): string {
     return `${count} preset${count === 1 ? '' : 's'}`;
 }
@@ -69,29 +134,26 @@ function buildPresetId(source: PresetSource, preset: LibraryPreset): string {
         : `user:${preset.name}`;
 }
 
-function loadStoredUserPresets(): LibraryPreset[] {
-    const stored = localStorage.getItem(USER_PRESETS_STORAGE_KEY);
-    if (!stored) {
-        return [];
-    }
-
+function readStoredUserPresetCandidates(): unknown[] | null {
     try {
-        const parsed = JSON.parse(stored);
-        if (!Array.isArray(parsed)) {
+        const stored = localStorage.getItem(USER_PRESETS_STORAGE_KEY);
+        if (!stored) {
             return [];
         }
 
-        return parsed.filter(
-            (candidate) =>
-                candidate &&
-                typeof candidate === 'object' &&
-                typeof candidate.name === 'string' &&
-                (typeof candidate.sections === 'string' || Array.isArray(candidate.sections)),
-        );
+        const parsed: unknown = JSON.parse(stored);
+        if (!Array.isArray(parsed)) {
+            return null;
+        }
+        return parsed;
     } catch (error) {
         console.warn('[PresetLibrary] Failed to parse stored user presets:', error);
-        return [];
+        return null;
     }
+}
+
+function loadStoredUserPresets(): LibraryPreset[] {
+    return (readStoredUserPresetCandidates() ?? []).filter(isStoredUserPreset);
 }
 
 function loadStoredStringArray(key: string): string[] {
@@ -566,12 +628,18 @@ export function PresetLibrary({ onSelect, mode = 'replace' }: PresetLibraryProps
             return;
         }
 
-        const updatedUserPresets = userPresets.filter(
-            (candidate) => buildPresetId('user', candidate) !== entry.id,
-        );
-
         try {
-            localStorage.setItem(USER_PRESETS_STORAGE_KEY, JSON.stringify(updatedUserPresets));
+            const storedCandidates = readStoredUserPresetCandidates();
+            if (!storedCandidates) {
+                throw new Error('Stored user presets are unreadable');
+            }
+            const updatedStoredCandidates = storedCandidates.filter(
+                (candidate) =>
+                    !isStoredUserPreset(candidate) || buildPresetId('user', candidate) !== entry.id,
+            );
+            const updatedUserPresets = updatedStoredCandidates.filter(isStoredUserPreset);
+
+            localStorage.setItem(USER_PRESETS_STORAGE_KEY, JSON.stringify(updatedStoredCandidates));
             const nextFavoriteIds = favoriteIds.filter((id) => id !== entry.id);
             const nextRecentIds = recentIds.filter((id) => id !== entry.id);
 
