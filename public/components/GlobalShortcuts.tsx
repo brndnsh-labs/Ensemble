@@ -12,10 +12,16 @@ export function GlobalShortcuts() {
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             const { playback } = getState();
-            const target = e.target as HTMLElement;
+            const target = e.target instanceof HTMLElement ? e.target : null;
             const isTyping =
-                ['INPUT', 'SELECT', 'TEXTAREA'].includes(target.tagName) ||
-                target.isContentEditable;
+                target !== null &&
+                (['INPUT', 'SELECT', 'TEXTAREA'].includes(target.tagName) ||
+                    target.isContentEditable);
+            const isInteractiveSpaceTarget =
+                e.target instanceof Element &&
+                e.target.closest(
+                    'button, input, select, textarea, a[href], area[href], [contenteditable]:not([contenteditable="false"]), [role="button"], [role="switch"], [role="slider"], [role="tab"]',
+                ) !== null;
 
             // Space: Toggle Play
             const anyModalOpen =
@@ -23,7 +29,7 @@ export function GlobalShortcuts() {
                 document.querySelector('.modal-overlay.closing') !== null ||
                 document.querySelector('.settings-overlay.closing') !== null;
 
-            if (e.key === ' ' && !isTyping && !anyModalOpen) {
+            if (e.key === ' ' && !isTyping && !isInteractiveSpaceTarget && !anyModalOpen) {
                 e.preventDefault();
                 dispatch(ACTIONS.TOGGLE_PLAY);
             }
