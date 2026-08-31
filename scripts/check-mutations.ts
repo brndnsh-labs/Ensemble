@@ -32,17 +32,22 @@ const aliasDeclRegex = new RegExp(
     String.raw`\b(?:const|let|var)\s+([a-zA-Z0-9_$]+)\s*(?::[^=]+)?=\s*\(?\s*(${SLICES})(\.[a-zA-Z0-9_]+)*\s+as\s+`,
 );
 
-const MARKER = /@direct-mutation|@worker-mutation/;
+const MARKER_SOURCE = '@(?:direct|worker)-mutation';
+const MARKER = new RegExp(MARKER_SOURCE);
+const STANDALONE_MARKER_COMMENT = new RegExp(
+    String.raw`^\s*(?://.*${MARKER_SOURCE}.*|/\*.*${MARKER_SOURCE}.*\*/|\*.*${MARKER_SOURCE}.*\*/)\s*$`,
+);
 // A marker trails the STATEMENT, not the line: multi-line writes such as
 //   (playback as Mutable<typeof playback>).currentLoopCount = Math.floor(
 //       globalStep / this.totalStepsOneLoop,
 //   ); // @worker-mutation
-// put the marker several lines below the `=`. Scan the previous line (the
-// comment-above form) plus forward to the end of the statement.
+// put the marker several lines below the `=`. Scan a standalone comment on the
+// previous line (the comment-above form) plus forward to the end of the statement.
+// A trailing marker on the preceding statement belongs only to that statement.
 const MAX_STATEMENT_LINES = 12;
 
 function isAnnotated(lines: string[], index: number): boolean {
-    if (MARKER.test(lines[index - 1] ?? '')) {
+    if (STANDALONE_MARKER_COMMENT.test(lines[index - 1] ?? '')) {
         return true;
     }
     for (let i = index; i < Math.min(lines.length, index + MAX_STATEMENT_LINES); i++) {
