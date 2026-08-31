@@ -1,15 +1,19 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { getScaleForChord } from '../../../public/engine/theory-scales.js';
 import { getState } from '../../../public/state.js';
+import type { Mutable } from '../../../public/types.js';
 
-const { arranger, soloist, groove } = getState();
+const state = getState();
+const arranger = state.arranger as Mutable<typeof state.arranger>;
+const soloistSession = state.soloist.session as Mutable<typeof state.soloist.session>;
+const groove = state.groove as Mutable<typeof state.groove>;
 
 describe('Dissonance Prevention', () => {
     beforeEach(() => {
         arranger.key = 'C';
         arranger.isMinor = false;
         groove.genreFeel = 'Rock';
-        soloist.session.tension = 0;
+        soloistSession.tension = 0;
     });
 
     it('should return Ionian/Lydian for F Major even if global key is C Minor (State Leak)', () => {

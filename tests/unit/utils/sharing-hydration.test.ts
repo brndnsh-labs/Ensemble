@@ -5,7 +5,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { dispatch, getState } from '../../../public/state.js';
 
-const { arranger, playback, groove, chords, bass, soloist, harmony } = getState();
+const state = getState();
+const arranger = state.arranger as Mutable<typeof state.arranger>;
+const playback = state.playback as Mutable<typeof state.playback>;
+const groove = state.groove as Mutable<typeof state.groove>;
+const chords = state.chords as Mutable<typeof state.chords>;
+const bass = state.bass as Mutable<typeof state.bass>;
+const soloist = state.soloist as Mutable<typeof state.soloist>;
+const harmony = state.harmony as Mutable<typeof state.harmony>;
 
 import { TIME_SIGNATURES } from '../../../public/config.js';
 import {
@@ -18,7 +25,7 @@ import { generateShareUrl, shareProgression } from '../../../public/export/shari
 import { MIXER_SETTINGS_VERSION } from '../../../public/state/instruments.js';
 import { encodeBase64Unicode } from '../../../public/state/share-codec.js';
 import { loadFromUrl, normalizeSwingSub } from '../../../public/state/state-hydration.js';
-import { ACTIONS } from '../../../public/types.js';
+import { ACTIONS, type Mutable } from '../../../public/types.js';
 
 vi.mock('../../../public/ui.js', () => ({
     ui: {
@@ -214,7 +221,6 @@ describe('Sharing & Hydration Round-trip', () => {
     });
 
     it('should hydrate high-fidelity band settings (volume, reverb) from bnd parameter', () => {
-        const { soloist, bass } = getState();
         // 1. Setup specific band state
         soloist.volume = 0.8;
         soloist.reverb = 0.7;
@@ -244,7 +250,6 @@ describe('Sharing & Hydration Round-trip', () => {
     });
 
     it('normalizes legacy soloist polyphonic mode to monophonic during URL hydration', () => {
-        const { soloist } = getState();
         const legacyBandState = {
             s: {
                 e: 1,
@@ -552,17 +557,20 @@ describe('band.c share round-trip — the same mismatch class (#1257)', () => {
     // through `clamp`, so `parseFloat('rich')` → NaN → the numeric default 0.5 landed
     // in a string field. `chords-styles.ts` compares `density === 'rich'` / `=== 'thin'`,
     // both then permanently false, collapsing a shared voicing choice to standard.
-    it.each(['rich', 'thin', 'standard'])('preserves chord density %s across a share', (d) => {
-        chords.density = d;
-        const url = roundTripUrl();
+    it.each(['rich', 'thin', 'standard'] as const)(
+        'preserves chord density %s across a share',
+        (d) => {
+            chords.density = d;
+            const url = roundTripUrl();
 
-        chords.density = d === 'standard' ? 'rich' : 'standard';
-        vi.stubGlobal('location', new URL(url));
-        loadFromUrl();
+            chords.density = d === 'standard' ? 'rich' : 'standard';
+            vi.stubGlobal('location', new URL(url));
+            loadFromUrl();
 
-        expect(chords.density).toBe(d);
-        expect(typeof chords.density).toBe('string');
-    });
+            expect(chords.density).toBe(d);
+            expect(typeof chords.density).toBe('string');
+        },
+    );
 
     // #1064 — the auto-conductor's runtime-derived mirrors (playback.conductorDensity /
     // playback.conductorHarmonyComplexity) must never leak into a share URL: only
@@ -779,7 +787,7 @@ describe('bnd payload keyspace guards (#1264)', () => {
         arranger.sections = [{ id: '1', label: 'Intro', value: 'I' }];
     });
 
-    const loadBnd = (payload) => {
+    const loadBnd = (payload: unknown) => {
         const bnd = encodeBase64Unicode(JSON.stringify(payload));
         vi.stubGlobal('location', new URL(`http://localhost/?bnd=${encodeURIComponent(bnd)}`));
         loadFromUrl();
@@ -877,7 +885,7 @@ describe('song seed: one bound, at the write side (#1266)', () => {
         expect(arranger.seed.startsWith('script')).toBe(true);
 
         // Non-strings coerce to the empty seed rather than into the PRNG.
-        dispatch(ACTIONS.SET_SONG_SEED, { evil: 1 });
+        dispatch(ACTIONS.SET_SONG_SEED, { evil: 1 } as unknown as string);
         expect(arranger.seed).toBe('');
     });
 

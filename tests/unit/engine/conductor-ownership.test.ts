@@ -16,7 +16,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { applyConductor, updateAutoConductor } from '../../../public/engine/conductor.js';
 import { dispatch, getState } from '../../../public/state.js';
-import { ACTIONS } from '../../../public/types.js';
+import { ACTIONS, type Mutable } from '../../../public/types.js';
 
 describe('#1064 — conductor never overwrites chords.density/harmony.complexity', () => {
     beforeEach(() => {
@@ -24,7 +24,11 @@ describe('#1064 — conductor never overwrites chords.density/harmony.complexity
     });
 
     it('leaves the user-authored density/complexity untouched across a full simulated ramp with autoIntensity on', () => {
-        const { playback, chords, harmony, conductor } = getState();
+        const state = getState();
+        const playback = state.playback as Mutable<typeof state.playback>;
+        const chords = state.chords as Mutable<typeof state.chords>;
+        const harmony = state.harmony as Mutable<typeof state.harmony>;
+        const conductor = state.conductor as Mutable<typeof state.conductor>;
         chords.density = 'rich';
         harmony.complexity = 0.2;
         playback.autoIntensity = true;
@@ -59,7 +63,9 @@ describe('#1064 — conductor never overwrites chords.density/harmony.complexity
     });
 
     it('still floors harmony complexity toward song-ending build via the runtime mirror only', () => {
-        const { playback, harmony } = getState();
+        const state = getState();
+        const playback = state.playback as Mutable<typeof state.playback>;
+        const harmony = state.harmony as Mutable<typeof state.harmony>;
         harmony.complexity = 0.1;
         playback.songMode = true;
         playback.isEndingPending = true;

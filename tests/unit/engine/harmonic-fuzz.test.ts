@@ -4,8 +4,13 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getState } from '../../../public/state.js';
+import type { Mutable } from '../../../public/types.js';
 
-const { arranger, chords, bass, groove } = getState();
+const state = getState();
+const arranger = state.arranger as Mutable<typeof state.arranger>;
+const chords = state.chords as Mutable<typeof state.chords>;
+const bass = state.bass as Mutable<typeof state.bass>;
+const groove = state.groove as Mutable<typeof state.groove>;
 
 import { getChordDetails, validateProgression } from '../../../public/engine/chords-engine.js';
 

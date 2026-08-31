@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { arranger, arrangerReducer } from '../../../public/state/arranger.js';
-import { ACTIONS } from '../../../public/types.js';
+import { ACTIONS, type Mutable } from '../../../public/types.js';
+
+const mutableArranger = arranger as Mutable<typeof arranger>;
 
 describe('Arranger Reducer', () => {
     beforeEach(() => {
@@ -8,8 +10,8 @@ describe('Arranger Reducer', () => {
     });
 
     it('should reset to default values', () => {
-        arranger.key = 'Eb';
-        arranger.notation = 'name';
+        mutableArranger.key = 'Eb';
+        mutableArranger.notation = 'name';
         arrangerReducer({ type: ACTIONS.RESET_STATE, payload: undefined });
         expect(arranger.key).toBe('C');
         expect(arranger.notation).toBe('roman');
@@ -31,18 +33,18 @@ describe('Arranger Reducer', () => {
     });
 
     it('clears authored grouping whenever an action changes the meter', () => {
-        arranger.grouping = [2, 3];
+        mutableArranger.grouping = [2, 3];
         arrangerReducer({ type: ACTIONS.SET_TIME_SIGNATURE, payload: '7/8' });
         expect(arranger.grouping).toBeNull();
 
-        arranger.grouping = [2, 2, 3];
+        mutableArranger.grouping = [2, 2, 3];
         arrangerReducer({
             type: ACTIONS.LOAD_TEMPLATE,
             payload: { sections: [], timeSignature: '5/4' },
         });
         expect(arranger.grouping).toBeNull();
 
-        arranger.grouping = [3, 2];
+        mutableArranger.grouping = [3, 2];
         arrangerReducer({
             type: ACTIONS.SET_PARAM,
             payload: { module: 'arranger', param: 'timeSignature', value: '4/4' },
@@ -51,8 +53,8 @@ describe('Arranger Reducer', () => {
     });
 
     it('preserves authored grouping when a meter action is a no-op', () => {
-        arranger.timeSignature = '5/4';
-        arranger.grouping = [2, 3];
+        mutableArranger.timeSignature = '5/4';
+        mutableArranger.grouping = [2, 3];
 
         arrangerReducer({ type: ACTIONS.SET_TIME_SIGNATURE, payload: '5/4' });
         expect(arranger.grouping).toEqual([2, 3]);

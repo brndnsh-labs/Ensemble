@@ -2,8 +2,10 @@
 import { describe, expect, it } from 'vitest';
 import { normalizeMidiVelocity } from '../../../public/engine/midi-utils.js';
 import { getState } from '../../../public/state.js';
+import type { Mutable } from '../../../public/types.js';
 
-const { midi } = getState();
+const state = getState();
+const midi = state.midi as Mutable<typeof state.midi>;
 
 describe('MIDI Velocity Mapping', () => {
     it('should boost low velocities significantly', () => {

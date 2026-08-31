@@ -31,20 +31,20 @@ vi.mock('../../public/state.js', () => {
             lastInterval: null,
             profile: 'srv',
         },
+        // Phrase-first performs a seeded theme (it rests without one); give it a small
+        // theme over the 16-step loop so the soloist lane stays active in the
+        // cross-lane coordination scan (epic #10 — mirrors production's synced seed).
+        sessionSeed: {
+            loopLengthSteps: 16,
+            notes: [
+                { step: 0, midi: 67, durationSteps: 2, velocity: 0.8 },
+                { step: 4, midi: 71, durationSteps: 2, velocity: 0.8 },
+                { step: 8, midi: 67, durationSteps: 2, velocity: 0.8 },
+                { step: 12, midi: 64, durationSteps: 2, velocity: 0.8 },
+            ],
+        },
+        isResting: false,
     });
-    // Phrase-first performs a seeded theme (it rests without one); give it a small
-    // theme over the 16-step loop so the soloist lane stays active in the
-    // cross-lane coordination scan (epic #10 — mirrors production's synced seed).
-    mockSoloist.session.seed = {
-        loopLengthSteps: 16,
-        notes: [
-            { step: 0, midi: 67, durationSteps: 2, velocity: 0.8 },
-            { step: 4, midi: 71, durationSteps: 2, velocity: 0.8 },
-            { step: 8, midi: 67, durationSteps: 2, velocity: 0.8 },
-            { step: 12, midi: 64, durationSteps: 2, velocity: 0.8 },
-        ],
-    };
-    mockSoloist.session.phrasing.isResting = false;
     const mockBass = { enabled: true, lastFreq: 110 };
     const mockChords = { enabled: true, rhythmicMask: 0, style: 'smart' };
     const mockHarmony = { enabled: true, rhythmicMask: 0 };
@@ -73,10 +73,15 @@ import { getHarmonyNotes } from '../../public/engine/harmonies.js';
 // THE live soloist engine (epic #10 — legacy getSoloistNote retired).
 import { getSoloistNotePhraseFirst as getSoloistNote } from '../../public/engine/soloist-phrase-first.js';
 import { getState } from '../../public/state.js';
+import type { Mutable } from '../../public/types.js';
+
+type MutableArranger = Mutable<ReturnType<typeof getState>['arranger']>;
+type MutableChords = Mutable<ReturnType<typeof getState>['chords']>;
 
 describe('Arrangement Integrity & Clutter Audit', () => {
     it('should measure rhythmic density and collisions across 100 steps', () => {
         const state = getState();
+        const arranger = state.arranger as MutableArranger;
         const steps = 100;
         const collisions: any[] = [];
         let totalHits = 0;
@@ -89,7 +94,7 @@ describe('Arrangement Integrity & Clutter Audit', () => {
             quality: 'maj7',
             beats: 4,
         } as any;
-        state.arranger.progression = [chord];
+        arranger.progression = [chord];
 
         for (let s = 0; s < steps; s++) {
             const hitsAtStep: any[] = [];
@@ -215,6 +220,8 @@ describe('Arrangement Integrity & Clutter Audit', () => {
 
     it('should verify that Accompaniment explicitly yields to Soloist active signal', () => {
         const state = getState();
+        const arranger = state.arranger as MutableArranger;
+        const chords = state.chords as MutableChords;
         const steps = 100;
         const chord = {
             rootMidi: 60,
@@ -223,8 +230,8 @@ describe('Arrangement Integrity & Clutter Audit', () => {
             quality: 'maj7',
             beats: 4,
         } as any;
-        state.arranger.progression = [chord];
-        state.chords.style = 'smart';
+        arranger.progression = [chord];
+        chords.style = 'smart';
 
         let hitsQuiet = 0;
         let hitsBusy = 0;
