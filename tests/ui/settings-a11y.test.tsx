@@ -24,6 +24,7 @@ vi.mock('../../public/engine/engine.js', () => ({
     restoreGains: vi.fn(),
 }));
 vi.mock('../../public/pwa.js', () => ({
+    syncInstallButtonVisibility: vi.fn(),
     triggerInstall: vi.fn(),
 }));
 

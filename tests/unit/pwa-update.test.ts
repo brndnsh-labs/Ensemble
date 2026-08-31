@@ -59,13 +59,32 @@ vi.mock('workbox-window', () => {
     return { Workbox: MockWorkbox };
 });
 
-import { initPWA, skipWaiting } from '../../public/pwa.js';
+import {
+    initPWA,
+    skipWaiting,
+    syncInstallButtonVisibility,
+    triggerInstall,
+} from '../../public/pwa.js';
 import { ACTIONS } from '../../public/types.js';
+
+interface MockBeforeInstallPromptEvent extends Event {
+    prompt: ReturnType<typeof vi.fn>;
+    userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
+}
+
+function createInstallPromptEvent(outcome: 'accepted' | 'dismissed'): MockBeforeInstallPromptEvent {
+    const event = new Event('beforeinstallprompt') as MockBeforeInstallPromptEvent;
+    const choice = { outcome, platform: 'web' };
+    event.prompt = vi.fn(() => Promise.resolve(choice));
+    event.userChoice = Promise.resolve(choice);
+    return event;
+}
 
 describe('initPWA — workbox-window wiring', () => {
     beforeEach(() => {
         dispatchMock.mockClear();
         instances.length = 0;
+        document.body.innerHTML = '<button id="installAppBtn" style="display: none"></button>';
         Object.defineProperty(window, 'location', {
             writable: true,
             configurable: true,
@@ -112,5 +131,78 @@ describe('initPWA — workbox-window wiring', () => {
         skipWaiting();
 
         expect(wb.messageSkipWaiting).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([
+        ['accepted', true],
+        ['dismissed', false],
+    ] as const)(
+        'consumes an %s install prompt, hides the button, and rejects reuse',
+        async (outcome, expectedResult) => {
+            initPWA();
+            const installButton = document.getElementById('installAppBtn');
+            const promptEvent = createInstallPromptEvent(outcome);
+
+            window.dispatchEvent(promptEvent);
+            expect(installButton?.style.display).toBe('flex');
+
+            await expect(triggerInstall()).resolves.toBe(expectedResult);
+            expect(promptEvent.prompt).toHaveBeenCalledTimes(1);
+            expect(installButton?.style.display).toBe('none');
+
+            await expect(triggerInstall()).resolves.toBe(false);
+            expect(promptEvent.prompt).toHaveBeenCalledTimes(1);
+        },
+    );
+
+    it('rejects a second call while the first prompt choice is still pending', async () => {
+        initPWA();
+        let resolveChoice:
+            | ((choice: { outcome: 'accepted'; platform: string }) => void)
+            | undefined;
+        const promptEvent = createInstallPromptEvent('accepted');
+        promptEvent.prompt = vi.fn(
+            () =>
+                new Promise((resolve) => {
+                    resolveChoice = resolve;
+                }),
+        );
+
+        window.dispatchEvent(promptEvent);
+        const firstInstall = triggerInstall();
+
+        await expect(triggerInstall()).resolves.toBe(false);
+        expect(promptEvent.prompt).toHaveBeenCalledTimes(1);
+
+        resolveChoice?.({ outcome: 'accepted', platform: 'web' });
+        await expect(firstInstall).resolves.toBe(true);
+    });
+
+    it('shows a prompt captured before the install button mounts', () => {
+        initPWA();
+        document.body.innerHTML = '';
+        window.dispatchEvent(createInstallPromptEvent('accepted'));
+
+        document.body.innerHTML = '<button id="installAppBtn" style="display: none"></button>';
+        syncInstallButtonVisibility();
+
+        expect(document.getElementById('installAppBtn')?.style.display).toBe('flex');
+    });
+
+    it('re-enables installation when a later beforeinstallprompt event arrives', async () => {
+        initPWA();
+        const installButton = document.getElementById('installAppBtn');
+        const dismissedPrompt = createInstallPromptEvent('dismissed');
+        const laterPrompt = createInstallPromptEvent('accepted');
+
+        window.dispatchEvent(dismissedPrompt);
+        await expect(triggerInstall()).resolves.toBe(false);
+        expect(installButton?.style.display).toBe('none');
+
+        window.dispatchEvent(laterPrompt);
+        expect(installButton?.style.display).toBe('flex');
+        await expect(triggerInstall()).resolves.toBe(true);
+        expect(laterPrompt.prompt).toHaveBeenCalledTimes(1);
+        expect(installButton?.style.display).toBe('none');
     });
 });

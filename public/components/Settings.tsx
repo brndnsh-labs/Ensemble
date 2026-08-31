@@ -1,8 +1,8 @@
-import { useRef, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { APP_VERSION, BUILD_REV, KOFI_URL } from '../config.js';
 import { dispatchMidiInputConfig, initMIDI, panic } from '../controllers/midi-controller.js';
 import { getEffectiveLoopLimit } from '../engine/arc.js';
-import { triggerInstall } from '../pwa.js';
+import { syncInstallButtonVisibility, triggerInstall } from '../pwa.js';
 import { dispatch, getState } from '../state.js';
 import { ACTIONS } from '../types.js';
 import { useEnsembleState } from '../ui-bridge.js';
@@ -120,12 +120,7 @@ export function Settings() {
     };
 
     const handleInstall = async () => {
-        if (await triggerInstall()) {
-            const btn = document.getElementById('installAppBtn') as HTMLElement | null;
-            if (btn) {
-                btn.style.display = 'none';
-            }
-        }
+        await triggerInstall();
     };
 
     const [showConfirmReset, setShowConfirmReset] = useState(false);
@@ -169,6 +164,9 @@ export function Settings() {
     const overlayRef = useRef<HTMLDivElement | null>(null);
 
     useModalA11y(overlayRef, isOpen, closeSettings, 'Settings');
+    useEffect(() => {
+        syncInstallButtonVisibility();
+    }, []);
 
     return (
         <div
