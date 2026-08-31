@@ -2,26 +2,40 @@ import { Workbox } from 'workbox-window';
 import { dispatch } from './state.js';
 import { ACTIONS } from './types.js';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let deferredPrompt: any;
+interface InstallPromptChoice {
+    outcome: 'accepted' | 'dismissed';
+    platform: string;
+}
+
+interface BeforeInstallPromptEvent extends Event {
+    prompt(): Promise<InstallPromptChoice>;
+    userChoice: Promise<InstallPromptChoice>;
+}
+
+let deferredPrompt: BeforeInstallPromptEvent | null = null;
 let wb: Workbox | null = null;
+
+function setInstallButtonVisible(visible: boolean): void {
+    const installBtn = document.getElementById('installAppBtn');
+    if (installBtn) {
+        installBtn.style.display = visible ? 'flex' : 'none';
+    }
+}
+
+export function syncInstallButtonVisibility(): void {
+    setInstallButtonVisible(deferredPrompt !== null);
+}
 
 export function initPWA(): void {
     window.addEventListener('beforeinstallprompt', (e) => {
         e.preventDefault();
-        deferredPrompt = e;
-        const installBtn = document.getElementById('installAppBtn');
-        if (installBtn) {
-            installBtn.style.display = 'flex';
-        }
+        deferredPrompt = e as BeforeInstallPromptEvent;
+        setInstallButtonVisible(true);
     });
 
     window.addEventListener('appinstalled', () => {
         deferredPrompt = null;
-        const installBtn = document.getElementById('installAppBtn');
-        if (installBtn) {
-            installBtn.style.display = 'none';
-        }
+        setInstallButtonVisible(false);
         dispatch(ACTIONS.SHOW_TOAST, 'App installed successfully!');
     });
 
@@ -84,11 +98,16 @@ export function skipWaiting(): void {
 }
 
 export async function triggerInstall(): Promise<boolean> {
-    if (deferredPrompt) {
-        deferredPrompt.prompt();
-        const { outcome } = await deferredPrompt.userChoice;
-        deferredPrompt = null;
-        return outcome === 'accepted';
+    const promptEvent = deferredPrompt;
+    if (!promptEvent) {
+        return false;
     }
-    return false;
+
+    // The browser prompt is one-shot. Consume our reference before waiting for
+    // the user's choice so a second click cannot try to reuse it, while a later
+    // real `beforeinstallprompt` event can install a fresh prompt immediately.
+    deferredPrompt = null;
+    setInstallButtonVisible(false);
+    const { outcome } = await promptEvent.prompt();
+    return outcome === 'accepted';
 }
