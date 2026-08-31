@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { playback, playbackReducer } from '../../../public/state/playback.js';
-import { ACTIONS } from '../../../public/types.js';
+import { ACTIONS, type Mutable } from '../../../public/types.js';
+
+const mutablePlayback = playback as Mutable<typeof playback>;
 
 describe('Playback Reducer', () => {
     beforeEach(() => {
@@ -9,8 +11,8 @@ describe('Playback Reducer', () => {
     });
 
     it('should reset to default values', () => {
-        playback.bpm = 150;
-        playback.bandIntensity = 0.8;
+        mutablePlayback.bpm = 150;
+        mutablePlayback.bandIntensity = 0.8;
         playbackReducer({ type: ACTIONS.RESET_STATE, payload: undefined });
         expect(playback.bpm).toBe(100);
         expect(playback.bandIntensity).toBe(0.35);
@@ -116,11 +118,11 @@ describe('Playback Reducer', () => {
         // them per-test — otherwise a prior test's live `isPlaying` flips a
         // TOGGLE_PLAY "start" into a "stop".
         beforeEach(() => {
-            playback.isPlaying = false;
-            playback.loopStartStep = -1;
-            playback.loopEndStep = -1;
-            playback.rampBpm = false;
-            playback.rampBpmTarget = 0;
+            mutablePlayback.isPlaying = false;
+            mutablePlayback.loopStartStep = -1;
+            mutablePlayback.loopEndStep = -1;
+            mutablePlayback.rampBpm = false;
+            mutablePlayback.rampBpmTarget = 0;
         });
 
         it('merges provided fields and clamps to drill bounds', () => {
@@ -156,7 +158,7 @@ describe('Playback Reducer', () => {
         });
 
         it('captures the goal and drops to the start speed at play-start', () => {
-            playback.bpm = 120;
+            mutablePlayback.bpm = 120;
             playbackReducer({ type: ACTIONS.SET_PRACTICE_LOOP, payload: { start: 32, end: 64 } });
             playbackReducer({
                 type: ACTIONS.SET_PRACTICE_RAMP,
@@ -168,7 +170,7 @@ describe('Playback Reducer', () => {
         });
 
         it('does not touch tempo at play-start when unarmed or without a loop', () => {
-            playback.bpm = 120;
+            mutablePlayback.bpm = 120;
             // armed but NO loop → no capture, tempo untouched
             playbackReducer({ type: ACTIONS.SET_PRACTICE_LOOP, payload: null });
             playbackReducer({ type: ACTIONS.SET_PRACTICE_RAMP, payload: { enabled: true } });
@@ -179,14 +181,14 @@ describe('Playback Reducer', () => {
         });
 
         it('restores the goal tempo and disarms on stop (never stranded slow)', () => {
-            playback.bpm = 120;
+            mutablePlayback.bpm = 120;
             playbackReducer({ type: ACTIONS.SET_PRACTICE_LOOP, payload: { start: 32, end: 64 } });
             playbackReducer({
                 type: ACTIONS.SET_PRACTICE_RAMP,
                 payload: { enabled: true, startPct: 0.5 },
             });
             playbackReducer({ type: ACTIONS.TOGGLE_PLAY, payload: undefined }); // START → 60
-            playback.bpm = 92; // simulate climbing partway
+            mutablePlayback.bpm = 92; // simulate climbing partway
             playbackReducer({ type: ACTIONS.TOGGLE_PLAY, payload: undefined }); // STOP
             expect(playback.bpm).toBe(120); // restored to goal, not left at 92
             expect(playback.rampBpm).toBe(false);
@@ -194,14 +196,14 @@ describe('Playback Reducer', () => {
         });
 
         it('restores the goal tempo when the loop is cleared mid-drill', () => {
-            playback.bpm = 100;
+            mutablePlayback.bpm = 100;
             playbackReducer({ type: ACTIONS.SET_PRACTICE_LOOP, payload: { start: 32, end: 64 } });
             playbackReducer({
                 type: ACTIONS.SET_PRACTICE_RAMP,
                 payload: { enabled: true, startPct: 0.6 },
             });
             playbackReducer({ type: ACTIONS.TOGGLE_PLAY, payload: undefined }); // START → 60
-            playback.bpm = 78;
+            mutablePlayback.bpm = 78;
             playbackReducer({ type: ACTIONS.SET_PRACTICE_LOOP, payload: null }); // clear loop
             expect(playback.bpm).toBe(100);
             expect(playback.rampBpm).toBe(false);
@@ -229,7 +231,7 @@ describe('Playback Reducer', () => {
         const invalidResult = playbackReducer({
             type: ACTIONS.SET_MODAL_OPEN,
             payload: { modal: 'invalid_modal', open: true },
-        });
+        } as unknown as Parameters<typeof playbackReducer>[0]);
         expect(invalidResult).toBe(false);
     });
 
@@ -249,7 +251,7 @@ describe('Playback Reducer', () => {
     });
 
     it('should handle emergency lookahead doubling', () => {
-        playback.scheduleAheadTime = 0.2;
+        mutablePlayback.scheduleAheadTime = 0.2;
         playbackReducer({ type: ACTIONS.TRIGGER_EMERGENCY_LOOKAHEAD, payload: undefined });
         expect(playback.scheduleAheadTime).toBe(0.4);
 
@@ -270,7 +272,7 @@ describe('Playback Reducer', () => {
         expect(playback.toasts.length).toBe(1);
         expect(playback.toasts[0].message).toBe('Hello World');
 
-        playbackReducer({ type: ACTIONS.TOAST_EXPIRED, payload: 'test-id' as any });
+        playbackReducer({ type: ACTIONS.TOAST_EXPIRED, payload: 'test-id' });
         expect(playback.toasts.length).toBe(0);
     });
 

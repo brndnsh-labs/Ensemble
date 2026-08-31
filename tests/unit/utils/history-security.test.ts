@@ -4,8 +4,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { undo } from '../../../public/state/history.js';
 import { getState } from '../../../public/state.js';
+import type { Mutable } from '../../../public/types.js';
 
-const { arranger } = getState();
+const arranger = getState().arranger as Mutable<ReturnType<typeof getState>['arranger']>;
 
 // Mock dependencies
 vi.mock('../../../public/ui.js', () => ({

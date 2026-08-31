@@ -6,7 +6,12 @@ import {
     instrumentReducer,
     soloist,
 } from '../../../public/state/instruments.js';
-import { ACTIONS } from '../../../public/types.js';
+import { ACTIONS, type Mutable } from '../../../public/types.js';
+
+const mutableChords = chords as Mutable<typeof chords>;
+const mutableHarmony = harmony as Mutable<typeof harmony>;
+const mutableSoloist = soloist as Mutable<typeof soloist>;
+const mutableSoloistSession = soloist.session as Mutable<typeof soloist.session>;
 
 describe('Instrument Reducer', () => {
     beforeEach(() => {
@@ -14,8 +19,8 @@ describe('Instrument Reducer', () => {
     });
 
     it('should reset all instruments to default values', () => {
-        soloist.enabled = true;
-        soloist.volume = 0.9;
+        mutableSoloist.enabled = true;
+        mutableSoloist.volume = 0.9;
         instrumentReducer({ type: ACTIONS.RESET_STATE, payload: undefined });
         expect(soloist.enabled).toBe(false);
         expect(soloist.volume).toBe(1.0);
@@ -68,7 +73,7 @@ describe('Instrument Reducer', () => {
         });
 
         it('keeps Auto on when auto:true (genre auto-follow)', () => {
-            harmony.autoSound = false;
+            mutableHarmony.autoSound = false;
             instrumentReducer({
                 type: ACTIONS.SET_INSTRUMENT_VOICE,
                 payload: { module: 'harmony', voice: 'pack:horns-section', auto: true },
@@ -78,7 +83,7 @@ describe('Instrument Reducer', () => {
         });
 
         it('leaves the mode untouched when auto is omitted (bare voice reset)', () => {
-            harmony.autoSound = true;
+            mutableHarmony.autoSound = true;
             instrumentReducer({
                 type: ACTIONS.SET_INSTRUMENT_VOICE,
                 payload: { module: 'harmony', voice: 'synth' },
@@ -88,7 +93,7 @@ describe('Instrument Reducer', () => {
         });
 
         it('defaults autoSound to true on reset', () => {
-            harmony.autoSound = false;
+            mutableHarmony.autoSound = false;
             instrumentReducer({ type: ACTIONS.RESET_STATE, payload: undefined });
             expect(harmony.autoSound).toBe(true);
             expect(bass.autoSound).toBe(true);
@@ -98,7 +103,7 @@ describe('Instrument Reducer', () => {
     });
 
     it('should handle session resets', () => {
-        soloist.session.sessionSteps = 100;
+        mutableSoloistSession.sessionSteps = 100;
         instrumentReducer({ type: ACTIONS.RESET_SESSION, payload: undefined });
         expect(soloist.session.sessionSteps).toBe(0);
     });
@@ -107,7 +112,7 @@ describe('Instrument Reducer', () => {
         // The conductor's computed density now lands only on the runtime-derived
         // playback.conductorDensity mirror (see playback-reducer.test.ts); the
         // instrument reducer must leave the user's own document field alone.
-        chords.density = 'standard';
+        mutableChords.density = 'standard';
         instrumentReducer({
             type: ACTIONS.UPDATE_CONDUCTOR_DECISION,
             payload: { density: 'thin' },
@@ -137,7 +142,7 @@ describe('Instrument Reducer', () => {
         // instead. The reducer itself excludes `complexity` from its generic
         // key pass-through so a future caller can't silently resurrect the bug
         // (harmony.complexity is document-owned — persisted, shareable).
-        harmony.complexity = 0.2;
+        mutableHarmony.complexity = 0.2;
         instrumentReducer({
             type: ACTIONS.UPDATE_HB,
             payload: { complexity: 0.9, style: 'horns' },
@@ -158,14 +163,17 @@ describe('Instrument Reducer', () => {
                 motifTracking: true,
                 tension: 0.42, // a live key alongside them still applies
             },
-        });
+        } as unknown as Parameters<typeof instrumentReducer>[0]);
         expect(soloist.session.tension).toBe(0.42);
         expect((soloist as Record<string, unknown>).pinnedProfile).toBeUndefined();
         expect((soloist as Record<string, unknown>).motifTracking).toBeUndefined();
     });
 
     it('should return false for unknown actions', () => {
-        const result = instrumentReducer({ type: 'UNKNOWN_ACTION', payload: {} });
+        const result = instrumentReducer({
+            type: 'UNKNOWN_ACTION',
+            payload: {},
+        } as unknown as Parameters<typeof instrumentReducer>[0]);
         expect(result).toBe(false);
     });
 

@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { groove, grooveReducer as grooveReducerImpl } from '../../../public/state/groove.js';
-import { ACTIONS } from '../../../public/types.js';
+import { ACTIONS, type Mutable } from '../../../public/types.js';
+
+const mutableGroove = groove as Mutable<typeof groove>;
 
 // Tests call grooveReducer with 1-2 args; production signature requires 2 (action object + optional playback).
 const grooveReducer = grooveReducerImpl as (action: any, playback?: any) => any;
@@ -11,7 +13,7 @@ describe('Groove Reducer', () => {
     });
 
     it('should reset to default values and clear instruments', () => {
-        groove.volume = 0.9;
+        mutableGroove.volume = 0.9;
         groove.instruments[0].steps[0] = 1;
         grooveReducer({ type: ACTIONS.RESET_STATE, payload: undefined });
         expect(groove.volume).toBe(1.0);

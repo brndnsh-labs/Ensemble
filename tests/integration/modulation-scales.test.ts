@@ -45,8 +45,11 @@ vi.mock('../../public/ui.js', () => ({ ui: { updateProgressionDisplay: vi.fn() }
 import { validateProgression } from '../../public/engine/chords-engine.js';
 import { getScaleForChord } from '../../public/engine/theory-scales.js';
 import { getState } from '../../public/state.js';
+import type { Mutable } from '../../public/types.js';
 
-const { arranger } = getState();
+type MutableArranger = Mutable<ReturnType<typeof getState>['arranger']>;
+
+const arranger = getState().arranger as MutableArranger;
 
 describe('Modulation Scale Selection Integration', () => {
     beforeEach(() => {

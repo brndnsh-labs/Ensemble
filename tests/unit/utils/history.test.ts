@@ -4,8 +4,9 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getState } from '../../../public/state.js';
+import type { Mutable } from '../../../public/types.js';
 
-const { arranger } = getState();
+const arranger = getState().arranger as Mutable<ReturnType<typeof getState>['arranger']>;
 
 import { pushHistory, undo } from '../../../public/state/history.js';
 

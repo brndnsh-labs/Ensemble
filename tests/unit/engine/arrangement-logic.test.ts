@@ -87,8 +87,11 @@ import { addSection, onSectionUpdate } from '../../../public/controllers/arrange
 import { validateProgression } from '../../../public/engine/chords-engine.js';
 import { analyzeForm, getSectionEnergy } from '../../../public/song/form-analysis.js';
 import { getState } from '../../../public/state.js';
+import type { Mutable } from '../../../public/types.js';
 
-const { arranger } = getState();
+type MutableArranger = Mutable<ReturnType<typeof getState>['arranger']>;
+
+const arranger = getState().arranger as MutableArranger;
 
 describe('Arrangement Logic & Mixed Meter', () => {
     beforeEach(() => {
