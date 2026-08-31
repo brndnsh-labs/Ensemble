@@ -9,7 +9,8 @@ import path from 'node:path';
  * and that all core modules are mapped in AI_MAP.md.
  */
 
-// The dir-scoped agent docs (#1153) and the pipeline skill tree. These are
+// The dir-scoped agent docs (#1153), active agent definitions, and the pipeline skill tree.
+// These are
 // auto-loaded the moment an agent works in the matching directory, so a rotted
 // path here misleads at exactly the point it is most trusted — and until #1303
 // none of them were scanned at all. That gap cost a real pointer: the
@@ -21,6 +22,7 @@ import path from 'node:path';
 // #1153 added the dir-scoped docs, and nobody noticed for months. Enumerating
 // them here would only move that staleness one file over.
 const AGENT_DOC_ROOTS = ['public', 'tests'];
+const AGENT_DEFINITIONS_ROOT = '.claude/agents';
 const SKILLS_ROOT = '.claude/skills';
 
 /** Every dir-scoped `CLAUDE.md` under the source tree, at any depth. */
@@ -43,6 +45,17 @@ function discoverNestedAgentDocs() {
         walk(root);
     }
     return found;
+}
+
+/** Every `.claude/agents/*.md` definition — a new agent is scanned the day it lands. */
+function discoverAgentDefinitionDocs() {
+    if (!fs.existsSync(AGENT_DEFINITIONS_ROOT)) {
+        return [];
+    }
+    return fs
+        .readdirSync(AGENT_DEFINITIONS_ROOT, { withFileTypes: true })
+        .filter((entry) => entry.isFile() && entry.name.endsWith('.md'))
+        .map((entry) => `${AGENT_DEFINITIONS_ROOT}/${entry.name}`);
 }
 
 /** DOCTRINE plus every `.claude/skills/<name>/SKILL.md` — a new skill is scanned the day it lands. */
@@ -79,6 +92,7 @@ const DOCS_TO_SCAN = [
     'docs/guides/PERFORMANCE_GUIDELINES.md',
     'tests/README.md',
     ...discoverNestedAgentDocs(),
+    ...discoverAgentDefinitionDocs(),
     ...discoverSkillDocs(),
 ];
 
@@ -389,10 +403,11 @@ function validateDocs() {
                 !cleanPath ||
                 cleanPath.startsWith('http') ||
                 cleanPath.startsWith('{{') ||
-                // A glob is a deliberate reference to a FAMILY of files
-                // (`synth-*.ts`, `tests/standards/*-critique.test.ts`) — real, and
-                // not resolvable by `existsSync`. Skipping is the correct read.
+                // A glob/template is a deliberate reference to a FAMILY of files
+                // (`synth-*.ts`, `public/state/<slice>.ts`, `synth-{bass,drums}.ts`) —
+                // real, and not resolvable by `existsSync`. Skipping is the correct read.
                 cleanPath.includes('*') ||
+                /<[^<>]+>|\{[^{}]+\}/.test(cleanPath) ||
                 !isCheckablePath(cleanPath, docDir)
             ) {
                 match = pathRegex.exec(content);

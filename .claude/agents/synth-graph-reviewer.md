@@ -58,7 +58,7 @@ Any `DelayNode` or `BiquadFilterNode` wired into a feedback loop — a reverb, e
 - **Cross-coupled `DelayNode` feedback cycles are unstable under Chromium's Web Audio.** Multiple delay lines matrix-mixed so each feeds every other (a feedback-delay network) self-oscillate *regardless of provably sub-unity loop gain* — the math says stable, the renderer disagrees. Each `DelayNode` must sit in its own self-contained feedback loop, never matrix-mixed into a shared web. (This killed the first reverb; it shipped as a Schroeder/Freeverb of single-loop combs + series allpasses instead — see `public/engine/reverb.ts`.)
 - A feedback gain that can ramp or clamp to ≥ 1 — e.g. an RT60→gain formula (`10^(-3·delay/rt60)`) with no hard cap strictly below 1.
 
-Verify: trace every cycle in the diff; for each, the product of gains around it stays < 1 at every frequency. The cheap repro for any doubt is an `OfflineAudioContext` impulse render (see `tests/e2e/reverb-stability.spec.ts`).
+Verify: trace every cycle in the diff; for each, the product of gains around it stays < 1 at every frequency. The cheap repro for any doubt is an `OfflineAudioContext` impulse render (see `tests/browser/reverb-stability.browser.test.ts`).
 
 ### CLOCK
 
