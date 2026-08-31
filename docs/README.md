@@ -31,3 +31,4 @@ Frozen archives — historical context only. The live tracker is GitHub issues (
 - [`docs/archive/`](archive/) — completed reports and archived audits.
 - [`docs/synth-audit/`](synth-audit/) — **⛔ frozen archive** of the synth-realism audit (7 epics, shipped). Live synth work is GitHub issues, Track `synth`.
 - [`docs/audit/FOLLOWUPS.md`](audit/FOLLOWUPS.md) — **⛔ frozen archive** of the musical-audit follow-up backlog. Live follow-ups are `finding`/`backlog` issues on the GitHub tracker. The audit cycle itself is archived at [`docs/archive/musical-audit-2026-05/`](archive/musical-audit-2026-05/).
+- [`docs/TECH_DEBT.md`](TECH_DEBT.md) — historical May 2026 state-discipline audit snapshot; its remaining mutation finding was superseded by the detached-render exception in `CLAUDE.md`.
