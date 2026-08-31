@@ -260,7 +260,11 @@ export function ShareModal() {
                         <div class="instrument-selection-grid">
                             <div class="instrument-toggle-row">
                                 <div class="instrument-toggle-container">
-                                    <Toggle checked={includeSolo} onChange={setIncludeSolo} />
+                                    <Toggle
+                                        checked={includeSolo}
+                                        onChange={setIncludeSolo}
+                                        ariaLabel="Include Soloist"
+                                    />
                                 </div>
                                 <span class="instrument-toggle-label">
                                     <Icon name="soloist" /> Soloist
@@ -268,7 +272,11 @@ export function ShareModal() {
                             </div>
                             <div class="instrument-toggle-row">
                                 <div class="instrument-toggle-container">
-                                    <Toggle checked={includeBass} onChange={setIncludeBass} />
+                                    <Toggle
+                                        checked={includeBass}
+                                        onChange={setIncludeBass}
+                                        ariaLabel="Include Bass"
+                                    />
                                 </div>
                                 <span class="instrument-toggle-label">
                                     <Icon name="bass" /> Bass
@@ -276,7 +284,11 @@ export function ShareModal() {
                             </div>
                             <div class="instrument-toggle-row">
                                 <div class="instrument-toggle-container">
-                                    <Toggle checked={includeChords} onChange={setIncludeChords} />
+                                    <Toggle
+                                        checked={includeChords}
+                                        onChange={setIncludeChords}
+                                        ariaLabel="Include Chords"
+                                    />
                                 </div>
                                 <span class="instrument-toggle-label">
                                     <Icon name="chords" /> Chords
@@ -284,7 +296,11 @@ export function ShareModal() {
                             </div>
                             <div class="instrument-toggle-row">
                                 <div class="instrument-toggle-container">
-                                    <Toggle checked={includeHarmony} onChange={setIncludeHarmony} />
+                                    <Toggle
+                                        checked={includeHarmony}
+                                        onChange={setIncludeHarmony}
+                                        ariaLabel="Include Harmony"
+                                    />
                                 </div>
                                 <span class="instrument-toggle-label">
                                     <Icon name="harmony" /> Harmony
@@ -292,7 +308,11 @@ export function ShareModal() {
                             </div>
                             <div class="instrument-toggle-row">
                                 <div class="instrument-toggle-container">
-                                    <Toggle checked={includeDrums} onChange={setIncludeDrums} />
+                                    <Toggle
+                                        checked={includeDrums}
+                                        onChange={setIncludeDrums}
+                                        ariaLabel="Include Drums"
+                                    />
                                 </div>
                                 <span class="instrument-toggle-label">
                                     <Icon name="drums" /> Drums
@@ -321,7 +341,11 @@ export function ShareModal() {
                                 label="Resolution Ending"
                                 description="Add a final chord to resolve the song"
                             >
-                                <Toggle checked={addEnding} onChange={setAddEnding} />
+                                <Toggle
+                                    checked={addEnding}
+                                    onChange={setAddEnding}
+                                    ariaLabel="Add resolution ending"
+                                />
                             </SettingRow>
                         </div>
                     </SettingGroup>

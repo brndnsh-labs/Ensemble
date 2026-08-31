@@ -225,6 +225,16 @@ test.describe('Modals Responsiveness @ui', () => {
         await expect(shareModal).toContainText('Share & Export');
         await expect(shareModal).toContainText('1. Configure Content');
         await expect(shareModal).toContainText('2. Select Destination');
+        for (const name of [
+            'Include Soloist',
+            'Include Bass',
+            'Include Chords',
+            'Include Harmony',
+            'Include Drums',
+            'Add resolution ending',
+        ]) {
+            await expect(shareModal.getByRole('switch', { name, exact: true })).toHaveCount(1);
+        }
 
         // Close modal
         await page.click('#closeShareBtn');
