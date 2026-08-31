@@ -55,6 +55,24 @@ describe('Global Shortcuts', () => {
         expect(dispatch).toHaveBeenCalledWith(ACTIONS.TOGGLE_PLAY);
     });
 
+    it('should let a focused button handle Space', async () => {
+        const { dispatch } = await import('../../public/state.js');
+        const button = document.createElement('button');
+        container.appendChild(button);
+        button.focus();
+
+        const event = new KeyboardEvent('keydown', {
+            key: ' ',
+            bubbles: true,
+            cancelable: true,
+        });
+        button.dispatchEvent(event);
+
+        expect(document.activeElement).toBe(button);
+        expect(dispatch).not.toHaveBeenCalledWith(ACTIONS.TOGGLE_PLAY);
+        expect(event.defaultPrevented).toBe(false);
+    });
+
     it('should NOT toggle playback if modal is open via state', async () => {
         const { playback, dispatch } = await import('../../public/state.js');
         playback.modals.settings = true;
