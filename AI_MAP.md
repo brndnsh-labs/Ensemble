@@ -24,7 +24,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/ui-types.ts` | Shared UI component prop definitions. | `SelectOption` |
 | `public/breakpoints.ts` | Shared viewport breakpoint constants for the compact/narrow UI experience. | `COMPACT_MQ` |
 | `public/ui-bridge.ts` | Preact <-> Engine synchronization hook. | `useEnsembleState` |
-| `public/controllers/app-controller.ts` | Top-level playback and session control. | `togglePlay`, `resetSession` |
+| `public/controllers/app-controller.ts` | Theme/palette DOM application and BPM updates with in-flight scheduler rescheduling. | `resolveMode`, `applyThemeToDom`, `setPalette`, `setMode`, `setBpm` |
 | `public/worker-client.ts` | Main-thread orchestrator for the live logic worker plus one-shot MIDI export workers. | `initWorker`, `startWorker`, `syncWorker`, `flushWorker`, `requestBuffer`, `startExport` |
 | `public/midi-export-worker.ts` | One-shot MIDI export worker entry; owns a fresh module realm and detached generation state for each export. | worker message handler |
 | `public/e2e-tools.ts` | Boot-time install of `window.ensemble` for E2E tests and scripts. | `installE2EGlobals` |
