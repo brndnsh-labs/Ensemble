@@ -86,15 +86,30 @@ test.describe('Instrument settings — desktop @ui', () => {
     // #1070 — Swing (grid geometry) and Humanize (scheduler-wide) are band
     // controls, so they live in the rail's band-settings surface, one tap away
     // and NOT behind any instrument's gear.
-    test('band settings surface exposes swing, swing-base and humanize', async ({ page }) => {
+    test('band settings surface exposes controls by human accessible names', async ({ page }) => {
         await page.getByRole('button', { name: 'Band settings' }).click();
         const surface = page.locator('.workspace-studio-surface--band-feel.is-open');
         await expect(surface).toBeVisible();
 
-        await expect(surface.locator('#swingSlider')).toBeVisible();
-        await expect(surface.locator('#swingBaseSelect')).toBeVisible();
-        await expect(surface.locator('#humanizeSlider')).toBeVisible();
-        await expect(surface.locator('#harmonyColorSelect')).toBeVisible();
+        await expect(surface.getByRole('slider', { name: 'Swing', exact: true })).toBeVisible();
+        await expect(
+            surface.getByRole('combobox', { name: 'Swing subdivision', exact: true }),
+        ).toBeVisible();
+        await expect(surface.getByRole('slider', { name: 'Humanize', exact: true })).toBeVisible();
+        await expect(
+            surface.getByRole('switch', { name: 'Auto intensity', exact: true }),
+        ).toHaveCount(1);
+        await expect(surface.getByRole('slider', { name: 'Intensity', exact: true })).toBeVisible();
+        await expect(
+            surface.getByRole('combobox', { name: 'Harmonic color', exact: true }),
+        ).toBeVisible();
+
+        await expect(surface.getByRole('slider', { name: 'swingSlider', exact: true })).toHaveCount(
+            0,
+        );
+        await expect(
+            surface.getByRole('combobox', { name: 'harmonyColorSelect', exact: true }),
+        ).toHaveCount(0);
         await expect(surface.locator('.workspace-studio-genre-grid')).toBeVisible();
         await expect(
             surface.locator('.workspace-studio-genre-option[aria-pressed]').first(),

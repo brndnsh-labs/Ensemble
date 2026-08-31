@@ -431,6 +431,7 @@ function StudioBandFeelChooser({
                             />
                             <Select
                                 id="swingBaseSelect"
+                                ariaLabel="Swing subdivision"
                                 value={swingSub || '8th'}
                                 disabled={swingDisabled}
                                 onChange={(val) => {

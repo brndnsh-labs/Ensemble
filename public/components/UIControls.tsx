@@ -60,7 +60,7 @@ export function Toggle({ id, checked, onChange, ariaLabel, label }: ToggleProps)
                 aria-checked={checked}
                 checked={checked}
                 onChange={(e) => onChange((e.target as HTMLInputElement).checked)}
-                aria-label={ariaLabel || label || id}
+                aria-label={ariaLabel || label}
             />
             <span class="toggle-slider" />
         </label>
@@ -99,7 +99,7 @@ export function Slider({
             step={step}
             value={value}
             onInput={(e) => onInput((e.target as HTMLInputElement).value)}
-            aria-label={ariaLabel || id}
+            aria-label={ariaLabel}
             aria-valuetext={ariaValueText}
             disabled={disabled}
         />
@@ -121,7 +121,7 @@ export function Select({ id, value, onChange, options, ariaLabel, disabled }: Se
             id={id}
             value={value}
             onChange={(e) => onChange((e.target as HTMLSelectElement).value)}
-            aria-label={ariaLabel || id}
+            aria-label={ariaLabel}
             disabled={disabled}
         >
             {options.map((opt) => (
