@@ -25,7 +25,7 @@ import {
     selectMixReportScenes,
 } from './mix-report-utils.js';
 
-const REPO_ROOT = '/home/brandon/code/ensemble';
+export const REPO_ROOT = path.resolve(import.meta.dirname, '..');
 const DIST_DIR = path.join(REPO_ROOT, 'dist');
 const HOST = '127.0.0.1';
 const REQUESTED_PORT = Number(process.env.MIX_REPORT_PORT || 0);
