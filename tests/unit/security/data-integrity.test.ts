@@ -1,7 +1,7 @@
 // @ts-nocheck
 import { describe, expect, it } from 'vitest';
 import { escapeHTML } from '../../../public/sanitize.js';
-import { decompressSections } from '../../../public/state/share-codec.js';
+import { decompressSections, tryDecompressSections } from '../../../public/state/share-codec.js';
 
 describe('Security: Data Integrity & Sanitization', () => {
     describe('HTML Sanitization (escapeHTML)', () => {
@@ -46,6 +46,13 @@ describe('Security: Data Integrity & Sanitization', () => {
             const result = decompressSections(badBase64);
             expect(result).toHaveLength(1);
             expect(result[0].label).toBe('Intro');
+        });
+
+        it('exposes decode failures to strict persisted-data callers', () => {
+            expect(tryDecompressSections(btoa('{{{{'))).toBeNull();
+            for (const invalidSections of ['[null]', '[1]', '["x"]', '[[]]']) {
+                expect(tryDecompressSections(btoa(invalidSections))).toBeNull();
+            }
         });
 
         it('should limit the number of decompressed sections', () => {

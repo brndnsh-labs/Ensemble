@@ -96,9 +96,10 @@ export function compressSections(sections: Section[]): string {
 }
 
 /**
- * Decompresses the Base64 string back into sections, handling Unicode.
+ * Strictly decompresses a Base64 section payload. Callers that need to reject
+ * invalid persisted records use the null result instead of fabricating data.
  */
-export function decompressSections(str: string): Section[] {
+export function tryDecompressSections(str: string): Section[] | null {
     try {
         if (!str || typeof str !== 'string') {
             throw new Error('Invalid input');
@@ -118,6 +119,9 @@ export function decompressSections(str: string): Section[] {
         const safeMinified = minified.slice(0, 500);
 
         return safeMinified.map((s: any, i: number) => {
+            if (s === null || typeof s !== 'object' || Array.isArray(s)) {
+                throw new Error('Invalid section: expected object');
+            }
             // Sanitize label to prevent XSS (even though likely handled by UI framework, defense in depth)
             let safeLabel = escapeHTML(s.l || `Section ${i + 1}`);
             if (safeLabel.length > 100) {
@@ -184,6 +188,14 @@ export function decompressSections(str: string): Section[] {
         });
     } catch (e) {
         console.error('Failed to decompress sections', e);
-        return [{ id: generateId(), label: 'Intro', value: 'I | IV' }];
+        return null;
     }
+}
+
+/**
+ * Decompresses the Base64 string back into sections, handling Unicode. The
+ * fallback is retained for user-facing share URLs that must remain recoverable.
+ */
+export function decompressSections(str: string): Section[] {
+    return tryDecompressSections(str) ?? [{ id: generateId(), label: 'Intro', value: 'I | IV' }];
 }

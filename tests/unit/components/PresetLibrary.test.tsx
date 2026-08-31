@@ -58,10 +58,13 @@ vi.mock('../../../public/data/chord-presets.js', () => ({
     ],
 }));
 
-vi.mock('../../../public/state/share-codec.js', () => ({
-    decompressSections: vi.fn((sections) => sections),
-    generateId: vi.fn(() => 'generated-section-id'),
-}));
+vi.mock('../../../public/state/share-codec.js', async (importOriginal) => {
+    const actual = await importOriginal();
+    return {
+        ...actual,
+        generateId: vi.fn(() => 'generated-section-id'),
+    };
+});
 
 vi.mock('../../../public/utils.js', () => ({
     transposeKeyName: vi.fn((key, shift) => {
@@ -303,6 +306,198 @@ describe('PresetLibrary', () => {
             mode: 'replace',
         });
         expect(JSON.stringify(mockTrack.mock.calls)).not.toContain('Private rehearsal title');
+    });
+
+    it('rejects malformed legacy section arrays without changing stored data', async () => {
+        const storedPresets = [
+            { name: 'Null sections', sections: [null], timestamp: 1 },
+            { name: 'Number sections', sections: [1], timestamp: 2 },
+            {
+                name: 'Mixed sections',
+                sections: [{ label: 'Main', value: 'I' }, null],
+                timestamp: 3,
+            },
+            { name: 'Nested array section', sections: [[]], timestamp: 4 },
+            { name: 'Invalid section field', sections: [{ value: {} }], timestamp: 5 },
+            {
+                name: 'Unsafe section id',
+                sections: [{ id: 'constructor', label: 'Main', value: 'I' }],
+                timestamp: 6,
+            },
+            { name: 'Invalid compressed JSON', sections: btoa('{{{{'), timestamp: 7 },
+            { name: 'Invalid compressed member', sections: btoa('[null]'), timestamp: 8 },
+            { name: 'Compressed number member', sections: btoa('[1]'), timestamp: 9 },
+            { name: 'Compressed string member', sections: btoa('["x"]'), timestamp: 10 },
+            { name: 'Compressed array member', sections: btoa('[[]]'), timestamp: 11 },
+            {
+                name: 'Too many legacy sections',
+                sections: Array.from({ length: 501 }, () => ({ label: 'Main', value: 'I' })),
+                timestamp: 12,
+            },
+            {
+                name: 'Zero repeat',
+                sections: [{ label: 'Main', value: 'I', repeat: 0 }],
+                timestamp: 13,
+            },
+            {
+                name: 'Oversized repeat',
+                sections: [{ label: 'Main', value: 'I', repeat: 65 }],
+                timestamp: 14,
+            },
+            {
+                name: 'Fractional repeat',
+                sections: [{ label: 'Main', value: 'I', repeat: 1.5 }],
+                timestamp: 15,
+            },
+            {
+                name: 'Valid repeat boundaries',
+                sections: [
+                    { label: 'Once', value: 'I', repeat: 1 },
+                    { label: 'Sixty-four times', value: 'IV', repeat: 64 },
+                ],
+                timestamp: 16,
+            },
+            {
+                name: 'Valid legacy',
+                sections: [{ label: 'Legacy', value: 'I | IV' }],
+                timestamp: 17,
+            },
+        ];
+        const originalStorage = JSON.stringify(storedPresets);
+        storageData.ensemble_userPresets = originalStorage;
+        const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+        await act(async () => {
+            render(<PresetLibrary />, container);
+            await new Promise((resolve) => setTimeout(resolve, 0));
+        });
+        consoleError.mockRestore();
+
+        const renderedNames = getRenderedChipNames();
+        expect(renderedNames).toEqual(
+            expect.arrayContaining([
+                'Pop (Standard)',
+                'Autumn Leaves',
+                'Valid repeat boundaries',
+                'Valid legacy',
+            ]),
+        );
+        for (const rejectedName of [
+            'Null sections',
+            'Number sections',
+            'Mixed sections',
+            'Nested array section',
+            'Invalid section field',
+            'Unsafe section id',
+            'Invalid compressed JSON',
+            'Invalid compressed member',
+            'Compressed number member',
+            'Compressed string member',
+            'Compressed array member',
+            'Too many legacy sections',
+            'Zero repeat',
+            'Oversized repeat',
+            'Fractional repeat',
+        ]) {
+            expect(renderedNames).not.toContain(rejectedName);
+        }
+        expect(storageData.ensemble_userPresets).toBe(originalStorage);
+        expect(localStorage.setItem).not.toHaveBeenCalled();
+        expect(localStorage.removeItem).not.toHaveBeenCalled();
+    });
+
+    it('keeps compressed and valid legacy presets selectable', async () => {
+        const { compressSections } = await import('../../../public/state/share-codec.js');
+        storageData.ensemble_userPresets = JSON.stringify([
+            {
+                name: 'Compressed user preset',
+                sections: compressSections([{ label: 'Compressed', value: 'ii | V | I' }]),
+                timestamp: 1,
+            },
+            {
+                name: 'Legacy user preset',
+                sections: [{ label: 'Legacy', value: 'I | IV' }],
+                timestamp: 2,
+            },
+        ]);
+        const originalStorage = storageData.ensemble_userPresets;
+        const onSelect = vi.fn();
+
+        await act(async () => {
+            render(<PresetLibrary onSelect={onSelect} />, container);
+            await new Promise((resolve) => setTimeout(resolve, 0));
+        });
+
+        for (const name of ['Compressed user preset', 'Legacy user preset']) {
+            const button = container.querySelector(
+                `.preset-library-chip-name[aria-label="${name}"]`,
+            );
+            expect(button).not.toBeNull();
+            await act(async () => {
+                button?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+            });
+        }
+
+        expect(onSelect).toHaveBeenCalledTimes(2);
+        expect(mockDispatch).toHaveBeenCalledWith(
+            'SET_ARRANGEMENT',
+            expect.arrayContaining([
+                expect.objectContaining({
+                    label: 'Compressed',
+                    value: 'ii | V | I',
+                    repeat: 1,
+                    timeSignature: '',
+                    seamless: false,
+                }),
+            ]),
+        );
+        expect(mockDispatch).toHaveBeenCalledWith('SET_ARRANGEMENT', [
+            {
+                id: 'generated-section-id',
+                label: 'Legacy',
+                value: 'I | IV',
+                repeat: 1,
+                key: undefined,
+                isMinor: undefined,
+                timeSignature: undefined,
+                seamless: undefined,
+            },
+        ]);
+        expect(storageData.ensemble_userPresets).toBe(originalStorage);
+    });
+
+    it('preserves rejected stored records when deleting a valid preset', async () => {
+        const malformedPreset = {
+            name: 'Keep for recovery',
+            sections: [null],
+            timestamp: 1,
+        };
+        storageData.ensemble_userPresets = JSON.stringify([
+            malformedPreset,
+            {
+                name: 'Delete me',
+                sections: [{ label: 'Legacy', value: 'I | IV' }],
+                timestamp: 2,
+            },
+        ]);
+        vi.stubGlobal(
+            'confirm',
+            vi.fn(() => true),
+        );
+
+        await act(async () => {
+            render(<PresetLibrary />, container);
+            await new Promise((resolve) => setTimeout(resolve, 0));
+        });
+
+        const deleteButton = container.querySelector('[aria-label="Delete preset Delete me"]');
+        expect(deleteButton).not.toBeNull();
+        await act(async () => {
+            deleteButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(JSON.parse(storageData.ensemble_userPresets)).toEqual([malformedPreset]);
+        expect(getRenderedChipNames()).not.toContain('Delete me');
     });
 
     it('delegates the worker resync to refreshArrangerUI AFTER swapping the arrangement (#1120)', async () => {
