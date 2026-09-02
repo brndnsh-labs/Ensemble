@@ -3,6 +3,7 @@ import { TIME_SIGNATURES } from '../../../public/config.js';
 import { getSoloistNotePhraseFirst } from '../../../public/engine/soloist-phrase-first.js';
 import { getEffectiveTimeSignature, getEffectiveTimeSignatures } from '../../../public/meter.js';
 import { getStepInfo } from '../../../public/utils.js';
+import { makeChord } from '../../utils/chord-fixture.js';
 
 // Structural guard for the parallel phrase-first soloist engine (Slice 1,
 // Build 2a). The real definition-of-done is the by-ear listening gate; these
@@ -12,7 +13,7 @@ import { getStepInfo } from '../../../public/utils.js';
 // The engine takes `state` as an argument and we always supply a seed, so the
 // legacy fallback path is never exercised here and no module mocks are needed.
 
-const CMAJ7 = { rootMidi: 60, intervals: [0, 4, 7, 10] }; // C E G Bb
+const CMAJ7 = makeChord({ rootMidi: 60, intervals: [0, 4, 7, 10] }); // C E G Bb
 const STRONG_PCS = new Set([0, 7]); // C-major strong tones: tonic + 5th
 
 function makeState(
@@ -24,7 +25,7 @@ function makeState(
         bpm = 120,
         phrasingIntensity = 0.5,
         timeSignature = '4/4',
-        grouping = null,
+        grouping = null as number[] | null,
     } = {},
 ): any {
     return {
@@ -182,7 +183,7 @@ describe('phrase-first soloist (Build 2a)', () => {
         // bar over C7. The downbeat note A (69) is NOT a C7 chord tone, so it snaps
         // to the nearest guide — B♭ (the chromatic ♭7); the pickup at step 15 must
         // resolve INTO that landing by step. A note at step 8 is the apex elsewhere.
-        const C7 = { rootMidi: 60, quality: '7', intervals: [0, 4, 7, 10] };
+        const C7 = makeChord({ rootMidi: 60, quality: '7', intervals: [0, 4, 7, 10] });
         const seed = [
             { step: 0, midi: 69, isAnchor: true, durationSteps: 1, velocity: 0.8 },
             { step: 8, midi: 84, isAnchor: true, durationSteps: 1, velocity: 0.8 },

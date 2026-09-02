@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { TIME_SIGNATURES } from '../../../public/config.js';
 import { applyGrooveOverrides } from '../../../public/engine/groove-engine.js';
 import { getState } from '../../../public/state.js';
+import type { EnsembleState } from '../../../public/types.js';
 import { getStepInfo } from '../../../public/utils.js';
 
 const { makeSoloistMock } = await vi.hoisted(
@@ -35,12 +36,15 @@ describe('Groove Engine - Generative Mode', () => {
             step,
             inst: { name: instName, muted: false },
             stepVal: 0,
-            playback: { bandIntensity: intensity, complexity: 0.5 },
+            playback: {
+                bandIntensity: intensity,
+                complexity: 0.5,
+            } as unknown as EnsembleState['playback'],
             groove: {
                 genreFeel: 'Rock',
                 lastDrumPreset: 'Basic Rock',
                 instruments: [],
-            },
+            } as unknown as EnsembleState['groove'],
             isDownbeat: info.isMeasureStart,
             isBeatStart: info.isBeatStart,
             isBackbeat: info.isBackbeat,
@@ -50,6 +54,8 @@ describe('Groove Engine - Generative Mode', () => {
             isEOfBeat: info.isEOfBeat,
             isAOfBeat: info.isAOfBeat,
             tsConfig: info.tsConfig,
+            sectionOccurrence: 0,
+            isFinalMeasure: false,
         };
     };
 

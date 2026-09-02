@@ -65,6 +65,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { checkSectionTransition, MACRO_JITTER_RANGE } from '../../public/engine/conductor.js';
 import { createPRNG } from '../../public/engine/hash-utils.js';
 import { getJamMacroArc, JAM_CYCLE_LENGTHS } from '../../public/song/form-analysis.js';
+import type { Dispatch, EnsembleState } from '../../public/types.js';
 import { ACTIONS } from '../../public/types.js';
 
 // The exact deterministic macro jitter the conductor applies at the fixture's
@@ -244,8 +245,8 @@ function runTransitionAtProgress(
         mockState.conductor.formIteration = opts.formIteration;
     }
     const dispatched: Array<{ type: string; payload: any }> = [];
-    const dispatch = (type: string, payload: any) => {
-        dispatched.push({ type, payload });
+    const dispatch: Dispatch = (type, ...args) => {
+        dispatched.push({ type, payload: args[0] });
     };
 
     const elapsedMs = progress * SESSION_TIMER_MIN * 60_000;
@@ -972,10 +973,10 @@ describe('Conductor Arc Critique (S7)', () => {
             // step 0 is the start of A's FIRST measure. measureEnd=16, which
             // is still inside section A (A ends at 32). So no section
             // transition is detected and no fill should fire.
-            const mockState = makeMockState();
+            const mockState = makeMockState() as unknown as EnsembleState;
             const dispatched: Array<{ type: string; payload: any }> = [];
-            const dispatch = (type: string, payload: any) => {
-                dispatched.push({ type, payload });
+            const dispatch: Dispatch = (type, ...args) => {
+                dispatched.push({ type, payload: args[0] });
             };
             const nowSpy = vi
                 .spyOn(performance, 'now')
@@ -1030,8 +1031,8 @@ describe('Conductor Arc Critique (S7)', () => {
             state.groove.orchestrationMap = [{ start: 0, end: TOTAL_STEPS, energyLevel }];
 
             const dispatched: Array<{ type: string; payload: any }> = [];
-            const dispatch = (type: string, payload: any) => {
-                dispatched.push({ type, payload });
+            const dispatch: Dispatch = (type, ...args) => {
+                dispatched.push({ type, payload: args[0] });
             };
             checkSectionTransition(state, 0, STEPS_PER_MEASURE, dispatch);
 

@@ -21,6 +21,7 @@ import { TIME_SIGNATURES } from '../../public/config.js';
 import { compingState, getAccompanimentNotes } from '../../public/engine/accompaniment.js';
 import { resetCompingState as resetCanonicalCompingState } from '../../public/engine/comping-state.js';
 import { getStepInfo } from '../../public/utils.js';
+import { makeChord } from '../utils/chord-fixture.js';
 
 const { makeSoloistMock } = await vi.hoisted(async () => await import('../utils/mock-soloist.js'));
 
@@ -33,18 +34,15 @@ const SIX_EIGHT = '6/8';
 const STEPS_PER_BAR = 12;
 const NUM_BARS = 24;
 
-const midiToFreq = (m: number) => 440 * 2 ** ((m - 69) / 12);
 function makeG7() {
-    const intervals = [0, 4, 7, 10];
-    return {
+    return makeChord({
         rootMidi: 67,
         quality: '7',
-        intervals,
+        intervals: [0, 4, 7, 10],
         is7th: true,
         beats: 6,
-        freqs: intervals.map((iv) => midiToFreq(67 + iv)),
         sectionId: 'Head',
-    };
+    });
 }
 
 function resetCompingState() {

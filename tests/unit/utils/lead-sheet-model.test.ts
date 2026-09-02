@@ -7,21 +7,24 @@ import {
     getLeadSheetLayoutProfile,
     getLeadSheetViewport,
 } from '../../../public/song/lead-sheet-model.js';
+import { makeChord } from '../../utils/chord-fixture.js';
 
 describe('lead-sheet-model', () => {
     const timeSignature = { beats: 4, stepsPerBeat: 4 };
 
     it('chunks sections into continuous four-measure rows', () => {
-        const progression = Array.from({ length: 8 }, (_, index) => ({
-            sectionId: 'a',
-            sectionLabel: 'A',
-            beats: 4,
-            absName: `Chord ${index + 1}`,
-        }));
+        const progression = Array.from({ length: 8 }, (_, index) =>
+            makeChord({
+                sectionId: 'a',
+                sectionLabel: 'A',
+                beats: 4,
+                absName: `Chord ${index + 1}`,
+            }),
+        );
 
         const sections = buildLeadSheetSections(
             progression,
-            [{ id: 'a', seamless: false }],
+            [{ id: 'a', label: 'A', value: '', seamless: false }],
             timeSignature,
         );
         const rows = buildLeadSheetRows(sections);
@@ -36,17 +39,17 @@ describe('lead-sheet-model', () => {
 
     it('starts a new row when a section changes', () => {
         const progression = [
-            { sectionId: 'a', sectionLabel: 'A', beats: 4, absName: 'I' },
-            { sectionId: 'a', sectionLabel: 'A', beats: 4, absName: 'IV' },
-            { sectionId: 'b', sectionLabel: 'B', beats: 4, absName: 'V' },
-            { sectionId: 'b', sectionLabel: 'B', beats: 4, absName: 'I' },
+            makeChord({ sectionId: 'a', sectionLabel: 'A', beats: 4, absName: 'I' }),
+            makeChord({ sectionId: 'a', sectionLabel: 'A', beats: 4, absName: 'IV' }),
+            makeChord({ sectionId: 'b', sectionLabel: 'B', beats: 4, absName: 'V' }),
+            makeChord({ sectionId: 'b', sectionLabel: 'B', beats: 4, absName: 'I' }),
         ];
 
         const sections = buildLeadSheetSections(
             progression,
             [
-                { id: 'a', seamless: false },
-                { id: 'b', seamless: false },
+                { id: 'a', label: 'A', value: '', seamless: false },
+                { id: 'b', label: 'B', value: '', seamless: false },
             ],
             timeSignature,
         );
@@ -60,21 +63,21 @@ describe('lead-sheet-model', () => {
 
     it('keeps seamless section changes inside the current row when space remains', () => {
         const progression = [
-            { sectionId: 'a', sectionLabel: 'A (Tonic)', beats: 4, absName: '1' },
-            { sectionId: 'a', sectionLabel: 'A (Tonic)', beats: 4, absName: '2' },
-            { sectionId: 'a', sectionLabel: 'A (Tonic)', beats: 4, absName: '3' },
-            { sectionId: 'a', sectionLabel: 'A (Tonic)', beats: 4, absName: '4' },
-            { sectionId: 'a', sectionLabel: 'A (Tonic)', beats: 4, absName: '5' },
-            { sectionId: 'b', sectionLabel: 'A (III)', beats: 4, absName: '6' },
-            { sectionId: 'b', sectionLabel: 'A (III)', beats: 4, absName: '7' },
-            { sectionId: 'b', sectionLabel: 'A (III)', beats: 4, absName: '8' },
+            makeChord({ sectionId: 'a', sectionLabel: 'A (Tonic)', beats: 4, absName: '1' }),
+            makeChord({ sectionId: 'a', sectionLabel: 'A (Tonic)', beats: 4, absName: '2' }),
+            makeChord({ sectionId: 'a', sectionLabel: 'A (Tonic)', beats: 4, absName: '3' }),
+            makeChord({ sectionId: 'a', sectionLabel: 'A (Tonic)', beats: 4, absName: '4' }),
+            makeChord({ sectionId: 'a', sectionLabel: 'A (Tonic)', beats: 4, absName: '5' }),
+            makeChord({ sectionId: 'b', sectionLabel: 'A (III)', beats: 4, absName: '6' }),
+            makeChord({ sectionId: 'b', sectionLabel: 'A (III)', beats: 4, absName: '7' }),
+            makeChord({ sectionId: 'b', sectionLabel: 'A (III)', beats: 4, absName: '8' }),
         ];
 
         const sections = buildLeadSheetSections(
             progression,
             [
-                { id: 'a', seamless: false },
-                { id: 'b', seamless: true },
+                { id: 'a', label: 'A', value: '', seamless: false },
+                { id: 'b', label: 'B', value: '', seamless: true },
             ],
             timeSignature,
         );
@@ -93,24 +96,24 @@ describe('lead-sheet-model', () => {
     it('builds measure bounds and chord timing from each section-local meter', () => {
         const sections = buildLeadSheetSections(
             [
-                {
+                makeChord({
                     sectionId: 'odd',
                     sectionLabel: 'Odd',
                     beats: 7,
                     timeSignature: '7/8',
                     absName: 'Dm',
-                },
-                {
+                }),
+                makeChord({
                     sectionId: 'four',
                     sectionLabel: 'Four',
                     beats: 4,
                     timeSignature: '4/4',
                     absName: 'G',
-                },
+                }),
             ],
             [
-                { id: 'odd', seamless: false, timeSignature: '7/8' },
-                { id: 'four', seamless: false, timeSignature: '4/4' },
+                { id: 'odd', label: 'Odd', value: '', seamless: false, timeSignature: '7/8' },
+                { id: 'four', label: 'Four', value: '', seamless: false, timeSignature: '4/4' },
             ],
             { beats: 7, stepsPerBeat: 2 },
         );
@@ -268,12 +271,14 @@ describe('lead-sheet-model', () => {
     // the meter, so the comparison must tolerate float drift, not the shape.)
     describe('TS-invariant measure grouping (S8)', () => {
         const buildShape = (bars: number, chordsPerBar: number, tsBeats: number) =>
-            Array.from({ length: bars * chordsPerBar }, (_, index) => ({
-                sectionId: 'a',
-                sectionLabel: 'A',
-                beats: tsBeats / chordsPerBar,
-                absName: `Chord ${index + 1}`,
-            }));
+            Array.from({ length: bars * chordsPerBar }, (_, index) =>
+                makeChord({
+                    sectionId: 'a',
+                    sectionLabel: 'A',
+                    beats: tsBeats / chordsPerBar,
+                    absName: `Chord ${index + 1}`,
+                }),
+            );
 
         const measureCount = (
             bars: number,
@@ -282,7 +287,7 @@ describe('lead-sheet-model', () => {
         ) =>
             buildLeadSheetSections(
                 buildShape(bars, chordsPerBar, ts.beats),
-                [{ id: 'a', seamless: false }],
+                [{ id: 'a', label: 'A', value: '', seamless: false }],
                 ts,
             ).reduce((total, block) => total + block.measures.length, 0);
 
