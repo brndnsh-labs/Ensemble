@@ -20,18 +20,25 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { calculateStepDuration } from '../../public/engine/groove-engine.js';
+import type { generateNotesForStep as GenerateNotesForStepFn } from '../../public/engine/tick-logic.js';
 import { getEffectiveMeterAtStep } from '../../public/meter.js';
+import type { EnsembleState, Section } from '../../public/types.js';
 
 const initAudioMock = vi.fn();
 const scheduleGlobalEventMock = vi.fn();
-const emptyGeneratedStep = () => ({
+const emptyGeneratedStep = (): {
+    notes: never[];
+    coordination: { lastActiveSoloistMidi?: number; lastActiveSoloistStep?: number };
+} => ({
     notes: [],
     coordination: { lastActiveSoloistMidi: 0, lastActiveSoloistStep: 0 },
 });
-const generateNotesForStepMock = vi.fn(emptyGeneratedStep);
+const generateNotesForStepMock = vi.fn((..._args: Parameters<typeof GenerateNotesForStepFn>) =>
+    emptyGeneratedStep(),
+);
 const validateProgressionMock = vi.fn();
 let hiddenGenerationPhase = 0;
-const resetHiddenGenerationMemoryMock = vi.fn(() => {
+const resetHiddenGenerationMemoryMock = vi.fn((_state: EnsembleState) => {
     hiddenGenerationPhase = 0;
 });
 const resetSoloistStateMock = vi.fn();
@@ -69,7 +76,8 @@ function makeLiveState() {
             unswungNextNoteTime: 0,
         },
         arranger: {
-            sections: [{ id: 'a', label: 'A', value: 'C G Am F' }],
+            sections: [{ id: 'a', label: 'A', value: 'C G Am F' } as Section],
+            timeSignature: '4/4',
             totalSteps: 16,
             progression: [],
             stepMap: [],
@@ -212,7 +220,7 @@ describe('renderStemsToWav (#1018 stem export)', () => {
         await renderCurrentSessionToWav();
 
         expect(generateNotesForStepMock).toHaveBeenCalled();
-        expect(generateNotesForStepMock.mock.calls[0][3].includeBass).toBe(true);
+        expect(generateNotesForStepMock.mock.calls[0][3]?.includeBass).toBe(true);
     });
 
     it('renders non-silent audio for every stem', async () => {

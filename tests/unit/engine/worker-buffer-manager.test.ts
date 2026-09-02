@@ -1,10 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { generateNotesForStep as GenerateNotesForStepFn } from '../../../public/engine/tick-logic.js';
 import { fillBuffers } from '../../../public/engine/worker-buffer-manager.js';
 import { resetWorkerContext, workerContext } from '../../../public/engine/worker-orchestrator.js';
 import type { EnsembleState } from '../../../public/types.js';
 
 const generateNotesForStep = vi.hoisted(() =>
-    vi.fn(() => ({ notes: [], coordination: {}, drumHits: [] })),
+    vi.fn((..._args: Parameters<typeof GenerateNotesForStepFn>) => ({
+        notes: [],
+        coordination: {},
+        drumHits: [],
+    })),
 );
 
 vi.mock('../../../public/engine/tick-logic.js', () => ({ generateNotesForStep }));
@@ -43,9 +48,9 @@ describe('worker buffer heads across section overrides', () => {
         expect(workerContext.bbBufferHead).toBe(8);
         expect(generateNotesForStep).toHaveBeenCalledTimes(8);
         expect(
-            generateNotesForStep.mock.calls.slice(0, 4).every((call) => !call[3].includeBass),
+            generateNotesForStep.mock.calls.slice(0, 4).every((call) => !call[3]?.includeBass),
         ).toBe(true);
-        expect(generateNotesForStep.mock.calls.slice(4).every((call) => call[3].includeBass)).toBe(
+        expect(generateNotesForStep.mock.calls.slice(4).every((call) => call[3]?.includeBass)).toBe(
             true,
         );
     });

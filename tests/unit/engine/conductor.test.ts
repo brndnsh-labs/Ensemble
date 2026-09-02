@@ -346,7 +346,7 @@ describe('Conductor Logic', () => {
             arranger.sections = [{ id: 's1', seamless: false }];
             conductor.form = null;
 
-            const runCycle = (iteration) => {
+            const runCycle = (iteration: number) => {
                 conductor.formIteration = iteration;
                 checkSectionTransition(getState(), 0, 16, dispatch);
                 return conductor.targetIntensity;
