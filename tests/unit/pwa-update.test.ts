@@ -35,11 +35,12 @@ vi.mock('workbox-window', () => {
         register = vi.fn(() => Promise.resolve(undefined));
         update = vi.fn();
         messageSkipWaiting = vi.fn();
+        scriptURL: string;
+        options: unknown;
 
-        constructor(
-            public scriptURL: string,
-            public options: unknown,
-        ) {
+        constructor(scriptURL: string, options: unknown) {
+            this.scriptURL = scriptURL;
+            this.options = options;
             instances.push(this);
         }
 

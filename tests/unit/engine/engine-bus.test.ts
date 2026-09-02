@@ -173,7 +173,9 @@ describe('Engine Bus Management', () => {
 
             expect(mockGain.gain.setTargetAtTime).toHaveBeenCalledTimes(5);
             expect(
-                mockGain.gain.setTargetAtTime.mock.calls.every(([target]) => target > 0.0001),
+                mockGain.gain.setTargetAtTime.mock.calls.every(
+                    ([target]: [number]) => target > 0.0001,
+                ),
             ).toBe(true);
         });
     });

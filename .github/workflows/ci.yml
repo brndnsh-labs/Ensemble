@@ -32,10 +32,11 @@ permissions:
 
 jobs:
   # The full non-browser gate. `npm run ci` is the single source of truth for
-  # what "green" means — typecheck, depcheck, knip, mutation/lint/docs checks,
-  # unit tests, production build, and bundle-size budgets — so `npm run ci`
-  # locally predicts this job exactly. Keep this job's checks == that script;
-  # don't add gate steps here that aren't in the script (or vice versa).
+  # what "green" means — typecheck (public/ + tests/), depcheck, knip,
+  # mutation/lint/docs checks, unit tests, production build, and bundle-size
+  # budgets — so `npm run ci` locally predicts this job exactly. Keep this
+  # job's checks == that script; don't add gate steps here that aren't in the
+  # script (or vice versa).
   checks:
     runs-on: ubuntu-latest
     timeout-minutes: 15

@@ -53,7 +53,7 @@ describe('MIDI Export Logic', () => {
     });
 
     it('keeps the caller pending until the worker export settles', async () => {
-        let finishExport;
+        let finishExport: ((value?: unknown) => void) | undefined;
         mockStartExport.mockReturnValue(
             new Promise((resolve) => {
                 finishExport = resolve;
@@ -67,7 +67,7 @@ describe('MIDI Export Logic', () => {
         await Promise.resolve();
         expect(settled).toBe(false);
 
-        finishExport();
+        finishExport!();
         await exportPromise;
         expect(settled).toBe(true);
     });

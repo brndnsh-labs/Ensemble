@@ -2,7 +2,7 @@ import type { Page } from '@playwright/test';
 import pkg from '@playwright/test';
 import { gotoHydrated, openSettings } from './helpers/nav.js';
 
-const { expect, test } = pkg;
+const { expect, test } = pkg as unknown as typeof import('@playwright/test');
 
 /** Read an instrument's sound-source state via the e2e bridge. */
 async function readSource(page: Page, module: string) {

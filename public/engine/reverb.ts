@@ -118,7 +118,7 @@ interface Comb {
  * space in real time.
  */
 export function createAlgorithmicReverb(
-    ctx: AudioContext,
+    ctx: BaseAudioContext,
     preset: ReverbPreset = REVERB_PRESETS.hall,
 ): AlgorithmicReverb {
     const input = ctx.createGain();
