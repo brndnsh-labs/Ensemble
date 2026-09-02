@@ -27,9 +27,10 @@
 // exercising this the moment an unrelated seeder change landed.
 import { describe, expect, it } from 'vitest';
 import { getSoloistNotePhraseFirst } from '../../../public/engine/soloist-phrase-first.js';
+import { makeChord } from '../../utils/chord-fixture.js';
 
 const TOTAL = 64;
-const CHORD = { rootMidi: 60, quality: 'maj7', intervals: [0, 4, 7, 11] };
+const CHORD = makeChord({ rootMidi: 60, quality: 'maj7', intervals: [0, 4, 7, 11] });
 
 function note(step: number, midi: number, extra: Record<string, unknown> = {}) {
     return { step, midi, isAnchor: false, durationSteps: 8, velocity: 0.7, ...extra };

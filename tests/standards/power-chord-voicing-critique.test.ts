@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { applyPowerChordVoicing } from '../../public/engine/accompaniment.js';
 import { isPowerChordChordsVoice } from '../../public/engine/instrument-registry.js';
+import type { NoteResult } from '../../public/engine/tick-logic.js';
 import { generateNotesForStep } from '../../public/engine/tick-logic.js';
 import { getState } from '../../public/state.js';
 import type { InstrumentVoice } from '../../public/types.js';
@@ -230,22 +231,34 @@ describe('Power-chord voicing — played freq through generateNotesForStep (#698
 
     it('the exposed final-cadence chord is a power chord in the PLAYED freq (no third)', () => {
         const state = makeGuitarChordsTickState('pack:electric-guitar-rhythm' as InstrumentVoice);
-        getState.mockReturnValue(state);
+        vi.mocked(getState).mockReturnValue(state);
         const cursors = {
             mainCursor: { index: 0, sectionIndex: 0 },
             lookaheadCursor: { index: 0, sectionIndex: 0 },
         };
 
-        const { notes } = generateNotesForStep(state, FINAL_DOWNBEAT, cursors, {
-            includeSoloist: false,
-            includeBass: false,
-            includeChords: true,
-            includeHarmony: false,
-            includeDrums: false,
-        });
+        const { notes } = generateNotesForStep(
+            state,
+            FINAL_DOWNBEAT,
+            cursors,
+            {
+                includeSoloist: false,
+                includeBass: false,
+                includeChords: true,
+                includeHarmony: false,
+                includeDrums: false,
+            },
+            null,
+        );
 
         const chordNotes = notes.filter(
-            (n: any) => n.module === 'chords' && !n.muted && Number.isFinite(n.freq) && n.freq > 0,
+            (n): n is NoteResult & { freq: number; midi: number } =>
+                n.module === 'chords' &&
+                !n.muted &&
+                typeof n.freq === 'number' &&
+                Number.isFinite(n.freq) &&
+                n.freq > 0 &&
+                typeof n.midi === 'number',
         );
         expect(chordNotes.length, 'cadence must emit a chord voicing').toBeGreaterThanOrEqual(2);
 
@@ -270,19 +283,25 @@ describe('Power-chord voicing — played freq through generateNotesForStep (#698
         // Negative control — the synth/piano fallback keeps the third; the
         // reduction must be voice-gated, not applied to every chord.
         const state = makeGuitarChordsTickState('pack:grand' as InstrumentVoice);
-        getState.mockReturnValue(state);
+        vi.mocked(getState).mockReturnValue(state);
         const cursors = {
             mainCursor: { index: 0, sectionIndex: 0 },
             lookaheadCursor: { index: 0, sectionIndex: 0 },
         };
 
-        const { notes } = generateNotesForStep(state, FINAL_DOWNBEAT, cursors, {
-            includeSoloist: false,
-            includeBass: false,
-            includeChords: true,
-            includeHarmony: false,
-            includeDrums: false,
-        });
+        const { notes } = generateNotesForStep(
+            state,
+            FINAL_DOWNBEAT,
+            cursors,
+            {
+                includeSoloist: false,
+                includeBass: false,
+                includeChords: true,
+                includeHarmony: false,
+                includeDrums: false,
+            },
+            null,
+        );
 
         const playedPcs = new Set(
             notes
@@ -302,19 +321,25 @@ describe('Power-chord voicing — played freq through generateNotesForStep (#698
             'pack:electric-guitar-rhythm' as InstrumentVoice,
             'Metal',
         );
-        getState.mockReturnValue(state);
+        vi.mocked(getState).mockReturnValue(state);
         const cursors = {
             mainCursor: { index: 0, sectionIndex: 0 },
             lookaheadCursor: { index: 0, sectionIndex: 0 },
         };
 
-        const { notes } = generateNotesForStep(state, FINAL_DOWNBEAT, cursors, {
-            includeSoloist: false,
-            includeBass: false,
-            includeChords: true,
-            includeHarmony: false,
-            includeDrums: false,
-        });
+        const { notes } = generateNotesForStep(
+            state,
+            FINAL_DOWNBEAT,
+            cursors,
+            {
+                includeSoloist: false,
+                includeBass: false,
+                includeChords: true,
+                includeHarmony: false,
+                includeDrums: false,
+            },
+            null,
+        );
 
         const chordNotes = notes.filter(
             (n: any) => n.module === 'chords' && !n.muted && n.freq > 0,

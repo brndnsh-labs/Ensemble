@@ -24,6 +24,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { entryBendToPitchWheel } from '../../../public/engine/midi-utils.js';
 import { isSilentSentinel } from '../../../public/engine/mute-contract.js';
 import { soloistIntensityGain } from '../../../public/engine/velocity-shaping.js';
+import type { ChordAtStep } from '../../../public/engine/worker-utils.js';
+import type { EnsembleState } from '../../../public/types.js';
 import { makeSoloistMock } from '../../utils/mock-soloist.js';
 
 vi.mock('../../../public/engine/engine.js', () => ({
@@ -83,7 +85,7 @@ describe('#1322 — bend-direction-sign parity (entryBendToPitchWheel)', () => {
 });
 
 describe('#1322 — note-existence parity: bass mute', () => {
-    const CHORD_DATA = { chord: { freqs: [] } };
+    const CHORD_DATA = { chord: { freqs: [] } } as unknown as ChordAtStep;
 
     function makeBassState(notes: Array<Record<string, unknown>>) {
         return {
@@ -334,9 +336,11 @@ describe('#1325 — the EXPORTER actually calls the shared curves (not just the 
         // above 1.0, so clamping collapses the exported bass lane to a single
         // velocity (measured: Rock and Jazz @0.6 both go 3-4 distinct values → 1).
         // If someone "restores parity" by adding the clamp, this goes red.
-        expect(exportedVelocityByte('bass', 1.25)).toBeGreaterThan(
-            exportedVelocityByte('bass', 1.0),
-        );
+        const highAccent = exportedVelocityByte('bass', 1.25);
+        const lowAccent = exportedVelocityByte('bass', 1.0);
+        expect(highAccent).not.toBeNull();
+        expect(lowAccent).not.toBeNull();
+        expect(highAccent as number).toBeGreaterThan(lowAccent as number);
     });
 
     it('BASS: the metric accent structure survives export — distinct velocities across the engine’s real [0,1.25] range', () => {
@@ -353,8 +357,11 @@ describe('#1325 — the EXPORTER actually calls the shared curves (not just the 
         const low = exportedVelocityByte('soloist', 0.7, 0);
         const mid = exportedVelocityByte('soloist', 0.7, 0.5);
         const high = exportedVelocityByte('soloist', 0.7, 1);
-        expect(low).toBeLessThan(mid);
-        expect(mid).toBeLessThan(high);
+        expect(low).not.toBeNull();
+        expect(mid).not.toBeNull();
+        expect(high).not.toBeNull();
+        expect(low as number).toBeLessThan(mid as number);
+        expect(mid as number).toBeLessThan(high as number);
     });
 
     it('CHORDS: an audible ghost keeps its engine velocity without a second export attenuation', () => {
@@ -370,9 +377,13 @@ describe('#1325 — the EXPORTER actually calls the shared curves (not just the 
 });
 
 describe('#938 — note-existence parity: audible chord ghosts and silent sentinels', () => {
-    const CHORD_DATA = { chord: { absName: 'C' } };
+    const CHORD_DATA = { chord: { absName: 'C' } } as unknown as ChordAtStep;
 
-    function makeChordsState(notes: Array<Record<string, unknown>>, voice = 'Piano') {
+    function makeChordsState(
+        notes: Array<Record<string, unknown>>,
+        voice = 'Piano',
+        vizEnabled = false,
+    ) {
         return {
             chords: { buffer: new Map([[0, notes]]), voice },
             playback: {
@@ -382,8 +393,8 @@ describe('#938 — note-existence parity: audible chord ghosts and silent sentin
                 lastChordKey: null,
                 drawQueue: [],
             },
-            vizState: { enabled: false },
-        } as never;
+            vizState: { enabled: vizEnabled },
+        } as unknown as EnsembleState;
     }
 
     function chordNote(overrides: Record<string, unknown> = {}) {
@@ -410,8 +421,11 @@ describe('#938 — note-existence parity: audible chord ghosts and silent sentin
     });
 
     it('an audible ghost reaches audio, MIDI-out, and the visualizer at its reduced velocity', () => {
-        const state = makeChordsState([chordNote({ velocity: 0.18, durationSteps: 0.1 })]);
-        state.vizState.enabled = true;
+        const state = makeChordsState(
+            [chordNote({ velocity: 0.18, durationSteps: 0.1 })],
+            'Piano',
+            true,
+        );
 
         scheduleChords(state, CHORD_DATA, 0, 0);
 

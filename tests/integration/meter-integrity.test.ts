@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { TIME_SIGNATURES } from '../../public/config.js';
 import { applyGrooveOverrides } from '../../public/engine/groove-engine.js';
+import type { EnsembleState } from '../../public/types.js';
 import { getStepInfo, getStepsPerMeasure } from '../../public/utils.js';
 import { makeSoloistMock } from '../utils/mock-soloist.js';
 
@@ -66,9 +67,9 @@ describe('Meter Integrity & Musicality', () => {
         ],
         measures: 1,
         sectionSeedMap: {},
-    };
+    } as unknown as EnsembleState['groove'];
 
-    const playback = { bandIntensity: 0.5 };
+    const playback = { bandIntensity: 0.5 } as unknown as EnsembleState['playback'];
 
     it('should maintain musical ride pulse in 6/8 Jazz', () => {
         const timeSignature = '6/8';
@@ -84,7 +85,11 @@ describe('Meter Integrity & Musicality', () => {
                 stepVal: 0,
                 playback,
                 groove: defaultGroove,
+                sectionOccurrence: 0,
+                isFinalMeasure: false,
                 ...stepInfo,
+                isDownbeat: stepInfo.isMeasureStart,
+                tsConfig: stepInfo.tsConfig,
             });
 
             if (res.shouldPlay) {
@@ -111,7 +116,11 @@ describe('Meter Integrity & Musicality', () => {
                 stepVal: 0,
                 playback,
                 groove: defaultGroove,
+                sectionOccurrence: 0,
+                isFinalMeasure: false,
                 ...stepInfo,
+                isDownbeat: stepInfo.isMeasureStart,
+                tsConfig: stepInfo.tsConfig,
             });
 
             if (res.shouldPlay) {
@@ -135,7 +144,11 @@ describe('Meter Integrity & Musicality', () => {
                 stepVal: 0,
                 playback,
                 groove: defaultGroove,
+                sectionOccurrence: 0,
+                isFinalMeasure: false,
                 ...stepInfo,
+                isDownbeat: stepInfo.isMeasureStart,
+                tsConfig: stepInfo.tsConfig,
             });
 
             if (res.shouldPlay) {
