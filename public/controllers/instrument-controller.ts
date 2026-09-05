@@ -46,7 +46,10 @@ export async function loadDrumPreset(name: string): Promise<void> {
     }
     const newInstruments = groove.instruments.map((inst) => {
         const spm = getStepsPerMeasure(arranger.timeSignature);
-        const pattern = p[inst.name] || new Array(spm).fill(0);
+        const rawPattern = p[inst.name] || new Array(spm).fill(0);
+        // The catalog mixes numeric hits with compact string grids for default rests.
+        const pattern =
+            typeof rawPattern === 'string' ? Array.from(rawPattern, Number) : rawPattern;
         const newSteps = new Array(128).fill(0);
         pattern.forEach((v: any, i: number) => {
             if (i < 128) {

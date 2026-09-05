@@ -238,19 +238,10 @@ describe('Jazz Bass Critique', () => {
         randomSpy.mockRestore();
     });
 
-    // why: epic-deterministic-phrasing S3. The generic walking fallback applies a
-    // target-distance bias when a chord change is ahead (gated on `nextChord &&
-    // nextChord.rootMidi !== chord.rootMidi`). The honest way to measure that bias is
-    // A/B: same call site, same other logic, the only difference being whether
-    // nextChord is passed or null. We compare mean pitch-class distance to the next
-    // root on beat 3 across the two runs and assert the bias-on mean is meaningfully
-    // lower. An absolute-threshold test can't work here — the random-uniform baseline
-    // over a normal jazz progression is already ~3 semitones (because parent scales
-    // overlap with the target's diatonic neighborhood), so any "< N" threshold is
-    // either trivially passing or sub-baseline-flaky. Delta is the real signal.
-    it('walking fallback on beat 3 pulls closer to next chord root when bias is on (A/B)', () => {
-        const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.5);
-
+    // Next-chord awareness should pull Jazz pickups toward their destination.
+    // Compare the same previous-note context with and without lookahead, rather
+    // than an absolute distance threshold that ordinary scale notes can satisfy.
+    it('Jazz beat-3 pickups pull closer to the next chord root with lookahead (A/B)', () => {
         const chordC = { rootMidi: 48, quality: 'maj7', beats: 4, intervals: [0, 4, 7, 11] };
         const chordG = { rootMidi: 43, quality: '7', beats: 4, intervals: [0, 4, 7, 10] };
         const chordA = { rootMidi: 45, quality: 'm7', beats: 4, intervals: [0, 3, 7, 10] };
@@ -271,10 +262,13 @@ describe('Jazz Bass Critique', () => {
         }
 
         // collectBeat3Distances measures the chosen note's pitch-class distance to
-        // the upcoming root on every beat 3 where a real chord change is pending.
-        // `passNextChord` toggles whether the engine sees a non-null nextChord (bias
-        // on) or always null (bias off) — both runs still know about the upcoming
-        // chord externally, so the measurement uses it regardless.
+        // the upcoming root on beat-3 pickups where a real chord change is pending.
+        // Beat 3 itself returns a root/fifth independent of lookahead. Its pickup
+        // reaches the shared approach branch, NOT the generic weighted fallback.
+        // This guards audible target awareness, not a particular weight multiplier.
+        // Both arms follow the SAME previous-note history. Toggle nextChord only
+        // for the measured pickup; otherwise a beat-2 path-note change can masquerade
+        // as an effect of the pickup's own lookahead.
         const collectBeat3Distances = (passNextChord: boolean): number[] => {
             const distances: number[] = [];
             let lastMidi: number | null = null;
@@ -284,7 +278,6 @@ describe('Jazz Bass Critique', () => {
                 const currentChord = progression[measure % 4];
                 const upcomingChord = progression[(measure + 1) % 4];
                 const isChange = upcomingChord.rootMidi !== currentChord.rootMidi;
-                const nextChordArg = passNextChord && isChange ? upcomingChord : null;
 
                 const info = getStepInfo(i, tsConfig, [], TIME_SIGNATURES);
                 const active = isBassActive(getState(), 'quarter', i, stepInMeasure, info);
@@ -292,27 +285,31 @@ describe('Jazz Bass Critique', () => {
                     continue;
                 }
 
-                const note = getBassNote(
-                    getState(),
-                    currentChord,
-                    nextChordArg,
-                    Math.floor(stepInMeasure / 4),
-                    lastMidi ? getFrequency(lastMidi) : 0,
-                    48,
-                    'quarter',
-                    0,
-                    i,
-                    stepInMeasure,
-                    {},
-                    info,
-                );
+                const noteAt = (target) =>
+                    getBassNote(
+                        getState(),
+                        currentChord,
+                        target,
+                        Math.floor(stepInMeasure / 4),
+                        lastMidi ? getFrequency(lastMidi) : 0,
+                        48,
+                        'quarter',
+                        0,
+                        i,
+                        stepInMeasure,
+                        {},
+                        info,
+                    );
+                const reference = noteAt(upcomingChord);
+                const intBeat = Math.floor(stepInMeasure / 4);
+                const isPickup = intBeat === 2 && !info.isBeatStart && isChange;
+                const note = !passNextChord && isPickup ? noteAt(null) : reference;
                 if (!note || note.muted) {
                     continue;
                 }
-                lastMidi = note.midi;
+                lastMidi = reference.midi;
 
-                const intBeat = Math.floor(stepInMeasure / 4);
-                if (intBeat === 2 && isChange) {
+                if (isPickup) {
                     const targetPc = upcomingChord.rootMidi % 12;
                     const notePc = note.midi % 12;
                     const pcDist = Math.min(
@@ -325,8 +322,21 @@ describe('Jazz Bass Critique', () => {
             return distances;
         };
 
-        const withBias = collectBeat3Distances(true);
-        const withoutBias = collectBeat3Distances(false);
+        // A single pinned RNG value made every earlier walk use one pitch choice.
+        // Measure the unchanged bias bound across 32 explicit, matched song seeds
+        // instead, so prior-note history samples the vocabulary the player hears.
+        const withBias: number[] = [];
+        const withoutBias: number[] = [];
+        const originalSeed = mockState.arranger.seed;
+        try {
+            for (let seed = 0; seed < 32; seed++) {
+                mockState.arranger.seed = `JAZZ_TARGET_${seed}`;
+                withBias.push(...collectBeat3Distances(true));
+                withoutBias.push(...collectBeat3Distances(false));
+            }
+        } finally {
+            mockState.arranger.seed = originalSeed;
+        }
 
         const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
         const meanWith = mean(withBias);
@@ -334,7 +344,7 @@ describe('Jazz Bass Critique', () => {
         const delta = meanWith - meanWithout;
 
         console.log(
-            '\n--- WALKING FALLBACK TARGET-AWARENESS A/B REPORT ---\n' +
+            '\n--- JAZZ PICKUP TARGET-AWARENESS A/B REPORT ---\n' +
                 `[Samples per run]                ${withBias.length}\n` +
                 `[Mean PC dist, bias ON]          ${meanWith.toFixed(2)} st\n` +
                 `[Mean PC dist, bias OFF]         ${meanWithout.toFixed(2)} st\n` +
@@ -344,19 +354,12 @@ describe('Jazz Bass Critique', () => {
         );
 
         // The bias-on mean must trend closer to the target than bias-off. The
-        // measurement is fully deterministic (Math.random pinned at 0.5, loop 0,
-        // and the activity gate is seeded on step) so this is a fixed value, not
-        // a noisy estimate. Epic 2 S4 seeded the jazz/quarter eighth-skip gate;
-        // that changed which beat-3 contexts the walk samples, so the observed
-        // pull is now ~0.13 st (was ~0.25 under the old degenerate 0.5-stub
-        // activity). The bias code (getBassNoteStyle) is unchanged — only the
-        // sample shifted. -0.10 still guards a real directional pull (≥0.10 st)
+        // measurement is fully deterministic (explicit seeds, loop 0, and an
+        // activity gate seeded on step). -0.10 guards a real directional pull (≥0.10 st)
         // without freezing the magnitude or pushing toward robotic root-targeting.
         expect(withBias.length).toBeGreaterThan(20);
         expect(withoutBias.length).toBe(withBias.length);
         expect(delta).toBeLessThanOrEqual(-0.1);
-
-        randomSpy.mockRestore();
     });
 
     // why: epic-bass-voice-leading S1. Walking-bass approach notes should fire
