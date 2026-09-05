@@ -282,6 +282,13 @@ export function getBassNote(
     const intBeat = Math.floor(stepInMeasure / ts.stepsPerBeat);
     const isDownbeat = stepInfo ? stepInfo.isMeasureStart : stepInMeasure === 0;
 
+    // Fresh takes with a locked song seed replay, while later passes still vary.
+    // Separate decision salts avoid a stream-order dependency on earlier branches.
+    // Why: the worker generates ahead of the scheduler's loop counter. Key only on
+    // generation position; section-practice steps retain their existing folded frame.
+    const emissionSeed = stringHash33(arranger.seed || '') ^ Math.imul(step, 0x9e3779b1);
+    const bassDraw = (salt: number) => scrambleHash((emissionSeed + salt) | 0);
+
     // --- Intensity Mapping ---
     const globalIntensity = playback.bandIntensity || 0.5;
     const intensity = globalIntensity;
@@ -1432,13 +1439,12 @@ export function getBassNote(
         !isDownbeat
     ) {
         // Quiet rock/funk off-beats (low intensity): mostly lay out — 60% skip, else a
-        // soft ghost 30% of the time for a breathing, human feel. Raw Math.random here
-        // (not this file's scrambleHash sites) is deliberate: per-loop variety on this
-        // ornament is wanted; loop-stable repetition is intentionally NOT (#1083).
-        if (isSoloistBusy || Math.random() < 0.6) {
+        // soft ghost 30% of the time for a breathing, human feel. The emission seed
+        // includes the pass: variation between loops remains intentional (#1083).
+        if (isSoloistBusy || bassDraw(1) < 0.6) {
             return null;
         }
-        if (Math.random() < 0.3) {
+        if (bassDraw(2) < 0.3) {
             return result(getFrequency(baseRoot), 1, 0.4, 1);
         }
     }
@@ -1464,10 +1470,10 @@ export function getBassNote(
                 targetInterval = scale.includes(10) ? 10 : 9;
             }
             // High-energy blues (intensity > 0.7): 40% of the time break the predictable
-            // walk-up with a random scale tone for an improvised, live feel. Raw
-            // Math.random (not scrambleHash) on purpose — per-loop variety is the point (#1083).
-            if (intensity > 0.7 && Math.random() < 0.4) {
-                targetInterval = scale[Math.floor(Math.random() * scale.length)];
+            // walk-up with a random scale tone for an improvised, live feel.
+            // Pass-aware draws retain per-loop variety without changing replay (#1083).
+            if (intensity > 0.7 && bassDraw(3) < 0.4) {
+                targetInterval = scale[Math.floor(bassDraw(4) * scale.length)];
             }
             return result(
                 getFrequency(clampAndNormalizeMidi(baseRoot + targetInterval, prevMidi)),
@@ -1717,7 +1723,7 @@ export function getBassNote(
             // #941: the mirrored term lost its `+ intensity * 0.3` slope at the
             // same time `tunedVel` did — this is a PAIRED SITE, and the two have
             // to keep matching or the fill stops sitting in the riddim's pocket.
-            const reggaeFillVel = velocity * 0.8 * (0.95 + Math.random() * 0.1) * 1.05;
+            const reggaeFillVel = velocity * 0.8 * (0.95 + bassDraw(5) * 0.1) * 1.05;
             const reggaeFillRes = result(
                 getFrequency(approachMidi),
                 // why: short duration (1 step) — pickup into the next downbeat,
@@ -1755,6 +1761,7 @@ export function getBassNote(
             // #1292 — the pump's say in the EMISSION, not just in the post-hoc `revoice`.
             // A drawn `fifth` re-voices a lift, so there has to be a lift for it to act on.
             pumpForcesLift: pump.forcesLift(),
+            bassDraw,
         },
         ts,
         stepsPerMeasure,
@@ -1840,7 +1847,7 @@ export function getBassNote(
             chromaticProb *= 0.5;
         }
 
-        if (Math.random() < chromaticProb) {
+        if (bassDraw(6) < chromaticProb) {
             const choices = [
                 { midi: targetRoot - 5, weight: 0.5 },
                 { midi: targetRoot - 1, weight: 1.0 },
@@ -1850,7 +1857,7 @@ export function getBassNote(
             for (let i = 0; i < choices.length; i++) {
                 tw += choices[i].weight;
             }
-            let r = Math.random() * tw;
+            let r = bassDraw(7) * tw;
             let approach = targetRoot - 1;
             for (const c of choices) {
                 r -= c.weight;
@@ -1869,7 +1876,7 @@ export function getBassNote(
                 1,
                 velocity,
                 0,
-                approachBend(groove.genreFeel, approach, targetRoot, isSoloistBusy),
+                approachBend(groove.genreFeel, approach, targetRoot, isSoloistBusy, bassDraw(8)),
                 targetRoot,
             );
         } else {
@@ -1883,7 +1890,7 @@ export function getBassNote(
             return result(
                 getFrequency(
                     valid.length > 0
-                        ? valid[Math.floor(Math.random() * valid.length)]
+                        ? valid[Math.floor(bassDraw(9) * valid.length)]
                         : targetRoot - 5,
                 ),
                 null,

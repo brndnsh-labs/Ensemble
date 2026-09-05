@@ -188,11 +188,12 @@ export function approachBend(
     approach: number,
     targetRoot: number,
     isSoloistBusy: boolean,
+    draw: number,
 ): -1 | 0 | 1 {
     if (isSoloistBusy || !EXPRESSIVE_BEND_GENRES.has(genreFeel)) {
         return 0;
     }
-    return Math.random() < 0.2 ? (approach < targetRoot ? -1 : 1) : 0;
+    return draw < 0.2 ? (approach < targetRoot ? -1 : 1) : 0;
 }
 
 export function checkBassActiveStyle(
@@ -604,6 +605,8 @@ export function getBassNoteStyle(
         normalizeToRange: (midi: number) => number;
         /** `BassPump.forcesLift()` — see the disco `isOffbeatAnd` branch. */
         pumpForcesLift: boolean;
+        /** Pass-aware emission draws; style salts start at 101, engine salts below 100. */
+        bassDraw: (salt: number) => number;
     },
     ts: { stepsPerBeat: number; beats: number },
     stepsPerMeasure: number,
@@ -653,7 +656,8 @@ export function getBassNoteStyle(
     // the now-deleted dead chromatic-approach block. Left off the destructure
     // rather than underscore-prefixed since object destructuring can simply
     // omit an unused property.
-    const { withOctaveJump, clampAndNormalize, normalizeToRange, pumpForcesLift } = context;
+    const { withOctaveJump, clampAndNormalize, normalizeToRange, pumpForcesLift, bassDraw } =
+        context;
 
     // --- COUNTRY STYLE (Two-Step + Quarter-Note Root-Fifth + Walk-Up) ---
     if (style === 'country') {
@@ -846,7 +850,7 @@ export function getBassNoteStyle(
                 isLastActiveStepBeforeChange &&
                 isChordChangeApproach(nextChord, chord) &&
                 intensity > 0.5 &&
-                Math.random() < 0.55
+                bassDraw(101) < 0.55
             ) {
                 // why: intensity > 0.5 gate keeps the slide a high-energy
                 // gesture (quiet hip-hop at intensity 0.4-0.5 stays grounded);
@@ -883,7 +887,7 @@ export function getBassNoteStyle(
                 // why: shorten the slide note so it reads as a pickup gesture
                 // into the new chord's downbeat, not a sustained root.
                 dur = ts.stepsPerBeat * 0.5;
-            } else if (playback.complexity > 0.85 && !isBeatStart && Math.random() < 0.15) {
+            } else if (playback.complexity > 0.85 && !isBeatStart && bassDraw(102) < 0.15) {
                 // why: retain a very low-rate octave grace note for high-
                 // complexity high-energy moments (e.g. a triplet 808 fill),
                 // but at MUCH lower probability than before (was 0.5, now 0.15)
@@ -918,10 +922,10 @@ export function getBassNoteStyle(
             const isSecondary = intBeat === 1 || intBeat === 3;
             if (isSecondary) {
                 // Occasional 5th or Octave at higher intensity
-                if (Math.random() < 0.4 + intensity * 0.3) {
+                if (bassDraw(103) < 0.4 + intensity * 0.3) {
                     const fifthOffset =
                         chord.quality.includes('dim') || chord.quality.includes('halfdim') ? 6 : 7;
-                    note = Math.random() < 0.6 ? baseRoot + fifthOffset : baseRoot + 12;
+                    note = bassDraw(104) < 0.6 ? baseRoot + fifthOffset : baseRoot + 12;
                     dur = ts.stepsPerBeat * 0.6; // Slightly shorter for secondary hits
                 }
             }
@@ -957,15 +961,15 @@ export function getBassNoteStyle(
         // Occurs on 'e' and 'a' subdivisions at medium-high intensity
         if (!isEighth) {
             const gallopProb = (intensity > 0.6 ? 0.6 : 0.2) + playback.complexity * 0.3;
-            if (Math.random() < gallopProb) {
+            if (bassDraw(105) < gallopProb) {
                 // Choice: Chug on root or chromatic approach to next beat
                 let note = baseRoot;
                 let isGhost = false;
 
                 // Chromatic Leading Note
-                if (intensity > 0.75 && Math.random() < 0.4) {
+                if (intensity > 0.75 && bassDraw(106) < 0.4) {
                     const target = baseRoot;
-                    note = Math.random() < 0.5 ? target - 1 : target + 1;
+                    note = bassDraw(107) < 0.5 ? target - 1 : target + 1;
                 } else {
                     isGhost = intensity < 0.8;
                 }
@@ -983,8 +987,8 @@ export function getBassNoteStyle(
         }
 
         // 4. Fill Logic: Fast 16th runs at max intensity
-        if (intensity > 0.9 && Math.random() < 0.3) {
-            const idx = Math.floor(Math.random() * scale.length);
+        if (intensity > 0.9 && bassDraw(108) < 0.3) {
+            const idx = Math.floor(bassDraw(109) * scale.length);
             const walkNote = baseRoot + scale[idx];
             return result(getFrequency(clampAndNormalize(walkNote)), 0.2, 1.1);
         }
@@ -1058,7 +1062,7 @@ export function getBassNoteStyle(
                       ? 0.5 // why: penultimate bar — approach window, a build not the landing
                       : 0.15; // why: no boundary imminent — rare, spontaneous feel
             const pushProb = (0.1 + intensity * 0.15) * sectionGateMult;
-            const isPushPoint = intBeat === ts.beats - 1 && Math.random() < pushProb;
+            const isPushPoint = intBeat === ts.beats - 1 && bassDraw(110) < pushProb;
             if (isPushPoint && isChordChangeApproach(nextChord, chord)) {
                 // why: migrated from rootMidi-only comparison to isChordChangeApproach so
                 // slash chords (e.g. G/B → C) are detected correctly — the old predicate
@@ -1076,7 +1080,7 @@ export function getBassNoteStyle(
                 // non-null on is8th slots, so the universal chromatic-approach branch at
                 // lines 1141-1203 never fires for rock — this sub-branch is the only path
                 // for rock to produce chromatic leading tones on beat-4 push-points.
-                if (Math.random() < 0.08 + intensity * 0.05) {
+                if (bassDraw(111) < 0.08 + intensity * 0.05) {
                     const below = normalizeToRange(nextTarget - 1);
                     const above = normalizeToRange(nextTarget + 1);
                     // why: pick direction by proximity to prevMidi for smooth voice leading
@@ -1113,10 +1117,10 @@ export function getBassNoteStyle(
         // why: 0.95 — the "and" is a connective eighth, deliberately under the 1.1
         // pulse. #941 removed the `+ intensity * 0.15` macro slope.
         let vel = 0.95;
-        if (intensity > 0.65 && Math.random() < 0.3 + intensity * 0.2 && !isSoloistBusy) {
+        if (intensity > 0.65 && bassDraw(112) < 0.3 + intensity * 0.2 && !isSoloistBusy) {
             const hasFlat5 = chord.quality === 'dim' || chord.quality === 'halfdim';
             const fifthOffset = hasFlat5 ? 6 : 7;
-            note = Math.random() < 0.5 ? baseRoot + 12 : baseRoot + fifthOffset;
+            note = bassDraw(113) < 0.5 ? baseRoot + 12 : baseRoot + fifthOffset;
             note = clampAndNormalize(note);
             vel *= 1.1;
         }
@@ -1618,7 +1622,7 @@ export function getBassNoteStyle(
             const res = result(
                 getFrequency(clampAndNormalize(finalDeepRoot)),
                 2,
-                tunedVel * (0.95 + Math.random() * 0.1),
+                tunedVel * (0.95 + bassDraw(114) * 0.1),
             );
             res.timingOffset += 0.01 + intensity * 0.01;
             return res;
@@ -1640,7 +1644,7 @@ export function getBassNoteStyle(
             const res = result(
                 getFrequency(clampAndNormalize(finalDeepRoot + interval)),
                 dur,
-                tunedVel * (0.95 + Math.random() * 0.1),
+                tunedVel * (0.95 + bassDraw(115) * 0.1),
             );
             res.timingOffset += 0.01 + intensity * 0.01;
             return res;
@@ -1677,8 +1681,8 @@ export function getBassNoteStyle(
         }
 
         // High Intensity: Add melodic variation and chromatic runs
-        if (intensity > 0.6 && Math.random() < 0.4) {
-            const randomScaleNote = scale[Math.floor(Math.random() * scale.length)];
+        if (intensity > 0.6 && bassDraw(116) < 0.4) {
+            const randomScaleNote = scale[Math.floor(bassDraw(117) * scale.length)];
             targetInterval = randomScaleNote;
         }
 
@@ -1692,7 +1696,7 @@ export function getBassNoteStyle(
         // the chromatic approach. (bass.md micro-cleanup S5.)
         if (isLastEighth && isChordChangeApproach(nextChord, chord) && intensity > 0.5) {
             const nextTarget = normalizeToRange(nextChord.rootMidi);
-            const approach = Math.random() < 0.5 ? nextTarget - 1 : nextTarget + 1;
+            const approach = bassDraw(118) < 0.5 ? nextTarget - 1 : nextTarget + 1;
             const res = result(getFrequency(clampAndNormalize(approach)), 0.8, 1.2);
             res.timingOffset -= 0.005; // Rush the transition
             return res;
@@ -1905,7 +1909,7 @@ export function getBassNoteStyle(
             // Beat 3: High preference for 5th or Octave
             const hasFlat5 = chord.quality === 'dim' || chord.quality === 'halfdim';
             const fifthOffset = hasFlat5 ? 6 : 7;
-            const targetInterval = Math.random() < 0.7 ? fifthOffset : 0;
+            const targetInterval = bassDraw(119) < 0.7 ? fifthOffset : 0;
             return result(
                 getFrequency(clampAndNormalize(baseRoot + targetInterval)),
                 isEighthSkip ? 0.4 : ts.stepsPerBeat * 0.45,

@@ -177,7 +177,7 @@ vi.mock('../../../public/state.js', async () => {
     };
 });
 
-import { getSyncState } from '../../../public/state.js';
+import { getState, getSyncState } from '../../../public/state.js';
 
 global.Worker = class MockWorker {
     url: any;
@@ -267,10 +267,7 @@ const WORKER_SYNC_MANIFEST: Record<
         snapshotOnly:
             'derived arranger structure; rebuilt + full syncWorker() on progression edits',
     },
-    'arranger.seed': {
-        snapshotOnly:
-            'WORKER_CONTRACT §8 main-thread-only: consumed on the main thread to derive sessionSeed/drum maps, which cross via their own deltas',
-    },
+    'arranger.seed': { delta: 'SET_SONG_SEED' },
 
     // --- chords ---
     'chords.style': { delta: 'SET_STYLE' },
@@ -450,6 +447,23 @@ describe('Worker-sync delta reachability (#1012)', () => {
         // manifest entry (and, if it changes live, a delta case). This is the gate.
         expect(unclassified, 'snapshot fields missing a WORKER_SYNC_MANIFEST entry').toEqual([]);
         expect(stale, 'manifest entries for fields no longer in the snapshot').toEqual([]);
+    });
+
+    it('sends the current song seed on successive edits without waiting for a full snapshot', () => {
+        const state = getState();
+        const originalSeed = state.arranger.seed;
+        const worker = getTimerWorker();
+        try {
+            for (const seed of ['FIRST_TAKE', 'SECOND_TAKE']) {
+                state.arranger.seed = seed;
+                worker.postMessage.mockClear();
+                syncWorker('SET_SONG_SEED', seed);
+                expect(worker.postMessage).toHaveBeenCalledTimes(1);
+                expect(worker.postMessage.mock.calls[0][0].data).toEqual({ arranger: { seed } });
+            }
+        } finally {
+            state.arranger.seed = originalSeed;
+        }
     });
 
     it('emits every delta-tagged field when its action is driven through syncWorker', () => {
