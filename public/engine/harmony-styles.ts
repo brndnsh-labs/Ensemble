@@ -21,6 +21,9 @@
  * 'Ska-Punk' feel at runtime, so it is not a key here.
  */
 
+import type { EnsembleState } from '../types.js';
+import { binarySearchMap } from '../utils.js';
+
 export type HarmonySmartStyle = 'organ' | 'strings' | 'horns' | 'plucks' | 'counter';
 export type HarmonyRhythmicStyle = 'pads' | 'stabs';
 
@@ -63,6 +66,8 @@ export interface HarmonyGenreProfile {
     voicing?: HarmonyVoicing;
     /** One restrained chord-tone connection per four-bar window, Smart pads only. */
     movingPadVoice?: boolean;
+    /** Gentle baseline / rise / crest / baseline dynamics on existing pad emissions. */
+    phraseDynamics?: boolean;
 }
 
 /**
@@ -91,6 +96,7 @@ export const HARMONY_GENRE_PROFILES: Record<string, HarmonyGenreProfile> = {
         patternKey: 'default',
         voicing: { harmonizedThirds: true, powerDoubling: true },
         movingPadVoice: true,
+        phraseDynamics: true,
     },
     Jazz: { smartStyle: 'organ', rhythmicStyle: 'stabs', patternKey: 'jazz' },
     Funk: { smartStyle: 'horns', rhythmicStyle: 'stabs', patternKey: 'funk16' },
@@ -111,6 +117,7 @@ export const HARMONY_GENRE_PROFILES: Record<string, HarmonyGenreProfile> = {
         rhythmicStyle: 'pads',
         patternKey: 'default',
         movingPadVoice: true,
+        phraseDynamics: true,
         // Harmony holds the sustained string PAD; the fingerpick arpeggio lives in
         // the chords lane (the 'arp' chord style, #787), its idiomatic plucked home.
         // The bowed strings sample wants to hold, not pluck.
@@ -134,4 +141,24 @@ export const HARMONY_GENRE_PROFILES: Record<string, HarmonyGenreProfile> = {
 /** Look up a genre's harmony profile, falling back to the generic default. */
 export function resolveHarmonyProfile(feel: string): HarmonyGenreProfile {
     return HARMONY_GENRE_PROFILES[feel] ?? DEFAULT_HARMONY_PROFILE;
+}
+
+/** Four actual section-relative bars, including mixed meters and practice returns. */
+export function getPadPhraseGain(state: EnsembleState, step: number): number {
+    const { arranger } = state;
+    if (!(arranger.totalSteps > 0)) {
+        return 1;
+    }
+    const position = ((step % arranger.totalSteps) + arranger.totalSteps) % arranger.totalSteps;
+    const section = binarySearchMap(arranger.sectionMap, position);
+    const measure = binarySearchMap(arranger.measureMap, position);
+    if (!section || !measure) {
+        return 1;
+    }
+    const bar = arranger.measureMap.filter(
+        (entry) => entry.start >= section.start && entry.start < measure.start,
+    ).length;
+    // Never accumulate gain, dip below baseline, or create an attack to express
+    // the contour. A held common tone receives this value on its next emission.
+    return [1, 1.04, 1.08, 1][bar % 4];
 }

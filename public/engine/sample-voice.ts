@@ -70,6 +70,12 @@ export interface SampledNoteHandle {
      * once. No-op-safe if the voice has already ended.
      */
     release(when: number, fade: number): void;
+    /**
+     * Continue a fixed-pitch sample without another attack. False means the
+     * source cannot cover the new hold (ended, released, or buffer exhausted).
+     * Callers may then crossfade a fresh source at this existing note event.
+     */
+    extend(when: number, duration: number, velocity: number, release?: number): boolean;
 }
 
 /** Time constant for the choke ramp — ~3·tc ≈ 12 ms to inaudible, click-free. */
@@ -598,7 +604,55 @@ export function playSampledNote(
 
         // Stop just past the release tail so the source frees itself; never cut
         // the envelope short.
-        const naturalEnd = releaseStart + release + 0.01;
+        let naturalEnd = releaseStart + release + 0.01;
+        let ended = false;
+        let releasedAt = Number.POSITIVE_INFINITY;
+        // Only fixed-pitch voices can use the buffer-duration calculation.
+        // Bends/vibrato retain their existing one-shot lifecycle.
+        const bufferEnd = startTime + zone.buffer.duration / baseRate;
+        let envelope = {
+            start: startTime,
+            from: 0,
+            attackEnd: startTime + attack,
+            peak,
+            releaseStart,
+            end: releaseStart + release,
+        };
+        // A panic can precede an extension already queued by lookahead. Keep
+        // the prior segments until this finite recording ends so that release
+        // evaluates the envelope at the requested time, not the last queued one.
+        const envelopes = [envelope];
+        const holdEnvelope = (at: number) => {
+            let index = envelopes.length - 1;
+            while (index > 0 && envelopes[index].start > at) {
+                index--;
+            }
+            const segment = envelopes[index];
+            // Reconstruct the scheduled value, not AudioParam.value (which is
+            // the audio clock's value, wrong for lookahead and offline renders).
+            const ramping = at < segment.attackEnd || at > segment.releaseStart;
+            const level =
+                at < segment.attackEnd
+                    ? segment.from +
+                      (segment.peak - segment.from) *
+                          Math.max(0, (at - segment.start) / (segment.attackEnd - segment.start))
+                    : at <= segment.releaseStart
+                      ? segment.peak
+                      : segment.peak *
+                        Math.max(
+                            0,
+                            1 - (at - segment.releaseStart) / (segment.end - segment.releaseStart),
+                        );
+            gain.gain.cancelScheduledValues(at);
+            // Preserve the truncated ramp before `at` as well as its value at
+            // `at`; cancel+set alone would flatten the preceding ramp.
+            if (ramping) {
+                gain.gain.linearRampToValueAtTime(level, at);
+            } else {
+                gain.gain.setValueAtTime(level, at);
+            }
+            return level;
+        };
 
         // Opt-in pitch vibrato (#744): an LFO summed onto playbackRate, stopped
         // with the source so it never runs past cleanup. Folded into the node
@@ -618,6 +672,7 @@ export function playSampledNote(
         // the same self-cleanup contract as `playPercussiveStrike`, so sampled
         // notes don't leak a source+gain per played note.
         source.onended = () => {
+            ended = true;
             safeDisconnect([source, gain, ...(toneTilt?.nodes ?? []), ...vibratoNodes]);
             onEnded?.();
         };
@@ -626,19 +681,68 @@ export function playSampledNote(
         source.stop(naturalEnd);
 
         return {
+            extend(when: number, duration: number, velocity: number, nextTail = release): boolean {
+                if (
+                    ended ||
+                    Number.isFinite(releasedAt) ||
+                    bend ||
+                    vibrato ||
+                    !Number.isFinite(when) ||
+                    !Number.isFinite(duration) ||
+                    duration <= 0 ||
+                    !Number.isFinite(velocity) ||
+                    !Number.isFinite(nextTail) ||
+                    nextTail < 0 ||
+                    when < envelope.start ||
+                    when >= Math.min(naturalEnd, bufferEnd) ||
+                    when + duration + nextTail > bufferEnd
+                ) {
+                    return false;
+                }
+                const at = Math.max(when, audio.currentTime);
+                if (at >= Math.min(naturalEnd, bufferEnd) || at + duration + nextTail > bufferEnd) {
+                    return false;
+                }
+                const from = holdEnvelope(at);
+                const nextPeak = Math.max(0, Math.min(MAX_SAMPLE_PEAK, velocity));
+                const attackEnd = at + Math.min(0.03, duration / 2);
+                const nextRelease = at + duration;
+                gain.gain.linearRampToValueAtTime(nextPeak, attackEnd);
+                gain.gain.setValueAtTime(nextPeak, nextRelease);
+                gain.gain.linearRampToValueAtTime(0, nextRelease + nextTail);
+                envelope = {
+                    start: at,
+                    from,
+                    attackEnd,
+                    peak: nextPeak,
+                    releaseStart: nextRelease,
+                    end: nextRelease + nextTail,
+                };
+                envelopes.push(envelope);
+                naturalEnd = nextRelease + nextTail + 0.01;
+                source.stop(naturalEnd);
+                return true;
+            },
             release(when: number, fade: number): void {
+                if (ended) {
+                    return;
+                }
                 try {
                     const at = Number.isFinite(when)
                         ? Math.max(startTime, Math.min(when, naturalEnd))
                         : audio.currentTime;
+                    if (at >= releasedAt) {
+                        return;
+                    }
                     // setTargetAtTime decays from wherever the envelope currently
                     // sits (no anchor read needed); tc ≈ fade/4 → ~inaudible by
                     // `at + fade`. Reschedule the source stop earlier so the voice
                     // frees promptly; never push it past its natural end.
                     const tc = Math.max(0.004, (Number.isFinite(fade) ? fade : 0.05) / 4);
-                    gain.gain.cancelScheduledValues(at);
+                    holdEnvelope(at);
                     gain.gain.setTargetAtTime(0, at, tc);
                     source.stop(Math.min(naturalEnd, at + tc * 8));
+                    releasedAt = at;
                 } catch {
                     /* already stopped / closed context — release is a no-op */
                 }

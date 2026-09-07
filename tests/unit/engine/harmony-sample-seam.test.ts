@@ -33,7 +33,11 @@ vi.mock('../../../public/data/sound-packs.js', () => ({
     toneTiltForPack: mocks.toneTiltForPack,
 }));
 
-import { playHarmonyNote } from '../../../public/engine/synth-harmonies.js';
+import {
+    killHarmonyNote,
+    playHarmonyNote,
+    releaseHarmonyVoicing,
+} from '../../../public/engine/synth-harmonies.js';
 
 const busGain = { connect: vi.fn() };
 
@@ -68,6 +72,10 @@ describe('harmony sample release scaling (#785)', () => {
         });
         mocks.getPackZones.mockReturnValue([zone69]);
         mocks.pickZone.mockReturnValue(zone69);
+        mocks.playSampledNote.mockImplementation(() => ({
+            release: vi.fn(),
+            extend: vi.fn(() => true),
+        }));
     });
 
     it('shortens the release tail for a fast-tempo (short) note', () => {
@@ -96,5 +104,57 @@ describe('harmony sample release scaling (#785)', () => {
         const r = releaseFor(Number.NaN);
         expect(Number.isFinite(r)).toBe(true);
         expect(r).toBeCloseTo(0.2, 5);
+    });
+
+    it('retains a sampled common tone and updates its calibrated gain without an attack', () => {
+        const state = makeState('pack:strings-ensemble');
+        const first = playHarmonyNote(state, A4, 0, 2, 0.4, 'strings', 69);
+        const next = playHarmonyNote(state, A4, 2, 2, 0.432, 'strings', 69, 0, 0, undefined, true);
+        expect(next).toBe(first);
+        expect(mocks.playSampledNote).toHaveBeenCalledTimes(1);
+        expect(state.harmony.activeVoices).toHaveLength(1);
+        expect(mocks.playSampledNote.mock.results[0].value.extend).toHaveBeenCalledWith(
+            2,
+            2,
+            0.864,
+            0.3,
+        );
+        releaseHarmonyVoicing(state, new Set([69]), 2, 0.05);
+        expect(state.harmony.activeVoices).toHaveLength(1);
+        killHarmonyNote(state, 0.05, 3);
+        expect(mocks.playSampledNote.mock.results[0].value.release).toHaveBeenCalledWith(3, 0.05);
+        expect(state.harmony.activeVoices).toHaveLength(0);
+    });
+
+    it('crossfades an exhausted sample at the existing emission and ignores its late cleanup', () => {
+        const state = makeState('pack:strings-ensemble');
+        const first = playHarmonyNote(state, A4, 0, 2, 0.4, 'strings', 69);
+        const oldHandle = mocks.playSampledNote.mock.results[0].value;
+        oldHandle.extend.mockReturnValue(false);
+        const next = playHarmonyNote(state, A4, 2, 2, 0.432, 'strings', 69, 0, 0, undefined, true);
+        expect(next).not.toBe(first);
+        expect(mocks.playSampledNote).toHaveBeenCalledTimes(2);
+        expect(oldHandle.release).toHaveBeenCalledWith(2, 0.06);
+        mocks.playSampledNote.mock.calls[0][5].onEnded();
+        expect(state.harmony.activeVoices).toEqual([next]);
+        mocks.playSampledNote.mock.calls[1][5].onEnded();
+        expect(state.harmony.activeVoices).toEqual([]);
+    });
+
+    it('releases a sampled non-common tone at the scheduled chord change', () => {
+        const state = makeState('pack:strings-ensemble');
+        playHarmonyNote(state, A4, 0, 2, 0.4, 'strings', 69);
+        releaseHarmonyVoicing(state, new Set([72]), 1.8, 0.05);
+        expect(mocks.playSampledNote.mock.results[0].value.release).toHaveBeenCalledWith(1.8, 0.05);
+        expect(state.harmony.activeVoices).toEqual([]);
+    });
+
+    it('gives a retained common tone the new shorter chord release', () => {
+        const state = makeState('pack:strings-ensemble');
+        playHarmonyNote(state, A4, 0, 1.5, 0.4, 'strings', 69);
+        playHarmonyNote(state, A4, 1.5, 0.43, 0.4, 'strings', 69, 0, 0, undefined, true);
+        const call = mocks.playSampledNote.mock.results[0].value.extend.mock.calls[0];
+        expect(call.slice(0, 3)).toEqual([1.5, 0.43, 0.8]);
+        expect(call[3]).toBeCloseTo(0.172, 8);
     });
 });
