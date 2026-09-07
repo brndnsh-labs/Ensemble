@@ -95,6 +95,25 @@ describe('InstrumentSettings Component', () => {
         );
     });
 
+    it.each([
+        ['Jazz', 'arp', 'Piano arpeggio'],
+        ['Jazz', 'strum-country', 'Country Strum'],
+        ['Rock', 'acoustic-strum', 'Acoustic guitar strum'],
+    ])('names a restored %s / %s player without replacing it', (genre, style, label) => {
+        mockUseEnsembleState.mockImplementation((cb) =>
+            cb({
+                chords: { style, density: 'standard', voice: 'synth', autoSound: false },
+                groove: { lastSmartGenre: genre },
+            }),
+        );
+        mockDispatch.mockClear();
+        act(() => render(<InstrumentSpecificSettings module="chords" />, container));
+        const select = container.querySelector('#chordPlayerSelect');
+        expect(select.value).toBe(style);
+        expect(select.options[select.selectedIndex].textContent).toBe(label);
+        expect(mockDispatch).not.toHaveBeenCalled();
+    });
+
     it('should render Volume and Reverb sliders for generic module', () => {
         // Mock state for a generic module (e.g. harmony)
         mockUseEnsembleState.mockImplementation((cb) => {

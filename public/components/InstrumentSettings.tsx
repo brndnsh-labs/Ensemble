@@ -1,6 +1,7 @@
 import { Fragment } from 'preact';
 import { refreshArrangerUI } from '../controllers/arranger-controller.js';
 import { autoVoiceForGenre } from '../data/genre-sound-map.js';
+import { getChordPlayerChoices } from '../data/instrument-styles.js';
 import { packsForInstrument } from '../data/sound-packs.js';
 import { hydrateVoice, isPackInstalled } from '../engine/instrument-registry.js';
 import { resolveSoloistMode } from '../engine/soloist-mode-policy.js';
@@ -16,20 +17,18 @@ import { useEnsembleState } from '../ui-bridge.js';
 import { Icon, type IconName } from './Icon.jsx';
 import { ButtonGroup, Select, SettingGroup, SettingRow, Slider } from './UIControls.jsx';
 
-type InstrumentAudioControl = 'volume' | 'reverb';
+const AUDIO_CONTROLS = [
+    { param: 'volume', suffix: 'Volume', label: 'Vol' },
+    { param: 'reverb', suffix: 'Reverb', label: 'Rev' },
+] as const;
+type InstrumentAudioControl = (typeof AUDIO_CONTROLS)[number]['param'];
 
 function getInstrumentState<M extends InstrumentModule>(module: M): EnsembleState[M] {
     return useEnsembleState((s) => s[module]);
 }
 
 function getModuleName(module: InstrumentModule) {
-    return module === 'groove'
-        ? 'drum'
-        : module === 'chords'
-          ? 'chord'
-          : module === 'harmony'
-            ? 'harmony'
-            : module;
+    return module === 'groove' ? 'drum' : module === 'chords' ? 'chord' : module;
 }
 
 /**
@@ -80,8 +79,6 @@ export function InstrumentMixerStrip({
 
     const moduleName = getModuleName(module);
     const title = label || module;
-    const volumeDisplay = `${Math.round(state.volume * 100)}%`;
-    const reverbDisplay = `${Math.round(state.reverb * 100)}%`;
 
     return (
         <section
@@ -96,44 +93,28 @@ export function InstrumentMixerStrip({
                 <h4>{title}</h4>
             </div>
             <div class="workspace-studio-mixer-strip-controls">
-                <div class="workspace-studio-mixer-strip-slider">
-                    <label
-                        class="workspace-studio-mixer-strip-slider-label"
-                        htmlFor={`${moduleName}Volume`}
-                    >
-                        Vol
-                    </label>
-                    <Slider
-                        id={`${moduleName}Volume`}
-                        min="0"
-                        max="1"
-                        step="0.05"
-                        value={state.volume}
-                        onInput={(val) => updateInstrumentAudio(module, 'volume', val)}
-                        ariaLabel={`${title} volume`}
-                        ariaValueText={volumeDisplay}
-                    />
-                    <span class="workspace-studio-mixer-strip-slider-value">{volumeDisplay}</span>
-                </div>
-                <div class="workspace-studio-mixer-strip-slider">
-                    <label
-                        class="workspace-studio-mixer-strip-slider-label"
-                        htmlFor={`${moduleName}Reverb`}
-                    >
-                        Rev
-                    </label>
-                    <Slider
-                        id={`${moduleName}Reverb`}
-                        min="0"
-                        max="1"
-                        step="0.05"
-                        value={state.reverb}
-                        onInput={(val) => updateInstrumentAudio(module, 'reverb', val)}
-                        ariaLabel={`${title} reverb`}
-                        ariaValueText={reverbDisplay}
-                    />
-                    <span class="workspace-studio-mixer-strip-slider-value">{reverbDisplay}</span>
-                </div>
+                {AUDIO_CONTROLS.map(({ param, suffix, label: controlLabel }) => {
+                    const id = `${moduleName}${suffix}`;
+                    const display = `${Math.round(state[param] * 100)}%`;
+                    return (
+                        <div class="workspace-studio-mixer-strip-slider" key={param}>
+                            <label class="workspace-studio-mixer-strip-slider-label" htmlFor={id}>
+                                {controlLabel}
+                            </label>
+                            <Slider
+                                id={id}
+                                min="0"
+                                max="1"
+                                step="0.05"
+                                value={state[param]}
+                                onInput={(val) => updateInstrumentAudio(module, param, val)}
+                                ariaLabel={`${title} ${param}`}
+                                ariaValueText={display}
+                            />
+                            <span class="workspace-studio-mixer-strip-slider-value">{display}</span>
+                        </div>
+                    );
+                })}
             </div>
         </section>
     );
@@ -247,22 +228,10 @@ interface ChordsControlsProps {
 
 function ChordsControls({ state }: ChordsControlsProps) {
     const genre = useEnsembleState((s) => s.groove.lastSmartGenre);
-    const acoustic = genre === 'Acoustic' || state.style === 'acoustic-strum';
-    const hasPlayerChoice =
-        acoustic || genre === 'Jazz' || ['modern-piano', 'open-modal'].includes(state.style);
-    const playerOptions = [
-        ...(acoustic
-            ? [
-                  { value: 'arp', label: 'Piano arpeggio' },
-                  { value: 'acoustic-strum', label: 'Acoustic guitar strum' },
-              ]
-            : [{ value: 'jazz', label: 'Jazz comping' }]),
-        { value: 'modern-piano', label: 'Modern jazz piano' },
-        { value: 'open-modal', label: 'Open modal piano' },
-    ];
+    const playerOptions = getChordPlayerChoices(genre, state.style);
     return (
         <Fragment>
-            {hasPlayerChoice && (
+            {playerOptions.length > 0 && (
                 <SettingRow
                     label="Playing style"
                     id="chordPlayerSelect"
@@ -277,12 +246,7 @@ function ChordsControls({ state }: ChordsControlsProps) {
                             // the snapshot used to refill the live lookahead buffer.
                             refreshArrangerUI();
                         }}
-                        options={[
-                            ...(!playerOptions.some((option) => option.value === state.style)
-                                ? [{ value: state.style, label: 'Current style' }]
-                                : []),
-                            ...playerOptions,
-                        ]}
+                        options={playerOptions}
                     />
                 </SettingRow>
             )}

@@ -308,7 +308,7 @@
     box-shadow: none;
 }
 
-.mobile-mix-sheet .workspace-studio-live-mix-header > div:first-child {
+.mobile-mix-sheet .workspace-studio-live-mix-header {
     display: none;
 }
 
@@ -368,8 +368,8 @@
 }
 
 /* The rail is space-constrained (desktop edge column or the Mix sheet) —
-   stack the header, drop the kicker, and hide the per-row summary so the
-   Controls trigger and power button fit. */
+   stack the header and drop the kicker. Instrument summaries and their
+   text actions wrap within each row. */
 .instrument-rail .workspace-studio-live-mix-header {
     flex-direction: column;
     align-items: stretch;
@@ -377,9 +377,5 @@
 }
 
 .instrument-rail .workspace-studio-live-mix-header > div:first-child .workspace-kicker {
-    display: none;
-}
-
-.instrument-rail .workspace-studio-mix-row-copy p {
     display: none;
 }
