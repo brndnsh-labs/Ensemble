@@ -58,6 +58,8 @@ interface ModalA11yOptions {
      * `role="dialog"` (the popover declares its own role if it wants one).
      */
     modal?: boolean;
+    /** Focus an advertised control on open; falls back to the first control. */
+    initialFocus?: string;
 }
 
 /**
@@ -81,6 +83,8 @@ export function useModalA11y(
     // closure for onClose, so depending on it directly re-ran this effect on
     // each re-render — which re-focused the modal's first element and scrolled
     // the panel back to the top whenever its contents updated (e.g. a stepper).
+    const initialFocusRef = useRef(options?.initialFocus);
+    initialFocusRef.current = options?.initialFocus;
     const onCloseRef = useRef(onClose);
     onCloseRef.current = onClose;
 
@@ -136,7 +140,10 @@ export function useModalA11y(
 
         // Focus into the overlay on open (both modes — this is what makes a
         // portaled popover keyboard-reachable), restore to the opener on close.
-        const focusable = el.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
+        const focusable =
+            (initialFocusRef.current
+                ? el.querySelector<HTMLElement>(initialFocusRef.current)
+                : null) ?? el.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
         const focusTimer = focusable ? setTimeout(() => focusable.focus(), 50) : undefined;
 
         return () => {

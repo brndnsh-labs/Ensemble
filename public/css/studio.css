@@ -135,11 +135,6 @@
         font-size: 0.94rem;
     }
 
-    .workspace-studio-mix-row-actions {
-        gap: 0.35rem;
-    }
-
-    .workspace-studio-live-mix .workspace-studio-mix-menu-trigger,
     .workspace-studio-live-mix .power-btn {
         height: 32px;
         width: 32px;
@@ -224,7 +219,8 @@
 .workspace-studio-mix-row-copy {
     min-width: 0;
     display: flex;
-    align-items: center;
+    flex-direction: column;
+    align-items: flex-start;
 }
 
 .workspace-studio-mix-row-copy h3 {
@@ -233,36 +229,46 @@
     color: var(--studio-row-accent);
 }
 
-.workspace-studio-mix-row-actions {
-    display: flex;
-    align-items: center;
-    gap: 0.45rem;
+.workspace-studio-mix-row > .power-btn {
     flex-shrink: 0;
 }
 
-/* Instrument settings gear button */
-.workspace-studio-mix-menu-trigger {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 36px;
-    height: 36px;
-    padding: 0;
-    border-radius: 50%;
-    font-size: 0.9rem;
-    color: var(--text-muted);
+/* Persistent musical controls, including on muted parts. */
+.workspace-studio-player-summary {
+    margin-top: 0.25rem;
+    color: var(--text-secondary);
+    font-size: 0.78rem;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
 }
 
-.workspace-studio-mix-menu-trigger:hover {
+.workspace-studio-control-trigger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.4rem;
+    min-height: 44px;
+    margin: 0 0 -0.4rem -0.4rem;
+    padding: 0.35rem 0.4rem;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-align: left;
+    line-height: 1.25;
+}
+
+.workspace-studio-control-trigger:hover,
+.workspace-studio-control-trigger.is-open {
     color: var(--studio-row-accent);
-    border-color: color-mix(in srgb, var(--studio-row-accent), transparent 55%);
     background: color-mix(in srgb, var(--studio-row-accent), transparent 92%);
 }
 
-.workspace-studio-mix-menu-trigger.is-open {
-    color: var(--studio-row-accent);
-    border-color: color-mix(in srgb, var(--studio-row-accent), transparent 35%);
-    background: color-mix(in srgb, var(--studio-row-accent), transparent 90%);
+.workspace-studio-control-trigger:focus-visible {
+    outline: 2px solid var(--studio-row-accent);
+    outline-offset: 2px;
 }
 
 .workspace-studio-surface-root {

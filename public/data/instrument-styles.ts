@@ -139,3 +139,32 @@ export function isKnownSoloistStyle(id: unknown): boolean {
 export function isKnownHarmonyStyle(id: unknown): boolean {
     return typeof id === 'string' && KNOWN_HARMONY_STYLES.has(id);
 }
+
+/** Existing player availability, shared by the rail and its settings chooser.
+ * This describes choices already supported here; pack installation never gates
+ * phrasing, because every player also works with the synth fallback.
+ */
+export function getChordPlayerChoices(genre: string | undefined, style: string) {
+    const acoustic = genre === 'Acoustic' || style === 'acoustic-strum';
+    if (!acoustic && genre !== 'Jazz' && !['modern-piano', 'open-modal'].includes(style)) {
+        return [];
+    }
+    const styles = acoustic ? ['arp', 'acoustic-strum'] : ['jazz'];
+    styles.push('modern-piano', 'open-modal');
+    // Keep a restored style selected and named even outside its usual genre.
+    if (!styles.includes(style)) {
+        styles.unshift(style);
+    }
+    return styles.map((value) => ({
+        value,
+        label:
+            value === 'arp'
+                ? 'Piano arpeggio'
+                : value === 'jazz'
+                  ? 'Jazz comping'
+                  : value === 'acoustic-strum'
+                    ? 'Acoustic guitar strum'
+                    : (CHORD_STYLES.find((entry) => entry.id === value)?.name ??
+                      'Current accompaniment'),
+    }));
+}

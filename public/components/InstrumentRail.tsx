@@ -3,6 +3,7 @@ import { createPortal } from 'preact/compat';
 import { useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { COMPACT_MQ } from '../breakpoints.js';
 import { togglePower } from '../controllers/instrument-controller.js';
+import { getChordPlayerChoices } from '../data/instrument-styles.js';
 import { GENRE_NAMES, SMART_GENRES } from '../data/smart-genres.js';
 import { dispatch } from '../state.js';
 import { track } from '../telemetry.js';
@@ -14,6 +15,43 @@ import { InstrumentMixerStrip, InstrumentSpecificSettings } from './InstrumentSe
 import { SoloistControls } from './SoloistControls.jsx';
 import { Select, SettingGroup, SettingRow, Slider, Toggle } from './UIControls.jsx';
 import { useModalA11y } from './use-modal-a11y.js';
+
+interface InstrumentControlEntry {
+    label: string;
+    summary?: string;
+    focusSelector: string;
+}
+
+function getInstrumentControlEntry(
+    module: InstrumentModule,
+    genre: string | undefined,
+    chordStyle: string,
+): InstrumentControlEntry {
+    const player =
+        module === 'chords'
+            ? getChordPlayerChoices(genre, chordStyle).find((option) => option.value === chordStyle)
+            : undefined;
+    if (player) {
+        return {
+            label: 'Change player',
+            summary: player.label,
+            focusSelector: '#chordPlayerSelect',
+        };
+    }
+    if (module === 'chords') {
+        return { label: 'Voicing', focusSelector: '#densitySelect' };
+    }
+    if (module === 'soloist') {
+        return {
+            label: 'Phrasing',
+            focusSelector: '#soloistPhrasingIntensity',
+        };
+    }
+    return {
+        label: 'Sound',
+        focusSelector: '.instrument-sound-source button[aria-pressed="true"]',
+    };
+}
 
 interface StudioInstrumentConfig {
     id: string;
@@ -149,6 +187,7 @@ interface StudioSurfaceProps {
     anchorElement?: HTMLElement | null;
     className?: string;
     closeLabel: string;
+    initialFocus?: string;
     isCompactViewport: boolean;
     isOpen: boolean;
     meta?: ComponentChildren;
@@ -163,6 +202,7 @@ export function StudioSurface({
     anchorElement = null,
     className = '',
     closeLabel,
+    initialFocus,
     isCompactViewport,
     isOpen,
     meta,
@@ -178,7 +218,7 @@ export function StudioSurface({
     // instrument-settings sheet), so they must NOT each claim aria-modal or trap
     // focus; the shared overlay stack (Escape closes only the topmost) handles
     // the nesting. #1129.
-    useModalA11y(surfaceRef, isOpen, onClose, title, { modal: false });
+    useModalA11y(surfaceRef, isOpen, onClose, title, { modal: false, initialFocus });
 
     useLayoutEffect(() => {
         if (!isOpen || isCompactViewport || typeof window === 'undefined') {
@@ -534,7 +574,6 @@ interface StudioMixRowProps {
     isOpen: boolean;
     onToggleSettings: () => void;
     rowRef?: (node: HTMLDivElement | null) => void;
-    showSettings: boolean;
     triggerRef?: (node: HTMLButtonElement | null) => void;
 }
 
@@ -543,7 +582,6 @@ function StudioMixRow({
     isOpen,
     onToggleSettings,
     rowRef,
-    showSettings,
     triggerRef,
 }: StudioMixRowProps) {
     const { enabled, sectionOverride } = useEnsembleState((s) => {
@@ -556,6 +594,9 @@ function StudioMixRow({
         const override = sec?.instruments?.[mod as keyof NonNullable<typeof sec.instruments>];
         return { enabled: baseEnabled, sectionOverride: override };
     });
+    const control = useEnsembleState((s) =>
+        getInstrumentControlEntry(instrument.module, s.groove.lastSmartGenre, s.chords.style),
+    );
     const overrideActive = typeof sectionOverride === 'boolean' && sectionOverride !== enabled;
     const powerClass = `power-btn ${enabled ? 'active' : ''} ${
         overrideActive ? 'section-override' : ''
@@ -574,6 +615,21 @@ function StudioMixRow({
                 </span>
                 <div class="workspace-studio-mix-row-copy">
                     <h3>{instrument.label}</h3>
+                    {control.summary && (
+                        <span class="workspace-studio-player-summary">{control.summary}</span>
+                    )}
+                    <button
+                        type="button"
+                        ref={triggerRef}
+                        class={`workspace-studio-control-trigger ${isOpen ? 'is-open' : ''}`}
+                        aria-label={`${instrument.label} settings: ${control.label}`}
+                        aria-haspopup="dialog"
+                        aria-expanded={isOpen}
+                        onClick={onToggleSettings}
+                    >
+                        {control.label}
+                        <span aria-hidden="true">›</span>
+                    </button>
                     {overrideActive && (
                         <span
                             class="workspace-studio-section-override"
@@ -586,30 +642,15 @@ function StudioMixRow({
                     )}
                 </div>
             </div>
-            <div class="workspace-studio-mix-row-actions">
-                {showSettings && (
-                    <button
-                        type="button"
-                        ref={triggerRef}
-                        class={`workspace-studio-mix-menu-trigger ${isOpen ? 'is-open' : ''}`}
-                        aria-label={`${instrument.label} settings`}
-                        aria-haspopup="dialog"
-                        aria-expanded={isOpen}
-                        onClick={onToggleSettings}
-                    >
-                        <Icon name="gear" />
-                    </button>
-                )}
-                <button
-                    type="button"
-                    class={powerClass}
-                    aria-label={`Toggle ${instrument.label}`}
-                    aria-pressed={enabled}
-                    onClick={() => togglePower(instrument.module)}
-                >
-                    <Icon name="power" />
-                </button>
-            </div>
+            <button
+                type="button"
+                class={powerClass}
+                aria-label={`Toggle ${instrument.label}`}
+                aria-pressed={enabled}
+                onClick={() => togglePower(instrument.module)}
+            >
+                <Icon name="power" />
+            </button>
         </div>
     );
 }
@@ -686,6 +727,12 @@ function StudioSettingsSurface({
         };
     });
 
+    const control = useEnsembleState((s) =>
+        instrument
+            ? getInstrumentControlEntry(instrument.module, s.groove.lastSmartGenre, s.chords.style)
+            : undefined,
+    );
+
     if (!instrument) {
         return null;
     }
@@ -702,6 +749,7 @@ function StudioSettingsSurface({
             anchorElement={anchorElement}
             className="workspace-studio-surface--settings"
             closeLabel={`Close ${instrument.label} settings`}
+            initialFocus={control?.focusSelector}
             isCompactViewport={isCompactViewport}
             isOpen={isOpen}
             meta={<span class={`workspace-instrument-state ${stateClass}`}>{stateLabel}</span>}
@@ -811,7 +859,6 @@ export function InstrumentRail() {
 
                             delete rowElementsRef.current[instrument.module];
                         }}
-                        showSettings={true}
                         triggerRef={(node) => {
                             if (node) {
                                 settingsTriggerRef.current[instrument.module] = node;
