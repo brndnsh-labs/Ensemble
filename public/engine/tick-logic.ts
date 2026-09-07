@@ -298,29 +298,26 @@ export function generateNotesForStep(
                     stepInfo || null,
                 );
                 if (generatedBass && (generatedBass.freq || generatedBass.midi)) {
-                    // #1136: this is generation metadata, not a worker-message
-                    // field. Consume it here so every audio/MIDI/render sink
-                    // receives the same authored pitch without a new protocol.
-                    const { pitchPlanned, ...bassResult } = generatedBass;
-                    if (!bassResult.midi) {
-                        bassResult.midi = getMidi(bassResult.freq);
-                    }
-                    // Always enforce range, but planned routes already chose
-                    // their octave. Revoicing toward the previous note can turn
-                    // a chromatic arrival into an octave-displaced MIDI leap.
-                    const lastBassMidi = bass.lastFreq ? getMidi(bass.lastFreq) : null;
-                    bassResult.midi = enforceRegisterSlotting(
+                    // #1158: every bass style owns its octave (walking arrivals,
+                    // Disco's octave pump, repeat-pass displacement). The shared
+                    // seam enforces range only; smoothing toward the last note
+                    // erased those contours in MIDI while audio kept the frequency.
+                    const midi = enforceRegisterSlotting(
                         'bass',
-                        bassResult.midi,
+                        generatedBass.midi || getMidi(generatedBass.freq),
                         coordination,
-                        pitchPlanned ? null : lastBassMidi,
                     );
-
-                    if (!bassResult.freq) {
-                        bassResult.freq = getFrequency(bassResult.midi);
-                    }
+                    // Audio scheduling reads freq; MIDI export reads midi. Both
+                    // must receive the same final, range-safe authored pitch.
+                    const bassResult = {
+                        ...generatedBass,
+                        midi,
+                        freq: getFrequency(midi),
+                        step,
+                        module: 'bass',
+                    };
                     (bass as Mutable<typeof bass>).lastFreq = bassResult.freq; // @worker-mutation
-                    notesToMain.push({ ...bassResult, step, module: 'bass' });
+                    notesToMain.push(bassResult);
                     updateCoordinationContext(coordination, 'bass', bassResult);
                 }
             }

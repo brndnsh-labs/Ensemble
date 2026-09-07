@@ -8,47 +8,6 @@ import { scrambleHash, stringHash33 } from './hash-utils.js';
  * This module ensures the "Musical Coordination Contract" is satisfied.
  */
 
-// why: leaning on the alterations over V7alt/V7b9/V7#9/etc. is the single most
-// idiomatic move in jazz soloing. The soloist needs to know "this chord is altered
-// and these specific pitch classes (relative to root) are the alterations to lean on".
-// Kept exhaustive and explicit rather than parsing the chord symbol — the chord
-// engine already canonicalizes quality strings; we map each known altered quality
-// to the set of *altered extensions* (NOT the chord tones themselves) so the
-// soloist's final-stage `weight *= 2.0` multiplier biases toward color tones,
-// not toward roots/3rds/5ths which already win via the chord-tone bonus.
-//
-// Pitch classes are semitone offsets from the chord root:
-//   b9 = 1,  #9 = 3,  #11/b5 = 6,  b13/#5 = 8
-//
-// Source: harmony-coordination.md P0 #8.
-const ALT_EXTENSIONS_BY_QUALITY: Record<string, readonly number[]> = {
-    // Fully altered dominant — bebop "altered scale" colors: b9, #9, #11, b13.
-    '7alt': [1, 3, 6, 8],
-    // Single-alteration dominants — only the named alteration is preferred.
-    '7b9': [1],
-    '7#9': [3],
-    '7b5': [6],
-    '7#11': [6],
-    '7b13': [8],
-    // Half-diminished / m7b5: bebop Locrian b9 (1) is iconic; Locrian #2 natural-9
-    // (2) is the modal default. Both are valid color tones; include both.
-    halfdim: [1, 2],
-    m7b5: [1, 2],
-    'half-diminished': [1, 2],
-    // Diminished (o7): whole-half diminished scale color tone is the natural-9
-    // above root (interval 2). b9 (1) belongs to the half-whole scale used on
-    // dominant-b9 chords, NOT on fully diminished — would sound out-of-scale here.
-    dim: [2],
-    diminished: [2],
-    // Augmented dominants (7#5): soloed with whole-tone scale [0,2,4,6,8,10] —
-    // the #11/b5 (interval 6) is the defining color tone. #9 (3) is NOT in the
-    // whole-tone scale and would break the chord's identity. augmaj7 is soloed
-    // with Lydian Augmented, where #11 (6) is again the canonical lean.
-    aug: [6],
-    augmented: [6],
-    augmaj7: [6],
-};
-
 /**
  * BAND-WIDE POCKET PALETTE (#1005) — the single per-genre micro-timing authority.
  *
@@ -190,39 +149,6 @@ export function getBandPocket(
     const scale = 1 + (getSectionEnergy(sectionLabel) - 0.5) * POCKET_ENERGY_SLOPE;
     const scaled = base * scale;
     return Math.sign(scaled) * Math.min(Math.abs(scaled), POCKET_FEEL_CEILING);
-}
-
-/**
- * Returns the pitch classes (semitone offsets from chord root) of the *altered
- * extensions* for a chord, or [] if the chord is not a recognized tension chord.
- * Soloist final-stage weight multiplier consumes this list.
- */
-export function getAltPitchClasses(
-    quality: string | undefined | null,
-    rootMidi: number | undefined | null,
-): number[] {
-    if (!quality || !Number.isFinite(rootMidi)) {
-        return [];
-    }
-    const offsets = ALT_EXTENSIONS_BY_QUALITY[quality];
-    if (!offsets) {
-        return [];
-    }
-    const rootPc = (((rootMidi as number) % 12) + 12) % 12;
-    const out: number[] = [];
-    for (let i = 0; i < offsets.length; i++) {
-        out.push((rootPc + offsets[i]) % 12);
-    }
-    return out;
-}
-
-/**
- * True iff the chord quality is one of the tension qualities that publishes
- * a non-empty altered-extension list. Mirrors `isTensionChordQuality` in
- * voicing-policy.ts but scoped to the soloist alteration map above.
- */
-export function isTensionChordForSoloist(quality: string | undefined | null): boolean {
-    return Boolean(quality && quality in ALT_EXTENSIONS_BY_QUALITY);
 }
 
 /**
@@ -539,21 +465,6 @@ export function createCoordinationContext(
         // writer: drums-tick.ts runDrumTick chord-data preamble (before producers)
         // readable-after: chord-data preamble (any producer)
         subtractionMutedLanes: [] as string[],
-        // why: published per-tick from the current chord (writer: tick-logic chord-preamble;
-        // readable-after: chord-preamble — i.e. by EVERY producer
-        // including the soloist which runs first). Lets the soloist bias toward
-        // b9/#9/#11/b13 over V7alt-family chords as a final-stage weight multiplier in
-        // selectPitchAndDevices. See harmony-coordination.md P0 #8.
-        //
-        // NOTE the writer is the tick-preamble, NOT a producer, because the soloist
-        // (the primary consumer) runs BEFORE the chords producer would have published.
-        // The fields are pure functions of the current chord, so we don't need a
-        // running producer to compute them — we publish them at the same time as
-        // upcomingSectionFirstChord and isTurnaround (the other chord-preamble fields).
-        // writer: tick-logic.ts (chord-data preamble, before producers run)
-        // readable-after: chord-data preamble (any producer)
-        isTensionChord: false,
-        altPitchClasses: [] as number[],
         // why: harmony's comper and finalizer modes read these to decide voicing density
         // and guide-tone reduction when the soloist is active. Publishing them through the
         // coordination context rather than letting harmonies.ts reach into soloist.session.*
@@ -850,17 +761,17 @@ function smoothOctaveClamp(
 ): number {
     let current = midi;
 
+    // Every path first folds the note into its permitted register.
+    while (current < min) {
+        current += 12;
+    }
+    while (current > max) {
+        current -= 12;
+    }
+
     // If we have a target (e.g. previous note), try to get as close as possible
     // while staying within [min, max]
     if (target !== null) {
-        // First get into range
-        while (current < min) {
-            current += 12;
-        }
-        while (current > max) {
-            current -= 12;
-        }
-
         // Then try to match target octave
         const octaves = [-12, 12];
         for (const shift of octaves) {
@@ -870,13 +781,6 @@ function smoothOctaveClamp(
                     current = shifted;
                 }
             }
-        }
-    } else {
-        while (current < min) {
-            current += 12;
-        }
-        while (current > max) {
-            current -= 12;
         }
     }
 

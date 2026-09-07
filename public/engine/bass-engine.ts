@@ -896,10 +896,6 @@ export function getBassNote(
         return {
             freq: outFreq,
             midi: outMidi,
-            // Worker-internal: tick-logic consumes this before emitting the
-            // note. Range safety still applies; nearest-octave revoicing does
-            // not get to undo an already-composed journey into the next One.
-            ...(walkingPitch ? { pitchPlanned: true } : {}),
             velocity: finalVel,
             durationSteps: safeDuration,
             timingOffset,
