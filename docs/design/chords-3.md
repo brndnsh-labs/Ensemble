@@ -167,6 +167,49 @@ a TEST listening pass before merge.
 [Open modal comparison scene](../../scripts/scenes/chords-3-open-modal.json)
 uses the same chart, Grand Piano source, tempo and intensity as the Modern scene.
 
+## Neo-Soul Rhodes pilot
+
+[Issue #1163](https://github.com/brndnsh-labs/Ensemble/issues/1163) extends the
+keyboard engine with optional **Neo-Soul Rhodes** (`neo-soul-rhodes`). Neo-Soul's
+player chooser keeps **Neo-Soul comping** (`smart`) as its default. Existing saved
+styles and pinned sounds retain their meaning. Auto selects installed Rhodes,
+with the built-in synth as fallback; a restored Rhodes player keeps its identity
+and source even outside Neo-Soul.
+
+This profile shares Modern piano's literal chord facts, bounded hand reach and
+movement scoring. It adds no new harmonic substitutions or suspension vocabulary.
+A full statement marks every bar and written chord arrival. Bars one and three
+of each four-bar phrase answer with at most two upper-hand keys; bars two and
+four leave space, with the fourth bar settling. In simple meter the answer is on
+the and of two; in eighth-note meters it is on the last eighth of the first
+written group. Short bars omit an answer that cannot fit.
+
+Right-hand statements last at most one and a half notated beats and answers
+at most half a beat. The left hand supports through the chord or bar. All hands
+re-strike at their authored attacks; retained pitches do not imply ties or a
+pedal model. Release gates subtract the positive pocket delay, so notes end before the
+chart boundary even when the next section moves closer to the beat. The profile takes the genre's existing band pocket once, sharing
+the established swing and humanization authorities.
+
+Density changes the full voicing, and intensity changes dynamics. Neither adds
+attacks or expands the two-key answer. Muting Soloist leaves the same reserved
+space for a human lead. Intro/outro and subtraction follow the established
+arrangement rules, including final-cadence precedence; explicit lane and section
+mutes still win.
+
+Matched scenes compare [existing Neo-Soul comping](../../scripts/scenes/chords-3-neo-soul-existing.json)
+with [Neo-Soul Rhodes](../../scripts/scenes/chords-3-neo-soul-rhodes.json), using the
+same scene ID, chart, seed, 82 BPM and installed Rhodes. Render them into separate
+output directories. Repeat with `voices[0].voice` set to `synth` for the fallback,
+and at low, normal and high intensity. The normal renderer includes both exposed
+chords and full-band stems, with and without its generated soloist.
+
+The shared piano critique checks harmonic identity, playable hands, meter,
+practice, seek and detached output. Profile-specific checks pin the proposed
+phrase/articulation and measure actual generated events. Rendered audio and
+these checks provide technical evidence; the exact TEST revision still needs a
+human listening verdict for feel, balance and usefulness before merge.
+
 ## Staged migration
 
 Existing keyboard styles remain on their established path. Their genre banks, rootless

@@ -17,7 +17,7 @@ async function pianoScene(
     profile: PianoProfile = 'modern-piano',
 ) {
     const boot = await bootstrapEnsembleAudit({
-        genre: 'Jazz',
+        genre: profile === 'neo-soul-rhodes' ? 'Neo-Soul' : 'Jazz',
         bpm: 108,
         intensity: 0.45,
         timeSignature: meter,
@@ -107,7 +107,7 @@ function capture(initial: EnsembleState, random = 0.05, start = 0) {
     }
 }
 
-describe.each(['modern-piano', 'open-modal'] as const)(
+describe.each(['modern-piano', 'open-modal', 'neo-soul-rhodes'] as const)(
     '%s: connected, economical and dependable accompaniment',
     (profile) => {
         const scene = (meter?: string, value?: string) => pianoScene(meter, value, profile);

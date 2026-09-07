@@ -347,8 +347,9 @@ export function generateNotesForStep(
             // bass register — that overlap is the metal idiom. Rock/other guitar
             // power chords keep the standard chords slot (~E3), which reads right.
             const powerChords =
-                !['acoustic-strum', 'modern-piano', 'open-modal'].includes(state.chords.style) &&
-                isPowerChordChordsVoice(state.chords.voice);
+                !['acoustic-strum', 'modern-piano', 'open-modal', 'neo-soul-rhodes'].includes(
+                    state.chords.style,
+                ) && isPowerChordChordsVoice(state.chords.voice);
             const metalLowChug = powerChords && state.groove.genreFeel === 'Metal';
             if (powerChords) {
                 applyPowerChordVoicing(

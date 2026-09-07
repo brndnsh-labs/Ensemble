@@ -15,6 +15,7 @@ export const CHORD_STYLES: StyleEntry[] = [
     { id: 'jazz', name: 'Jazz Comp', category: 'Jazz' },
     { id: 'modern-piano', name: 'Modern jazz piano', category: 'Jazz' },
     { id: 'open-modal', name: 'Open modal piano', category: 'Jazz' },
+    { id: 'neo-soul-rhodes', name: 'Neo-Soul Rhodes', category: 'Soul/Funk' },
     { id: 'funk', name: 'Funk Scratch', category: 'Soul/Funk' },
     { id: 'ska-upstroke', name: 'Ska Upstroke', category: 'Pop/Rock' },
     { id: 'acoustic-strum', name: 'Acoustic Guitar Strum', category: 'Country/Folk' },
@@ -146,11 +147,23 @@ export function isKnownHarmonyStyle(id: unknown): boolean {
  */
 export function getChordPlayerChoices(genre: string | undefined, style: string) {
     const acoustic = genre === 'Acoustic' || style === 'acoustic-strum';
-    if (!acoustic && genre !== 'Jazz' && !['modern-piano', 'open-modal'].includes(style)) {
+    const neo = genre === 'Neo-Soul';
+    if (
+        !acoustic &&
+        !neo &&
+        genre !== 'Jazz' &&
+        !['modern-piano', 'open-modal', 'neo-soul-rhodes'].includes(style)
+    ) {
         return [];
     }
-    const styles = acoustic ? ['arp', 'acoustic-strum'] : ['jazz'];
-    styles.push('modern-piano', 'open-modal');
+    const styles = neo
+        ? ['smart', 'neo-soul-rhodes']
+        : acoustic
+          ? ['arp', 'acoustic-strum']
+          : ['jazz'];
+    if (!neo) {
+        styles.push('modern-piano', 'open-modal');
+    }
     // Keep a restored style selected and named even outside its usual genre.
     if (!styles.includes(style)) {
         styles.unshift(style);
@@ -158,13 +171,15 @@ export function getChordPlayerChoices(genre: string | undefined, style: string) 
     return styles.map((value) => ({
         value,
         label:
-            value === 'arp'
-                ? 'Piano arpeggio'
-                : value === 'jazz'
-                  ? 'Jazz comping'
-                  : value === 'acoustic-strum'
-                    ? 'Acoustic guitar strum'
-                    : (CHORD_STYLES.find((entry) => entry.id === value)?.name ??
-                      'Current accompaniment'),
+            value === 'smart' && neo
+                ? 'Neo-Soul comping'
+                : value === 'arp'
+                  ? 'Piano arpeggio'
+                  : value === 'jazz'
+                    ? 'Jazz comping'
+                    : value === 'acoustic-strum'
+                      ? 'Acoustic guitar strum'
+                      : (CHORD_STYLES.find((entry) => entry.id === value)?.name ??
+                        'Current accompaniment'),
     }));
 }

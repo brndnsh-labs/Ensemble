@@ -143,6 +143,13 @@ less color. Try `Dm11 | G13 | Cmaj9 | Cmaj9`, then compare
 the piano supplies the root and any written slash bass. Sound follows the same
 Auto/pinned choice as Modern jazz piano.
 
+In **Neo-Soul**, use **Change player** in the Chords row to try **Neo-Soul Rhodes**.
+It pairs connected voicings with short upper-hand answers in a repeating phrase,
+leaving space for your melody. Try `Cm9 | Fm9 | Abmaj7 | G7b9` around 82 BPM,
+first with the band and then with Bass and Soloist off. Auto uses installed
+Rhodes, or the built-in synth when it is unavailable. **Neo-Soul comping** remains
+the default and is available in the same chooser for comparison.
+
 **Bass:**
 {{BASS_STYLES}}
 

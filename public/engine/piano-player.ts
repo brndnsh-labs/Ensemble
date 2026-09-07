@@ -1,7 +1,9 @@
 import { getEffectiveTimeSignature } from '../meter.js';
 import type { Chord, EnsembleState, Mutable, StepInfo } from '../types.js';
-import { binarySearchMapIndex } from '../utils.js';
+import { binarySearchMapIndex, secondsPerStepFor } from '../utils.js';
+import { INTRO_MUTES, OUTRO_MUTES } from './arrangement-layering.js';
 import type { AccompanimentCoordination } from './comping-emit.js';
+import { getBandPocket } from './coordination-engine.js';
 import { scrambleHash, stringHash31 } from './hash-utils.js';
 import { type PianoKey, type PianoProfile, voicePianoChord } from './piano-voicings.js';
 import { foldPracticeStep } from './section-overrides.js';
@@ -62,6 +64,16 @@ function gestures(info: StepInfo, barInPhrase: number, variant: number, profile:
     const result: { at: number; gesture: PianoPerformance['gesture'] }[] = [
         { at: 0, gesture: settling ? 'settle' : 'statement' },
     ];
+    if (profile === 'neo-soul-rhodes') {
+        // A repeated two-bar upper-hand hook, then space: the and of two
+        // in simple meter, the last eighth of the first group otherwise.
+        // Every bar/change still receives its full harmonic statement.
+        const answer = beat === 2 ? (ts.grouping[0] - 1) * beat : beat * 1.5;
+        if (barInPhrase % 2 === 0 && answer > 0 && answer < bar) {
+            result.push({ at: answer, gesture: 'answer' });
+        }
+        return result;
+    }
     if (profile === 'open-modal') {
         // Broad statements keep every bar legible. A single response in bar
         // two gives the four-bar phrase an answer without crowding practice.
@@ -99,7 +111,22 @@ export function getPianoNotes(
     bassPresent: boolean,
 ) {
     const profile: PianoProfile =
-        state.chords.style === 'open-modal' ? 'open-modal' : 'modern-piano';
+        state.chords.style === 'neo-soul-rhodes'
+            ? 'neo-soul-rhodes'
+            : state.chords.style === 'open-modal'
+              ? 'open-modal'
+              : 'modern-piano';
+    const rhodes = profile === 'neo-soul-rhodes';
+    if (
+        rhodes &&
+        !coordination.isFinalMeasure &&
+        (((coordination.introBarsElapsed ?? -1) >= 0 &&
+            coordination.introBarsElapsed! < INTRO_MUTES.chords) ||
+            ((coordination.outroBarsRemaining ?? -1) >= 0 &&
+                coordination.outroBarsRemaining! <= OUTRO_MUTES.chords))
+    ) {
+        return [];
+    }
     const ts =
         info.tsConfig ||
         getEffectiveTimeSignature(state.arranger.timeSignature, state.arranger.grouping);
@@ -132,7 +159,11 @@ export function getPianoNotes(
         stepInChord === 0
             ? { at: info.mStep, gesture: plan[0].gesture }
             : plan.find((g) => g.at === info.mStep);
-    if (!gesture || coordination.subtractionMutedLanes?.includes('chords')) {
+    if (
+        !gesture ||
+        (coordination.subtractionMutedLanes?.includes('chords') &&
+            !(rhodes && coordination.isFinalMeasure))
+    ) {
         return [];
     }
     const voicing = voicingAt(state, chord, chartStep, phraseStart, bassPresent, profile);
@@ -140,7 +171,12 @@ export function getPianoNotes(
     let selected = answering ? voicing.filter((n) => n.hand === 'right') : voicing;
     // The generated lead can soften a response without removing its pulse.
     // A human playing along retains the same reserved space with Soloist off.
-    if (answering && coordination.soloistBusy && selected.length > 1) {
+    if (answering && rhodes) {
+        // Keep the hook's upper voices and its budget even when the human
+        // takes over the lead; muting Soloist must not invite more decoration.
+        selected = selected.slice(-2);
+    }
+    if (answering && !rhodes && coordination.soloistBusy && selected.length > 1) {
         selected = selected.slice(0, 1);
     }
     // Chord beats use the meter's denominator, matching the parsed step map.
@@ -149,12 +185,25 @@ export function getPianoNotes(
     const intensity = Number.isFinite(state.playback.bandIntensity)
         ? Math.max(0, Math.min(1, state.playback.bandIntensity))
         : 0.5;
+    const timingOffset = rhodes ? getBandPocket(state.groove.genreFeel, chord.sectionLabel) : 0;
+    // A laid-back attack must not push its release past the chart boundary,
+    // especially when the next section's pocket moves closer to the beat.
+    const releaseOffset = rhodes
+        ? Math.max(0, timingOffset) / secondsPerStepFor(state.playback.bpm)
+        : 0;
     return selected.map((n, index) => {
-        const gate = answering
-            ? Math.min(remaining, ts.stepsPerBeat * (profile === 'open-modal' ? 1.5 : 0.8))
-            : n.hand === 'right' && answer
-              ? Math.min(remaining, answer.at - info.mStep)
-              : remaining;
+        const gate =
+            rhodes && (answering || n.hand === 'right')
+                ? Math.min(
+                      remaining,
+                      ts.stepsPerBeat * (answering ? 0.5 : 1.5),
+                      answer ? answer.at - info.mStep : remaining,
+                  )
+                : answering
+                  ? Math.min(remaining, ts.stepsPerBeat * (profile === 'open-modal' ? 1.5 : 0.8))
+                  : n.hand === 'right' && answer
+                    ? Math.min(remaining, answer.at - info.mStep)
+                    : remaining;
         return {
             midi: n.midi,
             velocity:
@@ -163,8 +212,8 @@ export function getPianoNotes(
                 (n.hand === 'left' ? 0.82 : index === selected.length - 1 ? 1.06 : 0.94) *
                 (coordination.harmonyEffectiveEnabled && n.hand === 'left' ? 0.9 : 1) *
                 (coordination.soloistBusy ? 0.88 : 1),
-            durationSteps: Math.max(0.05, gate - 0.12),
-            timingOffset: 0,
+            durationSteps: Math.max(0.05, gate - 0.12 - releaseOffset),
+            timingOffset,
             instrument: 'Piano' as const,
             dry: false,
             muted: false,

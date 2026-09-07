@@ -1133,7 +1133,7 @@ export function getAccompanimentNotes(
             coordination.bassEffectiveEnabled ?? isInstrumentActiveAtStep(state, 'bass', step),
         );
     }
-    if (chords.style === 'modern-piano' || chords.style === 'open-modal') {
+    if (['modern-piano', 'open-modal', 'neo-soul-rhodes'].includes(chords.style)) {
         return getPianoNotes(
             state,
             chord,
