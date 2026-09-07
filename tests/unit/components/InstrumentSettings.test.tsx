@@ -68,6 +68,21 @@ describe('InstrumentSettings Component', () => {
         vi.restoreAllMocks();
     });
 
+    it.each([
+        ['Jazz', 'jazz', ['jazz', 'modern-piano', 'open-modal']],
+        ['Acoustic', 'arp', ['arp', 'acoustic-strum', 'modern-piano', 'open-modal']],
+    ])('exposes the %s default and optional players distinctly', (genre, style, options) => {
+        const fullState = {
+            chords: { style, density: 'standard', voice: 'synth', autoSound: true },
+            groove: { lastSmartGenre: genre },
+        };
+        mockUseEnsembleState.mockImplementation((cb) => cb(fullState));
+        act(() => render(<InstrumentSpecificSettings module="chords" />, container));
+        const select = container.querySelector('#chordPlayerSelect');
+        expect(select.value).toBe(style);
+        expect(Array.from(select.options, (option) => option.value)).toEqual(options);
+    });
+
     it('offers the Acoustic piano/guitar comparison and rebuilds only after selecting the new style', async () => {
         const { refreshArrangerUI } = await import(
             '../../../public/controllers/arranger-controller.js'

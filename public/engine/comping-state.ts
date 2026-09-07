@@ -1,5 +1,8 @@
 export interface CompingState {
     currentVibe: string;
+    // #1165: protect only the last authored Hip Hop stab in an otherwise silent bar.
+    hipHopLastStep: number;
+    hipHopBarHadStab: boolean;
     currentCell: number[];
     lockedUntil: number;
     soloistActivity: number;
@@ -49,6 +52,8 @@ export interface CompingState {
 function createInitialCompingState(): CompingState {
     return {
         currentVibe: 'balanced',
+        hipHopLastStep: -1,
+        hipHopBarHadStab: false,
         currentCell: new Array(16).fill(0),
         lockedUntil: 0,
         soloistActivity: 0,

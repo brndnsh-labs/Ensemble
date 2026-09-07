@@ -1,3 +1,4 @@
+import { canonToFeel } from '../../public/data/smart-genres.js';
 import { validateProgression } from '../../public/engine/chords-engine.js';
 import { getSoloistNotePhraseFirst } from '../../public/engine/soloist-phrase-first.js';
 import { generateSessionSeed } from '../../public/engine/soloist-seeder.js';
@@ -17,7 +18,7 @@ export interface DynamicsNote {
 
 export function buildDynamicsState(genre = 'Rock', seedId = 'PRACTICE_RELIABILITY') {
     dispatch(ACTIONS.RESET_STATE);
-    dispatch(ACTIONS.UPDATE_GB, { enabled: true, genreFeel: genre });
+    dispatch(ACTIONS.UPDATE_GB, { enabled: true, genreFeel: canonToFeel(genre) ?? genre });
     dispatch(ACTIONS.UPDATE_SB, { enabled: true, style: 'smart', mode: 'guitar' });
     const detached = cloneStateForDetachedGeneration(getState());
     const state = {

@@ -42,6 +42,8 @@ describe('reset-ritual parity (#1013)', () => {
     describe('resetCompingState', () => {
         it('resets every comp-memory field to its fresh-run default', () => {
             compingState.currentVibe = 'dirty';
+            compingState.hipHopLastStep = 38;
+            compingState.hipHopBarHadStab = true;
             compingState.currentCell = new Array(16).fill(1);
             compingState.soloistActivity = 1;
             compingState.lastChordIndex = 7;
@@ -62,6 +64,8 @@ describe('reset-ritual parity (#1013)', () => {
 
             expect(compingState).toEqual({
                 currentVibe: 'balanced',
+                hipHopLastStep: -1,
+                hipHopBarHadStab: false,
                 currentCell: new Array(16).fill(0),
                 lockedUntil: 0,
                 soloistActivity: 0,
