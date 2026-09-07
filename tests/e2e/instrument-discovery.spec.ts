@@ -45,6 +45,7 @@ async function expectInViewport(page, locator) {
 for (const [genre, label, value] of [
     ['Jazz', 'Jazz comping', 'jazz'],
     ['Acoustic', 'Piano arpeggio', 'arp'],
+    ['Neo-Soul', 'Neo-Soul comping', 'smart'],
 ]) {
     test(`${genre} names its player and opens the chooser without changing the part`, async ({
         page,
@@ -60,8 +61,15 @@ for (const [genre, label, value] of [
         const chooser = page.getByLabel('Playing style', { exact: true });
         await expect(chooser).toBeFocused();
         await expect(chooser).toHaveValue(value);
-        await expect(chooser.locator('option[value="modern-piano"]')).toHaveCount(1);
-        await expect(chooser.locator('option[value="open-modal"]')).toHaveCount(1);
+        if (genre === 'Neo-Soul') {
+            await expect(chooser.locator('option')).toHaveText([
+                'Neo-Soul comping',
+                'Neo-Soul Rhodes',
+            ]);
+        } else {
+            await expect(chooser.locator('option[value="modern-piano"]')).toHaveCount(1);
+            await expect(chooser.locator('option[value="open-modal"]')).toHaveCount(1);
+        }
         // No installed packs in this fresh context: players stay available.
         expect(await settingsSnapshot(page)).toEqual(before);
         await page.keyboard.press('Escape');
@@ -171,4 +179,68 @@ test('compact mix exposes a touch-sized player action and restores nested focus 
     await expect(sheet).toBeVisible();
     await expect(trigger).toBeFocused();
     expect(await settingsSnapshot(page)).toEqual(before);
+});
+
+test('Neo-Soul Rhodes is an explicit available player, preserves a sound pin, and restores by name', async ({
+    page,
+}) => {
+    await gotoHydrated(page, '/?genre=Neo-Soul');
+    const row = page.locator('#panel-chords');
+    await expect(row.locator('.workspace-studio-player-summary')).toHaveText('Neo-Soul comping');
+    const before = await settingsSnapshot(page);
+    expect(before.lanes.chords.style).toBe('smart');
+    await row.getByRole('button', { name: 'Chords settings: Change player' }).click();
+    const chooser = page.getByLabel('Playing style', { exact: true });
+    await chooser.selectOption('neo-soul-rhodes');
+    const selected = await settingsSnapshot(page);
+    expect(selected.lanes.chords.style).toBe('neo-soul-rhodes');
+    expect(selected.lanes.chords.voice).toBe('synth'); // uninstalled Auto fallback
+    expect(selected.lanes.chords.autoSound).toBe(true);
+    expect(selected.playing).toBe(before.playing);
+    for (const module of ['groove', 'bass', 'harmony', 'soloist']) {
+        expect(selected.lanes[module]).toEqual(before.lanes[module]);
+    }
+    await page
+        .locator('.instrument-sound-source')
+        .getByRole('button', { name: 'Synth', exact: true })
+        .click();
+    await chooser.selectOption('smart');
+    await chooser.selectOption('neo-soul-rhodes');
+    expect((await settingsSnapshot(page)).lanes.chords.autoSound).toBe(false);
+    await page.keyboard.press('Escape');
+    await expect(row.locator('.workspace-studio-player-summary')).toHaveText('Neo-Soul Rhodes');
+    await page.waitForFunction(() => {
+        const saved = JSON.parse(localStorage.getItem('ensemble_currentState') || '{}');
+        return saved.chords?.style === 'neo-soul-rhodes' && saved.chords?.autoSound === false;
+    });
+    await page.evaluate(() => history.replaceState(null, '', '/'));
+    await page.reload();
+    await page.waitForSelector('html[data-hydrated="true"]');
+    await expect(row.locator('.workspace-studio-player-summary')).toHaveText('Neo-Soul Rhodes');
+    expect((await settingsSnapshot(page)).lanes.chords).toMatchObject({
+        style: 'neo-soul-rhodes',
+        voice: 'synth',
+        autoSound: false,
+    });
+});
+
+test('a shared Rhodes player keeps Acoustic choices available alongside its restored selection', async ({
+    page,
+}) => {
+    await gotoHydrated(page, '/?genre=Acoustic&style=neo-soul-rhodes');
+    const row = page.locator('#panel-chords');
+    await expect(row.locator('.workspace-studio-player-summary')).toHaveText('Neo-Soul Rhodes');
+    await row.getByRole('button', { name: 'Chords settings: Change player' }).click();
+    const chooser = page.getByLabel('Playing style', { exact: true });
+    await expect(chooser).toHaveValue('neo-soul-rhodes');
+    await expect(chooser.locator('option')).toHaveText([
+        'Neo-Soul Rhodes',
+        'Piano arpeggio',
+        'Acoustic guitar strum',
+        'Modern jazz piano',
+        'Open modal piano',
+    ]);
+    await chooser.selectOption('arp');
+    await page.keyboard.press('Escape');
+    await expect(row.locator('.workspace-studio-player-summary')).toHaveText('Piano arpeggio');
 });

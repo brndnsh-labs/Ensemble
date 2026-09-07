@@ -1,7 +1,7 @@
 import type { Chord } from '../types.js';
 import { chordFacts } from './chord-facts.js';
 
-export type PianoProfile = 'modern-piano' | 'open-modal';
+export type PianoProfile = 'modern-piano' | 'open-modal' | 'neo-soul-rhodes';
 
 export interface PianoKey {
     midi: number;

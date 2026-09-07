@@ -1,0 +1,27 @@
+[
+    {
+        "id": "chords3-neo-soul-rhodes",
+        "label": "Existing Neo-Soul comping",
+        "genreFeel": "Neo-Soul",
+        "drumPreset": "Neo",
+        "bpm": 82,
+        "intensity": 0.55,
+        "complexity": 0.4,
+        "key": "C",
+        "timeSignature": "4/4",
+        "chordStyle": "smart",
+        "sections": [
+            {
+                "id": "verse",
+                "label": "Verse",
+                "value": "Cm9 | Fm9 | Abmaj7 | G7b9"
+            }
+        ],
+        "voices": [
+            {
+                "module": "chords",
+                "voice": "pack:rhodes"
+            }
+        ]
+    }
+]

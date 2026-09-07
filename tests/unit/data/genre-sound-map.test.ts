@@ -9,6 +9,27 @@ const allInstalled = () => true;
 const noneInstalled = () => false;
 
 describe('genre → sound map (#675)', () => {
+    it('uses Rhodes for the explicit Neo-Soul player even outside its genre, with synth fallback', () => {
+        expect(autoVoiceForGenre('Neo-Soul', 'chords', allInstalled, 'neo-soul-rhodes')).toBe(
+            'pack:rhodes',
+        );
+        expect(autoVoiceForGenre('Jazz', 'chords', allInstalled, 'neo-soul-rhodes')).toBe(
+            'pack:rhodes',
+        );
+        expect(autoVoiceForGenre('Acoustic', 'chords', noneInstalled, 'neo-soul-rhodes')).toBe(
+            'synth',
+        );
+        // Installing Grand alone must not change this player's Auto identity.
+        expect(
+            autoVoiceForGenre('Jazz', 'chords', (pack) => pack === 'grand', 'neo-soul-rhodes'),
+        ).toBe('synth');
+        expect(autoVoiceForGenre('Neo-Soul', 'chords', allInstalled, 'modern-piano')).toBe(
+            'pack:grand',
+        );
+        expect(autoVoiceForGenre('Neo-Soul', 'chords', allInstalled, 'open-modal')).toBe(
+            'pack:grand',
+        );
+    });
     it.each(['modern-piano', 'open-modal'])(
         'follows %s with grand piano or the audible synth fallback',
         (profile) => {

@@ -143,6 +143,9 @@ export function autoVoiceForGenre(
     isPackInstalled: (packId: string) => boolean,
     chordStyle?: string,
 ): InstrumentVoice {
+    if (module === 'chords' && chordStyle === 'neo-soul-rhodes') {
+        return isPackInstalled('rhodes') ? 'pack:rhodes' : 'synth';
+    }
     if (module === 'chords' && (chordStyle === 'modern-piano' || chordStyle === 'open-modal')) {
         return isPackInstalled('grand') ? 'pack:grand' : 'synth';
     }

@@ -294,7 +294,7 @@ describe('#1325 — the EXPORTER actually calls the shared curves (not just the 
         };
     }
 
-    it.each(['guitar', 'modern-piano', 'open-modal'] as const)(
+    it.each(['guitar', 'modern-piano', 'open-modal', 'neo-soul-rhodes'] as const)(
         'preserves authored %s articulation and fractional releases through audio, live MIDI and export (#1150)',
         (player) => {
             const notes = [0, 1, 2].map((rank) => ({
