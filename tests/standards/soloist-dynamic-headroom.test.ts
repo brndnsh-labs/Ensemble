@@ -1,10 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { GENRE_NAMES } from '../../public/data/smart-genres.js';
+import { getBandPocket } from '../../public/engine/coordination-engine.js';
 import {
     getSoloistNotePhraseFirst,
     SOLOIST_VELOCITY_ENVELOPE,
 } from '../../public/engine/soloist-phrase-first.js';
 import { reserveSoloistHeadroom } from '../../public/engine/velocity-shaping.js';
+import { getChordAtStep } from '../../public/engine/worker-utils.js';
 import { makeChord } from '../utils/chord-fixture.js';
 import { buildDynamicsState, performDynamics } from '../utils/soloist-dynamics.js';
 
@@ -177,4 +179,35 @@ describe.each(GENRE_NAMES)('High-energy phrase headroom (#1135) - %s', (genre) =
             `[#1135 ${genre}] shipped/shaped means: ${JSON.stringify({ shippedMeans, means })}`,
         );
     });
+});
+
+// These UI labels differ from their runtime feel keys. Keep the production
+// microtiming context while retaining the velocity-only comparisons above.
+it.each([
+    ['Bossa', 'Bossa Nova', -0.003],
+    ['Ska-Punk', 'Ska', -0.004],
+] as const)('%s dynamics fixture retains its runtime pocket', (genre, feel, pocket) => {
+    const state = buildDynamicsState(genre);
+    expect(state.groove.genreFeel).toBe(feel);
+    expect(getBandPocket(state.groove.genreFeel)).toBe(pocket);
+    const seed = state.soloist.session.seed!;
+    const authored = seed.notes.find((note) => note.step >= 0)!;
+    const position = getChordAtStep(authored.step, state.arranger, { index: 0, sectionIndex: 0 })!;
+    const result = getSoloistNotePhraseFirst(
+        state,
+        position.chord,
+        null,
+        authored.step,
+        null,
+        state.soloist.octave,
+        'smart',
+        authored.step % 16,
+        { sectionStart: position.sectionStart, sectionEnd: position.sectionEnd },
+    );
+    const lead = Array.isArray(result) ? result.at(-1) : result;
+    expect(lead).toBeTruthy();
+    expect(lead!.timingOffset).toBeCloseTo(
+        (authored.timingOffset ?? 0) + getBandPocket(feel, position.chord.sectionLabel),
+        10,
+    );
 });

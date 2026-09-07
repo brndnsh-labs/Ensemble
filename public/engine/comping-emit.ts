@@ -352,6 +352,20 @@ export function emitCompNotes(args: CompEmitArgs): any[] {
     const bassHit = coordination.bassHit || false;
     const soloistActive = coordination.soloistActive || false;
 
+    // The worker folds section-practice returns to musical steps. Detect both a
+    // new bar and a rewind here, even when a mute skipped its first tick. Fresh
+    // playback, seek/FLUSH, MIDI and WAV renders also reset this shared memory.
+    if (genre === 'Hip Hop') {
+        if (
+            measureStep === 0 ||
+            step <= compingState.hipHopLastStep ||
+            step - compingState.hipHopLastStep > measureStep
+        ) {
+            compingState.hipHopBarHadStab = false;
+        }
+        compingState.hipHopLastStep = step;
+    }
+
     // --- STANDARD Pattern Logic ---
     let isHit = compingState.currentCell[measureStep % spm] === 1;
 
@@ -373,7 +387,17 @@ export function emitCompNotes(args: CompEmitArgs): any[] {
         // is a by-ear balance, not a stronger taste oracle; compDraw(1) keeps
         // the decision deterministic and loop-stable.
         if (bassHit && compDraw(1) < 0.4) {
-            isHit = false; // Yield the step entirely
+            // #1165: a one/two-stab Hip Hop cell can otherwise yield forever on
+            // a short practice loop. Keep its final AUTHORED opportunity only
+            // when no earlier stab sounded. No pulse is inserted; the following
+            // soloist/harmony gates retain their own right to rest this step.
+            const finalHipHopOpportunity =
+                genre === 'Hip Hop' &&
+                !compingState.hipHopBarHadStab &&
+                compingState.currentCell.lastIndexOf(1) === measureStep;
+            if (!finalHipHopOpportunity) {
+                isHit = false; // Yield the step entirely
+            }
         }
 
         // 2. Yield to Soloist: If soloist is active, increase the skip probability
@@ -1271,6 +1295,13 @@ export function emitCompNotes(args: CompEmitArgs): any[] {
                 dry: genre === 'Reggae' || genre === 'Funk' || genre === 'Disco',
             });
         });
+    }
+
+    if (
+        genre === 'Hip Hop' &&
+        notes.some((note) => note.midi > 0 && note.velocity > 0 && note.muted !== true)
+    ) {
+        compingState.hipHopBarHadStab = true;
     }
 
     if (notes.length === 0 && ccEvents.length > 0) {
