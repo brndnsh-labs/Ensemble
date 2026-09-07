@@ -74,6 +74,118 @@ function makeCtx() {
 
 const zone = (rootMidi: number): SampleZone => ({ rootMidi, buffer: fakeBuffer() });
 
+describe('sampled held-voice dynamics (#1147)', () => {
+    it('keeps release automation finite for a zero-tail sample', () => {
+        const { ctx, gain } = makeCtx();
+        const voice = playSampledNote(
+            ctx,
+            { rootMidi: 60, buffer: fakeBuffer(20) },
+            {} as AudioNode,
+            60,
+            10,
+            { duration: 2, release: 0 },
+        );
+        voice?.release(11, 0.05);
+        expect(gain.gain.calls.every((c: { value: number }) => Number.isFinite(c.value))).toBe(
+            true,
+        );
+    });
+
+    it('evaluates an early stop before an already-queued future gain extension', () => {
+        const { ctx, gain } = makeCtx();
+        const voice = playSampledNote(
+            ctx,
+            { rootMidi: 60, buffer: fakeBuffer(20) },
+            {} as AudioNode,
+            60,
+            10,
+            { duration: 2, attack: 0.2, velocity: 1 },
+        );
+        expect(voice?.extend(10.15, 2, 1.08)).toBe(true);
+        voice?.release(10.05, 0.05);
+        expect(
+            gain.gain.calls
+                .filter((c: { op: string; time: number }) => c.op === 'ramp' && c.time === 10.05)
+                .at(-1)?.value,
+        ).toBeCloseTo(0.25, 8);
+    });
+
+    it('uses the new hold release and lets a panic bring a queued release forward', () => {
+        const { ctx, source, gain } = makeCtx();
+        const voice = playSampledNote(
+            ctx,
+            { rootMidi: 60, buffer: fakeBuffer(20) },
+            {} as AudioNode,
+            60,
+            10,
+            { duration: 2, velocity: 1, release: 0.3 },
+        );
+        expect(voice?.extend(12, 0.43, 1, 0.172)).toBe(true);
+        expect(source.stop.mock.calls.at(-1)?.[0]).toBeCloseTo(12.612, 8);
+        voice?.release(12.5, 0.05);
+        voice?.release(12.1, 0.05);
+        expect(gain.gain.setTargetAtTime).toHaveBeenLastCalledWith(0, 12.1, 0.0125);
+        expect(source.stop.mock.calls.at(-1)?.[0]).toBeCloseTo(12.2, 8);
+    });
+    it('extends one source from baseline through a swell and back, without accumulating gain', () => {
+        const { ctx, source, gain } = makeCtx();
+        const handle = playSampledNote(
+            ctx,
+            { rootMidi: 60, buffer: fakeBuffer(30) },
+            {} as AudioNode,
+            60,
+            10,
+            { duration: 2, velocity: 0.5 },
+        );
+        expect(handle?.extend(12, 2, 0.54)).toBe(true);
+        expect(handle?.extend(14, 2, 0.5)).toBe(true);
+        expect(ctx.createBufferSource).toHaveBeenCalledTimes(1);
+        expect(source.start).toHaveBeenCalledTimes(1);
+        expect(gain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.54, 12.03);
+        expect(gain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.5, 14.03);
+        expect(source.stop).toHaveBeenLastCalledWith(16.09);
+        handle?.release(15, 0.05);
+        expect(handle?.extend(15, 2, 0.5)).toBe(false);
+    });
+
+    it('refuses extension before onset, after stop, or beyond pitch-adjusted sample length', () => {
+        const { ctx, gain } = makeCtx();
+        const handle = playSampledNote(
+            ctx,
+            { rootMidi: 60, buffer: fakeBuffer(10) },
+            {} as AudioNode,
+            72,
+            10,
+            { duration: 2 },
+        );
+        const calls = gain.gain.calls.length;
+        expect(handle?.extend(9, 2, 0.5)).toBe(false);
+        expect(handle?.extend(12.5, 1, 0.5)).toBe(false);
+        expect(handle?.extend(12, 3, 0.5)).toBe(false); // octave up: buffer ends at 15, before requested release
+        expect(handle?.extend(12, 1, Number.NaN)).toBe(false);
+        expect(gain.gain.calls).toHaveLength(calls);
+    });
+
+    it('cleans up after an extended source and never revives an ended voice', () => {
+        const { ctx, source, gain } = makeCtx();
+        const onEnded = vi.fn();
+        const handle = playSampledNote(
+            ctx,
+            { rootMidi: 60, buffer: fakeBuffer(20) },
+            {} as AudioNode,
+            60,
+            10,
+            { duration: 2, onEnded },
+        );
+        expect(handle?.extend(12, 2, 0.5)).toBe(true);
+        source.onended();
+        expect(source.disconnect).toHaveBeenCalledTimes(1);
+        expect(gain.disconnect).toHaveBeenCalledTimes(1);
+        expect(onEnded).toHaveBeenCalledTimes(1);
+        expect(handle?.extend(13, 2, 0.5)).toBe(false);
+    });
+});
+
 describe('sample-voice — pitchRatio', () => {
     it('is unity at the root (in tune where recorded)', () => {
         expect(pitchRatio(60, 60)).toBe(1);

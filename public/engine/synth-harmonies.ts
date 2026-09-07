@@ -2,7 +2,7 @@ import { gainForPack, toneTiltForPack } from '../data/sound-packs.js';
 import type { EnsembleState, Mutable } from '../types.js';
 import { clampFreq, safeDisconnect } from './audio-graph-utils.js';
 import { resolveInstrumentSource } from './instrument-registry.js';
-import { playSampledNote } from './sample-voice.js';
+import { playSampledNote, type SampledNoteHandle } from './sample-voice.js';
 import { createSimplePanner, resolveSampledZone } from './synth-utils.js';
 
 /**
@@ -154,7 +154,7 @@ function extendLegatoHarmonyVoice(
  * the other instruments are unaffected.
  */
 function killHarmonyVoice(
-    voice: { gain?: GainNode; nodes?: AudioNode[] },
+    voice: { gain?: GainNode; nodes?: AudioNode[]; sampleHandle?: SampledNoteHandle },
     time: number,
     fadeTime: number,
 ): void {
@@ -168,6 +168,10 @@ function killHarmonyVoice(
     // applies immediately, i.e. "release now".
     const at = Number.isFinite(time) ? time : 0;
     const fade = Math.max(0.005, Number.isFinite(fadeTime) ? fadeTime : 0.05);
+    if (voice.sampleHandle) {
+        voice.sampleHandle.release(at, fade);
+        return;
+    }
     const g = voice.gain?.gain;
     if (g) {
         try {
@@ -363,7 +367,7 @@ function dispatchHarmonySynth(
 // synth-audit Epic 6 — play one harmony voice from a sample pack (#660, the
 // String Ensemble pad). Converts the scheduled frequency to a MIDI target,
 // picks the nearest loaded zone, and plays it through the harmonies gain bus
-// (inheriting the bus EQ/reverb/limiting). Returns false — so the caller falls
+// (inheriting the bus EQ/reverb/limiting). Returns null — so the caller falls
 // back to the synth voice — when the pack's zones aren't loaded yet or the note
 // is otherwise unplayable. Sustained-pad samples suit the harmony lane's ≤3
 // held voices; the per-note envelope (attack + release) shapes each held note.
@@ -374,13 +378,15 @@ function playSampledHarmony(
     time: number,
     duration: number,
     vol: number,
-): boolean {
+    midi: number | null,
+    isLegato: boolean,
+): HarmonyVoiceHandle | null {
     // Fold notes above the pack's sampled range down an octave (#755): harmony
     // runs to MIDI 84 but the strings top at 74 and horns at 72, so the top zone
     // would otherwise pitch-shift up into a thin metallic ring. In-range unchanged.
     const resolved = resolveSampledZone(state, 'harmonies', packId, freq);
     if (!resolved) {
-        return false;
+        return null;
     }
     const { audio, dest, zone, targetMidi } = resolved;
     // Lift the loudness-normalized sample to the synth harmony seat via the
@@ -400,14 +406,75 @@ function playSampledHarmony(
     // at 0.08 s so a fast fingerpick note still decays click-free.
     const heldDur = Number.isFinite(duration) && duration > 0 ? duration : 0.5;
     const release = Math.max(0.08, Math.min(0.3, heldDur * 0.4));
-    playSampledNote(audio, zone, dest, targetMidi, Math.max(time, audio.currentTime), {
+    const at = Math.max(Number.isFinite(time) ? time : audio.currentTime, audio.currentTime);
+    // Identity is the written MIDI, not the pack-folded pitch: two written
+    // octaves can share a sample pitch without being the same harmony voice.
+    const voiceMidi = midi ?? Math.round(69 + 12 * Math.log2(freq / 440));
+    const { harmony } = state;
+    if (!harmony.activeVoices) {
+        (harmony as Mutable<typeof harmony>).activeVoices = []; // @direct-mutation
+    }
+    const voices = harmony.activeVoices;
+    const existing = voices.find((voice) => voice.midi === voiceMidi);
+    if (
+        isLegato &&
+        existing?.packId === packId &&
+        existing.audio === audio &&
+        existing.targetMidi === targetMidi &&
+        existing.destination === dest &&
+        existing.sampleHandle?.extend(at, heldDur, velocity, release)
+    ) {
+        existing.lastExtendedAt = at;
+        existing.duration = heldDur;
+        return existing;
+    }
+    // A finite recording cannot be extended indefinitely. Retire it smoothly
+    // at this already-authored emission and start the next held note normally.
+    // This also covers a pack/synth switch or a non-legato repeated pitch.
+    if (existing) {
+        killHarmonyVoice(existing, at, 0.06);
+        voices.splice(voices.indexOf(existing), 1); // @direct-mutation
+    }
+    if (voices.length >= 3) {
+        const oldest = voices.shift();
+        if (oldest) {
+            killHarmonyVoice(oldest, at, HARMONY_VOICE_LIMIT_FADE);
+        }
+    }
+    let voice: HarmonyVoiceHandle;
+    const sampleHandle = playSampledNote(audio, zone, dest, targetMidi, at, {
         velocity,
-        duration,
+        duration: heldDur,
         attack: 0.06,
         release,
         tone: toneTiltForPack(packId),
+        onEnded: () => {
+            const index = voices.indexOf(voice);
+            if (index >= 0) {
+                voices.splice(index, 1); // @direct-mutation
+            }
+        },
     });
-    return true;
+    if (!sampleHandle) {
+        return null;
+    }
+    voice = {
+        midi: voiceMidi,
+        release: (when, fade) => sampleHandle.release(when, fade),
+    };
+    // Same registry as synth voices: chord release, panic, voice switch, and
+    // detached-render reset already own this lifecycle. No new state field.
+    Object.assign(voice, {
+        sampleHandle,
+        packId,
+        audio,
+        destination: dest,
+        targetMidi,
+        time: at,
+        duration: heldDur,
+    });
+    voices.push(voice); // @direct-mutation
+    return voice;
 }
 
 // synth-audit Epic 6 S1 — instrument-source seam. A `pack:<id>` voice plays
@@ -418,12 +485,20 @@ export function playHarmonyNote(
 ): HarmonyVoiceHandle | null {
     const source = resolveInstrumentSource(args[0].harmony.voice);
     if (source.kind === 'sample') {
-        const [state, freq, time, duration, vol = 0.4] = args;
-        // The sampled pad self-releases on its own duration envelope and isn't
-        // registered in `activeVoices`; it exposes no chord-change handle (the
-        // #934 handle plumbing is scoped to the synth voice), so return null.
-        if (playSampledHarmony(state, source.packId, freq, time, duration, vol)) {
-            return null;
+        const [state, freq, time, duration, vol = 0.4, , midi = null, , , , isLegato = false] =
+            args;
+        const sampled = playSampledHarmony(
+            state,
+            source.packId,
+            freq,
+            time,
+            duration,
+            vol,
+            midi,
+            isLegato,
+        );
+        if (sampled) {
+            return sampled;
         }
     }
     return dispatchHarmonySynth(...args);

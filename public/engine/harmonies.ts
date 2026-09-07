@@ -6,7 +6,11 @@ import { INTRO_MUTES, OUTRO_MUTES } from './arrangement-layering.js';
 import { getBestInversion } from './chords-engine.js';
 import { getBandPocket } from './coordination-engine.js';
 import { getMovingPadVoicing } from './harmony-moving-voice.js';
-import { type HarmonyPatternKey, resolveHarmonyProfile } from './harmony-styles.js';
+import {
+    getPadPhraseGain,
+    type HarmonyPatternKey,
+    resolveHarmonyProfile,
+} from './harmony-styles.js';
 import { scrambleHash } from './hash-utils.js';
 import {
     HUMANIZE_PROFILES,
@@ -57,6 +61,7 @@ interface StyleConfig {
     octaveOffset: number;
     activeStyle?: string;
     movingPadVoice?: boolean;
+    phraseDynamics?: boolean;
 }
 
 interface HarmonyContext {
@@ -1227,6 +1232,10 @@ function finalizeHarmonyNotes(
     // was ALWAYS late, never early, regardless of the humanize knob. Centered now
     // (same total width, no systematic drag) and knob-gated.
     const voiceJitterSpread = (styleConfig.timingJitter || 0.008) / 2;
+    const phraseGain =
+        styleConfig.phraseDynamics && behavior.type === 'pad' && !isBloom && !isLatched
+            ? getPadPhraseGain(activeState, step)
+            : 1;
 
     for (let i = 0; i < currentMidis.length; i++) {
         let midi = currentMidis[i];
@@ -1291,7 +1300,7 @@ function finalizeHarmonyNotes(
         notes.push({
             midi,
             freq: getFrequency(midi),
-            velocity: baseVol * polyphonyComp * hVoice.velocityMult,
+            velocity: baseVol * polyphonyComp * hVoice.velocityMult * phraseGain,
             durationSteps: Math.max(0.1, duration),
             timingOffset: offset,
             style: styleConfig.activeStyle,
@@ -1465,6 +1474,7 @@ export function getHarmonyNotes(
         // Smart path: the resolved pads-vs-stabs decision is the profile's.
         config.rhythmicStyle = profile.rhythmicStyle;
         config.movingPadVoice = profile.movingPadVoice;
+        config.phraseDynamics = profile.phraseDynamics;
     } else {
         // Explicit-style path: keep the legacy resolution. 'auto' falls to pads
         // for the sustained-genre feels; the comping feels always force stabs
