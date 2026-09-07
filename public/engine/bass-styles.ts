@@ -698,7 +698,7 @@ export function getBassNoteStyle(
             intensity > 0.5 &&
             (isLastBeatOfBar || isLastBeatAndOfBar)
         ) {
-            const nextTarget = normalizeToRange(nextChord.rootMidi);
+            const nextTarget = normalizeToRange(nextChord.bassMidi ?? nextChord.rootMidi);
             // why: walk-ups punch slightly hotter than Two-Step roots (0.95) to
             // articulate the line as a pickup gesture.
             // #941: was `1.0 + intensity * 0.2` against the roots' `0.95 +
@@ -730,11 +730,12 @@ export function getBassNoteStyle(
             // on the approach side. why: country walks lean on whole-step motion
             // setting up the chromatic half-step on the "&" → root downbeat (T-2,
             // T-1, T as a three-note pull-in). Direction is computed from raw
-            // rootMidi delta (ascending V→I = walk down into target, descending
+            // written bass delta (ascending V→I = walk down into target, descending
             // I→V = walk up into target) so the walk follows harmonic contour
             // rather than register-normalized contour — normalizeToRange will
             // clamp the walk note into register afterward.
-            const rawDelta = nextChord.rootMidi - chord.rootMidi;
+            const rawDelta =
+                (nextChord.bassMidi ?? nextChord.rootMidi) - (chord.bassMidi ?? chord.rootMidi);
             const direction = rawDelta >= 0 ? -1 : 1; // approach side
             const wholeStep = normalizeToRange(nextTarget + direction * 2);
             const wholeStepPC = (((wholeStep - chord.rootMidi) % 12) + 12) % 12;
@@ -1697,7 +1698,7 @@ export function getBassNoteStyle(
         // correctly detected as a chord change rather than staying silent on
         // the chromatic approach. (bass.md micro-cleanup S5.)
         if (isLastEighth && isChordChangeApproach(nextChord, chord) && intensity > 0.5) {
-            const nextTarget = normalizeToRange(nextChord.rootMidi);
+            const nextTarget = normalizeToRange(nextChord.bassMidi ?? nextChord.rootMidi);
             const approach = bassDraw(118) < 0.5 ? nextTarget - 1 : nextTarget + 1;
             const res = result(getFrequency(clampAndNormalize(approach)), 0.8, 1.2);
             res.timingOffset -= 0.005; // Rush the transition
