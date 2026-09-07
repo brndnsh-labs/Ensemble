@@ -13,8 +13,6 @@ import {
     type CoordinationCarryover,
     type CoordinationContext,
     createCoordinationContext,
-    getAltPitchClasses,
-    isTensionChordForSoloist,
     type RockTransitionOwner,
     selectRockTransitionOwner,
 } from './coordination-engine.js';
@@ -216,20 +214,7 @@ export function runDrumTick(
         const isLongEnough = sectionSteps >= stepsPerMeasure * 8;
         coordination.isTurnaround = isLongEnough && remainingSteps <= stepsPerMeasure * 2;
 
-        // --- Tension-chord publication (writer: chord-preamble; readable-after: any producer) ---
-        // why: must be published BEFORE the soloist producer runs (line ~254) so the
-        // pitch picker's final-stage `weight *= 3` multiplier on altered pitch classes
-        // (soloist-pitch-engine.ts) actually sees the signal. The soloist always runs
-        // ahead of the chords producer, so writing this in `updateCoordinationContext('chords')`
-        // would be one tick too late. Both fields are pure functions of the current chord.
         const currentChord = chordData.chord;
-        if (currentChord) {
-            coordination.isTensionChord = isTensionChordForSoloist(currentChord.quality);
-            coordination.altPitchClasses = getAltPitchClasses(
-                currentChord.quality,
-                currentChord.rootMidi,
-            );
-        }
 
         // why (Epic 3 S12): widen ONLY the structural counter to the penultimate bar so
         // the bass approach-window ramp has a `1` tier. Pure function of remainingSteps —

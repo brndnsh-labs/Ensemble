@@ -298,24 +298,26 @@ export function generateNotesForStep(
                     stepInfo || null,
                 );
                 if (generatedBass && (generatedBass.freq || generatedBass.midi)) {
-                    const bassResult = { ...generatedBass };
-                    if (!bassResult.midi) {
-                        bassResult.midi = getMidi(bassResult.freq);
-                    }
                     // #1158: every bass style owns its octave (walking arrivals,
                     // Disco's octave pump, repeat-pass displacement). The shared
                     // seam enforces range only; smoothing toward the last note
                     // erased those contours in MIDI while audio kept the frequency.
-                    bassResult.midi = enforceRegisterSlotting(
+                    const midi = enforceRegisterSlotting(
                         'bass',
-                        bassResult.midi,
+                        generatedBass.midi || getMidi(generatedBass.freq),
                         coordination,
                     );
                     // Audio scheduling reads freq; MIDI export reads midi. Both
                     // must receive the same final, range-safe authored pitch.
-                    bassResult.freq = getFrequency(bassResult.midi);
+                    const bassResult = {
+                        ...generatedBass,
+                        midi,
+                        freq: getFrequency(midi),
+                        step,
+                        module: 'bass',
+                    };
                     (bass as Mutable<typeof bass>).lastFreq = bassResult.freq; // @worker-mutation
-                    notesToMain.push({ ...bassResult, step, module: 'bass' });
+                    notesToMain.push(bassResult);
                     updateCoordinationContext(coordination, 'bass', bassResult);
                 }
             }
