@@ -97,6 +97,12 @@ portable, validated ChartDocuments, not evidence of cloud sync.
 
 ## Chart/import design target
 
+The accepted September 8 direction and fixture evidence are in
+[`ensemble-v2-charts.md`](ensemble-v2-charts.md). Brandon approved a new semantic document
+format targeting full iReal chart compatibility, with quick text entry and Ensemble's
+additional features. The additive codec foundation is underway under #1171; live storage,
+engine adoption, form execution and import remain subsequent slices. The preview stays v1.
+
 Current section text is separated by barlines and divides each bar equally among chord tokens.
 It cannot naturally express C for two beats, Dm for one and G7 for one. Parsing also performs
 voicing work. Introduce a semantic representation of measures, explicit chord durations and

@@ -53,6 +53,13 @@ This map provides a quick reference for AI agents to understand the responsibili
 | :--- | :--- | :--- |
 | `public/songbook/types.ts` | Version-1 portable chart and workspace-preference schemas, kept independent of live state slices. | `ChartDocument`, `ChartContent`, `WorkspacePreferences` |
 | `public/songbook/codec.ts` | Pure complete-candidate validation plus JSON encode/decode, including explicit invalid/current/future-version results. | `validateChartDocument`, `decodeChartDocument`, `encodeChartDocument` |
+| `public/songbook/score-types.ts` | Additive document-v2 authored-score types: exact events, measures, context, repeat and jump directions; no runtime/storage adoption yet. | `ChartDocumentV2`, `SemanticScore`, `ScoreMeasure`, `ScoreDirection` |
+| `public/songbook/score-duration.ts` | Bounded rational quarter-note arithmetic and exact sixteenth-grid capability checks. | `scoreDuration`, `scoreMeter`, `durationToSteps` |
+| `public/songbook/score-context.ts` | Shared key/mode/meter inheritance and beat-grouping reset for already-validated authored contexts. | `resolveScoreContext` |
+| `public/songbook/score-text.ts` | Complete-token chord-bar parsing/printing, meter-labelled lengths and alternate spellings; independent of voicing. | `parseChordBar`, `printChordBar`, `isScoreChord` |
+| `public/songbook/score-codec.ts` | Detached authored-score validation, duration sums and source/marker reference integrity; not a performance itinerary compiler. | `validateSemanticScore` |
+| `public/songbook/document-v2.ts` | Version-2 envelope codec alongside the unchanged version-1 reader; no implicit conversion. | `validateChartDocumentV2`, `decodeChartDocumentV2`, `encodeChartDocumentV2` |
+| `public/songbook/legacy-score.ts` | Pure conservative v1 conversion proposals retaining original JSON, with blocking timing/spelling diagnostics. | `proposeLegacyScoreConversion` |
 | `public/songbook/structural-limits.ts` | Pre-schema input ceilings for byte size, nesting depth, visited nodes, and section count. | `inspectSongbookStructure`, `SONGBOOK_MAX_INPUT_BYTES` |
 | `public/songbook/state-ownership.ts` | Exhaustive document/preferences/runtime ownership for every top-level state field, plus the legacy-writer reachability manifest. | `STATE_OWNERSHIP_MANIFEST`, `LEGACY_PERSISTED_FIELD_OWNERSHIP` |
 
