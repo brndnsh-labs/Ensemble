@@ -83,10 +83,9 @@ audition; this script never deletes them. The regular root `scripts/deploy.sh te
 deletion and can remove this separate preview: rebuild/redeploy it afterward. No nginx, Docker,
 production deployment or production data changes are needed for this checkpoint.
 
-Observed test-host limitation: the edge currently assigns `/v2/sw.js` a four-hour cache lifetime.
-The least-privilege deploy account cannot edit nginx. The first audition artifact was verified at
-the canonical URL, and the deploy verifier now refuses success if that URL serves an older
-worker even when a cache-busted probe matches. Before a later update, an authorized operator
-should add a scoped no-cache policy (and purge the existing entry) or purge the worker URL as
-part of deployment. Track this hosting prerequisite with #1172; do not escalate deployment
-credentials or change production to work around it.
+The test-only Caddy rule now sets `Cache-Control: no-store` for `/v2/*` on the test hostname
+(homelab-maintenance commit `5ca32d7`). The old Cloudflare worker entry was purged on 2026-09-08;
+the canonical worker now returns `BYPASS`. Explicit app/sound Cache Storage remains functional.
+The deploy verifier still refuses success if the canonical URL serves an older worker even when
+a cache-busted probe matches. If caching regresses, investigate the scoped edge policy and purge
+only the affected preview URLs; never change production or purge the entire zone to work around it.

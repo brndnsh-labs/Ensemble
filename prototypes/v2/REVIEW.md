@@ -43,5 +43,12 @@ catalog downloads and all five sampled lanes, Save/Revert/export/import, offline
 partial eviction, corrupt responses, storage quota failure, and successful retry. These are
 functional checks, not a human judgment of timbre or real-device audio continuity.
 
-Test hosting remains gated by the documented canonical-service-worker cache policy. Do not infer
-that this follow-on has been deployed from its build or browser checks alone.
+The test-host cache prerequisite was resolved on 2026-09-08 with a test-preview-only Caddy rule
+and a user-performed Cloudflare purge. Deployment verified all 258 assets, the canonical worker,
+the manifest and unchanged original test root. The audition source is `62ef0b3e`; GitHub PR #1173
+records its artifact fingerprint and the current human-test status.
+
+Live acceptance exposed an import-test timing race: disabled Save also meant "busy," so the test
+could submit an invalid second file before the first import finished. A slow file-read fixture
+reproduced the failure; waiting for Song actions to become enabled fixes the test without
+changing the application or weakening invalid-input assertions.

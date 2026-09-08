@@ -336,6 +336,15 @@ test('two tabs cannot overwrite a newer save; a conflicting take can become a co
 test('file export/import is detached; invalid input never changes the active song', async ({
     page,
 }) => {
+    // Model slow device file I/O. Assertions must wait for import completion,
+    // not confuse the disabled-during-import Save button with a finished save.
+    await page.addInitScript(() => {
+        const read = File.prototype.text;
+        File.prototype.text = async function () {
+            await new Promise((resolve) => setTimeout(resolve, 200));
+            return read.call(this);
+        };
+    });
     await page.goto('/v2/');
     await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
     await page.getByRole('button', { name: 'Edit chart', exact: true }).click();
@@ -351,6 +360,7 @@ test('file export/import is detached; invalid input never changes the active son
     expect(path).toBeTruthy();
     await page.getByRole('button', { name: 'Close', exact: true }).click();
     await page.getByLabel('Import Ensemble document').setInputFiles(path!);
+    await expect(page.getByRole('button', { name: 'Song actions' })).toBeEnabled();
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
     await expect(
         page.getByRole('heading', { name: 'My writing sketch', exact: true }),
