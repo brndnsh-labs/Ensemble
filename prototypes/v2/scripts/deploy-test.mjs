@@ -63,6 +63,15 @@ const sw = await fetch(`${origin}/v2/sw.js?verify=${hash}`, { cache: 'no-store' 
 if (!sw.ok || (await sw.text()) !== (await readFile(path.join(root, 'sw.js'), 'utf8'))) {
     throw new Error('Live service worker mismatch');
 }
+const canonicalWorker = await fetch(`${origin}/v2/sw.js`, { cache: 'no-store' });
+if (
+    !canonicalWorker.ok ||
+    (await canonicalWorker.text()) !== (await readFile(path.join(root, 'sw.js'), 'utf8'))
+) {
+    throw new Error(
+        'The edge still serves an older canonical service worker. An authorized operator must purge that URL or configure no-cache before this deployment is ready. Do not report success from the cache-busted verification alone.',
+    );
+}
 const newRoot = await (await fetch(`${origin}/`, { cache: 'no-store' })).text();
 if (newRoot !== oldRoot) {
     throw new Error(

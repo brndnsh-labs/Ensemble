@@ -69,3 +69,11 @@ temporary-symlink/rename operation. No database migration occurs. Keep old relea
 audition; this script never deletes them. The regular root `scripts/deploy.sh test` uses rsync
 deletion and can remove this separate preview: rebuild/redeploy it afterward. No nginx, Docker,
 production deployment or production data changes are needed for this checkpoint.
+
+Observed test-host limitation: the edge currently assigns `/v2/sw.js` a four-hour cache lifetime.
+The least-privilege deploy account cannot edit nginx. The first audition artifact was verified at
+the canonical URL, and the deploy verifier now refuses success if that URL serves an older
+worker even when a cache-busted probe matches. Before a later update, an authorized operator
+should add a scoped no-cache policy (and purge the existing entry) or purge the worker URL as
+part of deployment. Track this hosting prerequisite with #1172; do not escalate deployment
+credentials or change production to work around it.
