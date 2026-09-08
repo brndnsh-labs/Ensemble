@@ -95,3 +95,36 @@ Captured UI evidence from the tested preview (not generated mockups):
 - [Focused laptop stand](evidence/focused-laptop.png)
 - [Focused portrait-phone stand](evidence/focused-phone.png)
 - [Install-all Sounds dialog](evidence/sounds-dialog.png)
+
+## Editing usability follow-on (#1175)
+
+An inline correctness pass and independent second-model source review covered per-section raw
+buffers, full-token checking for changed text, atomic Save/copy/export, failed writes/conflicts,
+navigation/transformations, tempo event ordering and the last-opened preference. The independent
+source pass found no actionable defect. Main-thread browser inspection found a small section
+selector tap target (F1); the patch gives it a 44px minimum and a responsive regression assertion.
+Independent finding closure confirmed F1 fixed with no nearby regression. The full 48-case
+preview suite passed; after the final selector-only patch, all 24 usability/responsive checks
+passed again across Chromium and WebKit. The original-app gates are recorded in PR #1173.
+
+The strict editor boundary reuses existing chord-quality recognition without imposing new rules
+on untouched saved text. Unknown roots and partially understood spellings no longer silently
+become substitute chords when saving new text. Invalid text stays tab-only, with explicit status
+and an unload guard; validated work enters existing recovery before a potentially failing Save.
+No saved schema, old browser data, generator, worker contract or sound behavior was changed.
+
+The tempo regression failed against the previous built preview: sequentially typing 90 produced
+240. An initial new upper-bound assertion also exposed an old UI/engine mismatch: the input
+advertised 300, but both the engine and canonical codec already enforce 240. The preview now
+matches that established 40–240 contract; no musical range was expanded.
+
+Browser checks cover raw-only Save, multiple edited sections, copy/export isolation, unsupported
+tokens and document bounds, failed Save recovery, competing-tab conflicts, transposition,
+navigation, tempo Enter/blur/Escape/steppers, preference failure, and editor visibility across
+laptop, phone portrait/landscape and tablet. Real-device keyboard/touch and musical audition
+remain human checks; this PR stays a test-only draft, not a production cutover.
+
+Captured from the final tested interface:
+
+- [Laptop editor](evidence/editor-laptop.png)
+- [Portrait-phone editor, WebKit](evidence/editor-phone.png)

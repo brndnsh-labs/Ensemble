@@ -4,9 +4,11 @@ import { KEY_ORDER, TIME_SIGNATURES } from '@engine/config';
 import { buildLeadSheetSections } from '@engine/song/lead-sheet-model';
 import type { InstrumentVoice } from '@engine/types';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { validateEditorText } from '../lib/editor';
 import * as repository from '../lib/repository';
 import type { ChartDocument } from '../lib/runtime';
 import * as runtime from '../lib/runtime';
+import { lastOpenedSong, rememberSong } from '../lib/session';
 import {
     allSoundsAvailableOffline,
     allSoundsSizeMB,
@@ -15,6 +17,7 @@ import {
     soundsAvailableOffline,
 } from '../lib/sounds';
 import { start } from '../lib/starters';
+import { TempoControl } from './tempo-control';
 
 const lanes = [
     ['groove', 'Drums'],
@@ -39,7 +42,11 @@ export default function Ensemble() {
     const [message, setMessage] = useState('');
     const [editing, setEditing] = useState(false);
     const [sectionId, setSectionId] = useState('');
-    const [text, setText] = useState('');
+    const [buffers, setBuffers] = useState(new Map<string, string>());
+    const pendingText = useRef(false);
+    const [lastOpened, setLastOpened] = useState<string | null>(null);
+    const [editorRequest, setEditorRequest] = useState(0);
+    const revealedEditorRequest = useRef(0);
     const [search, setSearch] = useState('');
     const [playing, setPlaying] = useState(false);
     const [playbackPending, setPlaybackPending] = useState(false);
@@ -60,7 +67,13 @@ export default function Ensemble() {
     const soundsDialog = useRef<HTMLDialogElement>(null);
     const file = useRef<HTMLInputElement>(null);
     const scroll = useRef<HTMLDivElement>(null);
-    const dirty = !!(current && saved && !same(current, saved));
+    const editor = useRef<HTMLTextAreaElement>(null);
+    const hasPendingText = buffers.size > 0;
+    const text =
+        buffers.get(sectionId) ??
+        current?.chart.arrangement.sections.find((section) => section.id === sectionId)?.value ??
+        '';
+    const dirty = hasPendingText || !!(current && saved && !same(current, saved));
     const playbackActive = playing || playbackPending;
     const focused = playbackActive && !showControls && !editing;
 
@@ -70,6 +83,7 @@ export default function Ensemble() {
             .then((result) => {
                 if (alive) {
                     setSongs(result);
+                    setLastOpened(lastOpenedSong());
                     setReady(true);
                 }
             })
@@ -84,7 +98,7 @@ export default function Ensemble() {
             setActive(state.playback.isPlaying ? state.chords.lastActiveChordIndex : null);
         }, 60);
         const preventLoss = (event: BeforeUnloadEvent) => {
-            if (volatileDrafts.current.size) {
+            if (volatileDrafts.current.size || pendingText.current) {
                 event.preventDefault();
                 event.returnValue = '';
             }
@@ -149,6 +163,15 @@ export default function Ensemble() {
             window.removeEventListener('beforeunload', preventLoss);
         };
     }, []);
+    useEffect(() => {
+        if (editing && !busy && editorRequest !== revealedEditorRequest.current) {
+            // Reveal the actual input, including an already-open editor's selected section.
+            revealedEditorRequest.current = editorRequest;
+            editor.current?.focus({ preventScroll: true });
+            editor.current?.closest('.edit-panel')?.scrollIntoView({ block: 'start' });
+            editor.current?.scrollIntoView({ block: 'nearest' });
+        }
+    }, [editing, editorRequest, busy]);
     useEffect(() => {
         if (menu) {
             dialog.current?.showModal();
@@ -243,13 +266,83 @@ export default function Ensemble() {
             );
         }
     }
-    function change(action: () => void | Promise<void>) {
+    function change(action: () => void | Promise<void>, includeText = false) {
         if (!current) {
             return;
         }
         void run(async () => {
+            const next = includeText ? updateChart() : current;
             await action();
-            draft({ ...current, chart: runtime.captureContent() });
+            draft({ ...next, chart: runtime.captureContent() });
+        });
+    }
+    function clearBuffers() {
+        pendingText.current = false;
+        setBuffers(new Map());
+    }
+    function editText(value: string) {
+        const next = new Map(buffers);
+        if (value === current?.chart.arrangement.sections.find((s) => s.id === sectionId)?.value) {
+            next.delete(sectionId);
+        } else {
+            next.set(sectionId, value);
+        }
+        pendingText.current = next.size > 0;
+        setBuffers(next);
+    }
+    function revealEditor(id = sectionId) {
+        runtime.stop();
+        setSectionId(id);
+        setEditing(true);
+        setEditorRequest((request) => request + 1);
+    }
+    function updateChart(): ChartDocument {
+        if (!current) {
+            throw new Error('Open a song first.');
+        }
+        if (!buffers.size) {
+            return current;
+        }
+        try {
+            const sections = current.chart.arrangement.sections.map((section) => ({
+                ...section,
+                value: buffers.get(section.id) ?? section.value,
+            }));
+            for (const section of sections) {
+                if (buffers.has(section.id)) {
+                    try {
+                        validateEditorText(section.label, section.value);
+                    } catch (error) {
+                        setSectionId(section.id);
+                        throw error;
+                    }
+                }
+            }
+            // Check the canonical document bounds before rebuilding the playable chart.
+            const candidate = repository.validated({
+                ...current,
+                chart: {
+                    ...current.chart,
+                    arrangement: { ...current.chart.arrangement, sections },
+                },
+            });
+            runtime.editSections(candidate.chart.arrangement.sections);
+            const next = { ...candidate, chart: runtime.captureContent() };
+            draft(next);
+            clearBuffers();
+            return next;
+        } catch (error) {
+            setMenu(false);
+            setEditing(true);
+            setEditorRequest((request) => request + 1);
+            throw error;
+        }
+    }
+    function goHome() {
+        void run(() => {
+            updateChart();
+            runtime.stop();
+            setCurrent(null);
         });
     }
     function selectSection(document: ChartDocument, id?: string) {
@@ -257,7 +350,6 @@ export default function Ensemble() {
             document.chart.arrangement.sections.find((s) => s.id === id) ||
             document.chart.arrangement.sections[0];
         setSectionId(section.id);
-        setText(section.value);
     }
     async function open(document: ChartDocument) {
         const recovery = repository.recoveryFor(document);
@@ -265,6 +357,9 @@ export default function Ensemble() {
         runtime.load(next);
         setSaved(document);
         setCurrent(next);
+        clearBuffers();
+        rememberSong(next.id);
+        setLastOpened(next.id);
         setRecoveryHealthy(!volatileDrafts.current.has(document.id));
         setEditing(false);
         setFollowing(true);
@@ -292,13 +387,20 @@ export default function Ensemble() {
         if (!current || !saved) {
             return;
         }
+        const candidate = updateChart();
         const next = copy
-            ? { ...current, id: crypto.randomUUID(), title: `${current.title} — copy` }
-            : current;
+            ? {
+                  ...candidate,
+                  id: crypto.randomUUID(),
+                  title: `${candidate.title.slice(0, 150)} — copy`,
+              }
+            : candidate;
         // A recovered stale draft must not borrow the newer saved revision.
         const result = await repository.save(next, copy ? null : current.revision);
         setSaved(result);
         setCurrent(result);
+        rememberSong(result.id);
+        setLastOpened(result.id);
         volatileDrafts.current.delete(current.id);
         setRecoveryHealthy(true);
         try {
@@ -331,15 +433,18 @@ export default function Ensemble() {
             const created = await repository.save(document, null);
             setSongs(await repository.list());
             await open(created);
-            setEditing(true);
+            revealEditor(created.chart.arrangement.sections[0].id);
         });
     }
     function exportSong() {
         if (!current) {
             return;
         }
+        const candidate = updateChart();
         const url = URL.createObjectURL(
-            new Blob([JSON.stringify(current, null, 2)], { type: 'application/json' }),
+            new Blob([JSON.stringify(repository.validated(candidate), null, 2)], {
+                type: 'application/json',
+            }),
         );
         const anchor = document.createElement('a');
         anchor.href = url;
@@ -355,6 +460,26 @@ export default function Ensemble() {
         return buildLeadSheetSections(a.progression, a.sections, TIME_SIGNATURES[a.timeSignature]);
     }, [current]);
     const totalBars = blocks.reduce((n, b) => n + b.measures.length, 0);
+    const continuedSave = songs.find((song) => song.id === lastOpened);
+    const featuredSave =
+        continuedSave || songs.find((song) => song.id === 'starter-blues') || songs[0];
+    const featured = useMemo(() => {
+        if (!featuredSave) {
+            return null;
+        }
+        if (current?.id === featuredSave.id) {
+            return current;
+        }
+        try {
+            return (
+                volatileDrafts.current.get(featuredSave.id) ||
+                repository.recoveryFor(featuredSave)?.document ||
+                featuredSave
+            );
+        } catch {
+            return volatileDrafts.current.get(featuredSave.id) || featuredSave;
+        }
+    }, [featuredSave, current]);
     let barNumber = 0;
 
     return (
@@ -416,6 +541,9 @@ export default function Ensemble() {
                         return;
                     }
                     void run(async () => {
+                        if (current) {
+                            updateChart();
+                        }
                         if (source.size > 1_048_576) {
                             throw new Error('Chart files must be 1 MB or smaller.');
                         }
@@ -457,20 +585,25 @@ export default function Ensemble() {
                     </div>
                     <div className="home-grid">
                         <div>
-                            {songs[0] && (
+                            {featured && (
                                 <section className="continue-card">
                                     <div className="continue-copy">
-                                        <span className="eyebrow">Pick up where you left off</span>
-                                        <h3>{songs[0].title}</h3>
+                                        <span className="eyebrow">
+                                            {continuedSave
+                                                ? 'Pick up where you left off'
+                                                : 'A good place to start'}
+                                        </span>
+                                        <h3>{featured.title}</h3>
                                         <p>
-                                            {songs[0].chart.band.groove.lastSmartGenre} ·{' '}
-                                            {songs[0].chart.performance.bpm} BPM ·{' '}
-                                            {songs[0].chart.arrangement.key}
+                                            {featured.chart.band.groove.lastSmartGenre} ·{' '}
+                                            {featured.chart.performance.bpm} BPM ·{' '}
+                                            {featured.chart.arrangement.key}
+                                            {featured.chart.arrangement.isMinor ? 'm' : ''}
                                         </p>
                                         <button
                                             className="btn"
                                             disabled={busy}
-                                            onClick={() => openSong(songs[0].id)}
+                                            onClick={() => openSong(featured.id)}
                                         >
                                             Open chart →
                                         </button>
@@ -602,10 +735,7 @@ export default function Ensemble() {
                                 className="icon-button back-btn"
                                 aria-label="Back to songbook"
                                 disabled={busy}
-                                onClick={() => {
-                                    runtime.stop();
-                                    setCurrent(null);
-                                }}
+                                onClick={goHome}
                             >
                                 ←
                             </button>
@@ -613,11 +743,13 @@ export default function Ensemble() {
                                 <h1 className="song-title">{current.title}</h1>
                                 <div className="song-subtitle">
                                     <span className={dirty ? 'unsaved' : ''}>
-                                        {dirty
-                                            ? recoveryHealthy
-                                                ? 'Unsaved setup · locally recovered'
-                                                : 'Unsaved setup · this tab only'
-                                            : 'Saved on this device'}
+                                        {hasPendingText
+                                            ? 'Unsaved chord text · this tab only'
+                                            : dirty
+                                              ? recoveryHealthy
+                                                  ? 'Unsaved setup · locally recovered'
+                                                  : 'Unsaved setup · this tab only'
+                                              : 'Saved on this device'}
                                     </span>
                                     <span>{totalBars} bars</span>
                                     <span>{current.chart.arrangement.timeSignature}</span>
@@ -645,15 +777,12 @@ export default function Ensemble() {
                                     className={!editing ? 'active' : ''}
                                     onClick={() => setEditing(false)}
                                 >
-                                    Play
+                                    Chart
                                 </button>
                                 <button
                                     className={editing ? 'active' : ''}
                                     disabled={busy}
-                                    onClick={() => {
-                                        runtime.stop();
-                                        setEditing(true);
-                                    }}
+                                    onClick={() => revealEditor()}
                                 >
                                     Edit chart
                                 </button>
@@ -694,69 +823,25 @@ export default function Ensemble() {
                                         return;
                                     }
                                     void run(async () => {
+                                        const next = updateChart();
                                         setEditing(false);
                                         setShowControls(false);
                                         setSoundMenu(false);
                                         await runtime.toggle(setSoundProgress);
                                         setPlaying(runtime.state().playback.isPlaying);
-                                        setSoundsOffline(
-                                            await soundsAvailableOffline(current.chart),
-                                        );
+                                        setSoundsOffline(await soundsAvailableOffline(next.chart));
                                         setSoundProgress('');
                                     });
                                 }}
                             >
                                 {playbackActive ? '■' : '▶'}
                             </button>
-                            <div>
-                                <label className="setting-label" htmlFor="tempo">
-                                    Tempo
-                                </label>
-                                <div className="tempo-control">
-                                    <button
-                                        className="step"
-                                        aria-label="Slower"
-                                        disabled={busy}
-                                        onClick={() =>
-                                            change(() =>
-                                                runtime.setTempo(current.chart.performance.bpm - 5),
-                                            )
-                                        }
-                                    >
-                                        −
-                                    </button>
-                                    <input
-                                        id="tempo"
-                                        type="number"
-                                        min="40"
-                                        max="300"
-                                        value={current.chart.performance.bpm}
-                                        disabled={busy}
-                                        onChange={(e) => {
-                                            if (
-                                                e.target.value &&
-                                                Number.isFinite(e.target.valueAsNumber)
-                                            ) {
-                                                change(() =>
-                                                    runtime.setTempo(e.target.valueAsNumber),
-                                                );
-                                            }
-                                        }}
-                                    />
-                                    <button
-                                        className="step"
-                                        aria-label="Faster"
-                                        disabled={busy}
-                                        onClick={() =>
-                                            change(() =>
-                                                runtime.setTempo(current.chart.performance.bpm + 5),
-                                            )
-                                        }
-                                    >
-                                        ＋
-                                    </button>
-                                </div>
-                            </div>
+                            <TempoControl
+                                key={current.id}
+                                value={current.chart.performance.bpm}
+                                disabled={busy}
+                                onCommit={(value) => change(() => runtime.setTempo(value))}
+                            />
                         </div>
                         <div className="key-setting">
                             <label className="setting-label" htmlFor="song-key">
@@ -768,11 +853,15 @@ export default function Ensemble() {
                                 disabled={busy}
                                 value={current.chart.arrangement.key}
                                 onChange={(event) =>
-                                    change(() =>
-                                        runtime.transpose(
-                                            KEY_ORDER.indexOf(event.target.value) -
-                                                KEY_ORDER.indexOf(current.chart.arrangement.key),
-                                        ),
+                                    change(
+                                        () =>
+                                            runtime.transpose(
+                                                KEY_ORDER.indexOf(event.target.value) -
+                                                    KEY_ORDER.indexOf(
+                                                        current.chart.arrangement.key,
+                                                    ),
+                                            ),
+                                        true,
                                     )
                                 }
                             >
@@ -794,7 +883,10 @@ export default function Ensemble() {
                                 disabled={busy}
                                 value={current.chart.band.groove.lastSmartGenre}
                                 onChange={(e) =>
-                                    change(() => runtime.setGenre(e.target.value, setSoundProgress))
+                                    change(
+                                        () => runtime.setGenre(e.target.value, setSoundProgress),
+                                        true,
+                                    )
                                 }
                             >
                                 {runtime.GENRE_NAMES.map((g) => (
@@ -999,7 +1091,8 @@ export default function Ensemble() {
                                             {editing && (
                                                 <button
                                                     className="section-edit"
-                                                    onClick={() => selectSection(current, block.id)}
+                                                    disabled={busy}
+                                                    onClick={() => revealEditor(block.id)}
                                                 >
                                                     Edit section
                                                 </button>
@@ -1046,7 +1139,6 @@ export default function Ensemble() {
                         </div>
                         {editing && (
                             <aside className="edit-panel">
-                                <span className="eyebrow">Make it yours</span>
                                 <h2>Edit your chart</h2>
                                 <p>
                                     Separate bars with |. Chords in the same bar share its beats
@@ -1068,12 +1160,14 @@ export default function Ensemble() {
                                 </label>
                                 <select
                                     id="section"
+                                    disabled={busy}
                                     value={sectionId}
                                     onChange={(e) => selectSection(current, e.target.value)}
                                 >
                                     {current.chart.arrangement.sections.map((s) => (
                                         <option key={s.id} value={s.id}>
                                             {s.label}
+                                            {buffers.has(s.id) ? ' · edited' : ''}
                                         </option>
                                     ))}
                                 </select>
@@ -1082,36 +1176,34 @@ export default function Ensemble() {
                                 </label>
                                 <textarea
                                     id="chord-text"
+                                    ref={editor}
                                     className="section-text"
+                                    disabled={busy}
+                                    aria-describedby="editor-help"
                                     value={text}
-                                    onChange={(e) => setText(e.target.value)}
+                                    onChange={(e) => editText(e.target.value)}
                                 />
                                 <div className="dialog-actions">
                                     <button
                                         className="btn primary"
                                         disabled={busy}
                                         onClick={() =>
-                                            change(() =>
-                                                runtime.editSections(
-                                                    current.chart.arrangement.sections.map((s) =>
-                                                        s.id === sectionId
-                                                            ? { ...s, value: text }
-                                                            : s,
-                                                    ),
-                                                ),
-                                            )
+                                            void run(() => {
+                                                updateChart();
+                                            })
                                         }
                                     >
-                                        Apply chords
+                                        Update chart
                                     </button>
                                     <button
                                         className="btn"
                                         disabled={busy}
-                                        onClick={() => {
-                                            const id = crypto.randomUUID();
-                                            change(() =>
-                                                runtime.editSections([
-                                                    ...current.chart.arrangement.sections,
+                                        onClick={() =>
+                                            void run(() => {
+                                                const next = updateChart();
+                                                const id = crypto.randomUUID();
+                                                const sections = [
+                                                    ...next.chart.arrangement.sections,
                                                     {
                                                         id,
                                                         label: String.fromCharCode(
@@ -1123,19 +1215,30 @@ export default function Ensemble() {
                                                         value: 'C | C | F | G',
                                                         repeat: 1,
                                                     },
-                                                ]),
-                                            );
-                                            setSectionId(id);
-                                            setText('C | C | F | G');
-                                        }}
+                                                ];
+                                                repository.validated({
+                                                    ...next,
+                                                    chart: {
+                                                        ...next.chart,
+                                                        arrangement: {
+                                                            ...next.chart.arrangement,
+                                                            sections,
+                                                        },
+                                                    },
+                                                });
+                                                runtime.editSections(sections);
+                                                draft({ ...next, chart: runtime.captureContent() });
+                                                revealEditor(id);
+                                            })
+                                        }
                                     >
                                         ＋ Section
                                     </button>
                                 </div>
-                                <p className="preview-note">
-                                    Apply updates the playable draft. Save keeps this setup; Save a
-                                    copy keeps a second version. Text still awaiting Apply is not
-                                    saved.
+                                <p className="preview-note" id="editor-help">
+                                    Save includes your typed chords. Update chart previews them
+                                    without saving. Unchecked text stays in this tab only; playback
+                                    and returning to your songbook check it first.
                                 </p>
                             </aside>
                         )}
@@ -1174,7 +1277,7 @@ export default function Ensemble() {
                     >
                         Save a copy
                     </button>
-                    <button className="btn" onClick={exportSong}>
+                    <button className="btn" disabled={busy} onClick={() => void run(exportSong)}>
                         Export file
                     </button>
                     <button
@@ -1187,6 +1290,7 @@ export default function Ensemble() {
                                 }
                                 runtime.load(saved);
                                 draft(saved);
+                                clearBuffers();
                                 selectSection(saved);
                                 setMenu(false);
                             })
@@ -1203,7 +1307,7 @@ export default function Ensemble() {
                         <summary>Preserved drafts ({recoveryOptions.length})</summary>
                         <p>
                             Older or competing drafts are kept here even after a newer save. Open
-                            Open one as an independent copy, leaving your current setup intact.
+                            one as an independent copy, leaving your current setup intact.
                         </p>
                         {recoveryOptions.map((record) => (
                             <button
@@ -1212,6 +1316,7 @@ export default function Ensemble() {
                                 disabled={busy}
                                 onClick={() =>
                                     void run(async () => {
+                                        updateChart();
                                         const copy = await repository.save(
                                             {
                                                 ...record.document,

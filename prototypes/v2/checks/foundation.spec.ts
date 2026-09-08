@@ -618,7 +618,7 @@ test('responsive chart and editor fit laptop, phone and tablet', async ({ page }
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
             true,
         );
-        await page.getByRole('button', { name: 'Play', exact: true }).click();
+        await page.getByRole('button', { name: 'Chart', exact: true }).click();
     }
 });
 
@@ -667,7 +667,7 @@ test('file export/import is detached; invalid input never changes the active son
     await page.getByRole('button', { name: 'Edit chart', exact: true }).click();
     await page.getByLabel('Song title').fill('My writing sketch');
     await page.getByLabel('Chord text').fill('Am7 | D7 | Gmaj7 | Cmaj7');
-    await page.getByRole('button', { name: 'Apply chords' }).click();
+    await page.getByRole('button', { name: 'Update chart' }).click();
     await expect(page.locator('.bar')).toHaveCount(4);
     await page.getByRole('button', { name: 'Song actions' }).click();
     const download = page.waitForEvent('download');
@@ -778,8 +778,8 @@ test('all existing feels and key/mutes survive a save; long charts scroll legibl
         .fill(
             Array.from({ length: 64 }, (_, i) => ['Cmaj7', 'Am7', 'Dm7', 'G7'][i % 4]).join(' | '),
         );
-    await page.getByRole('button', { name: 'Apply chords' }).click();
-    await page.getByRole('button', { name: 'Play', exact: true }).click();
+    await page.getByRole('button', { name: 'Update chart' }).click();
+    await page.getByRole('button', { name: 'Chart', exact: true }).click();
     await page.setViewportSize({ width: 402, height: 874 });
     await expect(page.locator('.bar')).toHaveCount(64);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(

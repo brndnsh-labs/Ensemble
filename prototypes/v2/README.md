@@ -2,7 +2,7 @@
 
 Isolated Next.js/React shell using Ensemble's existing browser engine and canonical chart codec.
 This is a working checkpoint, not a production replacement. See [the product brief](../../docs/design/ensemble-v2.md).
-Tracker: milestone 15; #1170 (preview), #1171 (chart/import design), #1172 (account/sync/hosting design), #1174 (manual sounds).
+Tracker: milestone 15; #1170 (preview), #1171 (chart/import design), #1172 (account/sync/hosting design), #1174 (sounds/focused stand), #1175 (editing usability).
 
 ## Run and verify
 
@@ -69,14 +69,36 @@ local browser projects and never deploys.
   full settings inventory, section-practice controls and visualizer are later work. Genre
   changes briefly stop/restart playback in this checkpoint, without expanding the focused chart.
   A failed change restores the previous setup and resumes only if its sounds are still verified;
-  Stop cancels a pending restart. Unapplied editor text is not part
-  of draft recovery: Apply first. Do not use this as the only copy of important writing yet.
+  Stop cancels a pending restart. Do not use this as the only copy of important writing yet.
 - Four bars per laptop/tablet row, two per portrait phone row, scrolling rather than pagination.
   The open song replaces the branding header; Sounds opens over the score without displacing it.
   Playback automatically focuses the chart, hiding editing/save chrome while leaving transport,
   tempo, key, feel and mutes visible. Show controls restores the setup actions without stopping.
   Playback highlights use the existing scheduler's lookahead (not a new musical clock); manual
   wheel/touch/keyboard browsing suspends following until explicitly resumed.
+
+## Editing and returning to practice (#1175)
+
+- Save, Save a copy and export include all currently typed section text. Update chart is an
+  optional playable preview, not a prerequisite for saving. Raw buffers survive section/view
+  changes and enable Save. Playback, key/feel changes, adding a section and returning to the
+  songbook validate/apply the buffers first; unsupported text keeps the editor open for correction.
+  Revert to saved explicitly discards both the setup experiment and pending text.
+- Only changed text receives strict full-token checking; existing untouched chart text keeps its
+  compatibility. The supported spelling follows the existing parser's absolute, Roman and
+  Nashville roots, recognized qualities, slash bass and 6/9 handling. Use ASCII #/b accidentals.
+  Empty bars, partial spellings and unimplemented directives such as N.C. or repeats are rejected
+  with a section-specific explanation. This is not richer chart semantics or iReal support.
+- Unchecked text is explicitly tab-only and requests an unload warning. Validated changes enter
+  the existing recovery path before attempting Save, so a conflict or failed write retains the
+  work. Browser unload warnings are not reliable on all mobile lifecycle paths; explicitly Save
+  or export before leaving important writing.
+- Edit chart/Edit section reveal the intended input on compact screens; Chart is a view switch,
+  not the playback button. Tempo keeps intermediate keystrokes local until Enter/blur; Escape
+  cancels, and steppers commit once. Its 40–240 bounds match the existing engine and codec.
+- Continue uses a best-effort device-local last-opened preference, including recovered setup
+  metadata. Opening a song does not alter saved revisions/timestamps. First visits offer a
+  starter honestly rather than implying previous practice; preference failure never gates play.
 
 ## Test deployment only
 

@@ -1013,7 +1013,11 @@ html [hidden] {
     font-size: 12px;
     color: var(--muted);
     line-height: 1.6;
-    margin-bottom: 23px;
+    margin-bottom: 12px;
+}
+.edit-panel h2 {
+    font-size: 20px;
+    margin-bottom: 8px;
 }
 .panel-label {
     font-size: 10px;
@@ -1683,7 +1687,8 @@ dialog textarea {
         font-size: 10px;
     }
     .workspace-body.editing {
-        display: block;
+        display: flex;
+        flex-direction: column;
         overflow: auto;
     }
     .editing .chart-scroll {
@@ -1691,17 +1696,18 @@ dialog textarea {
         padding-bottom: 10px;
     }
     .edit-panel {
+        order: -1;
         width: 100%;
         border-left: 0;
         border-top: 1px solid var(--line);
         overflow: visible;
-        padding: 23px 20px;
+        padding: 16px 20px;
     }
     .edit-panel > p {
         margin-bottom: 15px;
     }
     .panel-label {
-        margin-top: 16px;
+        margin-top: 10px;
     }
     .editing .bars {
         row-gap: 9px;
@@ -1835,12 +1841,14 @@ dialog textarea {
     }
     .workspace-body.editing {
         display: flex;
+        flex-direction: row;
         overflow: hidden;
     }
     .editing .chart-scroll {
         overflow: auto;
     }
     .edit-panel {
+        order: 0;
         width: 260px;
         border-left: 1px solid var(--line);
         border-top: 0;
@@ -1882,7 +1890,7 @@ dialog textarea {
     color: var(--muted);
     background: transparent;
 }
-.title-input {
+.edit-panel .title-input {
     min-height: 0;
     font-family: inherit;
     line-height: 1.4;
@@ -1979,6 +1987,19 @@ dialog textarea {
 }
 .edit-panel input {
     max-width: 100%;
+}
+.edit-panel .section-text,
+.edit-panel select {
+    font-size: 16px;
+}
+.edit-panel select {
+    width: 100%;
+    min-height: 44px;
+    padding: 8px 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--paper);
+    color: var(--ink);
 }
 .modal-backdrop {
     position: fixed;

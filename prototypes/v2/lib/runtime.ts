@@ -389,7 +389,7 @@ export async function setGenre(
 }
 
 export function setTempo(bpm: number): void {
-    dispatch(ACTIONS.SET_BPM, Math.max(40, Math.min(300, Math.round(bpm))));
+    dispatch(ACTIONS.SET_BPM, Math.max(40, Math.min(240, Math.round(bpm))));
 }
 export function setEnabled(module: InstrumentModule, enabled: boolean): void {
     if (getState()[module].enabled !== enabled) {
