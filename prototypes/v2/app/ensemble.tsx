@@ -1,0 +1,1027 @@
+'use client';
+
+import { KEY_ORDER, TIME_SIGNATURES } from '@engine/config';
+import { buildLeadSheetSections } from '@engine/song/lead-sheet-model';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import * as repository from '../lib/repository';
+import type { ChartDocument } from '../lib/runtime';
+import * as runtime from '../lib/runtime';
+import { start } from '../lib/starters';
+
+const lanes = [
+    ['groove', 'Drums'],
+    ['bass', 'Bass'],
+    ['chords', 'Chords'],
+    ['harmony', 'Harmony'],
+    ['soloist', 'Soloist'],
+] as const;
+const same = (a: ChartDocument, b: ChartDocument) =>
+    a.title === b.title && JSON.stringify(a.chart) === JSON.stringify(b.chart);
+
+export default function Ensemble() {
+    const [songs, setSongs] = useState<ChartDocument[]>([]);
+    const [current, setCurrent] = useState<ChartDocument | null>(null);
+    const [saved, setSaved] = useState<ChartDocument | null>(null);
+    const [ready, setReady] = useState(false);
+    const [busy, setBusy] = useState(false);
+    const volatileDrafts = useRef(new Map<string, ChartDocument>());
+    const [recoveryHealthy, setRecoveryHealthy] = useState(true);
+    const working = useRef(false);
+    const [error, setError] = useState('');
+    const [message, setMessage] = useState('');
+    const [editing, setEditing] = useState(false);
+    const [sectionId, setSectionId] = useState('');
+    const [text, setText] = useState('');
+    const [search, setSearch] = useState('');
+    const [playing, setPlaying] = useState(false);
+    const [active, setActive] = useState<number | null>(null);
+    const [following, setFollowing] = useState(true);
+    const [offline, setOffline] = useState('Preparing offline access…');
+    const [menu, setMenu] = useState(false);
+    const [recoveryOptions, setRecoveryOptions] = useState<
+        ReturnType<typeof repository.recoveriesFor>
+    >([]);
+    const dialog = useRef<HTMLDialogElement>(null);
+    const file = useRef<HTMLInputElement>(null);
+    const scroll = useRef<HTMLDivElement>(null);
+    const dirty = !!(current && saved && !same(current, saved));
+
+    useEffect(() => {
+        let alive = true;
+        start()
+            .then((result) => {
+                if (alive) {
+                    setSongs(result);
+                    setReady(true);
+                }
+            })
+            .catch((e) => {
+                if (alive) {
+                    setError(String(e.message || e));
+                }
+            });
+        const timer = window.setInterval(() => {
+            const state = runtime.state();
+            setPlaying(state.playback.isPlaying);
+            setActive(state.playback.isPlaying ? state.chords.lastActiveChordIndex : null);
+        }, 60);
+        const preventLoss = (event: BeforeUnloadEvent) => {
+            if (volatileDrafts.current.size) {
+                event.preventDefault();
+                event.returnValue = '';
+            }
+        };
+        window.addEventListener('beforeunload', preventLoss);
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker
+                .register('/v2/sw.js', { scope: '/v2/', updateViaCache: 'none' })
+                .then(async (registration) => {
+                    // navigator.serviceWorker.ready may resolve the old root app's
+                    // worker. Only this registration earns the preview's ready label.
+                    if (registration.active?.state !== 'activated') {
+                        await new Promise<void>((resolve, reject) => {
+                            const worker =
+                                registration.installing ||
+                                registration.waiting ||
+                                registration.active;
+                            if (!worker) {
+                                reject(new Error('No preview worker'));
+                                return;
+                            }
+                            const check = () => {
+                                if (worker.state === 'activated') {
+                                    worker.removeEventListener('statechange', check);
+                                    resolve();
+                                }
+                                if (worker.state === 'redundant') {
+                                    worker.removeEventListener('statechange', check);
+                                    reject(new Error('Offline installation failed'));
+                                }
+                            };
+                            worker.addEventListener('statechange', check);
+                            check();
+                        });
+                    }
+                    if (alive) {
+                        setOffline('Available offline · built-in sounds');
+                    }
+                    registration.addEventListener('updatefound', () => {
+                        registration.installing?.addEventListener('statechange', () => {
+                            if (registration.waiting && alive) {
+                                setOffline('Update ready · close all preview tabs to install');
+                            }
+                        });
+                    });
+                })
+                .catch(() => {
+                    if (alive) {
+                        setOffline('Offline download unavailable · retry by reloading');
+                    }
+                });
+        } else {
+            setOffline('Offline installation unavailable in this browser');
+        }
+        return () => {
+            alive = false;
+            window.clearInterval(timer);
+            window.removeEventListener('beforeunload', preventLoss);
+        };
+    }, []);
+    useEffect(() => {
+        if (menu) {
+            dialog.current?.showModal();
+        } else {
+            dialog.current?.close();
+        }
+    }, [menu]);
+    useEffect(() => {
+        if (!following || active === null) {
+            return;
+        }
+        const bar = scroll.current?.querySelector<HTMLElement>('[data-active="true"]');
+        if (bar && scroll.current) {
+            const bounds = scroll.current.getBoundingClientRect(),
+                item = bar.getBoundingClientRect();
+            if (item.bottom > bounds.bottom - 35 || item.top < bounds.top) {
+                bar.scrollIntoView({ block: 'center', behavior: 'auto' });
+            }
+        }
+    }, [active, following]);
+
+    async function run(task: () => void | Promise<void>) {
+        if (working.current) {
+            return;
+        }
+        working.current = true;
+        setBusy(true);
+        setError('');
+        try {
+            await task();
+        } catch (e) {
+            setError(e instanceof Error ? e.message : String(e));
+        } finally {
+            working.current = false;
+            setBusy(false);
+        }
+    }
+    function draft(next: ChartDocument) {
+        setCurrent(next);
+        try {
+            repository.recover(next);
+            volatileDrafts.current.delete(next.id);
+            setRecoveryHealthy(true);
+            setMessage('Draft recovered on this device');
+        } catch (e) {
+            volatileDrafts.current.set(next.id, next);
+            setRecoveryHealthy(false);
+            setError(
+                `Draft is only in this tab: ${e instanceof Error ? e.message : String(e)}. Export before closing.`,
+            );
+        }
+    }
+    function change(action: () => void | Promise<void>) {
+        if (!current) {
+            return;
+        }
+        void run(async () => {
+            await action();
+            draft({ ...current, chart: runtime.captureContent() });
+        });
+    }
+    function selectSection(document: ChartDocument, id?: string) {
+        const section =
+            document.chart.arrangement.sections.find((s) => s.id === id) ||
+            document.chart.arrangement.sections[0];
+        setSectionId(section.id);
+        setText(section.value);
+    }
+    async function open(document: ChartDocument) {
+        const recovery = repository.recoveryFor(document);
+        const next = volatileDrafts.current.get(document.id) || recovery?.document || document;
+        runtime.load(next);
+        setSaved(document);
+        setCurrent(next);
+        setRecoveryHealthy(!volatileDrafts.current.has(document.id));
+        setEditing(false);
+        setFollowing(true);
+        setMessage(
+            recovery
+                ? recovery.conflict
+                    ? 'Recovered draft is based on an older save. Save a copy to keep both.'
+                    : 'Recovered your unsaved setup'
+                : 'Saved on this device',
+        );
+        selectSection(next);
+    }
+    function openSong(id: string) {
+        void run(async () => {
+            const fresh = await repository.list();
+            setSongs(fresh);
+            const document = fresh.find((s) => s.id === id);
+            if (!document) {
+                throw new Error('Song no longer exists.');
+            }
+            await open(document);
+        });
+    }
+    async function save(copy = false) {
+        if (!current || !saved) {
+            return;
+        }
+        const next = copy
+            ? { ...current, id: crypto.randomUUID(), title: `${current.title} — copy` }
+            : current;
+        // A recovered stale draft must not borrow the newer saved revision.
+        const result = await repository.save(next, copy ? null : current.revision);
+        setSaved(result);
+        setCurrent(result);
+        volatileDrafts.current.delete(current.id);
+        setRecoveryHealthy(true);
+        try {
+            repository.clearOwnRecovery(current.id);
+        } catch {
+            /* The committed save is authoritative; retained recovery is harmless. */
+        }
+        setSongs(await repository.list());
+        setMessage('Saved on this device');
+        setMenu(false);
+    }
+    function newSong() {
+        void run(async () => {
+            const base = songs[0];
+            if (!base) {
+                throw new Error('Starter library is not ready.');
+            }
+            const document = structuredClone(base);
+            document.id = crypto.randomUUID();
+            document.title = 'Untitled song';
+            document.chart.arrangement = {
+                ...document.chart.arrangement,
+                key: 'C',
+                isMinor: false,
+                notation: 'name',
+                sections: [
+                    { id: crypto.randomUUID(), label: 'A', value: 'C | G | Am | F', repeat: 1 },
+                ],
+            };
+            const created = await repository.save(document, null);
+            setSongs(await repository.list());
+            await open(created);
+            setEditing(true);
+        });
+    }
+    function exportSong() {
+        if (!current) {
+            return;
+        }
+        const url = URL.createObjectURL(
+            new Blob([JSON.stringify(current, null, 2)], { type: 'application/json' }),
+        );
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = `${current.title.replace(/[^\p{L}\p{N} -]/gu, '').slice(0, 80) || 'chart'}.ensemble`;
+        anchor.click();
+        window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+    const blocks = useMemo(() => {
+        if (!current) {
+            return [];
+        }
+        const a = runtime.state().arranger;
+        return buildLeadSheetSections(a.progression, a.sections, TIME_SIGNATURES[a.timeSignature]);
+    }, [current]);
+    const totalBars = blocks.reduce((n, b) => n + b.measures.length, 0);
+    let barNumber = 0;
+
+    return (
+        <>
+            <header className="site-header">
+                <div className="header-left">
+                    <button
+                        className="brand"
+                        disabled={busy}
+                        onClick={() => {
+                            runtime.stop();
+                            setCurrent(null);
+                        }}
+                    >
+                        ♬ ensemble
+                    </button>
+                    <nav className="site-nav" aria-label="Main">
+                        <button
+                            className={!current ? 'active' : ''}
+                            disabled={busy}
+                            onClick={() => {
+                                runtime.stop();
+                                setCurrent(null);
+                            }}
+                        >
+                            My songbook
+                        </button>
+                    </nav>
+                </div>
+                <div className="header-right">
+                    <span className="local-status">{offline}</span>
+                    <span className="concept-tag">V2 · working preview</span>
+                </div>
+            </header>
+            {error && (
+                <div className="error-banner" role="alert">
+                    <span>{error}</span>
+                    <button onClick={() => setError('')}>Dismiss</button>
+                </div>
+            )}
+            {volatileDrafts.current.size > 0 && (
+                <div className="error-banner" role="status">
+                    {volatileDrafts.current.size} draft(s) could not be stored. They are retained in
+                    this tab only. Reopen and export or save them before closing.
+                </div>
+            )}
+            <input
+                ref={file}
+                type="file"
+                className="file-input"
+                accept=".ensemble,.json"
+                aria-label="Import Ensemble document"
+                onChange={(event) => {
+                    const source = event.target.files?.[0];
+                    event.target.value = '';
+                    if (!source) {
+                        return;
+                    }
+                    void run(async () => {
+                        if (source.size > 1_048_576) {
+                            throw new Error('Chart files must be 1 MB or smaller.');
+                        }
+                        const candidate = repository.validated(JSON.parse(await source.text()));
+                        const result = await repository.save(
+                            { ...candidate, id: crypto.randomUUID() },
+                            null,
+                        );
+                        setSongs(await repository.list());
+                        await open(result);
+                    });
+                }}
+            />
+            {!ready ? (
+                <main className="loading">
+                    <h1>Getting the band together.</h1>
+                    <p>Loading your local songbook and musical engine.</p>
+                </main>
+            ) : !current ? (
+                <main className="home">
+                    <div className="home-intro">
+                        <div>
+                            <span className="eyebrow">Your next good session</span>
+                            <h1>Let’s play something.</h1>
+                            <p>A chart, a backing band, and a little room to explore.</p>
+                        </div>
+                        <div className="home-actions">
+                            <button
+                                className="btn"
+                                disabled={busy}
+                                onClick={() => file.current?.click()}
+                            >
+                                ↑ Import file
+                            </button>
+                            <button className="btn primary" disabled={busy} onClick={newSong}>
+                                ＋ New song
+                            </button>
+                        </div>
+                    </div>
+                    <div className="home-grid">
+                        <div>
+                            {songs[0] && (
+                                <section className="continue-card">
+                                    <div className="continue-copy">
+                                        <span className="eyebrow">Pick up where you left off</span>
+                                        <h3>{songs[0].title}</h3>
+                                        <p>
+                                            {songs[0].chart.band.groove.lastSmartGenre} ·{' '}
+                                            {songs[0].chart.performance.bpm} BPM ·{' '}
+                                            {songs[0].chart.arrangement.key}
+                                        </p>
+                                        <button
+                                            className="btn"
+                                            disabled={busy}
+                                            onClick={() => openSong(songs[0].id)}
+                                        >
+                                            Open chart →
+                                        </button>
+                                    </div>
+                                    <div className="continue-art" aria-hidden="true">
+                                        <div className="mini-heading">
+                                            A little room to improvise
+                                        </div>
+                                        <div className="mini-grid">
+                                            {['C7', 'F7', 'C7', 'G7', 'F7', 'F7', 'C7', 'G7'].map(
+                                                (c, i) => (
+                                                    // biome-ignore lint/suspicious/noArrayIndexKey: Fixed decorative sample, never reordered.
+                                                    <span key={i}>{c}</span>
+                                                ),
+                                            )}
+                                        </div>
+                                    </div>
+                                </section>
+                            )}
+                            <div className="section-heading library-heading">
+                                <h2>Your songbook</h2>
+                                <label className="search">
+                                    <span className="sr">Search songs</span>
+                                    <input
+                                        placeholder="Find a song…"
+                                        value={search}
+                                        onChange={(e) => setSearch(e.target.value)}
+                                    />
+                                </label>
+                            </div>
+                            <table className="song-table">
+                                <thead>
+                                    <tr>
+                                        <th>Song</th>
+                                        <th>Key</th>
+                                        <th className="hide-mobile">Tempo</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {songs
+                                        .filter((s) =>
+                                            s.title.toLowerCase().includes(search.toLowerCase()),
+                                        )
+                                        .map((s) => (
+                                            <tr className="song-row" key={s.id}>
+                                                <td>
+                                                    <button
+                                                        className="song-link"
+                                                        disabled={busy}
+                                                        onClick={() => openSong(s.id)}
+                                                    >
+                                                        <span className="song-glyph">♪</span>
+                                                        <span>
+                                                            <span className="song-name">
+                                                                {s.title}
+                                                            </span>
+                                                            <span className="song-detail">
+                                                                {s.chart.band.groove.lastSmartGenre}{' '}
+                                                                · Saved locally
+                                                            </span>
+                                                        </span>
+                                                    </button>
+                                                </td>
+                                                <td className="song-key">
+                                                    {s.chart.arrangement.key}
+                                                    {s.chart.arrangement.isMinor ? 'm' : ''}
+                                                </td>
+                                                <td className="hide-mobile">
+                                                    {s.chart.performance.bpm}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                </tbody>
+                            </table>
+                            <p className="offline-note">
+                                {offline}. Browser storage can be cleared; export songs you want to
+                                keep.
+                            </p>
+                        </div>
+                        <aside>
+                            <section className="quick-jam">
+                                <span className="eyebrow">No blank page required</span>
+                                <h2>Just start playing.</h2>
+                                <p>
+                                    Pick a chart, change the key or the feel, and make it your own.
+                                </p>
+                                {songs
+                                    .filter((s) => s.id.startsWith('starter-'))
+                                    .map((s) => (
+                                        <button
+                                            className="jam-tile"
+                                            key={s.id}
+                                            disabled={busy}
+                                            onClick={() => openSong(s.id)}
+                                        >
+                                            <span className="jam-symbol">♭</span>
+                                            <span>
+                                                <strong>
+                                                    {s.chart.band.groove.lastSmartGenre}
+                                                </strong>
+                                                <small>{s.title}</small>
+                                            </span>
+                                        </button>
+                                    ))}
+                            </section>
+                            <section className="sync-card">
+                                <h3>Your band, wherever you play.</h3>
+                                <p>
+                                    Accounts and cloud songbooks are the next stage. This preview is
+                                    device-local, with real playback and portable Ensemble files.
+                                </p>
+                                <p className="preview-note">
+                                    iReal import, chord discovery, sound packs, and sharing are not
+                                    implemented here yet.
+                                </p>
+                            </section>
+                        </aside>
+                    </div>
+                    <footer className="home-footer">
+                        <span>Made for practice, writing, and getting lost in a good groove.</span>
+                        <span>Foundation preview · {process.env.NEXT_PUBLIC_SOURCE_REV}</span>
+                    </footer>
+                </main>
+            ) : (
+                <main className="workspace">
+                    <div className="song-header">
+                        <div className="song-heading">
+                            <button
+                                className="icon-button back-btn"
+                                aria-label="Back to songbook"
+                                disabled={busy}
+                                onClick={() => {
+                                    runtime.stop();
+                                    setCurrent(null);
+                                }}
+                            >
+                                ←
+                            </button>
+                            <div>
+                                <h1 className="song-title">{current.title}</h1>
+                                <div className="song-subtitle">
+                                    <span className={dirty ? 'unsaved' : ''}>
+                                        {dirty
+                                            ? recoveryHealthy
+                                                ? 'Unsaved setup · locally recovered'
+                                                : 'Unsaved setup · this tab only'
+                                            : 'Saved on this device'}
+                                    </span>
+                                    <span>{totalBars} bars</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="song-actions">
+                            <div className="mode-switch">
+                                <button
+                                    className={!editing ? 'active' : ''}
+                                    onClick={() => setEditing(false)}
+                                >
+                                    Play
+                                </button>
+                                <button
+                                    className={editing ? 'active' : ''}
+                                    disabled={busy}
+                                    onClick={() => {
+                                        runtime.stop();
+                                        setEditing(true);
+                                        selectSection(current);
+                                    }}
+                                >
+                                    Edit chart
+                                </button>
+                            </div>
+                            <button
+                                className="btn primary save-btn"
+                                disabled={busy || !dirty}
+                                onClick={() => void run(() => save())}
+                            >
+                                Save
+                            </button>
+                            <button
+                                className="icon-button menu-btn"
+                                aria-label="Song actions"
+                                disabled={busy}
+                                onClick={() =>
+                                    void run(() => {
+                                        setRecoveryOptions(repository.recoveriesFor(current));
+                                        setMenu(true);
+                                    })
+                                }
+                            >
+                                •••
+                            </button>
+                        </div>
+                    </div>
+                    <div className="transport-bar">
+                        <div className="transport-cluster">
+                            <button
+                                className="play-button"
+                                aria-label={playing ? 'Stop playback' : 'Start playback'}
+                                disabled={busy}
+                                onClick={() => {
+                                    runtime.toggle();
+                                    setPlaying(runtime.state().playback.isPlaying);
+                                }}
+                            >
+                                {playing ? '■' : '▶'}
+                            </button>
+                            <div>
+                                <label className="setting-label" htmlFor="tempo">
+                                    Tempo
+                                </label>
+                                <div className="tempo-control">
+                                    <button
+                                        className="step"
+                                        aria-label="Slower"
+                                        disabled={busy}
+                                        onClick={() =>
+                                            change(() =>
+                                                runtime.setTempo(current.chart.performance.bpm - 5),
+                                            )
+                                        }
+                                    >
+                                        −
+                                    </button>
+                                    <input
+                                        id="tempo"
+                                        type="number"
+                                        min="40"
+                                        max="300"
+                                        value={current.chart.performance.bpm}
+                                        disabled={busy}
+                                        onChange={(e) => {
+                                            if (
+                                                e.target.value &&
+                                                Number.isFinite(e.target.valueAsNumber)
+                                            ) {
+                                                change(() =>
+                                                    runtime.setTempo(e.target.valueAsNumber),
+                                                );
+                                            }
+                                        }}
+                                    />
+                                    <button
+                                        className="step"
+                                        aria-label="Faster"
+                                        disabled={busy}
+                                        onClick={() =>
+                                            change(() =>
+                                                runtime.setTempo(current.chart.performance.bpm + 5),
+                                            )
+                                        }
+                                    >
+                                        ＋
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="key-setting">
+                            <label className="setting-label" htmlFor="song-key">
+                                Key
+                            </label>
+                            <select
+                                id="song-key"
+                                className="setting-select"
+                                disabled={busy}
+                                value={current.chart.arrangement.key}
+                                onChange={(event) =>
+                                    change(() =>
+                                        runtime.transpose(
+                                            KEY_ORDER.indexOf(event.target.value) -
+                                                KEY_ORDER.indexOf(current.chart.arrangement.key),
+                                        ),
+                                    )
+                                }
+                            >
+                                {KEY_ORDER.map((key) => (
+                                    <option key={key} value={key}>
+                                        {key}
+                                        {current.chart.arrangement.isMinor ? 'm' : ''}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="genre-setting">
+                            <label className="setting-label" htmlFor="genre">
+                                Feel
+                            </label>
+                            <select
+                                id="genre"
+                                className="setting-select"
+                                disabled={busy}
+                                value={current.chart.band.groove.lastSmartGenre}
+                                onChange={(e) => change(() => runtime.setGenre(e.target.value))}
+                            >
+                                {runtime.GENRE_NAMES.map((g) => (
+                                    <option key={g}>{g}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="band-controls" aria-label="Band instruments">
+                            {lanes.map(([key, label]) => (
+                                <button
+                                    key={key}
+                                    className={`band-toggle ${current.chart.band[key].enabled ? 'on' : ''}`}
+                                    disabled={busy}
+                                    aria-pressed={current.chart.band[key].enabled}
+                                    onClick={() =>
+                                        change(() =>
+                                            runtime.setEnabled(
+                                                key,
+                                                !current.chart.band[key].enabled,
+                                            ),
+                                        )
+                                    }
+                                >
+                                    <span className="dot" />
+                                    {label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                    <div className={`workspace-body ${editing ? 'editing' : ''}`}>
+                        <div
+                            className="chart-scroll"
+                            ref={scroll}
+                            onWheel={() => setFollowing(false)}
+                            onTouchMove={() => setFollowing(false)}
+                            onKeyDown={(e) => {
+                                if (
+                                    [
+                                        'ArrowDown',
+                                        'ArrowUp',
+                                        'PageDown',
+                                        'PageUp',
+                                        'Home',
+                                        'End',
+                                    ].includes(e.key)
+                                ) {
+                                    setFollowing(false);
+                                }
+                            }}
+                            tabIndex={0}
+                            aria-label="Chord chart"
+                        >
+                            <article className="sheet">
+                                <div className="sheet-top">
+                                    <div className="sheet-meta">
+                                        <span className="tempo-mark">
+                                            ♩ = {current.chart.performance.bpm}
+                                        </span>
+                                        <span>{current.chart.arrangement.timeSignature}</span>
+                                        <span>{current.chart.band.groove.lastSmartGenre}</span>
+                                    </div>
+                                    <div className="sheet-tools">
+                                        <button
+                                            className="text-button"
+                                            onClick={() => setFollowing(!following)}
+                                        >
+                                            {following ? 'Following playback' : 'Resume follow'}
+                                        </button>
+                                    </div>
+                                </div>
+                                {blocks.map((block) => (
+                                    <section
+                                        className="section"
+                                        key={block.measures[0]?.chords[0]?.globalIndex}
+                                    >
+                                        <div className="section-head">
+                                            <span className="section-letter">
+                                                {block.label || 'A'}
+                                            </span>
+                                            <span className="section-name">
+                                                {current.chart.arrangement.sections.find(
+                                                    (s) => s.id === block.id,
+                                                )?.key || current.chart.arrangement.key}
+                                            </span>
+                                            {editing && (
+                                                <button
+                                                    className="section-edit"
+                                                    onClick={() => selectSection(current, block.id)}
+                                                >
+                                                    Edit section
+                                                </button>
+                                            )}
+                                        </div>
+                                        <div className="bars">
+                                            {block.measures.map((measure, i) => {
+                                                barNumber++;
+                                                return (
+                                                    <div
+                                                        className={`bar ${measure.chords.some((c) => c.globalIndex === active) ? 'active' : ''} ${i === block.measures.length - 1 ? 'end' : ''}`}
+                                                        data-active={measure.chords.some(
+                                                            (c) => c.globalIndex === active,
+                                                        )}
+                                                        key={measure.chords[0]?.globalIndex}
+                                                    >
+                                                        <span className="bar-number">
+                                                            {barNumber}
+                                                        </span>
+                                                        {measure.chords.map((c) => (
+                                                            <button
+                                                                className="chord chord-button"
+                                                                key={c.globalIndex}
+                                                                disabled={playing || busy}
+                                                                aria-label={`Audition ${c.absName}`}
+                                                                onClick={() =>
+                                                                    runtime.audition(c.globalIndex)
+                                                                }
+                                                            >
+                                                                {c.absName}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </section>
+                                ))}
+                                <div className="chart-bottom">
+                                    <span>Tap a chord to hear it while stopped.</span>
+                                    <span>{totalBars} bars · repeats continuously</span>
+                                </div>
+                            </article>
+                        </div>
+                        {editing && (
+                            <aside className="edit-panel">
+                                <span className="eyebrow">Make it yours</span>
+                                <h2>Edit your chart</h2>
+                                <p>
+                                    Separate bars with |. Chords in the same bar share its beats
+                                    equally.
+                                </p>
+                                <label className="panel-label" htmlFor="title">
+                                    Song title
+                                </label>
+                                <input
+                                    id="title"
+                                    disabled={busy}
+                                    className="section-text title-input"
+                                    maxLength={160}
+                                    value={current.title}
+                                    onChange={(e) => draft({ ...current, title: e.target.value })}
+                                />
+                                <label className="panel-label" htmlFor="section">
+                                    Section
+                                </label>
+                                <select
+                                    id="section"
+                                    value={sectionId}
+                                    onChange={(e) => selectSection(current, e.target.value)}
+                                >
+                                    {current.chart.arrangement.sections.map((s) => (
+                                        <option key={s.id} value={s.id}>
+                                            {s.label}
+                                        </option>
+                                    ))}
+                                </select>
+                                <label className="panel-label" htmlFor="chord-text">
+                                    Chord text
+                                </label>
+                                <textarea
+                                    id="chord-text"
+                                    className="section-text"
+                                    value={text}
+                                    onChange={(e) => setText(e.target.value)}
+                                />
+                                <div className="dialog-actions">
+                                    <button
+                                        className="btn primary"
+                                        disabled={busy}
+                                        onClick={() =>
+                                            change(() =>
+                                                runtime.editSections(
+                                                    current.chart.arrangement.sections.map((s) =>
+                                                        s.id === sectionId
+                                                            ? { ...s, value: text }
+                                                            : s,
+                                                    ),
+                                                ),
+                                            )
+                                        }
+                                    >
+                                        Apply chords
+                                    </button>
+                                    <button
+                                        className="btn"
+                                        disabled={busy}
+                                        onClick={() => {
+                                            const id = crypto.randomUUID();
+                                            change(() =>
+                                                runtime.editSections([
+                                                    ...current.chart.arrangement.sections,
+                                                    {
+                                                        id,
+                                                        label: String.fromCharCode(
+                                                            65 +
+                                                                (current.chart.arrangement.sections
+                                                                    .length %
+                                                                    26),
+                                                        ),
+                                                        value: 'C | C | F | G',
+                                                        repeat: 1,
+                                                    },
+                                                ]),
+                                            );
+                                            setSectionId(id);
+                                            setText('C | C | F | G');
+                                        }}
+                                    >
+                                        ＋ Section
+                                    </button>
+                                </div>
+                                <p className="preview-note">
+                                    Apply updates the playable draft. Save keeps this setup; Save a
+                                    copy keeps a second version. Text still awaiting Apply is not
+                                    saved.
+                                </p>
+                            </aside>
+                        )}
+                    </div>
+                    <footer className="playback-footer">
+                        <span role="status">
+                            {busy ? 'Updating…' : playing ? 'Band is playing' : message}
+                        </span>
+                        <span className="footer-tip">{offline}</span>
+                        <button className="follow-btn" onClick={() => setFollowing(!following)}>
+                            {following ? 'Following' : 'Resume follow'}
+                        </button>
+                    </footer>
+                </main>
+            )}
+            <dialog
+                ref={dialog}
+                className="modal-box"
+                onCancel={() => setMenu(false)}
+                onClose={() => setMenu(false)}
+            >
+                <h2>Keep a good take.</h2>
+                <p>
+                    Saved setups and recovered drafts stay on this device. Export a file to move a
+                    song to another computer.
+                </p>
+                <div className="dialog-actions">
+                    <button
+                        className="btn primary"
+                        disabled={busy}
+                        onClick={() => void run(() => save(true))}
+                    >
+                        Save a copy
+                    </button>
+                    <button className="btn" onClick={exportSong}>
+                        Export file
+                    </button>
+                    <button
+                        className="btn"
+                        disabled={busy || !dirty}
+                        onClick={() =>
+                            void run(() => {
+                                if (!saved) {
+                                    return;
+                                }
+                                runtime.load(saved);
+                                draft(saved);
+                                selectSection(saved);
+                                setMenu(false);
+                            })
+                        }
+                    >
+                        Revert to saved
+                    </button>
+                    <button className="btn" onClick={() => setMenu(false)}>
+                        Close
+                    </button>
+                </div>
+                {recoveryOptions.length > 0 && (
+                    <details className="recovery-list">
+                        <summary>Preserved drafts ({recoveryOptions.length})</summary>
+                        <p>
+                            Older or competing drafts are kept here even after a newer save. Open
+                            Open one as an independent copy, leaving your current setup intact.
+                        </p>
+                        {recoveryOptions.map((record) => (
+                            <button
+                                className="jam-tile"
+                                key={`${record.capturedAt}-${record.document.revision}-${JSON.stringify(record.document.chart)}`}
+                                disabled={busy}
+                                onClick={() =>
+                                    void run(async () => {
+                                        const copy = await repository.save(
+                                            {
+                                                ...record.document,
+                                                id: crypto.randomUUID(),
+                                                title: `${record.document.title.slice(0, 140)} — recovered`,
+                                            },
+                                            null,
+                                        );
+                                        setSongs(await repository.list());
+                                        await open(copy);
+                                        setMenu(false);
+                                    })
+                                }
+                            >
+                                <span>
+                                    <strong>
+                                        Open copy of {record.document.title} ·{' '}
+                                        {record.document.chart.performance.bpm} BPM
+                                    </strong>
+                                    <small>
+                                        {new Date(record.capturedAt).toLocaleString()} · based on
+                                        revision {record.document.revision}
+                                    </small>
+                                </span>
+                            </button>
+                        ))}
+                    </details>
+                )}
+            </dialog>
+        </>
+    );
+}

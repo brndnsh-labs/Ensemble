@@ -1,0 +1,38 @@
+{
+    "compilerOptions": {
+        "target": "ES2022",
+        "lib": ["es2022", "dom", "dom.iterable"],
+        "allowJs": true,
+        "skipLibCheck": true,
+        "strict": true,
+        "noEmit": true,
+        "esModuleInterop": true,
+        "module": "esnext",
+        "moduleResolution": "bundler",
+        "paths": {
+            "@engine/*": ["../../public/*"],
+            "deepsignal": ["./lib/deepsignal-compat.d.ts"]
+        },
+        "resolveJsonModule": true,
+        "isolatedModules": true,
+        "jsx": "react-jsx",
+        "incremental": true,
+        "plugins": [
+            {
+                "name": "next"
+            }
+        ]
+    },
+    "include": [
+        "next-env.d.ts",
+        "app/**/*.tsx",
+        "lib/**/*.ts",
+        "checks/**/*.ts",
+        "playwright.config.ts",
+        ".next/types/**/*.ts",
+        "../../env.d.ts",
+        "../../public/**/*.d.ts",
+        ".next/dev/types/**/*.ts"
+    ],
+    "exclude": ["node_modules"]
+}

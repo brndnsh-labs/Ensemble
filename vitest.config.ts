@@ -29,6 +29,8 @@ export default defineConfig({
             'tests/e2e/**',
             'tests/browser/**',
             'tests/bench/**',
+            // The isolated Next preview owns a separate Playwright runner.
+            'prototypes/v2/checks/**',
             // Agent-tool worktrees are full checkouts under the repo root — without
             // this, every vitest run (and any filename filter) also discovers and
             // runs their copies of the whole suite.

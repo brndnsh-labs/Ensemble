@@ -1,0 +1,10 @@
+node_modules/
+.engine-types/
+.next/
+out/
+test-results/
+playwright-report/
+next-env.d.ts
+*.tsbuildinfo
+public/sw.js
+public/build.json
