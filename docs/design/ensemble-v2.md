@@ -65,6 +65,8 @@ Checkpoint 1: written brief, working Next browser-engine/local-songbook preview 
 verification. Accounts, cloud storage and iReal import are unavailable; portable Ensemble JSON
 file import/export is included. Tracked in milestone 15 and #1170; chart/import design is #1171,
 and account/sync/hosting contracts are #1172.
+The #1174 follow-on connects existing manual sound packs and verifies offline downloads without
+changing the editor layout. Automatic sound selection and whole-library sync remain later work.
 Checkpoint 2: settle explicit rhythmic chart representation and bounded import compatibility.
 Checkpoint 3: account, sync, shared snapshot and admin services; migration/restore/conflict proof.
 Production cutover follows real-device review and compatibility gates, not mockup approval.

@@ -2088,3 +2088,49 @@ dialog textarea {
         font-size: 11px;
     }
 }
+.sound-panel {
+    padding: 10px 24px;
+    border-bottom: 1px solid var(--line);
+    background: var(--paper);
+    flex-shrink: 0;
+    max-height: 40vh;
+    overflow: auto;
+}
+.sound-panel summary {
+    cursor: pointer;
+    font-weight: 600;
+}
+.sound-panel summary span {
+    font-size: 12px;
+    font-weight: 400;
+    margin-left: 12px;
+}
+.sound-choices {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+    padding-top: 16px;
+}
+.sound-choices label {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-size: 13px;
+    min-width: 0;
+}
+.sound-choices select {
+    width: 100%;
+    min-height: 44px;
+    font: inherit;
+}
+.sound-choices small {
+    font-size: 10px;
+}
+.sound-panel p,
+.sound-progress {
+    font-size: 12px;
+}
+.sound-progress {
+    padding: 6px 24px;
+    margin: 0;
+}

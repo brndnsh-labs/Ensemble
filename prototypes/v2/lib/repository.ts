@@ -1,5 +1,7 @@
 import { validateChartDocument } from '@engine/songbook/codec';
 import type { ChartDocument } from '@engine/songbook/types';
+import type { InstrumentModule } from '@engine/types';
+import { validateVoice } from './sounds';
 
 const DATABASE = 'ensemble-v2-preview';
 const STORE = 'documents';
@@ -26,16 +28,12 @@ export function validated(candidate: unknown): ChartDocument {
                 : result.issues.map((i) => `${i.path}: ${i.message}`).join('; ');
         throw new Error(`Cannot open this chart: ${reason}. The source has not been changed.`);
     }
-    // This bounded first prototype ships with built-in voices only. A pack-backed
-    // document must never be silently downgraded and then saved over the original.
-    if (Object.values(result.value.chart.band).some((lane) => lane.voice !== 'synth')) {
-        throw new Error(
-            'This preview currently supports built-in sounds only. Keep this file for the sound-pack stage.',
-        );
+    for (const [module, lane] of Object.entries(result.value.chart.band)) {
+        validateVoice(module as InstrumentModule, lane.voice);
     }
     if (Object.values(result.value.chart.band).some((lane) => lane.autoSound)) {
         throw new Error(
-            'Automatic sound-pack selection is not supported by this built-in-sounds preview. Keep the original file for the sound-pack stage.',
+            'Automatic sound selection is not supported yet. Keep the original file; manual sound choices are supported.',
         );
     }
     return result.value;

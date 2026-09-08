@@ -2,10 +2,12 @@
 
 import { KEY_ORDER, TIME_SIGNATURES } from '@engine/config';
 import { buildLeadSheetSections } from '@engine/song/lead-sheet-model';
+import type { InstrumentVoice } from '@engine/types';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as repository from '../lib/repository';
 import type { ChartDocument } from '../lib/runtime';
 import * as runtime from '../lib/runtime';
+import { packsForInstrument, soundsAvailableOffline } from '../lib/sounds';
 import { start } from '../lib/starters';
 
 const lanes = [
@@ -38,6 +40,8 @@ export default function Ensemble() {
     const [following, setFollowing] = useState(true);
     const [offline, setOffline] = useState('Preparing offline access…');
     const [menu, setMenu] = useState(false);
+    const [soundProgress, setSoundProgress] = useState('');
+    const [soundsOffline, setSoundsOffline] = useState<boolean | null>(null);
     const [recoveryOptions, setRecoveryOptions] = useState<
         ReturnType<typeof repository.recoveriesFor>
     >([]);
@@ -103,7 +107,7 @@ export default function Ensemble() {
                         });
                     }
                     if (alive) {
-                        setOffline('Available offline · built-in sounds');
+                        setOffline('App available offline');
                     }
                     registration.addEventListener('updatefound', () => {
                         registration.installing?.addEventListener('statechange', () => {
@@ -135,6 +139,21 @@ export default function Ensemble() {
         }
     }, [menu]);
     useEffect(() => {
+        let alive = true;
+        setSoundsOffline(null);
+        setSoundProgress('');
+        if (current) {
+            void soundsAvailableOffline(current.chart).then((available) => {
+                if (alive) {
+                    setSoundsOffline(available);
+                }
+            });
+        }
+        return () => {
+            alive = false;
+        };
+    }, [current]);
+    useEffect(() => {
         if (!following || active === null) {
             return;
         }
@@ -158,6 +177,7 @@ export default function Ensemble() {
         try {
             await task();
         } catch (e) {
+            setSoundProgress('');
             setError(e instanceof Error ? e.message : String(e));
         } finally {
             working.current = false;
@@ -604,10 +624,20 @@ export default function Ensemble() {
                             <button
                                 className="play-button"
                                 aria-label={playing ? 'Stop playback' : 'Start playback'}
-                                disabled={busy}
+                                disabled={busy && !playing}
                                 onClick={() => {
-                                    runtime.toggle();
-                                    setPlaying(runtime.state().playback.isPlaying);
+                                    if (runtime.state().playback.isPlaying) {
+                                        runtime.stop();
+                                        setPlaying(false);
+                                        return;
+                                    }
+                                    void run(async () => {
+                                        await runtime.toggle(setSoundProgress);
+                                        setPlaying(runtime.state().playback.isPlaying);
+                                        setSoundsOffline(
+                                            await soundsAvailableOffline(current.chart),
+                                        );
+                                    });
                                 }}
                             >
                                 {playing ? '■' : '▶'}
@@ -726,6 +756,64 @@ export default function Ensemble() {
                             ))}
                         </div>
                     </div>
+                    <details className="sound-panel">
+                        <summary>
+                            Sounds{' '}
+                            <span>
+                                {soundsOffline === null
+                                    ? 'Checking downloads…'
+                                    : soundsOffline
+                                      ? 'Song sounds available offline'
+                                      : 'Some sounds need downloading'}
+                            </span>
+                        </summary>
+                        <div className="sound-choices">
+                            {lanes.map(([lane, label]) => (
+                                <label key={lane}>
+                                    {label} sound
+                                    <select
+                                        aria-label={`${label} sound`}
+                                        value={current.chart.band[lane].voice}
+                                        disabled={busy}
+                                        onChange={(event) =>
+                                            change(() =>
+                                                runtime.setVoice(
+                                                    lane,
+                                                    event.target.value as InstrumentVoice,
+                                                    setSoundProgress,
+                                                ),
+                                            )
+                                        }
+                                    >
+                                        <option value="synth">Built-in</option>
+                                        {packsForInstrument(lane).map((pack) => (
+                                            <option key={pack.id} value={`pack:${pack.id}`}>
+                                                {pack.name} · {pack.approxSizeMB} MB
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <small>
+                                        {
+                                            packsForInstrument(lane).find(
+                                                (pack) =>
+                                                    current.chart.band[lane].voice ===
+                                                    `pack:${pack.id}`,
+                                            )?.attribution
+                                        }
+                                    </small>
+                                </label>
+                            ))}
+                        </div>
+                        <p>
+                            Choosing a sound downloads it for offline use. Save keeps your choices
+                            with this song. Browser storage can still be cleared or evicted.
+                        </p>
+                    </details>
+                    {soundProgress && (
+                        <p className="sound-progress" role="status">
+                            {soundProgress}
+                        </p>
+                    )}
                     <div className={`workspace-body ${editing ? 'editing' : ''}`}>
                         <div
                             className="chart-scroll"

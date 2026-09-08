@@ -14,14 +14,21 @@ import { validateChartDocument } from '@engine/songbook/codec';
 import type { ChartContent, ChartDocument, ChartLaneMix } from '@engine/songbook/types';
 import { dispatch, getState, subscribe } from '@engine/state';
 import { handleEffects, reconcileUrlGenreOnBoot } from '@engine/state/state-effects';
-import { ACTIONS, type EnsembleState, type InstrumentModule } from '@engine/types';
+import {
+    ACTIONS,
+    type EnsembleState,
+    type InstrumentModule,
+    type InstrumentVoice,
+} from '@engine/types';
 import { initWorker, syncWorker } from '@engine/worker-client';
+import { initializeSounds, prepareSound, prepareSounds, validateVoice } from './sounds';
 
 export type { ChartContent, ChartDocument };
 export { GENRE_NAMES };
 
 let boot: Promise<void> | undefined;
 let loading = false;
+let playIntent = 0;
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
 const param = (module: string, name: string, value: unknown) =>
     dispatch(ACTIONS.SET_PARAM, { module, param: name, value });
@@ -161,6 +168,7 @@ function receiveNotes(notes: unknown[], resolution: true | undefined): void {
 export function initialize(): Promise<void> {
     if (!boot) {
         boot = (async () => {
+            initializeSounds();
             initWorker(
                 () => scheduler(getState(), dispatch),
                 (notes, _sent, _duration, resolution) => receiveNotes(notes, resolution),
@@ -194,15 +202,40 @@ export function initialize(): Promise<void> {
 }
 
 export function stop(): void {
+    playIntent++;
     if (getState().playback.isPlaying) {
         dispatch(ACTIONS.TOGGLE_PLAY);
     }
 }
 
-export function toggle(): void {
+export async function toggle(progress: (text: string) => void): Promise<void> {
+    if (getState().playback.isPlaying) {
+        stop();
+        return;
+    }
     // Keep AudioContext creation on the gesture stack for mobile Safari.
     initAudio(getState());
+    const intent = ++playIntent;
+    await prepareSounds(captureContent(), progress);
+    if (intent !== playIntent) {
+        return;
+    }
     dispatch(ACTIONS.TOGGLE_PLAY);
+}
+
+export async function setVoice(
+    module: InstrumentModule,
+    voice: InstrumentVoice,
+    progress: (text: string) => void,
+): Promise<void> {
+    validateVoice(module, voice);
+    if (voice !== 'synth') {
+        await prepareSound(voice.slice(5), progress);
+    }
+    // Keep the old selection throughout download/failure. Dispatch through the
+    // established effects and worker delta (including crunch chord voicing).
+    dispatch(ACTIONS.SET_INSTRUMENT_VOICE, { module, voice, auto: false });
+    rebuild();
 }
 
 function apply(content: ChartContent): void {

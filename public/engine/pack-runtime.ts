@@ -6,7 +6,7 @@ import {
     packIdFromVoice,
     seedInstalledPacks,
 } from './instrument-registry.js';
-import { loadPack, type PackManifest, withRevToken } from './sample-loader.js';
+import { fetchPackAsset, loadPack, type PackManifest, withRevToken } from './sample-loader.js';
 import type { SampleZone } from './sample-voice.js';
 
 /**
@@ -36,7 +36,7 @@ async function fetchManifest(packId: string, rev: number): Promise<PackManifest>
     // #752 — token the manifest URL too, from the same catalog `rev`: the
     // manifest is itself under `/packs/` (CacheFirst), so a bare URL would serve
     // a stale manifest after a re-encode and never reach the new sample bytes.
-    const res = await fetch(withRevToken(`/packs/${packId}/manifest.json`, rev));
+    const res = await fetchPackAsset(withRevToken(`/packs/${packId}/manifest.json`, rev));
     if (!res.ok) {
         throw new Error(
             `[pack-runtime] manifest fetch failed (${res.status}) for pack "${packId}"`,

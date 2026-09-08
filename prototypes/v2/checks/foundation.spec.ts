@@ -1,5 +1,40 @@
 import { test as base, expect } from '@playwright/test';
 
+async function observeSamples(page: import('@playwright/test').Page) {
+    await page.addInitScript(() => {
+        const decoded = new Set<AudioBuffer>();
+        const evidence = { starts: 0, nonzero: 0 };
+        Object.assign(window, { __sampleEvidence: evidence });
+        const decode = BaseAudioContext.prototype.decodeAudioData;
+        BaseAudioContext.prototype.decodeAudioData = function (bytes: ArrayBuffer) {
+            return decode.call(this, bytes).then((buffer) => {
+                decoded.add(buffer);
+                return buffer;
+            });
+        };
+        const start = AudioBufferSourceNode.prototype.start;
+        AudioBufferSourceNode.prototype.start = function (
+            ...args: Parameters<AudioBufferSourceNode['start']>
+        ) {
+            if (this.buffer && decoded.has(this.buffer)) {
+                evidence.starts++;
+                if (this.buffer.getChannelData(0).some((value) => Math.abs(value) > 0.0001)) {
+                    evidence.nonzero++;
+                }
+            }
+            return Reflect.apply(start, this, args);
+        };
+    });
+}
+
+async function sampleStarts(page: import('@playwright/test').Page) {
+    return page.evaluate(
+        () =>
+            (window as unknown as { __sampleEvidence: { nonzero: number } }).__sampleEvidence
+                .nonzero,
+    );
+}
+
 const test = base.extend<{ disconnect: () => Promise<void> }>({
     disconnect: async ({ browserName, context, request }, use) => {
         await use(async () => {
@@ -21,6 +56,141 @@ const test = base.extend<{ disconnect: () => Promise<void> }>({
             await request.post('/__test/network?offline=0');
         }
     },
+});
+
+test('manual sounds save, revert, export/import and play sampled audio after offline reload', async ({
+    page,
+    disconnect,
+}) => {
+    await observeSamples(page);
+    await page.goto('/v2/');
+    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
+    await page.locator('.sound-panel summary').click();
+    await page.getByLabel('Chords sound', { exact: true }).selectOption('pack:grand');
+    await expect(page.getByLabel('Chords sound', { exact: true })).toBeEnabled();
+    await expect(page.getByLabel('Chords sound', { exact: true })).toHaveValue('pack:grand');
+    await expect(page.getByText('Song sounds available offline', { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await page.getByLabel('Chords sound', { exact: true }).selectOption('synth');
+    await page.getByRole('button', { name: 'Song actions' }).click();
+    await page.getByRole('button', { name: 'Revert to saved' }).click();
+    await expect(page.getByLabel('Chords sound', { exact: true })).toHaveValue('pack:grand');
+    await page.getByRole('button', { name: 'Song actions' }).click();
+    const download = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Export file' }).click();
+    const file = await (await download).path();
+    await page.getByRole('button', { name: 'Close', exact: true }).click();
+    await page.getByLabel('Import Ensemble document').setInputFiles(file!);
+    await expect(page.getByLabel('Chords sound', { exact: true })).toHaveValue('pack:grand');
+    // Observe decoded, nonzero sample buffers reaching actual playback sources.
+    await page.getByRole('button', { name: 'Start playback', exact: true }).click();
+    await expect.poll(() => sampleStarts(page)).toBeGreaterThan(0);
+    await page.getByRole('button', { name: 'Stop playback' }).click();
+    await expect
+        .poll(() => page.evaluate(() => navigator.serviceWorker.controller?.scriptURL || ''))
+        .toContain('/v2/sw.js');
+    await disconnect();
+    await page.reload();
+    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).first().click();
+    await page.locator('.sound-panel summary').click();
+    await expect(page.getByLabel('Chords sound', { exact: true })).toHaveValue('pack:grand');
+    await page.getByRole('button', { name: 'Start playback', exact: true }).click();
+    await expect.poll(() => sampleStarts(page)).toBeGreaterThan(0);
+    await page.getByRole('button', { name: 'Stop playback' }).click();
+    // Partial cache eviction must be detected even when decoded samples remain in RAM.
+    await page.evaluate(async () => {
+        const cache = await caches.open('ensemble-v2-sounds-v1');
+        const sample = (await cache.keys()).find((request) => request.url.includes('.m4a'))!;
+        await cache.delete(sample);
+    });
+    await page.reload();
+    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).first().click();
+    await expect(page.getByText('Some sounds need downloading', { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Start playback', exact: true }).click();
+    await expect(page.locator('.error-banner')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Start playback', exact: true })).toBeEnabled();
+    expect(await sampleStarts(page)).toBe(0);
+    await page.locator('.sound-panel summary').click();
+    await expect(page.getByLabel('Chords sound', { exact: true })).toHaveValue('pack:grand');
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
+});
+
+test('all five lanes route real samples and every catalog choice downloads', async ({ page }) => {
+    test.setTimeout(120_000);
+    await observeSamples(page);
+    await page.goto('/v2/');
+    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
+    await page.locator('.sound-panel summary').click();
+    for (const label of ['Drums', 'Bass', 'Chords', 'Harmony', 'Soloist']) {
+        for (const other of ['Drums', 'Bass', 'Chords', 'Harmony', 'Soloist']) {
+            const mute = page.getByRole('button', { name: other, exact: true });
+            if (((await mute.getAttribute('aria-pressed')) === 'true') !== (other === label)) {
+                await mute.click();
+            }
+        }
+        const select = page.getByLabel(`${label} sound`, { exact: true });
+        const choices = await select
+            .locator('option')
+            .evaluateAll((options) =>
+                options
+                    .map((option) => (option as HTMLOptionElement).value)
+                    .filter((value) => value !== 'synth'),
+            );
+        expect(choices.length).toBeGreaterThan(0);
+        for (const choice of choices) {
+            await select.selectOption(choice);
+            await expect(select).toBeEnabled({ timeout: 30_000 });
+            await expect(select).toHaveValue(choice);
+            await expect(page.locator('.error-banner')).toHaveCount(0);
+        }
+        const before = await sampleStarts(page);
+        await page.getByRole('button', { name: 'Start playback', exact: true }).click();
+        await expect.poll(() => sampleStarts(page), { timeout: 15_000 }).toBeGreaterThan(before);
+        await page.getByRole('button', { name: 'Stop playback' }).click();
+    }
+});
+
+test('corrupt downloads and storage failures preserve the previous sound', async ({ page }) => {
+    await page.addInitScript(() => {
+        const original = window.fetch;
+        Object.assign(window, { __breakSound: 'corrupt' });
+        window.fetch = async (input, init) => {
+            const mode = (window as unknown as { __breakSound: string }).__breakSound;
+            if (
+                mode === 'corrupt' &&
+                String(input).includes('/v2/packs/grand/') &&
+                String(input).includes('.m4a')
+            ) {
+                return new Response('bad sample', { status: 200 });
+            }
+            return original(input, init);
+        };
+        const put = Cache.prototype.put;
+        Cache.prototype.put = function (request, response) {
+            if (
+                (window as unknown as { __breakSound: string }).__breakSound === 'quota' &&
+                String(request).includes('/v2/packs/')
+            ) {
+                return Promise.reject(new DOMException('Storage full', 'QuotaExceededError'));
+            }
+            return put.call(this, request, response);
+        };
+    });
+    await page.goto('/v2/');
+    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
+    await page.locator('.sound-panel summary').click();
+    await page.getByLabel('Chords sound', { exact: true }).selectOption('pack:grand');
+    await expect(page.locator('.error-banner')).toContainText('could not be verified');
+    await expect(page.getByLabel('Chords sound', { exact: true })).toHaveValue('synth');
+    await page.evaluate(() => Object.assign(window, { __breakSound: 'quota' }));
+    await page.getByLabel('Chords sound', { exact: true }).selectOption('pack:grand');
+    await expect(page.locator('.error-banner')).toContainText('Storage full');
+    await expect(page.getByLabel('Chords sound', { exact: true })).toHaveValue('synth');
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
+    await page.evaluate(() => Object.assign(window, { __breakSound: '' }));
+    await page.getByLabel('Chords sound', { exact: true }).selectOption('pack:grand');
+    await expect(page.getByLabel('Chords sound', { exact: true })).toBeEnabled();
+    await expect(page.getByLabel('Chords sound', { exact: true })).toHaveValue('pack:grand');
 });
 
 test('real runtime, local saves, reload recovery and offline playback', async ({

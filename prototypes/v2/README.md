@@ -2,7 +2,7 @@
 
 Isolated Next.js/React shell using Ensemble's existing browser engine and canonical chart codec.
 This is a working checkpoint, not a production replacement. See [the product brief](../../docs/design/ensemble-v2.md).
-Tracker: milestone 15; #1170 (preview), #1171 (chart/import design), #1172 (account/sync/hosting design).
+Tracker: milestone 15; #1170 (preview), #1171 (chart/import design), #1172 (account/sync/hosting design), #1174 (manual sounds).
 
 ## Run and verify
 
@@ -14,7 +14,9 @@ npm run build --prefix prototypes/v2
 npm run test:e2e --prefix prototypes/v2
 ```
 
-For development, `npm run dev --prefix prototypes/v2`, then visit `http://localhost:3100/v2/`.
+For UI development, `npm run dev --prefix prototypes/v2`, then visit `http://localhost:3100/v2/`.
+Sound-pack assets and their integrity index are assembled by the build script: use the built
+export (`node scripts/serve.mjs` in this directory) to exercise downloads and offline playback.
 Offline installation only works against the built export, not the development server. The
 Playwright configuration starts that static server automatically. Tests inspect actual browser
 audio output; they are not a by-ear judgment. Original project gates still apply.
@@ -30,7 +32,7 @@ local browser projects and never deploys.
 
 ## Deliberate boundaries
 
-- Real existing worker/generators/synths; no iframe, rewritten music engine or simulated transport.
+- Real existing worker/generators/synths/samples; no iframe, rewritten music engine or simulated transport.
 - Browser-page singleton runtime, explicit authored-content projection, stop/load/rebuild/full
   worker sync/flush lifecycle. Buffer ingestion temporarily mirrors the original bootstrap;
   extract one shared runtime before production adoption rather than maintaining two indefinitely.
@@ -45,9 +47,20 @@ local browser projects and never deploys.
   Quota errors retain the current draft in memory and warn before leaving the page where the
   browser supports that prompt. Browser eviction/clearing can still remove local data: export
   valuable charts. This preview does not promise durable cloud backup.
-- Only built-in synth sounds; imports requiring packs or automatic pack selection are refused
-  without changing their source. `.ensemble`/JSON file export/import works; iReal import does not.
-- Accounts, cloud/outbox, sharing, admin, pack downloads, richer chart semantics, chord discovery,
+- Manual compatible sound packs are selected in the collapsed Sounds panel. Existing decoding,
+  sample playback, calibrated gain and voice effects are reused without musical changes. A host
+  asset-fetch adapter maps original pack URLs into `/v2/packs/`, never root-app storage. The
+  production host retains its ordinary fetch path.
+- The app shell caches a build-specific SHA256 sound-file index; sounds download on selection
+  or playback, not during app-shell installation. `ensemble-v2-sounds-v1` stores content-addressed,
+  verified bytes independently of app upgrades. Readiness checks every required file (not just
+  a manifest marker); selection waits for caching and decoding before changing a voice. Failed
+  playback preparation leaves the chart readable and unchanged, with an error instead of silent
+  synth substitution. Missing sounds can be downloaded by reconnecting and pressing Play.
+  App readiness and the current song's sound readiness are separate indicators. This is not
+  whole-library/cloud sync. Automatic sound selection remains explicitly unsupported on import.
+  `.ensemble`/JSON file export/import works, including manual sounds; iReal import does not.
+- Accounts, cloud/outbox, sharing, admin, richer chart semantics, chord discovery,
   full settings inventory, section-practice controls and visualizer are later work. Genre
   changes briefly stop/restart playback in this checkpoint. Unapplied editor text is not part
   of draft recovery: Apply first. Do not use this as the only copy of important writing yet.

@@ -29,3 +29,19 @@ HTML reproduction (documented in README). This is not a skipped offline assertio
 Human test still required: audible continuity/quality, laptop usability, real iPhone touch,
 legibility and offline startup. Remaining product limitations are in README. A heavyweight human
 code review is worthwhile before turning this prototype bridge into the production runtime.
+
+## Manual sounds follow-on (#1174)
+
+An inline pass and an independent second-model review covered the injected asset-fetch boundary,
+compatible manual voice validation, asynchronous selection/play preparation, content-addressed
+cache integrity, v1 isolation, and on-demand packaging. The independent review found stale
+built-in-only documentation (F1); it was corrected and independently confirmed closed. No further
+source-review blocker was found. No generator, sample, gain, or audio-graph tuning changed.
+
+Browser checks instrument decoded nonzero sample buffers at actual source playback, exercise all
+catalog downloads and all five sampled lanes, Save/Revert/export/import, offline cold reload,
+partial eviction, corrupt responses, storage quota failure, and successful retry. These are
+functional checks, not a human judgment of timbre or real-device audio continuity.
+
+Test hosting remains gated by the documented canonical-service-worker cache policy. Do not infer
+that this follow-on has been deployed from its build or browser checks alone.

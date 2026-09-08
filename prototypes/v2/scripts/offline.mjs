@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { readdir, readFile, writeFile } from 'node:fs/promises';
+import { cp, readdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -15,6 +15,15 @@ async function walk(directory) {
         )
     ).flat();
 }
+// Deploy sounds beside the preview, but download only packs the musician uses.
+await cp(path.resolve('../../public/packs'), path.join(root, 'packs'), { recursive: true });
+const packFiles = {};
+for (const file of await walk(path.join(root, 'packs'))) {
+    packFiles[`/${path.relative(root, file).split(path.sep).join('/')}`] = createHash('sha256')
+        .update(await readFile(file))
+        .digest('hex');
+}
+await writeFile(path.join(root, 'pack-files.json'), JSON.stringify(packFiles));
 const paths = (await walk(root))
     .filter((p) => !['sw.js', 'build.json'].includes(path.relative(root, p)))
     .sort();
@@ -44,7 +53,7 @@ await writeFile(
     path.join(root, 'sw.js'),
     `
 const CACHE = 'ensemble-v2-preview-${fingerprint}';
-const ASSETS = ${JSON.stringify([...Object.keys(assets), '/v2/', '/v2/build.json'])};
+const ASSETS = ${JSON.stringify([...Object.keys(assets).filter((url) => !url.startsWith('/v2/packs/')), '/v2/', '/v2/build.json'])};
 self.addEventListener('install', event => event.waitUntil((async () => {
     const cache = await caches.open(CACHE);
     try { await cache.addAll(ASSETS.map(url => new Request(url, { cache: 'reload' }))); }
@@ -66,4 +75,6 @@ self.addEventListener('fetch', event => {
 });
 `,
 );
-console.log(`V2 artifact ${fingerprint.slice(0, 16)} · ${paths.length} offline assets`);
+console.log(
+    `V2 artifact ${fingerprint.slice(0, 16)} · ${paths.length} deployed assets (sounds download on demand)`,
+);
