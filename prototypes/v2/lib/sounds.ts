@@ -6,6 +6,7 @@ import type { ChartContent } from '@engine/songbook/types';
 import type { InstrumentModule, InstrumentVoice } from '@engine/types';
 
 export { packsForInstrument };
+export const allSoundsSizeMB = SOUND_PACKS.reduce((total, pack) => total + pack.approxSizeMB, 0);
 
 const CACHE = 'ensemble-v2-sounds-v1'; // Not deleted by app-shell upgrades.
 let index: Promise<Record<string, string>> | undefined;
@@ -119,6 +120,27 @@ export async function prepareSounds(
     );
     for (const id of ids) {
         await prepareSound(id!, progress);
+    }
+}
+
+/** One explicit install gesture; partial success is reusable but never earns "all ready". */
+export async function installAllSounds(progress: (text: string) => void): Promise<void> {
+    for (const [i, pack] of SOUND_PACKS.entries()) {
+        await prepareSound(pack.id, (text) => progress(`${i + 1}/${SOUND_PACKS.length} · ${text}`));
+    }
+}
+
+export async function allSoundsAvailableOffline(): Promise<boolean> {
+    try {
+        for (const pack of SOUND_PACKS) {
+            const manifest = await manifestFor(pack.id, true);
+            for (const url of sampleUrls(manifest)) {
+                await asset(withRevToken(url, revForPack(pack.id)), true);
+            }
+        }
+        return true;
+    } catch {
+        return false;
     }
 }
 

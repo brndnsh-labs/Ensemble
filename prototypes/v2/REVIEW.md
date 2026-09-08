@@ -10,7 +10,8 @@ Findings fixed before audition:
 
 1. Older competing drafts hidden after newer saves: expose retained drafts explicitly.
 2. Async navigation/title races: disable competing intents while an operation is pending.
-3. Automatic sound selection could load packs: reject that unsupported input without alteration.
+3. Automatic sound selection could load packs: the initial foundation rejected it without
+   alteration; the explicit installation follow-on below now supports and prepares these choices.
 4. Reverb hydration left existing buses stale: use the engine's canonical per-lane send sync.
 5. Failed recovery could lose a draft on navigation: keep a per-song in-memory fallback, mark
    it tab-only, retain a persistent warning and request the browser's unload prompt.
@@ -45,10 +46,52 @@ functional checks, not a human judgment of timbre or real-device audio continuit
 
 The test-host cache prerequisite was resolved on 2026-09-08 with a test-preview-only Caddy rule
 and a user-performed Cloudflare purge. Deployment verified all 258 assets, the canonical worker,
-the manifest and unchanged original test root. The audition source is `62ef0b3e`; GitHub PR #1173
-records its artifact fingerprint and the current human-test status.
+the manifest and unchanged original test root. The first manual-sound audition source was
+`62ef0b3e`; GitHub PR #1173 records the current artifact and human-test status.
 
 Live acceptance exposed an import-test timing race: disabled Save also meant "busy," so the test
 could submit an invalid second file before the first import finished. A slow file-read fixture
 reproduced the failure; waiting for Song actions to become enabled fixes the test without
 changing the application or weakening invalid-input assertions.
+
+## Install-all and focused stand follow-on (#1174)
+
+The user requested one installation action that immediately improves the current band's sounds,
+less space above the chart, and minimal playback controls. The reported missing desktop menu was
+withdrawn after it loaded; this iteration does not claim to fix a reproduced desktop-picker bug.
+
+An inline correctness pass and independent second-model review covered complete-catalog
+installation, manual pins versus Follow feel, saved-document compatibility, offline failures,
+playback intent and responsive layout. Three findings were fixed and received a clean closure:
+
+1. Failed feel preparation restored the old setup but stranded an active band stopped. Verify
+   the previous required files before resuming it, honor Stop during either preparation path,
+   and report when even the old sounds cannot safely resume.
+2. The temporary engine pause expanded the focused controls and displaced the chart. Retain
+   playback intent in the UI until preparation settles, with an enabled Stop throughout.
+3. Reopening the editor after playback reset unapplied chord text. Keep it in the current tab
+   when switching views; Apply and Save remain explicit, with no new durable text-recovery claim.
+
+Browser regression coverage now includes bulk quota failure and cached retry, all five automatic
+choices, a manually pinned lane across feels, exported/imported Follow feel, offline cold reload
+and genre changes, verified rollback/resume, Stop during preparation, and unavailable old sounds.
+Responsive checks exercise laptop, portrait/landscape phone and tablet layouts, modal focus,
+automatic playback focus and preservation of unapplied editor text. The preparation-focus test
+failed against the pre-fix artifact before passing against the repaired build in both engines.
+
+No sample, gain, generator or worker-contract changes were made. Existing genre mappings and
+their soloist-phrasing reconciliation are reused. Other saved songs are not rewritten. Read the
+README rollback caveat before trying an older manual-only build with new Follow feel documents.
+Automated routing and layout evidence still do not replace a real laptop/iPhone audition.
+
+All 26 final preview checks passed across Chromium and WebKit. During the original-app regression
+run, the unchanged settings-scroll test once observed an 85px difference. A read-only, 20-run
+isolation probe then observed exactly 407px before and after every toggle (0 failures). That does
+not establish a cause or a fixed flake; no assertion, timeout, test or original-app code was
+changed. PR #1173 retains this diagnostic and the final full-suite result.
+
+Captured UI evidence from the tested preview (not generated mockups):
+
+- [Focused laptop stand](evidence/focused-laptop.png)
+- [Focused portrait-phone stand](evidence/focused-phone.png)
+- [Install-all Sounds dialog](evidence/sounds-dialog.png)

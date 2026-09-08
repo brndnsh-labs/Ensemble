@@ -47,7 +47,11 @@ local browser projects and never deploys.
   Quota errors retain the current draft in memory and warn before leaving the page where the
   browser supports that prompt. Browser eviction/clearing can still remove local data: export
   valuable charts. This preview does not promise durable cloud backup.
-- Manual compatible sound packs are selected in the collapsed Sounds panel. Existing decoding,
+- The Sounds dialog offers one explicit install-all action (about 9.1 MB) that applies the
+  existing genre sound map to the current draft. Per-lane Follow feel updates on genre changes;
+  a manual choice pins that lane. Other saved songs are not rewritten. Save keeps the chosen
+  setup, including Follow feel, and Revert restores it. Guest startup remains built-in-only
+  until a sound-selection/install gesture. Existing decoding,
   sample playback, calibrated gain and voice effects are reused without musical changes. A host
   asset-fetch adapter maps original pack URLs into `/v2/packs/`, never root-app storage. The
   production host retains its ordinary fetch path.
@@ -58,13 +62,19 @@ local browser projects and never deploys.
   playback preparation leaves the chart readable and unchanged, with an error instead of silent
   synth substitution. Missing sounds can be downloaded by reconnecting and pressing Play.
   App readiness and the current song's sound readiness are separate indicators. This is not
-  whole-library/cloud sync. Automatic sound selection remains explicitly unsupported on import.
-  `.ensemble`/JSON file export/import works, including manual sounds; iReal import does not.
+  whole-library/cloud sync. Bulk installation verifies and decodes the complete catalog before
+  applying voices; a failed install keeps the previous setup and reuses completed files on retry.
+  `.ensemble`/JSON export/import preserves manual and Follow feel choices; iReal import does not.
 - Accounts, cloud/outbox, sharing, admin, richer chart semantics, chord discovery,
   full settings inventory, section-practice controls and visualizer are later work. Genre
-  changes briefly stop/restart playback in this checkpoint. Unapplied editor text is not part
+  changes briefly stop/restart playback in this checkpoint, without expanding the focused chart.
+  A failed change restores the previous setup and resumes only if its sounds are still verified;
+  Stop cancels a pending restart. Unapplied editor text is not part
   of draft recovery: Apply first. Do not use this as the only copy of important writing yet.
 - Four bars per laptop/tablet row, two per portrait phone row, scrolling rather than pagination.
+  The open song replaces the branding header; Sounds opens over the score without displacing it.
+  Playback automatically focuses the chart, hiding editing/save chrome while leaving transport,
+  tempo, key, feel and mutes visible. Show controls restores the setup actions without stopping.
   Playback highlights use the existing scheduler's lookahead (not a new musical clock); manual
   wheel/touch/keyboard browsing suspends following until explicitly resumed.
 
@@ -82,6 +92,11 @@ temporary-symlink/rename operation. No database migration occurs. Keep old relea
 audition; this script never deletes them. The regular root `scripts/deploy.sh test` uses rsync
 deletion and can remove this separate preview: rebuild/redeploy it afterward. No nginx, Docker,
 production deployment or production data changes are needed for this checkpoint.
+
+Compatibility caveat: manual-only preview builds before Follow feel support reject documents
+with `autoSound: true`. Do not roll a browser's songbook back to those builds after saving Follow
+feel setups; export first and prefer a corrective preview release. Existing manual saves and the
+canonical document schema are unchanged.
 
 The test-only Caddy rule now sets `Cache-Control: no-store` for `/v2/*` on the test hostname
 (homelab-maintenance commit `5ca32d7`). The old Cloudflare worker entry was purged on 2026-09-08;

@@ -7,7 +7,13 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import * as repository from '../lib/repository';
 import type { ChartDocument } from '../lib/runtime';
 import * as runtime from '../lib/runtime';
-import { packsForInstrument, soundsAvailableOffline } from '../lib/sounds';
+import {
+    allSoundsAvailableOffline,
+    allSoundsSizeMB,
+    installAllSounds,
+    packsForInstrument,
+    soundsAvailableOffline,
+} from '../lib/sounds';
 import { start } from '../lib/starters';
 
 const lanes = [
@@ -36,19 +42,27 @@ export default function Ensemble() {
     const [text, setText] = useState('');
     const [search, setSearch] = useState('');
     const [playing, setPlaying] = useState(false);
+    const [playbackPending, setPlaybackPending] = useState(false);
     const [active, setActive] = useState<number | null>(null);
     const [following, setFollowing] = useState(true);
     const [offline, setOffline] = useState('Preparing offline access…');
     const [menu, setMenu] = useState(false);
     const [soundProgress, setSoundProgress] = useState('');
     const [soundsOffline, setSoundsOffline] = useState<boolean | null>(null);
+    const [allSoundsOffline, setAllSoundsOffline] = useState<boolean | null>(null);
+    const [soundMenu, setSoundMenu] = useState(false);
+    const [showControls, setShowControls] = useState(false);
+    const [pendingSound, setPendingSound] = useState<{ lane: string; value: string } | null>(null);
     const [recoveryOptions, setRecoveryOptions] = useState<
         ReturnType<typeof repository.recoveriesFor>
     >([]);
     const dialog = useRef<HTMLDialogElement>(null);
+    const soundsDialog = useRef<HTMLDialogElement>(null);
     const file = useRef<HTMLInputElement>(null);
     const scroll = useRef<HTMLDivElement>(null);
     const dirty = !!(current && saved && !same(current, saved));
+    const playbackActive = playing || playbackPending;
+    const focused = playbackActive && !showControls && !editing;
 
     useEffect(() => {
         let alive = true;
@@ -107,7 +121,11 @@ export default function Ensemble() {
                         });
                     }
                     if (alive) {
-                        setOffline('App available offline');
+                        setOffline(
+                            registration.waiting
+                                ? 'Update ready · close all preview tabs to install'
+                                : 'App available offline',
+                        );
                     }
                     registration.addEventListener('updatefound', () => {
                         registration.installing?.addEventListener('statechange', () => {
@@ -139,10 +157,30 @@ export default function Ensemble() {
         }
     }, [menu]);
     useEffect(() => {
+        if (soundMenu) {
+            soundsDialog.current?.showModal();
+        } else {
+            soundsDialog.current?.close();
+        }
+    }, [soundMenu]);
+    useEffect(() => {
+        let alive = true;
+        setAllSoundsOffline(null);
+        if (soundMenu && !busy) {
+            void allSoundsAvailableOffline().then((available) => {
+                if (alive) {
+                    setAllSoundsOffline(available);
+                }
+            });
+        }
+        return () => {
+            alive = false;
+        };
+    }, [soundMenu, busy]);
+    useEffect(() => {
         let alive = true;
         setSoundsOffline(null);
-        setSoundProgress('');
-        if (current) {
+        if (current && !busy && soundMenu) {
             void soundsAvailableOffline(current.chart).then((available) => {
                 if (alive) {
                     setSoundsOffline(available);
@@ -152,7 +190,7 @@ export default function Ensemble() {
         return () => {
             alive = false;
         };
-    }, [current]);
+    }, [current, soundMenu, busy]);
     useEffect(() => {
         if (!following || active === null) {
             return;
@@ -173,6 +211,9 @@ export default function Ensemble() {
         }
         working.current = true;
         setBusy(true);
+        // Genre preparation briefly pauses the engine, not the musician's intent.
+        // Keep the stand stable and Stop usable until this operation settles.
+        setPlaybackPending(runtime.state().playback.isPlaying);
         setError('');
         try {
             await task();
@@ -182,6 +223,9 @@ export default function Ensemble() {
         } finally {
             working.current = false;
             setBusy(false);
+            setPlaying(runtime.state().playback.isPlaying);
+            setPlaybackPending(false);
+            setSoundProgress('');
         }
     }
     function draft(next: ChartDocument) {
@@ -314,8 +358,10 @@ export default function Ensemble() {
     let barNumber = 0;
 
     return (
-        <>
-            <header className="site-header">
+        <div
+            className={`app-shell ${current ? 'song-open' : ''} ${focused ? 'performance-focus' : ''}`}
+        >
+            <header className="site-header" hidden={!!current}>
                 <div className="header-left">
                     <button
                         className="brand"
@@ -345,7 +391,7 @@ export default function Ensemble() {
                     <span className="concept-tag">V2 · working preview</span>
                 </div>
             </header>
-            {error && (
+            {error && !soundMenu && (
                 <div className="error-banner" role="alert">
                     <span>{error}</span>
                     <button onClick={() => setError('')}>Dismiss</button>
@@ -537,8 +583,8 @@ export default function Ensemble() {
                                     device-local, with real playback and portable Ensemble files.
                                 </p>
                                 <p className="preview-note">
-                                    iReal import, chord discovery, sound packs, and sharing are not
-                                    implemented here yet.
+                                    iReal import, chord discovery, and sharing are not implemented
+                                    here yet.
                                 </p>
                             </section>
                         </aside>
@@ -549,7 +595,7 @@ export default function Ensemble() {
                     </footer>
                 </main>
             ) : (
-                <main className="workspace">
+                <main className="workspace" data-focused={focused}>
                     <div className="song-header">
                         <div className="song-heading">
                             <button
@@ -574,10 +620,26 @@ export default function Ensemble() {
                                             : 'Saved on this device'}
                                     </span>
                                     <span>{totalBars} bars</span>
+                                    <span>{current.chart.arrangement.timeSignature}</span>
                                 </div>
                             </div>
                         </div>
                         <div className="song-actions">
+                            <button
+                                className="btn sounds-button"
+                                onClick={() => setSoundMenu(true)}
+                            >
+                                Sounds
+                            </button>
+                            {playbackActive && (
+                                <button
+                                    className="btn focus-toggle"
+                                    aria-pressed={focused}
+                                    onClick={() => setShowControls(!showControls)}
+                                >
+                                    {focused ? 'Show controls' : 'Focus chart'}
+                                </button>
+                            )}
                             <div className="mode-switch">
                                 <button
                                     className={!editing ? 'active' : ''}
@@ -591,7 +653,6 @@ export default function Ensemble() {
                                     onClick={() => {
                                         runtime.stop();
                                         setEditing(true);
-                                        selectSection(current);
                                     }}
                                 >
                                     Edit chart
@@ -623,24 +684,29 @@ export default function Ensemble() {
                         <div className="transport-cluster">
                             <button
                                 className="play-button"
-                                aria-label={playing ? 'Stop playback' : 'Start playback'}
-                                disabled={busy && !playing}
+                                aria-label={playbackActive ? 'Stop playback' : 'Start playback'}
+                                disabled={busy && !playbackActive}
                                 onClick={() => {
-                                    if (runtime.state().playback.isPlaying) {
+                                    if (runtime.state().playback.isPlaying || playbackPending) {
                                         runtime.stop();
                                         setPlaying(false);
+                                        setPlaybackPending(false);
                                         return;
                                     }
                                     void run(async () => {
+                                        setEditing(false);
+                                        setShowControls(false);
+                                        setSoundMenu(false);
                                         await runtime.toggle(setSoundProgress);
                                         setPlaying(runtime.state().playback.isPlaying);
                                         setSoundsOffline(
                                             await soundsAvailableOffline(current.chart),
                                         );
+                                        setSoundProgress('');
                                     });
                                 }}
                             >
-                                {playing ? '■' : '▶'}
+                                {playbackActive ? '■' : '▶'}
                             </button>
                             <div>
                                 <label className="setting-label" htmlFor="tempo">
@@ -727,7 +793,9 @@ export default function Ensemble() {
                                 className="setting-select"
                                 disabled={busy}
                                 value={current.chart.band.groove.lastSmartGenre}
-                                onChange={(e) => change(() => runtime.setGenre(e.target.value))}
+                                onChange={(e) =>
+                                    change(() => runtime.setGenre(e.target.value, setSoundProgress))
+                                }
                             >
                                 {runtime.GENRE_NAMES.map((g) => (
                                     <option key={g}>{g}</option>
@@ -756,9 +824,60 @@ export default function Ensemble() {
                             ))}
                         </div>
                     </div>
-                    <details className="sound-panel">
-                        <summary>
-                            Sounds{' '}
+                    <dialog
+                        className="sound-panel"
+                        ref={soundsDialog}
+                        aria-labelledby="sounds-title"
+                        onClose={() => setSoundMenu(false)}
+                    >
+                        <div className="sounds-heading">
+                            <div>
+                                <h2 id="sounds-title">Your band's sound</h2>
+                                <p>Install once. Play anywhere.</p>
+                            </div>
+                            <button
+                                className="icon-button"
+                                aria-label="Close sounds"
+                                onClick={() => setSoundMenu(false)}
+                            >
+                                ✕
+                            </button>
+                        </div>
+                        <div className="sound-install">
+                            <button
+                                className="btn primary"
+                                disabled={busy}
+                                onClick={() =>
+                                    change(async () => {
+                                        await installAllSounds(setSoundProgress);
+                                        await runtime.applyGenreSounds(setSoundProgress);
+                                    })
+                                }
+                            >
+                                {busy ? 'Preparing sounds…' : 'Install all & use genre sounds'}
+                            </button>
+                            <p>
+                                About {allSoundsSizeMB.toFixed(1)} MB. Chooses sounds for this
+                                song's feel; changing the feel follows along. Save to keep this
+                                setup.
+                            </p>
+                            <small>
+                                {allSoundsOffline === null
+                                    ? 'Checking installed sounds…'
+                                    : allSoundsOffline
+                                      ? 'All sound packs available offline'
+                                      : 'Missing downloads will be installed. Completed files are reused.'}
+                            </small>
+                        </div>
+                        {error && soundMenu && (
+                            <div className="error-banner" role="alert">
+                                {error}
+                            </div>
+                        )}
+                        <p className="sound-progress" role="status">
+                            {soundProgress}
+                        </p>
+                        <div className="sounds-status">
                             <span>
                                 {soundsOffline === null
                                     ? 'Checking downloads…'
@@ -766,25 +885,45 @@ export default function Ensemble() {
                                       ? 'Song sounds available offline'
                                       : 'Some sounds need downloading'}
                             </span>
-                        </summary>
+                            <span>Or choose each instrument:</span>
+                        </div>
                         <div className="sound-choices">
                             {lanes.map(([lane, label]) => (
                                 <label key={lane}>
                                     {label} sound
                                     <select
                                         aria-label={`${label} sound`}
-                                        value={current.chart.band[lane].voice}
-                                        disabled={busy}
-                                        onChange={(event) =>
-                                            change(() =>
-                                                runtime.setVoice(
-                                                    lane,
-                                                    event.target.value as InstrumentVoice,
-                                                    setSoundProgress,
-                                                ),
-                                            )
+                                        value={
+                                            pendingSound?.lane === lane
+                                                ? pendingSound.value
+                                                : current.chart.band[lane].autoSound
+                                                  ? 'auto'
+                                                  : current.chart.band[lane].voice
                                         }
+                                        disabled={busy}
+                                        onChange={(event) => {
+                                            const value = event.target.value;
+                                            if (working.current) {
+                                                return;
+                                            }
+                                            setPendingSound({ lane, value });
+                                            change(async () => {
+                                                try {
+                                                    await runtime.setVoice(
+                                                        lane,
+                                                        value === 'auto'
+                                                            ? runtime.recommendedVoice(lane)
+                                                            : (value as InstrumentVoice),
+                                                        setSoundProgress,
+                                                        value === 'auto',
+                                                    );
+                                                } finally {
+                                                    setPendingSound(null);
+                                                }
+                                            });
+                                        }}
                                     >
+                                        <option value="auto">Follow feel</option>
                                         <option value="synth">Built-in</option>
                                         {packsForInstrument(lane).map((pack) => (
                                             <option key={pack.id} value={`pack:${pack.id}`}>
@@ -793,6 +932,16 @@ export default function Ensemble() {
                                         ))}
                                     </select>
                                     <small>
+                                        {current.chart.band[lane].autoSound && (
+                                            <span className="resolved-sound">
+                                                Using{' '}
+                                                {packsForInstrument(lane).find(
+                                                    (pack) =>
+                                                        current.chart.band[lane].voice ===
+                                                        `pack:${pack.id}`,
+                                                )?.name || 'Built-in'}
+                                            </span>
+                                        )}
                                         {
                                             packsForInstrument(lane).find(
                                                 (pack) =>
@@ -808,12 +957,7 @@ export default function Ensemble() {
                             Choosing a sound downloads it for offline use. Save keeps your choices
                             with this song. Browser storage can still be cleared or evicted.
                         </p>
-                    </details>
-                    {soundProgress && (
-                        <p className="sound-progress" role="status">
-                            {soundProgress}
-                        </p>
-                    )}
+                    </dialog>
                     <div className={`workspace-body ${editing ? 'editing' : ''}`}>
                         <div
                             className="chart-scroll"
@@ -838,23 +982,6 @@ export default function Ensemble() {
                             aria-label="Chord chart"
                         >
                             <article className="sheet">
-                                <div className="sheet-top">
-                                    <div className="sheet-meta">
-                                        <span className="tempo-mark">
-                                            ♩ = {current.chart.performance.bpm}
-                                        </span>
-                                        <span>{current.chart.arrangement.timeSignature}</span>
-                                        <span>{current.chart.band.groove.lastSmartGenre}</span>
-                                    </div>
-                                    <div className="sheet-tools">
-                                        <button
-                                            className="text-button"
-                                            onClick={() => setFollowing(!following)}
-                                        >
-                                            {following ? 'Following playback' : 'Resume follow'}
-                                        </button>
-                                    </div>
-                                </div>
                                 {blocks.map((block) => (
                                     <section
                                         className="section"
@@ -911,7 +1038,7 @@ export default function Ensemble() {
                                         </div>
                                     </section>
                                 ))}
-                                <div className="chart-bottom">
+                                <div className="chart-bottom" hidden={playbackActive}>
                                     <span>Tap a chord to hear it while stopped.</span>
                                     <span>{totalBars} bars · repeats continuously</span>
                                 </div>
@@ -1015,7 +1142,11 @@ export default function Ensemble() {
                     </div>
                     <footer className="playback-footer">
                         <span role="status">
-                            {busy ? 'Updating…' : playing ? 'Band is playing' : message}
+                            {busy
+                                ? soundProgress || 'Updating…'
+                                : playing
+                                  ? 'Band is playing'
+                                  : message}
                         </span>
                         <span className="footer-tip">{offline}</span>
                         <button className="follow-btn" onClick={() => setFollowing(!following)}>
@@ -1110,6 +1241,6 @@ export default function Ensemble() {
                     </details>
                 )}
             </dialog>
-        </>
+        </div>
     );
 }

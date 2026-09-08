@@ -47,6 +47,13 @@ versus pagination. Following must respect manual browsing and resume explicitly.
 retain the chart's spatial structure. Keyboard, touch, contrast, reduced motion and audible
 error/recovery behavior are acceptance criteria, not a final polish phase.
 
+The September 8 follow-up makes the music-stand view part of the preview now: remove duplicate
+branding/metadata above an open chart, put sound details in a dialog, and hide editing/save
+controls during playback with a reversible Show controls action. An explicit install-all action
+downloads the existing catalog and applies established genre defaults to the current draft.
+Follow feel and manual overrides belong to the saved setup; installation never rewrites other
+saved songs. This is not a new sound-design or whole-library migration project.
+
 This approved v2 direction supersedes VISION's absolute no-accounts/no-backend language and the
 old no-navigation premise for this preview. It does not change the production app until an
 explicitly reviewed rollout. The existing conductor project and reserved gestures are separate.

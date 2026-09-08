@@ -31,11 +31,6 @@ export function validated(candidate: unknown): ChartDocument {
     for (const [module, lane] of Object.entries(result.value.chart.band)) {
         validateVoice(module as InstrumentModule, lane.voice);
     }
-    if (Object.values(result.value.chart.band).some((lane) => lane.autoSound)) {
-        throw new Error(
-            'Automatic sound selection is not supported yet. Keep the original file; manual sound choices are supported.',
-        );
-    }
     return result.value;
 }
 

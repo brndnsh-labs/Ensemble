@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { test as base, expect } from '@playwright/test';
 
 async function observeSamples(page: import('@playwright/test').Page) {
@@ -58,6 +59,13 @@ const test = base.extend<{ disconnect: () => Promise<void> }>({
     },
 });
 
+async function openSounds(page: import('@playwright/test').Page) {
+    await page.getByRole('button', { name: 'Sounds', exact: true }).click();
+}
+async function closeSounds(page: import('@playwright/test').Page) {
+    await page.getByRole('button', { name: 'Close sounds' }).click();
+}
+
 test('manual sounds save, revert, export/import and play sampled audio after offline reload', async ({
     page,
     disconnect,
@@ -65,13 +73,17 @@ test('manual sounds save, revert, export/import and play sampled audio after off
     await observeSamples(page);
     await page.goto('/v2/');
     await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
-    await page.locator('.sound-panel summary').click();
+    await openSounds(page);
     await page.getByLabel('Chords sound', { exact: true }).selectOption('pack:grand');
     await expect(page.getByLabel('Chords sound', { exact: true })).toBeEnabled();
     await expect(page.getByLabel('Chords sound', { exact: true })).toHaveValue('pack:grand');
     await expect(page.getByText('Song sounds available offline', { exact: true })).toBeVisible();
+    await closeSounds(page);
     await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await openSounds(page);
     await page.getByLabel('Chords sound', { exact: true }).selectOption('synth');
+    await expect(page.getByLabel('Chords sound', { exact: true })).toBeEnabled();
+    await closeSounds(page);
     await page.getByRole('button', { name: 'Song actions' }).click();
     await page.getByRole('button', { name: 'Revert to saved' }).click();
     await expect(page.getByLabel('Chords sound', { exact: true })).toHaveValue('pack:grand');
@@ -92,8 +104,9 @@ test('manual sounds save, revert, export/import and play sampled audio after off
     await disconnect();
     await page.reload();
     await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).first().click();
-    await page.locator('.sound-panel summary').click();
+    await openSounds(page);
     await expect(page.getByLabel('Chords sound', { exact: true })).toHaveValue('pack:grand');
+    await closeSounds(page);
     await page.getByRole('button', { name: 'Start playback', exact: true }).click();
     await expect.poll(() => sampleStarts(page)).toBeGreaterThan(0);
     await page.getByRole('button', { name: 'Stop playback' }).click();
@@ -105,13 +118,16 @@ test('manual sounds save, revert, export/import and play sampled audio after off
     });
     await page.reload();
     await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).first().click();
+    await openSounds(page);
     await expect(page.getByText('Some sounds need downloading', { exact: true })).toBeVisible();
+    await closeSounds(page);
     await page.getByRole('button', { name: 'Start playback', exact: true }).click();
     await expect(page.locator('.error-banner')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Start playback', exact: true })).toBeEnabled();
     expect(await sampleStarts(page)).toBe(0);
-    await page.locator('.sound-panel summary').click();
+    await openSounds(page);
     await expect(page.getByLabel('Chords sound', { exact: true })).toHaveValue('pack:grand');
+    await closeSounds(page);
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
 });
 
@@ -120,7 +136,6 @@ test('all five lanes route real samples and every catalog choice downloads', asy
     await observeSamples(page);
     await page.goto('/v2/');
     await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
-    await page.locator('.sound-panel summary').click();
     for (const label of ['Drums', 'Bass', 'Chords', 'Harmony', 'Soloist']) {
         for (const other of ['Drums', 'Bass', 'Chords', 'Harmony', 'Soloist']) {
             const mute = page.getByRole('button', { name: other, exact: true });
@@ -128,13 +143,14 @@ test('all five lanes route real samples and every catalog choice downloads', asy
                 await mute.click();
             }
         }
+        await openSounds(page);
         const select = page.getByLabel(`${label} sound`, { exact: true });
         const choices = await select
             .locator('option')
             .evaluateAll((options) =>
                 options
                     .map((option) => (option as HTMLOptionElement).value)
-                    .filter((value) => value !== 'synth'),
+                    .filter((value) => value.startsWith('pack:')),
             );
         expect(choices.length).toBeGreaterThan(0);
         for (const choice of choices) {
@@ -143,6 +159,7 @@ test('all five lanes route real samples and every catalog choice downloads', asy
             await expect(select).toHaveValue(choice);
             await expect(page.locator('.error-banner')).toHaveCount(0);
         }
+        await closeSounds(page);
         const before = await sampleStarts(page);
         await page.getByRole('button', { name: 'Start playback', exact: true }).click();
         await expect.poll(() => sampleStarts(page), { timeout: 15_000 }).toBeGreaterThan(before);
@@ -178,7 +195,7 @@ test('corrupt downloads and storage failures preserve the previous sound', async
     });
     await page.goto('/v2/');
     await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
-    await page.locator('.sound-panel summary').click();
+    await openSounds(page);
     await page.getByLabel('Chords sound', { exact: true }).selectOption('pack:grand');
     await expect(page.locator('.error-banner')).toContainText('could not be verified');
     await expect(page.getByLabel('Chords sound', { exact: true })).toHaveValue('synth');
@@ -186,11 +203,282 @@ test('corrupt downloads and storage failures preserve the previous sound', async
     await page.getByLabel('Chords sound', { exact: true }).selectOption('pack:grand');
     await expect(page.locator('.error-banner')).toContainText('Storage full');
     await expect(page.getByLabel('Chords sound', { exact: true })).toHaveValue('synth');
+    await closeSounds(page);
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
+    await openSounds(page);
     await page.evaluate(() => Object.assign(window, { __breakSound: '' }));
     await page.getByLabel('Chords sound', { exact: true }).selectOption('pack:grand');
     await expect(page.getByLabel('Chords sound', { exact: true })).toBeEnabled();
     await expect(page.getByLabel('Chords sound', { exact: true })).toHaveValue('pack:grand');
+});
+
+test('one install applies genre sounds, preserves manual overrides and follows feels offline', async ({
+    page,
+    disconnect,
+}) => {
+    test.setTimeout(120_000);
+    await observeSamples(page);
+    const downloads: string[] = [];
+    page.on('request', (request) => {
+        if (request.url().includes('/v2/packs/')) {
+            downloads.push(request.url());
+        }
+    });
+    await page.goto('/v2/');
+    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
+    expect(downloads).toEqual([]);
+    await openSounds(page);
+    await page.getByRole('button', { name: 'Install all & use genre sounds' }).click();
+    await expect(page.getByRole('button', { name: 'Install all & use genre sounds' })).toBeEnabled({
+        timeout: 60_000,
+    });
+    await expect(
+        page.getByText('All sound packs available offline', { exact: true }),
+    ).toBeVisible();
+    for (const label of ['Drums', 'Bass', 'Chords', 'Harmony', 'Soloist']) {
+        await expect(page.getByLabel(`${label} sound`, { exact: true })).toHaveValue('auto');
+    }
+    await expect(page.locator('.resolved-sound')).toContainText([
+        'Acoustic Drum Kit',
+        'Upright Bass',
+        'Drawbar Organ',
+        'Horn Section',
+        'Alto Sax',
+    ]);
+    await page.getByLabel('Chords sound', { exact: true }).selectOption('pack:rhodes');
+    await expect(page.getByLabel('Chords sound', { exact: true })).toBeEnabled();
+    await closeSounds(page);
+    await page.getByLabel('Feel', { exact: true }).selectOption('Funk');
+    await expect(page.getByLabel('Feel', { exact: true })).toBeEnabled();
+    await openSounds(page);
+    await expect(page.getByLabel('Chords sound', { exact: true })).toHaveValue('pack:rhodes');
+    await expect(page.locator('.resolved-sound')).toContainText([
+        'Acoustic Drum Kit',
+        'Built-in',
+        'Horn Section',
+        'Electric Guitar (Clean)',
+    ]);
+    await closeSounds(page);
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
+    await page.getByRole('button', { name: 'Song actions' }).click();
+    const download = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Export file' }).click();
+    const path = await (await download).path();
+    const exported = JSON.parse(await readFile(path!, 'utf8'));
+    expect(exported.chart.band.soloist).toMatchObject({
+        voice: 'pack:electric-guitar-clean',
+        autoSound: true,
+        mode: 'guitar',
+    });
+    expect(exported.chart.band.chords).toMatchObject({ voice: 'pack:rhodes', autoSound: false });
+    await page.getByRole('button', { name: 'Close', exact: true }).click();
+    await page.getByLabel('Import Ensemble document').setInputFiles(path!);
+    await expect(page.getByRole('button', { name: 'Song actions' })).toBeEnabled();
+    await expect(page.locator('.error-banner')).toHaveCount(0);
+    await openSounds(page);
+    await expect(page.getByLabel('Drums sound', { exact: true })).toHaveValue('auto');
+    await expect(page.getByLabel('Chords sound', { exact: true })).toHaveValue('pack:rhodes');
+    await closeSounds(page);
+    await expect
+        .poll(() => page.evaluate(() => navigator.serviceWorker.controller?.scriptURL || ''))
+        .toContain('/v2/sw.js');
+    await disconnect();
+    await page.reload();
+    await page.getByRole('button', { name: 'Blue pocket Funk · Saved locally' }).first().click();
+    await page.getByLabel('Feel', { exact: true }).selectOption('Jazz');
+    await expect(page.getByLabel('Feel', { exact: true })).toBeEnabled();
+    await openSounds(page);
+    await expect(page.getByLabel('Chords sound', { exact: true })).toHaveValue('pack:rhodes');
+    await expect(page.locator('.resolved-sound')).toContainText([
+        'Acoustic Drum Kit',
+        'Upright Bass',
+        'Horn Section',
+        'Alto Sax',
+    ]);
+    await expect(
+        page.getByText('All sound packs available offline', { exact: true }),
+    ).toBeVisible();
+    await closeSounds(page);
+    await page.getByRole('button', { name: 'Start playback', exact: true }).click();
+    await expect.poll(() => sampleStarts(page)).toBeGreaterThan(0);
+    await page.getByRole('button', { name: 'Stop playback' }).click();
+    await page.getByRole('button', { name: 'Song actions' }).click();
+    await page.getByRole('button', { name: 'Revert to saved' }).click();
+    await expect(page.getByLabel('Feel', { exact: true })).toHaveValue('Funk');
+    await openSounds(page);
+    await expect(page.getByLabel('Drums sound', { exact: true })).toHaveValue('auto');
+    // All-ready is derived from bytes, never a durable success flag.
+    await page.evaluate(async () => {
+        const cache = await caches.open('ensemble-v2-sounds-v1');
+        const file = (await cache.keys()).find(
+            (request) => request.url.includes('/acoustic-kit/') && request.url.includes('.m4a'),
+        )!;
+        await cache.delete(file);
+    });
+    await closeSounds(page);
+    await openSounds(page);
+    await expect(page.getByText('All sound packs available offline', { exact: true })).toBeHidden();
+    await page.getByRole('button', { name: 'Install all & use genre sounds' }).click();
+    await expect(page.locator('.error-banner')).toBeVisible();
+    await expect(page.getByLabel('Chords sound', { exact: true })).toHaveValue('pack:rhodes');
+    await closeSounds(page);
+    // A failed feel change must roll back the runtime as well as the displayed draft.
+    await page.getByLabel('Feel', { exact: true }).selectOption('Jazz');
+    await expect(page.locator('.error-banner')).toBeVisible();
+    await expect(page.getByLabel('Feel', { exact: true })).toHaveValue('Funk');
+    await page.getByRole('button', { name: 'Faster', exact: true }).click();
+    await expect(page.getByLabel('Feel', { exact: true })).toHaveValue('Funk');
+    await openSounds(page);
+    await expect(page.getByLabel('Chords sound', { exact: true })).toHaveValue('pack:rhodes');
+});
+
+test('failed bulk installation keeps every previous voice and retries completed downloads', async ({
+    page,
+}) => {
+    test.setTimeout(120_000);
+    await page.addInitScript(() => {
+        const put = Cache.prototype.put;
+        Object.assign(window, { __failBulk: true });
+        Cache.prototype.put = function (request, response) {
+            if (
+                (window as unknown as { __failBulk: boolean }).__failBulk &&
+                String(request).includes('/v2/packs/acoustic-kit/')
+            ) {
+                return Promise.reject(new DOMException('Storage full', 'QuotaExceededError'));
+            }
+            return put.call(this, request, response);
+        };
+    });
+    await page.goto('/v2/');
+    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
+    await openSounds(page);
+    await page.getByRole('button', { name: 'Install all & use genre sounds' }).click();
+    await expect(page.locator('.error-banner')).toContainText('Storage full', { timeout: 60_000 });
+    for (const label of ['Drums', 'Bass', 'Chords', 'Harmony', 'Soloist']) {
+        await expect(page.getByLabel(`${label} sound`, { exact: true })).toHaveValue('synth');
+    }
+    await expect(page.getByText('All sound packs available offline', { exact: true })).toBeHidden();
+    await closeSounds(page);
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
+    await page.evaluate(() => Object.assign(window, { __failBulk: false }));
+    const repeated: string[] = [];
+    page.on('request', (request) => {
+        if (request.url().includes('/v2/packs/grand/')) {
+            repeated.push(request.url());
+        }
+    });
+    await openSounds(page);
+    await page.getByRole('button', { name: 'Install all & use genre sounds' }).click();
+    await expect(page.getByRole('button', { name: 'Install all & use genre sounds' })).toBeEnabled({
+        timeout: 60_000,
+    });
+    await expect(
+        page.getByText('All sound packs available offline', { exact: true }),
+    ).toBeVisible();
+    expect(repeated).toEqual([]);
+    await expect(page.getByLabel('Chords sound', { exact: true })).toHaveValue('auto');
+});
+
+test('feel preparation keeps the stand stable, rolls back playback safely, and respects Stop', async ({
+    page,
+    disconnect,
+}) => {
+    test.setTimeout(120_000);
+    await observeSamples(page);
+    await page.addInitScript(() => {
+        const match = Cache.prototype.match;
+        const control = { hold: false, release: null as null | (() => void) };
+        Object.assign(window, { __preparation: control });
+        Cache.prototype.match = async function (request, options) {
+            if (control.hold && String(request).includes('/v2/packs/grand/')) {
+                control.hold = false;
+                await new Promise<void>((resolve) => {
+                    control.release = resolve;
+                });
+            }
+            return match.call(this, request, options);
+        };
+    });
+    const hold = () =>
+        page.evaluate(() => {
+            const control = (
+                window as unknown as { __preparation: { hold: boolean; release: unknown } }
+            ).__preparation;
+            control.hold = true;
+            control.release = null;
+        });
+    const release = () =>
+        page.evaluate(() =>
+            (
+                window as unknown as { __preparation: { release: () => void } }
+            ).__preparation.release(),
+        );
+    const held = () =>
+        page.waitForFunction(
+            () =>
+                typeof (window as unknown as { __preparation: { release: unknown } }).__preparation
+                    .release === 'function',
+        );
+    await page.goto('/v2/');
+    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
+    await openSounds(page);
+    await page.getByRole('button', { name: 'Install all & use genre sounds' }).click();
+    await expect(page.getByRole('button', { name: 'Install all & use genre sounds' })).toBeEnabled({
+        timeout: 60_000,
+    });
+    await closeSounds(page);
+    await page.getByRole('button', { name: 'Start playback', exact: true }).click();
+    await expect.poll(() => sampleStarts(page)).toBeGreaterThan(0);
+    const chartTop = (await page.locator('.chart-scroll').boundingBox())!.y;
+    await hold();
+    await page.getByLabel('Feel', { exact: true }).selectOption('Jazz');
+    await held();
+    await expect(page.locator('.workspace')).toHaveAttribute('data-focused', 'true');
+    await expect(page.getByRole('button', { name: 'Stop playback' })).toBeEnabled();
+    expect((await page.locator('.chart-scroll').boundingBox())!.y).toBe(chartTop);
+    await release();
+    await expect(page.getByLabel('Feel', { exact: true })).toBeEnabled();
+    await expect(page.getByRole('button', { name: 'Stop playback' })).toBeEnabled();
+    await page.getByLabel('Feel', { exact: true }).selectOption('Blues');
+    await expect(page.getByLabel('Feel', { exact: true })).toBeEnabled();
+    await page.evaluate(async () => {
+        const cache = await caches.open('ensemble-v2-sounds-v1');
+        const file = (await cache.keys()).find(
+            (r) => r.url.includes('/grand/') && r.url.includes('.m4a'),
+        )!;
+        await cache.delete(file);
+    });
+    await disconnect();
+    const beforeFailure = await sampleStarts(page);
+    await page.getByLabel('Feel', { exact: true }).selectOption('Jazz');
+    await expect(page.getByLabel('Feel', { exact: true })).toBeEnabled();
+    await expect(page.getByLabel('Feel', { exact: true })).toHaveValue('Blues');
+    await expect(page.locator('.error-banner')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Stop playback' })).toBeEnabled();
+    await expect.poll(() => sampleStarts(page)).toBeGreaterThan(beforeFailure);
+    await hold();
+    await page.getByLabel('Feel', { exact: true }).selectOption('Jazz');
+    await held();
+    await page.getByRole('button', { name: 'Stop playback' }).click();
+    await release();
+    await expect(page.getByLabel('Feel', { exact: true })).toBeEnabled();
+    await expect(page.getByRole('button', { name: 'Start playback', exact: true })).toBeEnabled();
+    await expect(page.getByLabel('Feel', { exact: true })).toHaveValue('Blues');
+    // If the old setup loses files as well, fail visibly instead of silently synthesizing.
+    await page.getByRole('button', { name: 'Start playback', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Stop playback' })).toBeEnabled();
+    await page.evaluate(async () => {
+        const cache = await caches.open('ensemble-v2-sounds-v1');
+        const file = (await cache.keys()).find(
+            (r) => r.url.includes('/acoustic-kit/') && r.url.includes('.m4a'),
+        )!;
+        await cache.delete(file);
+    });
+    await page.getByLabel('Feel', { exact: true }).selectOption('Jazz');
+    await expect(page.getByLabel('Feel', { exact: true })).toBeEnabled();
+    await expect(page.getByRole('button', { name: 'Start playback', exact: true })).toBeEnabled();
+    await expect(page.locator('.error-banner')).toContainText('Could not change feel or resume');
 });
 
 test('real runtime, local saves, reload recovery and offline playback', async ({
@@ -295,9 +583,38 @@ test('responsive chart and editor fit laptop, phone and tablet', async ({ page }
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
             true,
         );
+        const firstBar = await page.locator('.bar').first().boundingBox();
+        expect(firstBar!.y).toBeLessThan(width > 1100 ? 220 : height < 500 ? 210 : 310);
+        const chartBefore = await page.locator('.chart-scroll').boundingBox();
+        await openSounds(page);
+        await expect(page.getByRole('dialog', { name: "Your band's sound" })).toBeVisible();
+        expect(await page.locator('.chart-scroll').boundingBox()).toEqual(chartBefore);
+        await closeSounds(page);
+        await expect(page.getByRole('button', { name: 'Sounds', exact: true })).toBeFocused();
+        await page.getByRole('button', { name: 'Start playback', exact: true }).click();
+        await expect(page.locator('.workspace')).toHaveAttribute('data-focused', 'true');
+        await expect(page.getByRole('button', { name: 'Edit chart', exact: true })).toBeHidden();
+        await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeHidden();
+        for (const label of ['Tempo', 'Key', 'Feel']) {
+            await expect(page.getByLabel(label, { exact: true })).toBeVisible();
+        }
+        await expect(page.getByRole('button', { name: 'Bass', exact: true })).toBeVisible();
+        const focusedChart = await page.locator('.chart-scroll').boundingBox();
+        expect(focusedChart!.height).toBeGreaterThan(height * 0.5);
+        await page.screenshot({ path: `test-results/focused-${width}.png` });
+        await page.getByRole('button', { name: 'Show controls' }).click();
+        await expect(page.getByRole('button', { name: 'Sounds', exact: true })).toBeVisible();
+        await page.getByRole('button', { name: 'Stop playback' }).click();
         await page.screenshot({ path: `test-results/chart-${width}.png` });
         await page.getByRole('button', { name: 'Edit chart', exact: true }).click();
         await expect(page.getByLabel('Chord text')).toBeVisible();
+        const unapplied = 'Dm7 | G7 | Cmaj7 | A7';
+        await page.getByLabel('Chord text').fill(unapplied);
+        await page.getByRole('button', { name: 'Start playback', exact: true }).click();
+        await expect(page.getByLabel('Chord text')).toBeHidden();
+        await page.getByRole('button', { name: 'Stop playback' }).click();
+        await page.getByRole('button', { name: 'Edit chart', exact: true }).click();
+        await expect(page.getByLabel('Chord text')).toHaveValue(unapplied);
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
             true,
         );

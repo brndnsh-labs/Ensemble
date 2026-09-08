@@ -4,6 +4,7 @@ import {
     loadDrumPreset,
     togglePower,
 } from '@engine/controllers/instrument-controller';
+import { autoVoiceForGenre } from '@engine/data/genre-sound-map';
 import { GENRE_NAMES, SMART_GENRES } from '@engine/data/smart-genres';
 import { validateProgression } from '@engine/engine/chords-engine';
 import { analyzeFormUI } from '@engine/engine/conductor';
@@ -13,7 +14,11 @@ import { isSoloistMonophonicMode } from '@engine/engine/soloist-mode-policy';
 import { validateChartDocument } from '@engine/songbook/codec';
 import type { ChartContent, ChartDocument, ChartLaneMix } from '@engine/songbook/types';
 import { dispatch, getState, subscribe } from '@engine/state';
-import { handleEffects, reconcileUrlGenreOnBoot } from '@engine/state/state-effects';
+import {
+    deriveSoloistModeOnBoot,
+    handleEffects,
+    reconcileUrlGenreOnBoot,
+} from '@engine/state/state-effects';
 import {
     ACTIONS,
     type EnsembleState,
@@ -174,6 +179,10 @@ export function initialize(): Promise<void> {
                 (notes, _sent, _duration, resolution) => receiveNotes(notes, resolution),
             );
             await loadDrumPreset('Basic Rock');
+            // Guest startup must not download audio without an install/selection gesture.
+            for (const module of ['groove', 'bass', 'chords', 'harmony', 'soloist'] as const) {
+                param(module, 'autoSound', false);
+            }
             subscribe((action, state, context) => {
                 if (loading) {
                     return;
@@ -227,6 +236,7 @@ export async function setVoice(
     module: InstrumentModule,
     voice: InstrumentVoice,
     progress: (text: string) => void,
+    auto = false,
 ): Promise<void> {
     validateVoice(module, voice);
     if (voice !== 'synth') {
@@ -234,7 +244,38 @@ export async function setVoice(
     }
     // Keep the old selection throughout download/failure. Dispatch through the
     // established effects and worker delta (including crunch chord voicing).
-    dispatch(ACTIONS.SET_INSTRUMENT_VOICE, { module, voice, auto: false });
+    dispatch(ACTIONS.SET_INSTRUMENT_VOICE, { module, voice, auto });
+    if (auto && module === 'soloist') {
+        // Auto dispatch normally runs inside genre resolution; this explicit
+        // picker also needs its established voice-to-phrasing reconciliation.
+        deriveSoloistModeOnBoot(getState(), dispatch);
+    }
+    rebuild();
+}
+
+export function recommendedVoice(module: InstrumentModule): InstrumentVoice {
+    const state = getState();
+    // Resolve the intended mapping, not a temporary synth fallback based on RAM.
+    // Every caller prepares these files before committing the choice or playing.
+    return autoVoiceForGenre(state.groove.lastSmartGenre, module, () => true, state.chords.style);
+}
+
+/** Called only after the explicit bulk install has fully succeeded. */
+export async function applyGenreSounds(progress: (text: string) => void): Promise<void> {
+    for (const module of ['groove', 'bass', 'chords', 'harmony', 'soloist'] as const) {
+        const voice = recommendedVoice(module);
+        if (voice !== 'synth') {
+            await prepareSound(voice.slice(5), progress);
+        }
+    }
+    for (const module of ['groove', 'bass', 'chords', 'harmony', 'soloist'] as const) {
+        dispatch(ACTIONS.SET_INSTRUMENT_VOICE, {
+            module,
+            voice: recommendedVoice(module),
+            auto: true,
+        });
+    }
+    deriveSoloistModeOnBoot(getState(), dispatch);
     rebuild();
 }
 
@@ -292,17 +333,58 @@ export function load(document: ChartDocument): void {
     }
 }
 
-export async function setGenre(name: string): Promise<void> {
+export async function setGenre(
+    name: string,
+    progress: (text: string) => void = () => {},
+): Promise<void> {
     if (!Object.hasOwn(SMART_GENRES, name)) {
         throw new Error('Unknown genre.');
     }
     const wasPlaying = getState().playback.isPlaying;
+    const previous = captureContent();
     stop();
-    dispatch(ACTIONS.SET_GENRE_FEEL, { genreName: name, ...SMART_GENRES[name] });
-    await reconcileUrlGenreOnBoot(getState(), name, null, dispatch);
-    rebuild();
-    if (wasPlaying) {
-        dispatch(ACTIONS.TOGGLE_PLAY);
+    const intent = playIntent;
+    try {
+        dispatch(ACTIONS.SET_GENRE_FEEL, { genreName: name, ...SMART_GENRES[name] });
+        for (const module of ['groove', 'bass', 'chords', 'harmony', 'soloist'] as const) {
+            if (getState()[module].autoSound) {
+                const voice = recommendedVoice(module);
+                if (voice !== 'synth') {
+                    await prepareSound(voice.slice(5), progress);
+                }
+            }
+        }
+        await reconcileUrlGenreOnBoot(getState(), name, null, dispatch);
+        rebuild();
+        if (wasPlaying && intent === playIntent) {
+            await prepareSounds(captureContent(), progress);
+            if (intent === playIntent) {
+                dispatch(ACTIONS.TOGGLE_PLAY);
+            }
+        }
+    } catch (error) {
+        loading = true;
+        try {
+            apply(previous);
+            rebuild();
+        } finally {
+            loading = false;
+        }
+        if (wasPlaying && intent === playIntent) {
+            // A failed new feel must not strand a still-playable old band. Recheck
+            // its files too: an evicted old pack cannot earn silent synth fallback.
+            try {
+                await prepareSounds(previous, progress);
+            } catch {
+                throw new Error(
+                    'Could not change feel or resume the previous sounds. Reconnect and press Play.',
+                );
+            }
+            if (intent === playIntent) {
+                dispatch(ACTIONS.TOGGLE_PLAY);
+            }
+        }
+        throw error;
     }
 }
 
