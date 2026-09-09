@@ -69,9 +69,10 @@ that accounts are implemented or that the eventual service needs no server. Dock
 packaging decision, to be measured against the current deployment loop.
 
 Checkpoint 1: written brief, working Next browser-engine/local-songbook preview and test-server
-verification. Accounts, cloud storage and iReal import are unavailable; portable Ensemble JSON
-file import/export is included. Tracked in milestone 15 and #1170; chart/import design is #1171,
-and account/sync/hosting contracts are #1172.
+verification. The initial checkpoint included portable Ensemble JSON file import/export;
+conservative iReal import was added in checkpoint 2. Accounts and cloud storage remain
+unavailable. Tracked in milestone 15 and #1170; chart/import work is #1171, and
+account/sync/hosting contracts are #1172.
 The #1174 follow-on connects existing sound packs, explicit install-all, Follow feel/manual pins,
 offline verification and focused playback. Whole-library cloud sync remains later work.
 The #1175 usability slice makes typed chords part of Save/copy/export, preserves section buffers,
@@ -80,6 +81,11 @@ document commits. Update chart is an optional preview; unsupported text is retai
 Unchecked text is tab-only, with an unload warning, rather than a new durable recovery format.
 Checkpoint 2: settle explicit rhythmic chart representation and bounded import compatibility.
 Checkpoint 3: account, sync, shared snapshot and admin services; migration/restore/conflict proof.
+The proposed contract and Songs I Know reuse assessment are in
+[`ensemble-v2-sync.md`](ensemble-v2-sync.md). The recovery-code policy was approved on
+September 9; hosting ratification remains open. The document does not
+authorize a backend rollout or convert the guest preview to accounts. #1177 implements the
+isolated account-local store/outbox before any live transport is attached.
 Production cutover follows real-device review and compatibility gates, not mockup approval.
 
 ## Storage contract updates
@@ -100,14 +106,16 @@ portable, validated ChartDocuments, not evidence of cloud sync.
 The accepted September 8 direction and fixture evidence are in
 [`ensemble-v2-charts.md`](ensemble-v2-charts.md). Brandon approved a new semantic document
 format targeting full iReal chart compatibility, with quick text entry and Ensemble's
-additional features. The additive codec foundation is underway under #1171; live storage,
-engine adoption, form execution and import remain subsequent slices. The preview stays v1.
+additional features. The preview now supports additive v2 documents, measure-based editing,
+bounded form execution and conservative iReal import under #1171. Existing v1 songs keep
+their editor; conversion creates a separate copy. The compatibility ledger in that chart
+design remains authoritative about unsupported playback semantics, not a claim of full parity.
 
-Current section text is separated by barlines and divides each bar equally among chord tokens.
-It cannot naturally express C for two beats, Dm for one and G7 for one. Parsing also performs
-voicing work. Introduce a semantic representation of measures, explicit chord durations and
-musical directions, separated from page geometry and generated voicings. Retain a defined
-text round trip; do not let graphical and text representations become competing authorities.
+Legacy section text is separated by barlines and divides each bar equally among chord tokens.
+It cannot naturally express C for two beats, Dm for one and G7 for one. The v2 measure editor
+now supports explicit durations such as `C:2 Dm:1 G7:1`, separating semantic measures and
+musical directions from page geometry and generated voicings. Preserve the defined text
+round trip; graphical and text representations must not become competing authorities.
 
 First import support must be fixture-backed against real current iReal exports, distinguishing
 irealb exports from the documented irealbook generation protocol. Preview before keeping,

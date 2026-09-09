@@ -4,6 +4,34 @@ Isolated Next.js/React shell using Ensemble's existing browser engine and canoni
 This is a working checkpoint, not a production replacement. See [the product brief](../../docs/design/ensemble-v2.md).
 Tracker: milestone 15; #1170 (preview), #1171 (chart/import design), #1172 (account/sync/hosting design), #1174 (sounds/focused stand), #1175 (editing usability).
 
+## Account storage foundation (#1177)
+
+`lib/sync/` is the isolated account-local repository and explicit Save outbox. It is not
+connected to the preview UI or an authenticated server yet. The existing guest repository,
+starter creation, recovery keys and app bootstrap are unchanged; opening the preview does
+not create this account database. Passkeys/recovery, real transport, library downloads and
+account UI are subsequent slices of [the sync contract](../../docs/design/ensemble-v2-sync.md).
+
+The host supplies an account scope after a future authenticated transition. Saves compare local
+revisions and commit the frozen snapshot plus queue entry in one IndexedDB transaction. Each
+writer's unsaved recovery is separate. `sendNext` sends only the queue head through an injected
+transport; retries reuse exact request bytes, acknowledgements update only sync metadata, and
+conflicts preserve both versions and pause that song's queue. Multiple senders may retry the
+same frozen head, so the future server MUST enforce owner-bound idempotency and revisions.
+An account scope is routing context, not proof of authentication or protection from same-origin
+script access to browser storage. `switchAccount(null)` fences access but does not implement
+secure sign-out, remote session revocation, or private-cache deletion.
+
+Queues currently bound pending explicit Saves to 64 per song. At the limit, Save fails without
+changing the prior document or queue; the host must retain the editor/recovery and offer export.
+Completed local receipts retain only a request digest and revision, not another full chart copy.
+The foundation deliberately has no conflict-resolution, remote-import or deletion entrypoint.
+
+From the repository root, `npm run test:sync` verifies native IndexedDB behavior in Chromium
+and WebKit, including aborted transactions, competing connections, lost responses, owner
+switches, corrupted bytes and offline Save ordering. These are storage contract tests, not
+an end-to-end cloud-service or physical iPhone acceptance claim.
+
 ## Run and verify
 
 From the repository root, install the existing engine dependencies with `npm ci`, then:
