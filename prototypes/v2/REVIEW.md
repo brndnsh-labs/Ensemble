@@ -213,3 +213,32 @@ also covered. Main-thread visual inspection checked both editor and focused stan
 This is not full iReal parity: importer, measure-repeat signs, cross-section repeat bars,
 D.C./D.S./coda/Fine and the remaining notation/lane contracts are still staged work. The PR
 remains draft and test-only. Automated audio checks are not a by-ear or real-device verdict.
+
+### Startup-size delivery repair
+
+The clean repeat/ending commit exposed a pre-existing near-zero startup-size margin:
+the original-app initial graph measured 125.034 kB locally (125.002 kB in CI) against
+the unchanged 125 kB budget, despite the dirty-tree validation passing. The new form
+modules were absent from that graph; revision/chunk-name compression moved the boundary.
+
+The bounded repair loads the original app's chord picker only when opened, with pending
+Escape, outside-pointer, focus-exit and playback cancellation, a visible loading status,
+and a non-destructive download-error toast. Its existing chord/spelling implementation
+is unchanged. The canonical note-name array is now a dependency-free leaf re-exported
+by config, avoiding a transitive genre-table dependency in the deferred editor.
+The initial deferral alone grew the graph and was not accepted as a size win; the leaf
+extraction brought the measured graph below budget. This is a startup-download reduction,
+not a claim that all JavaScript or offline-cache bytes shrink. No thresholds, build-revision
+rules, musical generators, persisted data or worker contracts changed.
+
+Regression coverage includes a delayed response after dismissal, loaded selection/focus
+restoration, a failed download preserving authored chords, and an installed service worker
+opening the never-used picker after a cold offline reload. Final exact-commit size and
+gate receipts are recorded in PR #1173.
+
+Bundle review also closed two loading-boundary findings: BR1 removes pending-dismiss
+listeners synchronously before exposing the loaded picker (an immediate first-input
+regression covers the passive-effect window); BR2 replaces an inaccurate retry promise
+with reconnect/reload guidance after a browser reproduction showed a failed module fetch
+remains cached in the current page. Reload recovery preserves the chart and is tested;
+the application never reloads automatically on a failed download.

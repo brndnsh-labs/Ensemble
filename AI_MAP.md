@@ -78,6 +78,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/engine/accompaniment.ts` | Chord comping and rhythmic backing. | `getAccompanimentNotes`, `compingState` |
 | `public/engine/chords-engine.ts` | Chord parsing and harmonic analysis. | `getChordDetails` |
 | `public/engine/note-spelling.ts` | Canonical pitch-class → letter-name spelling policy (sharp/flat by key), shared by the chart render path and the chord editor. | `spellPitchClass` |
+| `public/data/note-names.ts` | Pure pitch-class name table; re-exported by config without pulling genre data into notation-only editors. | `KEY_ORDER` |
 | `public/engine/harmonies.ts` | Background pad/stab generation. | `getHarmonyNotes` |
 | `public/engine/harmony-styles.ts` | Per-genre harmony idiom profiles and section-relative pad phrase dynamics. | `HARMONY_GENRE_PROFILES`, `resolveHarmonyProfile`, `getPadPhraseGain` |
 | `public/engine/harmony-moving-voice.ts` | Chart-derived, bounded moving-voice connections for Smart Rock/Acoustic pads. | `getMovingPadVoicing` |

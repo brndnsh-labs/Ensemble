@@ -9,7 +9,7 @@
 // app's accepted default. An explicit accidental hint always wins over the key
 // context (a borrowed `bVI` stays flat even in a sharp key).
 
-import { KEY_ORDER } from '../config.js';
+import { KEY_ORDER } from '../data/note-names.js';
 
 const SHARP_NOTE_ORDER = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 

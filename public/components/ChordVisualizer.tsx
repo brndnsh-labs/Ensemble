@@ -1,3 +1,4 @@
+import type { ComponentType } from 'preact';
 import { memo } from 'preact/compat';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { replaceChordInSection } from '../controllers/arranger-controller.js';
@@ -12,8 +13,9 @@ import {
     type LeadSheetRowMeasure,
 } from '../song/lead-sheet-model.js';
 import type { Section } from '../types.js';
+import { showToast } from '../ui.js';
 import { useEnsembleState } from '../ui-bridge.js';
-import { ChordPicker } from './editor/ChordPicker.jsx';
+import type { ChordPicker } from './editor/ChordPicker.jsx';
 import { SectionHeaderStrip } from './editor/SectionHeaderStrip.jsx';
 
 /**
@@ -193,9 +195,66 @@ export function ChordVisualizer() {
         chord: LeadSheetChord;
         rect: DOMRect;
     } | null>(null);
+    const [Picker, setPicker] = useState<ComponentType<Parameters<typeof ChordPicker>[0]> | null>(
+        null,
+    );
     const handleChordPick = (chord: LeadSheetChord, rect: DOMRect) => {
         setOpenPick({ chord, rect });
     };
+
+    // **Why:** the picker is an editing-only download, not startup/audio code.
+    // Keep the chart live while loading, and cancel a pending open on dismissal
+    // so a slow response cannot reopen it or steal focus after the user moved on.
+    useEffect(() => {
+        if (!openPick) {
+            return;
+        }
+        if (isPlaying || !chartLocked) {
+            setOpenPick(null);
+            return;
+        }
+        if (Picker) {
+            return;
+        }
+        let cancelled = false;
+        const dismiss = () => setOpenPick(null);
+        const onKey = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                dismiss();
+            }
+        };
+        document.addEventListener('keydown', onKey);
+        document.addEventListener('mousedown', dismiss);
+        document.addEventListener('touchstart', dismiss);
+        document.addEventListener('focusin', dismiss);
+        const removePendingListeners = () => {
+            document.removeEventListener('keydown', onKey);
+            document.removeEventListener('mousedown', dismiss);
+            document.removeEventListener('touchstart', dismiss);
+            document.removeEventListener('focusin', dismiss);
+        };
+        void import('./editor/ChordPicker.jsx').then(
+            (module) => {
+                if (!cancelled) {
+                    // **Why:** passive cleanup runs after paint. Hand off dismissal
+                    // before mounting, or the first picker click/focus can cancel it.
+                    removePendingListeners();
+                    setPicker(() => module.ChordPicker);
+                }
+            },
+            () => {
+                if (!cancelled) {
+                    removePendingListeners();
+                    dismiss();
+                    showToast('Chord picker could not load. Reconnect, then reload to try again.');
+                }
+            },
+        );
+        return () => {
+            cancelled = true;
+            removePendingListeners();
+        };
+    }, [openPick, Picker, isPlaying, chartLocked]);
 
     const containerRef = useRef<HTMLDivElement | null>(null);
     const [viewportSize, setViewportSize] = useState(getViewportSize);
@@ -547,8 +606,13 @@ export function ChordVisualizer() {
                     );
                 })}
             </div>
-            {openPick && pickerInitial && (
-                <ChordPicker
+            {openPick && !Picker && (
+                <span role="status" class="text-mini-muted">
+                    Loading chord picker…
+                </span>
+            )}
+            {openPick && pickerInitial && Picker && (
+                <Picker
                     initialDegree={pickerInitial.degree}
                     initialAccidental={pickerInitial.accidental}
                     initialQualityId={pickerInitial.qualityId}

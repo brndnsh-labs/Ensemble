@@ -1,6 +1,6 @@
 import { createPortal } from 'preact/compat';
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
-import { KEY_ORDER } from '../../config.js';
+import { KEY_ORDER } from '../../data/note-names.js';
 import { spellPitchClass } from '../../engine/note-spelling.js';
 import type { StyleObject } from '../../ui-types.js';
 
