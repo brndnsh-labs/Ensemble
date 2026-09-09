@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { scoreDisplayIndices, scoreLeadSheet } from '../../../prototypes/v2/lib/lead-sheet.js';
 import { GENRE_FEELS } from '../../../public/data/smart-genres.js';
 import {
     registerScorePlaybackRenderer,
@@ -97,6 +98,134 @@ function musicalChord(chord: Chord) {
 }
 
 describe('semantic score playback: exact authored timing', () => {
+    it('plays alternate endings with exact offsets and written context on every visit', () => {
+        const score = scoreFixture([
+            bar('a1', 'C:2 Dm:1 G7:1', '4/4', { start: [{ kind: 'repeat-start' }] }),
+            bar('a2', 'F'),
+            bar('a3', 'I', '3/4', {
+                meter: '3/4',
+                key: 'D',
+                start: [{ kind: 'ending-start', passes: [1] }],
+                end: [{ kind: 'repeat-end', times: 2 }],
+            }),
+            bar('a4', 'I', '6/8', {
+                meter: '6/8',
+                key: 'E',
+                start: [{ kind: 'ending-start', passes: [2] }],
+                end: [{ kind: 'ending-end' }],
+            }),
+            bar('a5', 'Am', '6/8'),
+        ]);
+        const original = structuredClone(score);
+        const state = fullStateFixture(score);
+        validateProgression(state);
+        expect(state.arranger.progression.map((chord) => chord.absName)).toEqual([
+            'C',
+            'Dm',
+            'G7',
+            'F',
+            'D',
+            'C',
+            'Dm',
+            'G7',
+            'F',
+            'E',
+            'Am',
+        ]);
+        expect(offsets(state.arranger.stepMap)).toEqual([
+            [0, 8],
+            [8, 12],
+            [12, 16],
+            [16, 32],
+            [32, 44],
+            [44, 52],
+            [52, 56],
+            [56, 60],
+            [60, 76],
+            [76, 88],
+            [88, 100],
+        ]);
+        expect(state.arranger.progression.map((chord) => chord.key)).toEqual([
+            'C',
+            'C',
+            'C',
+            'C',
+            'D',
+            'C',
+            'C',
+            'C',
+            'C',
+            'E',
+            'E',
+        ]);
+        expect(state.arranger.measureMap.map((measure) => measure.ts)).toEqual([
+            '4/4',
+            '4/4',
+            '3/4',
+            '4/4',
+            '4/4',
+            '6/8',
+            '6/8',
+        ]);
+        expect(state.arranger.totalSteps).toBe(100);
+        const blocks = scoreLeadSheet(state.arranger, score);
+        expect(blocks[0].measures.map((measure) => measure.chords[0].measureId)).toEqual([
+            'a1',
+            'a2',
+            'a3',
+            'a4',
+            'a5',
+        ]);
+        expect(scoreDisplayIndices(state.arranger)).toEqual([0, 1, 2, 3, 4, 0, 1, 2, 3, 9, 10]);
+        const clone = cloneStateForDetachedGeneration(state);
+        validateProgression(clone);
+        expect(clone.arranger.stepMap).toEqual(state.arranger.stepMap);
+        expect(buildArrangerSyncPayload(state.arranger).measureMap).toEqual(
+            state.arranger.measureMap,
+        );
+        expect(score).toEqual(original);
+    });
+
+    it('keeps non-monotonic ending pass sets in written order, including a repeated one-bar section', () => {
+        const score = scoreFixture([
+            bar('a1', 'C', '4/4', { start: [{ kind: 'repeat-start' }] }),
+            bar('a2', 'F', '4/4', {
+                start: [{ kind: 'ending-start', passes: [2] }],
+                end: [{ kind: 'repeat-end', times: 2 }],
+            }),
+            bar('a3', 'G', '4/4', {
+                start: [{ kind: 'ending-start', passes: [1] }],
+                end: [{ kind: 'ending-end' }],
+            }),
+        ]);
+        score.sections.push({ id: 'b', label: 'B', repeat: 2, measures: [bar('b1', 'Am G')] });
+        const state = fullStateFixture(score);
+        validateProgression(state);
+        expect(state.arranger.progression.map((chord) => chord.absName)).toEqual([
+            'C',
+            'G',
+            'C',
+            'F',
+            'Am',
+            'G',
+            'Am',
+            'G',
+        ]);
+        const blocks = scoreLeadSheet(state.arranger, score);
+        expect(
+            blocks.map((block) => block.measures.map((measure) => measure.chords[0].measureId)),
+        ).toEqual([['a1', 'a2', 'a3'], ['b1']]);
+        expect(scoreDisplayIndices(state.arranger)).toEqual([0, 1, 0, 3, 4, 5, 4, 5]);
+        score.sections[1].seamless = true;
+        const joined = scoreLeadSheet(state.arranger, score);
+        expect(joined).toHaveLength(1);
+        expect(joined[0].measures.at(-1)).toMatchObject({
+            sectionId: 'b',
+            sectionLabel: 'B',
+            startsSection: true,
+            isSeamlessStart: true,
+        });
+    });
     it('plays 2+1+1 as three chord events at 0, 8 and 12, ending exactly at 16', () => {
         const source = scoreFixture();
         const untouched = structuredClone(source);
@@ -373,7 +502,7 @@ describe('semantic score playback: capability and atomicity boundaries', () => {
         expect(() => prepareScorePlayback(score)).toThrow(/fermata/i);
     });
 
-    it('rejects written repeats, endings and jumps without discarding their markers', () => {
+    it('rejects incomplete repeats/endings and unsupported jumps without discarding markers', () => {
         const measures = [
             bar('a1', 'C', '4/4', { start: [{ kind: 'repeat-start' }] }),
             bar('a2', 'G7', '4/4', {
@@ -387,13 +516,12 @@ describe('semantic score playback: capability and atomicity boundaries', () => {
                 ],
             }),
         ];
-        // Exercise each class independently so an early repeat-start rejection
-        // cannot mask an accidentally accepted ending or jump later in the score.
+        // Each fragment is invalid form alone; supported markers do not excuse missing pairs.
         for (const measure of measures) {
             const score = scoreFixture([measure]);
             const source = structuredClone(score);
             expect(validateSemanticScore(score).kind).toBe('ok');
-            expect(() => prepareScorePlayback(score)).toThrow(/repeats|endings|navigation/i);
+            expect(() => prepareScorePlayback(score)).toThrow(/repeat|ending|D\.C\./i);
             expect(score).toEqual(source);
         }
     });
@@ -404,7 +532,7 @@ describe('semantic score playback: capability and atomicity boundaries', () => {
             { id: 'a2', content: { kind: 'repeat', measureId: 'a1', display: 'one-bar' } },
         ]);
         expect(validateSemanticScore(score).kind).toBe('ok');
-        expect(() => prepareScorePlayback(score)).toThrow(/repeats|navigation/i);
+        expect(() => prepareScorePlayback(score)).toThrow(/measure-repeat/i);
     });
 
     it('rejects an authored meter the engine cannot play instead of using 4/4', () => {

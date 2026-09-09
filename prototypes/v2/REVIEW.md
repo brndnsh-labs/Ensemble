@@ -165,3 +165,51 @@ substitutions. The schema can represent more than this first playable editor sup
 
 - [Measure editor, laptop](evidence/semantic-editor-laptop.png)
 - [Measure editor, WebKit phone](evidence/semantic-editor-phone.png)
+
+## Repeat/ending form and compact written stand (part of #1171)
+
+The next approved checkpoint adds nested repeat barlines and alternate ending passes within
+self-contained sections. A bounded syntax tree unfolds into source-indexed visits; written
+context is resolved before traversal, and exact duration maps still drive the existing worker
+and detached renderer. No new document version, worker payload field, generator or audio-graph
+change was needed. Unknown navigation and malformed/crossing form fail before adoption.
+
+The music stand displays each written measure once, including whole-section repeats, and maps
+every performed event back to its written slot. Repeats and endings live in a default-closed
+bar-editor disclosure. Raw multi-bar edits remain pending until checked together; Save/export,
+transpose, Revert and offline recovery retain authored form rather than unfolded copies.
+React documentation informed raw controlled strings rather than keystroke normalization.
+
+Independent form tests and isolated controls/browser work were reviewed and re-run on the main
+thread. An inline pass plus independent form/playback and second-model UI reviews found four
+issues; all were fixed and independently closed:
+
+1. FP1 (P2): an outer first ending eagerly consumed an inner final ending's closure. Resolve
+   inside-out, then consume an optional still-unclaimed outer closure.
+2. FP2 (P2): an ending could close inside a nested repeated passage while the compiler silently
+   extended it. Claim only complete-child boundaries and exhaustively reject unclaimed markers.
+3. FP3 (P2): a nested repeat's co-located ending-start could be read as a peer ending. Inside
+   an open ending, the new repeat owns that start; an explicit outer closure makes it independent.
+4. F1 (P1, UI): compact seamless sections could lose their individual section repeat counts.
+   Show each joined section's own label/count at its written seam, including a single pass.
+
+All three compiler repros were red before the repair and green afterward. Independent closure
+also executed nearby crossing and explicitly independent repeat variants. Root validation
+passed with 411 files / 4,381 tests; the existing bundle limits were unchanged. The full preview
+suite passed 66 cases before review patches, then all 20 semantic-editor/form/playback cases
+passed across Chromium and WebKit after the patches (including two new seam-count cases).
+Final exact-head CI and test-deployment receipts belong in PR #1173, not this historical count.
+
+Browser observations cover the actual module worker, exact maps, repeated chart highlighting
+and nonzero audio over two complete form laps. Multi-bar draft failures, hidden-editor Save,
+exported source identities, transposition, rejected imports, Revert and offline reopening are
+also covered. Main-thread visual inspection checked both editor and focused stand captures:
+
+- [Repeat/ending stand, laptop](evidence/repeat-stand-laptop.png)
+- [Repeat/ending stand, WebKit phone](evidence/repeat-stand-phone.png)
+- [Form controls, laptop](evidence/form-editor-laptop.png)
+- [Form controls, WebKit phone](evidence/form-editor-phone.png)
+
+This is not full iReal parity: importer, measure-repeat signs, cross-section repeat bars,
+D.C./D.S./coda/Fine and the remaining notation/lane contracts are still staged work. The PR
+remains draft and test-only. Automated audio checks are not a by-ear or real-device verdict.

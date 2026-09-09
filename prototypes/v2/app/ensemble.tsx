@@ -10,7 +10,7 @@ import type { InstrumentVoice } from '@engine/types';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { arrangementOf, convertedCopy } from '../lib/documents';
 import { validateEditorText } from '../lib/editor';
-import { scoreLeadSheet } from '../lib/lead-sheet';
+import { scoreDisplayIndices, scoreLeadSheet } from '../lib/lead-sheet';
 import * as repository from '../lib/repository';
 import type { ChartDocument } from '../lib/runtime';
 import * as runtime from '../lib/runtime';
@@ -593,10 +593,16 @@ export default function Ensemble() {
         }
         const a = runtime.state().arranger;
         if (current.schemaVersion === 2) {
-            return scoreLeadSheet(a);
+            return scoreLeadSheet(a, current.chart.score);
         }
         return buildLeadSheetSections(a.progression, a.sections, TIME_SIGNATURES[a.timeSignature]);
     }, [current]);
+    const displayIndices = useMemo(
+        () => (current?.schemaVersion === 2 ? scoreDisplayIndices(runtime.state().arranger) : []),
+        [current],
+    );
+    const displayActive = active === null ? null : (displayIndices[active] ?? active);
+    const activeEvent = active === null ? null : runtime.state().arranger.stepMap[active];
     const totalBars = blocks.reduce((n, b) => n + b.measures.length, 0);
     const writtenBars = useMemo(
         () =>
@@ -605,6 +611,15 @@ export default function Ensemble() {
                     ? current.chart.score.sections.flatMap((section) =>
                           section.measures.map((bar) => [bar.id, bar] as const),
                       )
+                    : [],
+            ),
+        [current],
+    );
+    const writtenSections = useMemo(
+        () =>
+            new Map(
+                current?.schemaVersion === 2
+                    ? current.chart.score.sections.map((section) => [section.id, section] as const)
                     : [],
             ),
         [current],
@@ -1238,6 +1253,19 @@ export default function Ensemble() {
                                                     (s) => s.id === block.id,
                                                 )?.key || arrangementOf(current).key}
                                             </span>
+                                            {current.schemaVersion === 2 &&
+                                                (current.chart.score.sections.find(
+                                                    (s) => s.id === block.id,
+                                                )?.repeat ?? 1) > 1 && (
+                                                    <span className="section-repeat">
+                                                        Section ×
+                                                        {
+                                                            current.chart.score.sections.find(
+                                                                (s) => s.id === block.id,
+                                                            )?.repeat
+                                                        }
+                                                    </span>
+                                                )}
                                             {editing && (
                                                 <button
                                                     className="section-edit"
@@ -1259,21 +1287,85 @@ export default function Ensemble() {
                                         <div className="bars">
                                             {block.measures.map((measure, i) => {
                                                 barNumber++;
-                                                const notes =
-                                                    writtenBars.get(
-                                                        measure.chords[0]?.measureId ?? '',
-                                                    )?.annotations ?? [];
+                                                const writtenBar = writtenBars.get(
+                                                    measure.chords[0]?.measureId ?? '',
+                                                );
+                                                const notes = writtenBar?.annotations ?? [];
+                                                const owningSection = writtenSections.get(
+                                                    measure.sectionId ?? '',
+                                                );
+                                                const sectionSeam =
+                                                    measure.isSeamlessStart &&
+                                                    measure.sectionId !== block.id;
+                                                const repeatStart = writtenBar?.start?.some(
+                                                    (mark) => mark.kind === 'repeat-start',
+                                                );
+                                                const repeatEnd = writtenBar?.end?.find(
+                                                    (mark) => mark.kind === 'repeat-end',
+                                                );
+                                                const endingStart = writtenBar?.start?.find(
+                                                    (mark) => mark.kind === 'ending-start',
+                                                );
+                                                const endingEnd = writtenBar?.end?.some(
+                                                    (mark) => mark.kind === 'ending-end',
+                                                );
+                                                const endingEndBefore = writtenBar?.start?.some(
+                                                    (mark) => mark.kind === 'ending-end',
+                                                );
                                                 return (
                                                     <div
-                                                        className={`bar ${measure.chords.some((c) => c.globalIndex === active) ? 'active' : ''} ${i === block.measures.length - 1 ? 'end' : ''}`}
+                                                        className={`bar ${measure.chords.some((c) => c.globalIndex === displayActive) ? 'active' : ''} ${i === block.measures.length - 1 ? 'end' : ''} ${repeatStart ? 'repeat-start' : ''} ${repeatEnd ? 'repeat-end' : ''} ${endingStart ? 'ending-start' : ''} ${endingEnd ? 'ending-end' : ''}`}
+                                                        data-measure-id={writtenBar?.id}
                                                         data-active={measure.chords.some(
-                                                            (c) => c.globalIndex === active,
+                                                            (c) => c.globalIndex === displayActive,
                                                         )}
                                                         key={measure.chords[0]?.globalIndex}
                                                     >
                                                         <span className="bar-number">
                                                             {barNumber}
                                                         </span>
+                                                        {endingStart && (
+                                                            <span
+                                                                className="ending-label"
+                                                                aria-label={`Ending passes ${endingStart.passes.join(', ')}`}
+                                                                title={`Ending passes ${endingStart.passes.join(', ')}`}
+                                                            >
+                                                                {endingStart.passes.join(', ')}.
+                                                            </span>
+                                                        )}
+                                                        {endingEnd && !endingStart && (
+                                                            <span
+                                                                className="ending-close"
+                                                                aria-label="End ending after this bar"
+                                                            />
+                                                        )}
+                                                        {endingEndBefore && (
+                                                            <span
+                                                                className="ending-close ending-close-before"
+                                                                aria-label="End previous ending before this bar"
+                                                            />
+                                                        )}
+                                                        {repeatStart && (
+                                                            <span
+                                                                className="repeat-sign repeat-sign-start"
+                                                                aria-label="Start repeat"
+                                                            >
+                                                                𝄆
+                                                            </span>
+                                                        )}
+                                                        {repeatEnd && (
+                                                            <span
+                                                                className="repeat-sign repeat-sign-end"
+                                                                aria-label={`End repeat, ${repeatEnd.times} total passes`}
+                                                            >
+                                                                𝄇
+                                                                {repeatEnd.times !== 2 && (
+                                                                    <small>
+                                                                        ×{repeatEnd.times}
+                                                                    </small>
+                                                                )}
+                                                            </span>
+                                                        )}
                                                         {current.schemaVersion === 2 && editing && (
                                                             <button
                                                                 className="bar-edit"
@@ -1292,6 +1384,7 @@ export default function Ensemble() {
                                                         )}
                                                         {current.schemaVersion === 2 &&
                                                             (i === 0 ||
+                                                                sectionSeam ||
                                                                 measure.chords[0]?.key !==
                                                                     block.measures[i - 1]?.chords[0]
                                                                         ?.key ||
@@ -1302,6 +1395,22 @@ export default function Ensemble() {
                                                                     block.measures[i - 1]?.chords[0]
                                                                         ?.timeSignature) && (
                                                                 <span className="bar-context">
+                                                                    {sectionSeam &&
+                                                                        owningSection && (
+                                                                            <b
+                                                                                aria-label={`Section ${owningSection.label}, ${owningSection.repeat} total passes`}
+                                                                                title={`Section ${owningSection.label}, ${owningSection.repeat} total passes`}
+                                                                            >
+                                                                                {
+                                                                                    owningSection.label
+                                                                                }{' '}
+                                                                                · ×
+                                                                                {
+                                                                                    owningSection.repeat
+                                                                                }{' '}
+                                                                                ·{' '}
+                                                                            </b>
+                                                                        )}
                                                                     {measure.chords[0]?.key}
                                                                     {measure.chords[0]?.keyIsMinor
                                                                         ? 'm'
@@ -1331,12 +1440,22 @@ export default function Ensemble() {
                                                             <button
                                                                 className="chord chord-button"
                                                                 aria-current={
-                                                                    active === c.globalIndex
+                                                                    displayActive === c.globalIndex
                                                                         ? 'true'
                                                                         : undefined
                                                                 }
-                                                                data-start-step={c.start}
-                                                                data-end-step={c.end}
+                                                                data-start-step={
+                                                                    displayActive ===
+                                                                        c.globalIndex && activeEvent
+                                                                        ? activeEvent.start
+                                                                        : c.start
+                                                                }
+                                                                data-end-step={
+                                                                    displayActive ===
+                                                                        c.globalIndex && activeEvent
+                                                                        ? activeEvent.end
+                                                                        : c.end
+                                                                }
                                                                 style={
                                                                     current.schemaVersion === 2
                                                                         ? { flex: c.end - c.start }

@@ -7,6 +7,8 @@ import { durationToSteps, scoreDuration, scoreMeter } from '@engine/songbook/sco
 import { parseChordBar, printChordBar } from '@engine/songbook/score-text';
 import type { ScoreContext, ScoreMeasure, SemanticScore } from '@engine/songbook/score-types';
 import { type Ref, useEffect, useId, useImperativeHandle, useRef, useState } from 'react';
+import { applyMeasureForm, type FormDraft, readMeasureForm } from '../lib/form-editing';
+import { FormControls } from './form-controls';
 import './measure-editor.css';
 
 export interface MeasureEditorHandle {
@@ -29,6 +31,7 @@ interface MeasureEditorProps {
 interface BarDraft {
     text: string;
     context: ScoreContext;
+    form: FormDraft | null;
 }
 
 type EffectiveContext = ReturnType<typeof resolveScoreContext>;
@@ -91,9 +94,17 @@ function editableText(measure: ScoreMeasure, meter: string): string | null {
 }
 
 function initialDraft(entry: BarEntry): BarDraft {
+    let form: FormDraft | null = null;
+    try {
+        form = readMeasureForm(entry.measure);
+    } catch {
+        // Keep unusual but valid source boundaries intact while allowing chord edits.
+        // The compact controls cannot represent every future form without losing notation.
+    }
     return {
         text: editableText(entry.measure, entry.effective.meter) ?? '',
         context: writtenContext(entry.measure),
+        form,
     };
 }
 
@@ -216,7 +227,17 @@ export function MeasureEditor({
                             measure.id,
                         );
                     }
-                    const next = { ...measure };
+                    let next: ScoreMeasure;
+                    try {
+                        next = buffer.form
+                            ? applyMeasureForm(measure, buffer.form)
+                            : { ...measure };
+                    } catch (reason) {
+                        return fail(
+                            `${entry.label}: ${reason instanceof Error ? reason.message : 'Check the repeat and ending settings.'}`,
+                            measure.id,
+                        );
+                    }
                     delete next.key;
                     delete next.isMinor;
                     delete next.meter;
@@ -488,6 +509,18 @@ export function MeasureEditor({
                             still fit its meter before you update the chart.
                         </p>
                     </details>
+                    {draft.form ? (
+                        <FormControls
+                            value={draft.form}
+                            onChange={(form) => updateDraft({ ...draft, form })}
+                            disabled={disabled}
+                        />
+                    ) : (
+                        <p className="measure-editor-hint">
+                            This bar has repeat boundaries these compact controls cannot edit. Its
+                            notation is preserved.
+                        </p>
+                    )}
                 </>
             )}
             {error && (

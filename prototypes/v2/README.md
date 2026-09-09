@@ -90,8 +90,22 @@ Key or meter change applies from that bar through the section; it does not trans
 Global Key transposes the entire score. Add bar appends to the selected section; Add section
 starts in the global key/meter. Save includes pending measures even with the editor hidden.
 
+Under **Repeats and endings**, mark a start repeat, then enter the total passes on its ending
+bar (2 means twice). For first/second endings, put `1` in Ending passes on the first ending's
+first bar, put 2 total repeat passes on its last bar, then put `2` on the second ending's first
+bar and check End ending here on its last bar. Set all affected bars before Update chart or
+Save. Unfinished form stays in the current tab; validated updates enter the recovery path.
+The stand shows each written bar once, with repeat signs and ending labels; highlighting
+returns to that same bar on later passes. Saved/exported charts never contain unfolded copies.
+
+Repeat regions must stay inside one section for now. Nested repeats, multiple ending passes,
+and existing whole-section repeats are supported. An end repeat without a start repeats from
+the section's beginning. D.C./D.S., coda/Fine and measure-repeat signs remain follow-on work.
+The compiler rejects ambiguous/unpaired forms and bounds nesting to 16 and performed measures
+to 16,384; exact event/step limits also apply before live adoption.
+
 Validated score input compiles to exact maps used by the chart, worker and detached rendering.
-Unsupported form, N.C., holds, alternates, fermatas, off-grid lengths and unimplemented chord
+Unsupported navigation, N.C., holds, alternates, fermatas, off-grid lengths and unimplemented chord
 voicings stop with an explanation, not partial playback. Full iReal import remains next-stage work.
 Both versions use the existing explicit-save/recovery/export boundaries and work offline.
 

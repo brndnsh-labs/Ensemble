@@ -123,7 +123,7 @@ async function observePlayback(page: Page) {
         }).observe(document, {
             subtree: true,
             attributes: true,
-            attributeFilter: ['aria-current'],
+            attributeFilter: ['aria-current', 'data-start-step'],
         });
 
         // Branch an analyser from the existing final output connection. The
@@ -266,6 +266,93 @@ test('semantic timing reaches the real worker, audio output and chart for two co
     ]) {
         expect(evidence.notes.some((note) => note.step >= start && note.step < end)).toBe(true);
     }
+    expect(evidence.nonzeroAudioSamples).toBeGreaterThan(0);
+    expect(evidence.secondLapAudioSamples).toBeGreaterThan(0);
+});
+
+test('repeat visits follow the real band while the music stand keeps four written bars', async ({
+    page,
+}, info) => {
+    test.setTimeout(60_000);
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    await observePlayback(page);
+    await page.goto('/v2/');
+    await page.getByRole('button', { name: '＋ New song', exact: true }).click();
+    await page.getByLabel('Song title').fill('Two endings study');
+    await page.getByText('Repeats and endings', { exact: true }).click();
+    await page.getByLabel('Start repeat here', { exact: true }).check();
+    await page.getByRole('button', { name: 'Next bar', exact: true }).click();
+    await page.getByRole('button', { name: 'Next bar', exact: true }).click();
+    await page.getByLabel('Ending passes', { exact: true }).fill('1');
+    await page.getByLabel('Total repeat passes', { exact: true }).fill('2');
+    await page.getByRole('button', { name: 'Next bar', exact: true }).click();
+    await page.getByLabel('Ending passes', { exact: true }).fill('2');
+    await page.getByLabel('End ending here', { exact: true }).check();
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
+    await page.getByRole('button', { name: 'Chart', exact: true }).click();
+    const tempo = page.getByLabel('Tempo', { exact: true });
+    await tempo.fill('240');
+    await tempo.press('Enter');
+    await expect(tempo).toHaveValue('240');
+    await expect(page.locator('.bar')).toHaveCount(4);
+    await expect(page.locator('.chord')).toHaveText(['C', 'G', 'Am', 'F']);
+    await expect(page.getByLabel('Ending passes 1', { exact: true })).toBeVisible();
+    await expect(page.getByLabel('Ending passes 2', { exact: true })).toBeVisible();
+    const written = await page
+        .locator('.bar')
+        .evaluateAll((bars) => bars.map((bar) => bar.getAttribute('data-measure-id')));
+    await page.evaluate(() => {
+        const evidence = window.__semanticPlaybackEvidence;
+        evidence.snapshots = [];
+        evidence.highlights = [];
+        evidence.notes = [];
+        evidence.armed = true;
+    });
+    await page.getByRole('button', { name: 'Start playback', exact: true }).click();
+    await expect
+        .poll(
+            () =>
+                page.evaluate(
+                    () =>
+                        window.__semanticPlaybackEvidence.highlights.filter(
+                            (event) => event.start === 0,
+                        ).length,
+                ),
+            { timeout: 25_000 },
+        )
+        .toBeGreaterThanOrEqual(3);
+    await page.screenshot({ path: info.outputPath('repeat-stand.png') });
+    await expect(page.locator('.bar')).toHaveCount(4);
+    expect(
+        await page
+            .locator('.bar')
+            .evaluateAll((bars) => bars.map((bar) => bar.getAttribute('data-measure-id'))),
+    ).toEqual(written);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+        true,
+    );
+    await page.getByRole('button', { name: 'Stop playback', exact: true }).click();
+    const evidence = await page.evaluate(() => {
+        window.__semanticPlaybackEvidence.armed = false;
+        return window.__semanticPlaybackEvidence;
+    });
+    const names = ['C', 'G', 'Am', 'C', 'G', 'F'];
+    const lap = names.map((name, index) => ({ name, start: index * 16, end: (index + 1) * 16 }));
+    expect(evidence.highlights.slice(0, 13)).toEqual([...lap, ...lap, lap[0]]);
+    const snapshots = evidence.snapshots.filter((snapshot) => snapshot.totalSteps === 96);
+    expect(snapshots.some((snapshot) => snapshot.type === 'flush')).toBe(true);
+    for (const snapshot of snapshots) {
+        expect(snapshot.chords).toEqual(lap.map((chord) => ({ ...chord, key: 'C' })));
+        expect(snapshot.measures).toEqual(
+            lap.map(({ start, end }) => ({ start, end, ts: '4/4', grouping: [2, 2] })),
+        );
+    }
+    expect(evidence.sourceLeaks).toEqual([]);
+    expect(evidence.errors).toEqual([]);
+    expect(errors).toEqual([]);
+    expect(evidence.notes.some((note) => note.step >= 96 && note.step < 192)).toBe(true);
     expect(evidence.nonzeroAudioSamples).toBeGreaterThan(0);
     expect(evidence.secondLapAudioSamples).toBeGreaterThan(0);
 });

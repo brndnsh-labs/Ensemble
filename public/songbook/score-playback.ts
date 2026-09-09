@@ -4,12 +4,14 @@ import type { ArrangerState, Chord, EnsembleState, Section } from '../types.js';
 import { validateSemanticScore } from './score-codec.js';
 import { resolveScoreContext } from './score-context.js';
 import { durationToSteps, scoreMeter } from './score-duration.js';
+import { compileScoreForm, type ScoreFormVisit } from './score-form.js';
 import type { SemanticScore } from './score-types.js';
 
 /** A derived, bounded performance input. Never a document or persistence authority. */
 export interface ScorePlaybackPlan {
     sections: {
         section: Section;
+        visits: ScoreFormVisit[];
         measures: {
             id: string;
             key: string;
@@ -34,11 +36,13 @@ export function prepareScorePlayback(candidate: unknown): ScorePlaybackPlan {
         throw new Error('The chart is invalid; its source has not been changed.');
     }
     const score = checked.value;
+    const itinerary = compileScoreForm(score);
     let performedEvents = 0;
     let performedMeasures = 0;
     let performedSteps = 0;
     return {
-        sections: score.sections.map((written) => {
+        sections: score.sections.map((written, sectionIndex) => {
+            const visits = itinerary.filter((visit) => visit.sectionIndex === sectionIndex);
             let context = resolveScoreContext(score, written);
             const measures = written.measures.map((measure, index) => {
                 const where = `${written.label}, bar ${index + 1}`;
@@ -47,13 +51,9 @@ export function prepareScorePlayback(candidate: unknown): ScorePlaybackPlan {
                 if (!meter) {
                     throw new Error(`${where}: ${context.meter} playback is not supported yet.`);
                 }
-                if (
-                    measure.start?.length ||
-                    measure.end?.length ||
-                    measure.content.kind !== 'events'
-                ) {
+                if (measure.content.kind !== 'events') {
                     throw new Error(
-                        `${where}: repeats, endings and navigation playback are coming next. The chart is preserved.`,
+                        `${where}: measure-repeat signs cannot be played yet. The chart is preserved.`,
                     );
                 }
                 const symbols: string[] = [];
@@ -83,19 +83,6 @@ export function prepareScorePlayback(candidate: unknown): ScorePlaybackPlan {
                     symbols.push(symbol);
                     steps.push(length);
                 }
-                performedEvents += symbols.length * written.repeat;
-                performedMeasures += written.repeat;
-                performedSteps +=
-                    (durationToSteps(scoreMeter(context.meter)!.length) ?? 0) * written.repeat;
-                if (
-                    performedEvents > 65_536 ||
-                    performedMeasures > 16_384 ||
-                    performedSteps > 1_048_576
-                ) {
-                    throw new Error(
-                        'This chart expands beyond the current playback limit. Reduce section repeats.',
-                    );
-                }
                 return {
                     id: measure.id,
                     key: context.key,
@@ -106,6 +93,21 @@ export function prepareScorePlayback(candidate: unknown): ScorePlaybackPlan {
                     steps,
                 };
             });
+            for (const visit of visits) {
+                const measure = measures[visit.measureIndex];
+                performedEvents += measure.symbols.length;
+                performedMeasures++;
+                performedSteps += durationToSteps(scoreMeter(measure.meter).length)!;
+                if (
+                    performedEvents > 65_536 ||
+                    performedMeasures > 16_384 ||
+                    performedSteps > 1_048_576
+                ) {
+                    throw new Error(
+                        'This chart expands beyond the current playback limit. Reduce repeats.',
+                    );
+                }
+            }
             const { measures: _measures, meter, grouping: _grouping, ...settings } = written;
             return {
                 section: {
@@ -116,6 +118,7 @@ export function prepareScorePlayback(candidate: unknown): ScorePlaybackPlan {
                     value: measures.map((measure) => measure.symbols.join(' ')).join(' | '),
                 },
                 measures,
+                visits,
             };
         }),
     };
@@ -144,54 +147,59 @@ export function renderScorePlayback(state: EnsembleState, parse: ParseBar) {
     const sectionMap: ArrangerState['sectionMap'] = [];
     let step = 0;
     let previousMidis: number[] = [];
-    for (const { section, measures } of plan.sections) {
+    for (const { section, measures, visits } of plan.sections) {
         const sectionStart = step;
         // A detached stem render may mask lanes in its passed-state sections.
         // Voicing follows that effective bass presence, not the authored plan's copy.
         const bassActive =
             state.arranger.sections.find((entry) => entry.id === section.id)?.instruments?.bass ??
             Boolean(state.bass?.enabled);
-        for (let repeat = 0; repeat < (section.repeat ?? 1); repeat++) {
-            let localIndex = 0;
-            for (const [barIndex, bar] of measures.entries()) {
-                const start = step;
-                const parsed = parse(
-                    state,
-                    bar.symbols.join(' '),
-                    bar.key,
-                    bar.meter,
-                    previousMidis,
-                    bar.isMinor,
-                    bassActive,
-                    barIndex === 0,
-                );
-                if (parsed.chords.length !== bar.steps.length) {
-                    throw new Error('The playback adapter could not resolve every written chord.');
-                }
-                previousMidis = parsed.finalMidis;
-                parsed.chords.forEach((voicing, index) => {
-                    const end = step + bar.steps[index];
-                    const chord: Chord = {
-                        ...voicing,
-                        beats: bar.steps[index] / bar.config.stepsPerBeat,
-                        sectionId: section.id,
-                        sectionLabel: section.label,
-                        keyIsMinor: bar.isMinor,
-                        localIndex: localIndex++,
-                        repeatIndex: repeat,
-                        measureId: bar.id,
-                    };
-                    progression.push(chord);
-                    stepMap.push({ start: step, end, chord });
-                    step = end;
-                });
-                measureMap.push({
-                    start,
-                    end: step,
-                    ts: bar.meter,
-                    config: bar.config,
-                });
+        let localIndex = 0;
+        let previousSectionPass = -1;
+        for (const visit of visits) {
+            const bar = measures[visit.measureIndex];
+            const startsSection = visit.sectionPass !== previousSectionPass;
+            if (startsSection) {
+                localIndex = 0;
             }
+            previousSectionPass = visit.sectionPass;
+            const start = step;
+            const parsed = parse(
+                state,
+                bar.symbols.join(' '),
+                bar.key,
+                bar.meter,
+                previousMidis,
+                bar.isMinor,
+                bassActive,
+                startsSection,
+            );
+            if (parsed.chords.length !== bar.steps.length) {
+                throw new Error('The playback adapter could not resolve every written chord.');
+            }
+            previousMidis = parsed.finalMidis;
+            parsed.chords.forEach((voicing, index) => {
+                const end = step + bar.steps[index];
+                const chord: Chord = {
+                    ...voicing,
+                    beats: bar.steps[index] / bar.config.stepsPerBeat,
+                    sectionId: section.id,
+                    sectionLabel: section.label,
+                    keyIsMinor: bar.isMinor,
+                    localIndex: localIndex++,
+                    repeatIndex: visit.sectionPass,
+                    measureId: bar.id,
+                };
+                progression.push(chord);
+                stepMap.push({ start: step, end, chord });
+                step = end;
+            });
+            measureMap.push({
+                start,
+                end: step,
+                ts: bar.meter,
+                config: bar.config,
+            });
         }
         sectionMap.push({ id: section.id, label: section.label, start: sectionStart, end: step });
     }

@@ -1,6 +1,6 @@
 # V2 charts: explicit music, flexible page
 
-Status: **direction accepted; linear playback and measure editor implemented under #1171**, 2026-09-08.
+Status: **direction accepted; repeat/ending playback and measure editor implemented under #1171**, 2026-09-08.
 Brandon explicitly approved changing the document format and targeting full iReal chart
 compatibility, while retaining quick text entry and Ensemble's additional capabilities.
 This supersedes the earlier proposal's permanently limited compatibility boundary.
@@ -17,10 +17,12 @@ are separate from the implementation described here.
   transforms, playback and Home check every pending bar first. Failed validation retains raw
   buffers; successful adoption retires them before a subsequent transpose. Revert clears them
   explicitly. Checked edits use the same writer-scoped recovery and revision-aware saves as v1.
-- Linear sections, whole-section repeats, unequal exact-grid chord lengths, and sticky bar
+- Linear sections, whole-section repeats, nested repeat barlines and alternate endings,
+  unequal exact-grid chord lengths, and sticky bar
   key/mode/meter/grouping contexts compile to one bounded performance plan. The existing
   voicer consumes complete supported symbols without re-dividing their durations. The chart
-  reads the resulting step/measure maps directly; the worker receives those same maps, including
+  reads the resulting step/measure maps directly, placing each written bar once and mapping
+  all subsequent visits back to its written event slots; the worker receives those same maps, including
   each bar's resolved meter config. Detached renders rebuild from the same prepared input.
 - `arranger.scorePlan` is **runtime-derived**, not authored/persisted state and not a worker
   field. The preview host owns the validated authored score. V1 loads clear the plan. Only
@@ -29,7 +31,7 @@ are separate from the implementation described here.
   A host without a semantic renderer fails explicitly if handed a prepared semantic chart.
 - Playback is bounded to 65,536 events, 16,384 performed measures and 1,048,576 steps. The
   wider authored codec remains separate. Unsupported meters, off-grid divisions, qualities
-  beyond the existing voicer, measure-repeat signs, navigation/endings, N.C., holds, alternates
+  beyond the existing voicer, measure-repeat signs, D.C./D.S./coda/Fine, N.C., holds, alternates
   and fermatas fail visibly before runtime adoption. They are not stripped or played as tonic.
 - Older preview clients reject v2 records and may fail to enumerate a mixed-version library.
   Keeping a v1 source protects its data, **not** cross-version simultaneous editing. Export
@@ -151,12 +153,27 @@ identity and key context without changing duration or form. Resolve relative not
 against the owning section's key/mode. Do not run new syntax through the tolerant v1 parser.
 
 The authored form model retains section repeats, repeat barlines, ending passes, D.C./D.S.,
-coda/Fine destinations and explicit repeat-policy-after-jump. Linear playback executes
-section repeat counts; barline and navigation directions remain unavailable for playback.
-The next compiler must validate nesting, ending reachability, ambiguity
-and bounded traversal into an itinerary with source measure IDs and pass numbers. A codec
+coda/Fine destinations and explicit repeat-policy-after-jump. Playback executes section counts
+and self-contained section repeat/ending form through `compileScoreForm`. It validates nesting,
+ending reachability, ambiguity and bounded traversal into an itinerary with written
+section/measure indices and pass numbers. D.C./D.S./coda/Fine remain unavailable for playback. A codec
 success proves authored-data validity and references, not that the form can be performed.
 Never use an unfolded chord list as the only retained chart.
+
+The current form grammar pairs repeat barlines within each section (an unmatched end repeat
+starts at that section's beginning). An explicit start must close in the same section; repeated
+regions cannot cross or share an ambiguous start. Nesting is capped at 16. Ending pass sets
+must be disjoint and cover exactly the repeat's total passes, including non-monotonic sets
+such as `1,3` / `2`. The first ending closes at the repeat-end. Later consecutive endings close
+at an explicit ending-end, the next ending-start, or section end. A start-boundary ending-end
+excludes its own measure from the prior ending. Whole-section repeats replay the complete
+inner itinerary, resetting its pass counters. All source bars remain addressable on the stand.
+Cross-section repeats and jump navigation are explicit future capabilities, not discarded data.
+Inside an already open ending, a new repeat-start owns an ending-start on the same bar;
+it is a nested form, not a sibling ending of the outer repeat. Close the outer ending
+explicitly before that bar to make the next repeat independent. Inner endings claim their
+closures before an enclosing first ending's optional close; the enclosing repeat-end already
+closes that first ending. An ending closure cannot cut through an inner repeated passage.
 
 Context is deliberately explicit: each section starts from the global key/mode/meter plus
 its overrides. Within that section, measure key/mode/meter changes persist until changed
@@ -245,7 +262,8 @@ fixture for this specific export, not general import or by-ear compatibility.
 | Unequal chord durations | Native editing/playback implemented; import only for verified cell patterns | Short real exports for 2+1+1 and 1+1+2; no guessed cell rounding. |
 | Qualities and slash bass | Wider authored vocabulary; conservative existing-engine subset playable | Complete official vocabulary mapping and harmonic-identity fixtures; no partial matches. |
 | Whole-section repeats | Native playback implemented; repeat controls and import still pending | Distinguish written repeats from player chorus count; real import fixture. |
-| First/second endings, D.C./D.S., coda, Fine | Authored directions represented; form compiler pending | Bounded traversal, import mapping and auditioned fixtures. |
+| Repeat barlines and first/second endings | Native compact display, editing and bounded playback implemented within sections | Real-device audition, import mapping and cross-section forms. |
+| D.C./D.S., coda, Fine | Authored directions represented; navigation execution pending | Bounded traversal, import mapping and auditioned fixtures. |
 | N.C., holds, alternate chords, fermatas | Authored events represented; playback pending | Per-lane meaning, editing and faithful import mapping. |
 | Other rhythmic notation, rests and pushes | Inventory and represent without guessing equivalence | Current protocol/app fixtures and explicit lane semantics. |
 | Meter/key changes | Native bar editing, sticky contexts and supported-meter playback tested | Real-device and audible acceptance; source import mapping. |
