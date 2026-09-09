@@ -6,13 +6,19 @@ import {
 } from '@engine/controllers/instrument-controller';
 import { autoVoiceForGenre } from '@engine/data/genre-sound-map';
 import { GENRE_NAMES, SMART_GENRES } from '@engine/data/smart-genres';
-import { validateProgression } from '@engine/engine/chords-engine';
+import { registerScorePlaybackRenderer, validateProgression } from '@engine/engine/chords-engine';
 import { analyzeFormUI } from '@engine/engine/conductor';
 import { initAudio, playNote, restoreGains, syncBusReverbSend } from '@engine/engine/engine';
 import { scheduler } from '@engine/engine/scheduler-core';
 import { isSoloistMonophonicMode } from '@engine/engine/soloist-mode-policy';
-import { validateChartDocument } from '@engine/songbook/codec';
-import type { ChartContent, ChartDocument, ChartLaneMix } from '@engine/songbook/types';
+import { transposeChordText } from '@engine/engine/transpose';
+import {
+    prepareScorePlayback,
+    renderScorePlayback,
+    scoreArrangement,
+} from '@engine/songbook/score-playback';
+import type { SemanticScore } from '@engine/songbook/score-types';
+import type { ChartContent, ChartLaneMix } from '@engine/songbook/types';
 import { dispatch, getState, subscribe } from '@engine/state';
 import {
     deriveSoloistModeOnBoot,
@@ -25,7 +31,9 @@ import {
     type InstrumentModule,
     type InstrumentVoice,
 } from '@engine/types';
+import { transposeKeyName } from '@engine/utils';
 import { initWorker, syncWorker } from '@engine/worker-client';
+import { type ChartDocument, type DocumentContent, validateDocument } from './documents';
 import { initializeSounds, prepareSound, prepareSounds, validateVoice } from './sounds';
 
 export type { ChartContent, ChartDocument };
@@ -34,6 +42,8 @@ export { GENRE_NAMES };
 let boot: Promise<void> | undefined;
 let loading = false;
 let playIntent = 0;
+// Authored source belongs to the host document, never to generated runtime state.
+let currentScore: SemanticScore | null = null;
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
 const param = (module: string, name: string, value: unknown) =>
     dispatch(ACTIONS.SET_PARAM, { module, param: name, value });
@@ -124,6 +134,17 @@ function rebuild(): void {
     }
 }
 
+function captureSessionContent(): DocumentContent {
+    const content = captureContent();
+    return currentScore
+        ? { score: clone(currentScore), performance: content.performance, band: content.band }
+        : content;
+}
+
+export function captureDocument(document: ChartDocument): ChartDocument {
+    return validateDocument({ ...document, chart: captureSessionContent() });
+}
+
 /** Uses the same buffer ownership and monophonic guard as the current page bootstrap. */
 function receiveNotes(notes: unknown[], resolution: true | undefined): void {
     const state = getState();
@@ -172,6 +193,7 @@ function receiveNotes(notes: unknown[], resolution: true | undefined): void {
 /** One runtime per browser page, independent of React mount/unmount and route views. */
 export function initialize(): Promise<void> {
     if (!boot) {
+        registerScorePlaybackRenderer(renderScorePlayback);
         boot = (async () => {
             initializeSounds();
             initWorker(
@@ -279,8 +301,14 @@ export async function applyGenreSounds(progress: (text: string) => void): Promis
     rebuild();
 }
 
-function apply(content: ChartContent): void {
-    for (const [key, value] of Object.entries(content.arrangement)) {
+function apply(content: DocumentContent): void {
+    const score = 'score' in content ? clone(content.score) : null;
+    const plan = score ? prepareScorePlayback(score) : null;
+    const arrangement =
+        score && plan ? scoreArrangement(score, plan) : (content as ChartContent).arrangement;
+    param('arranger', 'scorePlan', plan);
+    currentScore = score;
+    for (const [key, value] of Object.entries(arrangement)) {
         param('arranger', key, value);
     }
     param('arranger', 'seed', content.performance.seed);
@@ -314,15 +342,15 @@ function apply(content: ChartContent): void {
 }
 
 export function load(document: ChartDocument): void {
-    const result = validateChartDocument(document);
-    if (result.kind !== 'ok') {
-        throw new Error('This chart document is invalid or from an unsupported version.');
+    const checked = validateDocument(document);
+    if (checked.schemaVersion === 2) {
+        prepareScorePlayback(checked.chart.score);
     }
     stop();
-    const previous = captureContent();
+    const previous = captureSessionContent();
     loading = true;
     try {
-        apply(result.value.chart);
+        apply(checked.chart);
         rebuild();
     } catch (error) {
         apply(previous);
@@ -341,7 +369,7 @@ export async function setGenre(
         throw new Error('Unknown genre.');
     }
     const wasPlaying = getState().playback.isPlaying;
-    const previous = captureContent();
+    const previous = captureSessionContent();
     stop();
     const intent = playIntent;
     try {
@@ -397,10 +425,62 @@ export function setEnabled(module: InstrumentModule, enabled: boolean): void {
     }
 }
 export function transpose(delta: number): void {
+    if (currentScore) {
+        const score = clone(currentScore);
+        score.key = transposeKeyName(score.key, delta);
+        for (const section of score.sections) {
+            if (section.key) {
+                section.key = transposeKeyName(section.key, delta);
+            }
+            for (const measure of section.measures) {
+                if (measure.key) {
+                    measure.key = transposeKeyName(measure.key, delta);
+                }
+                if (measure.content.kind === 'events') {
+                    for (const event of measure.content.events) {
+                        if (event.kind === 'chord') {
+                            event.symbol = transposeChordText(event.symbol, delta);
+                            if (event.alternates) {
+                                event.alternates = event.alternates.map((symbol) =>
+                                    transposeChordText(symbol, delta),
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        const wasPlaying = getState().playback.isPlaying;
+        editScore(score);
+        if (wasPlaying) {
+            dispatch(ACTIONS.TOGGLE_PLAY);
+        }
+        return;
+    }
     transposeKey(delta);
 }
+export function editScore(score: SemanticScore): void {
+    prepareScorePlayback(score);
+    const before = captureSessionContent();
+    stop();
+    loading = true;
+    try {
+        const { performance, band } = before;
+        apply({ score, performance, band });
+        rebuild();
+    } catch (error) {
+        apply(before);
+        rebuild();
+        throw error;
+    } finally {
+        loading = false;
+    }
+}
 export function editSections(sections: ChartContent['arrangement']['sections']): void {
-    const before = captureContent();
+    if (currentScore) {
+        throw new Error('Use the measure editor for this chart.');
+    }
+    const before = captureSessionContent();
     stop();
     loading = true;
     try {

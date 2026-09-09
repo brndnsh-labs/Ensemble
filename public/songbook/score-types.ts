@@ -77,7 +77,7 @@ export interface SemanticScore {
     sections: ScoreSection[];
 }
 
-/** Additive codec only: existing v1 readers/writers and browser records remain unchanged. */
+/** Semantic document; the isolated preview reads both versions. V1 sources are never rewritten. */
 export interface ChartDocumentV2 extends Omit<ChartDocument, 'schemaVersion' | 'chart'> {
     schemaVersion: 2;
     chart: {

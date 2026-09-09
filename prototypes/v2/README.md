@@ -39,7 +39,7 @@ local browser projects and never deploys.
 - The preview bundles original TypeScript through `@engine`. A narrow type-only compatibility
   declaration preserves the non-proxied `lastActiveDrumElements` DOM field when React ambient
   types are loaded. Other deepsignal declarations and readonly state fields are unchanged.
-  The unmodified engine's own typecheck also runs before every preview build.
+  The original app's engine typecheck also runs before every preview build.
 - Persistence calls are compile-time redirected to a no-op. Neither `ensemble_currentState`
   nor `ensemble_userPresets` is migrated or overwritten. Playwright pins a legacy sentinel.
 - IndexedDB `ensemble-v2-preview` holds explicit saves with atomic revision comparison. Local
@@ -64,8 +64,8 @@ local browser projects and never deploys.
   App readiness and the current song's sound readiness are separate indicators. This is not
   whole-library/cloud sync. Bulk installation verifies and decodes the complete catalog before
   applying voices; a failed install keeps the previous setup and reuses completed files on retry.
-  `.ensemble`/JSON export/import preserves manual and Follow feel choices; iReal import does not.
-- Accounts, cloud/outbox, sharing, admin, richer chart semantics, chord discovery,
+  `.ensemble`/JSON export/import preserves manual and Follow feel choices; iReal import is not implemented yet.
+- Accounts, cloud/outbox, sharing, admin, full form execution/import, chord discovery,
   full settings inventory, section-practice controls and visualizer are later work. Genre
   changes briefly stop/restart playback in this checkpoint, without expanding the focused chart.
   A failed change restores the previous setup and resumes only if its sounds are still verified;
@@ -77,7 +77,29 @@ local browser projects and never deploys.
   Playback highlights use the existing scheduler's lookahead (not a new musical clock); manual
   wheel/touch/keyboard browsing suspends following until explicitly resumed.
 
-## Editing and returning to practice (#1175)
+## Measure-based charts (#1171)
+
+New song uses document v2: sections, stable measure identities and exact chord durations.
+Existing songs/starters keep their legacy editor. In Edit chart, **Try the bar editor · keep
+original** creates a separate editable copy; it never replaces the old record. Charts whose
+legacy meaning/timing cannot be converted exactly stay in the original editor with an explanation.
+
+Select a bar, type chords and optionally choose each chord's length. For example, `C Dm G7`
+in 4/4 needs an explicit timing choice: choose lengths 2, 1, 1 or type `C:2 Dm:1 G7:1`.
+Key or meter change applies from that bar through the section; it does not transpose chord names.
+Global Key transposes the entire score. Add bar appends to the selected section; Add section
+starts in the global key/meter. Save includes pending measures even with the editor hidden.
+
+Validated score input compiles to exact maps used by the chart, worker and detached rendering.
+Unsupported form, N.C., holds, alternates, fermatas, off-grid lengths and unimplemented chord
+voicings stop with an explanation, not partial playback. Full iReal import remains next-stage work.
+Both versions use the existing explicit-save/recovery/export boundaries and work offline.
+
+Do not downgrade this browser's mixed-version songbook to an older preview: those clients reject
+v2 documents and may fail to list the library. Original v1 data is retained, but old-client
+coexistence/production migration has not shipped. Prefer a corrective release and export first.
+
+## Legacy editing and returning to practice (#1175)
 
 - Save, Save a copy and export include all currently typed section text. Update chart is an
   optional playable preview, not a prerequisite for saving. Raw buffers survive section/view

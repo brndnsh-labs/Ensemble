@@ -144,6 +144,8 @@ export interface FormattedChordNames {
  * placed in the arrangement.
  */
 export interface Chord {
+    /** Written measure identity, present for semantic-score playback. */
+    measureId?: string;
     // --- Display ---
     romanName: string;
     absName: string;
@@ -240,6 +242,8 @@ export interface Section {
 export type SectionInstrumentKey = 'groove' | 'bass' | 'chords' | 'harmony' | 'soloist';
 
 export interface ArrangerState {
+    /** Derived semantic performance input; main-thread rebuild only, never persisted/synced. */
+    readonly scorePlan?: import('./songbook/score-playback.js').ScorePlaybackPlan | null;
     /** List of song sections. */
     readonly sections: Section[];
     /** Flattened list of parsed chord objects. */
@@ -259,7 +263,12 @@ export interface ArrangerState {
     /** Map of steps to chord objects. */
     readonly stepMap: Array<{ start: number; end: number; chord: Chord }>;
     /** Map of measures to time signatures. */
-    readonly measureMap: Array<{ start: number; end: number; ts: string }>;
+    readonly measureMap: Array<{
+        start: number;
+        end: number;
+        ts: string;
+        config?: import('./config.js').TimeSignatureConfig;
+    }>;
     /** Map of sections to step ranges. */
     readonly sectionMap: Array<{ id: string; start: number; end: number; label: string }>;
     /** Undo history stack (JSON strings). */

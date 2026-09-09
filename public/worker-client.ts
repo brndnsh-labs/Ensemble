@@ -124,6 +124,9 @@ export function startExport(options: WorkerExportOptions): Promise<void> {
     return new Promise((resolve, reject) => {
         try {
             const state = cloneStateForDetachedGeneration(getState());
+            // Local WAV renders rebuild voicings, but the MIDI realm uses compiled
+            // maps only. Keep the semantic rebuild plan out of its wire payload.
+            const { scorePlan: _scorePlan, ...arranger } = state.arranger;
             const worker = new Worker(new URL('./midi-export-worker.ts', import.meta.url), {
                 type: 'module',
             });
@@ -178,7 +181,7 @@ export function startExport(options: WorkerExportOptions): Promise<void> {
 
             const request: MidiExportRequest = {
                 type: MIDI_EXPORT_MSG.START,
-                data: { state, options: { ...options } },
+                data: { state: { ...state, arranger }, options: { ...options } },
             };
             worker.postMessage(request);
         } catch (error) {

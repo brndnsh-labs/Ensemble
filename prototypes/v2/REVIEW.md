@@ -128,3 +128,40 @@ Captured from the final tested interface:
 
 - [Laptop editor](evidence/editor-laptop.png)
 - [Portrait-phone editor, WebKit](evidence/editor-phone.png)
+
+## Playable semantic charts (part of #1171)
+
+The user approved an additive measure-based document and this bounded playable/editor slice.
+New songs use schema 2; existing songs and starters remain schema 1 unless the user explicitly
+creates an editable copy with a fresh ID. No original record is rewritten. Production adoption,
+old/new-client coexistence, full form execution and iReal import are still separate work.
+
+An inline correctness/trust-boundary pass and independent music/state/worker plus document/UI
+reviews covered exact timing, sticky context, legacy musical parity, bounded preparation,
+detached renders, version-aware persistence, recovery, pending buffers and failed imports.
+Three P2 findings were fixed and independently confirmed closed:
+
+1. F1: a mode-only key change did not earn a bar-context marker. Compare mode as well as tonic
+   and meter; the browser regression checks the marker and the saved IndexedDB document.
+2. F2: detached chord-only stems read the prepared plan's authored bass override instead of
+   the render's effective section mask. Read the passed-state override; a production-clone
+   regression verifies root inclusion, legacy equivalence and unchanged source/live state.
+3. F3: the dedicated MIDI worker received an unused semantic rebuild plan. Exclude it at
+   `startExport`'s wire seam and assert against the actual posted request. Local WAV clones
+   retain the plan; both workers still receive the existing exact performance maps.
+
+The optional renderer is registered by the v2 host. Original-app startup does not import the
+semantic renderer/codec; no size limit was raised. Tests compare valid on-grid voicings across
+all 13 genres, observe exact 2+1+1 offsets and effective meter/grouping, and instrument actual
+worker messages, chord highlighting and nonzero audio output across two complete chart laps.
+Browser checks include source-preserving conversion, pending multiple bars, hidden-editor Save,
+transposition, Revert, offline reload/playback, revision conflicts, recovery and unsupported-import
+atomicity. Exact final gate/deployed-revision results are recorded in PR #1173.
+
+Laptop and WebKit phone editor captures were inspected on the main thread. Automated evidence
+does not constitute musical or actual-device acceptance. N.C., holds, alternates, navigation,
+unsupported meters/qualities and off-grid timing remain explicit playback errors, not silent
+substitutions. The schema can represent more than this first playable editor supports.
+
+- [Measure editor, laptop](evidence/semantic-editor-laptop.png)
+- [Measure editor, WebKit phone](evidence/semantic-editor-phone.png)

@@ -110,7 +110,7 @@ export async function prepareSound(id: string, progress: (text: string) => void)
 }
 
 export async function prepareSounds(
-    chart: ChartContent,
+    chart: Pick<ChartContent, 'band'>,
     progress: (text: string) => void,
 ): Promise<void> {
     const ids = new Set(
@@ -144,7 +144,7 @@ export async function allSoundsAvailableOffline(): Promise<boolean> {
     }
 }
 
-export async function soundsAvailableOffline(chart: ChartContent): Promise<boolean> {
+export async function soundsAvailableOffline(chart: Pick<ChartContent, 'band'>): Promise<boolean> {
     try {
         for (const lane of Object.values(chart.band)) {
             const id = packIdFromVoice(lane.voice);

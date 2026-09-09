@@ -1,14 +1,44 @@
 # V2 charts: explicit music, flexible page
 
-Status: **direction accepted; first codec foundation implemented under #1171**, 2026-09-08.
+Status: **direction accepted; linear playback and measure editor implemented under #1171**, 2026-09-08.
 Brandon explicitly approved changing the document format and targeting full iReal chart
 compatibility, while retaining quick text entry and Ensemble's additional capabilities.
 This supersedes the earlier proposal's permanently limited compatibility boundary.
-There is no implemented importer or live migration yet. The current preview remains v1.
+There is no implemented iReal importer or in-place migration yet. The isolated preview can
+read both document versions; production remains unchanged. Test deployment and human audition
+are separate from the implementation described here.
+
+## Current playable checkpoint
+
+- New songs use semantic documents. Existing songs and starter presets retain their v1
+  reader/editor. **Try the bar editor · keep original** explicitly creates a new-ID copy;
+  it never rewrites the original record, and incompatible legacy bars block conversion.
+- The measure editor accepts chord text and optional length pickers. Save, export, key/feel
+  transforms, playback and Home check every pending bar first. Failed validation retains raw
+  buffers; successful adoption retires them before a subsequent transpose. Revert clears them
+  explicitly. Checked edits use the same writer-scoped recovery and revision-aware saves as v1.
+- Linear sections, whole-section repeats, unequal exact-grid chord lengths, and sticky bar
+  key/mode/meter/grouping contexts compile to one bounded performance plan. The existing
+  voicer consumes complete supported symbols without re-dividing their durations. The chart
+  reads the resulting step/measure maps directly; the worker receives those same maps, including
+  each bar's resolved meter config. Detached renders rebuild from the same prepared input.
+- `arranger.scorePlan` is **runtime-derived**, not authored/persisted state and not a worker
+  field. The preview host owns the validated authored score. V1 loads clear the plan. Only
+  derived progression/maps cross the ordinary full snapshot; sync precedes buffer flush.
+  The host registers its renderer at boot; v1 startup does not import that implementation.
+  A host without a semantic renderer fails explicitly if handed a prepared semantic chart.
+- Playback is bounded to 65,536 events, 16,384 performed measures and 1,048,576 steps. The
+  wider authored codec remains separate. Unsupported meters, off-grid divisions, qualities
+  beyond the existing voicer, measure-repeat signs, navigation/endings, N.C., holds, alternates
+  and fermatas fail visibly before runtime adoption. They are not stripped or played as tonic.
+- Older preview clients reject v2 records and may fail to enumerate a mixed-version library.
+  Keeping a v1 source protects its data, **not** cross-version simultaneous editing. Export
+  valuable work and prefer a corrective preview release; production migration/coexistence
+  remains a separate stage.
 
 ## Recommended next build
 
-Build the semantic chart and exact-timing foundation, a measure-aware editor, then faithful
+With the exact-timing foundation and first measure-aware editor implemented, build faithful
 iReal import and form playback in verifiable slices. Keep quick text entry and the
 music-stand appearance. Full chart compatibility is the destination, not a claim about the
 first slice. Accounts and cross-device songbooks (#1172) need not wait for every symbol.
@@ -20,7 +50,8 @@ and Save. The chart stays visible. A musician who likes typing can keep using te
 
 ### Entry examples
 
-These inputs are supported by the new bar parser, **not yet by the current preview**.
+These inputs are supported by the authored bar parser. The linear preview plays the first
+six examples; alternates, holds and N.C. remain representation-only pending lane/form work.
 
 | Meter | Text | Meaning |
 | --- | --- | --- |
@@ -48,7 +79,7 @@ example, `C Dm G7` in 4/4 offers 2+1+1, 1+2+1 and 1+1+2, with no default silentl
 The authored score remains representable even when the engine cannot yet play it. This
 playback restriction must not retroactively invalidate untouched legacy songs.
 
-### Small editor, not a notation workstation
+### Editor direction (some controls remain follow-on work)
 
 - Keep Edit chart as the explicit entry point; playback is still a music stand.
 - Within editing, selecting a measure opens its chords and a meter-labelled count strip.
@@ -62,7 +93,7 @@ playback restriction must not retroactively invalidate untouched legacy songs.
 - Section names, repeat counts and key/meter overrides get one section settings surface.
   Preserve the reserved conductor gestures; do not overload playback section taps.
 
-## Current-code evidence
+## Legacy-code evidence (unchanged v1 path)
 
 `ChartSection.value` in `public/songbook/types.ts` is authored text. Its codec allows
 1,000 characters per section, 500 sections, and repeat counts from 1 to 64. There is no
@@ -84,7 +115,8 @@ A local diagnostic invoking the real `validateProgression` on a detached state r
 The middle row is an existing timing defect, **not desired behavior to pin as correct**.
 The last row is not a proposed workaround: duplicating a token introduces extra chord
 events and can change generation. A migration must not silently reinterpret the middle
-row as 2+1+1 or claim a lossless conversion. This codec foundation does not fix the engine defect.
+row as 2+1+1 or claim a lossless conversion. The v1 path remains unchanged; the new exact-duration
+path avoids this defect without silently reinterpreting a saved legacy chart.
 
 ## Accepted semantic boundary and first implementation
 
@@ -93,9 +125,11 @@ measures contain ordered chord events and exact durations. Page geometry, line b
 generated voicings, playback cursors and unfolded repeats are derived, not musical authority.
 
 The additive `ChartDocumentV2` codec retains the document envelope, performance and band
-settings, replacing `chart.arrangement` with `chart.score`. Existing readers still use v1;
-they reject v2 as a future version. No browser record, share schema, engine state or worker
-contract changes in this first slice. The new types live in `public/songbook/score-types.ts`.
+settings, replacing `chart.arrangement` with `chart.score`. The isolated preview now reads
+both versions; older readers reject v2 as a future version. The earlier codec-only checkpoint
+changed no browser records or runtime contracts. The playable checkpoint adds the derived
+adapter described above, without rewriting existing records or changing share payloads.
+The new types live in `public/songbook/score-types.ts`.
 
 ```text
 section: identity, label, key/mode and meter overrides, repeat count, measures
@@ -116,9 +150,10 @@ whole chord token, including bass and quality, before voicing. Transposition cha
 identity and key context without changing duration or form. Resolve relative notation
 against the owning section's key/mode. Do not run new syntax through the tolerant v1 parser.
 
-The first authored form model already retains section repeats, repeat barlines, ending
-passes, D.C./D.S., coda/Fine destinations and explicit repeat-policy-after-jump. It does not
-yet execute them. The next compiler must validate nesting, ending reachability, ambiguity
+The authored form model retains section repeats, repeat barlines, ending passes, D.C./D.S.,
+coda/Fine destinations and explicit repeat-policy-after-jump. Linear playback executes
+section repeat counts; barline and navigation directions remain unavailable for playback.
+The next compiler must validate nesting, ending reachability, ambiguity
 and bounded traversal into an itinerary with source measure IDs and pass numbers. A codec
 success proves authored-data validity and references, not that the form can be performed.
 Never use an unfolded chord list as the only retained chart.
@@ -200,20 +235,20 @@ The decoded body and hand-reviewed bar expectation are in
 [`fixtures/ensemble-v2-charts.json`](fixtures/ensemble-v2-charts.json). They establish a
 fixture for this specific export, not general import or by-ear compatibility.
 
-### Compatibility ledger (all rows remain targets)
+### Compatibility ledger (import remains a target)
 
-| Feature | First-slice state / next work | Proof still required |
+| Feature | Current preview / next work | Proof still required |
 | --- | --- | --- |
 | Single-song modern export, simple 4/4 | Target | Actual importer against the supplied fixture; key/tempo interpretation. |
 | Generated open-protocol link | Target, separate decoder | Synthetic protocol fixtures and current-app round trip. |
 | Whole-bar chords and previous-measure repeat | Target; retain source provenance | Correct source references and playback event equivalence. |
-| Unequal chord durations | Target only for verified cell patterns | Short real exports for 2+1+1 and 1+1+2; no guessed cell rounding. |
-| Qualities and slash bass | Whole-token spelling vocabulary in new codec; voicing adapter pending | Complete official vocabulary mapping and harmonic-identity fixtures; no partial matches. |
-| Whole-section repeats | Target after a real fixture | Distinguish written repeats from player chorus count. |
+| Unequal chord durations | Native editing/playback implemented; import only for verified cell patterns | Short real exports for 2+1+1 and 1+1+2; no guessed cell rounding. |
+| Qualities and slash bass | Wider authored vocabulary; conservative existing-engine subset playable | Complete official vocabulary mapping and harmonic-identity fixtures; no partial matches. |
+| Whole-section repeats | Native playback implemented; repeat controls and import still pending | Distinguish written repeats from player chorus count; real import fixture. |
 | First/second endings, D.C./D.S., coda, Fine | Authored directions represented; form compiler pending | Bounded traversal, import mapping and auditioned fixtures. |
 | N.C., holds, alternate chords, fermatas | Authored events represented; playback pending | Per-lane meaning, editing and faithful import mapping. |
 | Other rhythmic notation, rests and pushes | Inventory and represent without guessing equivalence | Current protocol/app fixtures and explicit lane semantics. |
-| Meter/key changes | Authored contexts represented; adapter pending | Boundary-position and inheritance fixtures; exact engine-supported meters. |
+| Meter/key changes | Native bar editing, sticky contexts and supported-meter playback tested | Real-device and audible acceptance; source import mapping. |
 | Unsupported meters or off-grid timing | Block, explain location | Never substitute 4/4 or round durations. |
 | Long charts | No fixed page limit | Synthetic 64/128-bar layouts and explicit input/expansion bounds. |
 | Playlist HTML | Import-surface follow-up | Per-song selection/diagnostics; no silent first-song-only import. |
@@ -269,9 +304,9 @@ following; Resume following is explicit. Repeated passes retain a stable source 
 Delivery slices after the accepted format decision:
 
 1. Exact-duration semantic codec + conservative source-preserving conversion proposals
-   (this slice); no migration writes or audio-equivalence claim yet.
+   (implemented foundation); no automatic migration or audible-equivalence claim.
 2. Shared map/engine adapter + measure editing, with Save/recovery/transpose and actual-audio
-   tests; separate worker-contract review and test-server audition.
+   tests (current playable checkpoint); separate worker-contract review and test-server audition.
 3. Form compiler and full iReal chart import in fixture-backed stages, source retention
    and negative tests; no permanent notation/form exclusions.
 4. Source-preserving migration and old/new-client coexistence, before production adoption.

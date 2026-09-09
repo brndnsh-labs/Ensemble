@@ -1,6 +1,5 @@
-import { validateChartDocument } from '@engine/songbook/codec';
-import type { ChartDocument } from '@engine/songbook/types';
 import type { InstrumentModule } from '@engine/types';
+import { type ChartDocument, validateDocument } from './documents';
 import { validateVoice } from './sounds';
 
 const DATABASE = 'ensemble-v2-preview';
@@ -20,18 +19,11 @@ export class ConflictError extends Error {
 }
 
 export function validated(candidate: unknown): ChartDocument {
-    const result = validateChartDocument(candidate);
-    if (result.kind !== 'ok') {
-        const reason =
-            result.kind === 'future-version'
-                ? 'a newer document version'
-                : result.issues.map((i) => `${i.path}: ${i.message}`).join('; ');
-        throw new Error(`Cannot open this chart: ${reason}. The source has not been changed.`);
-    }
-    for (const [module, lane] of Object.entries(result.value.chart.band)) {
+    const document = validateDocument(candidate);
+    for (const [module, lane] of Object.entries(document.chart.band)) {
         validateVoice(module as InstrumentModule, lane.voice);
     }
-    return result.value;
+    return document;
 }
 
 function open(): Promise<IDBDatabase> {

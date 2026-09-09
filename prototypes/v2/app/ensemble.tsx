@@ -2,9 +2,15 @@
 
 import { KEY_ORDER, TIME_SIGNATURES } from '@engine/config';
 import { buildLeadSheetSections } from '@engine/song/lead-sheet-model';
+import { resolveScoreContext } from '@engine/songbook/score-context';
+import { scoreMeter } from '@engine/songbook/score-duration';
+import { prepareScorePlayback } from '@engine/songbook/score-playback';
+import type { SemanticScore } from '@engine/songbook/score-types';
 import type { InstrumentVoice } from '@engine/types';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { arrangementOf, convertedCopy } from '../lib/documents';
 import { validateEditorText } from '../lib/editor';
+import { scoreLeadSheet } from '../lib/lead-sheet';
 import * as repository from '../lib/repository';
 import type { ChartDocument } from '../lib/runtime';
 import * as runtime from '../lib/runtime';
@@ -17,6 +23,7 @@ import {
     soundsAvailableOffline,
 } from '../lib/sounds';
 import { start } from '../lib/starters';
+import { MeasureEditor, type MeasureEditorHandle } from './measure-editor';
 import { TempoControl } from './tempo-control';
 
 const lanes = [
@@ -43,6 +50,9 @@ export default function Ensemble() {
     const [editing, setEditing] = useState(false);
     const [sectionId, setSectionId] = useState('');
     const [buffers, setBuffers] = useState(new Map<string, string>());
+    const [measureId, setMeasureId] = useState('');
+    const [pendingMeasures, setPendingMeasures] = useState(false);
+    const measureEditor = useRef<MeasureEditorHandle>(null);
     const pendingText = useRef(false);
     const [lastOpened, setLastOpened] = useState<string | null>(null);
     const [editorRequest, setEditorRequest] = useState(0);
@@ -68,10 +78,13 @@ export default function Ensemble() {
     const file = useRef<HTMLInputElement>(null);
     const scroll = useRef<HTMLDivElement>(null);
     const editor = useRef<HTMLTextAreaElement>(null);
-    const hasPendingText = buffers.size > 0;
+    const editPanel = useRef<HTMLElement>(null);
+    const hasPendingText = buffers.size > 0 || pendingMeasures;
     const text =
         buffers.get(sectionId) ??
-        current?.chart.arrangement.sections.find((section) => section.id === sectionId)?.value ??
+        (current
+            ? arrangementOf(current).sections.find((section) => section.id === sectionId)?.value
+            : '') ??
         '';
     const dirty = hasPendingText || !!(current && saved && !same(current, saved));
     const playbackActive = playing || playbackPending;
@@ -167,9 +180,10 @@ export default function Ensemble() {
         if (editing && !busy && editorRequest !== revealedEditorRequest.current) {
             // Reveal the actual input, including an already-open editor's selected section.
             revealedEditorRequest.current = editorRequest;
-            editor.current?.focus({ preventScroll: true });
-            editor.current?.closest('.edit-panel')?.scrollIntoView({ block: 'start' });
-            editor.current?.scrollIntoView({ block: 'nearest' });
+            const input = editPanel.current?.querySelector<HTMLTextAreaElement>('textarea');
+            input?.focus({ preventScroll: true });
+            editPanel.current?.scrollIntoView({ block: 'start' });
+            input?.scrollIntoView({ block: 'nearest' });
         }
     }, [editing, editorRequest, busy]);
     useEffect(() => {
@@ -273,16 +287,21 @@ export default function Ensemble() {
         void run(async () => {
             const next = includeText ? updateChart() : current;
             await action();
-            draft({ ...next, chart: runtime.captureContent() });
+            draft(runtime.captureDocument(next));
         });
     }
     function clearBuffers() {
         pendingText.current = false;
         setBuffers(new Map());
+        setPendingMeasures(false);
+        measureEditor.current?.reset();
     }
     function editText(value: string) {
         const next = new Map(buffers);
-        if (value === current?.chart.arrangement.sections.find((s) => s.id === sectionId)?.value) {
+        if (
+            value ===
+            (current ? arrangementOf(current).sections.find((s) => s.id === sectionId)?.value : '')
+        ) {
             next.delete(sectionId);
         } else {
             next.set(sectionId, value);
@@ -296,15 +315,45 @@ export default function Ensemble() {
         setEditing(true);
         setEditorRequest((request) => request + 1);
     }
+    function applyScore(score: SemanticScore): ChartDocument {
+        if (current?.schemaVersion !== 2) {
+            throw new Error('Open a measure-based chart first.');
+        }
+        const candidate = repository.validated({ ...current, chart: { ...current.chart, score } });
+        runtime.load(candidate);
+        const next = runtime.captureDocument(candidate);
+        draft(next);
+        pendingText.current = false;
+        setPendingMeasures(false);
+        // A subsequent transpose may immediately replace the accepted score again.
+        // Retire these raw buffers on successful runtime adoption, not object equality.
+        measureEditor.current?.reset();
+        return next;
+    }
     function updateChart(): ChartDocument {
         if (!current) {
             throw new Error('Open a song first.');
+        }
+        if (current.schemaVersion === 2) {
+            if (!pendingMeasures) {
+                return current;
+            }
+            try {
+                if (!measureEditor.current) {
+                    throw new Error('Reopen the measure editor to check your changes.');
+                }
+                return applyScore(measureEditor.current.commit());
+            } catch (error) {
+                setMenu(false);
+                setEditing(true);
+                throw error;
+            }
         }
         if (!buffers.size) {
             return current;
         }
         try {
-            const sections = current.chart.arrangement.sections.map((section) => ({
+            const sections = arrangementOf(current).sections.map((section) => ({
                 ...section,
                 value: buffers.get(section.id) ?? section.value,
             }));
@@ -323,11 +372,11 @@ export default function Ensemble() {
                 ...current,
                 chart: {
                     ...current.chart,
-                    arrangement: { ...current.chart.arrangement, sections },
+                    arrangement: { ...arrangementOf(current), sections },
                 },
             });
-            runtime.editSections(candidate.chart.arrangement.sections);
-            const next = { ...candidate, chart: runtime.captureContent() };
+            runtime.editSections(arrangementOf(candidate).sections);
+            const next = runtime.captureDocument(candidate);
             draft(next);
             clearBuffers();
             return next;
@@ -347,9 +396,14 @@ export default function Ensemble() {
     }
     function selectSection(document: ChartDocument, id?: string) {
         const section =
-            document.chart.arrangement.sections.find((s) => s.id === id) ||
-            document.chart.arrangement.sections[0];
+            arrangementOf(document).sections.find((s) => s.id === id) ||
+            arrangementOf(document).sections[0];
         setSectionId(section.id);
+        if (document.schemaVersion === 2) {
+            setMeasureId(
+                document.chart.score.sections.find((s) => s.id === section.id)!.measures[0].id,
+            );
+        }
     }
     async function open(document: ChartDocument) {
         const recovery = repository.recoveryFor(document);
@@ -418,22 +472,103 @@ export default function Ensemble() {
             if (!base) {
                 throw new Error('Starter library is not ready.');
             }
-            const document = structuredClone(base);
-            document.id = crypto.randomUUID();
-            document.title = 'Untitled song';
-            document.chart.arrangement = {
-                ...document.chart.arrangement,
-                key: 'C',
-                isMinor: false,
-                notation: 'name',
-                sections: [
-                    { id: crypto.randomUUID(), label: 'A', value: 'C | G | Am | F', repeat: 1 },
-                ],
-            };
+            const document = repository.validated({
+                schemaVersion: 2,
+                id: crypto.randomUUID(),
+                title: 'Untitled song',
+                revision: 0,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+                chart: {
+                    performance: base.chart.performance,
+                    band: base.chart.band,
+                    score: {
+                        key: 'C',
+                        isMinor: false,
+                        notation: 'name',
+                        meter: '4/4',
+                        grouping: null,
+                        sections: [
+                            {
+                                id: crypto.randomUUID(),
+                                label: 'A',
+                                repeat: 1,
+                                measures: ['C', 'G', 'Am', 'F'].map((symbol) => ({
+                                    id: crypto.randomUUID(),
+                                    content: {
+                                        kind: 'events',
+                                        events: [{ kind: 'chord', symbol, duration: [4, 1] }],
+                                    },
+                                })),
+                            },
+                        ],
+                    },
+                },
+            });
             const created = await repository.save(document, null);
             setSongs(await repository.list());
             await open(created);
-            revealEditor(created.chart.arrangement.sections[0].id);
+            revealEditor(arrangementOf(created).sections[0].id);
+        });
+    }
+    function upgradeEditor() {
+        void run(async () => {
+            const original = updateChart();
+            if (original.schemaVersion !== 1) {
+                return;
+            }
+            const converted = convertedCopy(original);
+            // Capability preflight before creating a copy or changing the active song.
+            prepareScorePlayback(converted.chart.score);
+            const created = await repository.save(converted, null);
+            setSongs(await repository.list());
+            await open(created);
+            revealEditor(arrangementOf(created).sections[0].id);
+            setMessage('Editable copy created · your original song is unchanged');
+        });
+    }
+    function extendScore(newSection: boolean) {
+        void run(() => {
+            const next = updateChart();
+            if (next.schemaVersion !== 2) {
+                return;
+            }
+            const score = structuredClone(next.chart.score);
+            const selectedSection =
+                score.sections.find((s) => s.measures.some((m) => m.id === measureId)) ??
+                score.sections[0];
+            const section = newSection
+                ? {
+                      id: crypto.randomUUID(),
+                      label: String.fromCharCode(65 + (score.sections.length % 26)),
+                      repeat: 1,
+                      measures: [],
+                  }
+                : selectedSection;
+            if (newSection) {
+                score.sections.push(section);
+            }
+            let context = resolveScoreContext(score, section);
+            for (const measure of section.measures) {
+                context = resolveScoreContext(context, measure);
+            }
+            const id = crypto.randomUUID();
+            section.measures.push({
+                id,
+                content: {
+                    kind: 'events',
+                    events: [
+                        {
+                            kind: 'chord',
+                            symbol: context.key + (context.isMinor ? 'm' : ''),
+                            duration: scoreMeter(context.meter).length,
+                        },
+                    ],
+                },
+            });
+            applyScore(score);
+            setMeasureId(id);
+            setSectionId(section.id);
         });
     }
     function exportSong() {
@@ -457,9 +592,23 @@ export default function Ensemble() {
             return [];
         }
         const a = runtime.state().arranger;
+        if (current.schemaVersion === 2) {
+            return scoreLeadSheet(a);
+        }
         return buildLeadSheetSections(a.progression, a.sections, TIME_SIGNATURES[a.timeSignature]);
     }, [current]);
     const totalBars = blocks.reduce((n, b) => n + b.measures.length, 0);
+    const writtenBars = useMemo(
+        () =>
+            new Map(
+                current?.schemaVersion === 2
+                    ? current.chart.score.sections.flatMap((section) =>
+                          section.measures.map((bar) => [bar.id, bar] as const),
+                      )
+                    : [],
+            ),
+        [current],
+    );
     const continuedSave = songs.find((song) => song.id === lastOpened);
     const featuredSave =
         continuedSave || songs.find((song) => song.id === 'starter-blues') || songs[0];
@@ -548,6 +697,9 @@ export default function Ensemble() {
                             throw new Error('Chart files must be 1 MB or smaller.');
                         }
                         const candidate = repository.validated(JSON.parse(await source.text()));
+                        if (candidate.schemaVersion === 2) {
+                            prepareScorePlayback(candidate.chart.score);
+                        }
                         const result = await repository.save(
                             { ...candidate, id: crypto.randomUUID() },
                             null,
@@ -597,8 +749,8 @@ export default function Ensemble() {
                                         <p>
                                             {featured.chart.band.groove.lastSmartGenre} ·{' '}
                                             {featured.chart.performance.bpm} BPM ·{' '}
-                                            {featured.chart.arrangement.key}
-                                            {featured.chart.arrangement.isMinor ? 'm' : ''}
+                                            {arrangementOf(featured).key}
+                                            {arrangementOf(featured).isMinor ? 'm' : ''}
                                         </p>
                                         <button
                                             className="btn"
@@ -668,8 +820,8 @@ export default function Ensemble() {
                                                     </button>
                                                 </td>
                                                 <td className="song-key">
-                                                    {s.chart.arrangement.key}
-                                                    {s.chart.arrangement.isMinor ? 'm' : ''}
+                                                    {arrangementOf(s).key}
+                                                    {arrangementOf(s).isMinor ? 'm' : ''}
                                                 </td>
                                                 <td className="hide-mobile">
                                                     {s.chart.performance.bpm}
@@ -752,7 +904,7 @@ export default function Ensemble() {
                                               : 'Saved on this device'}
                                     </span>
                                     <span>{totalBars} bars</span>
-                                    <span>{current.chart.arrangement.timeSignature}</span>
+                                    <span>{arrangementOf(current).timeSignature}</span>
                                 </div>
                             </div>
                         </div>
@@ -851,15 +1003,13 @@ export default function Ensemble() {
                                 id="song-key"
                                 className="setting-select"
                                 disabled={busy}
-                                value={current.chart.arrangement.key}
+                                value={arrangementOf(current).key}
                                 onChange={(event) =>
                                     change(
                                         () =>
                                             runtime.transpose(
                                                 KEY_ORDER.indexOf(event.target.value) -
-                                                    KEY_ORDER.indexOf(
-                                                        current.chart.arrangement.key,
-                                                    ),
+                                                    KEY_ORDER.indexOf(arrangementOf(current).key),
                                             ),
                                         true,
                                     )
@@ -868,7 +1018,7 @@ export default function Ensemble() {
                                 {KEY_ORDER.map((key) => (
                                     <option key={key} value={key}>
                                         {key}
-                                        {current.chart.arrangement.isMinor ? 'm' : ''}
+                                        {arrangementOf(current).isMinor ? 'm' : ''}
                                     </option>
                                 ))}
                             </select>
@@ -1084,15 +1234,23 @@ export default function Ensemble() {
                                                 {block.label || 'A'}
                                             </span>
                                             <span className="section-name">
-                                                {current.chart.arrangement.sections.find(
+                                                {arrangementOf(current).sections.find(
                                                     (s) => s.id === block.id,
-                                                )?.key || current.chart.arrangement.key}
+                                                )?.key || arrangementOf(current).key}
                                             </span>
                                             {editing && (
                                                 <button
                                                     className="section-edit"
                                                     disabled={busy}
-                                                    onClick={() => revealEditor(block.id)}
+                                                    onClick={() => {
+                                                        if (current.schemaVersion === 2) {
+                                                            setMeasureId(
+                                                                block.measures[0]?.chords[0]
+                                                                    ?.measureId ?? '',
+                                                            );
+                                                        }
+                                                        revealEditor(block.id);
+                                                    }}
                                                 >
                                                     Edit section
                                                 </button>
@@ -1101,6 +1259,10 @@ export default function Ensemble() {
                                         <div className="bars">
                                             {block.measures.map((measure, i) => {
                                                 barNumber++;
+                                                const notes =
+                                                    writtenBars.get(
+                                                        measure.chords[0]?.measureId ?? '',
+                                                    )?.annotations ?? [];
                                                 return (
                                                     <div
                                                         className={`bar ${measure.chords.some((c) => c.globalIndex === active) ? 'active' : ''} ${i === block.measures.length - 1 ? 'end' : ''}`}
@@ -1112,9 +1274,74 @@ export default function Ensemble() {
                                                         <span className="bar-number">
                                                             {barNumber}
                                                         </span>
+                                                        {current.schemaVersion === 2 && editing && (
+                                                            <button
+                                                                className="bar-edit"
+                                                                disabled={busy}
+                                                                aria-label={`Edit bar ${barNumber}`}
+                                                                onClick={() => {
+                                                                    setMeasureId(
+                                                                        measure.chords[0]
+                                                                            ?.measureId ?? '',
+                                                                    );
+                                                                    revealEditor(measure.sectionId);
+                                                                }}
+                                                            >
+                                                                Edit
+                                                            </button>
+                                                        )}
+                                                        {current.schemaVersion === 2 &&
+                                                            (i === 0 ||
+                                                                measure.chords[0]?.key !==
+                                                                    block.measures[i - 1]?.chords[0]
+                                                                        ?.key ||
+                                                                measure.chords[0]?.keyIsMinor !==
+                                                                    block.measures[i - 1]?.chords[0]
+                                                                        ?.keyIsMinor ||
+                                                                measure.chords[0]?.timeSignature !==
+                                                                    block.measures[i - 1]?.chords[0]
+                                                                        ?.timeSignature) && (
+                                                                <span className="bar-context">
+                                                                    {measure.chords[0]?.key}
+                                                                    {measure.chords[0]?.keyIsMinor
+                                                                        ? 'm'
+                                                                        : ''}{' '}
+                                                                    ·{' '}
+                                                                    {
+                                                                        measure.chords[0]
+                                                                            ?.timeSignature
+                                                                    }
+                                                                </span>
+                                                            )}
+                                                        {notes
+                                                            .filter(
+                                                                (note) =>
+                                                                    note.placement === 'above',
+                                                            )
+                                                            .map((note, index) => (
+                                                                <span
+                                                                    className="bar-note"
+                                                                    // biome-ignore lint/suspicious/noArrayIndexKey: Authored annotations have no IDs; these display-only spans hold no local state.
+                                                                    key={`${note.at.join('/')}-${index}`}
+                                                                >
+                                                                    {note.text}
+                                                                </span>
+                                                            ))}
                                                         {measure.chords.map((c) => (
                                                             <button
                                                                 className="chord chord-button"
+                                                                aria-current={
+                                                                    active === c.globalIndex
+                                                                        ? 'true'
+                                                                        : undefined
+                                                                }
+                                                                data-start-step={c.start}
+                                                                data-end-step={c.end}
+                                                                style={
+                                                                    current.schemaVersion === 2
+                                                                        ? { flex: c.end - c.start }
+                                                                        : undefined
+                                                                }
                                                                 key={c.globalIndex}
                                                                 disabled={playing || busy}
                                                                 aria-label={`Audition ${c.absName}`}
@@ -1125,6 +1352,20 @@ export default function Ensemble() {
                                                                 {c.absName}
                                                             </button>
                                                         ))}
+                                                        {notes
+                                                            .filter(
+                                                                (note) =>
+                                                                    note.placement === 'below',
+                                                            )
+                                                            .map((note, index) => (
+                                                                <span
+                                                                    className="bar-note"
+                                                                    // biome-ignore lint/suspicious/noArrayIndexKey: Authored annotations have no IDs; these display-only spans hold no local state.
+                                                                    key={`${note.at.join('/')}-${index}`}
+                                                                >
+                                                                    {note.text}
+                                                                </span>
+                                                            ))}
                                                     </div>
                                                 );
                                             })}
@@ -1137,111 +1378,156 @@ export default function Ensemble() {
                                 </div>
                             </article>
                         </div>
-                        {editing && (
-                            <aside className="edit-panel">
-                                <h2>Edit your chart</h2>
-                                <p>
-                                    Separate bars with |. Chords in the same bar share its beats
-                                    equally.
-                                </p>
-                                <label className="panel-label" htmlFor="title">
-                                    Song title
-                                </label>
-                                <input
-                                    id="title"
-                                    disabled={busy}
-                                    className="section-text title-input"
-                                    maxLength={160}
-                                    value={current.title}
-                                    onChange={(e) => draft({ ...current, title: e.target.value })}
-                                />
-                                <label className="panel-label" htmlFor="section">
-                                    Section
-                                </label>
-                                <select
-                                    id="section"
-                                    disabled={busy}
-                                    value={sectionId}
-                                    onChange={(e) => selectSection(current, e.target.value)}
-                                >
-                                    {current.chart.arrangement.sections.map((s) => (
-                                        <option key={s.id} value={s.id}>
-                                            {s.label}
-                                            {buffers.has(s.id) ? ' · edited' : ''}
-                                        </option>
-                                    ))}
-                                </select>
-                                <label className="panel-label" htmlFor="chord-text">
-                                    Chord text
-                                </label>
-                                <textarea
-                                    id="chord-text"
-                                    ref={editor}
-                                    className="section-text"
-                                    disabled={busy}
-                                    aria-describedby="editor-help"
-                                    value={text}
-                                    onChange={(e) => editText(e.target.value)}
-                                />
-                                <div className="dialog-actions">
-                                    <button
-                                        className="btn primary"
+                        <aside className="edit-panel" ref={editPanel} hidden={!editing}>
+                            <h2>Edit your chart</h2>
+                            <p hidden={current.schemaVersion === 2}>
+                                Separate bars with |. Chords in the same bar share its beats
+                                equally.
+                            </p>
+                            <label className="panel-label" htmlFor="title">
+                                Song title
+                            </label>
+                            <input
+                                id="title"
+                                disabled={busy}
+                                className="section-text title-input"
+                                maxLength={160}
+                                value={current.title}
+                                onChange={(e) => draft({ ...current, title: e.target.value })}
+                            />
+                            {current.schemaVersion === 2 ? (
+                                <>
+                                    <MeasureEditor
+                                        key={current.id}
+                                        ref={measureEditor}
+                                        score={current.chart.score}
+                                        selectedMeasureId={measureId}
+                                        onSelect={setMeasureId}
                                         disabled={busy}
-                                        onClick={() =>
+                                        onPendingChange={(pending) => {
+                                            pendingText.current = pending;
+                                            setPendingMeasures(pending);
+                                        }}
+                                        onApply={(score) =>
                                             void run(() => {
-                                                updateChart();
+                                                applyScore(score);
                                             })
                                         }
-                                    >
-                                        Update chart
+                                    />
+                                    <div className="dialog-actions">
+                                        <button
+                                            className="btn"
+                                            disabled={busy}
+                                            onClick={() => extendScore(false)}
+                                        >
+                                            ＋ Bar
+                                        </button>
+                                        <button
+                                            className="btn"
+                                            disabled={busy}
+                                            onClick={() => extendScore(true)}
+                                        >
+                                            ＋ Section
+                                        </button>
+                                    </div>
+                                    <p className="preview-note">
+                                        Save includes all edited bars. Unchecked typing stays in
+                                        this tab until you update or save.
+                                    </p>
+                                </>
+                            ) : (
+                                <>
+                                    <button className="btn" disabled={busy} onClick={upgradeEditor}>
+                                        Try the bar editor · keep original
                                     </button>
-                                    <button
-                                        className="btn"
+                                    <label className="panel-label" htmlFor="section">
+                                        Section
+                                    </label>
+                                    <select
+                                        id="section"
                                         disabled={busy}
-                                        onClick={() =>
-                                            void run(() => {
-                                                const next = updateChart();
-                                                const id = crypto.randomUUID();
-                                                const sections = [
-                                                    ...next.chart.arrangement.sections,
-                                                    {
-                                                        id,
-                                                        label: String.fromCharCode(
-                                                            65 +
-                                                                (current.chart.arrangement.sections
-                                                                    .length %
-                                                                    26),
-                                                        ),
-                                                        value: 'C | C | F | G',
-                                                        repeat: 1,
-                                                    },
-                                                ];
-                                                repository.validated({
-                                                    ...next,
-                                                    chart: {
-                                                        ...next.chart,
-                                                        arrangement: {
-                                                            ...next.chart.arrangement,
-                                                            sections,
+                                        value={sectionId}
+                                        onChange={(e) => selectSection(current, e.target.value)}
+                                    >
+                                        {arrangementOf(current).sections.map((s) => (
+                                            <option key={s.id} value={s.id}>
+                                                {s.label}
+                                                {buffers.has(s.id) ? ' · edited' : ''}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <label className="panel-label" htmlFor="chord-text">
+                                        Chord text
+                                    </label>
+                                    <textarea
+                                        id="chord-text"
+                                        ref={editor}
+                                        className="section-text"
+                                        disabled={busy}
+                                        aria-describedby="editor-help"
+                                        value={text}
+                                        onChange={(e) => editText(e.target.value)}
+                                    />
+                                    <div className="dialog-actions">
+                                        <button
+                                            className="btn primary"
+                                            disabled={busy}
+                                            onClick={() =>
+                                                void run(() => {
+                                                    updateChart();
+                                                })
+                                            }
+                                        >
+                                            Update chart
+                                        </button>
+                                        <button
+                                            className="btn"
+                                            disabled={busy}
+                                            onClick={() =>
+                                                void run(() => {
+                                                    const next = updateChart();
+                                                    const id = crypto.randomUUID();
+                                                    const sections = [
+                                                        ...arrangementOf(next).sections,
+                                                        {
+                                                            id,
+                                                            label: String.fromCharCode(
+                                                                65 +
+                                                                    (arrangementOf(current).sections
+                                                                        .length %
+                                                                        26),
+                                                            ),
+                                                            value: 'C | C | F | G',
+                                                            repeat: 1,
                                                         },
-                                                    },
-                                                });
-                                                runtime.editSections(sections);
-                                                draft({ ...next, chart: runtime.captureContent() });
-                                                revealEditor(id);
-                                            })
-                                        }
-                                    >
-                                        ＋ Section
-                                    </button>
-                                </div>
-                                <p className="preview-note" id="editor-help">
-                                    Save includes your typed chords. Update chart previews them
-                                    without saving. Unchecked text stays in this tab only; playback
-                                    and returning to your songbook check it first.
-                                </p>
-                            </aside>
-                        )}
+                                                    ];
+                                                    repository.validated({
+                                                        ...next,
+                                                        chart: {
+                                                            ...next.chart,
+                                                            arrangement: {
+                                                                ...arrangementOf(next),
+                                                                sections,
+                                                            },
+                                                        },
+                                                    });
+                                                    runtime.editSections(sections);
+                                                    draft(runtime.captureDocument(next));
+                                                    revealEditor(id);
+                                                })
+                                            }
+                                        >
+                                            ＋ Section
+                                        </button>
+                                    </div>
+                                    <p className="preview-note" id="editor-help">
+                                        Save includes your typed chords. Update chart previews them
+                                        without saving. Unchecked text stays in this tab only;
+                                        playback and returning to your songbook check it first.
+                                    </p>
+                                </>
+                            )}
+                        </aside>
                     </div>
                     <footer className="playback-footer">
                         <span role="status">

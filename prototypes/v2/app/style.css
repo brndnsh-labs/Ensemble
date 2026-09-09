@@ -2057,11 +2057,41 @@ dialog textarea {
     padding: 0;
     cursor: pointer;
 }
+.chord-button[aria-current="true"] {
+    color: var(--accent);
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 5px;
+}
 .section-edit {
     font-size: 11px;
     color: var(--accent);
     margin-left: auto;
     text-decoration: underline;
+}
+.bar-edit {
+    position: absolute;
+    top: 1px;
+    right: 4px;
+    color: var(--accent);
+    padding: 2px 6px;
+    font-size: 11px;
+}
+.bar-context {
+    position: absolute;
+    top: 3px;
+    left: 28px;
+    font-family: Inter, sans-serif;
+    font-size: 9px;
+    color: var(--muted);
+}
+.bar-note {
+    flex-basis: 100%;
+    font-family: Inter, sans-serif;
+    font-size: 11px;
+    line-height: 1.4;
+    color: var(--muted);
+    overflow-wrap: anywhere;
 }
 .home-actions input {
     display: none;
