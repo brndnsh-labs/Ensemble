@@ -64,7 +64,8 @@ local browser projects and never deploys.
   App readiness and the current song's sound readiness are separate indicators. This is not
   whole-library/cloud sync. Bulk installation verifies and decodes the complete catalog before
   applying voices; a failed install keeps the previous setup and reuses completed files on retry.
-  `.ensemble`/JSON export/import preserves manual and Follow feel choices; iReal import is not implemented yet.
+  `.ensemble`/JSON export/import preserves manual and Follow feel choices. Conservative iReal
+  import is available through Import chart; see its explicit boundaries below.
 - Accounts, cloud/outbox, sharing, admin, full form execution/import, chord discovery,
   full settings inventory, section-practice controls and visualizer are later work. Genre
   changes briefly stop/restart playback in this checkpoint, without expanding the focused chart.
@@ -100,14 +101,47 @@ returns to that same bar on later passes. Saved/exported charts never contain un
 
 Repeat regions must stay inside one section for now. Nested repeats, multiple ending passes,
 and existing whole-section repeats are supported. An end repeat without a start repeats from
-the section's beginning. D.C./D.S., coda/Fine and measure-repeat signs remain follow-on work.
+the section's beginning. D.C./D.S. to end, Fine and coda use a global performed route, including
+returns across sections. Explicit native `play` replays repeats; `skip` uses their final passes
+and endings. Al-Nth-ending destinations and jump commands inside repeated passages remain
+blocked. One-/two-bar references resolve earlier written IDs only when effective context matches;
+two-bar pairs must have consecutive earlier sources and stay within their sections.
 The compiler rejects ambiguous/unpaired forms and bounds nesting to 16 and performed measures
 to 16,384; exact event/step limits also apply before live adoption.
 
 Validated score input compiles to exact maps used by the chart, worker and detached rendering.
 Unsupported navigation, N.C., holds, alternates, fermatas, off-grid lengths and unimplemented chord
-voicings stop with an explanation, not partial playback. Full iReal import remains next-stage work.
+voicings stop with an explanation, not partial playback. Full iReal compatibility remains staged.
 Both versions use the existing explicit-save/recovery/export boundaries and work offline.
+
+## iReal import checkpoint (#1171)
+
+Choose **Import chart**, open an HTML export or paste an `irealb://`/`irealbook://` chart link,
+review its written bars and explanations, then **Add to songbook**. Nothing is saved or installed
+in playback until that explicit action; Cancel leaves the current chart and pending edits alone.
+Multiple supported entries can be selected individually. Existing Ensemble file import remains.
+
+Stored key is used without applying unverified export transposition. The starting tempo and
+current band setup are shown explicitly; style, player chorus count and raw tempo are not guessed.
+The exact input is kept as inert `importSource` text in the new document, survives save/copy/
+transpose/export, and can be downloaded as a plain-text file even when an import is blocked.
+No HTML is executed, remote assets fetched, or charts uploaded by the importer.
+
+The sanitized user-provided Blues export, documented chord spellings, whole-bar timing,
+conservative exact 4/4 cell patterns, repeated bars, paired endings and unambiguous Fine/coda
+imports are covered in stages. Unsupported compression variants, uncertain timing, jumps combined
+with iReal repeats and other unmapped playback commands block import rather than losing music.
+Minor Swing still contains unsupported annotations and is not a full-compatibility claim.
+Source <=1 MiB, <=64 songs and <=4,096 aggregate written measures; document and playback limits
+also apply. Large source plus decoded music may exceed the document limit and fail safely.
+
+The stand keeps written repeat signs and navigation labels. Bars bypassed by navigation remain
+visible using detached display-only maps; they never enter the performed maps or audition indices.
+The quick editor preserves measure references and navigation it cannot edit. #1176 remains deferred.
+
+Older preview clients may reject documents with the new optional source field. Do not downgrade
+after importing; export important writing and prefer corrective preview updates. No production
+migration or old/new-client coexistence guarantee is introduced by this checkpoint.
 
 Do not downgrade this browser's mixed-version songbook to an older preview: those clients reject
 v2 documents and may fail to list the library. Original v1 data is retained, but old-client

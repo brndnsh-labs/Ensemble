@@ -59,9 +59,30 @@ export function validateChartDocumentV2(candidate: unknown): CodecDecodeResult<C
         root,
         '$',
         ['schemaVersion', 'id', 'title', 'createdAt', 'updatedAt', 'revision', 'chart'],
-        ['metadata'],
+        ['metadata', 'importSource'],
     );
     const chart = checkObject(root.chart, '$.chart', ['score', 'performance', 'band']);
+    if (Object.hasOwn(root, 'importSource')) {
+        const source = checkObject(root.importSource, '$.importSource', ['format', 'text']);
+        if (source.format !== 'irealbook' && source.format !== 'irealb') {
+            issues.push({
+                path: '$.importSource.format',
+                code: 'invalid-value',
+                message: 'Unknown import format.',
+            });
+        }
+        if (
+            typeof source.text !== 'string' ||
+            !source.text.length ||
+            new TextEncoder().encode(source.text).byteLength > 1_048_576
+        ) {
+            issues.push({
+                path: '$.importSource.text',
+                code: 'invalid-value',
+                message: 'Expected bounded original import text.',
+            });
+        }
+    }
     if (Object.hasOwn(root, 'metadata')) {
         const metadata = checkObject(root.metadata, '$.metadata', [], ['composer', 'style']);
         for (const [key, value] of Object.entries(metadata)) {

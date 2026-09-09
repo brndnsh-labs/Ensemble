@@ -86,4 +86,6 @@ export interface ChartDocumentV2 extends Omit<ChartDocument, 'schemaVersion' | '
         band: ChartBand;
     };
     metadata?: { composer?: string; style?: string };
+    /** Exact local import source, never interpreted as markup or sent to telemetry. */
+    importSource?: { format: 'irealbook' | 'irealb'; text: string };
 }

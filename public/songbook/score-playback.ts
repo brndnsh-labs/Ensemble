@@ -5,10 +5,13 @@ import { validateSemanticScore } from './score-codec.js';
 import { resolveScoreContext } from './score-context.js';
 import { durationToSteps, scoreMeter } from './score-duration.js';
 import { compileScoreForm, type ScoreFormVisit } from './score-form.js';
+import { resolveScoreMeasureEvents } from './score-measure-events.js';
 import type { SemanticScore } from './score-types.js';
 
 /** A derived, bounded performance input. Never a document or persistence authority. */
 export interface ScorePlaybackPlan {
+    /** Global performance order. Never regroup these visits by written section. */
+    visits: ScoreFormVisit[];
     sections: {
         section: Section;
         visits: ScoreFormVisit[];
@@ -37,10 +40,12 @@ export function prepareScorePlayback(candidate: unknown): ScorePlaybackPlan {
     }
     const score = checked.value;
     const itinerary = compileScoreForm(score);
+    const resolved = resolveScoreMeasureEvents(score);
     let performedEvents = 0;
     let performedMeasures = 0;
     let performedSteps = 0;
     return {
+        visits: itinerary,
         sections: score.sections.map((written, sectionIndex) => {
             const visits = itinerary.filter((visit) => visit.sectionIndex === sectionIndex);
             let context = resolveScoreContext(score, written);
@@ -51,14 +56,9 @@ export function prepareScorePlayback(candidate: unknown): ScorePlaybackPlan {
                 if (!meter) {
                     throw new Error(`${where}: ${context.meter} playback is not supported yet.`);
                 }
-                if (measure.content.kind !== 'events') {
-                    throw new Error(
-                        `${where}: measure-repeat signs cannot be played yet. The chart is preserved.`,
-                    );
-                }
                 const symbols: string[] = [];
                 const steps: number[] = [];
-                for (const event of measure.content.events) {
+                for (const event of resolved[sectionIndex][index]) {
                     if (
                         event.kind !== 'chord' ||
                         event.fermata ||
@@ -147,61 +147,65 @@ export function renderScorePlayback(state: EnsembleState, parse: ParseBar) {
     const sectionMap: ArrangerState['sectionMap'] = [];
     let step = 0;
     let previousMidis: number[] = [];
-    for (const { section, measures, visits } of plan.sections) {
-        const sectionStart = step;
+    let previousSectionIndex = -1;
+    let previousSectionPass = -1;
+    let localIndex = 0;
+    for (const visit of plan.visits) {
+        const { section, measures } = plan.sections[visit.sectionIndex];
+        const changesSection = visit.sectionIndex !== previousSectionIndex;
+        if (changesSection) {
+            sectionMap.push({ id: section.id, label: section.label, start: step, end: step });
+        }
         // A detached stem render may mask lanes in its passed-state sections.
         // Voicing follows that effective bass presence, not the authored plan's copy.
         const bassActive =
             state.arranger.sections.find((entry) => entry.id === section.id)?.instruments?.bass ??
             Boolean(state.bass?.enabled);
-        let localIndex = 0;
-        let previousSectionPass = -1;
-        for (const visit of visits) {
-            const bar = measures[visit.measureIndex];
-            const startsSection = visit.sectionPass !== previousSectionPass;
-            if (startsSection) {
-                localIndex = 0;
-            }
-            previousSectionPass = visit.sectionPass;
-            const start = step;
-            const parsed = parse(
-                state,
-                bar.symbols.join(' '),
-                bar.key,
-                bar.meter,
-                previousMidis,
-                bar.isMinor,
-                bassActive,
-                startsSection,
-            );
-            if (parsed.chords.length !== bar.steps.length) {
-                throw new Error('The playback adapter could not resolve every written chord.');
-            }
-            previousMidis = parsed.finalMidis;
-            parsed.chords.forEach((voicing, index) => {
-                const end = step + bar.steps[index];
-                const chord: Chord = {
-                    ...voicing,
-                    beats: bar.steps[index] / bar.config.stepsPerBeat,
-                    sectionId: section.id,
-                    sectionLabel: section.label,
-                    keyIsMinor: bar.isMinor,
-                    localIndex: localIndex++,
-                    repeatIndex: visit.sectionPass,
-                    measureId: bar.id,
-                };
-                progression.push(chord);
-                stepMap.push({ start: step, end, chord });
-                step = end;
-            });
-            measureMap.push({
-                start,
-                end: step,
-                ts: bar.meter,
-                config: bar.config,
-            });
+        const bar = measures[visit.measureIndex];
+        const startsSection = changesSection || visit.sectionPass !== previousSectionPass;
+        if (startsSection) {
+            localIndex = 0;
         }
-        sectionMap.push({ id: section.id, label: section.label, start: sectionStart, end: step });
+        previousSectionPass = visit.sectionPass;
+        previousSectionIndex = visit.sectionIndex;
+        const start = step;
+        const parsed = parse(
+            state,
+            bar.symbols.join(' '),
+            bar.key,
+            bar.meter,
+            previousMidis,
+            bar.isMinor,
+            bassActive,
+            startsSection,
+        );
+        if (parsed.chords.length !== bar.steps.length) {
+            throw new Error('The playback adapter could not resolve every written chord.');
+        }
+        previousMidis = parsed.finalMidis;
+        parsed.chords.forEach((voicing, index) => {
+            const end = step + bar.steps[index];
+            const chord: Chord = {
+                ...voicing,
+                beats: bar.steps[index] / bar.config.stepsPerBeat,
+                sectionId: section.id,
+                sectionLabel: section.label,
+                keyIsMinor: bar.isMinor,
+                localIndex: localIndex++,
+                repeatIndex: visit.sectionPass,
+                measureId: bar.id,
+            };
+            progression.push(chord);
+            stepMap.push({ start: step, end, chord });
+            step = end;
+        });
+        measureMap.push({
+            start,
+            end: step,
+            ts: bar.meter,
+            config: bar.config,
+        });
+        sectionMap[sectionMap.length - 1].end = step;
     }
     return { progression, stepMap, measureMap, sectionMap, totalSteps: step };
 }

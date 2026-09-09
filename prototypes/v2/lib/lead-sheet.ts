@@ -9,7 +9,24 @@ import type { ArrangerState } from '../../../public/types';
 export function scoreLeadSheet(
     arranger: ArrangerState,
     score: SemanticScore,
+    written?: ArrangerState,
 ): LeadSheetSectionBlock[] {
+    const unplayed = written
+        ? new Map(
+              scoreLeadSheet(written, score)
+                  .flatMap((block) => block.measures)
+                  .map((measure) => [
+                      measure.chords[0]?.measureId,
+                      {
+                          ...measure,
+                          chords: measure.chords.map((chord) => ({
+                              ...chord,
+                              globalIndex: -1 - chord.globalIndex,
+                          })),
+                      },
+                  ]),
+          )
+        : new Map<string, LeadSheetMeasure>();
     let eventIndex = 0;
     const firstVisits = new Map<string, LeadSheetMeasure>();
     for (const measure of arranger.measureMap) {
@@ -53,7 +70,7 @@ export function scoreLeadSheet(
             blocks.push(block);
         }
         for (const [index, bar] of section.measures.entries()) {
-            const visit = firstVisits.get(bar.id);
+            const visit = firstVisits.get(bar.id) ?? unplayed.get(bar.id);
             if (!visit) {
                 throw new Error('The written chart contains an unreachable measure.');
             }

@@ -145,6 +145,34 @@ export function captureDocument(document: ChartDocument): ChartDocument {
     return validateDocument({ ...document, chart: captureSessionContent() });
 }
 
+/** Display-only maps for bars bypassed by navigation; never installed in live state. */
+export function writtenChart() {
+    const state = getState();
+    const plan = state.arranger.scorePlan;
+    if (!plan) {
+        return state.arranger;
+    }
+    const detached = {
+        ...state,
+        arranger: {
+            ...state.arranger,
+            scorePlan: {
+                ...plan,
+                visits: plan.sections.flatMap((entry, sectionIndex) =>
+                    entry.measures.map((_, measureIndex) => ({
+                        sectionIndex,
+                        measureIndex,
+                        sectionPass: 0,
+                        repeatPasses: [],
+                    })),
+                ),
+            },
+        },
+    };
+    validateProgression(detached);
+    return detached.arranger;
+}
+
 /** Uses the same buffer ownership and monophonic guard as the current page bootstrap. */
 function receiveNotes(notes: unknown[], resolution: true | undefined): void {
     const state = getState();

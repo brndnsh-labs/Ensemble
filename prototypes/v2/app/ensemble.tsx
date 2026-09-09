@@ -14,6 +14,7 @@ import { scoreDisplayIndices, scoreLeadSheet } from '../lib/lead-sheet';
 import * as repository from '../lib/repository';
 import type { ChartDocument } from '../lib/runtime';
 import * as runtime from '../lib/runtime';
+import { directionLabel } from '../lib/score-labels';
 import { lastOpenedSong, rememberSong } from '../lib/session';
 import {
     allSoundsAvailableOffline,
@@ -23,6 +24,7 @@ import {
     soundsAvailableOffline,
 } from '../lib/sounds';
 import { start } from '../lib/starters';
+import { downloadImportSource, ImportDialog } from './import-dialog';
 import { MeasureEditor, type MeasureEditorHandle } from './measure-editor';
 import { TempoControl } from './tempo-control';
 
@@ -64,6 +66,7 @@ export default function Ensemble() {
     const [following, setFollowing] = useState(true);
     const [offline, setOffline] = useState('Preparing offline access…');
     const [menu, setMenu] = useState(false);
+    const [importing, setImporting] = useState(false);
     const [soundProgress, setSoundProgress] = useState('');
     const [soundsOffline, setSoundsOffline] = useState<boolean | null>(null);
     const [allSoundsOffline, setAllSoundsOffline] = useState<boolean | null>(null);
@@ -593,7 +596,16 @@ export default function Ensemble() {
         }
         const a = runtime.state().arranger;
         if (current.schemaVersion === 2) {
-            return scoreLeadSheet(a, current.chart.score);
+            const writtenCount = current.chart.score.sections.reduce(
+                (n, section) => n + section.measures.length,
+                0,
+            );
+            const visitedCount = new Set(a.progression.map((chord) => chord.measureId)).size;
+            return scoreLeadSheet(
+                a,
+                current.chart.score,
+                visitedCount < writtenCount ? runtime.writtenChart() : undefined,
+            );
         }
         return buildLeadSheetSections(a.progression, a.sections, TIME_SIGNATURES[a.timeSignature]);
     }, [current]);
@@ -724,6 +736,27 @@ export default function Ensemble() {
                     });
                 }}
             />
+            {importing && (current || songs[0]) && (
+                <ImportDialog
+                    base={current ?? songs[0]}
+                    onClose={() => setImporting(false)}
+                    onAdd={async (candidate) => {
+                        const checked = repository.validated(candidate);
+                        if (checked.schemaVersion === 2) {
+                            prepareScorePlayback(checked.chart.score);
+                        }
+                        if (current) {
+                            updateChart();
+                        }
+                        const result = await repository.save(
+                            { ...checked, id: crypto.randomUUID() },
+                            null,
+                        );
+                        setSongs(await repository.list());
+                        await open(result);
+                    }}
+                />
+            )}
             {!ready ? (
                 <main className="loading">
                     <h1>Getting the band together.</h1>
@@ -741,9 +774,9 @@ export default function Ensemble() {
                             <button
                                 className="btn"
                                 disabled={busy}
-                                onClick={() => file.current?.click()}
+                                onClick={() => setImporting(true)}
                             >
-                                ↑ Import file
+                                Import chart
                             </button>
                             <button className="btn primary" disabled={busy} onClick={newSong}>
                                 ＋ New song
@@ -1291,6 +1324,18 @@ export default function Ensemble() {
                                                     measure.chords[0]?.measureId ?? '',
                                                 );
                                                 const notes = writtenBar?.annotations ?? [];
+                                                const measureRepeat =
+                                                    writtenBar?.content.kind === 'repeat'
+                                                        ? writtenBar.content
+                                                        : null;
+                                                const navigation = [
+                                                    ...(writtenBar?.start ?? []),
+                                                    ...(writtenBar?.end ?? []),
+                                                ].filter((mark) =>
+                                                    ['segno', 'coda', 'fine', 'jump'].includes(
+                                                        mark.kind,
+                                                    ),
+                                                );
                                                 const owningSection = writtenSections.get(
                                                     measure.sectionId ?? '',
                                                 );
@@ -1324,6 +1369,13 @@ export default function Ensemble() {
                                                         <span className="bar-number">
                                                             {barNumber}
                                                         </span>
+                                                        {navigation.length > 0 && (
+                                                            <span className="bar-navigation">
+                                                                {navigation
+                                                                    .map(directionLabel)
+                                                                    .join(' · ')}
+                                                            </span>
+                                                        )}
                                                         {endingStart && (
                                                             <span
                                                                 className="ending-label"
@@ -1436,41 +1488,101 @@ export default function Ensemble() {
                                                                     {note.text}
                                                                 </span>
                                                             ))}
-                                                        {measure.chords.map((c) => (
-                                                            <button
-                                                                className="chord chord-button"
-                                                                aria-current={
-                                                                    displayActive === c.globalIndex
-                                                                        ? 'true'
-                                                                        : undefined
-                                                                }
-                                                                data-start-step={
-                                                                    displayActive ===
-                                                                        c.globalIndex && activeEvent
-                                                                        ? activeEvent.start
-                                                                        : c.start
-                                                                }
-                                                                data-end-step={
-                                                                    displayActive ===
-                                                                        c.globalIndex && activeEvent
-                                                                        ? activeEvent.end
-                                                                        : c.end
-                                                                }
-                                                                style={
-                                                                    current.schemaVersion === 2
-                                                                        ? { flex: c.end - c.start }
-                                                                        : undefined
-                                                                }
-                                                                key={c.globalIndex}
-                                                                disabled={playing || busy}
-                                                                aria-label={`Audition ${c.absName}`}
-                                                                onClick={() =>
-                                                                    runtime.audition(c.globalIndex)
-                                                                }
-                                                            >
-                                                                {c.absName}
-                                                            </button>
-                                                        ))}
+                                                        {measure.chords
+                                                            .filter(
+                                                                (_, index) =>
+                                                                    !measureRepeat || index === 0,
+                                                            )
+                                                            .map((c) => (
+                                                                <button
+                                                                    className="chord chord-button"
+                                                                    aria-current={
+                                                                        (
+                                                                            measureRepeat
+                                                                                ? measure.chords.some(
+                                                                                      (event) =>
+                                                                                          event.globalIndex ===
+                                                                                          displayActive,
+                                                                                  )
+                                                                                : displayActive ===
+                                                                                  c.globalIndex
+                                                                        )
+                                                                            ? 'true'
+                                                                            : undefined
+                                                                    }
+                                                                    data-start-step={
+                                                                        (measureRepeat
+                                                                            ? measure.chords.some(
+                                                                                  (event) =>
+                                                                                      event.globalIndex ===
+                                                                                      displayActive,
+                                                                              )
+                                                                            : displayActive ===
+                                                                              c.globalIndex) &&
+                                                                        activeEvent
+                                                                            ? activeEvent.start
+                                                                            : c.start
+                                                                    }
+                                                                    data-end-step={
+                                                                        (measureRepeat
+                                                                            ? measure.chords.some(
+                                                                                  (event) =>
+                                                                                      event.globalIndex ===
+                                                                                      displayActive,
+                                                                              )
+                                                                            : displayActive ===
+                                                                              c.globalIndex) &&
+                                                                        activeEvent
+                                                                            ? activeEvent.end
+                                                                            : c.end
+                                                                    }
+                                                                    style={
+                                                                        current.schemaVersion === 2
+                                                                            ? {
+                                                                                  flex:
+                                                                                      c.end -
+                                                                                      c.start,
+                                                                              }
+                                                                            : undefined
+                                                                    }
+                                                                    key={c.globalIndex}
+                                                                    disabled={
+                                                                        playing ||
+                                                                        busy ||
+                                                                        c.globalIndex < 0
+                                                                    }
+                                                                    aria-label={
+                                                                        measureRepeat
+                                                                            ? `Repeated bar: ${measure.chords.map((event) => event.absName).join(', ')}`
+                                                                            : `Audition ${c.absName}`
+                                                                    }
+                                                                    title={
+                                                                        measureRepeat
+                                                                            ? measure.chords
+                                                                                  .map(
+                                                                                      (event) =>
+                                                                                          event.absName,
+                                                                                  )
+                                                                                  .join(' · ')
+                                                                            : undefined
+                                                                    }
+                                                                    onClick={() =>
+                                                                        runtime.audition(
+                                                                            c.globalIndex,
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    {measureRepeat
+                                                                        ? measureRepeat.display ===
+                                                                          'one-bar'
+                                                                            ? '%'
+                                                                            : measureRepeat.display ===
+                                                                                'two-bar-start'
+                                                                              ? '𝄎 1'
+                                                                              : '𝄎 2'
+                                                                        : c.absName}
+                                                                </button>
+                                                            ))}
                                                         {notes
                                                             .filter(
                                                                 (note) =>
@@ -1684,6 +1796,25 @@ export default function Ensemble() {
                     </button>
                     <button className="btn" disabled={busy} onClick={() => void run(exportSong)}>
                         Export file
+                    </button>
+                    {current?.schemaVersion === 2 && current.importSource && (
+                        <button
+                            className="btn"
+                            disabled={busy}
+                            onClick={() => downloadImportSource(current.importSource!.text)}
+                        >
+                            Download original source
+                        </button>
+                    )}
+                    <button
+                        className="btn"
+                        disabled={busy}
+                        onClick={() => {
+                            setMenu(false);
+                            setImporting(true);
+                        }}
+                    >
+                        Import chart
                     </button>
                     <button
                         className="btn"

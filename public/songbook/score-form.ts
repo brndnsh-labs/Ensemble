@@ -1,5 +1,5 @@
 import { validateSemanticScore } from './score-codec.js';
-import type { ScoreDirection, ScoreSection } from './score-types.js';
+import type { ScoreDirection, ScoreSection, SemanticScore } from './score-types.js';
 
 export interface ScoreFormVisit {
     sectionIndex: number;
@@ -25,7 +25,7 @@ interface Repeat {
 
 const MAX_MEASURES = 16_384;
 const MAX_DEPTH = 16;
-const SUPPORTED = new Set(['repeat-start', 'repeat-end', 'ending-start', 'ending-end']);
+const FORM_DIRECTIONS = new Set(['repeat-start', 'repeat-end', 'ending-start', 'ending-end']);
 
 /** Build a small syntax tree before expanding anything. Sections are independent forms. */
 function sectionForm(section: ScoreSection): Node[] {
@@ -61,14 +61,8 @@ function sectionForm(section: ScoreSection): Node[] {
         for (const edge of ['start', 'end'] as const) {
             const seen = new Set<string>();
             for (const direction of bar[edge] ?? []) {
-                if (!SUPPORTED.has(direction.kind)) {
-                    fail(
-                        i,
-                        'D.C./D.S., coda and Fine playback are not available yet. The chart is preserved.',
-                    );
-                }
                 if (seen.has(direction.kind)) {
-                    fail(i, 'Duplicate repeat or ending marker.');
+                    fail(i, 'Duplicate repeat, ending or navigation marker on one boundary.');
                 }
                 seen.add(direction.kind);
             }
@@ -218,7 +212,10 @@ function sectionForm(section: ScoreSection): Node[] {
     for (const [index, bar] of bars.entries()) {
         for (const edge of ['start', 'end'] as const) {
             for (const direction of bar[edge] ?? []) {
-                if (!used.has(key(index, edge, direction.kind))) {
+                if (
+                    FORM_DIRECTIONS.has(direction.kind) &&
+                    !used.has(key(index, edge, direction.kind))
+                ) {
                     fail(
                         index,
                         'An ending must belong to a complete repeat and cannot cross a nested boundary.',
@@ -230,18 +227,148 @@ function sectionForm(section: ScoreSection): Node[] {
     return result;
 }
 
-/** Validate authored form, then unfold a bounded itinerary. Never changes the score. */
-export function compileScoreForm(candidate: unknown): ScoreFormVisit[] {
-    const checked = validateSemanticScore(candidate);
-    if (checked.kind !== 'ok') {
-        const issue = checked.kind === 'invalid' ? checked.issues[0] : null;
-        throw new Error(
-            `The chart is invalid${issue ? ` (${issue.path}: ${issue.message})` : ''}; its source has not been changed.`,
-        );
+type Jump = Extract<ScoreDirection, { kind: 'jump' }>;
+type Marker = Extract<ScoreDirection, { kind: 'segno' | 'coda' | 'fine' }>;
+interface Boundary {
+    sectionIndex: number;
+    measureIndex: number;
+    edge: 'start' | 'end';
+    /** Written measure boundary, independent of repeat expansion. */
+    position: number;
+    directions: (Jump | Marker)[];
+}
+type PerformanceStep =
+    | { kind: 'measure'; visit: ScoreFormVisit }
+    | { kind: 'boundary'; boundary: Boundary };
+interface Tape {
+    steps: PerformanceStep[];
+    markers: Map<string, number[]>;
+}
+
+function failAt(score: SemanticScore, boundary: Boundary, message: string): never {
+    throw new Error(
+        `${score.sections[boundary.sectionIndex].label}, bar ${boundary.measureIndex + 1}: ${message} The chart is preserved.`,
+    );
+}
+
+function expansionLimit(): never {
+    throw new Error(
+        'This chart expands beyond the playback limit of 16,384 measures. Reduce repeats.',
+    );
+}
+
+function boundaryKey(sectionIndex: number, measureIndex: number, edge: 'start' | 'end') {
+    return `${sectionIndex}:${measureIndex}:${edge}`;
+}
+
+/** Validate every authored navigation command, including ones a later jump may bypass. */
+function navigation(score: SemanticScore, forms: Node[][]) {
+    const boundaries = new Map<string, Boundary>();
+    const markers = new Map<string, Boundary>();
+    const commands: { jump: Jump; boundary: Boundary }[] = [];
+    let position = 0;
+    score.sections.forEach((section, sectionIndex) => {
+        section.measures.forEach((measure, measureIndex) => {
+            for (const edge of ['start', 'end'] as const) {
+                const directions = (measure[edge] ?? []).filter(
+                    (direction): direction is Jump | Marker => !FORM_DIRECTIONS.has(direction.kind),
+                );
+                if (!directions.length) {
+                    continue;
+                }
+                const boundary: Boundary = {
+                    sectionIndex,
+                    measureIndex,
+                    edge,
+                    position: position + (edge === 'end' ? 1 : 0),
+                    directions,
+                };
+                boundaries.set(boundaryKey(sectionIndex, measureIndex, edge), boundary);
+                for (const direction of directions) {
+                    if (direction.kind === 'jump') {
+                        commands.push({ jump: direction, boundary });
+                    } else {
+                        markers.set(direction.label, boundary);
+                    }
+                }
+            }
+            position++;
+        });
+    });
+    function checkCommandOwnership(nodes: Node[], sectionIndex: number, nested: boolean) {
+        for (const node of nodes) {
+            if (node.kind === 'repeat') {
+                checkCommandOwnership(node.body, sectionIndex, true);
+                for (const ending of node.endings) {
+                    checkCommandOwnership(ending.body, sectionIndex, true);
+                }
+            } else {
+                const boundary = boundaries.get(boundaryKey(sectionIndex, node.index, 'end'));
+                if (
+                    boundary?.directions.some((direction) => direction.kind === 'jump') &&
+                    (nested || score.sections[sectionIndex].repeat > 1)
+                ) {
+                    failAt(
+                        score,
+                        boundary,
+                        'Jump timing inside a repeated passage is ambiguous. Place the D.C./D.S. command after the complete repeat and its endings in a section that plays once.',
+                    );
+                }
+            }
+        }
     }
-    const score = checked.value;
-    const forms = score.sections.map(sectionForm);
-    const visits: ScoreFormVisit[] = [];
+    forms.forEach((form, sectionIndex) => checkCommandOwnership(form, sectionIndex, false));
+    for (const { jump, boundary } of commands) {
+        if (jump.destination.kind === 'ending') {
+            failAt(
+                score,
+                boundary,
+                'D.C./D.S. al ending is not supported yet: its owning repeat and stopping Fine must be explicit. Use an explicit Fine or coda destination.',
+            );
+        }
+        const start = jump.from === 'start' ? 0 : markers.get(jump.segno!)!.position;
+        if (start >= boundary.position) {
+            failAt(score, boundary, 'A D.C./D.S. jump must return to an earlier boundary.');
+        }
+        if (jump.destination.kind === 'coda') {
+            const via = markers.get(jump.destination.via)!;
+            const target = markers.get(jump.destination.target)!;
+            if (target.position <= via.position) {
+                failAt(
+                    score,
+                    boundary,
+                    'The coda arrival must follow its departure; a backward coda would create a navigation cycle.',
+                );
+            }
+        }
+    }
+    return { boundaries, commands };
+}
+
+/** A bounded repeat tape retains exact boundaries, rather than attaching markers to visits. */
+function performanceTape(
+    score: SemanticScore,
+    forms: Node[][],
+    boundaries: Map<string, Boundary>,
+    policy: 'play' | 'skip',
+): Tape {
+    const steps: PerformanceStep[] = [];
+    const markers = new Map<string, number[]>();
+    let measures = 0;
+    function emitBoundary(sectionIndex: number, measureIndex: number, edge: 'start' | 'end') {
+        const boundary = boundaries.get(boundaryKey(sectionIndex, measureIndex, edge));
+        if (!boundary) {
+            return;
+        }
+        for (const direction of boundary.directions) {
+            if (direction.kind !== 'jump') {
+                const positions = markers.get(direction.label) ?? [];
+                positions.push(steps.length);
+                markers.set(direction.label, positions);
+            }
+        }
+        steps.push({ kind: 'boundary', boundary });
+    }
     function perform(
         nodes: Node[],
         sectionIndex: number,
@@ -250,19 +377,24 @@ export function compileScoreForm(candidate: unknown): ScoreFormVisit[] {
     ) {
         for (const node of nodes) {
             if (node.kind === 'bar') {
-                if (visits.length >= MAX_MEASURES) {
-                    throw new Error(
-                        'This chart expands beyond the playback limit of 16,384 measures. Reduce repeats.',
-                    );
+                if (measures++ >= MAX_MEASURES) {
+                    expansionLimit();
                 }
-                visits.push({
-                    sectionIndex,
-                    measureIndex: node.index,
-                    sectionPass,
-                    repeatPasses: [...repeatPasses],
+                emitBoundary(sectionIndex, node.index, 'start');
+                steps.push({
+                    kind: 'measure',
+                    visit: {
+                        sectionIndex,
+                        measureIndex: node.index,
+                        sectionPass,
+                        repeatPasses: [...repeatPasses],
+                    },
                 });
+                emitBoundary(sectionIndex, node.index, 'end');
             } else {
-                for (let pass = 1; pass <= node.times; pass++) {
+                // Native score policy: skipping repeats takes their final pass/ending,
+                // recursively. Importers must not guess this policy from ambiguous text.
+                for (let pass = policy === 'skip' ? node.times : 1; pass <= node.times; pass++) {
                     const path = [...repeatPasses, pass];
                     perform(node.body, sectionIndex, sectionPass, path);
                     const ending = node.endings.find((entry) => entry.passes.includes(pass));
@@ -274,9 +406,144 @@ export function compileScoreForm(candidate: unknown): ScoreFormVisit[] {
         }
     }
     forms.forEach((form, sectionIndex) => {
-        for (let pass = 0; pass < score.sections[sectionIndex].repeat; pass++) {
+        const times = score.sections[sectionIndex].repeat;
+        for (let pass = policy === 'skip' ? times - 1 : 0; pass < times; pass++) {
             perform(form, sectionIndex, pass, []);
         }
     });
+    return { steps, markers };
+}
+
+/** Validate authored form, then unfold a bounded global itinerary. Never changes the score. */
+export function compileScoreForm(candidate: unknown): ScoreFormVisit[] {
+    const checked = validateSemanticScore(candidate);
+    if (checked.kind !== 'ok') {
+        const issue = checked.kind === 'invalid' ? checked.issues[0] : null;
+        throw new Error(
+            `The chart is invalid${issue ? ` (${issue.path}: ${issue.message})` : ''}; its source has not been changed.`,
+        );
+    }
+    const score = checked.value;
+    const forms = score.sections.map(sectionForm);
+    const { boundaries, commands } = navigation(score, forms);
+    const play = performanceTape(score, forms, boundaries, 'play');
+    const skip = commands.some(({ jump }) => jump.repeats === 'skip')
+        ? performanceTape(score, forms, boundaries, 'skip')
+        : play;
+    for (const { jump, boundary } of commands) {
+        const selected = jump.repeats === 'skip' ? skip : play;
+        const start = jump.from === 'start' ? 0 : selected.markers.get(jump.segno!)?.[0];
+        const destination = jump.destination;
+        const label =
+            destination.kind === 'fine'
+                ? destination.label
+                : destination.kind === 'coda'
+                  ? destination.via
+                  : undefined;
+        if (
+            start === undefined ||
+            (label !== undefined &&
+                !selected.markers.get(label)?.some((index) => index >= start)) ||
+            (destination.kind === 'coda' && !selected.markers.has(destination.target))
+        ) {
+            failAt(
+                score,
+                boundary,
+                'The navigation destination is unreachable under the selected repeat policy.',
+            );
+        }
+        if (destination.kind === 'coda') {
+            const departure = selected.markers
+                .get(destination.via)!
+                .find((index) => index >= start)!;
+            const arrival = selected.markers.get(destination.target)![0];
+            if (arrival <= departure) {
+                failAt(
+                    score,
+                    boundary,
+                    'The coda arrival must follow its departure in the performed repeat route; this navigation would jump backward.',
+                );
+            }
+        }
+    }
+    const used = new Set<Jump>();
+    const visits: ScoreFormVisit[] = [];
+    let tape = play;
+    let cursor = 0;
+    let active: { jump: Jump; boundary: Boundary } | undefined;
+
+    function target(label: string, boundary: Boundary): number {
+        const index = tape.markers.get(label)?.[0];
+        if (index === undefined) {
+            failAt(
+                score,
+                boundary,
+                'The navigation destination is unreachable under the selected repeat policy.',
+            );
+        }
+        return index;
+    }
+    while (cursor < tape.steps.length) {
+        const step = tape.steps[cursor++];
+        if (step.kind === 'measure') {
+            if (visits.length >= MAX_MEASURES) {
+                expansionLimit();
+            }
+            visits.push({ ...step.visit, repeatPasses: [...step.visit.repeatPasses] });
+            continue;
+        }
+        const { boundary } = step;
+        const destination = active?.jump.destination;
+        if (
+            destination?.kind === 'fine' &&
+            boundary.directions.some(
+                (direction) => direction.kind === 'fine' && direction.label === destination.label,
+            )
+        ) {
+            return visits;
+        }
+        if (
+            destination?.kind === 'coda' &&
+            boundary.directions.some(
+                (direction) => direction.kind === 'coda' && direction.label === destination.via,
+            )
+        ) {
+            const arrival = target(destination.target, active!.boundary);
+            if (arrival < cursor) {
+                failAt(
+                    score,
+                    active!.boundary,
+                    'The coda arrival must follow its departure in the performed repeat route; this navigation would jump backward.',
+                );
+            }
+            cursor = arrival;
+            active = undefined;
+            continue;
+        }
+        const jump = boundary.directions.find(
+            (direction): direction is Jump => direction.kind === 'jump',
+        );
+        if (!jump || used.has(jump)) {
+            continue;
+        }
+        if (active && active.jump.destination.kind !== 'end') {
+            failAt(
+                score,
+                boundary,
+                'A second jump is reached before the active Fine or coda; the navigation destination is ambiguous.',
+            );
+        }
+        used.add(jump);
+        active = { jump, boundary };
+        tape = jump.repeats === 'skip' ? skip : play;
+        cursor = jump.from === 'start' ? 0 : target(jump.segno!, boundary);
+    }
+    if (active && active.jump.destination.kind !== 'end') {
+        failAt(
+            score,
+            active.boundary,
+            'The requested Fine or coda departure is unreachable after the jump.',
+        );
+    }
     return visits;
 }

@@ -653,18 +653,18 @@ describe('semantic score form: rejection is visible, complete and bounded', () =
     );
 
     it.each(['segno', 'coda', 'fine'] as const)(
-        'rejects unsupported %s, even with otherwise valid repeats',
+        'keeps unarmed %s markers without changing the repeat route',
         (kind) => {
             const score = alternateEndings();
             score.sections[0].measures[2].start?.push({ kind, label: 'unsupported-marker' });
             expect(validateSemanticScore(score).kind).toBe('ok');
-            expect(() => compileScoreForm(score)).toThrow(
-                /segno|coda|fine|navigation|direction|supported/i,
-            );
+            const original = structuredClone(score);
+            expect(performedIds(score)).toEqual(['a', 'b', 'c', 'a', 'b', 'd', 'e']);
+            expect(score).toEqual(original);
         },
     );
 
-    it('rejects a structurally valid D.C. jump rather than silently omitting it', () => {
+    it('performs a D.C. jump and explicitly skips to final repeat endings on return', () => {
         const score = alternateEndings();
         score.sections[0].measures[4].end = [
             {
@@ -675,9 +675,21 @@ describe('semantic score form: rejection is visible, complete and bounded', () =
             },
         ];
         expect(validateSemanticScore(score).kind).toBe('ok');
-        expect(() => compileScoreForm(score)).toThrow(
-            /D\.C\.|jump|navigation|direction|supported/i,
-        );
+        const original = structuredClone(score);
+        expect(performedIds(score)).toEqual([
+            'a',
+            'b',
+            'c',
+            'a',
+            'b',
+            'd',
+            'e',
+            'a',
+            'b',
+            'd',
+            'e',
+        ]);
+        expect(score).toEqual(original);
     });
 
     it('supports the full sixteen-level nesting boundary when the performed result is small', () => {

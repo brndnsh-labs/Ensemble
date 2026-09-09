@@ -1,10 +1,10 @@
 # V2 charts: explicit music, flexible page
 
-Status: **direction accepted; repeat/ending playback and measure editor implemented under #1171**, 2026-09-08.
+Status: **direction accepted; iReal import and navigation checkpoint under verification in #1171**, 2026-09-09.
 Brandon explicitly approved changing the document format and targeting full iReal chart
 compatibility, while retaining quick text entry and Ensemble's additional capabilities.
 This supersedes the earlier proposal's permanently limited compatibility boundary.
-There is no implemented iReal importer or in-place migration yet. The isolated preview can
+There is a conservative iReal importer, but no in-place migration. The isolated preview can
 read both document versions; production remains unchanged. Test deployment and human audition
 are separate from the implementation described here.
 
@@ -31,7 +31,7 @@ are separate from the implementation described here.
   A host without a semantic renderer fails explicitly if handed a prepared semantic chart.
 - Playback is bounded to 65,536 events, 16,384 performed measures and 1,048,576 steps. The
   wider authored codec remains separate. Unsupported meters, off-grid divisions, qualities
-  beyond the existing voicer, measure-repeat signs, D.C./D.S./coda/Fine, N.C., holds, alternates
+  beyond the existing voicer, ambiguous navigation, N.C., holds, alternates
   and fermatas fail visibly before runtime adoption. They are not stripped or played as tonic.
 - Older preview clients reject v2 records and may fail to enumerate a mixed-version library.
   Keeping a v1 source protects its data, **not** cross-version simultaneous editing. Export
@@ -39,6 +39,14 @@ are separate from the implementation described here.
   remains a separate stage.
 
 ## Recommended next build
+
+Current batch adds source-preserving import review, context-checked one-/two-bar reference
+resolution, and bounded native D.C./D.S. to end/Fine/coda. Global performed order is authoritative;
+the written stand uses detached display maps for bypassed bars. Native repeat-after-jump policy
+is explicit (`play` restarts repeats, `skip` selects final passes), not inferred for ambiguous
+iReal forms. Jump commands within repeats and al-Nth-ending destinations remain blocked.
+The optional document `importSource` holds inert original text and its format, not runtime state.
+This is additive preview work, not production adoption or complete iReal compatibility.
 
 With the exact-timing foundation and first measure-aware editor implemented, build faithful
 iReal import and form playback in verifiable slices. Keep quick text entry and the
@@ -156,7 +164,8 @@ The authored form model retains section repeats, repeat barlines, ending passes,
 coda/Fine destinations and explicit repeat-policy-after-jump. Playback executes section counts
 and self-contained section repeat/ending form through `compileScoreForm`. It validates nesting,
 ending reachability, ambiguity and bounded traversal into an itinerary with written
-section/measure indices and pass numbers. D.C./D.S./coda/Fine remain unavailable for playback. A codec
+section/measure indices and pass numbers. Bounded D.C./D.S./coda/Fine traversal now preserves
+that global order; unsupported/ambiguous jump forms still fail explicitly. A codec
 success proves authored-data validity and references, not that the form can be performed.
 Never use an unfolded chord list as the only retained chart.
 
@@ -252,25 +261,25 @@ The decoded body and hand-reviewed bar expectation are in
 [`fixtures/ensemble-v2-charts.json`](fixtures/ensemble-v2-charts.json). They establish a
 fixture for this specific export, not general import or by-ear compatibility.
 
-### Compatibility ledger (import remains a target)
+### Compatibility ledger (full compatibility remains a target)
 
 | Feature | Current preview / next work | Proof still required |
 | --- | --- | --- |
-| Single-song modern export, simple 4/4 | Target | Actual importer against the supplied fixture; key/tempo interpretation. |
-| Generated open-protocol link | Target, separate decoder | Synthetic protocol fixtures and current-app round trip. |
-| Whole-bar chords and previous-measure repeat | Target; retain source provenance | Correct source references and playback event equivalence. |
+| Single-song modern export, simple 4/4 | Conservative decoder/import review implemented | Supplied Blues import/browser evidence; displayed-key interpretation remains explicit rather than guessed. |
+| Generated open-protocol link | Separate decoder implemented | Synthetic protocol fixtures; current-app round trip still outstanding. |
+| Whole-bar chords and previous-measure repeat | Context-checked native playback and import implemented | Source retention and exact engine maps; physical-device audition. |
 | Unequal chord durations | Native editing/playback implemented; import only for verified cell patterns | Short real exports for 2+1+1 and 1+1+2; no guessed cell rounding. |
 | Qualities and slash bass | Wider authored vocabulary; conservative existing-engine subset playable | Complete official vocabulary mapping and harmonic-identity fixtures; no partial matches. |
 | Whole-section repeats | Native playback implemented; repeat controls and import still pending | Distinguish written repeats from player chorus count; real import fixture. |
-| Repeat barlines and first/second endings | Native compact display, editing and bounded playback implemented within sections | Real-device audition, import mapping and cross-section forms. |
-| D.C./D.S., coda, Fine | Authored directions represented; navigation execution pending | Bounded traversal, import mapping and auditioned fixtures. |
+| Repeat barlines and first/second endings | Native compact display/edit/play and conservative import within sections | Real-device audition and cross-section repeat forms. |
+| D.C./D.S., coda, Fine | Native global traversal and conservative unambiguous import implemented | Al-Nth-ending destinations, jumps inside repeats, ambiguous import repeat policy and physical-device audition. |
 | N.C., holds, alternate chords, fermatas | Authored events represented; playback pending | Per-lane meaning, editing and faithful import mapping. |
 | Other rhythmic notation, rests and pushes | Inventory and represent without guessing equivalence | Current protocol/app fixtures and explicit lane semantics. |
 | Meter/key changes | Native bar editing, sticky contexts and supported-meter playback tested | Real-device and audible acceptance; source import mapping. |
 | Unsupported meters or off-grid timing | Block, explain location | Never substitute 4/4 or round durations. |
 | Long charts | No fixed page limit | Synthetic 64/128-bar layouts and explicit input/expansion bounds. |
-| Playlist HTML | Import-surface follow-up | Per-song selection/diagnostics; no silent first-song-only import. |
-| Composer, title, style, transpose, tempo | Basic document metadata represented; source mapping pending | Preserve raw import metadata separately; no style-to-genre or zero-tempo guess. |
+| Playlist HTML | Bounded supported-envelope selection/diagnostics implemented | Additional real playlist envelopes; no silent first-song-only import. |
+| Composer, title, style, transpose, tempo | Display metadata plus original source retained; starting tempo explicit | Verify raw transpose/tempo/repetition meanings before applying them automatically. |
 
 Unsupported-at-this-stage means visibly unavailable until implemented, not intentionally
 excluded from v2. The ledger must distinguish authored representation, editor support,

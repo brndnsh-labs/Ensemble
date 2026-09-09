@@ -136,6 +136,41 @@ function documentFixture(): ChartDocumentV2 {
 }
 
 describe('semantic authored-score validation', () => {
+    it('retains inert original import bytes through document validation and export', () => {
+        const document = documentFixture();
+        document.importSource = {
+            format: 'irealb',
+            text: '<html><script>never execute</script>\r\n<a href="irealb://source">original</a></html>',
+        };
+        const encoded = encodeChartDocumentV2(document);
+        expect(encoded.kind).toBe('ok');
+        if (encoded.kind !== 'ok') {
+            throw new Error('Expected valid import source');
+        }
+        expect(decodeChartDocumentV2(encoded.json)).toEqual({ kind: 'ok', value: document });
+        expect(
+            validateChartDocumentV2({
+                ...document,
+                importSource: { format: 'https', text: 'source' },
+            }).kind,
+        ).toBe('invalid');
+        expect(
+            validateChartDocumentV2({ ...document, importSource: { format: 'irealb', text: '' } })
+                .kind,
+        ).toBe('invalid');
+        expect(
+            validateChartDocumentV2({
+                ...document,
+                importSource: { format: 'irealb', text: 'x', executable: true },
+            }).kind,
+        ).toBe('invalid');
+        expect(
+            validateChartDocumentV2({
+                ...document,
+                importSource: { format: 'irealb', text: 'é'.repeat(524_289) },
+            }).kind,
+        ).toBe('invalid');
+    });
     it('shares explicit context inheritance and meter-grouping reset rules', () => {
         const global = { key: 'C', isMinor: false, meter: '4/4', grouping: [2, 2] };
         const section = resolveScoreContext(global, { key: 'D', isMinor: true });

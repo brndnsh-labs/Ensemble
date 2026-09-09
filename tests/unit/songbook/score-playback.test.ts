@@ -98,6 +98,54 @@ function musicalChord(chord: Chord) {
 }
 
 describe('semantic score playback: exact authored timing', () => {
+    it('keeps bypassed coda bars visible without inventing performed visits or audition indices', () => {
+        const score = scoreFixture([
+            bar('a', 'C', '4/4', { end: [{ kind: 'coda', label: 'leave' }] }),
+            bar('jump', 'G7', '4/4', {
+                end: [
+                    {
+                        kind: 'jump',
+                        from: 'start',
+                        repeats: 'skip',
+                        destination: { kind: 'coda', via: 'leave', target: 'tail' },
+                    },
+                ],
+            }),
+            bar('bypassed', 'Dm7'),
+            bar('tail', 'F', '4/4', { start: [{ kind: 'coda', label: 'tail' }] }),
+        ]);
+        const state = fullStateFixture(score);
+        validateProgression(state);
+        const before = structuredClone(state.arranger.progression);
+        const written = fullStateFixture(score);
+        written.arranger.scorePlan = {
+            ...written.arranger.scorePlan!,
+            visits: score.sections[0].measures.map((_, measureIndex) => ({
+                sectionIndex: 0,
+                measureIndex,
+                sectionPass: 0,
+                repeatPasses: [],
+            })),
+        };
+        validateProgression(written);
+        const bars = scoreLeadSheet(state.arranger, score, written.arranger)[0].measures;
+        expect(bars.map((measure) => measure.chords[0].measureId)).toEqual([
+            'a',
+            'jump',
+            'bypassed',
+            'tail',
+        ]);
+        expect(bars[2].chords[0].absName).toBe('Dm7');
+        expect(bars[2].chords[0].globalIndex).toBeLessThan(0);
+        expect(state.arranger.progression.map((chord) => chord.measureId)).toEqual([
+            'a',
+            'jump',
+            'a',
+            'tail',
+        ]);
+        expect(state.arranger.progression).toEqual(before);
+        expect(scoreDisplayIndices(state.arranger)).toEqual([0, 1, 0, 3]);
+    });
     it('plays alternate endings with exact offsets and written context on every visit', () => {
         const score = scoreFixture([
             bar('a1', 'C:2 Dm:1 G7:1', '4/4', { start: [{ kind: 'repeat-start' }] }),
@@ -526,13 +574,26 @@ describe('semantic score playback: capability and atomicity boundaries', () => {
         }
     });
 
-    it('rejects a measure-repeat reference instead of treating it as an empty bar', () => {
+    it('plays a measure-repeat reference without treating it as an empty bar or rewriting its source', () => {
         const score = scoreFixture([
             bar('a1', 'C'),
             { id: 'a2', content: { kind: 'repeat', measureId: 'a1', display: 'one-bar' } },
         ]);
         expect(validateSemanticScore(score).kind).toBe('ok');
-        expect(() => prepareScorePlayback(score)).toThrow(/measure-repeat/i);
+        const original = structuredClone(score);
+        const state = fullStateFixture(score);
+        validateProgression(state);
+        expect(state.arranger.progression.map((chord) => [chord.absName, chord.measureId])).toEqual(
+            [
+                ['C', 'a1'],
+                ['C', 'a2'],
+            ],
+        );
+        expect(state.arranger.measureMap.map(({ start, end }) => [start, end])).toEqual([
+            [0, 16],
+            [16, 32],
+        ]);
+        expect(score).toEqual(original);
     });
 
     it('rejects an authored meter the engine cannot play instead of using 4/4', () => {

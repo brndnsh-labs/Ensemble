@@ -242,3 +242,63 @@ regression covers the passive-effect window); BR2 replaces an inaccurate retry p
 with reconnect/reload guidance after a browser reproduction showed a failed module fetch
 remains cached in the current page. Reload recovery preserves the chart and is tested;
 the application never reloads automatically on a failed download.
+
+## iReal import, navigation and measure-reference checkpoint (part of #1171)
+
+The next user-approved parallel batch separates import decoding/notation, global navigation,
+written measure references and independent contracts. The main thread owns host integration,
+source retention, review and verification. These notes supersede the earlier checkpoints'
+statements that import, D.C./D.S./Fine/coda and measure-repeat playback were unavailable.
+
+Import chart now reviews bounded HTML exports or direct chart links without creating a DOM,
+fetching resources or writing the songbook. Explicit Add makes an independent local document.
+Exact input survives as inert `importSource`, including after transpose/save/export; blocked
+input can be downloaded as plain text. Stored key and chosen starting tempo are explicit;
+unverified export transpose, style and chorus-count meanings are not silently applied.
+
+The compiler preserves one global performed route across sections. Native repeat-after-jump
+policy is explicit; ambiguous imported policy, jumps within repeated passages and al-Nth-ending
+destinations remain blocked. One-/two-bar signs resolve earlier written identities with matching
+key/mode/meter/grouping, not preceding performed events. The stand remains compact and preserves
+bypassed written bars through detached display-only maps. No worker field or generator changed.
+
+Main-thread integration found and closed alias/title-boundary mismatches and a missing display
+path for valid coda-bypassed bars. Independent tests caught an empty interior bar being dropped;
+the importer now rejects it without offering partial music. Independent safety and navigation/
+adapter reviews found no remaining blocking defects. Two narrow follow-ups were independently
+closed: memoized capability checks and exact active timing metadata for collapsed repeat bars.
+
+Local evidence: 328 focused chart/import tests pass. After the narrow review refinements,
+all 76 full-preview browser cases pass in Chromium and WebKit, including eight import cases
+with exact multi-chord-repeat and D.C. al Fine highlight sequences through the next loop.
+Tests also exercise inert source, explicit adoption, stored-key interpretation,
+transposition, persistence, exported source, offline cold reopening and rejected imports.
+Main-thread visual inspection checked both review and focused-stand captures:
+
+- [Import review, laptop](evidence/ireal-import-review-laptop.png)
+- [Import review, WebKit phone](evidence/ireal-import-review-phone.png)
+- [Imported stand, laptop](evidence/ireal-import-stand-laptop.png)
+- [Imported stand, WebKit phone](evidence/ireal-import-stand-phone.png)
+
+The real local Blues export imports twelve written bars. Minor Swing still blocks at its bass
+break annotation; private original HTML was not copied into the repository. N.C., holds/breaks,
+alternates, fermatas, unsupported compression/rhythm and the remaining compatibility ledger
+are not claimed as playable. Original-app regression, exact-head CI and isolated deployment
+receipts belong in PR #1173. This remains draft/test-only, without by-ear or physical-device
+acceptance, production adoption, downgrade compatibility or a persisted-data rewrite.
+
+### Original-app Settings regression precondition
+
+Two full root E2E runs reported an 85px Settings scroll delta. A faithful isolated run reproduced
+it once in five attempts. Trace evidence placed the 407-to-322 movement in Playwright's own
+actionability/scroll preparation, before the state-changing click; the entrance animation was
+still active. A standalone probe that explicitly installed the E2E flag did not reproduce it,
+which was not sufficient evidence to dismiss the suite failure.
+
+The bounded test-only repair performs a trial click before capturing a positive scroll baseline,
+then verifies the real checkbox change and keeps the existing delayed less-than-5px assertion.
+It adds no retries or longer timeout and changes no application behavior. Twenty measured probe
+runs and twenty actual retry-free test repetitions pass. Five simulated old delayed-refocus
+mutations still move 407 to zero and fail the original assertion. Independent exact-diff closure
+is clean; final full-suite results belong in the PR receipt. The ineffective global E2E-flag
+configuration was not broadly rewritten as part of this checkpoint.

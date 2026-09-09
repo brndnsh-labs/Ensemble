@@ -56,7 +56,11 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/songbook/score-types.ts` | Document-v2 authored-score types: exact events, measures, context, repeat and jump directions; isolated preview adoption preserves v1 sources. | `ChartDocumentV2`, `SemanticScore`, `ScoreMeasure`, `ScoreDirection` |
 | `public/songbook/score-duration.ts` | Bounded rational quarter-note arithmetic and exact sixteenth-grid capability checks. | `scoreDuration`, `scoreMeter`, `durationToSteps` |
 | `public/songbook/score-context.ts` | Shared key/mode/meter inheritance and beat-grouping reset for already-validated authored contexts. | `resolveScoreContext` |
-| `public/songbook/score-form.ts` | Pure bounded repeat/ending compiler: validates self-contained section form and emits written-measure visits with pass provenance. | `compileScoreForm`, `ScoreFormVisit` |
+| `public/songbook/score-form.ts` | Bounded repeat/ending and global D.C./D.S./Fine/coda traversal; preserves source identities and explicit repeat-after-jump policy. | `compileScoreForm`, `ScoreFormVisit` |
+| `public/songbook/score-measure-events.ts` | Detached, bounded written-identity resolution of one-/two-bar references, with context and pair integrity checks. | `resolveScoreMeasureEvents` |
+| `public/songbook/ireal-import.ts` | Source-preserving iReal import results, raw metadata and per-song blocking diagnostics. | `parseIRealImport`, `IRealImportResult` |
+| `public/songbook/ireal-decode.ts` | Bounded inert HTML/link extraction, separate protocol envelopes and modern permutation decoder. | `decodeIRealInput`, `decodeIRealMusic` |
+| `public/songbook/ireal-score.ts` | Conservative rhythm-cell and notation mapping into validated semantic scores; uncertain music blocks import. | `scoreFromIRealBody` |
 | `public/songbook/score-playback.ts` | Bounded semantic-score playback capability checks and exact chord/measure maps over performed visits; preserves written context and existing voicing. | `prepareScorePlayback`, `renderScorePlayback`, `scoreArrangement` |
 | `public/songbook/score-text.ts` | Complete-token chord-bar parsing/printing, meter-labelled lengths and alternate spellings; independent of voicing. | `parseChordBar`, `printChordBar`, `isScoreChord` |
 | `public/songbook/score-codec.ts` | Detached authored-score validation, duration sums and source/marker reference integrity; not a performance itinerary compiler. | `validateSemanticScore` |
