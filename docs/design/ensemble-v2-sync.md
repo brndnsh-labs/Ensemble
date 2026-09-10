@@ -359,7 +359,10 @@ small implementation children with exact files, prerequisites and tests before s
    sessions and recovery-only enrollment on disposable data. Tests must reject wrong origin/RP,
    cross-account ceremonies, expired/replayed challenges, missing user verification and concurrent
    recovery claims; interruption cannot consume the sole recovery route. No real account launch
-   until implementation choices and threat-model review are complete.
+   until implementation choices and threat-model review are complete. Shaped and filed on
+   2026-09-10 as #1187-#1192 against a separate Node service at `prototypes/v2-api/`; the
+   [batch index](ensemble-v2-next-batch.md) records the chain, the review requirements and what
+   the sibling codebase does and does not actually supply.
 3. **Owner-bound revision API:** authenticated owner predicates on every read/write/receipt,
    atomic document+receipt transaction, same-byte duplicate success, changed-byte ID rejection,
    revision conflict and tombstone non-resurrection. Prove lost-response and concurrent-client
