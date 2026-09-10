@@ -91,6 +91,45 @@ cookie-authenticated mutations. Never cache private APIs, auth responses, or per
 in the service worker/CDN; responses are private/no-store. The offline cache has an explicit
 allowlist of anonymous shell assets. Auth tokens and recovery codes stay out of localStorage.
 
+### Server-side storage: cleartext documents, measured (DECISION 2026-09-10)
+
+Brandon asked whether sync could be entirely server-side given that we only store text, and
+whether client-side "privacy-preserving compression" was worth it to shrink the server's
+commitment. Measured first, on a representative 32-bar standard serialized as a
+`ChartDocumentV2` — two 16-bar sections, full band config, groove pattern lanes, metadata:
+
+| | per song | 500 songs | 2,000 songs |
+| --- | --- | --- | --- |
+| Raw JSON | 6.4 KB | 3.3 MB | 13.2 MB |
+| gzip | 950 B | 0.5 MB | 1.9 MB |
+| With retained iReal `importSource` | 6.9 KB | 3.6 MB | 14.4 MB |
+
+Storage is therefore **not a design constraint**: a 2,000-chart hoarder costs ~13 MB, and even
+retaining fifty revisions per song for that user stays under a gigabyte. For scale, the shared
+`public/packs/` sound corpus is ~9 MB and is public, content-addressed and per-account free.
+
+Decisions that follow:
+
+- **The server stores readable documents.** Opaque client-side blobs are rejected. Compression
+  is not privacy — a gzipped blob is readable by anyone who can read the server — and opacity
+  would break bounded listing (#1178 needs `title`/`updatedAt`), deny-by-default request
+  validation (#1182 cannot validate what it cannot parse), conflict handling, and the small
+  operator surface. Transport compression is already negotiated by HTTPS, so client-side
+  compression buys nothing on the wire either.
+- **No end-to-end encryption in this product.** It collides with the approved recovery model:
+  passkeys yield no stable encryption key without the WebAuthn PRF extension, and a second
+  passkey derives a different one, so the recovery code would become the key-wrapping secret.
+  Losing it would then make the ciphertext permanently unrecoverable rather than merely locking
+  the account, while retained local charts stay exportable. These are chord charts of largely
+  published songs, not a credential vault; that failure mode costs more than the threat it closes.
+- **Compression at rest, if ever wanted, belongs on the server** (gzip the document column,
+  transparent to every reader). At these sizes it is not worth doing; recorded so the option is
+  known rather than rediscovered.
+- **"Server-side sync" means single authority, not single store.** The revision/receipt protocol
+  below is the sole arbiter — no P2P, no CRDT merge, no timestamp last-write-wins. The
+  local-first store stays regardless: practising without a connection is a product promise, and
+  guest playback must never require a server. Storage economics never justify removing it.
+
 ## Explicit Save protocol
 
 1. Apply and validate pending editor input. In one local transaction, compare the local
@@ -248,13 +287,58 @@ Evidence collected locally on 2026-09-09 at application revision `f2c28fa8`:
 - Local Docker client and daemon report 29.8.0. No image was built or container started.
   The sibling's Node 22 image recipe is not an approved baseline for this Node 26 workspace.
 
-Provisional recommendation: first validate a supervised standalone Node release with SQLite,
-using the existing release/backup habits. Docker remains an optional packaging experiment.
-Before final hosting ratification, compare cold build, warm no-op build, one-source-file rebuild,
-artifact transfer, startup/health, migration and rollback on the same revision and target for
-both candidates. Include native SQLite ABI compatibility, memory/disk use, volume ownership and
-secret handling. No measured standalone-versus-Docker winner is claimed here; #1172 remains
-open until this evidence and the product decisions are ratified.
+### Ratified topology (DECISION 2026-09-10)
+
+The provisional standalone-versus-Docker comparison above is **superseded**. Surveying the
+actual boxes settled it without needing a benchmark, because the deciding facts were not
+performance:
+
+- Ensemble had **no server-side anything**. `scripts/deploy.sh` says so outright — static files
+  on nginx, no app server, no DB, no restart. Accounts introduce the first stateful service, so
+  there was no existing server topology to preserve or migrate.
+- `docker04` already runs fifteen healthy containers on an established convention:
+  `ghcr.io/brndnsh-labs/<app>:sha-<commit>` images, compose stacks under `/opt/docker/<name>/`,
+  healthchecks, uptime-kuma monitoring, and Proxmox firewall rules admitting Caddy alone. An
+  Ensemble API is the ninth service doing what eight others already do, not new infrastructure.
+- The `ensembletest` LXC had **no node, no sqlite3, no restic** installed. Every dependency this
+  service needs would have been hand-installed on a pet box and re-remembered at every upgrade.
+
+Decisions:
+
+1. **The account API runs as a container on `docker04`**, following the existing GHCR/compose
+   convention. Nothing is hand-installed on an LXC.
+2. **The test origin moved to `docker04` first** (2026-09-10, commit `94952e1e`): nginx container
+   at `/opt/docker/ensembletest`, host port 8090, serving the bind mount `/srv/ensemble-test/www`;
+   Caddy's `@ensembletest` block reverse-proxies to it. LXC 116 was verified idle and shut down.
+3. **The API must be a PATH on the existing origin, never a second host.** WebAuthn RP\_ID and
+   session cookies are origin-bound, so a separate API hostname would force CORS, `SameSite=None`
+   and an RP\_ID mismatch. Caddy splits `ensembletest.brndn.zip/api/*` to the API container and
+   everything else to the static container, keeping one origin. The existing
+   `ensemble_cache_policy` snippet touches only `/sw.js` and entry points, so it will not wrongly
+   cache API responses — which must still send `private, no-store` themselves, as Cloudflare also
+   fronts this origin.
+4. **Use `node:sqlite`, not `better-sqlite3`.** Node 26 ships SQLite in core, including the
+   `backup` API needed for WAL-safe snapshots (verified: `node:sqlite` exports `DatabaseSync`,
+   `StatementSync`, `Session`, `constants`, `backup`). This removes the single most load-bearing
+   footgun in the sibling's runbook — its Node ABI pin, where the app must run on
+   `/usr/local/bin/node` v26 because a native module was compiled for NODE\_MODULE\_VERSION 147.
+   A container with zero native dependencies also rebuilds cleanly on any base-image bump.
+5. **Compose restart policy and healthcheck, not pm2.** The sibling runs pm2 *under* systemd, two
+   supervisors stacked, with the attendant `PM2_HOME`/`dump.pm2`/disabled-`pm2-root` scar tissue.
+   A fresh service inherits none of it.
+6. **Backup/restore is ported from `../songsiknow`**, adapted to the bind-mounted database:
+   `sqlite3 .backup` (never `cp` — the WAL sidecar makes a plain copy silently near-empty),
+   gzipped and rotated locally, plus a daily restic push to Backblaze B2, and the same
+   stop → gunzip → drop `-wal`/`-shm` → chown → start restore procedure. Nothing to back up until
+   a database exists; this lands with stage 3, not before.
+7. **Test and prod now differ at the hosting layer**, accepted deliberately. Prod remains the
+   plain nginx LXC. A container-only test result is therefore not automatically a prod result.
+   Migrating the static site on both sides — and retiring the LXC pattern — is a separate,
+   post-v2 concern, not entangled with accounts.
+
+Docker is **not** mandated for the v1/v2 static app, and no production cutover is authorized by
+any of the above. What remains open on #1172 is operational, not architectural: backup/restore
+rehearsal on a real database, and the physical Edge/macOS + iPhone acceptance in stage 6.
 
 ## Staged implementation acceptance
 
@@ -292,11 +376,15 @@ small implementation children with exact files, prerequisites and tests before s
    downloads and required sound verification support offline cold start. Account switch, expired
    session and sign-out preflight preserve work and isolate owners; pending remote logout cannot
    destroy a later session. Preserve guest/legacy sentinels and instrument voices throughout.
-6. **Test hosting and recovery rehearsal:** ratify topology/backup policy from measurements;
-   verify immutable release identity, private-cache exclusions, WAL-safe backup, isolated restore,
-   server epoch invalidation and rollback applicability. Then physical Edge/macOS and iPhone
-   passkey/playback/eviction acceptance. No production cutover or destructive migration follows
-   automatically from a green preview.
+6. **Test hosting and recovery rehearsal:** topology is **ratified and partly built** — see
+   *Ratified topology* above; the test origin is a container on `docker04` as of `94952e1e`, and
+   immutable release identity is already proven (the v2 deploy re-fetches and hashes all 259
+   assets plus the worker over the public origin on every run). Still open here, and all of it
+   needs a real database first: WAL-safe backup on the bind-mounted file, isolated restore,
+   server epoch invalidation, rollback applicability, and confirmation that private-cache
+   exclusions hold once `/api/*` exists behind the same origin. Then physical Edge/macOS and
+   iPhone passkey/playback/eviction acceptance. No production cutover or destructive migration
+   follows automatically from a green preview, and prod remains the plain nginx LXC.
 7. **Snapshots/admin:** after the save/open/offline journey, separately scope immutable public
    snapshots with revocation and stripped private source/metadata, plus registrations, foreground
    return activity and bounded error/suggestion intake. Old shares remain compatible; automatic
