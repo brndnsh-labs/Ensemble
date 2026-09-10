@@ -65,6 +65,20 @@ describe('local safety is separate from every cloud fact', () => {
         ['unknown persistence is never reported as saved', { savedRevision: 'unknown' }, 'unknown'],
         ['a song never committed locally is unsaved', { savedRevision: null }, 'unsaved'],
         ['a clean editor over a committed revision is saved', {}, 'saved'],
+        // Both of the next two independently satisfy a later branch (unknown persistence)
+        // as well as their own; without these, swapping the ordering of the top two branches
+        // with unknown persistence is invisible — a failed Save could silently soften into
+        // "we're not sure", the exact lie this module exists to prevent.
+        [
+            'a failed Save still outranks unknown persistence',
+            { lastSave: 'failed', savedRevision: 'unknown' },
+            'save-failed',
+        ],
+        [
+            'dirty editing still outranks unknown persistence',
+            { editing: 'dirty', savedRevision: 'unknown' },
+            'unsaved',
+        ],
     ];
     for (const [name, patch, status] of cases) {
         it(name, () => expect(local(patch).status).toBe(status));
@@ -173,6 +187,9 @@ describe('offline readiness reports its parts separately', () => {
         ['an unknown shell is unknown', { shell: 'unknown' }, 'unknown'],
         ['an unobserved required count is unknown', { sounds: p(null, 0) }, 'unknown'],
         ['an unobserved verified count is unknown', { sounds: p(5, null) }, 'unknown'],
+        // The sounds cases above prove nothing about documents: each fact is checked by its
+        // own guard, and only sounds had a case exercising it.
+        ['an unobserved documents count is unknown', { documents: p(null, null) }, 'unknown'],
         ['a verified shell with every requirement met is ready', {}, 'ready'],
     ];
     for (const [name, patch, status] of cases) {
@@ -182,6 +199,9 @@ describe('offline readiness reports its parts separately', () => {
     it('a known shortfall outranks an unknown elsewhere rather than hiding behind it', () => {
         expect(offline({ shell: 'unknown', sounds: p(5, 1) }).status).toBe('incomplete');
         expect(offline({ shell: 'missing', sounds: p(null, null) }).status).toBe('incomplete');
+        // Same ordering claim, but for documents: the sounds-only case above cannot catch a
+        // regression confined to the documents guard.
+        expect(offline({ shell: 'unknown', documents: p(2, 1) }).status).toBe('incomplete');
     });
 
     it('zero required sounds is complete only when that empty requirement was observed', () => {
@@ -447,6 +467,54 @@ describe('inputs that would require guessing are rejected, never defaulted', () 
             offline({ shell: 'probably' as unknown as StatusFacts['offline']['shell'] }),
         ).toThrow('offline.shell must be one of');
     });
+
+    // Every case above feeds a wrong-but-well-typed value. These feed structurally wrong
+    // shapes instead, so a guard's own strictness (not just its enum table) is on the hook.
+    it('rejects a boolean field given a truthy non-boolean', () => {
+        expect(() =>
+            cloud({
+                observation: {
+                    remoteRevision: 'cloud-3',
+                    pendingCount: 0,
+                    conflict: 'yes' as unknown as boolean,
+                },
+            }),
+        ).toThrow('must be a boolean');
+    });
+
+    it('rejects an unsafe integer count, not just a negative one', () => {
+        expect(() => local({ savedRevision: 2 ** 53 + 2 })).toThrow('non-negative safe integer');
+    });
+
+    it('rejects explicit undefined the same as an absent field', () => {
+        expect(() => local({ savedRevision: undefined as unknown as number })).toThrow(
+            'non-negative safe integer',
+        );
+    });
+
+    it('rejects an array standing in for a status object', () => {
+        expect(() =>
+            projectSyncStatus({ ...facts(), offline: [] as unknown as StatusFacts['offline'] }),
+        ).toThrow('offline must be a status object');
+    });
+
+    it('rejects a required fact reachable only through the prototype chain', () => {
+        // Bypasses facts()/structuredClone deliberately: a spread merge only copies OWN
+        // properties, which would silently drop the inherited key before it ever reached
+        // the guard under test, and structuredClone does not preserve custom prototypes.
+        const withoutOwnRecovery = Object.assign(Object.create({ recovery: 'none' }), {
+            savedRevision: 3,
+            editing: 'clean',
+            lastSave: 'idle',
+        }) as StatusFacts['local'];
+        expect(() =>
+            projectSyncStatus({
+                local: withoutOwnRecovery,
+                cloud: IDLE_CLOUD,
+                offline: READY_OFFLINE,
+            }),
+        ).toThrow('local.recovery is required');
+    });
 });
 
 describe('retained facts are detached copies', () => {
@@ -454,8 +522,12 @@ describe('retained facts are detached copies', () => {
         const input = facts();
         const view = projectSyncStatus(input);
         input.offline.sounds.verified = 0;
+        // documents alongside sounds: a leak confined to one Progress field must not hide
+        // behind an assertion that only ever exercises the other one.
+        input.offline.documents.verified = 0;
         input.local.savedRevision = 99;
         expect(view.offline.sounds).toEqual({ required: 5, verified: 5 });
+        expect(view.offline.documents).toEqual({ required: 2, verified: 2 });
         expect(view.offline.status).toBe('ready');
         expect(view.local.savedRevision).toBe(3);
     });
@@ -464,7 +536,10 @@ describe('retained facts are detached copies', () => {
         const input = facts();
         const view = projectSyncStatus(input);
         view.offline.sounds.verified = 0;
+        view.offline.documents.verified = 0;
         expect(input.offline.sounds.verified).toBe(5);
+        expect(input.offline.documents.verified).toBe(2);
         expect(projectSyncStatus(input).offline.sounds.verified).toBe(5);
+        expect(projectSyncStatus(input).offline.documents.verified).toBe(2);
     });
 });

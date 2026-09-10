@@ -252,7 +252,34 @@ describe('bounded owner-scoped listing on real IndexedDB', () => {
         raw.close();
 
         book = connection();
-        await expect(book.list(scope)).rejects.toThrow();
+        await expect(book.list(scope)).rejects.toThrow(
+            'Stored chart identity does not match its record.',
+        );
+    });
+
+    it('rejects a stored key outside the identifier charset', async () => {
+        await seed(1);
+        await book.close();
+        const raw = await rawDatabase();
+        const stored = await rawRead<{ documentId: string; document: { id: string } }>(
+            raw,
+            'songs',
+            ['owner-a', songId(1)],
+        );
+        // A space is outside the identifier charset. Only reachable by writing under the
+        // application, since AccountSongbook itself only ever mints identifier()-valid ids.
+        await rawWrite(raw, 'songs', (table) => {
+            table.delete(['owner-a', songId(1)]);
+            table.put({
+                ...stored,
+                documentId: 'my song',
+                document: { ...stored.document, id: 'my song' },
+            });
+        });
+        raw.close();
+
+        book = connection();
+        await expect(book.list(scope)).rejects.toThrow('Invalid sync identifier');
     });
 
     it('captures the account before yielding, so mutating the caller’s objects cannot retarget it', async () => {
@@ -283,6 +310,51 @@ describe('bounded owner-scoped listing on real IndexedDB', () => {
         expect(again.songs[0].remoteRevision).toBeNull();
         // The single-record accessor agrees, so nothing was written through either path.
         expect((await book.read(scope, songId(1)))?.document.title).toBe(`title-${songId(1)}`);
+    });
+
+    it('returns the rebuilt allowlisted record, not the raw stored row', async () => {
+        // A value-equality check on tampered output cannot distinguish "detached copy" from
+        // "the raw IndexedDB row, which structured-clones on every getAll regardless of
+        // whether list() rebuilds anything". A stray top-level field surviving to the caller
+        // is the oracle that actually depends on savedSong() running. (An extra field inside
+        // `document` isn't a usable probe here: the schema validator already rejects unknown
+        // document keys for any caller, rebuilt or not, so it can't isolate this property.)
+        await seed(1);
+        await book.close();
+        const raw = await rawDatabase();
+        const key = ['owner-a', songId(1)];
+        const stored = await rawRead<Record<string, unknown>>(raw, 'songs', key);
+        await rawWrite(raw, 'songs', (table) =>
+            table.put({ ...stored, stray: 'unexpected top-level field' }),
+        );
+        raw.close();
+
+        book = connection();
+        const page = await book.list(scope);
+        expect(page.songs).toHaveLength(1);
+        expect(page.songs[0]).not.toHaveProperty('stray');
+        expect(Object.keys(page.songs[0]).sort()).toEqual(
+            ['document', 'documentId', 'ownerId', 'remoteRevision'].sort(),
+        );
+    });
+
+    it('bounds the fetched range to exactly this owner, not a post-filtered wider scan', async () => {
+        // Every existing cross-owner test is consistent with the code reaching the right
+        // answer via a post-filter. This asserts the mechanism the doc comment actually
+        // promises: the range handed to IndexedDB is already owner-bounded before any row
+        // is read, so another owner's records never enter the window to be filtered at all.
+        await seed(1);
+        const spy = vi.spyOn(IDBObjectStore.prototype, 'getAll');
+        await book.list(scope, { limit: 10 });
+        expect(spy).toHaveBeenCalledTimes(1);
+        const range = spy.mock.calls[0][0] as IDBKeyRange;
+        expect(range.lower).toEqual(['owner-a']);
+        expect(range.upper).toEqual(['owner-a', []]);
+        // Exclusive by construction: [ownerId, []] is never itself a real stored key (a
+        // document ID is always a string), so exclusive vs. inclusive is behaviorally
+        // equivalent here — but the range the code actually asks for is upperOpen.
+        expect(range.upperOpen).toBe(true);
+        spy.mockRestore();
     });
 
     it('a stale account generation rejects instead of listing the new account', async () => {
