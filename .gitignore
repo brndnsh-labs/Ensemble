@@ -13,6 +13,11 @@ test-dist/
 /playwright/.cache/
 coverage
 
+# Vitest browser mode (test:browser, test:sync) writes these only when a test
+# FAILS. They are failure debris, not fixtures — the suites take no snapshots.
+/.vitest-attachments/
+tests/browser/__screenshots__/
+
 gha-creds-*.json
 report/
 tmp/
