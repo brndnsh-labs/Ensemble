@@ -11,6 +11,7 @@ export default defineConfig({
         include: [
             'tests/browser/account-songbook.browser.test.ts',
             'tests/browser/account-songbook-list.browser.test.ts',
+            'tests/browser/account-outbox-pass.browser.test.ts',
         ],
         browser: {
             enabled: true,
