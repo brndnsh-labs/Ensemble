@@ -9,6 +9,7 @@ import {
     type PreparedSave,
 } from '../../prototypes/v2/lib/sync/protocol.js';
 import { AccountSongbook } from '../../prototypes/v2/lib/sync/repository.js';
+import { decodeSaveRequest } from '../../prototypes/v2/lib/sync/request.js';
 import { sendNext } from '../../prototypes/v2/lib/sync/send.js';
 import type { ChartDocumentV2 } from '../../public/songbook/score-types.js';
 import { accountChart } from '../utils/account-songbook-fixture.js';
@@ -773,6 +774,46 @@ describe('account songbook on real IndexedDB', () => {
             }
         } finally {
             raw.close();
+        }
+    });
+
+    /**
+     * The server-side decoder's compatibility with the REAL producer.
+     *
+     * `tests/unit/songbook/sync-request.test.ts` builds its request bodies with a hand-copied
+     * replica of `prepare()`'s serialization, so on its own it pins the replica, not the
+     * contract: bumping `protocolVersion` in `repository.ts` leaves every one of those unit
+     * tests green while rejecting every real Save. Verified — that is why this lives here,
+     * where a genuine frozen `wireBody` exists.
+     */
+    it('the server decoder accepts the exact bytes prepare() froze, for v1 and v2 charts', async () => {
+        for (const [label, chart] of [
+            ['v1', accountChart('A', 'study')],
+            ['v2', semanticChart('A', 'study')],
+        ] as const) {
+            const fresh = `${ACCOUNT_DATABASE}-test-${crypto.randomUUID()}`;
+            const isolated = new AccountSongbook(fresh);
+            connections.push(isolated);
+            const owner = (await isolated.switchAccount('owner-a'))!;
+            await isolated.save(owner, chart, null);
+            const request = await isolated.prepare(owner, 'study');
+            if (typeof request === 'string') {
+                throw new Error(`Expected a frozen request for ${label}, got ${request}`);
+            }
+
+            const decoded = await decodeSaveRequest(request.body, owner.ownerId);
+            expect(decoded.ownerId).toBe(owner.ownerId);
+            expect(decoded.documentId).toBe('study');
+            expect(decoded.operationId).toBe(request.operationId);
+            expect(decoded.expectedRevision).toBeNull();
+            // Both sides independently hashed the same bytes: the client's frozen digest is
+            // the one a receipt would be bound to, so they must agree exactly.
+            expect(decoded.digest).toBe(request.digest);
+            expect(decoded.document).toEqual(JSON.parse(request.body).document);
+            // And the authenticated-owner check is live on the real bytes too.
+            await expect(decodeSaveRequest(request.body, 'owner-b')).rejects.toThrow(
+                'does not match the authenticated account',
+            );
         }
     });
 });
