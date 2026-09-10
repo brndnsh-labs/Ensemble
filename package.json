@@ -26,6 +26,7 @@
         "test:vitest": "npx vitest run --reporter=dot --silent=true",
         "test:browser": "npx vitest run --config vitest.browser.config.ts",
         "test:sync": "npx vitest run --config vitest.sync.config.ts",
+        "test:api": "npm test --prefix prototypes/v2-api",
         "test:verbose": "npm run check-mutations && npm run lint && npx vitest run",
         "test:e2e": "npx playwright test",
         "test:coverage": "npx vitest run --coverage",

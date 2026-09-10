@@ -1,0 +1,19 @@
+{
+    "name": "ensemble-v2-api",
+    "private": true,
+    "version": "0.0.0",
+    "description": "Standalone Node service for Ensemble v2 accounts: schema, migrations and (in later stage-2 stories) WebAuthn ceremonies and sessions. Not wired into prototypes/v2 or public/ — see prototypes/v2-api/README.md.",
+    "type": "module",
+    "engines": {
+        "node": ">=26"
+    },
+    "scripts": {
+        "typecheck": "tsc --noEmit",
+        "test": "npm run typecheck && vitest run --config vitest.api.config.ts"
+    },
+    "devDependencies": {
+        "@types/node": "^26.0.1",
+        "typescript": "^7.0.2",
+        "vitest": "^4.1.2"
+    }
+}

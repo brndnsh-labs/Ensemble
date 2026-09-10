@@ -10,6 +10,9 @@ This map provides a quick reference for AI agents to understand the responsibili
 - Use `docs/README.md` for the docs index.
 - V2 application work starts at `prototypes/v2/CLAUDE.md`: scoped source map, provider-neutral
   handoff and branch-only delivery. Its React shell is separate from the Preact host below.
+- The v2 account API is a separate standalone Node service at `prototypes/v2-api/` (sibling of
+  `prototypes/v2/`, not a subdirectory) — see `prototypes/v2-api/README.md`. `node:sqlite`
+  schema/migrations only as of #1187; no ceremony, session or client wiring yet.
 - If guidance conflicts, prefer live code/config first, then realign the docs so `CLAUDE.md` and `AI_MAP.md` stay reliable.
 
 ## Core Architecture

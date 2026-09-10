@@ -46,7 +46,7 @@ was independently verified in this checkpoint. Source paths below are relative t
 | Surface | Reuse | Ensemble-specific work |
 | --- | --- | --- |
 | `src/lib/auth/passkey-{register,login}.ts`, auth routes | SimpleWebAuthn ceremonies, one-time challenge claims, origin/RP checks, friendly browser errors | Separate RP, cookies, secrets and DB; bind challenge to ceremony/session/account; recovery and revocation tests |
-| `src/lib/auth/session.ts`, `origin.ts`, `rate-limit.ts` | HttpOnly cookie handling, same-origin mutation checks, bounded abuse controls | Revocable sessions and account-state checks on every private route; no activity writes from generic session reads |
+| `src/lib/auth/session.ts` ⚠️, `origin.ts`, `rate-limit.ts` | `origin.ts`/`rate-limit.ts`: same-origin mutation checks, bounded abuse controls, genuinely reusable. `session.ts` ⚠️: **there is no server-side session store to borrow** — the sibling seals the whole session into an `iron-session` cookie (no token, no hash, no session table, so no way to revoke one device without rotating the shared secret and destroying every session for every user). Only the general "HttpOnly cookie" shape carries over; #1189 designs our hashed, revocable session model from scratch. See `docs/design/ensemble-v2-next-batch.md`'s stage-2 reuse assessment. | Revocable sessions and account-state checks on every private route; no activity writes from generic session reads |
 | `src/lib/db/schema.ts`, queries | SQLite/Drizzle patterns, explicit ownership predicates, transactions | Document revisions, durable outbox protocol, tombstones and idempotency; never reuse music-analysis or payment tables |
 | Admin/feedback queries and routes | Small operator view, bounded feedback and operational diagnostics | Count foreground musical use, not automatic sync; exclude private chart contents from telemetry |
 | `scripts/deploy.sh`, `ops/backup-db.sh` | Build/release verification, backup-before-migration, WAL-safe snapshots, health checks | Separate service/data roots and credentials; validate restoration and old-client coexistence before launch |
@@ -245,10 +245,16 @@ remotely wiped; on their next authenticated contact, reject the deleted identity
 export of any divergent local work before local cleanup. Define backup retention before launch
 and do not advertise instant erasure from retained backups.
 
-Recommend one Next.js Node service and one SQLite database on persistent local disk, with
-the anonymous browser shell and existing engine kept separate from server-only dependencies.
-Use same-origin API routes, a least-privilege service identity, data outside release directories,
+**Superseded 2026-09-10.** This section originally recommended one Next.js Node service and one
+SQLite database on persistent local disk. The *Ratified topology* decision below supersedes the
+service-shape half of that: the API is a **separate standalone Node service** at
+`prototypes/v2-api/`, not Next.js route handlers, so it stays out of the Next app's compilation
+and static-export config entirely. The database technology and storage-hygiene guidance were
+right and remain current — one SQLite database (`node:sqlite`, not `better-sqlite3`; see
+*Ratified topology*), a least-privilege service identity, data outside release directories,
 explicit migrations, WAL-safe backup, off-host encrypted copies, and a tested restore procedure.
+Same-origin is still required, achieved by Caddy splitting `/api/*` to the API container on the
+existing origin rather than by co-locating the API inside the Next app's own routes.
 No billing or third-party auth service is required by this proposal.
 
 An initial operational target to ratify before public accounts: backup at least every six
