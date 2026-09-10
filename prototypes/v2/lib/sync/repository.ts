@@ -17,6 +17,21 @@ import {
 } from './protocol';
 import { copyScope, savedDraft, savedOperation, savedSong } from './records';
 
+export const DEFAULT_LIST_LIMIT = 50;
+export const MAX_LIST_LIMIT = 100;
+
+export interface ListOptions {
+    /** Exclusive cursor: the last document ID of the previous page. */
+    afterDocumentId?: string;
+    limit?: number;
+}
+
+export interface SongPage {
+    songs: SavedSong[];
+    /** Null at end of list. Never a promise that the next page sees the same library. */
+    nextAfterDocumentId: string | null;
+}
+
 function operations<T>(
     tx: Transaction<T>,
     scope: AccountScope,
@@ -109,6 +124,63 @@ export class AccountSongbook {
         return this.database.run('readonly', scope, (tx) =>
             operations(tx, scope, documentId, tx.finish),
         );
+    }
+
+    /**
+     * One bounded page of this owner's saved songs, ordered by document ID.
+     *
+     * The cursor is a local pagination token and never an authorization: the owner fence in
+     * `AccountDatabase.run` still decides what this call may see, and the key range below is
+     * bounded to the captured owner so another account's records cannot enter the window at
+     * all — not even to be filtered out afterwards.
+     *
+     * A page is transactional. Separate pages are not a historical snapshot: a library that
+     * changes between calls is reflected by the later call, which is why the cursor is a
+     * document ID rather than an offset.
+     */
+    async list(scope: AccountScope, options: ListOptions = {}): Promise<SongPage> {
+        scope = copyScope(scope);
+        if (!options || typeof options !== 'object' || Array.isArray(options)) {
+            throw new Error('Invalid list options.');
+        }
+        // Captured synchronously: a caller mutating its options object while IDB awaits
+        // cannot retarget the page that is already in flight.
+        const { afterDocumentId, limit = DEFAULT_LIST_LIMIT } = options;
+        if (!Number.isSafeInteger(limit) || limit < 1 || limit > MAX_LIST_LIMIT) {
+            throw new Error(`List limit must be an integer between 1 and ${MAX_LIST_LIMIT}.`);
+        }
+        if (afterDocumentId !== undefined) {
+            identifier(afterDocumentId);
+        }
+        return this.database.run('readonly', scope, (tx) => {
+            // An array sorts after every string in IndexedDB key order, so [ownerId, []] is a
+            // tight upper bound: it stops at this owner's last document and cannot reach the
+            // next owner's records. The lower bound is exclusive only when resuming, which is
+            // what makes the cursor exclusive without tracking offsets.
+            const range = IDBKeyRange.bound(
+                afterDocumentId === undefined ? [scope.ownerId] : [scope.ownerId, afterDocumentId],
+                [scope.ownerId, []],
+                afterDocumentId !== undefined,
+                true,
+            );
+            // limit + 1 detects a further page without a second query and without reading
+            // the whole library. getAll yields ascending key order, so the page is stable.
+            tx.read(tx.table('songs').getAll(range, limit + 1), (rows: SavedSong[]) => {
+                // The whole fetched window is validated, not only the records handed back: a
+                // malformed or future-version record must fail the page explicitly rather
+                // than be silently skipped or reduced to a partial success.
+                const validated = rows.map((row) => {
+                    identifier(row?.documentId);
+                    return savedSong(row, scope, row.documentId);
+                });
+                const songs = validated.slice(0, limit);
+                tx.finish({
+                    songs,
+                    nextAfterDocumentId:
+                        validated.length > limit ? songs[songs.length - 1].documentId : null,
+                });
+            });
+        });
     }
 
     async save(

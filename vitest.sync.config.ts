@@ -6,7 +6,12 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
     publicDir: false,
     test: {
-        include: ['tests/browser/account-songbook.browser.test.ts'],
+        // Listed one by one on purpose: a glob here would silently stop covering a file that
+        // was renamed, and these are the only proof of real IDB transaction/range behavior.
+        include: [
+            'tests/browser/account-songbook.browser.test.ts',
+            'tests/browser/account-songbook-list.browser.test.ts',
+        ],
         browser: {
             enabled: true,
             provider: playwright(),
