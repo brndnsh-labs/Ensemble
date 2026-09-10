@@ -2375,27 +2375,20 @@ dialog textarea {
 .performance-focus .sounds-button {
     display: none;
 }
-/* Playing is the music-stand case: the chart is the only thing on screen, so it
-   takes the most room. Specificity is 0,3,0 so this beats the .song-open scale
-   without depending on source order. */
-.song-open.performance-focus .sheet {
-    --bar-min: clamp(96px, 17vh, 172px);
-    --chord-size: clamp(36px, 6vh, 64px);
-}
+/* One size for idle and playing: a second, larger playing-only scale used to
+   reflow every bar/chord/section-letter the instant playback started or
+   stopped, which read as the chart jumping around rather than settling. The
+   idle scale above already uses the available space well, so the modest extra
+   size playing used to add (#1186) wasn't worth that jump. Chrome (Edit/Save/
+   genre controls) still hides via the rules above; only typography stopped
+   changing. */
 /* Phone portrait already reads well at playing distance and is the reference
-   layout (#1186). Growing its chords would wrap two-chord bars at this width, so
-   both states hold their established sizes; only section identity grows. */
+   layout (#1186); only section identity grows here. */
 @media (max-width: 760px) {
     .song-open .sheet {
         --bar-min: 86px;
         --chord-size: 30px;
         --section-letter-size: clamp(12px, 2.2vh, 18px);
-    }
-    .song-open.performance-focus .sheet {
-        --bar-min: 96px;
-        /* Playing on a phone deliberately stays at 30px: 36px wraps two-chord
-           bars at 402px. This is the single authority for that value now. */
-        --chord-size: 30px;
     }
 }
 /* Landscape phone trades height for width; hold every floor. */
@@ -2405,16 +2398,6 @@ dialog textarea {
         --chord-size: 27px;
         --section-letter-size: 12px;
     }
-    .song-open.performance-focus .sheet {
-        --bar-min: 96px;
-        --chord-size: 36px;
-    }
-}
-.performance-focus .chord {
-    font-size: var(--chord-size, 36px);
-}
-.performance-focus .bar {
-    min-height: var(--bar-min, 96px);
 }
 .playback-footer [role="status"] {
     min-width: 0;
@@ -2478,8 +2461,5 @@ dialog textarea {
     }
     .performance-focus .song-title {
         max-width: calc(100vw - 185px);
-    }
-    .performance-focus .chord {
-        font-size: var(--chord-size, 30px);
     }
 }

@@ -369,16 +369,16 @@ test('Edit chart and Edit section reveal the input across laptop, phone and tabl
     }
 });
 
-test('the stand scales to its screen in both states and keeps mute state readable', async ({
+test('the stand scales to its screen, holds still across play/pause and keeps mute state readable', async ({
     page,
 }, info) => {
     await page.goto('/v2/');
     await page.getByRole('button', { name: blue }).click();
     await page.waitForSelector('.bar');
-    // #1186 — the stand's size is governed by .song-open / .performance-focus, not
-    // by the base .bar/.chord rules, and the playing state used to be a flat 36px
-    // chord in a 96px bar on every screen. Both states are pinned per breakpoint so
-    // a later edit cannot quietly reintroduce a screen-independent scale.
+    // #1186 pinned a playing-only scale larger than idle; that made every play/pause
+    // toggle reflow bar height, chord size and section letters at once, which read
+    // as the chart jumping around. One scale now covers both states — toggling
+    // performance-focus must not change any of these measurements.
     const measure = (focused: boolean) =>
         page.evaluate((f) => {
             document.querySelector('.app-shell')!.classList.toggle('performance-focus', f);
@@ -394,31 +394,25 @@ test('the stand scales to its screen in both states and keeps mute state readabl
             };
         }, focused);
     for (const at of [
-        { width: 1300, height: 940, idle: [130, 42], playing: [150, 52], letter: 16 },
-        { width: 1600, height: 1100, idle: [140, 48], playing: [165, 60], letter: 19 },
-        { width: 820, height: 1180, idle: [140, 48], playing: [165, 60], letter: 19 },
-        // Phone portrait is the reference layout and holds its established sizes:
-        // enlarging chords wraps two-chord bars at this width.
-        { width: 402, height: 874, idle: [86, 30], playing: [96, 30], letter: 14 },
-        { width: 874, height: 402, idle: [86, 27], playing: [96, 36], letter: 12 },
+        { width: 1300, height: 940, bar: 130, chord: 42, letter: 16 },
+        { width: 1600, height: 1100, bar: 140, chord: 48, letter: 19 },
+        { width: 820, height: 1180, bar: 140, chord: 48, letter: 19 },
+        // Phone portrait is the reference layout and holds its established size.
+        { width: 402, height: 874, bar: 86, chord: 30, letter: 14 },
+        { width: 874, height: 402, bar: 86, chord: 27, letter: 12 },
     ]) {
         await page.setViewportSize({ width: at.width, height: at.height });
-        for (const [focused, expected] of [
-            [false, at.idle],
-            [true, at.playing],
-        ] as const) {
-            const m = await measure(focused);
-            expect(
-                m.bar,
-                `bar @${at.width}x${at.height} focused=${focused}`,
-            ).toBeGreaterThanOrEqual(expected[0]);
-            expect(
-                m.chord,
-                `chord @${at.width}x${at.height} focused=${focused}`,
-            ).toBeGreaterThanOrEqual(expected[1]);
-            expect(m.letter).toBeGreaterThanOrEqual(at.letter);
-            expect(m.noOverflow).toBe(true);
-        }
+        const idle = await measure(false);
+        expect(idle.bar, `bar @${at.width}x${at.height}`).toBeGreaterThanOrEqual(at.bar);
+        expect(idle.chord, `chord @${at.width}x${at.height}`).toBeGreaterThanOrEqual(at.chord);
+        expect(idle.letter).toBeGreaterThanOrEqual(at.letter);
+        expect(idle.noOverflow).toBe(true);
+        const playing = await measure(true);
+        expect(playing.bar, `play/pause jump @${at.width}x${at.height}`).toBe(idle.bar);
+        expect(playing.chord, `play/pause jump @${at.width}x${at.height}`).toBe(idle.chord);
+        expect(playing.letter, `play/pause jump @${at.width}x${at.height}`).toBe(idle.letter);
+        expect(playing.noOverflow).toBe(true);
+        await measure(false);
         await page.screenshot({
             path: info.outputPath(`stand-${at.width}x${at.height}.png`),
         });
@@ -426,7 +420,6 @@ test('the stand scales to its screen in both states and keeps mute state readabl
     // Phone must not grow: 402px cannot fit larger chords in a two-bar row.
     await page.setViewportSize({ width: 402, height: 874 });
     expect((await measure(false)).chord).toBeLessThanOrEqual(31);
-    expect((await measure(true)).chord).toBeLessThanOrEqual(31);
 
     // The muted treatment (hollow dot, struck label, dropped chrome) existed in the
     // stylesheet but was unreachable: the button emitted no `off` class and rendered
