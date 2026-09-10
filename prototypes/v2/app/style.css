@@ -727,8 +727,8 @@ html [hidden] {
     height: 15px;
 }
 .band-toggle .dot {
-    width: 4px;
-    height: 4px;
+    width: 7px;
+    height: 7px;
     background: var(--green);
 }
 .band-toggle.off {
@@ -1885,10 +1885,12 @@ dialog textarea {
 .band-toggle[aria-pressed="true"] {
     background: var(--green-light);
     color: var(--green);
+    border-color: var(--green);
 }
 .band-toggle[aria-pressed="false"] {
-    color: var(--muted);
+    color: #8a8d82;
     background: transparent;
+    border-color: transparent;
 }
 .edit-panel .title-input {
     min-height: 0;
@@ -2323,6 +2325,22 @@ dialog textarea {
 }
 .song-open .sheet {
     max-width: 1200px;
+    /* #1186 — the stand's scale lives here, in the layer that actually governs an
+       open chart. The base .bar/.chord rules never win once .song-open is on the
+       shell, so scaling them had no effect on the stand. Floors equal the previous
+       flat values, so nothing shrinks anywhere. */
+    --bar-min: clamp(86px, 15vh, 150px);
+    --chord-size: clamp(30px, 4.8vh, 52px);
+    --section-letter-size: clamp(12px, 2vh, 21px);
+    --section-name-size: clamp(11px, 1.5vh, 15px);
+    min-height: 100%;
+    display: flex;
+    flex-direction: column;
+    /* Top-anchored, not centred: a short chart reads as a page starting at the top
+       with room below, not as content floating mid-screen. Centering was tried and
+       reverted (#1186) — it pushed the first bar ~200px down on a short chart at
+       laptop width, which regressed the existing top-of-stand contract. */
+    justify-content: flex-start;
 }
 .song-open .section {
     margin-bottom: 18px;
@@ -2331,7 +2349,20 @@ dialog textarea {
     margin-bottom: 6px;
 }
 .song-open .bar {
-    min-height: 86px;
+    min-height: var(--bar-min, 86px);
+}
+.song-open .chord {
+    font-size: var(--chord-size, 30px);
+}
+.song-open .section-letter {
+    /* Section identity is navigation now that repeats and endings make
+       multi-section forms real; the box is em-sized so it tracks the letter. */
+    font-size: var(--section-letter-size, 12px);
+    min-width: 2em;
+    height: 1.9em;
+}
+.song-open .section-name {
+    font-size: var(--section-name-size, 11px);
 }
 .song-open .playback-footer {
     min-height: 28px;
@@ -2344,11 +2375,46 @@ dialog textarea {
 .performance-focus .sounds-button {
     display: none;
 }
+/* Playing is the music-stand case: the chart is the only thing on screen, so it
+   takes the most room. Specificity is 0,3,0 so this beats the .song-open scale
+   without depending on source order. */
+.song-open.performance-focus .sheet {
+    --bar-min: clamp(96px, 17vh, 172px);
+    --chord-size: clamp(36px, 6vh, 64px);
+}
+/* Phone portrait already reads well at playing distance and is the reference
+   layout (#1186). Growing its chords would wrap two-chord bars at this width, so
+   both states hold their established sizes; only section identity grows. */
+@media (max-width: 760px) {
+    .song-open .sheet {
+        --bar-min: 86px;
+        --chord-size: 30px;
+        --section-letter-size: clamp(12px, 2.2vh, 18px);
+    }
+    .song-open.performance-focus .sheet {
+        --bar-min: 96px;
+        /* Playing on a phone deliberately stays at 30px: 36px wraps two-chord
+           bars at 402px. This is the single authority for that value now. */
+        --chord-size: 30px;
+    }
+}
+/* Landscape phone trades height for width; hold every floor. */
+@media (max-height: 520px) and (orientation: landscape) {
+    .song-open .sheet {
+        --bar-min: 86px;
+        --chord-size: 27px;
+        --section-letter-size: 12px;
+    }
+    .song-open.performance-focus .sheet {
+        --bar-min: 96px;
+        --chord-size: 36px;
+    }
+}
 .performance-focus .chord {
-    font-size: 36px;
+    font-size: var(--chord-size, 36px);
 }
 .performance-focus .bar {
-    min-height: 96px;
+    min-height: var(--bar-min, 96px);
 }
 .playback-footer [role="status"] {
     min-width: 0;
@@ -2414,6 +2480,6 @@ dialog textarea {
         max-width: calc(100vw - 185px);
     }
     .performance-focus .chord {
-        font-size: 30px;
+        font-size: var(--chord-size, 30px);
     }
 }

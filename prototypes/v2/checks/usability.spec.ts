@@ -368,3 +368,90 @@ test('Edit chart and Edit section reveal the input across laptop, phone and tabl
         });
     }
 });
+
+test('the stand scales to its screen in both states and keeps mute state readable', async ({
+    page,
+}, info) => {
+    await page.goto('/v2/');
+    await page.getByRole('button', { name: blue }).click();
+    await page.waitForSelector('.bar');
+    // #1186 — the stand's size is governed by .song-open / .performance-focus, not
+    // by the base .bar/.chord rules, and the playing state used to be a flat 36px
+    // chord in a 96px bar on every screen. Both states are pinned per breakpoint so
+    // a later edit cannot quietly reintroduce a screen-independent scale.
+    const measure = (focused: boolean) =>
+        page.evaluate((f) => {
+            document.querySelector('.app-shell')!.classList.toggle('performance-focus', f);
+            const px = (selector: string, property: 'minHeight' | 'fontSize') =>
+                Number.parseFloat(
+                    getComputedStyle(document.querySelector(selector) as HTMLElement)[property],
+                );
+            return {
+                bar: px('.bar', 'minHeight'),
+                chord: px('.chord', 'fontSize'),
+                letter: px('.section-letter', 'fontSize'),
+                noOverflow: document.documentElement.scrollWidth <= innerWidth,
+            };
+        }, focused);
+    for (const at of [
+        { width: 1300, height: 940, idle: [130, 42], playing: [150, 52], letter: 16 },
+        { width: 1600, height: 1100, idle: [140, 48], playing: [165, 60], letter: 19 },
+        { width: 820, height: 1180, idle: [140, 48], playing: [165, 60], letter: 19 },
+        // Phone portrait is the reference layout and holds its established sizes:
+        // enlarging chords wraps two-chord bars at this width.
+        { width: 402, height: 874, idle: [86, 30], playing: [96, 30], letter: 14 },
+        { width: 874, height: 402, idle: [86, 27], playing: [96, 36], letter: 12 },
+    ]) {
+        await page.setViewportSize({ width: at.width, height: at.height });
+        for (const [focused, expected] of [
+            [false, at.idle],
+            [true, at.playing],
+        ] as const) {
+            const m = await measure(focused);
+            expect(
+                m.bar,
+                `bar @${at.width}x${at.height} focused=${focused}`,
+            ).toBeGreaterThanOrEqual(expected[0]);
+            expect(
+                m.chord,
+                `chord @${at.width}x${at.height} focused=${focused}`,
+            ).toBeGreaterThanOrEqual(expected[1]);
+            expect(m.letter).toBeGreaterThanOrEqual(at.letter);
+            expect(m.noOverflow).toBe(true);
+        }
+        await page.screenshot({
+            path: info.outputPath(`stand-${at.width}x${at.height}.png`),
+        });
+    }
+    // Phone must not grow: 402px cannot fit larger chords in a two-bar row.
+    await page.setViewportSize({ width: 402, height: 874 });
+    expect((await measure(false)).chord).toBeLessThanOrEqual(31);
+    expect((await measure(true)).chord).toBeLessThanOrEqual(31);
+
+    // The muted treatment (hollow dot, struck label, dropped chrome) existed in the
+    // stylesheet but was unreachable: the button emitted no `off` class and rendered
+    // a bare text node with no `span.label` to match.
+    await page.setViewportSize({ width: 1300, height: 940 });
+    await page.evaluate(() =>
+        document.querySelector('.app-shell')!.classList.remove('performance-focus'),
+    );
+    const drums = page.getByRole('button', { name: 'Drums' });
+    const chrome = () =>
+        drums.evaluate((element) => {
+            const label = element.querySelector('.label');
+            return {
+                background: getComputedStyle(element).backgroundColor,
+                border: getComputedStyle(element).borderTopColor,
+                strike: label ? getComputedStyle(label).textDecorationLine : 'missing',
+            };
+        });
+    const on = await chrome();
+    await drums.click();
+    await expect(drums).toHaveAttribute('aria-pressed', 'false');
+    await expect(drums).toHaveClass(/\boff\b/);
+    const off = await chrome();
+    expect(off.background).not.toBe(on.background);
+    expect(off.border).not.toBe(on.border);
+    expect(off.strike).toContain('line-through');
+    expect(on.strike).not.toContain('line-through');
+});

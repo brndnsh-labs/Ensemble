@@ -1096,7 +1096,7 @@ export default function Ensemble() {
                             {lanes.map(([key, label]) => (
                                 <button
                                     key={key}
-                                    className={`band-toggle ${current.chart.band[key].enabled ? 'on' : ''}`}
+                                    className={`band-toggle ${current.chart.band[key].enabled ? 'on' : 'off'}`}
                                     disabled={busy}
                                     aria-pressed={current.chart.band[key].enabled}
                                     onClick={() =>
@@ -1109,7 +1109,7 @@ export default function Ensemble() {
                                     }
                                 >
                                     <span className="dot" />
-                                    {label}
+                                    <span className="label">{label}</span>
                                 </button>
                             ))}
                         </div>
