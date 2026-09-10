@@ -2,7 +2,7 @@
 name: deploy-prod
 description: Deploy Ensemble to production — the gated ritual. Preflight (clean pushed main, what's actually shipping, any migration plan), then STOP for Brandon's explicit go, then deploy, then independently verify the public origin. Includes the rollback path. Never runs unattended. Usage `/deploy-prod`.
 ---
-<!-- cycle:rendered template=skills/deploy-prod.md.tmpl hash=77f9fa34eadc — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/deploy-prod.md.tmpl hash=ff6636ccb1e9 — managed by the-cycle; edit the template, not this file -->
 
 # /deploy-prod — ship to production
 
@@ -15,14 +15,19 @@ from invoking it.
 ## Topology
 
 - **Test** — `ensembletest.brndn.zip`: edge **Caddy** terminates TLS, reverse-proxies to
-  **nginx**, which serves the app as **static files** out of `/var/www/html/`. No app
-  server, no DB — nginx serves the new files the instant rsync finishes, nothing to
-  restart. SSH alias **`ensembletest-admin`** (least-privilege `claude` account,
-  `IdentitiesOnly homelab_nginx`). Private, low-ceremony — the pre-merge audition box.
-- **Prod** — `ensemble.brndn.zip`: same static-file topology, SSH alias
-  **`ensemble-admin`**. **Continuously deployed** — a green PR merge (branch-protected)
-  triggers the CI `deploy` job, which ships automatically. `/deploy-prod` is the manual
-  break-glass path (CI down, or forcing a known-good build), not the normal route.
+  **nginx**, which serves the app as **static files**. No app server, no DB — nginx serves
+  the new files the instant rsync finishes, nothing to restart. Since **2026-09-10** that
+  nginx is a **container on `docker04`** (`/opt/docker/ensembletest`, host port `8090`),
+  serving the bind mount `/srv/ensemble-test/www/`; SSH alias **`docker04-admin`**. It
+  moved so the coming v2 account API can sit behind this same origin without
+  hand-installed dependencies. Private, low-ceremony — the pre-merge audition box.
+- **Prod** — `ensemble.brndn.zip`: still the plain **nginx LXC**, static files out of
+  `/var/www/html/`, SSH alias **`ensemble-admin`**. **Test and prod now differ at the
+  hosting layer** — an accepted, deliberate divergence (2026-09-10), so a
+  container-specific test result is not automatically a prod result. **Continuously
+  deployed** — a green PR merge (branch-protected) triggers the CI `deploy` job, which
+  ships automatically. `/deploy-prod` is the manual break-glass path (CI down, or forcing
+  a known-good build), not the normal route.
 - Both: `scripts/deploy.sh <test|prod>` builds (`vite build --mode <test|production>`),
   prints the **Built REV** + footprint + the delta vs. the live site, `rsync --delete`s,
   then **re-verifies the live asset hash itself** — the script's own exit code already

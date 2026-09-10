@@ -7,7 +7,12 @@ import { promisify } from 'node:util';
 // Intentionally no production target or arbitrary host/path argument.
 const run = promisify(execFile);
 const origin = 'https://ensembletest.brndn.zip';
-const host = 'ensembletest-admin';
+// Staging moved off LXC 116 to a bind-mounted nginx container on docker04
+// (2026-09-10); `webRoot` is the host-side bind mount, not a path inside the
+// container. Releases still publish by swapping one relative symlink inside
+// that tree, so nginx needs no restart and the swap stays atomic.
+const host = 'docker04-admin';
+const webRoot = '/srv/ensemble-test/www';
 const root = path.resolve('out');
 const manifest = JSON.parse(await readFile(path.join(root, 'build.json'), 'utf8'));
 const hash = manifest.fingerprint;
@@ -29,12 +34,9 @@ for (const [url, expected] of Object.entries(manifest.assets)) {
 }
 const oldRoot = await (await fetch(`${origin}/`, { cache: 'no-store' })).text();
 const releaseId = `${hash}-${randomUUID()}`;
-const release = `/var/www/html/.v2-previews/${releaseId}`;
+const release = `${webRoot}/.v2-previews/${releaseId}`;
 console.log(`Uploading TEST-only v2 artifact ${hash} (existing app stays in place)`);
-await run('ssh', [
-    host,
-    `test ! -e /var/www/html/v2 -o -L /var/www/html/v2 && mkdir -p ${release}`,
-]);
+await run('ssh', [host, `test ! -e ${webRoot}/v2 -o -L ${webRoot}/v2 && mkdir -p ${release}`]);
 const copied = await run('rsync', ['-az', '--delete', `${root}/`, `${host}:${release}/`]);
 if (copied.stdout) {
     console.log(copied.stdout);
@@ -42,7 +44,7 @@ if (copied.stdout) {
 // Switch one symlink atomically only after the complete release is present.
 await run('ssh', [
     host,
-    `ln -sfn .v2-previews/${releaseId} /var/www/html/.v2-next && mv -Tf /var/www/html/.v2-next /var/www/html/v2`,
+    `ln -sfn .v2-previews/${releaseId} ${webRoot}/.v2-next && mv -Tf ${webRoot}/.v2-next ${webRoot}/v2`,
 ]);
 const live = await fetch(`${origin}/v2/build.json?verify=${hash}`, { cache: 'no-store' });
 if (!live.ok || (await live.json()).fingerprint !== hash) {

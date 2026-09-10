@@ -48,7 +48,20 @@ done
 case "$ENV_NAME" in
     test)
         MODE="test"
-        RSYNC_HOST="ensembletest-admin"
+        # TEST moved off LXC 116 to a bind-mounted nginx container on docker04
+        # (2026-09-10) so the account API can join it there without hand-installed
+        # dependencies. PROD is deliberately still the plain nginx LXC — the two
+        # environments now differ at the hosting layer, which Brandon accepted.
+        RSYNC_HOST="docker04-admin"
+        RSYNC_PATH="/srv/ensemble-test/www/"
+        # The isolated v2 preview shares this web root: prototypes/v2/scripts/
+        # deploy-test.mjs publishes releases into .v2-previews/<sha>-<uuid>/ and
+        # points a `v2` symlink at the live one. Neither is produced by this
+        # script's `dist/`, so a bare `--delete` would take the whole preview and
+        # every archived release with it on the next v1 test deploy. Both patterns
+        # are anchored with a leading `/` so they match only at the transfer root
+        # and can never swallow a nested asset path that happens to contain "v2".
+        RSYNC_EXCLUDES=(--exclude=/.v2-previews --exclude=/v2)
         ORIGIN_URL="https://ensembletest.brndn.zip"
         LABEL="TEST"
         ICON="🚀"
@@ -56,6 +69,11 @@ case "$ENV_NAME" in
     prod)
         MODE="production"
         RSYNC_HOST="ensemble-admin"
+        RSYNC_PATH="/var/www/html/"
+        # Deliberately empty: prod hosts no v2 preview (deploy-test.mjs has no
+        # production target at all), so a stray /v2 there is drift that `--delete`
+        # SHOULD clean up rather than something to protect.
+        RSYNC_EXCLUDES=()
         ORIGIN_URL="https://ensemble.brndn.zip"
         LABEL="PROD"
         ICON="🌟"
@@ -124,13 +142,13 @@ if [ "$QUIET" = false ]; then
 fi
 
 if [ "$DRY_RUN" = true ]; then
-    log "🔍 (Simulated) rsync -avz --delete -e ssh dist/ ${RSYNC_HOST}:/var/www/html/"
+    log "🔍 (Simulated) rsync -avz --delete ${RSYNC_EXCLUDES[*]} -e ssh dist/ ${RSYNC_HOST}:${RSYNC_PATH}"
     log "✅ Dry run complete."
     exit 0
 fi
 
 log "🚚 Syncing to ${LABEL} (scoped 'claude' account)..."
-rsync -avz --delete -e ssh dist/ "${RSYNC_HOST}:/var/www/html/"
+rsync -avz --delete "${RSYNC_EXCLUDES[@]}" -e ssh dist/ "${RSYNC_HOST}:${RSYNC_PATH}"
 
 # Verify the running site now serves exactly what we built.
 AFTER_CACHE_NONCE="after-$(date +%s)"

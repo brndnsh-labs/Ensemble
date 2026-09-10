@@ -1,5 +1,5 @@
 {
-  "upstream": "98f02a0",
+  "upstream": "f9177ec",
   "files": {
     ".claude/skills/DOCTRINE.md": "f0578e87bd24",
     ".claude/skills/DELIVERY.md": "9632608acf87",
@@ -14,8 +14,8 @@
     ".claude/skills/scout/SKILL.md": "509286cedd51",
     ".claude/skills/burndown/SKILL.md": "e25020e3bc0a",
     ".claude/skills/dep-update/SKILL.md": "b28ecfbaafb0",
-    ".claude/skills/deploy-test/SKILL.md": "f96ec04a53b8",
-    ".claude/skills/deploy-prod/SKILL.md": "f4aeb0aca63a",
+    ".claude/skills/deploy-test/SKILL.md": "48501133faba",
+    ".claude/skills/deploy-prod/SKILL.md": "70f94f8875eb",
     ".claude/skills/unblock/SKILL.md": "30a747b5a95c",
     ".claude/skills/wrap-up/SKILL.md": "c7a38b83dbb4",
     ".claude/skills/pre-compact/SKILL.md": "1cac080453a7",
@@ -36,8 +36,8 @@
     ".agents/skills/scout/SKILL.md": "289def7810b7",
     ".agents/skills/burndown/SKILL.md": "4ccb8570bda0",
     ".agents/skills/dep-update/SKILL.md": "63e3633b4dce",
-    ".agents/skills/deploy-test/SKILL.md": "99b68b9e2bac",
-    ".agents/skills/deploy-prod/SKILL.md": "77f9fa34eadc",
+    ".agents/skills/deploy-test/SKILL.md": "3fb321ef2854",
+    ".agents/skills/deploy-prod/SKILL.md": "ff6636ccb1e9",
     ".agents/skills/unblock/SKILL.md": "70b4f0f2b528",
     ".agents/skills/wrap-up/SKILL.md": "909ab31eb780",
     ".agents/skills/pre-compact/SKILL.md": "3b22cb303820",
