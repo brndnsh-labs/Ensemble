@@ -38,9 +38,9 @@ are separate from the implementation described here.
   valuable work and prefer a corrective preview release; production migration/coexistence
   remains a separate stage.
 
-## Recommended next build
+## Import/navigation foundation and remaining scope
 
-Current batch adds source-preserving import review, context-checked one-/two-bar reference
+The implemented batch adds source-preserving import review, context-checked one-/two-bar reference
 resolution, and bounded native D.C./D.S. to end/Fine/coda. Global performed order is authoritative;
 the written stand uses detached display maps for bypassed bars. Native repeat-after-jump policy
 is explicit (`play` restarts repeats, `skip` selects final passes), not inferred for ambiguous
@@ -270,7 +270,7 @@ fixture for this specific export, not general import or by-ear compatibility.
 | Whole-bar chords and previous-measure repeat | Context-checked native playback and import implemented | Source retention and exact engine maps; physical-device audition. |
 | Unequal chord durations | Native editing/playback implemented; import only for verified cell patterns | Short real exports for 2+1+1 and 1+1+2; no guessed cell rounding. |
 | Qualities and slash bass | Wider authored vocabulary; conservative existing-engine subset playable | Complete official vocabulary mapping and harmonic-identity fixtures; no partial matches. |
-| Whole-section repeats | Native playback implemented; repeat controls and import still pending | Distinguish written repeats from player chorus count; real import fixture. |
+| Whole-section repeats | Native playback/display implemented; authoring remains limited | Distinguish section repetition, written repeat barlines and player chorus count; broader editor/import coverage. |
 | Repeat barlines and first/second endings | Native compact display/edit/play and conservative import within sections | Real-device audition and cross-section repeat forms. |
 | D.C./D.S., coda, Fine | Native global traversal and conservative unambiguous import implemented | Al-Nth-ending destinations, jumps inside repeats, ambiguous import repeat policy and physical-device audition. |
 | N.C., holds, alternate chords, fermatas | Authored events represented; playback pending | Per-lane meaning, editing and faithful import mapping. |
@@ -342,3 +342,9 @@ Account/sync contracts can proceed once the document envelope/version policy is 
 they need not wait for every import symbol. The document-format approval has been given;
 production adoption, real-device acceptance and listening remain separate gates. This
 foundation and its fixtures do not close #1171.
+
+For new sessions, use [the v2 handoff](../../prototypes/v2/CLAUDE.md) and pick a bounded child,
+not a cycle across this whole compatibility target. Source preservation and rejection tests
+can be mechanical; unresolved N.C./break/hold/alternate playback meaning cannot. Record the
+musical decision and exact fixtures before labeling such implementation ready. #1176 remains
+the deferred repeat/ending authoring interaction decision, not a blocker for account work.

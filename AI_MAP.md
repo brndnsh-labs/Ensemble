@@ -8,6 +8,8 @@ This map provides a quick reference for AI agents to understand the responsibili
 - Use `CLAUDE.md` for operational rules, architecture, and safety conventions. (`AGENTS.md` is a pointer to it.)
 - Nested `CLAUDE.md` files (`public/CLAUDE.md`, `public/engine/CLAUDE.md`, `public/engine/grooves/CLAUDE.md`, `public/components/CLAUDE.md`, `tests/CLAUDE.md`) hold directory-scoped load-bearing invariants and traps — sharper than this map or the root file, auto-loaded by tooling that walks the directory tree. Read the one for a directory before editing in it.
 - Use `docs/README.md` for the docs index.
+- V2 application work starts at `prototypes/v2/CLAUDE.md`: scoped source map, provider-neutral
+  handoff and branch-only delivery. Its React shell is separate from the Preact host below.
 - If guidance conflicts, prefer live code/config first, then realign the docs so `CLAUDE.md` and `AI_MAP.md` stay reliable.
 
 ## Core Architecture

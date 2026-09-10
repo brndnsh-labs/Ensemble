@@ -256,18 +256,51 @@ both candidates. Include native SQLite ABI compatibility, memory/disk use, volum
 secret handling. No measured standalone-versus-Docker winner is claimed here; #1172 remains
 open until this evidence and the product decisions are ratified.
 
-## First implementation acceptance
+## Staged implementation acceptance
 
-Split implementation into separately reviewable tracker stories:
+#1177 is implemented on the v2 branch: separate account-local records, writer recovery,
+transactional explicit-Save outbox, frozen retries, guarded acknowledgements and preserved
+conflicts. It has native Chromium/WebKit storage tests with injected transports, not a live
+account service or UI. Keep its review/delivery receipt distinct from deployment and user
+acceptance. The [next batch](ensemble-v2-next-batch.md) breaks the immediate work into bounded
+handoffs; the [v2 guide](../../prototypes/v2/CLAUDE.md) defines the common branch-only cycle.
 
-1. #1177: account-scoped local records + immutable transactional outbox, initially driven by a fake
-   transport. No live migration or backend required to test the Save contract.
-2. Auth/recovery + owner-scoped revision/receipt API on a throwaway database. Include abuse,
-   replay, wrong-origin, cross-account and session-revocation tests before test hosting.
-3. Two-device integration: explicit Save, full-library download, sound readiness and offline
-   cold start. Preserve guest originals and legacy storage sentinels throughout.
-4. Test-only hosting preflight, migration/restore rehearsal and deployment, then physical
-   Edge/macOS and iPhone passkey/playback checks. Production and final hosting remain gated.
+Later stages below are **acceptance contracts, not ready-to-cycle tickets**. Shape each into
+small implementation children with exact files, prerequisites and tests before scheduling.
+
+1. **Local foundations:** bounded owner-only listing, request validation, independent status
+   facts and one-pass outbox processing. Prove semantic v2 documents survive Save/retry as
+   exactly as v1. No guest bootstrap, authentication or server wiring in those helpers.
+2. **Authentication/recovery in isolation:** register/login/add/revoke passkeys, hashed revocable
+   sessions and recovery-only enrollment on disposable data. Tests must reject wrong origin/RP,
+   cross-account ceremonies, expired/replayed challenges, missing user verification and concurrent
+   recovery claims; interruption cannot consume the sole recovery route. No real account launch
+   until implementation choices and threat-model review are complete.
+3. **Owner-bound revision API:** authenticated owner predicates on every read/write/receipt,
+   atomic document+receipt transaction, same-byte duplicate success, changed-byte ID rejection,
+   revision conflict and tombstone non-resurrection. Prove lost-response and concurrent-client
+   behavior on a throwaway real database, not just a mock transport. API/auth responses are
+   private/no-store and excluded from offline artifacts. This depends on verified auth and
+   a selected server persistence implementation; it does not authorize live migrations.
+4. **Library download/reconciliation:** bounded pages with transactional cursor advancement,
+   dirty/active-chart preservation, explicit unsupported-version failures and tombstones.
+   Guest copy is opt-in and retry-safe with originals retained. Keep both mints a fresh identity
+   and preserves queued and unsaved versions. Test interrupted pages and owner switches before UI
+   integration. Do not treat timestamps or receipt arrival as permission to overwrite a chart.
+5. **Account/offline product integration:** on two independent browser contexts, Save A then C
+   while unsaved D stays local; the other device receives only explicit Saves. Full-library
+   downloads and required sound verification support offline cold start. Account switch, expired
+   session and sign-out preflight preserve work and isolate owners; pending remote logout cannot
+   destroy a later session. Preserve guest/legacy sentinels and instrument voices throughout.
+6. **Test hosting and recovery rehearsal:** ratify topology/backup policy from measurements;
+   verify immutable release identity, private-cache exclusions, WAL-safe backup, isolated restore,
+   server epoch invalidation and rollback applicability. Then physical Edge/macOS and iPhone
+   passkey/playback/eviction acceptance. No production cutover or destructive migration follows
+   automatically from a green preview.
+7. **Snapshots/admin:** after the save/open/offline journey, separately scope immutable public
+   snapshots with revocation and stripped private source/metadata, plus registrations, foreground
+   return activity and bounded error/suggestion intake. Old shares remain compatible; automatic
+   polling must not count as returning use. Private chart text/URLs/credentials stay out of logs.
 
 Required failure proofs: crash between local save and enqueue; server commit with lost reply;
 duplicate senders; multiple offline Saves plus later unsaved edits; remote conflict/deletion;

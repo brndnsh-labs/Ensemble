@@ -14,6 +14,24 @@ Operational guide for AI agents working in the Ensemble codebase. Claude Code au
 
 If any guide drifts from live code/config, prefer live and update the docs.
 
+## V2 delivery exception — read before starting a v2 story
+
+Brandon's 2026-09-10 direction: "we'll keep building off of this branch for now since main=prod".
+For v2 work, including its shared-engine and test companions, first read
+[`prototypes/v2/CLAUDE.md`](prototypes/v2/CLAUDE.md). This is the common handoff for Claude,
+Codex and other agents; no previous conversation or private agent memory is required.
+
+- Integrate on `feat/ensemble-v2-foundation`, through existing **draft PR #1173**.
+- `/cycle` still requires implementation, review and verification, but its delivery endpoint
+  here is a reviewed commit pushed to that branch. **Do not merge, enable auto-merge, mark the
+  PR ready, close implemented issues, prune the branch, sync to main, or deploy production.**
+  This exception overrides the normal work-loop delivery/merge defaults for v2 only.
+- Leave implemented child stories open at `status:in-review` (or their real human gate), with
+  a commit and test receipt. Check branch code/receipts before treating an open issue as unbuilt.
+- The original application's Preact/component conventions below still apply to `public/`.
+  The isolated v2 shell uses its existing React components; do not migrate either UI as a
+  side effect of a story. Engine/state/worker safeguards apply to both hosts.
+
 ## Mandatory Checklist (before any change)
 
 1. **State writes** flow through `dispatch(ACTIONS.TYPE, payload)`. Never mutate state objects directly outside reducers (exception: `// @direct-mutation` in performance-critical engine code). A `document`/`preferences`-owned field (`public/songbook/state-ownership.ts`) is written **only** by user intent — a UI dispatch or hydration; a runtime system's modulation of it lives in a paired `runtime-derived` sibling field, composed at read time — see `docs/design/write-ownership.md`.

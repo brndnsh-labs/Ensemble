@@ -2,7 +2,9 @@
 
 Isolated Next.js/React shell using Ensemble's existing browser engine and canonical chart codec.
 This is a working checkpoint, not a production replacement. See [the product brief](../../docs/design/ensemble-v2.md).
-Tracker: milestone 15; #1170 (preview), #1171 (chart/import design), #1172 (account/sync/hosting design), #1174 (sounds/focused stand), #1175 (editing usability).
+Tracker: milestone 15; #1170 (preview), #1171 (chart/import), #1172 (account/sync/hosting), #1174 (sounds/focused stand), #1175 (editing usability), #1177 (account-local outbox).
+Fresh Claude/Codex/other-agent sessions start with [the v2 handoff](CLAUDE.md).
+Work stays on `feat/ensemble-v2-foundation` / draft PR #1173; no merge to production `main`.
 
 ## Account storage foundation (#1177)
 
@@ -94,7 +96,8 @@ local browser projects and never deploys.
   applying voices; a failed install keeps the previous setup and reuses completed files on retry.
   `.ensemble`/JSON export/import preserves manual and Follow feel choices. Conservative iReal
   import is available through Import chart; see its explicit boundaries below.
-- Accounts, cloud/outbox, sharing, admin, full form execution/import, chord discovery,
+- Account-local storage/outbox and bounded native form execution are implemented foundations;
+  authenticated cloud sync, sharing, admin, remaining iReal semantics, chord discovery,
   full settings inventory, section-practice controls and visualizer are later work. Genre
   changes briefly stop/restart playback in this checkpoint, without expanding the focused chart.
   A failed change restores the previous setup and resumes only if its sounds are still verified;

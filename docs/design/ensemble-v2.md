@@ -79,7 +79,9 @@ The #1175 usability slice makes typed chords part of Save/copy/export, preserves
 reveals editing on compact screens, and separates tempo typing and last-opened preference from
 document commits. Update chart is an optional preview; unsupported text is retained for correction.
 Unchecked text is tab-only, with an unload warning, rather than a new durable recovery format.
-Checkpoint 2: settle explicit rhythmic chart representation and bounded import compatibility.
+Checkpoint 2: explicit rhythmic chart representation, measure editing and bounded form/import
+are implemented; extend compatibility only in fixture-backed stages, with missing semantics
+called out. #1171 remains the umbrella, not a fresh design-only task.
 Checkpoint 3: account, sync, shared snapshot and admin services; migration/restore/conflict proof.
 The proposed contract and Songs I Know reuse assessment are in
 [`ensemble-v2-sync.md`](ensemble-v2-sync.md). The recovery-code policy was approved on
@@ -123,11 +125,26 @@ preserve source, and refuse musical transformations that silently change timing/
 endings/jumps, N.C., unsupported meters, alternate chords and composer/style metadata need
 explicit dispositions. These are decisions to test with a chart corpus, not guessed support.
 
-## Still to decide before production
+## Remaining acceptance before production
 
-- Precise import and rhythmic/form compatibility, including how text expresses explicit lengths.
-- Account recovery, account switching/sign-out cache policy and cloud deletion semantics.
-- Conflict-resolution UX and crash-safe outbox/idempotency protocol.
-- Offline sound installation, browser eviction/recovery and shared-device privacy.
-- OS audio interruption behavior, safe service-worker upgrades and migration coexistence.
-- Measured framework/build/deploy costs; final API/database/container topology.
+- Remaining iReal compatibility: fixture-backed timing/metadata meanings and explicit lane
+  behavior for N.C., breaks, holds, alternates and fermatas. Native durations/repeats/jumps
+  already exist; do not reopen that approved format decision. Deferred authoring UX is #1176.
+- Real passkey/recovery and account switching/sign-out/deletion flows, including lost/expired
+  credentials and shared-device failure paths. Recovery direction is approved, not implemented.
+- Server-side atomic revisions/receipts, downloads and Keep both conflict resolution. The local
+  immutable outbox exists under #1177; it is not a live server or an end-to-end sync claim.
+- Whole-library document/sound download and eviction recovery. Explicit sound installation
+  and per-song readiness already work in the preview; account-library readiness is later.
+- Physical-device audio interruptions, safe upgrades, source-preserving migration/coexistence,
+  restore rehearsal and exact-build user acceptance.
+- Measured framework/build/deploy costs; ratified API/database/container topology and backup
+  policy. Docker is optional and production still requires a separate go-ahead.
+
+## Cross-provider continuation
+
+The [v2 handoff](../../prototypes/v2/CLAUDE.md) is the common Claude/Codex entrypoint. GitHub
+milestone 15 owns task status; design parents explain contracts, not a parallel task queue.
+The [next batch](ensemble-v2-next-batch.md) shapes bounded child work with independent acceptance.
+Brandon's 2026-09-10 branch decision keeps implementation on `feat/ensemble-v2-foundation` and
+PR #1173 draft. Normal cycle verification remains; its merge/main/production steps do not apply.
