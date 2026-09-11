@@ -41,16 +41,21 @@ session cookies stay origin-bound.
 | --- | --- | --- |
 | [#1187](https://github.com/brndnsh-labs/Ensemble/issues/1187) | Service skeleton, schema, migration runner, disposable-DB harness | — |
 | [#1188](https://github.com/brndnsh-labs/Ensemble/issues/1188) | Registration and login ceremonies with bound challenge claims | #1187 |
-| [#1189](https://github.com/brndnsh-labs/Ensemble/issues/1189) | Hashed, revocable sessions and same-origin checks | #1188 |
+| [#1189](https://github.com/brndnsh-labs/Ensemble/issues/1189) | Hashed, revocable sessions, same-origin checks, **and the HTTP layer on Hono** (amended 2026-09-10) | #1188 |
 | [#1190](https://github.com/brndnsh-labs/Ensemble/issues/1190) | Passkey add/revoke behind a fresh-authentication requirement | #1189 |
 | [#1191](https://github.com/brndnsh-labs/Ensemble/issues/1191) | Recovery-code enrollment, claim and atomic consumption | #1189 |
 | [#1192](https://github.com/brndnsh-labs/Ensemble/issues/1192) | Bounded auth surface and the stage-2 threat-model review | #1188–#1191 |
 
+No story originally owned the HTTP server; #1189 was amended on 2026-09-10 (ratified) to create
+it on Hono. Its built-in CSRF middleware must be tested against the contract's header-less
+request cases before it is relied on — see the amendment comment on #1189.
+
 The service lives at `prototypes/v2-api/` — a sibling of `prototypes/v2/`, not a subdirectory,
 so the API sources stay out of the Next app's compilation and static-export config.
 
-**Only #1187 is `status:ready`.** The rest are `status:blocked` on the chain above; promote each
-to ready only when its prerequisite is implemented and verified on the branch. **None of
+**Readiness follows the chain above.** Promote each story to ready only when its prerequisite is
+implemented and verified on the branch; read live labels rather than this sentence for the
+current position. **None of
 #1188–#1192 is unattended work** — every one is a frontier-tier authentication surface requiring
 an independent correctness and security review with cold context, per the
 [v2 handoff](../../prototypes/v2/CLAUDE.md). Do not pick them up in a `/burndown` or `/nightly`
