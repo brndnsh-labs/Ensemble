@@ -9,9 +9,12 @@ disposable-database test harness. **#1188** (story 2 of 6) added the WebAuthn re
 login ceremony modules (`src/auth/`) and migration `0002`. **#1189** (story 3 of 6) added the
 session model (`src/auth/session.ts`, migration `0003`) and — per its ratified scope amendment —
 the entire HTTP layer on Hono (`src/http/`, `src/server.ts`): this is the first story where the
-service is actually reachable over a socket. **No passkey add/revoke, no recovery-code logic, and
-no wiring to `prototypes/v2/` or `public/` land here** — see the stage-2 batch in
-[`docs/design/ensemble-v2-next-batch.md`](../../docs/design/ensemble-v2-next-batch.md) (#1190-#1192)
+service is actually reachable over a socket. **#1190** (story 4 of 6) added passkey management
+(add/list/revoke) and step-up re-authentication, gated by a single fresh-authentication predicate
+(`src/auth/fresh-auth.ts`, migration `0004`) — see "Passkey management and step-up
+re-authentication (#1190)" below. **No recovery-code logic, and no wiring to `prototypes/v2/` or
+`public/` land here** — see the stage-2 batch in
+[`docs/design/ensemble-v2-next-batch.md`](../../docs/design/ensemble-v2-next-batch.md) (#1191-#1192)
 for where those land, each blocked on the story before it.
 
 ## Layout
@@ -21,21 +24,26 @@ for where those land, each blocked on the story before it.
 | `src/db/connection.ts` | Opens a `node:sqlite` `DatabaseSync` and sets `journal_mode=WAL`, `busy_timeout`, `foreign_keys=ON` explicitly. |
 | `src/db/transaction.ts` | `withTransaction(db, fn)` — `node:sqlite` has no built-in `db.transaction()` helper; every multi-statement write must use this. |
 | `src/db/migrate.ts` | Hand-rolled, content-addressed migration runner. Depends only on `node:fs`/`node:crypto`/`node:sqlite`, deliberately not on any migration-authoring toolkit. |
-| `migrations/*.sql` | Schema, applied in filename order. `0001_init.sql` creates `accounts`, `credentials`, `challenges`, `sessions`, `recovery_codes`. `0002_challenge_ceremony_hash.sql` adds `challenges.ceremony_hash` (+ its unique index) for #1188's ceremony-token binding. `0003_session_token_hash.sql` adds `sessions.token_hash` (+ its unique index) for #1189's session token model. |
+| `migrations/*.sql` | Schema, applied in filename order. `0001_init.sql` creates `accounts`, `credentials`, `challenges`, `sessions`, `recovery_codes`. `0002_challenge_ceremony_hash.sql` adds `challenges.ceremony_hash` (+ its unique index) for #1188's ceremony-token binding. `0003_session_token_hash.sql` adds `sessions.token_hash` (+ its unique index) for #1189's session token model. `0004_passkey_management_bindings.sql` adds `sessions.credential_id` (nullable, `ON DELETE SET NULL`, indexed) and `challenges.session_id` (nullable, no FK) for #1190. |
 | `src/auth/config.ts` | `createWebAuthnConfig({ rpId, rpName, origin })` — validates and freezes ceremony config. The origin must already be canonical, and `rpId` must **exactly** equal its hostname (no parent-domain relaxation; separate environments use separate RP IDs). Always passed as an argument; never a module-level `process.env` read. |
-| `src/auth/challenges.ts` | `claimChallenge` — the one `DELETE ... RETURNING *` atomic challenge claim — plus ceremony-token minting/hashing and the expired-row sweep. |
+| `src/auth/challenges.ts` | `claimChallenge` — the one `DELETE ... RETURNING *` atomic challenge claim — plus ceremony-token minting/hashing and the expired-row sweep. `ChallengeType` is `'registration' \| 'login' \| 'reauth' \| 'add_passkey'` (the last two added by #1190). |
 | `src/auth/request-guard.ts` | `isMalformedCeremonyRequest(input)` — the shallow shape guard both verify functions run first, synchronously, before the challenge claim, so a malformed request returns `malformed_request` without consuming the ceremony token. |
 | `src/auth/credential-row.ts` | Shared `credentials` row shape, transports JSON encode/decode, and the duplicate-credential-id error classifier. |
 | `src/auth/registration.ts` | `startRegistration` / `verifyRegistration` — discoverable-passkey registration against the real `@simplewebauthn/server` verify path. |
-| `src/auth/login.ts` | `startLogin` / `verifyLogin` — usernameless login, the counter-regression-safe commit. |
-| `src/auth/session.ts` | `issueSession` / `readSession` / `revokeSession` / `revokeOtherSessions` — hashed, revocable, 30-day-absolute sessions (#1189). `readSession` performs zero database writes. |
+| `src/auth/login.ts` | `startLogin` / `verifyLogin` — usernameless login. Its own verify-and-commit core is `src/auth/assertion-commit.ts` (#1190), shared with reauth. |
+| `src/auth/assertion-commit.ts` | `verifyAssertionAndCommitCounter` (#1190) — the counter-regression-safe assertion verify + commit, extracted out of #1188's `verifyLogin` so #1190's `verifyReauth` can share it instead of copying it. `login.ts`'s own tests are the regression guard that the extraction changed nothing. |
+| `src/auth/fresh-auth.ts` | `isFreshlyAuthenticated` / `FRESH_AUTH_WINDOW_MS` (#1190) — the ONE "freshly authenticated" predicate: one SQL read requiring the session to belong to the account, be unrevoked, unexpired, created within the last 10 minutes, and to have been created by a passkey ceremony (`credential_id IS NOT NULL`). Called at add-passkey options, inside the add-passkey commit transaction, and as the first step inside `revokePasskey`'s transaction. |
+| `src/auth/recovery-material.ts` | `hasEnrolledRecoveryMaterial` (#1190) — "does this account have at least one unconsumed `recovery_codes` row," the narrow slice `revokePasskey`'s last-credential guard needs before #1191 owns the full recovery-code lifecycle. |
+| `src/auth/reauth.ts` | `startReauth` / `verifyReauth` (#1190) — step-up re-authentication. `allowCredentials` is the account's own credentials (unlike login's empty/usernameless list); the challenge binds `account_id` AND `session_id`; verify shares `assertion-commit.ts`'s core with login. Success does not itself rotate the session — the caller (the HTTP route) does that via `finishAuthentication`. |
+| `src/auth/passkeys.ts` | `startAddPasskey` / `verifyAddPasskey` / `revokePasskey` / `listPasskeys` (#1190). Add-passkey requires a FRESH session (checked at options AND re-checked inside the verify commit transaction) and binds `account_id` + `session_id` into the challenge; an already-registered credential on the same account is a no-op (`alreadyRegistered: true`), on another account it's `credential_exists`. `revokePasskey` is one synchronous transaction: fresh check, owner-scoped lookup, last-credential guard (owner-scoped SELECT/DELETE and account-scoped session revocation — never trust `id`/`credential_id` alone), revoke every session the credential created, delete. `listPasskeys` never returns the public key or counter. |
+| `src/auth/session.ts` | `issueSession` / `readSession` / `revokeSession` / `revokeOtherSessions` — hashed, revocable, 30-day-absolute sessions (#1189). `readSession` performs zero database writes. #1190 adds an optional `credentialId` argument to `issueSession` (defaulting to `null`, so every pre-#1190 call keeps its exact behavior) and a `credentialId` field to `SessionClaims`, recording which credential's ceremony created the session — the register, login and reauth-verify HTTP routes all pass it now. |
 | `src/auth/index.ts` | Barrel re-export of the above. |
-| `src/http/app.ts` | `createApp({ db, config, now?, sessionTtlMs? })` — the Hono app factory. No module-level state. Wires security headers, `bodyLimit`, the same-origin guard, the JSON-only guard, every `/api/auth/*` route, and the collapsed error mapping. |
+| `src/http/app.ts` | `createApp({ db, config, now?, sessionTtlMs? })` — the Hono app factory. No module-level state. Wires security headers, `bodyLimit`, the same-origin guard, the JSON-only guard, every `/api/auth/*` route, and the collapsed error mapping. `finishAuthentication` (the fixation-defense revoke-then-issue) now also records the credential id on the freshly-minted session (#1190). |
 | `src/http/same-origin.ts` | `sameOriginGuard(config)` — our own CSRF defense (never `hono/csrf`, which does not satisfy the contract — see the module doc comment). |
 | `src/http/content-type.ts` | `jsonOnlyGuard()` / `requestHasBody()` — 415 on a body-carrying unsafe method that isn't `application/json`. |
 | `src/http/cookies.ts` | Ceremony/session cookie transport — names, `__Host-` prefixing, and attributes, all derived from `config.origin`. |
 | `src/http/headers.ts` | `securityHeaders()` — `Cache-Control`, CSP, `X-Content-Type-Options`, `Referrer-Policy` on every `/api/*` response, including 404/413/415/403/500. |
-| `src/http/errors.ts` | `sendError` / `ceremonyFailureResponse` — the collapsed `{ error: <code> }` taxonomy; every ceremony failure reason except `malformed_request` becomes `401 authentication_failed`. |
+| `src/http/errors.ts` | `sendError` / `ceremonyFailureResponse` / `revokePasskeyFailureResponse` (#1190) — the collapsed `{ error: <code> }` taxonomy. `malformed_request` is 400; `fresh_auth_required` (add-passkey only) is 403; every other ceremony failure reason, including #1190's `session_mismatch`, is `401 authentication_failed`. `revokePasskey`'s own reasons map separately: `fresh_auth_required` 403, `not_found` 404, `last_credential` 409. |
 | `src/server.ts` | The only file that reads `process.env`. Builds config, opens the database, runs migrations, starts `@hono/node-server`, and closes the database on `SIGTERM`/`SIGINT`. |
 | `test/helpers/test-db.ts` | `createTestDatabase()` — a fresh on-disk (never `:memory:`, which can't hold WAL mode) SQLite file per test, migrated for real. |
 | `test/helpers/soft-authenticator.ts` | `createSoftAuthenticator({ rpId, origin })` — a software WebAuthn authenticator that builds real ES256 registration/assertion responses (`node:crypto` + `isoCBOR`/`isoBase64URL`) so ceremony tests exercise the actual library verify path, not a mock. Controllable origin, RP ID, UV flag, counter, `userHandle` and signing key pair. |
@@ -112,8 +120,8 @@ server. The service is reachable over a real socket for the first time here.
   session's own owner, from `readSession`) before minting the fresh one.
 - **Routes** are all under `/api/auth`: `POST register/{options,verify}`, `POST
   login/{options,verify}`, `GET session`, `POST logout` (idempotent, `204`), `POST
-  sessions/revoke-others` (requires a session, `204`). No session-listing or revoke-by-id route —
-  nothing in stage 2 needs one; the library function exists and is tested directly.
+  sessions/revoke-others` (requires a session, `204`). #1190 adds passkey management and
+  step-up reauth routes — see below.
 - **Security headers** (`src/http/headers.ts`) are registered on `'*'`, so they land on every
   response the process sends — a path outside `/api`, `app.notFound`'s 404 and `app.onError`'s
   500 included.
@@ -122,6 +130,68 @@ server. The service is reachable over a real socket for the first time here.
   before `bodyLimit` would drain an unsized stream. `SAFE_METHODS` (`GET`/`HEAD`/`OPTIONS`,
   `src/http/http-safe-methods.ts`) is the one exemption list both guards share; every other
   method, `PURGE` included, is gated.
+
+## Passkey management and step-up re-authentication (#1190)
+
+Adding or revoking a credential is a sensitive operation. A valid session alone is not enough —
+the contract requires a RECENT user-verified ceremony, so a stolen or borrowed logged-in session
+cannot be silently promoted into permanent account takeover by enrolling an attacker's passkey
+and revoking the owner's.
+
+- **The fresh-authentication rule** (`src/auth/fresh-auth.ts`): `isFreshlyAuthenticated(db,
+  sessionId, accountId, now)` is the ONE implementation of "fresh" in this service — a single SQL
+  read requiring the session to belong to the account, be unrevoked, unexpired, **created within
+  the last 10 minutes** (`FRESH_AUTH_WINDOW_MS`), and to have been created by a real passkey
+  ceremony (`credential_id IS NOT NULL`). Every session is created by a user-verified ceremony
+  (registration, login, or reauth), so a brand-new session is fresh for 10 minutes from the
+  moment it's issued — enrolling a second passkey immediately after signup works with zero
+  friction. The predicate is checked in three places: at `passkeys/options` (before any ceremony
+  starts), again inside `passkeys/verify`'s commit transaction (the WebAuthn ceremony's
+  real-world await — the user physically touching a key — is exactly the window a session can go
+  stale in), and as the first step inside `revokePasskey`'s transaction. `credential_id IS NOT
+  NULL` fails safe for #1191's future recovery session, which has none.
+  **Known residual risk:** a session picked up within 10 minutes of the owner's login can still
+  add a passkey, sign in with it and revoke the owner's. No bounded window closes that; the
+  mitigation (security events for passkey add/revoke) is carried on #1192.
+- **Step-up re-authentication** (`src/auth/reauth.ts`): `POST /api/auth/reauth/options` requires
+  a valid (not necessarily fresh) session and returns authentication options scoped to that
+  account's own credentials (`allowCredentials`, unlike login's empty/usernameless list). The
+  challenge binds both `account_id` and `session_id`. `POST /api/auth/reauth/verify` requires the
+  presented session to be EXACTLY the bound one, for the bound account, then shares
+  `assertion-commit.ts`'s verify-and-commit core with login. On success it rotates the session
+  (revokes the presented one, issues a fresh one with `credential_id` set) via the same
+  `finishAuthentication` fixation defense register/login use — a step-up is a privilege change,
+  so the token is renewed rather than a flag stamped on the old row.
+- **Adding a passkey** (`src/auth/passkeys.ts`): `POST /api/auth/passkeys/options` requires a
+  FRESH session; its options reuse the account's existing WebAuthn user handle (`userID`, decoded
+  back from the account id) and set `excludeCredentials` to the account's current credentials.
+  `POST /api/auth/passkeys/verify` order is: shape guard, claim the challenge, require the
+  presented session to be exactly the bound session for the bound account, verify the response,
+  then commit — re-checking freshness and account existence inside the same transaction before
+  inserting. An authenticator already registered on the SAME account is a clean no-op
+  (`alreadyRegistered: true`, never overwriting the stored public key or counter); already
+  registered on ANOTHER account is `credential_exists`.
+- **Revoking a passkey** (`POST /api/auth/passkeys/revoke`, body `{ credentialId }`): one
+  synchronous transaction, in order — fresh check (a stale session gets `403` whether or not the
+  target exists, so it can't be used to probe for ids); owner-scoped lookup (a nonexistent
+  credential and one belonging to another account return an IDENTICAL `404 not_found`, with no
+  side effects either way); the last-credential guard (`409 last_credential` unless
+  `hasEnrolledRecoveryMaterial` — at least one unconsumed `recovery_codes` row — says otherwise);
+  revoke every session that credential created (a lost device's passkey being revoked must end
+  that device's sessions, not only block its future logins); delete. The response is `200
+  { signedOut }`, and the session cookie is cleared when the revoked credential turns out to have
+  been the one that created the CURRENT session.
+- **Listing passkeys** (`GET /api/auth/passkeys`): requires a session, but not a fresh one —
+  listing is not a sensitive write, and it's the prerequisite for revoking by id. Returns `id`,
+  `createdAt`, `lastUsedAt`, `transports` and `current` (whether this credential created the
+  requesting session) — never the public key or counter.
+- **New error codes** (`src/http/errors.ts`): `403 fresh_auth_required` and `409
+  last_credential`. Everything else — including the new `session_mismatch` ceremony-binding
+  failure — collapses into the existing `401 authentication_failed` / `400 malformed_request`
+  taxonomy, for the same anti-probing reason as #1189's decision 14.
+- **Shared, not copied**: `src/auth/assertion-commit.ts` extracts the assertion-verify-and-commit
+  core (counter-regression handling included) out of #1188's `verifyLogin` so `verifyReauth` can
+  reuse it. `verifyLogin`'s own public behavior, and every #1188 test, is unchanged.
 
 ## Commands
 

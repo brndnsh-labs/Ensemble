@@ -12,12 +12,22 @@ import type { DatabaseSync } from 'node:sqlite';
 /** Challenge rows expire 5 minutes after issuance (decision 12). */
 export const CHALLENGE_TTL_MS = 5 * 60 * 1000;
 
-export type ChallengeType = 'registration' | 'login';
+/**
+ * `'reauth'` (#1190 decision 3) and `'add_passkey'` (#1190 decision 4) are new challenge types
+ * added on top of #1188's `'registration'`/`'login'`. Both are POST-authentication ceremonies —
+ * unlike registration/login, they bind `session_id` (below) as well as `account_id`.
+ */
+export type ChallengeType = 'registration' | 'login' | 'reauth' | 'add_passkey';
 
 /** Row shape as returned by `claimChallenge`'s `DELETE ... RETURNING *`. */
 export interface ChallengeRow {
     id: string;
     account_id: string | null;
+    /**
+     * The session a `reauth`/`add_passkey` ceremony is bound to (#1190 migration 0004).
+     * `null` for `registration`/`login`, which predate any session existing.
+     */
+    session_id: string | null;
     challenge: string;
     type: string;
     created_at: number;
@@ -28,6 +38,9 @@ export interface ChallengeRow {
 export interface NewChallenge {
     id: string;
     accountId: string | null;
+    /** See `ChallengeRow.session_id`. Every caller must pass this explicitly — `null` for
+     * registration/login, the initiating session's id for reauth/add_passkey. */
+    sessionId: string | null;
     challenge: string;
     type: ChallengeType;
     createdAt: number;
@@ -64,11 +77,13 @@ export function sweepExpiredChallenges(db: DatabaseSync, now: number): void {
 
 export function insertChallenge(db: DatabaseSync, row: NewChallenge): void {
     db.prepare(
-        `INSERT INTO challenges (id, account_id, challenge, type, created_at, expires_at, ceremony_hash)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO challenges
+            (id, account_id, session_id, challenge, type, created_at, expires_at, ceremony_hash)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
         row.id,
         row.accountId,
+        row.sessionId,
         row.challenge,
         row.type,
         row.createdAt,

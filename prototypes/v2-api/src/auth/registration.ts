@@ -40,7 +40,8 @@ export interface StartRegistrationResult {
     ceremonyToken: string;
 }
 
-function resolveLabel(label: string | undefined): string {
+/** Shared with #1190's `src/auth/passkeys.ts` add-passkey flow — same bounded-label contract. */
+export function resolveLabel(label: string | undefined): string {
     if (label === undefined) {
         return DEFAULT_LABEL;
     }
@@ -96,6 +97,7 @@ export async function startRegistration(
     insertChallenge(db, {
         id: randomBytes(16).toString('base64url'),
         accountId,
+        sessionId: null,
         challenge: options.challenge,
         type: 'registration',
         createdAt: now,

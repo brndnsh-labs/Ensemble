@@ -179,6 +179,7 @@ describe('registration ceremony (#1188)', () => {
         insertChallenge(testDb.db, {
             id: 'login-ceremony',
             accountId: null,
+            sessionId: null,
             challenge: 'irrelevant-challenge',
             type: 'login',
             createdAt: now,

@@ -4,13 +4,21 @@ import { type Context, Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import {
     issueSession,
+    listPasskeys,
     readSession,
     revokeOtherSessions,
+    revokePasskey,
     revokeSession,
     SESSION_TTL_MS,
+    type SessionClaims,
+    type StartAddPasskeyResult,
+    startAddPasskey,
     startLogin,
+    startReauth,
     startRegistration,
+    verifyAddPasskey,
     verifyLogin,
+    verifyReauth,
     verifyRegistration,
     type WebAuthnConfig,
 } from '../auth/index.js';
@@ -23,7 +31,7 @@ import {
     setCeremonyCookie,
     setSessionCookie,
 } from './cookies.js';
-import { ceremonyFailureResponse, sendError } from './errors.js';
+import { ceremonyFailureResponse, revokePasskeyFailureResponse, sendError } from './errors.js';
 import { securityHeaders } from './headers.js';
 import { sameOriginGuard } from './same-origin.js';
 
@@ -119,8 +127,13 @@ export function createApp({
      * before minting the fresh one. `revokeSession` is owner-scoped, so the old session's own
      * `accountId` off `readSession` — not the newly-authenticated one — is what authorizes its
      * revocation.
+     *
+     * `credentialId` (#1190 decision 7) is recorded on the freshly-minted session so
+     * `isFreshlyAuthenticated` can later tell this was a real passkey ceremony, not merely a
+     * valid session. Every caller — register/verify, login/verify, and #1190's reauth/verify —
+     * passes the credential id its own successful verify returned; none of them may pass `null`.
      */
-    function finishAuthentication(c: Context, accountId: string): void {
+    function finishAuthentication(c: Context, accountId: string, credentialId: string): void {
         const nowMs = now();
         const presentedToken = getSessionToken(c, config);
         if (presentedToken !== undefined) {
@@ -129,36 +142,53 @@ export function createApp({
                 revokeSession(db, claims.sessionId, claims.accountId, nowMs);
             }
         }
-        const issued = issueSession(db, accountId, nowMs, sessionTtlMs);
+        const issued = issueSession(db, accountId, nowMs, sessionTtlMs, credentialId);
         setSessionCookie(c, config, issued.token, sessionTtlMs);
     }
 
-    app.post('/api/auth/register/options', async (c) => {
+    /**
+     * Shared by register/options and #1190's passkeys/options: parses an optional `{ label? }`
+     * JSON body, returning `undefined` when no body was sent at all (so the caller falls back to
+     * `resolveLabel`'s own default) or a `sendError` `Response` the route must return as-is on
+     * any shape problem.
+     */
+    async function parseOptionalLabel(
+        c: Context,
+    ): Promise<{ ok: true; label: string | undefined } | { ok: false; response: Response }> {
         const parsed = await parseJsonBody(c);
         if (!parsed.ok) {
-            return sendError(c, 400, 'malformed_request');
+            return { ok: false, response: sendError(c, 400, 'malformed_request') };
         }
-        let label: string | undefined;
-        if (parsed.value !== undefined) {
-            // `typeof [] === 'object'` too, so Array.isArray must be checked explicitly — a JSON
-            // array body would otherwise pass this guard, read `.label` as `undefined` off the
-            // array, and silently succeed with the default label.
-            if (
-                parsed.value === null ||
-                typeof parsed.value !== 'object' ||
-                Array.isArray(parsed.value)
-            ) {
-                return sendError(c, 400, 'malformed_request');
-            }
-            const rawLabel = (parsed.value as Record<string, unknown>).label;
-            if (rawLabel !== undefined && typeof rawLabel !== 'string') {
-                return sendError(c, 400, 'malformed_request');
-            }
-            label = rawLabel;
+        if (parsed.value === undefined) {
+            return { ok: true, label: undefined };
+        }
+        // `typeof [] === 'object'` too, so Array.isArray must be checked explicitly — a JSON
+        // array body would otherwise pass this guard, read `.label` as `undefined` off the
+        // array, and silently succeed with the default label.
+        if (
+            parsed.value === null ||
+            typeof parsed.value !== 'object' ||
+            Array.isArray(parsed.value)
+        ) {
+            return { ok: false, response: sendError(c, 400, 'malformed_request') };
+        }
+        const rawLabel = (parsed.value as Record<string, unknown>).label;
+        if (rawLabel !== undefined && typeof rawLabel !== 'string') {
+            return { ok: false, response: sendError(c, 400, 'malformed_request') };
+        }
+        return { ok: true, label: rawLabel };
+    }
+
+    app.post('/api/auth/register/options', async (c) => {
+        const parsedLabel = await parseOptionalLabel(c);
+        if (!parsedLabel.ok) {
+            return parsedLabel.response;
         }
 
         try {
-            const { options, ceremonyToken } = await startRegistration(db, config, { label });
+            const { options, ceremonyToken } = await startRegistration(db, config, {
+                label: parsedLabel.label,
+            });
             setCeremonyCookie(c, config, ceremonyToken);
             return c.json({ options });
         } catch {
@@ -188,7 +218,7 @@ export function createApp({
             return ceremonyFailureResponse(c, result.reason);
         }
 
-        finishAuthentication(c, result.accountId);
+        finishAuthentication(c, result.accountId, result.credentialId);
         return c.json({ accountId: result.accountId });
     });
 
@@ -216,7 +246,7 @@ export function createApp({
             return ceremonyFailureResponse(c, result.reason);
         }
 
-        finishAuthentication(c, result.accountId);
+        finishAuthentication(c, result.accountId, result.credentialId);
         return c.json({ accountId: result.accountId });
     });
 
@@ -258,6 +288,203 @@ export function createApp({
         }
         revokeOtherSessions(db, claims.accountId, claims.sessionId, now());
         return c.body(null, 204);
+    });
+
+    /**
+     * Shared by every #1190 route below: resolves the presented session cookie the same way
+     * `/api/auth/session` does, returning either the live claims or the `401 unauthenticated`
+     * `Response` the caller must return as-is. None of these six routes accept an unauthenticated
+     * request — `passkeys/options` and `passkeys/verify` additionally require FRESHNESS, checked
+     * separately (inside `startAddPasskey`/`verifyAddPasskey` themselves, not here), because a
+     * valid-but-stale session is a distinct failure (`403 fresh_auth_required`), not `401`.
+     */
+    function requireSession(
+        c: Context,
+    ): { ok: true; claims: SessionClaims } | { ok: false; response: Response } {
+        const token = getSessionToken(c, config);
+        if (token === undefined) {
+            return { ok: false, response: sendError(c, 401, 'unauthenticated') };
+        }
+        const claims = readSession(db, token, now());
+        if (claims === null) {
+            return { ok: false, response: sendError(c, 401, 'unauthenticated') };
+        }
+        return { ok: true, claims };
+    }
+
+    // --- #1190: passkey management and step-up re-authentication -----------------------------
+
+    app.get('/api/auth/passkeys', (c) => {
+        const session = requireSession(c);
+        if (!session.ok) {
+            return session.response;
+        }
+        const passkeys = listPasskeys(db, session.claims.accountId, session.claims.credentialId);
+        return c.json({ passkeys });
+    });
+
+    app.post('/api/auth/passkeys/options', async (c) => {
+        const session = requireSession(c);
+        if (!session.ok) {
+            return session.response;
+        }
+        const parsedLabel = await parseOptionalLabel(c);
+        if (!parsedLabel.ok) {
+            return parsedLabel.response;
+        }
+
+        let result: StartAddPasskeyResult;
+        try {
+            result = await startAddPasskey(
+                db,
+                config,
+                {
+                    accountId: session.claims.accountId,
+                    sessionId: session.claims.sessionId,
+                    label: parsedLabel.label,
+                },
+                now(),
+            );
+        } catch {
+            // Same invalid-label-throws-synchronously contract as startRegistration (see
+            // register/options above).
+            return sendError(c, 400, 'malformed_request');
+        }
+        if (!result.ok) {
+            return ceremonyFailureResponse(c, result.reason);
+        }
+        setCeremonyCookie(c, config, result.ceremonyToken);
+        return c.json({ options: result.options });
+    });
+
+    app.post('/api/auth/passkeys/verify', async (c) => {
+        const ceremonyToken = getCeremonyToken(c, config) ?? '';
+        // Single-use, success or failure, same as every other verify route (decision 13).
+        clearCeremonyCookie(c, config);
+
+        const session = requireSession(c);
+        if (!session.ok) {
+            return session.response;
+        }
+
+        const parsed = await parseJsonBody(c);
+        if (!parsed.ok) {
+            return sendError(c, 400, 'malformed_request');
+        }
+
+        const result = await verifyAddPasskey(
+            db,
+            config,
+            {
+                ceremonyToken,
+                sessionId: session.claims.sessionId,
+                accountId: session.claims.accountId,
+                response: parsed.value as RegistrationResponseJSON,
+            },
+            now(),
+        );
+        if (!result.ok) {
+            return ceremonyFailureResponse(c, result.reason);
+        }
+        // Unlike register/verify and login/verify, this does NOT call finishAuthentication —
+        // adding a passkey is not itself an authentication event, and the presented session is
+        // left exactly as it was.
+        return c.json({
+            credentialId: result.credentialId,
+            alreadyRegistered: result.alreadyRegistered,
+        });
+    });
+
+    app.post('/api/auth/passkeys/revoke', async (c) => {
+        const session = requireSession(c);
+        if (!session.ok) {
+            return session.response;
+        }
+
+        const parsed = await parseJsonBody(c);
+        if (!parsed.ok) {
+            return sendError(c, 400, 'malformed_request');
+        }
+        if (
+            parsed.value === null ||
+            typeof parsed.value !== 'object' ||
+            Array.isArray(parsed.value)
+        ) {
+            return sendError(c, 400, 'malformed_request');
+        }
+        const credentialId = (parsed.value as Record<string, unknown>).credentialId;
+        if (typeof credentialId !== 'string' || credentialId.length === 0) {
+            return sendError(c, 400, 'malformed_request');
+        }
+
+        const result = revokePasskey(
+            db,
+            session.claims.accountId,
+            session.claims.sessionId,
+            credentialId,
+            now(),
+        );
+        if (!result.ok) {
+            return revokePasskeyFailureResponse(c, result.reason);
+        }
+        // The revoked credential may have been the one that created the CURRENT session — if so
+        // it was just revoked server-side too, so the client-held cookie must be cleared here.
+        if (result.signedOut) {
+            clearSessionCookie(c, config);
+        }
+        return c.json({ signedOut: result.signedOut });
+    });
+
+    app.post('/api/auth/reauth/options', async (c) => {
+        const session = requireSession(c);
+        if (!session.ok) {
+            return session.response;
+        }
+        const { options, ceremonyToken } = await startReauth(
+            db,
+            config,
+            {
+                accountId: session.claims.accountId,
+                sessionId: session.claims.sessionId,
+            },
+            now(),
+        );
+        setCeremonyCookie(c, config, ceremonyToken);
+        return c.json({ options });
+    });
+
+    app.post('/api/auth/reauth/verify', async (c) => {
+        const ceremonyToken = getCeremonyToken(c, config) ?? '';
+        clearCeremonyCookie(c, config);
+
+        const session = requireSession(c);
+        if (!session.ok) {
+            return session.response;
+        }
+
+        const parsed = await parseJsonBody(c);
+        if (!parsed.ok) {
+            return sendError(c, 400, 'malformed_request');
+        }
+
+        const result = await verifyReauth(
+            db,
+            config,
+            {
+                ceremonyToken,
+                sessionId: session.claims.sessionId,
+                accountId: session.claims.accountId,
+                response: parsed.value as AuthenticationResponseJSON,
+            },
+            now(),
+        );
+        if (!result.ok) {
+            return ceremonyFailureResponse(c, result.reason);
+        }
+
+        // Step-up is a privilege change (decision 3): the token is renewed, not flagged in place.
+        finishAuthentication(c, result.accountId, result.credentialId);
+        return c.json({ accountId: result.accountId });
     });
 
     return app;

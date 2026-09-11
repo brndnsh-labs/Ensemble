@@ -4,9 +4,8 @@ import {
     type AuthenticationResponseJSON,
     generateAuthenticationOptions,
     type PublicKeyCredentialRequestOptionsJSON,
-    verifyAuthenticationResponse,
 } from '@simplewebauthn/server';
-import { withTransaction } from '../db/transaction.js';
+import { verifyAssertionAndCommitCounter } from './assertion-commit.js';
 import {
     CHALLENGE_TTL_MS,
     claimChallenge,
@@ -16,7 +15,7 @@ import {
     sweepExpiredChallenges,
 } from './challenges.js';
 import type { WebAuthnConfig } from './config.js';
-import { type CredentialRow, decodeTransports } from './credential-row.js';
+import type { CredentialRow } from './credential-row.js';
 import { isMalformedCeremonyRequest } from './request-guard.js';
 
 export interface StartLoginResult {
@@ -49,6 +48,7 @@ export async function startLogin(
         id: randomBytes(16).toString('base64url'),
         // No account is known yet — this is exactly what usernameless login means.
         accountId: null,
+        sessionId: null,
         challenge: options.challenge,
         type: 'login',
         createdAt: now,
@@ -79,12 +79,6 @@ export type LoginFailureReason =
 export type LoginResult =
     | { ok: true; accountId: string; credentialId: string }
     | { ok: false; reason: LoginFailureReason };
-
-class CommitAbort extends Error {
-    constructor(readonly reason: LoginFailureReason) {
-        super(reason);
-    }
-}
 
 /**
  * Verifies a completed login ceremony and, on success, persists the rotated signature counter.
@@ -136,76 +130,24 @@ export async function verifyLogin(
         return { ok: false, reason: 'user_handle_mismatch' };
     }
 
-    let verification: Awaited<ReturnType<typeof verifyAuthenticationResponse>>;
-    try {
-        verification = await verifyAuthenticationResponse({
-            response: input.response,
-            expectedChallenge: claim.row.challenge,
-            expectedOrigin: config.origin,
-            expectedRPID: config.rpId,
-            credential: {
-                id: credentialRow.id,
-                publicKey: new Uint8Array(credentialRow.public_key),
-                counter: credentialRow.sign_count,
-                transports: decodeTransports(credentialRow.transports),
-            },
-            // Explicit even though `true` is also the library default: never rely on the
-            // default happening to match policy. Ensemble requires user verification.
-            requireUserVerification: true,
-        });
-    } catch {
-        return { ok: false, reason: 'verification_failed' };
+    // Shared with reauth (#1190 decision 3) — see assertion-commit.ts's doc comment. This is the
+    // exact verify-and-commit sequence #1188 shipped, only moved so a second ceremony can reuse
+    // it instead of copying it.
+    const commit = await verifyAssertionAndCommitCounter(
+        db,
+        config,
+        credentialRow,
+        input.response,
+        claim.row.challenge,
+        now,
+    );
+    if (!commit.ok) {
+        return { ok: false, reason: commit.reason };
     }
 
-    if (!verification.verified) {
-        return { ok: false, reason: 'verification_failed' };
-    }
-
-    const newCounter = verification.authenticationInfo.newCounter;
-
-    try {
-        return withTransaction(db, () => {
-            // Re-check account and credential state at commit time (issue body), not just at
-            // the pre-verify lookup above — a concurrent revoke/delete between the lookup and
-            // this point must not silently commit a stale write.
-            const account = db
-                .prepare('SELECT id FROM accounts WHERE id = ?')
-                .get(credentialRow.account_id);
-            if (!account) {
-                throw new CommitAbort('account_not_found');
-            }
-            const freshCredential = db
-                .prepare('SELECT sign_count FROM credentials WHERE id = ?')
-                .get(credentialRow.id) as { sign_count: number } | undefined;
-            if (!freshCredential) {
-                throw new CommitAbort('credential_not_found');
-            }
-
-            // Monotonic counter under concurrency (decision 9). Synced passkeys always report
-            // counter 0 (measured: 0 -> 0 verifies) — a naive "must strictly increase" check
-            // would lock out every iCloud/Google-synced passkey, so 0 -> 0 is the one allowed
-            // exception. Zero rows changed means a counter regression: a racing login already
-            // committed a counter this one has already passed, or a cloned authenticator.
-            const info = db
-                .prepare(
-                    `UPDATE credentials SET sign_count = ?, last_used_at = ?
-                     WHERE id = ? AND (sign_count < ? OR (? = 0 AND sign_count = 0))`,
-                )
-                .run(newCounter, now, credentialRow.id, newCounter, newCounter);
-            if (info.changes === 0) {
-                throw new CommitAbort('counter_regression');
-            }
-
-            return {
-                ok: true,
-                accountId: credentialRow.account_id,
-                credentialId: credentialRow.id,
-            } as const;
-        });
-    } catch (error) {
-        if (error instanceof CommitAbort) {
-            return { ok: false, reason: error.reason };
-        }
-        throw error;
-    }
+    return {
+        ok: true,
+        accountId: credentialRow.account_id,
+        credentialId: credentialRow.id,
+    };
 }

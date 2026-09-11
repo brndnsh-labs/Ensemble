@@ -76,7 +76,29 @@ describe('issueSession', () => {
             sessionId: issued.sessionId,
             accountId: 'acc-1',
             expiresAt: issued.expiresAt,
+            // #1190: not passed to this 3-argument issueSession call, so defaults to null.
+            credentialId: null,
         });
+    });
+
+    it('records credentialId when passed, and readSession returns it (#1190 decision 7)', () => {
+        testDb = createTestDatabase();
+        insertAccount(testDb, 'acc-1');
+        testDb.db
+            .prepare(
+                'INSERT INTO credentials (id, account_id, public_key, sign_count, created_at) VALUES (?, ?, ?, ?, ?)',
+            )
+            .run('cred-1', 'acc-1', Buffer.from('x'), 0, 0);
+        const now = 1_000_000;
+
+        const issued = issueSession(testDb.db, 'acc-1', now, SESSION_TTL_MS, 'cred-1');
+        const row = rawSessionRow(testDb, issued.sessionId) as RawSessionRow & {
+            credential_id: string | null;
+        };
+        expect(row.credential_id).toBe('cred-1');
+
+        const claims = readSession(testDb.db, issued.token, now);
+        expect(claims?.credentialId).toBe('cred-1');
     });
 
     it('issues a distinct token and sessionId on every call', () => {

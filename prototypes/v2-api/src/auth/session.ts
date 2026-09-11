@@ -48,6 +48,16 @@ export interface SessionClaims {
     sessionId: string;
     accountId: string;
     expiresAt: number;
+    /**
+     * The credential whose ceremony created this session (#1190 migration 0004), or `null` for
+     * a session that wasn't — today that's only a session minted by a 3-argument `issueSession`
+     * call in a test; #1191's future recovery session is the production case. This is what lets
+     * a caller (e.g. `listPasskeys`'s `current` flag) know "did THIS credential create the
+     * session I'm looking at" without a second query, and it's the same column
+     * `isFreshlyAuthenticated` (fresh-auth.ts) requires `IS NOT NULL` on — though that function
+     * does its own independent read rather than trusting this one, see its doc comment.
+     */
+    credentialId: string | null;
 }
 
 function hashToken(token: string): string {
@@ -72,12 +82,22 @@ function sweepExpiredSessions(db: DatabaseSync, now: number): void {
  * It exists for `src/http/app.ts`'s `createApp({ sessionTtlMs })` factory option (decision 7),
  * which a test can use to mint short-lived sessions instead of driving an injected clock 30 days
  * forward to exercise expiry over HTTP.
+ *
+ * `credentialId` (#1190 decision 7) is additive in the same spirit: an optional 5th argument
+ * defaulting to `null`, so every existing 3- and 4-argument call (the bulk of `session.test.ts`,
+ * which is testing session lifetime/revocation mechanics that have nothing to do with which
+ * credential created the session) keeps its exact behavior unchanged. The register, login and
+ * reauth-verify HTTP routes are the callers that must now pass it — see `src/http/app.ts`'s
+ * `finishAuthentication`. `isFreshlyAuthenticated` (fresh-auth.ts) is what actually depends on
+ * this column being populated for a passkey-created session; a session mistakenly left at the
+ * `null` default is simply never fresh, never wrongly-fresh — the failure mode is safe.
  */
 export function issueSession(
     db: DatabaseSync,
     accountId: string,
     now: number,
     ttlMs: number = SESSION_TTL_MS,
+    credentialId: string | null = null,
 ): IssuedSession {
     sweepExpiredSessions(db, now);
 
@@ -86,9 +106,9 @@ export function issueSession(
     const expiresAt = now + ttlMs;
 
     db.prepare(
-        `INSERT INTO sessions (id, account_id, created_at, expires_at, revoked_at, token_hash)
-         VALUES (?, ?, ?, ?, NULL, ?)`,
-    ).run(sessionId, accountId, now, expiresAt, hashToken(token));
+        `INSERT INTO sessions (id, account_id, created_at, expires_at, revoked_at, token_hash, credential_id)
+         VALUES (?, ?, ?, ?, NULL, ?, ?)`,
+    ).run(sessionId, accountId, now, expiresAt, hashToken(token), credentialId);
 
     return { token, sessionId, expiresAt };
 }
@@ -113,20 +133,31 @@ export function readSession(db: DatabaseSync, token: unknown, now: number): Sess
             // schema). If a future story adds account deletion, it must delete/revoke that
             // account's sessions FIRST, or this JOIN silently stops being redundant defense and
             // starts being load-bearing without anyone having verified it. Tracked on #1190/#1192.
-            `SELECT s.id AS session_id, s.account_id AS account_id, s.expires_at AS expires_at
+            `SELECT s.id AS session_id, s.account_id AS account_id, s.expires_at AS expires_at,
+                    s.credential_id AS credential_id
              FROM sessions s
              JOIN accounts a ON a.id = s.account_id
              WHERE s.token_hash = ? AND s.revoked_at IS NULL AND s.expires_at > ?`,
         )
         .get(hashToken(token), now) as unknown as
-        | { session_id: string; account_id: string; expires_at: number }
+        | {
+              session_id: string;
+              account_id: string;
+              expires_at: number;
+              credential_id: string | null;
+          }
         | undefined;
 
     if (!row) {
         return null;
     }
 
-    return { sessionId: row.session_id, accountId: row.account_id, expiresAt: row.expires_at };
+    return {
+        sessionId: row.session_id,
+        accountId: row.account_id,
+        expiresAt: row.expires_at,
+        credentialId: row.credential_id,
+    };
 }
 
 /**

@@ -67,6 +67,7 @@ describe('challenge TTL and expiry sweep (P2-5)', () => {
         insertChallenge(testDb.db, {
             id: 'expired-row',
             accountId: null,
+            sessionId: null,
             challenge: 'c1',
             type: 'login',
             createdAt: now - 10,
@@ -76,6 +77,7 @@ describe('challenge TTL and expiry sweep (P2-5)', () => {
         insertChallenge(testDb.db, {
             id: 'live-row',
             accountId: null,
+            sessionId: null,
             challenge: 'c2',
             type: 'login',
             createdAt: now,
@@ -98,6 +100,7 @@ describe('challenge TTL and expiry sweep (P2-5)', () => {
         insertChallenge(testDb.db, {
             id: 'stale-expired-row',
             accountId: null,
+            sessionId: null,
             challenge: 'stale',
             type: 'registration',
             createdAt: now - 1_000_000,
@@ -120,6 +123,7 @@ describe('challenge TTL and expiry sweep (P2-5)', () => {
         insertChallenge(testDb.db, {
             id: 'stale-expired-row',
             accountId: null,
+            sessionId: null,
             challenge: 'stale',
             type: 'login',
             createdAt: now - 1_000_000,
