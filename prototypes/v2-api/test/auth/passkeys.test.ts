@@ -47,12 +47,16 @@ function insertRecoveryCode(
     testDb: TestDatabase,
     accountId: string,
     consumedAt: number | null,
+    // #1191 decision 5: hasEnrolledRecoveryMaterial now ALSO requires confirmed_at IS NOT NULL —
+    // defaults to confirmed (0) so every pre-#1191 caller here keeps testing "usable recovery
+    // material" rather than accidentally exercising the new confirmed-gate.
+    confirmedAt: number | null = 0,
 ): void {
     testDb.db
         .prepare(
-            'INSERT INTO recovery_codes (id, account_id, code_hash, created_at, consumed_at) VALUES (?, ?, ?, ?, ?)',
+            'INSERT INTO recovery_codes (id, account_id, code_hash, created_at, consumed_at, confirmed_at) VALUES (?, ?, ?, ?, ?, ?)',
         )
-        .run(`code-${Math.random()}`, accountId, 'hash', 0, consumedAt);
+        .run(`code-${Math.random()}`, accountId, 'hash', 0, consumedAt, confirmedAt);
 }
 
 function credentialCount(testDb: TestDatabase, accountId: string): number {

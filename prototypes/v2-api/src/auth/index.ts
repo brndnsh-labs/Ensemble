@@ -19,6 +19,8 @@ export type {
     VerifyAddPasskeyInput,
 } from './passkeys.js';
 export { listPasskeys, revokePasskey, startAddPasskey, verifyAddPasskey } from './passkeys.js';
+export type { RateLimiterOptions, RateLimitResult } from './rate-limit.js';
+export { createRateLimiter } from './rate-limit.js';
 export type {
     ReauthFailureReason,
     ReauthResult,
@@ -27,6 +29,29 @@ export type {
     VerifyReauthInput,
 } from './reauth.js';
 export { startReauth, verifyReauth } from './reauth.js';
+export type {
+    ClaimRecoveryCodeResult,
+    ConfirmRecoveryCodeFailureReason,
+    ConfirmRecoveryCodeResult,
+    EnrollRecoveryCodeFailureReason,
+    EnrollRecoveryCodeResult,
+    RecoveryEnrollPasskeyFailureReason,
+    StartRecoveryEnrollPasskeyInput,
+    StartRecoveryEnrollPasskeyResult,
+    VerifyRecoveryEnrollPasskeyInput,
+    VerifyRecoveryEnrollPasskeyResult,
+} from './recovery.js';
+export {
+    claimRecoveryCode,
+    confirmRecoveryCode,
+    enrollRecoveryCode,
+    RECOVERY_CLAIM_RATE_LIMIT,
+    RECOVERY_CODE_BYTES,
+    RECOVERY_SESSION_TTL_MS,
+    readLiveRecoverySession,
+    startRecoveryEnrollPasskey,
+    verifyRecoveryEnrollPasskey,
+} from './recovery.js';
 export { hasEnrolledRecoveryMaterial } from './recovery-material.js';
 export type {
     RegistrationFailureReason,

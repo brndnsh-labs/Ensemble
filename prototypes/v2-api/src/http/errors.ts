@@ -2,8 +2,11 @@ import type { Context } from 'hono';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import type {
     AddPasskeyFailureReason,
+    ConfirmRecoveryCodeFailureReason,
+    EnrollRecoveryCodeFailureReason,
     LoginFailureReason,
     ReauthFailureReason,
+    RecoveryEnrollPasskeyFailureReason,
     RegistrationFailureReason,
     RevokePasskeyFailureReason,
 } from '../auth/index.js';
@@ -15,7 +18,8 @@ import type {
  * that a caller (or an attacker probing the endpoint) cannot distinguish "wrong
  * password-equivalent" from "credential does not exist" from "counter regression": see
  * `ceremonyFailureResponse` below. `fresh_auth_required` and `last_credential` are the two new
- * codes #1190 adds — everything else stays exactly as #1189 shipped it.
+ * codes #1190 adds; `rate_limited` is the one new code #1191 adds — everything else stays exactly
+ * as #1189 shipped it.
  */
 export type ApiErrorCode =
     | 'malformed_request'
@@ -27,7 +31,8 @@ export type ApiErrorCode =
     | 'not_found'
     | 'internal_error'
     | 'fresh_auth_required'
-    | 'last_credential';
+    | 'last_credential'
+    | 'rate_limited';
 
 export function sendError(c: Context, status: ContentfulStatusCode, code: ApiErrorCode) {
     return c.json({ error: code }, status);
@@ -45,6 +50,12 @@ export function sendError(c: Context, status: ContentfulStatusCode, code: ApiErr
  * code for one of those: that reopens the credential-existence probe review advisory #2 was
  * written to close, and a session-binding failure must look identical to any other ceremony
  * failure for the same anti-probing reason.
+ *
+ * `RecoveryEnrollPasskeyFailureReason` (#1191) extends the accepted union with no new branches in
+ * the function body: `recovery_session_invalid`, `account_not_found` and `recovery_code_not_found`
+ * all collapse to the same `401 authentication_failed` as every other non-`malformed_request`
+ * ceremony reason — none of them get `fresh_auth_required`'s `403`, because a recovery session's
+ * liveness is not the same concept as a standard session's freshness.
  */
 export function ceremonyFailureResponse(
     c: Context,
@@ -52,7 +63,8 @@ export function ceremonyFailureResponse(
         | RegistrationFailureReason
         | LoginFailureReason
         | ReauthFailureReason
-        | AddPasskeyFailureReason,
+        | AddPasskeyFailureReason
+        | RecoveryEnrollPasskeyFailureReason,
 ) {
     if (reason === 'malformed_request') {
         return sendError(c, 400, 'malformed_request');
@@ -77,4 +89,21 @@ export function revokePasskeyFailureResponse(c: Context, reason: RevokePasskeyFa
         return sendError(c, 404, 'not_found');
     }
     return sendError(c, 409, 'last_credential');
+}
+
+/**
+ * `enrollRecoveryCode`/`confirmRecoveryCode`'s failure reasons (#1191 decisions 3-4) — neither is
+ * a ceremony (no `ceremonyToken`/challenge involved), so they get their own small mapping rather
+ * than folding into `ceremonyFailureResponse`'s union, same precedent as
+ * `revokePasskeyFailureResponse` above. `not_found` (confirm only) means "no pending code
+ * matches" — see `confirmRecoveryCode`'s doc comment for why that is not an oracle risk here.
+ */
+export function recoveryActionFailureResponse(
+    c: Context,
+    reason: EnrollRecoveryCodeFailureReason | ConfirmRecoveryCodeFailureReason,
+) {
+    if (reason === 'fresh_auth_required') {
+        return sendError(c, 403, 'fresh_auth_required');
+    }
+    return sendError(c, 404, 'not_found');
 }

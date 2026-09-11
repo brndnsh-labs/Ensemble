@@ -16,8 +16,14 @@ export const CHALLENGE_TTL_MS = 5 * 60 * 1000;
  * `'reauth'` (#1190 decision 3) and `'add_passkey'` (#1190 decision 4) are new challenge types
  * added on top of #1188's `'registration'`/`'login'`. Both are POST-authentication ceremonies —
  * unlike registration/login, they bind `session_id` (below) as well as `account_id`.
+ *
+ * `'recovery_enroll'` (#1191) is a THIRD kind of session-bound ceremony: it binds `session_id` to
+ * a RECOVERY session (`sessions.purpose = 'recovery'`, migration 0005), not a standard one — the
+ * one ceremony a recovery-only session is ever allowed to start. `startRecoveryEnrollPasskey`/
+ * `verifyRecoveryEnrollPasskey` (`recovery.ts`) are its sole producer/consumer, mirroring
+ * `add_passkey`'s binding discipline exactly.
  */
-export type ChallengeType = 'registration' | 'login' | 'reauth' | 'add_passkey';
+export type ChallengeType = 'registration' | 'login' | 'reauth' | 'add_passkey' | 'recovery_enroll';
 
 /** Row shape as returned by `claimChallenge`'s `DELETE ... RETURNING *`. */
 export interface ChallengeRow {

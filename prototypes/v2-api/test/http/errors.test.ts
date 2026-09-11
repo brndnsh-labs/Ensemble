@@ -2,12 +2,19 @@ import { Hono } from 'hono';
 import { describe, expect, it } from 'vitest';
 import type {
     AddPasskeyFailureReason,
+    ConfirmRecoveryCodeFailureReason,
+    EnrollRecoveryCodeFailureReason,
     LoginFailureReason,
     ReauthFailureReason,
+    RecoveryEnrollPasskeyFailureReason,
     RegistrationFailureReason,
     RevokePasskeyFailureReason,
 } from '../../src/auth/index.js';
-import { ceremonyFailureResponse, revokePasskeyFailureResponse } from '../../src/http/errors.js';
+import {
+    ceremonyFailureResponse,
+    recoveryActionFailureResponse,
+    revokePasskeyFailureResponse,
+} from '../../src/http/errors.js';
 
 /**
  * Exhaustive table test for the collapsed-failure mapping (#1189 decision 14, P2-6 review
@@ -29,7 +36,8 @@ type AnyCeremonyFailureReason =
     | RegistrationFailureReason
     | LoginFailureReason
     | ReauthFailureReason
-    | AddPasskeyFailureReason;
+    | AddPasskeyFailureReason
+    | RecoveryEnrollPasskeyFailureReason;
 
 const EXPECTED = {
     malformed_request: { status: 400, error: 'malformed_request' },
@@ -45,6 +53,10 @@ const EXPECTED = {
     counter_regression: { status: 401, error: 'authentication_failed' },
     session_mismatch: { status: 401, error: 'authentication_failed' },
     fresh_auth_required: { status: 403, error: 'fresh_auth_required' },
+    // #1191: recovery-enroll-passkey's three own reasons — none get fresh_auth_required's 403;
+    // a recovery session's liveness is a different concept from a standard session's freshness.
+    recovery_session_invalid: { status: 401, error: 'authentication_failed' },
+    recovery_code_not_found: { status: 401, error: 'authentication_failed' },
 } satisfies Record<AnyCeremonyFailureReason, { status: number; error: string }>;
 
 describe('ceremonyFailureResponse (collapsed error table, exhaustive over both unions)', () => {
@@ -124,4 +136,34 @@ describe('revokePasskeyFailureResponse (exhaustive)', () => {
         expect(res.status).toBe(404);
         expect(await res.json()).toEqual({ error: 'not_found' });
     });
+});
+
+/**
+ * `enrollRecoveryCode`/`confirmRecoveryCode`'s failure reasons (#1191 decisions 3-4) — neither is
+ * a ceremony, so `recoveryActionFailureResponse` gets its own exhaustive table, same precedent as
+ * `revokePasskeyFailureResponse` above.
+ */
+const RECOVERY_ACTION_EXPECTED = {
+    fresh_auth_required: { status: 403, error: 'fresh_auth_required' },
+    not_found: { status: 404, error: 'not_found' },
+} satisfies Record<
+    EnrollRecoveryCodeFailureReason | ConfirmRecoveryCodeFailureReason,
+    { status: number; error: string }
+>;
+
+describe('recoveryActionFailureResponse (exhaustive)', () => {
+    for (const [reason, expected] of Object.entries(RECOVERY_ACTION_EXPECTED)) {
+        it(`${reason} -> ${expected.status} {"error":"${expected.error}"}`, async () => {
+            const app = new Hono();
+            app.get('/probe', (c) =>
+                recoveryActionFailureResponse(
+                    c,
+                    reason as EnrollRecoveryCodeFailureReason | ConfirmRecoveryCodeFailureReason,
+                ),
+            );
+            const res = await app.request('/probe');
+            expect(res.status).toBe(expected.status);
+            expect(await res.json()).toEqual({ error: expected.error });
+        });
+    }
 });

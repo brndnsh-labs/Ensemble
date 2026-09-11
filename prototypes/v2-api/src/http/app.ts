@@ -1,10 +1,18 @@
 import type { DatabaseSync } from 'node:sqlite';
+import { getConnInfo } from '@hono/node-server/conninfo';
 import type { AuthenticationResponseJSON, RegistrationResponseJSON } from '@simplewebauthn/server';
 import { type Context, Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import {
+    claimRecoveryCode,
+    confirmRecoveryCode,
+    createRateLimiter,
+    enrollRecoveryCode,
+    hasEnrolledRecoveryMaterial,
     issueSession,
     listPasskeys,
+    RECOVERY_CLAIM_RATE_LIMIT,
+    RECOVERY_SESSION_TTL_MS,
     readSession,
     revokeOtherSessions,
     revokePasskey,
@@ -12,13 +20,16 @@ import {
     SESSION_TTL_MS,
     type SessionClaims,
     type StartAddPasskeyResult,
+    type StartRecoveryEnrollPasskeyResult,
     startAddPasskey,
     startLogin,
     startReauth,
+    startRecoveryEnrollPasskey,
     startRegistration,
     verifyAddPasskey,
     verifyLogin,
     verifyReauth,
+    verifyRecoveryEnrollPasskey,
     verifyRegistration,
     type WebAuthnConfig,
 } from '../auth/index.js';
@@ -31,7 +42,12 @@ import {
     setCeremonyCookie,
     setSessionCookie,
 } from './cookies.js';
-import { ceremonyFailureResponse, revokePasskeyFailureResponse, sendError } from './errors.js';
+import {
+    ceremonyFailureResponse,
+    recoveryActionFailureResponse,
+    revokePasskeyFailureResponse,
+    sendError,
+} from './errors.js';
 import { securityHeaders } from './headers.js';
 import { sameOriginGuard } from './same-origin.js';
 
@@ -60,6 +76,30 @@ export interface CreateAppOptions {
      * forward to exercise expiry over HTTP.
      */
     sessionTtlMs?: number;
+    /**
+     * Name of a request header carrying the real client IP for the recovery-claim rate limiter
+     * (#1191 adversarial-review P1 finding). Undefined by default: the limiter then keys on the
+     * raw socket address via `getConnInfo`, which is only correct when NOTHING proxies to this
+     * service.
+     *
+     * Setting this (e.g. `'cf-connecting-ip'`) is a claim that the immediate hop in front of this
+     * process strips/overwrites that header for every external caller and only ever forwards its
+     * own verified value. This module does not verify that — it can't, because this standalone
+     * prototype has no fixed deployment topology yet, unlike `same-origin.ts`'s Caddy note or
+     * `headers.ts`'s Cloudflare note, which describe the MAIN app's already-live front door, not
+     * this service's. The deployer configuring `server.ts` is responsible for confirming the
+     * header is actually trustworthy in whatever sits in front of this process before setting it.
+     *
+     * Trusting an unverified header is strictly worse than the raw-socket fallback — it lets an
+     * external caller pick their own rate-limit bucket at will, rather than merely sharing one
+     * bucket with every other caller behind the same proxy (the bug this option exists to fix).
+     * If this service is ever deployed behind a single shared proxy/tunnel hop (the case the
+     * review flagged: every caller's socket address collapses to the proxy's own address, so 1
+     * request/minute from anyone denies recovery to everyone), this MUST be set to that proxy's
+     * verified client-IP header before going live — leaving it unset in that topology is a
+     * denial-of-recovery vector, not merely an imprecise rate limit.
+     */
+    recoveryClaimRateLimitIpHeader?: string;
 }
 
 type JsonBodyResult = { ok: true; value: unknown } | { ok: false };
@@ -80,7 +120,35 @@ export function createApp({
     config,
     now = () => Date.now(),
     sessionTtlMs = SESSION_TTL_MS,
+    recoveryClaimRateLimitIpHeader,
 }: CreateAppOptions): Hono {
+    /**
+     * Caller key for the recovery-claim rate limiter (#1191 decision 10, tightened by
+     * adversarial-review P1). Prefers `recoveryClaimRateLimitIpHeader` when the caller configured
+     * one — see that option's doc comment for why this app never guesses a header to trust on its
+     * own. Falls back to the remote socket address via `@hono/node-server`'s `getConnInfo`,
+     * wrapped in a try/catch: `getConnInfo` reads `c.env.incoming.socket`, which only the real
+     * `@hono/node-server` request listener populates (verified against the installed
+     * `@hono/node-server@2.1.1` — `getRequestListener` passes `{ incoming, outgoing }` as `env`).
+     * Hono's own `app.request()` test helper leaves `c.env` empty unless a test passes a matching
+     * third `Env` argument, which would otherwise throw here. Final fallback is one shared
+     * `'unknown'` bucket — a missing address still rate-limits (just not per-caller) instead of
+     * taking the endpoint down.
+     */
+    function recoveryClaimRateLimitKey(c: Context): string {
+        if (recoveryClaimRateLimitIpHeader !== undefined) {
+            const headerValue = c.req.header(recoveryClaimRateLimitIpHeader);
+            if (headerValue !== undefined && headerValue.trim().length > 0) {
+                return headerValue.trim();
+            }
+        }
+        try {
+            return getConnInfo(c).remote.address ?? 'unknown';
+        } catch {
+            return 'unknown';
+        }
+    }
+
     const app = new Hono();
 
     // Registration order matters: each `app.use` wraps everything registered after it, so
@@ -250,27 +318,39 @@ export function createApp({
         return c.json({ accountId: result.accountId });
     });
 
+    // `requireSession`/`requireRecoverySession` are `function` declarations (hoisted within this
+    // closure), so the routes below — registered textually before either definition — can call
+    // them freely; only requests dispatched AFTER `createApp()` has fully returned ever invoke a
+    // route handler.
+
     app.get('/api/auth/session', (c) => {
-        const token = getSessionToken(c, config);
-        if (token === undefined) {
-            return sendError(c, 401, 'unauthenticated');
+        const session = requireSession(c);
+        if (!session.ok) {
+            return session.response;
         }
-        const claims = readSession(db, token, now());
-        if (claims === null) {
-            return sendError(c, 401, 'unauthenticated');
-        }
-        return c.json({ accountId: claims.accountId });
+        return c.json({ accountId: session.claims.accountId });
     });
 
     app.post('/api/auth/logout', (c) => {
-        // Idempotent (decision 8): revoking a session that is missing, already revoked, or
-        // expired is a silent no-op in the session library, so this never has to branch on
-        // whether one was actually there.
+        // Idempotent for a missing, already-revoked, or expired session (decision 8, #1189) —
+        // this predates #1191 and is exercised by same-origin.test.ts/content-type.test.ts, which
+        // call logout with NO session cookie at all and require 204; that contract is preserved
+        // here exactly. A plain `requireSession(c)` call would 401 on a missing token, which
+        // would break that pre-existing, unrelated-to-recovery contract. So logout resolves
+        // claims the same way `requireSession` does, but only turns that into a hard refusal
+        // (`401`) for the ONE new case #1191 requires: a LIVE recovery-purpose session must never
+        // be treated as "logged in enough to clear a session" — a recovery session can do nothing
+        // but the two enroll-passkey routes, full stop. Every other missing/invalid case stays
+        // the pre-existing silent no-op.
+        const nowMs = now();
         const token = getSessionToken(c, config);
         if (token !== undefined) {
-            const claims = readSession(db, token, now());
+            const claims = readSession(db, token, nowMs);
             if (claims !== null) {
-                revokeSession(db, claims.sessionId, claims.accountId, now());
+                if (claims.purpose === 'recovery') {
+                    return sendError(c, 401, 'unauthenticated');
+                }
+                revokeSession(db, claims.sessionId, claims.accountId, nowMs);
             }
         }
         clearSessionCookie(c, config);
@@ -278,25 +358,27 @@ export function createApp({
     });
 
     app.post('/api/auth/sessions/revoke-others', (c) => {
-        const token = getSessionToken(c, config);
-        if (token === undefined) {
-            return sendError(c, 401, 'unauthenticated');
+        const session = requireSession(c);
+        if (!session.ok) {
+            return session.response;
         }
-        const claims = readSession(db, token, now());
-        if (claims === null) {
-            return sendError(c, 401, 'unauthenticated');
-        }
-        revokeOtherSessions(db, claims.accountId, claims.sessionId, now());
+        revokeOtherSessions(db, session.claims.accountId, session.claims.sessionId, now());
         return c.body(null, 204);
     });
 
     /**
-     * Shared by every #1190 route below: resolves the presented session cookie the same way
-     * `/api/auth/session` does, returning either the live claims or the `401 unauthenticated`
-     * `Response` the caller must return as-is. None of these six routes accept an unauthenticated
-     * request — `passkeys/options` and `passkeys/verify` additionally require FRESHNESS, checked
-     * separately (inside `startAddPasskey`/`verifyAddPasskey` themselves, not here), because a
-     * valid-but-stale session is a distinct failure (`403 fresh_auth_required`), not `401`.
+     * Shared by every #1190 route below and `/api/auth/session`/`/api/auth/sessions/revoke-others`
+     * above: resolves the presented session cookie, returning either the live claims or the
+     * `401 unauthenticated` `Response` the caller must return as-is. `passkeys/options` and
+     * `passkeys/verify` additionally require FRESHNESS, checked separately (inside
+     * `startAddPasskey`/`verifyAddPasskey` themselves, not here), because a valid-but-stale
+     * session is a distinct failure (`403 fresh_auth_required`), not `401`.
+     *
+     * `claims.purpose === 'recovery'` is refused identically to a missing/invalid token (#1191
+     * decision 9, "Session gating changes") — this is the enforcement point for "a recovery
+     * session can do nothing but enroll a passkey." Every route in this file that gates on
+     * `requireSession` inherits this refusal automatically; only `requireRecoverySession` below
+     * (used exclusively by the two `recovery/enroll-passkey/*` routes) accepts a recovery session.
      */
     function requireSession(
         c: Context,
@@ -306,7 +388,27 @@ export function createApp({
             return { ok: false, response: sendError(c, 401, 'unauthenticated') };
         }
         const claims = readSession(db, token, now());
-        if (claims === null) {
+        if (claims === null || claims.purpose === 'recovery') {
+            return { ok: false, response: sendError(c, 401, 'unauthenticated') };
+        }
+        return { ok: true, claims };
+    }
+
+    /**
+     * The inverse of `requireSession` (#1191): requires `claims.purpose === 'recovery'`, refusing
+     * a `'standard'` session identically to a missing/invalid one. Used ONLY by the two
+     * `recovery/enroll-passkey/*` routes — everything else in this file must keep using
+     * `requireSession`, never this function.
+     */
+    function requireRecoverySession(
+        c: Context,
+    ): { ok: true; claims: SessionClaims } | { ok: false; response: Response } {
+        const token = getSessionToken(c, config);
+        if (token === undefined) {
+            return { ok: false, response: sendError(c, 401, 'unauthenticated') };
+        }
+        const claims = readSession(db, token, now());
+        if (claims === null || claims.purpose !== 'recovery') {
             return { ok: false, response: sendError(c, 401, 'unauthenticated') };
         }
         return { ok: true, claims };
@@ -483,6 +585,212 @@ export function createApp({
         }
 
         // Step-up is a privilege change (decision 3): the token is renewed, not flagged in place.
+        finishAuthentication(c, result.accountId, result.credentialId);
+        return c.json({ accountId: result.accountId });
+    });
+
+    // --- #1191: recovery-code enrollment, claim, and recovery-only passkey enrollment --------
+
+    /**
+     * Factory-produced, closure-captured per `createApp()` call (#1191 decision 10) — never a
+     * module-level singleton — matching every other piece of app state (`now`, `sessionTtlMs`)
+     * and keeping tests isolated per app instance. See `rate-limit.ts`'s doc comment for the
+     * single-container deployment assumption this relies on.
+     */
+    const checkRecoveryClaimRate = createRateLimiter(RECOVERY_CLAIM_RATE_LIMIT);
+
+    app.get('/api/auth/recovery/status', (c) => {
+        const session = requireSession(c);
+        if (!session.ok) {
+            return session.response;
+        }
+        return c.json({ enrolled: hasEnrolledRecoveryMaterial(db, session.claims.accountId) });
+    });
+
+    app.post('/api/auth/recovery/enroll', (c) => {
+        const session = requireSession(c);
+        if (!session.ok) {
+            return session.response;
+        }
+        // Fresh-auth-gated INSIDE enrollRecoveryCode itself (decision 3), matching the
+        // add-passkey/revoke-passkey precedent of checking freshness at the point of the write,
+        // not only at the HTTP boundary.
+        const result = enrollRecoveryCode(
+            db,
+            session.claims.accountId,
+            session.claims.sessionId,
+            now(),
+        );
+        if (!result.ok) {
+            return recoveryActionFailureResponse(c, result.reason);
+        }
+        // The raw code is returned exactly ONCE, here — never logged, never stored, never
+        // retrievable again (decision 1/11).
+        return c.json({ code: result.code });
+    });
+
+    app.post('/api/auth/recovery/confirm', async (c) => {
+        const session = requireSession(c);
+        if (!session.ok) {
+            return session.response;
+        }
+        const parsed = await parseJsonBody(c);
+        if (!parsed.ok) {
+            return sendError(c, 400, 'malformed_request');
+        }
+        if (
+            parsed.value === null ||
+            typeof parsed.value !== 'object' ||
+            Array.isArray(parsed.value)
+        ) {
+            return sendError(c, 400, 'malformed_request');
+        }
+        const code = (parsed.value as Record<string, unknown>).code;
+        if (typeof code !== 'string' || code.length === 0) {
+            return sendError(c, 400, 'malformed_request');
+        }
+
+        const result = confirmRecoveryCode(
+            db,
+            session.claims.accountId,
+            session.claims.sessionId,
+            code,
+            now(),
+        );
+        if (!result.ok) {
+            return recoveryActionFailureResponse(c, result.reason);
+        }
+        return c.body(null, 204);
+    });
+
+    app.post('/api/auth/recovery/claim', async (c) => {
+        // Rate limit FIRST, before any database lookup (decision 8/10, mutation target 9) — a
+        // rate-limited caller learns nothing about the code's validity, only that they are
+        // rate-limited.
+        const nowMs = now();
+        const limit = checkRecoveryClaimRate(recoveryClaimRateLimitKey(c), nowMs);
+        if (!limit.allowed) {
+            // `retryAfterMs` was computed but unused before this fix (adversarial-review P3) —
+            // surface it as the standard header so a well-behaved caller backs off instead of
+            // hammering the endpoint again immediately.
+            c.header('Retry-After', String(Math.ceil(limit.retryAfterMs / 1000)));
+            return sendError(c, 429, 'rate_limited');
+        }
+
+        const parsed = await parseJsonBody(c);
+        if (!parsed.ok) {
+            return sendError(c, 400, 'malformed_request');
+        }
+        if (
+            parsed.value === null ||
+            typeof parsed.value !== 'object' ||
+            Array.isArray(parsed.value)
+        ) {
+            return sendError(c, 400, 'malformed_request');
+        }
+        const code = (parsed.value as Record<string, unknown>).code;
+        if (typeof code !== 'string' || code.length === 0) {
+            return sendError(c, 400, 'malformed_request');
+        }
+
+        // claimRecoveryCode's single UPDATE...RETURNING is the first (and only) database access
+        // this branch performs before deciding success/failure — see its own doc comment.
+        const claim = claimRecoveryCode(db, code, nowMs);
+        if (!claim.ok) {
+            // Every failure reason (code doesn't exist, wrong hash, unconfirmed, already
+            // consumed, already claimed and still locked) collapses to the SAME 401 as every
+            // ceremony failure (decision 8 step 2) — never a distinct code for any of these.
+            return sendError(c, 401, 'authentication_failed');
+        }
+
+        // Fixation defense (decision 8 step 3), the SAME shape as finishAuthentication: revoke
+        // any session presented on THIS request, using ITS OWN account_id from readSession — not
+        // the recovery target's.
+        const presentedToken = getSessionToken(c, config);
+        if (presentedToken !== undefined) {
+            const presentedClaims = readSession(db, presentedToken, nowMs);
+            if (presentedClaims !== null) {
+                revokeSession(db, presentedClaims.sessionId, presentedClaims.accountId, nowMs);
+            }
+        }
+        const issued = issueSession(
+            db,
+            claim.accountId,
+            nowMs,
+            RECOVERY_SESSION_TTL_MS,
+            null,
+            'recovery',
+            claim.recoveryCodeId,
+        );
+        setSessionCookie(c, config, issued.token, RECOVERY_SESSION_TTL_MS);
+        // 204, no body — nothing left to disclose after the cookie is set (decision 8 step 3).
+        return c.body(null, 204);
+    });
+
+    app.post('/api/auth/recovery/enroll-passkey/options', async (c) => {
+        const session = requireRecoverySession(c);
+        if (!session.ok) {
+            return session.response;
+        }
+        const parsedLabel = await parseOptionalLabel(c);
+        if (!parsedLabel.ok) {
+            return parsedLabel.response;
+        }
+
+        let result: StartRecoveryEnrollPasskeyResult;
+        try {
+            result = await startRecoveryEnrollPasskey(
+                db,
+                config,
+                {
+                    accountId: session.claims.accountId,
+                    sessionId: session.claims.sessionId,
+                    label: parsedLabel.label,
+                },
+                now(),
+            );
+        } catch {
+            return sendError(c, 400, 'malformed_request');
+        }
+        if (!result.ok) {
+            return ceremonyFailureResponse(c, result.reason);
+        }
+        setCeremonyCookie(c, config, result.ceremonyToken);
+        return c.json({ options: result.options });
+    });
+
+    app.post('/api/auth/recovery/enroll-passkey/verify', async (c) => {
+        const ceremonyToken = getCeremonyToken(c, config) ?? '';
+        clearCeremonyCookie(c, config);
+
+        const session = requireRecoverySession(c);
+        if (!session.ok) {
+            return session.response;
+        }
+
+        const parsed = await parseJsonBody(c);
+        if (!parsed.ok) {
+            return sendError(c, 400, 'malformed_request');
+        }
+
+        const result = await verifyRecoveryEnrollPasskey(
+            db,
+            config,
+            {
+                ceremonyToken,
+                sessionId: session.claims.sessionId,
+                accountId: session.claims.accountId,
+                response: parsed.value as RegistrationResponseJSON,
+            },
+            now(),
+        );
+        if (!result.ok) {
+            return ceremonyFailureResponse(c, result.reason);
+        }
+
+        // Completing recovery genuinely IS a fresh authentication event (unlike ordinary
+        // add-passkey, which deliberately does NOT call this) — mint a brand-new STANDARD
+        // session bound to the new credential, immediately fresh (decision 12's closing note).
         finishAuthentication(c, result.accountId, result.credentialId);
         return c.json({ accountId: result.accountId });
     });

@@ -74,7 +74,7 @@ gate evidence. Do not copy old test totals or preview SHAs into a new claim of v
 | Portable chart / iReal semantics | `../../public/songbook/` | Root/scoped engine guides and canonical codecs apply |
 | Offline install / test deployment | `scripts/offline.mjs`, `scripts/deploy-test.mjs` | Anonymous shell + verified sounds; test-only release |
 | Browser evidence | `checks/`, `../../tests/browser/account-songbook.browser.test.ts` | Preview E2E plus real IndexedDB in Chromium/WebKit |
-| Server account API (stage 2, #1187+) | `../v2-api/` (sibling, not a subdirectory — see `../v2-api/README.md`) | Standalone Node service, own `package.json`/`node:sqlite` schema; ceremony (#1188), session + HTTP layer (#1189), and passkey management + step-up reauth gated by one fresh-authentication predicate (#1190) modules land here; no recovery logic or client wiring until #1191-#1192 land |
+| Server account API (stage 2, #1187+) | `../v2-api/` (sibling, not a subdirectory — see `../v2-api/README.md`) | Standalone Node service, own `package.json`/`node:sqlite` schema; ceremony (#1188), session + HTTP layer (#1189), passkey management + step-up reauth gated by one fresh-authentication predicate (#1190), and single-use recovery codes behind a restricted recovery-only session (#1191) modules land here; no client wiring until #1192 lands |
 
 ## Verification and receipt
 

@@ -12,10 +12,12 @@ the entire HTTP layer on Hono (`src/http/`, `src/server.ts`): this is the first 
 service is actually reachable over a socket. **#1190** (story 4 of 6) added passkey management
 (add/list/revoke) and step-up re-authentication, gated by a single fresh-authentication predicate
 (`src/auth/fresh-auth.ts`, migration `0004`) — see "Passkey management and step-up
-re-authentication (#1190)" below. **No recovery-code logic, and no wiring to `prototypes/v2/` or
-`public/` land here** — see the stage-2 batch in
-[`docs/design/ensemble-v2-next-batch.md`](../../docs/design/ensemble-v2-next-batch.md) (#1191-#1192)
-for where those land, each blocked on the story before it.
+re-authentication (#1190)" below. **#1191** (story 5 of 6) added single-use recovery codes —
+enroll/confirm/claim, and a restricted recovery-only session that can do nothing but enroll one
+new passkey (`src/auth/recovery.ts`, `src/auth/rate-limit.ts`, migration `0005`) — see "Recovery
+codes and the recovery-only session (#1191)" below. **No wiring to `prototypes/v2/` or `public/`
+lands here** — only the stage gate, #1192, remains in the stage-2 batch; see
+[`docs/design/ensemble-v2-next-batch.md`](../../docs/design/ensemble-v2-next-batch.md).
 
 ## Layout
 
@@ -24,26 +26,28 @@ for where those land, each blocked on the story before it.
 | `src/db/connection.ts` | Opens a `node:sqlite` `DatabaseSync` and sets `journal_mode=WAL`, `busy_timeout`, `foreign_keys=ON` explicitly. |
 | `src/db/transaction.ts` | `withTransaction(db, fn)` — `node:sqlite` has no built-in `db.transaction()` helper; every multi-statement write must use this. |
 | `src/db/migrate.ts` | Hand-rolled, content-addressed migration runner. Depends only on `node:fs`/`node:crypto`/`node:sqlite`, deliberately not on any migration-authoring toolkit. |
-| `migrations/*.sql` | Schema, applied in filename order. `0001_init.sql` creates `accounts`, `credentials`, `challenges`, `sessions`, `recovery_codes`. `0002_challenge_ceremony_hash.sql` adds `challenges.ceremony_hash` (+ its unique index) for #1188's ceremony-token binding. `0003_session_token_hash.sql` adds `sessions.token_hash` (+ its unique index) for #1189's session token model. `0004_passkey_management_bindings.sql` adds `sessions.credential_id` (nullable, `ON DELETE SET NULL`, indexed) and `challenges.session_id` (nullable, no FK) for #1190. |
+| `migrations/*.sql` | Schema, applied in filename order. `0001_init.sql` creates `accounts`, `credentials`, `challenges`, `sessions`, `recovery_codes`. `0002_challenge_ceremony_hash.sql` adds `challenges.ceremony_hash` (+ its unique index) for #1188's ceremony-token binding. `0003_session_token_hash.sql` adds `sessions.token_hash` (+ its unique index) for #1189's session token model. `0004_passkey_management_bindings.sql` adds `sessions.credential_id` (nullable, `ON DELETE SET NULL`, indexed) and `challenges.session_id` (nullable, no FK) for #1190. `0005_recovery_session_and_code_state.sql` adds `sessions.purpose`/`recovery_code_id`, `recovery_codes.confirmed_at`/`claimed_at`, and a unique index on `recovery_codes.code_hash`, for #1191. |
 | `src/auth/config.ts` | `createWebAuthnConfig({ rpId, rpName, origin })` — validates and freezes ceremony config. The origin must already be canonical, and `rpId` must **exactly** equal its hostname (no parent-domain relaxation; separate environments use separate RP IDs). Always passed as an argument; never a module-level `process.env` read. |
-| `src/auth/challenges.ts` | `claimChallenge` — the one `DELETE ... RETURNING *` atomic challenge claim — plus ceremony-token minting/hashing and the expired-row sweep. `ChallengeType` is `'registration' \| 'login' \| 'reauth' \| 'add_passkey'` (the last two added by #1190). |
+| `src/auth/challenges.ts` | `claimChallenge` — the one `DELETE ... RETURNING *` atomic challenge claim — plus ceremony-token minting/hashing and the expired-row sweep. `ChallengeType` is `'registration' \| 'login' \| 'reauth' \| 'add_passkey' \| 'recovery_enroll'` (`reauth`/`add_passkey` added by #1190, `recovery_enroll` by #1191 — the one ceremony a recovery-only session is ever allowed to start). |
 | `src/auth/request-guard.ts` | `isMalformedCeremonyRequest(input)` — the shallow shape guard both verify functions run first, synchronously, before the challenge claim, so a malformed request returns `malformed_request` without consuming the ceremony token. |
 | `src/auth/credential-row.ts` | Shared `credentials` row shape, transports JSON encode/decode, and the duplicate-credential-id error classifier. |
 | `src/auth/registration.ts` | `startRegistration` / `verifyRegistration` — discoverable-passkey registration against the real `@simplewebauthn/server` verify path. |
 | `src/auth/login.ts` | `startLogin` / `verifyLogin` — usernameless login. Its own verify-and-commit core is `src/auth/assertion-commit.ts` (#1190), shared with reauth. |
 | `src/auth/assertion-commit.ts` | `verifyAssertionAndCommitCounter` (#1190) — the counter-regression-safe assertion verify + commit, extracted out of #1188's `verifyLogin` so #1190's `verifyReauth` can share it instead of copying it. `login.ts`'s own tests are the regression guard that the extraction changed nothing. |
 | `src/auth/fresh-auth.ts` | `isFreshlyAuthenticated` / `FRESH_AUTH_WINDOW_MS` (#1190) — the ONE "freshly authenticated" predicate: one SQL read requiring the session to belong to the account, be unrevoked, unexpired, created within the last 10 minutes, and to have been created by a passkey ceremony (`credential_id IS NOT NULL`). Called at add-passkey options, inside the add-passkey commit transaction, and as the first step inside `revokePasskey`'s transaction. |
-| `src/auth/recovery-material.ts` | `hasEnrolledRecoveryMaterial` (#1190) — "does this account have at least one unconsumed `recovery_codes` row," the narrow slice `revokePasskey`'s last-credential guard needs before #1191 owns the full recovery-code lifecycle. |
+| `src/auth/recovery-material.ts` | `hasEnrolledRecoveryMaterial` — "does this account have at least one CONFIRMED, unconsumed `recovery_codes` row." Introduced narrow by #1190 (just `consumed_at IS NULL`) for `revokePasskey`'s last-credential guard; tightened by #1191 to also require `confirmed_at IS NOT NULL` — an enrolled-but-never-proven-possessed code must not stand in as a safety net. |
+| `src/auth/rate-limit.ts` | `createRateLimiter({ max, windowMs })` (#1191) — a factory-produced, in-memory sliding-window limiter, ported from `../../songsiknow/src/lib/auth/rate-limit.ts` with one adaptation: `check(key, now)` takes `now` as a required argument, never `Date.now()`. Guards `POST /api/auth/recovery/claim`. Correctness assumption: a single-container deployment — see the module doc comment and `src/http/app.ts`'s `recoveryClaimRateLimitIpHeader` option below. |
+| `src/auth/recovery.ts` | `enrollRecoveryCode` / `confirmRecoveryCode` / `claimRecoveryCode` / `readLiveRecoverySession` / `startRecoveryEnrollPasskey` / `verifyRecoveryEnrollPasskey` (#1191) — see "Recovery codes and the recovery-only session (#1191)" below. |
 | `src/auth/reauth.ts` | `startReauth` / `verifyReauth` (#1190) — step-up re-authentication. `allowCredentials` is the account's own credentials (unlike login's empty/usernameless list); the challenge binds `account_id` AND `session_id`; verify shares `assertion-commit.ts`'s core with login. Success does not itself rotate the session — the caller (the HTTP route) does that via `finishAuthentication`. |
 | `src/auth/passkeys.ts` | `startAddPasskey` / `verifyAddPasskey` / `revokePasskey` / `listPasskeys` (#1190). Add-passkey requires a FRESH session (checked at options AND re-checked inside the verify commit transaction) and binds `account_id` + `session_id` into the challenge; an already-registered credential on the same account is a no-op (`alreadyRegistered: true`), on another account it's `credential_exists`. `revokePasskey` is one synchronous transaction: fresh check, owner-scoped lookup, last-credential guard (owner-scoped SELECT/DELETE and account-scoped session revocation — never trust `id`/`credential_id` alone), revoke every session the credential created, delete. `listPasskeys` never returns the public key or counter. |
-| `src/auth/session.ts` | `issueSession` / `readSession` / `revokeSession` / `revokeOtherSessions` — hashed, revocable, 30-day-absolute sessions (#1189). `readSession` performs zero database writes. #1190 adds an optional `credentialId` argument to `issueSession` (defaulting to `null`, so every pre-#1190 call keeps its exact behavior) and a `credentialId` field to `SessionClaims`, recording which credential's ceremony created the session — the register, login and reauth-verify HTTP routes all pass it now. |
+| `src/auth/session.ts` | `issueSession` / `readSession` / `revokeSession` / `revokeOtherSessions` — hashed, revocable, 30-day-absolute sessions (#1189). `readSession` performs zero database writes. #1190 adds an optional `credentialId` argument to `issueSession` (defaulting to `null`, so every pre-#1190 call keeps its exact behavior) and a `credentialId` field to `SessionClaims`, recording which credential's ceremony created the session. #1191 adds two more optional trailing arguments, `purpose` (`'standard' \| 'recovery'`, default `'standard'`) and `recoveryCodeId` (default `null`) — same additive discipline, every pre-#1191 call unchanged. `purpose` is the enforcement mechanism for the recovery-only session's privilege boundary; see below. |
 | `src/auth/index.ts` | Barrel re-export of the above. |
-| `src/http/app.ts` | `createApp({ db, config, now?, sessionTtlMs? })` — the Hono app factory. No module-level state. Wires security headers, `bodyLimit`, the same-origin guard, the JSON-only guard, every `/api/auth/*` route, and the collapsed error mapping. `finishAuthentication` (the fixation-defense revoke-then-issue) now also records the credential id on the freshly-minted session (#1190). |
+| `src/http/app.ts` | `createApp({ db, config, now?, sessionTtlMs?, recoveryClaimRateLimitIpHeader? })` — the Hono app factory. No module-level state. Wires security headers, `bodyLimit`, the same-origin guard, the JSON-only guard, every `/api/auth/*` route, and the collapsed error mapping. `finishAuthentication` (the fixation-defense revoke-then-issue) also records the credential id on the freshly-minted session (#1190). `requireSession` (#1190, tightened by #1191) refuses a `purpose: 'recovery'` session identically to a missing/invalid one; `requireRecoverySession` (#1191) is its exact inverse, used only by the two `recovery/enroll-passkey/*` routes. `recoveryClaimRateLimitIpHeader` (#1191, unset by default) names a request header to trust for the recovery-claim rate limiter's per-caller key instead of the raw socket address — see the option's doc comment for why this app never guesses a proxy header to trust on its own, and the "Recovery codes" section below for why leaving it unset behind a shared proxy/tunnel is a real denial-of-recovery risk. |
 | `src/http/same-origin.ts` | `sameOriginGuard(config)` — our own CSRF defense (never `hono/csrf`, which does not satisfy the contract — see the module doc comment). |
 | `src/http/content-type.ts` | `jsonOnlyGuard()` / `requestHasBody()` — 415 on a body-carrying unsafe method that isn't `application/json`. |
 | `src/http/cookies.ts` | Ceremony/session cookie transport — names, `__Host-` prefixing, and attributes, all derived from `config.origin`. |
 | `src/http/headers.ts` | `securityHeaders()` — `Cache-Control`, CSP, `X-Content-Type-Options`, `Referrer-Policy` on every `/api/*` response, including 404/413/415/403/500. |
-| `src/http/errors.ts` | `sendError` / `ceremonyFailureResponse` / `revokePasskeyFailureResponse` (#1190) — the collapsed `{ error: <code> }` taxonomy. `malformed_request` is 400; `fresh_auth_required` (add-passkey only) is 403; every other ceremony failure reason, including #1190's `session_mismatch`, is `401 authentication_failed`. `revokePasskey`'s own reasons map separately: `fresh_auth_required` 403, `not_found` 404, `last_credential` 409. |
+| `src/http/errors.ts` | `sendError` / `ceremonyFailureResponse` / `revokePasskeyFailureResponse` / `recoveryActionFailureResponse` (#1191) — the collapsed `{ error: <code> }` taxonomy. `malformed_request` is 400; `fresh_auth_required` (add-passkey, and #1191's enroll/confirm) is 403; every other ceremony failure reason, including #1190's `session_mismatch` and #1191's `recovery_session_invalid`/`account_not_found`/`recovery_code_not_found`, is `401 authentication_failed`. `revokePasskey`'s own reasons map separately: `fresh_auth_required` 403, `not_found` 404, `last_credential` 409. `recoveryActionFailureResponse` (enroll/confirm): `fresh_auth_required` 403, `not_found` 404. `rate_limited` (#1191, the recovery-claim limiter) is 429. |
 | `src/server.ts` | The only file that reads `process.env`. Builds config, opens the database, runs migrations, starts `@hono/node-server`, and closes the database on `SIGTERM`/`SIGINT`. |
 | `test/helpers/test-db.ts` | `createTestDatabase()` — a fresh on-disk (never `:memory:`, which can't hold WAL mode) SQLite file per test, migrated for real. |
 | `test/helpers/soft-authenticator.ts` | `createSoftAuthenticator({ rpId, origin })` — a software WebAuthn authenticator that builds real ES256 registration/assertion responses (`node:crypto` + `isoCBOR`/`isoBase64URL`) so ceremony tests exercise the actual library verify path, not a mock. Controllable origin, RP ID, UV flag, counter, `userHandle` and signing key pair. |
@@ -176,7 +180,7 @@ and revoking the owner's.
   target exists, so it can't be used to probe for ids); owner-scoped lookup (a nonexistent
   credential and one belonging to another account return an IDENTICAL `404 not_found`, with no
   side effects either way); the last-credential guard (`409 last_credential` unless
-  `hasEnrolledRecoveryMaterial` — at least one unconsumed `recovery_codes` row — says otherwise);
+  `hasEnrolledRecoveryMaterial` — at least one CONFIRMED, unconsumed `recovery_codes` row — says otherwise);
   revoke every session that credential created (a lost device's passkey being revoked must end
   that device's sessions, not only block its future logins); delete. The response is `200
   { signedOut }`, and the session cookie is cleared when the revoked credential turns out to have
@@ -192,6 +196,64 @@ and revoking the owner's.
 - **Shared, not copied**: `src/auth/assertion-commit.ts` extracts the assertion-verify-and-commit
   core (counter-regression handling included) out of #1188's `verifyLogin` so `verifyReauth` can
   reuse it. `verifyLogin`'s own public behavior, and every #1188 test, is unchanged.
+
+## Recovery codes and the recovery-only session (#1191)
+
+This is the only account-recovery mechanism the service has — no email reset, no operator
+override. A single-use, high-entropy code is the sole thing standing between a lost device and a
+permanently gone account, so its failure modes bias hard toward "the code stays usable" over
+"the recovery completed."
+
+- **Enroll, then prove possession, before it counts.** `POST /api/auth/recovery/enroll` (fresh-
+  auth-gated, same gate as add-passkey) mints a code and returns the raw value exactly once —
+  only its SHA-256 hash is ever stored. `hasEnrolledRecoveryMaterial` does not report the account
+  protected yet: `POST /api/auth/recovery/confirm` must present that same code back before
+  `confirmed_at` is set. Calling `enroll` again (an interrupted download, or rotating a code on
+  purpose) replaces any existing LIVE row outright — at most one unconsumed code per account.
+- **The privilege boundary is a session field, not an accident of which routes check freshness.**
+  A recovery code authorizes ONLY enrolling one new passkey — not chart access, not any other
+  sensitive operation. `sessions.purpose` (migration `0005`) is `'standard'` for every session
+  register/login/reauth/passkey-add ever mint, or `'recovery'` for the one a successful
+  `POST /api/auth/recovery/claim` mints. `requireSession` (`src/http/app.ts`) refuses a live
+  `'recovery'` session identically to a missing/invalid one — this covers every existing
+  session-reading route, `GET /api/auth/session`/`POST /api/auth/logout`/`POST
+  /api/auth/sessions/revoke-others` included (those three predate `requireSession` and were
+  refactored onto it for exactly this reason). `requireRecoverySession` is the sole exception,
+  used only by `POST /api/auth/recovery/enroll-passkey/{options,verify}`.
+- **Claiming is one atomic statement.** `claimRecoveryCode` is a single `UPDATE ... SET
+  claimed_at = ? WHERE ... RETURNING`, the same synchronous-`node:sqlite`-has-no-interleaved-
+  statements discipline `claimChallenge` established in #1188 — two concurrent claims of the same
+  code can never both succeed. The `claimed_at` lock self-expires after `RECOVERY_SESSION_TTL_MS`
+  (10 minutes, the same constant as the recovery-only session's own lifetime): if the enrollment
+  ceremony it authorized never completes, the code becomes reclaimable the instant that session
+  would have died anyway — no separate sweep or unclaim step.
+- **Consume-and-enroll is one transaction, in this order:** re-check the recovery session is
+  still live, re-check the account exists, consume the code (`UPDATE ... WHERE consumed_at IS
+  NULL`, aborting closed if it doesn't affect exactly one row), revoke every live session on the
+  account (the recovery session included — no special-casing needed), delete every existing
+  credential, insert the new one. Any abort rolls back everything, INCLUDING the consume step —
+  this is what makes an interrupted or failed enrollment leave the code still usable, the single
+  most important property in this story. On success, `POST
+  /api/auth/recovery/enroll-passkey/verify` calls `finishAuthentication` (unlike ordinary
+  add-passkey, which deliberately doesn't) — completing recovery genuinely is a fresh
+  authentication event, and the resulting session is immediately fresh, so the client can enroll
+  a replacement recovery code right away via the same enroll/confirm pair.
+- **Rate limiting** (`src/auth/rate-limit.ts`): `POST /api/auth/recovery/claim` is capped at 10
+  attempts per 10-minute sliding window, checked BEFORE any database lookup so a rate-limited
+  caller learns nothing about a code's validity. **Known deployment-blocking gap, found in
+  adversarial review**: the limiter keys by caller IP, and the default (`getConnInfo`'s raw
+  socket address) collapses to ONE shared bucket for every caller sitting behind a single shared
+  reverse proxy or tunnel — in that topology, a handful of bogus requests denies recovery to
+  every account, not just the attacker's. `createApp`'s `recoveryClaimRateLimitIpHeader` option
+  exists to fix this (trust a named header instead of the socket address) but is unset by
+  default, because this standalone prototype has no fixed deployment topology yet for anyone to
+  have verified which header, if any, a future front door actually strips/overwrites for
+  external callers. **Whoever deploys this service behind any shared proxy hop MUST set this
+  option to that proxy's verified client-IP header before going live** — leaving it unset in that
+  topology is a real denial-of-recovery vector, not merely an imprecise rate limit.
+- **Never logged.** The raw code is a SQL bind parameter's hash input, never the parameter
+  itself, at every call site; no thrown error, log line, or response body other than the one-time
+  `enroll` response ever carries it.
 
 ## Commands
 

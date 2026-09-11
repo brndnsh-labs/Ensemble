@@ -78,6 +78,8 @@ describe('issueSession', () => {
             expiresAt: issued.expiresAt,
             // #1190: not passed to this 3-argument issueSession call, so defaults to null.
             credentialId: null,
+            // #1191: not passed to this 3-argument issueSession call, so defaults to 'standard'.
+            purpose: 'standard',
         });
     });
 

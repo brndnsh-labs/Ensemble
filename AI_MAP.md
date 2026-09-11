@@ -16,7 +16,8 @@ This map provides a quick reference for AI agents to understand the responsibili
   of #1188; the session model (`src/auth/session.ts`) and the entire HTTP layer on Hono
   (`src/http/`, `src/server.ts`) as of #1189; passkey add/list/revoke and step-up
   re-authentication, gated by the one `isFreshlyAuthenticated` predicate (`src/auth/fresh-auth.ts`),
-  as of #1190. No recovery codes or client wiring yet.
+  as of #1190; single-use recovery codes and a restricted recovery-only session
+  (`src/auth/recovery.ts`, `src/auth/rate-limit.ts`) as of #1191. No client wiring yet.
 - If guidance conflicts, prefer live code/config first, then realign the docs so `CLAUDE.md` and `AI_MAP.md` stay reliable.
 
 ## Core Architecture

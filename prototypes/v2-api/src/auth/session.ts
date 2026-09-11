@@ -51,13 +51,24 @@ export interface SessionClaims {
     /**
      * The credential whose ceremony created this session (#1190 migration 0004), or `null` for
      * a session that wasn't — today that's only a session minted by a 3-argument `issueSession`
-     * call in a test; #1191's future recovery session is the production case. This is what lets
-     * a caller (e.g. `listPasskeys`'s `current` flag) know "did THIS credential create the
-     * session I'm looking at" without a second query, and it's the same column
-     * `isFreshlyAuthenticated` (fresh-auth.ts) requires `IS NOT NULL` on — though that function
-     * does its own independent read rather than trusting this one, see its doc comment.
+     * call in a test; #1191's recovery session (`purpose: 'recovery'` below) is the production
+     * case. This is what lets a caller (e.g. `listPasskeys`'s `current` flag) know "did THIS
+     * credential create the session I'm looking at" without a second query, and it's the same
+     * column `isFreshlyAuthenticated` (fresh-auth.ts) requires `IS NOT NULL` on — though that
+     * function does its own independent read rather than trusting this one, see its doc comment.
      */
     credentialId: string | null;
+    /**
+     * `'standard'` for every session minted by register/login/reauth/passkey-add, `'recovery'`
+     * only for a session minted by a successful recovery-code claim (#1191 migration 0005). This
+     * is the enforcement mechanism for "a recovery code authorizes enrolling a passkey and
+     * nothing else" — `src/http/app.ts`'s `requireSession` refuses `'recovery'` outright, and
+     * `requireRecoverySession` is the sole route that accepts it. Never derive this from
+     * `credentialId === null` instead — a `'standard'` session predating #1190's `credential_id`
+     * column (or minted by a 3-argument test call) would look identical to a recovery session
+     * under that inference, and the two must never be confused.
+     */
+    purpose: 'standard' | 'recovery';
 }
 
 function hashToken(token: string): string {
@@ -91,6 +102,13 @@ function sweepExpiredSessions(db: DatabaseSync, now: number): void {
  * `finishAuthentication`. `isFreshlyAuthenticated` (fresh-auth.ts) is what actually depends on
  * this column being populated for a passkey-created session; a session mistakenly left at the
  * `null` default is simply never fresh, never wrongly-fresh — the failure mode is safe.
+ *
+ * `purpose`/`recoveryCodeId` (#1191 decision 9) are additive the same way: two more optional
+ * trailing parameters after `credentialId`, defaulting to `'standard'`/`null` — every existing
+ * 3-, 4- and 5-argument call keeps its exact behavior unchanged. Only `claimRecoveryCode`'s HTTP
+ * route (`POST /api/auth/recovery/claim`) passes `'recovery'`, and only that same call site
+ * passes a non-null `recoveryCodeId` — it is the id of the `recovery_codes` row THIS session is
+ * authorized to consume via the recovery-enroll-passkey ceremony, per migration 0005.
  */
 export function issueSession(
     db: DatabaseSync,
@@ -98,6 +116,8 @@ export function issueSession(
     now: number,
     ttlMs: number = SESSION_TTL_MS,
     credentialId: string | null = null,
+    purpose: 'standard' | 'recovery' = 'standard',
+    recoveryCodeId: string | null = null,
 ): IssuedSession {
     sweepExpiredSessions(db, now);
 
@@ -106,9 +126,19 @@ export function issueSession(
     const expiresAt = now + ttlMs;
 
     db.prepare(
-        `INSERT INTO sessions (id, account_id, created_at, expires_at, revoked_at, token_hash, credential_id)
-         VALUES (?, ?, ?, ?, NULL, ?, ?)`,
-    ).run(sessionId, accountId, now, expiresAt, hashToken(token), credentialId);
+        `INSERT INTO sessions
+            (id, account_id, created_at, expires_at, revoked_at, token_hash, credential_id, purpose, recovery_code_id)
+         VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?)`,
+    ).run(
+        sessionId,
+        accountId,
+        now,
+        expiresAt,
+        hashToken(token),
+        credentialId,
+        purpose,
+        recoveryCodeId,
+    );
 
     return { token, sessionId, expiresAt };
 }
@@ -134,7 +164,7 @@ export function readSession(db: DatabaseSync, token: unknown, now: number): Sess
             // account's sessions FIRST, or this JOIN silently stops being redundant defense and
             // starts being load-bearing without anyone having verified it. Tracked on #1190/#1192.
             `SELECT s.id AS session_id, s.account_id AS account_id, s.expires_at AS expires_at,
-                    s.credential_id AS credential_id
+                    s.credential_id AS credential_id, s.purpose AS purpose
              FROM sessions s
              JOIN accounts a ON a.id = s.account_id
              WHERE s.token_hash = ? AND s.revoked_at IS NULL AND s.expires_at > ?`,
@@ -145,6 +175,7 @@ export function readSession(db: DatabaseSync, token: unknown, now: number): Sess
               account_id: string;
               expires_at: number;
               credential_id: string | null;
+              purpose: 'standard' | 'recovery';
           }
         | undefined;
 
@@ -157,6 +188,7 @@ export function readSession(db: DatabaseSync, token: unknown, now: number): Sess
         accountId: row.account_id,
         expiresAt: row.expires_at,
         credentialId: row.credential_id,
+        purpose: row.purpose,
     };
 }
 

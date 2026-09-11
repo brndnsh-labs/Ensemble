@@ -371,9 +371,9 @@ describe('revocation (owner scope, last-credential guard, session cascade)', () 
 
         ctx.testDb.db
             .prepare(
-                'INSERT INTO recovery_codes (id, account_id, code_hash, created_at, consumed_at) VALUES (?, ?, ?, ?, ?)',
+                'INSERT INTO recovery_codes (id, account_id, code_hash, created_at, consumed_at, confirmed_at) VALUES (?, ?, ?, ?, ?, ?)',
             )
-            .run('live-code', accountId, 'hash-live', 0, null);
+            .run('live-code', accountId, 'hash-live', 0, null, 0);
 
         const succeeds = await postJson(ctx, '/api/auth/passkeys/revoke', { credentialId });
         expect(succeeds.status).toBe(200);
