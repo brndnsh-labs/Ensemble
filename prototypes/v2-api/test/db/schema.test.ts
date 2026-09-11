@@ -19,6 +19,7 @@ describe('schema (migrations/0001_init.sql)', () => {
         expect(indexNames).toContain('idx_challenges_account_id');
         expect(indexNames).toContain('idx_sessions_account_id');
         expect(indexNames).toContain('idx_recovery_codes_account_id');
+        expect(indexNames).toContain('idx_challenges_ceremony_hash');
     });
 
     it('rows come back null-prototype, not plain objects (node:sqlite behavior, not a mock)', () => {
@@ -37,8 +38,8 @@ describe('schema (migrations/0001_init.sql)', () => {
         testDb = createTestDatabase();
         expect(() =>
             testDb.db.exec(
-                'INSERT INTO challenges (id, account_id, challenge, type, created_at, expires_at) ' +
-                    "VALUES ('challenge-1', NULL, 'nonce', 'registration', 1000, 2000)",
+                'INSERT INTO challenges (id, account_id, challenge, type, created_at, expires_at, ceremony_hash) ' +
+                    "VALUES ('challenge-1', NULL, 'nonce', 'registration', 1000, 2000, 'hash-1')",
             ),
         ).not.toThrow();
 

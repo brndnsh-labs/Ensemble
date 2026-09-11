@@ -15,5 +15,8 @@
         "@types/node": "^26.0.1",
         "typescript": "^7.0.2",
         "vitest": "^4.1.2"
+    },
+    "dependencies": {
+        "@simplewebauthn/server": "14.0.1"
     }
 }
