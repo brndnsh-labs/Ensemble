@@ -13,7 +13,9 @@ This map provides a quick reference for AI agents to understand the responsibili
 - The v2 account API is a separate standalone Node service at `prototypes/v2-api/` (sibling of
   `prototypes/v2/`, not a subdirectory) — see `prototypes/v2-api/README.md`. `node:sqlite`
   schema/migrations as of #1187; WebAuthn registration/login ceremony modules (`src/auth/`) as
-  of #1188. No session issuance, passkey add/revoke, recovery codes or client wiring yet.
+  of #1188; the session model (`src/auth/session.ts`) and the entire HTTP layer on Hono
+  (`src/http/`, `src/server.ts`) as of #1189 — the service is reachable over a real socket as of
+  this story. No passkey add/revoke, recovery codes, or client wiring yet.
 - If guidance conflicts, prefer live code/config first, then realign the docs so `CLAUDE.md` and `AI_MAP.md` stay reliable.
 
 ## Core Architecture

@@ -15,3 +15,11 @@ export type {
     VerifyRegistrationInput,
 } from './registration.js';
 export { startRegistration, verifyRegistration } from './registration.js';
+export type { IssuedSession, SessionClaims } from './session.js';
+export {
+    issueSession,
+    readSession,
+    revokeOtherSessions,
+    revokeSession,
+    SESSION_TTL_MS,
+} from './session.js';
