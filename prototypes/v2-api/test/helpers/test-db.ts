@@ -11,15 +11,6 @@ import { runMigrations } from '../../src/db/migrate.js';
 // harness that wants to prove real WAL behavior must use a real temp file.
 const REAL_MIGRATIONS_DIR = fileURLToPath(new URL('../../migrations', import.meta.url));
 
-/** Every table this service's migrations create, in dependency order for truncation. */
-export const ALL_TABLES = [
-    'recovery_codes',
-    'sessions',
-    'challenges',
-    'credentials',
-    'accounts',
-] as const;
-
 export interface TestDatabase {
     db: DatabaseSync;
     /** Absolute path to the on-disk database file (and its -wal/-shm siblings). */
@@ -48,15 +39,4 @@ export function createTestDatabase(migrationsDir: string = REAL_MIGRATIONS_DIR):
             rmSync(dir, { recursive: true, force: true });
         },
     };
-}
-
-/**
- * Deletes every row from every known table, for suites that share one
- * database across several tests for speed instead of opening a fresh one
- * per test. Does not touch the `_migrations` bookkeeping table.
- */
-export function resetDatabase(db: DatabaseSync): void {
-    for (const table of ALL_TABLES) {
-        db.exec(`DELETE FROM ${table}`);
-    }
 }

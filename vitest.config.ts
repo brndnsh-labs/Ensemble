@@ -31,6 +31,10 @@ export default defineConfig({
             'tests/bench/**',
             // The isolated Next preview owns a separate Playwright runner.
             'prototypes/v2/checks/**',
+            // The standalone account API has its own package, tsconfig, Vitest config and CI
+            // step (npm run test:api). Collected here it would run twice, under a root config it
+            // was not written for, and knip would resolve its imports against the root manifest.
+            'prototypes/v2-api/**',
             // Agent-tool worktrees are full checkouts under the repo root — without
             // this, every vitest run (and any filename filter) also discovers and
             // runs their copies of the whole suite.
