@@ -21,6 +21,7 @@ This folder groups the living documentation for Ensemble.
 - [`docs/design/ensemble-v2-sync.md`](design/ensemble-v2-sync.md) — approved recovery direction, implemented account-local outbox, staged cloud/offline acceptance and provisional hosting recommendation (#1172).
 - [`prototypes/v2/CLAUDE.md`](../prototypes/v2/CLAUDE.md) — cross-provider v2 handoff, delivery rules, test gates and ownership boundaries.
 - [`docs/design/ensemble-v2-next-batch.md`](design/ensemble-v2-next-batch.md) — next bounded cycle batch; approval/filing state is explicit in the document.
+- [`docs/design/ensemble-v2-guided-form.md`](design/ensemble-v2-guided-form.md) — guided repeat/ending authoring, compiler-derived previews and advanced-form preservation (#1176).
 
 - [`docs/design/`](design/) — living design docs for load-bearing models: [`design/songbook.md`](design/songbook.md) (durable chart documents, migration, and rollback), [`design/soloist-phrase-first.md`](design/soloist-phrase-first.md) (the soloist engine), [`design/timing-model.md`](design/timing-model.md) (the three-tier micro-timing law + the uniform-shift proof), and [`design/write-ownership.md`](design/write-ownership.md) (the write-ownership invariant — runtime never writes a document/preferences field; composes with the timing-model law).
 - [`docs/guides/`](guides/) — implementation notes and reference guides.

@@ -123,11 +123,17 @@ Key or meter change applies from that bar through the section; it does not trans
 Global Key transposes the entire score. Add bar appends to the selected section; Add section
 starts in the global key/meter. Save includes pending measures even with the editor hidden.
 
-Under **Repeats and endings**, mark a start repeat, then enter the total passes on its ending
-bar (2 means twice). For first/second endings, put `1` in Ending passes on the first ending's
-first bar, put 2 total repeat passes on its last bar, then put `2` on the second ending's first
-bar and check End ending here on its last bar. Set all affected bars before Update chart or
-Save. Unfinished form stays in the current tab; validated updates enter the recovery path.
+Under **Repeats and endings**, select an existing bar range with two clicks/taps or Tab and
+Enter (or use From/Through), then **Repeat these bars** and choose the total plays, default 2.
+**Add first and second endings** guides the repeated body and two adjacent ending ranges.
+Review the written brackets and whole-chart playback route before Apply. Reopen a group to
+edit its range/count or remove only its form markers. Cancel keeps unrelated pending chord
+text. Apply adopts the complete validated draft; explicit Save updates the songbook.
+The [guided interaction note](../../docs/design/ensemble-v2-guided-form.md) describes the boundaries.
+
+**Advanced · per-bar repeat and ending markers** keeps the low-level fields for nested and
+nonstandard forms. Set every affected bar before Update chart or Save; unfinished form stays
+in the current tab. Complex sections are preserved by the guide and remain editable here.
 The stand shows each written bar once, with repeat signs and ending labels; highlighting
 returns to that same bar on later passes. Saved/exported charts never contain unfolded copies.
 
@@ -169,7 +175,8 @@ also apply. Large source plus decoded music may exceed the document limit and fa
 
 The stand keeps written repeat signs and navigation labels. Bars bypassed by navigation remain
 visible using detached display-only maps; they never enter the performed maps or audition indices.
-The quick editor preserves measure references and navigation it cannot edit. #1176 remains deferred.
+The quick editor preserves measure references and navigation it cannot edit. Guided common-case
+repeat/ending authoring is available; physical-device usability acceptance remains outstanding.
 
 Older preview clients may reject documents with the new optional source field. Do not downgrade
 after importing; export important writing and prefer corrective preview updates. No production

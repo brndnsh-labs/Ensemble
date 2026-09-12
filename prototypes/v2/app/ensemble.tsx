@@ -1644,6 +1644,14 @@ export default function Ensemble() {
                                                 applyScore(score);
                                             })
                                         }
+                                        onApplyForm={(score) => {
+                                            if (working.current) {
+                                                throw new Error(
+                                                    'Wait for the current change, then Apply again.',
+                                                );
+                                            }
+                                            applyScore(score);
+                                        }}
                                     />
                                     <div className="dialog-actions">
                                         <button

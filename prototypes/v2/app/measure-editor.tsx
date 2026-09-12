@@ -9,6 +9,7 @@ import type { ScoreContext, ScoreMeasure, SemanticScore } from '@engine/songbook
 import { type Ref, useEffect, useId, useImperativeHandle, useRef, useState } from 'react';
 import { applyMeasureForm, type FormDraft, readMeasureForm } from '../lib/form-editing';
 import { FormControls } from './form-controls';
+import { GuidedForm } from './guided-form';
 import './measure-editor.css';
 
 export interface MeasureEditorHandle {
@@ -23,6 +24,7 @@ interface MeasureEditorProps {
     selectedMeasureId: string;
     onSelect: (id: string) => void;
     onApply: (score: SemanticScore) => void;
+    onApplyForm: (score: SemanticScore) => void;
     onPendingChange: (pending: boolean) => void;
     disabled?: boolean;
     ref?: Ref<MeasureEditorHandle>;
@@ -143,6 +145,7 @@ export function MeasureEditor({
     selectedMeasureId,
     onSelect,
     onApply,
+    onApplyForm,
     onPendingChange,
     disabled = false,
     ref,
@@ -151,6 +154,7 @@ export function MeasureEditor({
     const draftRef = useRef(drafts);
     const acceptedCandidate = useRef<string | null>(null);
     const [error, setError] = useState('');
+    const [formScore, setFormScore] = useState<SemanticScore | null>(null);
     const id = useId();
     const entries = entriesFor(score, drafts);
     const selected = entries.find((entry) => entry.measure.id === selectedMeasureId) ?? entries[0];
@@ -271,6 +275,7 @@ export function MeasureEditor({
     useImperativeHandle(ref, () => ({
         commit,
         reset() {
+            setFormScore(null);
             acceptedCandidate.current = null;
             draftRef.current = new Map();
             setDrafts(draftRef.current);
@@ -346,6 +351,31 @@ export function MeasureEditor({
             <p className="measure-editor-context">
                 {selected.effective.key} {selected.effective.isMinor ? 'minor' : 'major'} · {meter}
             </p>
+            <button
+                type="button"
+                className="btn"
+                disabled={disabled}
+                onClick={() => {
+                    try {
+                        const candidate = commit();
+                        // Reviewing a form does not adopt or retire the pending chord buffers.
+                        acceptedCandidate.current = null;
+                        setFormScore(candidate);
+                    } catch {
+                        // commit reports the exact pending bar that needs correction.
+                    }
+                }}
+            >
+                Repeats and endings
+            </button>
+            {formScore && (
+                <GuidedForm
+                    score={formScore}
+                    selectedMeasureId={selected.measure.id}
+                    onClose={() => setFormScore(null)}
+                    onApply={onApplyForm}
+                />
+            )}
             {readOnly ? (
                 <p className="measure-editor-notice">
                     This bar contains a measure repeat or fermata that this quick editor cannot
