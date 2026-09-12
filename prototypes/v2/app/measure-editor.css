@@ -1,0 +1,106 @@
+.measure-editor {
+    display: grid;
+    gap: 12px;
+    min-width: 0;
+}
+.measure-editor-navigation {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+}
+.measure-editor-navigation select,
+.measure-editor-settings select {
+    width: 100%;
+}
+.measure-editor select,
+.measure-editor textarea {
+    min-height: 44px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    color: var(--ink);
+    background: var(--surface);
+    padding: 8px 10px;
+    font: inherit;
+}
+.measure-editor textarea {
+    width: 100%;
+    resize: vertical;
+    font-family: ui-monospace, SFMono-Regular, monospace;
+    font-size: 17px;
+    line-height: 1.6;
+}
+.measure-editor textarea:focus-visible {
+    outline: 3px solid #b34e3490;
+    outline-offset: 3px;
+}
+.measure-editor-context {
+    color: var(--green);
+    font-size: 13px;
+    font-weight: 600;
+}
+.measure-editor-hint {
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.5;
+}
+.measure-editor-lengths {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    min-width: 0;
+}
+.measure-editor-lengths legend {
+    padding: 0 0 8px;
+    font-size: 12px;
+    font-weight: 600;
+}
+.measure-editor-length-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(78px, 1fr));
+    gap: 8px;
+}
+.measure-editor-length-grid label,
+.measure-editor-settings label {
+    display: grid;
+    gap: 5px;
+    min-width: 0;
+    font-size: 12px;
+}
+.measure-editor-length-grid label span {
+    overflow-wrap: anywhere;
+}
+.measure-editor-length-grid select {
+    width: 100%;
+}
+.measure-editor-settings {
+    border-top: 1px solid var(--line);
+    padding-top: 10px;
+}
+.measure-editor-settings summary {
+    cursor: pointer;
+    font-size: 13px;
+    padding: 5px 0;
+}
+.measure-editor-settings-grid {
+    display: grid;
+    gap: 10px;
+    margin: 10px 0;
+}
+.measure-editor-notice,
+.measure-editor-error {
+    border-radius: 8px;
+    padding: 10px;
+    font-size: 13px;
+    line-height: 1.5;
+    background: var(--accent-light);
+}
+.measure-editor-error {
+    color: #87351f;
+}
+.measure-editor-footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+}

@@ -26,7 +26,7 @@ vi.mock('../../../public/state.js', () => ({
     storage: { get: vi.fn(), save: vi.fn() },
 }));
 vi.mock('../../../public/export/detached-generation-state.js', () => ({
-    cloneStateForDetachedGeneration: vi.fn(() => ({})),
+    cloneStateForDetachedGeneration: vi.fn(() => ({ arranger: {} })),
 }));
 
 // We need to import the module under test AFTER mocking

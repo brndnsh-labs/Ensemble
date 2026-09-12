@@ -1,5 +1,15 @@
 import { isPackLoaded, registerPackBuffer } from './instrument-registry.js';
 
+// Application hosts can supply isolated offline storage without changing the
+// sample player or installing a global fetch override. Production uses fetch.
+let assetFetcher: ((url: string) => Promise<Response>) | undefined;
+export function setPackAssetFetcher(fetcher: (url: string) => Promise<Response>): void {
+    assetFetcher = fetcher;
+}
+export function fetchPackAsset(url: string): Promise<Response> {
+    return assetFetcher ? assetFetcher(url) : fetch(url);
+}
+
 /**
  * synth-audit Epic 6 (Packs) S3 — sample loader.
  *
@@ -114,7 +124,7 @@ async function fetchAndDecode(
     rev: number,
 ): Promise<{ key: string; buffer: AudioBuffer }> {
     const url = withRevToken(sample.url, rev);
-    const res = await fetch(url);
+    const res = await fetchPackAsset(url);
     if (!res.ok) {
         throw new Error(
             `[sample-loader] pack "${packId}" sample "${sample.key}" — fetch failed ` +
@@ -176,4 +186,5 @@ export async function loadPack(
 /** Test helper: drop any in-flight load bookkeeping between cases. */
 export function __resetLoaderForTest(): void {
     inFlight.clear();
+    assetFetcher = undefined;
 }

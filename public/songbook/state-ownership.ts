@@ -16,6 +16,7 @@ type StateOwnershipManifest = {
  */
 export const STATE_OWNERSHIP_MANIFEST = {
     arranger: {
+        scorePlan: 'runtime-derived',
         sections: 'document',
         progression: 'runtime-derived',
         key: 'document',

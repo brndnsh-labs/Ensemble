@@ -6,6 +6,7 @@ import {
     ROMAN_VALS,
     TIME_SIGNATURES,
 } from '../config.js';
+import type { renderScorePlayback } from '../songbook/score-playback.js';
 import type { Chord, Dispatch, FormattedChordNames, Mutable } from '../types.js';
 import { ACTIONS } from '../types.js';
 import { getFrequency, normalizeKey } from '../utils.js';
@@ -20,6 +21,13 @@ export type { FormattedChordNames };
 const ROMAN_REGEX = /^([#b])?(III|II|IV|I|VII|VI|V|iii|ii|iv|i|vii|vi|v)/;
 const NNS_REGEX = /^([#b])?([1-7])/;
 const NOTE_REGEX = /^([A-G][#b]?)/i;
+
+// The optional semantic host supplies this adapter once at boot. Legacy startup
+// does not download v2-only code; detached audio renders share this module instance.
+let scoreRenderer: typeof renderScorePlayback | undefined;
+export function registerScorePlaybackRenderer(renderer: typeof renderScorePlayback): void {
+    scoreRenderer = renderer;
+}
 
 export interface ChordDetails {
     quality: string;
@@ -852,6 +860,7 @@ function parseProgressionPart(
     initialMidis: number[],
     keyIsMinor: boolean = false,
     bassActive = Boolean(state.bass?.enabled),
+    startsSection = true,
 ): { chords: Chord[]; finalMidis: number[] } {
     const { chords, groove } = state;
     // #1064 — the auto-conductor's runtime-derived density mirror wins when
@@ -972,7 +981,7 @@ function parseProgressionPart(
                 );
                 // Reduce mud: keep the comping pocket above the bass lane when that lane is active.
                 const pianoMin = getBassSpaceFloor(state, bassActive);
-                const isPivot = parsed.length === 0;
+                const isPivot = startsSection && parsed.length === 0;
                 // why: chords.md P1 #6 / Epic 11 S6(a) — functional comping genres
                 // (Jazz, Bossa, Blues) are built on guide-tone lines and common-tone
                 // holds across ii–V–I motion, so the voice-leading second pass is
@@ -1100,6 +1109,17 @@ export function validateProgression(
     renderCallback?: () => any,
 ): void {
     const { arranger } = state;
+    if (arranger.scorePlan) {
+        if (!scoreRenderer) {
+            throw new Error('Semantic chart playback is unavailable in this host.');
+        }
+        const rendered = scoreRenderer(state, parseProgressionPart);
+        // @direct-mutation — same passed-state/detached-render boundary as the legacy path.
+        Object.assign(arranger, rendered);
+        dispatch?.(ACTIONS.PROG_VALIDATED);
+        renderCallback?.();
+        return;
+    }
     let allChords: Chord[] = [];
     let lastMidis: number[] = [];
 

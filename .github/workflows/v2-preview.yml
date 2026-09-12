@@ -1,0 +1,48 @@
+name: V2 preview
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'prototypes/v2/**'
+      - 'public/**'
+      - 'package*.json'
+      - 'tsconfig*.json'
+      - 'env.d.ts'
+      - '.github/workflows/v2-preview.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v2-preview-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: '.nvmrc'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            prototypes/v2/package-lock.json
+      - run: npm ci
+      - run: npm ci --prefix prototypes/v2
+      - run: npx playwright install --with-deps chromium webkit
+        working-directory: prototypes/v2
+      - run: npm run build --prefix prototypes/v2
+      - run: npm run test:e2e --prefix prototypes/v2
+      - uses: actions/upload-artifact@v6
+        if: failure()
+        with:
+          name: v2-preview-failures
+          path: prototypes/v2/test-results/
+          retention-days: 7
+
+# No deployment job. Production adoption remains a separate human decision.

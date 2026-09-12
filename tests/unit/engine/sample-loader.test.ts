@@ -6,8 +6,10 @@ import {
 } from '../../../public/engine/instrument-registry.js';
 import {
     __resetLoaderForTest,
+    fetchPackAsset,
     loadPack,
     type PackManifest,
+    setPackAssetFetcher,
 } from '../../../public/engine/sample-loader.js';
 
 // A decoded-buffer stand-in (the loader/registry never inspect contents).
@@ -50,6 +52,20 @@ afterEach(() => {
 });
 
 describe('sample-loader — happy path', () => {
+    it('uses a host-owned asset fetcher for manifests and samples without replacing global fetch', async () => {
+        const globalFetch = stubFetch();
+        const hostFetch = vi.fn(async () => new Response(new Uint8Array([1, 2, 3])));
+        setPackAssetFetcher(hostFetch);
+        await fetchPackAsset('/packs/grand/manifest.json');
+        const { ctx } = makeCtx();
+        await loadPack(ctx, manifest);
+        expect(hostFetch.mock.calls).toHaveLength(3);
+        expect(globalFetch).not.toHaveBeenCalled();
+        expect(isPackLoaded('grand')).toBe(true);
+        __resetLoaderForTest();
+        await fetchPackAsset('/packs/grand/manifest.json');
+        expect(globalFetch).toHaveBeenCalledWith('/packs/grand/manifest.json');
+    });
     it('fetches, decodes, and registers every sample', async () => {
         const fetchFn = stubFetch();
         const { ctx, decode } = makeCtx();

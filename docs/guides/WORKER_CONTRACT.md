@@ -198,3 +198,13 @@ Reports an internal worker error.
     **`RESET_STATE` is boot-only by contract.** It has no delta case in `syncWorker()`'s switch, so a `RESET_STATE` dispatched after `initWorker()` posts nothing and leaves the worker generating over the entire pre-reset chart. Today that is safe because its only two production dispatch sites are in `state/state-hydration.ts`, which runs at `main.ts:36` — well before `initWorker()`. It now resets ~18 worker-synced fields, so if you ever wire it to a "New Session" control, follow it with `flushBuffers()`, **not** a bare `syncWorker()`: per rule 4 only `flush` resets cursors and buffer heads, which is exactly what a reset needs. Don't add a partial `case 'RESET_STATE'` delta — the correct payload for a reset is the whole snapshot plus a cursor reset.
 
     A further example: `playback.chartLocked` is pure UI state (controls whether the chord chart renders the inline editor) — read only by main-thread components (`ChartSurface.tsx`, `ChordVisualizer.tsx`, `GlobalShortcuts.tsx`, `state-effects.ts`) and intentionally excluded from `getSyncState().playback`. The `SET_CHART_LOCKED` action does **not** need a delta case in `syncWorker()`; if a future engine change ever reads `chartLocked` worker-side, add both the snapshot field and the delta in the same commit.
+
+    The isolated v2 host also keeps `arranger.scorePlan` main-thread-only. It is a bounded,
+    derived input to `validateProgression`, never authored storage or a worker input. The host
+    registers its semantic renderer at boot; detached audio rendering shares that renderer and
+    the production clone retains the plan. Live and MIDI workers consume the existing compiled
+    progression/step/measure/section maps instead. Semantic measure entries include their
+    resolved `config` (meter and grouping), which crosses with the existing `measureMap` in
+    the full sync and flush payloads. `getStepInfo` consumes that same config in every realm;
+    legacy entries without it retain their existing behavior. Opening or editing a semantic
+    chart rebuilds the complete maps, then performs the established full sync and flush.

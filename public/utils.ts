@@ -477,6 +477,10 @@ export function getStepInfo(
                     ? allTSConfigs['4/4']
                     : { beats: 4, stepsPerBeat: 4 };
             }
+            // Semantic playback compiles the resolved meter/grouping once per bar.
+            // All threads consume that same derived config, with no per-tick allocation
+            // or change to legacy maps (which have no config field).
+            currentTS = measure.config ?? currentTS;
             mStep = step - measure.start;
             if (mStep === 0) {
                 isMeasureStart = true;

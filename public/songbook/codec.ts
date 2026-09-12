@@ -831,7 +831,8 @@ type CandidatePreparationResult =
     | { kind: 'ok'; candidate: unknown }
     | { kind: 'invalid'; issues: CodecIssue[] };
 
-function prepareCandidate(candidate: unknown): CandidatePreparationResult {
+/** Shared bounded, accessor-safe detachment for versioned songbook codecs. */
+export function prepareCandidate(candidate: unknown): CandidatePreparationResult {
     const structural = inspectSongbookStructure(candidate);
     if (structural.kind === 'invalid') {
         return { kind: 'invalid', issues: [structural.issue] };
@@ -896,7 +897,7 @@ function prepareCandidate(candidate: unknown): CandidatePreparationResult {
     }
 }
 
-function readVersion(
+export function readVersion(
     candidate: unknown,
     currentVersion: number,
     source: unknown,
@@ -1028,7 +1029,7 @@ export function validateWorkspacePreferences(
     return ctx.issues.length > 0 ? { kind: 'invalid', issues: ctx.issues } : { kind: 'ok', value };
 }
 
-function decodeJson<T>(
+export function decodeJson<T>(
     json: string,
     validator: (candidate: unknown) => CodecDecodeResult<T>,
 ): CodecDecodeResult<T> {
@@ -1065,7 +1066,7 @@ export function decodeWorkspacePreferences(json: string): CodecDecodeResult<Work
     return decodeJson(json, validateWorkspacePreferences);
 }
 
-function encodeValidated<T>(
+export function encodeValidated<T>(
     value: T,
     validator: (candidate: unknown) => CodecDecodeResult<T>,
 ): CodecEncodeResult {

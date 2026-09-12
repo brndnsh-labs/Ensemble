@@ -5,8 +5,27 @@
 import { render } from 'preact';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildChordText, ChordPicker } from '../../../public/components/editor/ChordPicker.jsx';
+import { KEY_ORDER as CONFIG_KEYS } from '../../../public/config.js';
+import { KEY_ORDER } from '../../../public/data/note-names.js';
 
 describe('buildChordText', () => {
+    it('keeps the config compatibility export and editor on one canonical pitch table', () => {
+        expect(CONFIG_KEYS).toBe(KEY_ORDER);
+        expect(KEY_ORDER).toEqual([
+            'C',
+            'Db',
+            'D',
+            'Eb',
+            'E',
+            'F',
+            'Gb',
+            'G',
+            'Ab',
+            'A',
+            'Bb',
+            'B',
+        ]);
+    });
     const MAJ = { id: 'maj', label: 'maj', isMinor: false, suffix: '', nameSuffix: '', title: '' };
     const MIN = { id: 'min', label: 'min', isMinor: true, suffix: '', nameSuffix: 'm', title: '' };
     const DOM7 = {

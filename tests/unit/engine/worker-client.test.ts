@@ -54,6 +54,7 @@ import {
 vi.mock('../../../public/state.js', () => {
     const mockState = {
         arranger: {
+            scorePlan: { sections: [] },
             progression: [],
             stepMap: [],
             sectionMap: [],
@@ -308,6 +309,8 @@ describe('Worker Client', () => {
             expect(worker.postMessage).not.toHaveBeenCalledWith(
                 expect.objectContaining({ type: MIDI_EXPORT_MSG.START }),
             );
+            const posted = exportWorker.postMessage.mock.calls[0][0].data.state;
+            expect(posted.arranger).not.toHaveProperty('scorePlan');
 
             exportWorker.onmessage({
                 data: {

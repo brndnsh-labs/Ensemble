@@ -15,7 +15,7 @@ export const BUILD_REV = typeof __BUILD_REV__ !== 'undefined' ? __BUILD_REV__ : 
 // Ensemble is free + open. A no-pressure "support this project" link in
 // Settings → About points here. Swap the handle to point the donate button elsewhere.
 export const KOFI_URL = 'https://ko-fi.com/brndnsh';
-export const KEY_ORDER = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
+export { KEY_ORDER } from './data/note-names.js';
 export const ENHARMONIC_MAP = {
     // Standard sharp→flat equivalents (the 5 chromatic sharps)
     'C#': 'Db',

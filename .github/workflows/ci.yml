@@ -48,12 +48,26 @@ jobs:
         with:
           node-version-file: '.nvmrc'
           cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            prototypes/v2-api/package-lock.json
 
       - name: Install dependencies
         run: npm ci
 
       - name: Run the full gate (npm run ci)
         run: npm run ci
+
+      # The v2 account API (#1187) is a standalone sibling package under
+      # prototypes/v2-api/ with its own package-lock.json — same --prefix
+      # pattern v2-preview.yml uses for prototypes/v2. Kept HERE, not in
+      # e2e-tests: this suite is node-environment-only (node:sqlite, no DOM),
+      # so it doesn't need that job's browser install.
+      - name: Install v2 account API dependencies
+        run: npm ci --prefix prototypes/v2-api
+
+      - name: Run v2 account API tests
+        run: npm run test:api
 
   e2e-tests:
     runs-on: ubuntu-latest
@@ -107,6 +121,9 @@ jobs:
       # so an audio-graph regression fails early.
       - name: Run browser-mode audio guards
         run: npm run test:browser
+
+      - name: Verify account storage in Chromium and WebKit
+        run: npm run test:sync
 
       # `npm run test:e2e` builds the production bundle (VITE_E2E_BRIDGE=1) and
       # serves it via `vite preview` (see playwright.config.ts webServer) — the

@@ -1,0 +1,67 @@
+.import-dialog {
+    width: min(700px, calc(100vw - 24px));
+}
+.import-field {
+    display: grid;
+    gap: 8px;
+    margin: 14px 0;
+    font-size: 13px;
+}
+.import-dialog select {
+    max-width: 100%;
+    padding: 10px;
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+}
+.import-dialog textarea {
+    min-height: 70px;
+}
+.import-dialog summary {
+    cursor: pointer;
+    padding: 12px 0;
+}
+.import-summary {
+    margin-top: 18px;
+    border-top: 1px solid var(--line);
+    padding-top: 16px;
+}
+.import-chart {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    border-top: 1px solid var(--line);
+    border-left: 1px solid var(--line);
+}
+.import-chart > span {
+    min-width: 0;
+    padding: 12px 8px;
+    border-right: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+    overflow-wrap: anywhere;
+}
+.import-chart small {
+    display: block;
+    color: var(--muted);
+    font-size: 10px;
+    margin-bottom: 6px;
+}
+.import-diagnostics {
+    padding-left: 20px;
+    font-size: 13px;
+    line-height: 1.6;
+    overflow-wrap: anywhere;
+}
+.bar-navigation {
+    width: 100%;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--green);
+}
+@media (max-width: 500px) {
+    .import-dialog {
+        padding: 20px;
+    }
+    .import-chart {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}

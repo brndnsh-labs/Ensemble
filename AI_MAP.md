@@ -8,6 +8,16 @@ This map provides a quick reference for AI agents to understand the responsibili
 - Use `CLAUDE.md` for operational rules, architecture, and safety conventions. (`AGENTS.md` is a pointer to it.)
 - Nested `CLAUDE.md` files (`public/CLAUDE.md`, `public/engine/CLAUDE.md`, `public/engine/grooves/CLAUDE.md`, `public/components/CLAUDE.md`, `tests/CLAUDE.md`) hold directory-scoped load-bearing invariants and traps — sharper than this map or the root file, auto-loaded by tooling that walks the directory tree. Read the one for a directory before editing in it.
 - Use `docs/README.md` for the docs index.
+- V2 application work starts at `prototypes/v2/CLAUDE.md`: scoped source map, provider-neutral
+  handoff and delivery rules. Its React shell is separate from the Preact host below.
+- The v2 account API is a separate standalone Node service at `prototypes/v2-api/` (sibling of
+  `prototypes/v2/`, not a subdirectory) — see `prototypes/v2-api/README.md`. `node:sqlite`
+  schema/migrations as of #1187; WebAuthn registration/login ceremony modules (`src/auth/`) as
+  of #1188; the session model (`src/auth/session.ts`) and the entire HTTP layer on Hono
+  (`src/http/`, `src/server.ts`) as of #1189; passkey add/list/revoke and step-up
+  re-authentication, gated by the one `isFreshlyAuthenticated` predicate (`src/auth/fresh-auth.ts`),
+  as of #1190; single-use recovery codes and a restricted recovery-only session
+  (`src/auth/recovery.ts`, `src/auth/rate-limit.ts`) as of #1191. No client wiring yet.
 - If guidance conflicts, prefer live code/config first, then realign the docs so `CLAUDE.md` and `AI_MAP.md` stay reliable.
 
 ## Core Architecture
@@ -53,6 +63,19 @@ This map provides a quick reference for AI agents to understand the responsibili
 | :--- | :--- | :--- |
 | `public/songbook/types.ts` | Version-1 portable chart and workspace-preference schemas, kept independent of live state slices. | `ChartDocument`, `ChartContent`, `WorkspacePreferences` |
 | `public/songbook/codec.ts` | Pure complete-candidate validation plus JSON encode/decode, including explicit invalid/current/future-version results. | `validateChartDocument`, `decodeChartDocument`, `encodeChartDocument` |
+| `public/songbook/score-types.ts` | Document-v2 authored-score types: exact events, measures, context, repeat and jump directions; isolated preview adoption preserves v1 sources. | `ChartDocumentV2`, `SemanticScore`, `ScoreMeasure`, `ScoreDirection` |
+| `public/songbook/score-duration.ts` | Bounded rational quarter-note arithmetic and exact sixteenth-grid capability checks. | `scoreDuration`, `scoreMeter`, `durationToSteps` |
+| `public/songbook/score-context.ts` | Shared key/mode/meter inheritance and beat-grouping reset for already-validated authored contexts. | `resolveScoreContext` |
+| `public/songbook/score-form.ts` | Bounded repeat/ending and global D.C./D.S./Fine/coda traversal; preserves source identities and explicit repeat-after-jump policy. | `compileScoreForm`, `ScoreFormVisit` |
+| `public/songbook/score-measure-events.ts` | Detached, bounded written-identity resolution of one-/two-bar references, with context and pair integrity checks. | `resolveScoreMeasureEvents` |
+| `public/songbook/ireal-import.ts` | Source-preserving iReal import results, raw metadata and per-song blocking diagnostics. | `parseIRealImport`, `IRealImportResult` |
+| `public/songbook/ireal-decode.ts` | Bounded inert HTML/link extraction, separate protocol envelopes and modern permutation decoder. | `decodeIRealInput`, `decodeIRealMusic` |
+| `public/songbook/ireal-score.ts` | Conservative rhythm-cell and notation mapping into validated semantic scores; uncertain music blocks import. | `scoreFromIRealBody` |
+| `public/songbook/score-playback.ts` | Bounded semantic-score playback capability checks and exact chord/measure maps over performed visits; preserves written context and existing voicing. | `prepareScorePlayback`, `renderScorePlayback`, `scoreArrangement` |
+| `public/songbook/score-text.ts` | Complete-token chord-bar parsing/printing, meter-labelled lengths and alternate spellings; independent of voicing. | `parseChordBar`, `printChordBar`, `isScoreChord` |
+| `public/songbook/score-codec.ts` | Detached authored-score validation, duration sums and source/marker reference integrity; not a performance itinerary compiler. | `validateSemanticScore` |
+| `public/songbook/document-v2.ts` | Version-2 envelope codec alongside the unchanged version-1 reader; no implicit conversion. | `validateChartDocumentV2`, `decodeChartDocumentV2`, `encodeChartDocumentV2` |
+| `public/songbook/legacy-score.ts` | Pure conservative v1 conversion proposals retaining original JSON, with blocking timing/spelling diagnostics. | `proposeLegacyScoreConversion` |
 | `public/songbook/structural-limits.ts` | Pre-schema input ceilings for byte size, nesting depth, visited nodes, and section count. | `inspectSongbookStructure`, `SONGBOOK_MAX_INPUT_BYTES` |
 | `public/songbook/state-ownership.ts` | Exhaustive document/preferences/runtime ownership for every top-level state field, plus the legacy-writer reachability manifest. | `STATE_OWNERSHIP_MANIFEST`, `LEGACY_PERSISTED_FIELD_OWNERSHIP` |
 
@@ -69,6 +92,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/engine/accompaniment.ts` | Chord comping and rhythmic backing. | `getAccompanimentNotes`, `compingState` |
 | `public/engine/chords-engine.ts` | Chord parsing and harmonic analysis. | `getChordDetails` |
 | `public/engine/note-spelling.ts` | Canonical pitch-class → letter-name spelling policy (sharp/flat by key), shared by the chart render path and the chord editor. | `spellPitchClass` |
+| `public/data/note-names.ts` | Pure pitch-class name table; re-exported by config without pulling genre data into notation-only editors. | `KEY_ORDER` |
 | `public/engine/harmonies.ts` | Background pad/stab generation. | `getHarmonyNotes` |
 | `public/engine/harmony-styles.ts` | Per-genre harmony idiom profiles and section-relative pad phrase dynamics. | `HARMONY_GENRE_PROFILES`, `resolveHarmonyProfile`, `getPadPhraseGain` |
 | `public/engine/harmony-moving-voice.ts` | Chart-derived, bounded moving-voice connections for Smart Rock/Acoustic pads. | `getMovingPadVoicing` |

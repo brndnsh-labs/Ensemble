@@ -1,19 +1,27 @@
 {
     "$schema": "https://unpkg.com/knip@6/schema.json",
-    "entry": [
-        "public/logic-worker.ts",
-        "public/visualizer-worker.ts",
-        "public/sw.ts",
-        "scripts/**/*.ts",
-        "tests/**/*.{test,spec}.{ts,tsx}",
-        "tests/bench/**/*.ts",
-        "tests/scripts/**/*.ts"
-    ],
-    "project": ["public/**/*.{ts,tsx}", "scripts/**/*.ts", "tests/**/*.{ts,tsx}"],
+    "workspaces": {
+        ".": {
+            "entry": [
+                "public/logic-worker.ts",
+                "public/visualizer-worker.ts",
+                "public/sw.ts",
+                "scripts/**/*.ts",
+                "tests/**/*.{test,spec}.{ts,tsx}",
+                "tests/bench/**/*.ts",
+                "tests/scripts/**/*.ts"
+            ],
+            "project": ["public/**/*.{ts,tsx}", "scripts/**/*.ts", "tests/**/*.{ts,tsx}"],
+            "ignore": ["public/engine/grooves/*.ts"]
+        },
+        "prototypes/v2-api": {
+            "entry": ["src/db/index.ts", "src/auth/index.ts", "test/**/*.test.ts"],
+            "project": ["src/**/*.ts", "test/**/*.ts"]
+        }
+    },
     "ignoreExportsUsedInFile": {
         "interface": true,
         "type": true
     },
-    "ignore": ["public/engine/grooves/*.ts"],
     "ignoreBinaries": ["ffmpeg"]
 }

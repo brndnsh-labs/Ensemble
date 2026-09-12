@@ -152,9 +152,16 @@ test.describe('Modals Responsiveness @ui', () => {
                 }),
             )
             .toBeGreaterThan(0);
+        const toggle = page.locator('label.toggle-switch[for="applyPresetSettingsCheck"]');
+        // Finish actionability/scroll preparation before measuring. Otherwise modal-in
+        // can make Playwright itself scroll 85px before the actual state-changing click.
+        await toggle.click({ trial: true });
         const before = await panel.evaluate((el) => el.scrollTop);
+        expect(before).toBeGreaterThan(0);
+        const checked = await page.locator('#applyPresetSettingsCheck').isChecked();
 
-        await page.locator('label.toggle-switch[for="applyPresetSettingsCheck"]').click();
+        await toggle.click();
+        await expect(page.locator('#applyPresetSettingsCheck')).toBeChecked({ checked: !checked });
         // Wait past the old 50ms focus-on-open timeout that caused the jump.
         await page.waitForTimeout(150);
 

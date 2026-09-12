@@ -1,0 +1,147 @@
+{
+    "status": "import-research-and-capability-examples-not-an-implemented-importer",
+    "realExport": {
+        "id": "blues-var-2-modern",
+        "provenance": "User-self-entered iReal Pro chart supplied in conversation on 2026-09-08. Title/composer sanitized in this derivative; original HTML remains local.",
+        "originalBytes": 1504,
+        "originalSha256": "ffd8a43b0b4bd9dd36337a5382d64ac07f2ed1cbaaa7474825ef92d66b8649c2",
+        "exporter": "iReal Pro 2026.7 / iOS 26.6",
+        "sanitizedUrl": "irealb://Blues%20fixture=Ensemble==Blues=C=10=1r34LbKcu7G%7CQyX7XyQ%7C7C%7CQyXx%7CQyX7F%7CyQXx%7CQyX7C%7CQyX7FXyQ%7CxC44T%5B7XyQ%7CF7XyQ%7CC7XyQ%7CG7XyQZ%20=Blues%2DFunky=0=6",
+        "expectedPositionalFields": [
+            "Blues fixture",
+            "Ensemble",
+            "",
+            "Blues",
+            "C",
+            "10",
+            "1r34LbKcu7G|QyX7XyQ|7C|QyXx|QyX7F|yQXx|QyX7C|QyX7FXyQ|xC44T[7XyQ|F7XyQ|C7XyQ|G7XyQZ ",
+            "Blues-Funky",
+            "0",
+            "6"
+        ],
+        "expectedUnscrambledBody": "[T44C7XyQ|F7XyQ|C7XyQ|xXyQ|F7XyQ|xXyQ|C7XyQ|xXyQ|G7XyQ|F7XyQ|C7XyQ|G7XyQZ ",
+        "expectedStoredKey": "C",
+        "expectedMeter": "4/4",
+        "expectedWrittenBarCount": 12,
+        "expectedWrittenBars": [
+            "C7",
+            "F7",
+            "C7",
+            "%",
+            "F7",
+            "%",
+            "C7",
+            "%",
+            "G7",
+            "F7",
+            "C7",
+            "G7"
+        ],
+        "expectedResolvedBarsBeforeTranspose": [
+            "C7",
+            "F7",
+            "C7",
+            "C7",
+            "F7",
+            "F7",
+            "C7",
+            "C7",
+            "G7",
+            "F7",
+            "C7",
+            "G7"
+        ],
+        "unverified": [
+            "displayed/played key for transpose field 10",
+            "unset/default tempo field 0",
+            "player repetition metadata mapping",
+            "actual Ensemble import and audio"
+        ]
+    },
+    "syntheticOpenProtocol": {
+        "provenance": "Minimal original test progression authored for this proposal using the documented open protocol; not exported or auditioned in iReal.",
+        "url": "irealbook://Two%20bar%20fixture=Ensemble=Medium%20Swing=C=n=T44%5BC%20%20%20%7CG7%20%20%20Z",
+        "expectedFields": [
+            "Two bar fixture",
+            "Ensemble",
+            "Medium Swing",
+            "C",
+            "n",
+            "T44[C   |G7   Z"
+        ],
+        "status": "needs-current-app-round-trip"
+    },
+    "proposedTimingExamples": [
+        { "meter": "4/4", "text": "C", "durationQ": [[4, 1]], "stepBoundaries": [0, 16] },
+        {
+            "meter": "4/4",
+            "text": "Dm7 G7",
+            "durationQ": [[2, 1], [2, 1]],
+            "stepBoundaries": [0, 8, 16]
+        },
+        {
+            "meter": "4/4",
+            "text": "C:2 Dm:1 G7:1",
+            "durationQ": [[2, 1], [1, 1], [1, 1]],
+            "stepBoundaries": [0, 8, 12, 16]
+        },
+        {
+            "meter": "3/4",
+            "text": "Am:2 E7:1",
+            "durationQ": [[2, 1], [1, 1]],
+            "stepBoundaries": [0, 8, 12]
+        },
+        {
+            "meter": "6/8",
+            "text": "Am:3 E7:3",
+            "durationQ": [[3, 2], [3, 2]],
+            "stepBoundaries": [0, 6, 12]
+        },
+        {
+            "meter": "4/4",
+            "text": "C/E:2 F:2",
+            "durationQ": [[2, 1], [2, 1]],
+            "stepBoundaries": [0, 8, 16]
+        }
+    ],
+    "proposedBlockingExamples": [
+        {
+            "meter": "4/4",
+            "text": "C Dm G7",
+            "reason": "Equal thirds do not map to the existing sixteenth grid; require an explicit choice for a new chart, preserve legacy input."
+        },
+        {
+            "meter": "4/4",
+            "text": "C:2 Dm G7",
+            "reason": "Mixed explicit and implicit durations in one bar."
+        },
+        { "meter": "4/4", "text": "C:3 G7:2", "reason": "Overfull bar." },
+        { "meter": "4/4", "text": "C:2 G7:1", "reason": "Underfull bar." },
+        { "meter": "4/4", "text": "C:0 G7:4", "reason": "Non-positive duration." },
+        { "meter": "4/4", "text": "C | | G7", "reason": "Empty measure must not disappear." },
+        {
+            "meter": "4/4",
+            "text": "N.C.",
+            "reason": "Per-lane no-chord playback is not defined for the first adapter."
+        },
+        {
+            "meter": "9/8",
+            "text": "C",
+            "reason": "Meter is outside the current engine table; never substitute 4/4."
+        }
+    ],
+    "additionalFixtureRequests": [
+        "A short current iReal export with explicit 2+1+1 and 1+1+2 chord spacing.",
+        "Repeat/ending/coda example received as Minor Swing HTML plus screenshot; retained locally, not published here.",
+        "Slash bass and section key/meter changes after basic import is working; no long song needed for these cases."
+    ],
+    "futureSyntheticCoverage": [
+        "64/128-bar layout and bounded form expansion",
+        "malformed percent escapes and unsupported URL schemes",
+        "empty metadata fields and HTML entities",
+        "unknown chord quality, alternate chord and unknown staff directive",
+        "oversized input and repeat expansion limits",
+        "multiple songs in one export",
+        "markup-bearing metadata and no remote HTML resource requests"
+    ]
+}
