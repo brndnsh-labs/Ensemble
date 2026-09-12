@@ -88,6 +88,57 @@ function sampleUrls(manifest: PackManifest): string[] {
     return manifest.samples.flatMap((s) => [s.url, ...(s.variants || [])]);
 }
 
+// Six at a time. Browsers cap HTTP/1.1 at ~6 sockets per origin, and over HTTP/2
+// the ceiling moves to us: every file costs up to three main-thread SHA-256 passes
+// (cache-hit check, post-fetch verify, store read-back verify), so a wider pool
+// mostly queues on the CPU while holding more decoded bodies in memory at once.
+const FETCH_CONCURRENCY = 6;
+
+/**
+ * Walk `urls` through `asset()` with bounded concurrency, preserving the serial
+ * loop's contract: every file is still digest-verified, the first failure stops
+ * new work and is rethrown, and `onSettled` counts completions (not indexes, which
+ * no longer arrive in order). Workers drain before the throw so a rejected install
+ * leaves no unhandled promise behind.
+ */
+async function fetchAssets(
+    urls: string[],
+    rev: number,
+    cachedOnly: boolean,
+    onSettled?: (completed: number) => void,
+): Promise<void> {
+    let next = 0;
+    let completed = 0;
+    // A separate flag rather than `failure !== undefined`: a thrown `undefined`
+    // would otherwise leave the remaining workers running and the throw silent.
+    let failed = false;
+    let failure: unknown;
+    const worker = async (): Promise<void> => {
+        while (!failed) {
+            const i = next++;
+            if (i >= urls.length) {
+                return;
+            }
+            try {
+                await asset(withRevToken(urls[i], rev), cachedOnly);
+            } catch (error) {
+                if (!failed) {
+                    failed = true;
+                    failure = error;
+                }
+                return;
+            }
+            onSettled?.(++completed);
+        }
+    };
+    await Promise.all(
+        Array.from({ length: Math.min(FETCH_CONCURRENCY, urls.length) }, () => worker()),
+    );
+    if (failed) {
+        throw failure;
+    }
+}
+
 export async function prepareSound(id: string, progress: (text: string) => void): Promise<void> {
     const pack = SOUND_PACKS.find((p) => p.id === id);
     if (!pack) {
@@ -96,10 +147,9 @@ export async function prepareSound(id: string, progress: (text: string) => void)
     progress(`Preparing ${pack.name}…`);
     const manifest = await manifestFor(id, false);
     const urls = sampleUrls(manifest);
-    for (const [i, url] of urls.entries()) {
-        await asset(withRevToken(url, revForPack(id)));
-        progress(`${pack.name} · ${i + 1}/${urls.length} files`);
-    }
+    await fetchAssets(urls, revForPack(id), false, (done) => {
+        progress(`${pack.name} · ${done}/${urls.length} files`);
+    });
     progress(`Loading ${pack.name}…`);
     await ensurePackLoaded(new OfflineAudioContext(1, 1, 44100), id);
     // The old runtime intentionally swallows decode failures; this UI must not.
@@ -134,9 +184,7 @@ export async function allSoundsAvailableOffline(): Promise<boolean> {
     try {
         for (const pack of SOUND_PACKS) {
             const manifest = await manifestFor(pack.id, true);
-            for (const url of sampleUrls(manifest)) {
-                await asset(withRevToken(url, revForPack(pack.id)), true);
-            }
+            await fetchAssets(sampleUrls(manifest), revForPack(pack.id), true);
         }
         return true;
     } catch {
@@ -152,9 +200,7 @@ export async function soundsAvailableOffline(chart: Pick<ChartContent, 'band'>):
                 continue;
             }
             const manifest = await manifestFor(id, true);
-            for (const url of sampleUrls(manifest)) {
-                await asset(withRevToken(url, revForPack(id)), true);
-            }
+            await fetchAssets(sampleUrls(manifest), revForPack(id), true);
         }
         return true;
     } catch {
