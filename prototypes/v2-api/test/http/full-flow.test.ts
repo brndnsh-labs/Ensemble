@@ -526,6 +526,7 @@ describe('ceremony failure collapse (every reason except malformed_request -> 40
             rawId: 'x',
             type: 'public-key',
             response: { clientDataJSON: 'x', authenticatorData: 'x', signature: 'x' },
+            clientExtensionResults: {},
         });
         const res = await ctx.app.request(`${HTTPS_URL}/api/auth/login/verify`, {
             method: 'POST',
@@ -628,6 +629,8 @@ describe('ceremony failure collapse (every reason except malformed_request -> 40
             id: 'x',
             rawId: 'x',
             response: { clientDataJSON: 'not-real-base64url', attestationObject: 'also-not-real' },
+            type: 'public-key',
+            clientExtensionResults: {},
         });
         const res = await ctx.app.request(`${HTTPS_URL}/api/auth/register/verify`, {
             method: 'POST',
@@ -658,6 +661,8 @@ describe('ceremony failure collapse (every reason except malformed_request -> 40
                 authenticatorData: 'also-not-real',
                 signature: 'also-not-real',
             },
+            type: 'public-key',
+            clientExtensionResults: {},
         });
         const res = await ctx.app.request(`${HTTPS_URL}/api/auth/login/verify`, {
             method: 'POST',

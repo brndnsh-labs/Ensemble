@@ -22,6 +22,9 @@ import { hasEnrolledRecoveryMaterial } from './recovery-material.js';
 import { resolveLabel } from './registration.js';
 import { isMalformedCeremonyRequest } from './request-guard.js';
 
+/** Generous per-account bound on list/allow/exclude arrays. Checked at commit under concurrency. */
+export const MAX_PASSKEYS = 32;
+
 /**
  * Adding a passkey (#1190 orchestrator decision 4). Bound to BOTH the authenticated owner and
  * the initiating session — a ceremony started under account A's session can never be committed
@@ -35,7 +38,7 @@ export interface StartAddPasskeyInput {
 
 export type StartAddPasskeyResult =
     | { ok: true; options: PublicKeyCredentialCreationOptionsJSON; ceremonyToken: string }
-    | { ok: false; reason: 'fresh_auth_required' };
+    | { ok: false; reason: 'fresh_auth_required' | 'credential_limit' };
 
 /**
  * Requires a FRESH session (checked here, not only at the HTTP layer) so a stale session gets
@@ -62,6 +65,9 @@ export async function startAddPasskey(
     const credentialRows = db
         .prepare('SELECT id, transports FROM credentials WHERE account_id = ?')
         .all(input.accountId) as unknown as { id: string; transports: string | null }[];
+    if (credentialRows.length >= MAX_PASSKEYS) {
+        return { ok: false, reason: 'credential_limit' };
+    }
 
     const options = await generateRegistrationOptions({
         rpName: config.rpName,
@@ -111,7 +117,8 @@ export type AddPasskeyFailureReason =
     | 'verification_failed'
     | 'fresh_auth_required'
     | 'account_not_found'
-    | 'credential_exists';
+    | 'credential_exists'
+    | 'credential_limit';
 
 export type AddPasskeyResult =
     | { ok: true; credentialId: string; alreadyRegistered: boolean }
@@ -217,6 +224,13 @@ export async function verifyAddPasskey(
                 // overwrite, and it collapses to the same 401 as everything else at the HTTP
                 // boundary (decision 9) — never reveal which account owns it.
                 throw new AddPasskeyAbort('credential_exists');
+            }
+
+            const count = db
+                .prepare('SELECT COUNT(*) AS n FROM credentials WHERE account_id = ?')
+                .get(input.accountId) as { n: number };
+            if (count.n >= MAX_PASSKEYS) {
+                throw new AddPasskeyAbort('credential_limit');
             }
 
             db.prepare(

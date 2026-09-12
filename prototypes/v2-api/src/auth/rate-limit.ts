@@ -5,7 +5,7 @@
  * this service takes time as an explicit argument (see `config.ts`'s doc comment) rather than
  * reading the wall clock internally, and this is the one caller — `/api/auth/recovery/claim` —
  * that most needs a test to be able to drive the window boundary with a fake clock instead of a
- * real 10-minute sleep.
+ * real 10-minute sleep. #1192 reuses one limiter per auth endpoint.
  *
  * Why in-memory, not DB-counted: this service, like the sibling, runs as a SINGLE container
  * process (the ratified deployment topology for this service). One process-local limiter sees
@@ -16,8 +16,8 @@
  * changing the deployment topology must re-examine this file.
  *
  * Each limiter owns its own bucket map (factory, not a global singleton) — `src/http/app.ts`
- * instantiates exactly one per `createApp()` call, closure-captured alongside `now`/
- * `sessionTtlMs`, so tests get an isolated limiter per app instance instead of state leaking
+ * instantiates one per endpoint per `createApp()` call, closure-captured alongside `now`/
+ * `sessionTtlMs`, so tests get isolated limiters per app instance instead of state leaking
  * across unrelated test cases via a module-level map.
  */
 
@@ -33,6 +33,8 @@ export interface RateLimiterOptions {
     max: number;
     /** Sliding window length in ms. */
     windowMs: number;
+    /** Hard cap as well as expiry: source-address churn must not exhaust process memory. */
+    maxKeys?: number;
 }
 
 /**
@@ -43,7 +45,17 @@ export interface RateLimiterOptions {
  * periodic sweep (at most once per window) drops keys that have gone idle, so a churn of
  * distinct keys (e.g. distinct source IPs) can't grow the map without bound.
  */
-export function createRateLimiter({ max, windowMs }: RateLimiterOptions) {
+export function createRateLimiter({ max, windowMs, maxKeys = 10_000 }: RateLimiterOptions) {
+    if (
+        !Number.isSafeInteger(max) ||
+        max < 1 ||
+        !Number.isSafeInteger(windowMs) ||
+        windowMs < 1 ||
+        !Number.isSafeInteger(maxKeys) ||
+        maxKeys < 1
+    ) {
+        throw new Error('Invalid rate limit configuration');
+    }
     const hitsByKey = new Map<string, number[]>();
     let lastSweep = 0;
 
@@ -65,6 +77,11 @@ export function createRateLimiter({ max, windowMs }: RateLimiterOptions) {
 
     return function check(key: string, now: number): RateLimitResult {
         sweep(now);
+        // Overflow fails closed for new callers; never evict an attacker's live bucket and
+        // thereby reset its allowance. Existing callers retain independent budgets.
+        if (!hitsByKey.has(key) && hitsByKey.size >= maxKeys) {
+            key = 'overflow';
+        }
         const cutoff = now - windowMs;
         const hits = (hitsByKey.get(key) ?? []).filter((t) => t > cutoff);
 

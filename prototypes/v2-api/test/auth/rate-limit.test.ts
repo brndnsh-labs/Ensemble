@@ -9,6 +9,15 @@ import { createRateLimiter } from '../../src/auth/rate-limit.js';
  */
 
 describe('createRateLimiter', () => {
+    it('caps identity churn without evicting live buckets or resetting their allowance', () => {
+        const check = createRateLimiter({ max: 1, windowMs: 1000, maxKeys: 2 });
+        expect(check('a', 0).allowed).toBe(true);
+        expect(check('b', 0).allowed).toBe(true);
+        expect(check('c', 1).allowed).toBe(true); // one shared overflow bucket
+        expect(check('d', 2).allowed).toBe(false);
+        expect(check('a', 2).allowed).toBe(false);
+        expect(check('e', 1001).allowed).toBe(true);
+    });
     it('allows up to max hits within the window, blocks the (max + 1)th', () => {
         const check = createRateLimiter({ max: 3, windowMs: 1000 });
         expect(check('k', 0).allowed).toBe(true);

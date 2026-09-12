@@ -4,6 +4,7 @@ import { createWebAuthnConfig } from './auth/config.js';
 import { openDatabase } from './db/connection.js';
 import { runMigrations } from './db/migrate.js';
 import { createApp } from './http/app.js';
+import { type ClientIdentityOptions, createClientIdentity } from './http/client-identity.js';
 import { registerHealthCheck } from './http/health.js';
 
 /**
@@ -104,6 +105,14 @@ const revision = process.env.ENSEMBLE_BUILD_REVISION ?? 'development';
 if (revision !== 'development' && !/^[0-9a-f]{40}$/.test(revision)) {
     throw new Error('ENSEMBLE_BUILD_REVISION must be a full lowercase Git SHA or development');
 }
+const clientIdentity: ClientIdentityOptions = {
+    secret: readRequiredEnv('ENSEMBLE_AUTH_IP_SECRET'),
+    header: process.env.ENSEMBLE_AUTH_IP_HEADER,
+    trustedProxyAddresses: process.env.ENSEMBLE_AUTH_TRUSTED_PROXY_ADDRESSES?.split(','),
+};
+// Fail before database creation. No default Cloudflare/XFF choice: the current static route
+// does NOT sanitize direct-origin spoofing; see the #1192 threat-model evidence.
+createClientIdentity(clientIdentity);
 
 // Nothing above this line touches the filesystem or the network — every env value is validated
 // first. Only past this point does the process open (and, on failure, potentially leave behind)
@@ -113,7 +122,7 @@ const db = openDatabase(dbPath);
 // (`%20`), which readdirSync/readFileSync would then try to open literally rather than decoding.
 runMigrations(db, fileURLToPath(new URL('../migrations', import.meta.url)));
 
-const app = createApp({ db, config });
+const app = createApp({ db, config, clientIdentity });
 registerHealthCheck(app, db, revision);
 
 // This service's one intended startup log line. `noConsole` (biome.json) is scoped to
