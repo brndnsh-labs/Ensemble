@@ -32,9 +32,11 @@ export type ApiErrorCode =
     | 'internal_error'
     | 'fresh_auth_required'
     | 'last_credential'
-    | 'rate_limited';
+    | 'rate_limited'
+    | 'credential_limit';
 
 export function sendError(c: Context, status: ContentfulStatusCode, code: ApiErrorCode) {
+    c.set('authErrorCode', code);
     return c.json({ error: code }, status);
 }
 
@@ -66,6 +68,9 @@ export function ceremonyFailureResponse(
         | AddPasskeyFailureReason
         | RecoveryEnrollPasskeyFailureReason,
 ) {
+    if (reason === 'credential_limit') {
+        return sendError(c, 409, 'credential_limit');
+    }
     if (reason === 'malformed_request') {
         return sendError(c, 400, 'malformed_request');
     }

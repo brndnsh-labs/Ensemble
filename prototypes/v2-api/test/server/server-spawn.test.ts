@@ -108,7 +108,11 @@ describe('server entrypoint spawn tests', () => {
         }
         const child = spawn(process.execPath, ['--import', TSX_LOADER, SERVER_ENTRY], {
             cwd: tmpDir, // any stray relative-path file a bug might create lands in tmpDir
-            env: { ...process.env, ...env },
+            env: {
+                ...process.env,
+                ENSEMBLE_AUTH_IP_SECRET: 'test-only-secret-at-least-32-bytes-long',
+                ...env,
+            },
             stdio: ['ignore', 'pipe', 'pipe'],
         });
         activeChildren.push(child);
@@ -153,6 +157,16 @@ describe('server entrypoint spawn tests', () => {
     }
 
     const BAD_ENV_CASES: BadEnvCase[] = [
+        {
+            name: 'short IP secret',
+            envOverride: { ENSEMBLE_AUTH_IP_SECRET: 'short' },
+            expectedStderrContains: 'secret',
+        },
+        {
+            name: 'unbound trusted header',
+            envOverride: { ENSEMBLE_AUTH_IP_HEADER: 'cf-connecting-ip' },
+            expectedStderrContains: 'configured together',
+        },
         {
             name: 'non-canonical ENSEMBLE_ORIGIN (trailing slash)',
             envOverride: { ENSEMBLE_ORIGIN: 'http://localhost:5173/' },

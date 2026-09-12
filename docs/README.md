@@ -27,6 +27,7 @@ This folder groups the living documentation for Ensemble.
 - [`docs/guides/PERFORMANCE_GUIDELINES.md`](guides/PERFORMANCE_GUIDELINES.md) — hot-loop performance notes.
 - [`docs/guides/musical-engine-patterns.md`](guides/musical-engine-patterns.md) — reusable recipes for generative-engine work (5 smells in critique tests, coordination patterns, loop-awareness, final-stage multiplier discipline, seeded determinism). Extracted from the completed musical audit.
 - [`docs/guides/bundle-hygiene.md`](guides/bundle-hygiene.md) — reusable recipes for bundle-size work (budgets-as-baselines, DCE expectations, pre-flight grep for "orphaned" musical content, knip blind spots, code-splitting discipline, defense-in-depth hygiene). Extracted from the completed bundle audit.
+- [`docs/design/ensemble-v2-auth-threat-model.md`](design/ensemble-v2-auth-threat-model.md) — account authentication controls, residual risks and the outstanding proxy verification gate (#1192).
 - [`public/MANUAL.md`](../public/MANUAL.md) — in-app manual.
 - [`tests/README.md`](../tests/README.md) — test-suite conventions.
 - [`docs/FLAKY_TESTS.md`](FLAKY_TESTS.md) — registry of known-flaky tests, the four flake classes (unseeded-statistical / ordering-dependent / e2e-timing / slow-legitimate), and their fixes. Diagnose new flakes with the `/flake` skill.

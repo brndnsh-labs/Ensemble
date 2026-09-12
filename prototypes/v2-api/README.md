@@ -16,7 +16,11 @@ re-authentication (#1190)" below. **#1191** (story 5 of 6) added single-use reco
 enroll/confirm/claim, and a restricted recovery-only session that can do nothing but enroll one
 new passkey (`src/auth/recovery.ts`, `src/auth/rate-limit.ts`, migration `0005`) — see "Recovery
 codes and the recovery-only session (#1191)" below. **No wiring to `prototypes/v2/` or `public/`
-lands here** — only the stage gate, #1192, remains in the stage-2 batch; see
+lands here**. **#1192** adds bounded endpoint policies, per-route HMAC-IP rate limits,
+metadata-only security events (migration `0006`), a deletion-coverage registry and the
+[threat model](../../docs/design/ensemble-v2-auth-threat-model.md). **Its stage-exit gate remains
+open:** read-only live proxy probes found direct-origin client-IP spoofing, and the actual API
+route/socket identity is not built or verified. See the explicit receipt in that document and
 [`docs/design/ensemble-v2-next-batch.md`](../../docs/design/ensemble-v2-next-batch.md).
 
 ## Layout
@@ -36,13 +40,17 @@ lands here** — only the stage gate, #1192, remains in the stage-2 batch; see
 | `src/auth/assertion-commit.ts` | `verifyAssertionAndCommitCounter` (#1190) — the counter-regression-safe assertion verify + commit, extracted out of #1188's `verifyLogin` so #1190's `verifyReauth` can share it instead of copying it. `login.ts`'s own tests are the regression guard that the extraction changed nothing. |
 | `src/auth/fresh-auth.ts` | `isFreshlyAuthenticated` / `FRESH_AUTH_WINDOW_MS` (#1190) — the ONE "freshly authenticated" predicate: one SQL read requiring the session to belong to the account, be unrevoked, unexpired, created within the last 10 minutes, and to have been created by a passkey ceremony (`credential_id IS NOT NULL`). Called at add-passkey options, inside the add-passkey commit transaction, and as the first step inside `revokePasskey`'s transaction. |
 | `src/auth/recovery-material.ts` | `hasEnrolledRecoveryMaterial` — "does this account have at least one CONFIRMED, unconsumed `recovery_codes` row." Introduced narrow by #1190 (just `consumed_at IS NULL`) for `revokePasskey`'s last-credential guard; tightened by #1191 to also require `confirmed_at IS NOT NULL` — an enrolled-but-never-proven-possessed code must not stand in as a safety net. |
-| `src/auth/rate-limit.ts` | `createRateLimiter({ max, windowMs })` (#1191) — a factory-produced, in-memory sliding-window limiter, ported from `../../songsiknow/src/lib/auth/rate-limit.ts` with one adaptation: `check(key, now)` takes `now` as a required argument, never `Date.now()`. Guards `POST /api/auth/recovery/claim`. Correctness assumption: a single-container deployment — see the module doc comment and `src/http/app.ts`'s `recoveryClaimRateLimitIpHeader` option below. |
+| `src/auth/rate-limit.ts` | Factory-produced, single-process sliding-window limiter with injectable time, 10,000-key cap and shared overflow bucket. Every auth route has an independent budget through `src/http/auth-policy.ts`. |
+| `src/http/auth-policy.ts` | Exhaustive route registry: allowlisted bounded request shapes and independent rate limits; unknown endpoints/fields/query input fail closed. |
+| `src/http/client-identity.ts` | Domain-separated HMAC-SHA256 caller keys, canonical IPs, and an explicitly configured header trusted only from exact immediate proxy peers. Upstream sanitization must be verified separately. |
+| `src/auth/security-events.ts` | Best-effort metadata-only event recording, fixed error descriptions, 30-day/10,000-row retention bounds. |
+| `src/db/account-deletion-registry.ts` | Explicit future wipe order and retained/global classification; drift guard covers every table, including no-FK challenges. No deletion endpoint yet. |
 | `src/auth/recovery.ts` | `enrollRecoveryCode` / `confirmRecoveryCode` / `claimRecoveryCode` / `readLiveRecoverySession` / `startRecoveryEnrollPasskey` / `verifyRecoveryEnrollPasskey` (#1191) — see "Recovery codes and the recovery-only session (#1191)" below. |
 | `src/auth/reauth.ts` | `startReauth` / `verifyReauth` (#1190) — step-up re-authentication. `allowCredentials` is the account's own credentials (unlike login's empty/usernameless list); the challenge binds `account_id` AND `session_id`; verify shares `assertion-commit.ts`'s core with login. Success does not itself rotate the session — the caller (the HTTP route) does that via `finishAuthentication`. |
 | `src/auth/passkeys.ts` | `startAddPasskey` / `verifyAddPasskey` / `revokePasskey` / `listPasskeys` (#1190). Add-passkey requires a FRESH session (checked at options AND re-checked inside the verify commit transaction) and binds `account_id` + `session_id` into the challenge; an already-registered credential on the same account is a no-op (`alreadyRegistered: true`), on another account it's `credential_exists`. `revokePasskey` is one synchronous transaction: fresh check, owner-scoped lookup, last-credential guard (owner-scoped SELECT/DELETE and account-scoped session revocation — never trust `id`/`credential_id` alone), revoke every session the credential created, delete. `listPasskeys` never returns the public key or counter. |
 | `src/auth/session.ts` | `issueSession` / `readSession` / `revokeSession` / `revokeOtherSessions` — hashed, revocable, 30-day-absolute sessions (#1189). `readSession` performs zero database writes. #1190 adds an optional `credentialId` argument to `issueSession` (defaulting to `null`, so every pre-#1190 call keeps its exact behavior) and a `credentialId` field to `SessionClaims`, recording which credential's ceremony created the session. #1191 adds two more optional trailing arguments, `purpose` (`'standard' \| 'recovery'`, default `'standard'`) and `recoveryCodeId` (default `null`) — same additive discipline, every pre-#1191 call unchanged. `purpose` is the enforcement mechanism for the recovery-only session's privilege boundary; see below. |
 | `src/auth/index.ts` | Barrel re-export of the above. |
-| `src/http/app.ts` | `createApp({ db, config, now?, sessionTtlMs?, recoveryClaimRateLimitIpHeader? })` — the Hono app factory. No module-level state. Wires security headers, `bodyLimit`, the same-origin guard, the JSON-only guard, every `/api/auth/*` route, and the collapsed error mapping. `finishAuthentication` (the fixation-defense revoke-then-issue) also records the credential id on the freshly-minted session (#1190). `requireSession` (#1190, tightened by #1191) refuses a `purpose: 'recovery'` session identically to a missing/invalid one; `requireRecoverySession` (#1191) is its exact inverse, used only by the two `recovery/enroll-passkey/*` routes. `recoveryClaimRateLimitIpHeader` (#1191, unset by default) names a request header to trust for the recovery-claim rate limiter's per-caller key instead of the raw socket address — see the option's doc comment for why this app never guesses a proxy header to trust on its own, and the "Recovery codes" section below for why leaving it unset behind a shared proxy/tunnel is a real denial-of-recovery risk. |
+| `src/http/app.ts` | `createApp({ db, config, now?, sessionTtlMs?, clientIdentity? })` — Hono factory wiring headers, guards, endpoint policy and audit recording. Standard/recovery session-purpose guards remain distinct; successful authentication rotates the session. |
 | `src/http/same-origin.ts` | `sameOriginGuard(config)` — our own CSRF defense (never `hono/csrf`, which does not satisfy the contract — see the module doc comment). |
 | `src/http/content-type.ts` | `jsonOnlyGuard()` / `requestHasBody()` — 415 on a body-carrying unsafe method that isn't `application/json`. |
 | `src/http/cookies.ts` | Ceremony/session cookie transport — names, `__Host-` prefixing, and attributes, all derived from `config.origin`. |
@@ -189,6 +197,8 @@ and revoking the owner's.
   listing is not a sensitive write, and it's the prerequisite for revoking by id. Returns `id`,
   `createdAt`, `lastUsedAt`, `transports` and `current` (whether this credential created the
   requesting session) — never the public key or counter.
+  #1192 bounds account credentials to 32, checked before add options and inside the add commit;
+  `409 credential_limit` allows the client to explain that an existing key must be removed first.
 - **New error codes** (`src/http/errors.ts`): `403 fresh_auth_required` and `409
   last_credential`. Everything else — including the new `session_mismatch` ceremony-binding
   failure — collapses into the existing `401 authentication_failed` / `400 malformed_request`
@@ -238,19 +248,13 @@ permanently gone account, so its failure modes bias hard toward "the code stays 
   add-passkey, which deliberately doesn't) — completing recovery genuinely is a fresh
   authentication event, and the resulting session is immediately fresh, so the client can enroll
   a replacement recovery code right away via the same enroll/confirm pair.
-- **Rate limiting** (`src/auth/rate-limit.ts`): `POST /api/auth/recovery/claim` is capped at 10
-  attempts per 10-minute sliding window, checked BEFORE any database lookup so a rate-limited
-  caller learns nothing about a code's validity. **Known deployment-blocking gap, found in
-  adversarial review**: the limiter keys by caller IP, and the default (`getConnInfo`'s raw
-  socket address) collapses to ONE shared bucket for every caller sitting behind a single shared
-  reverse proxy or tunnel — in that topology, a handful of bogus requests denies recovery to
-  every account, not just the attacker's. `createApp`'s `recoveryClaimRateLimitIpHeader` option
-  exists to fix this (trust a named header instead of the socket address) but is unset by
-  default, because this standalone prototype has no fixed deployment topology yet for anyone to
-  have verified which header, if any, a future front door actually strips/overwrites for
-  external callers. **Whoever deploys this service behind any shared proxy hop MUST set this
-  option to that proxy's verified client-IP header before going live** — leaving it unset in that
-  topology is a real denial-of-recovery vector, not merely an imprecise rate limit.
+- **Rate limiting**: recovery claim retains 10 attempts per ten minutes; all auth endpoints now
+  have independent budgets. Keys are HMACs, never raw IPs. Proxy mode replaces the old unsafe
+  header-only option with `clientIdentity: { secret, header, trustedProxyAddresses }`, and
+  requires verified upstream sanitization. Current Caddy static-route probes preserved a
+  direct-origin spoofed CF header: selecting that header today is unsafe even when the socket
+  peer is Caddy. Socket-only mode behind a shared proxy instead collapses callers into one
+  bucket. The threat model names both failure modes and the required API-scoped operator work.
 - **Never logged.** The raw code is a SQL bind parameter's hash input, never the parameter
   itself, at every call site; no thrown error, log line, or response body other than the one-time
   `enroll` response ever carries it.
@@ -264,11 +268,18 @@ npm install       # first run only
 npm run typecheck
 npm test          # typecheck + vitest, node environment, no browser
 npm start         # tsx src/server.ts — needs ENSEMBLE_RP_ID, ENSEMBLE_RP_NAME, ENSEMBLE_ORIGIN,
-                  # ENSEMBLE_DB_PATH (a file, never :memory:); optional PORT (8080), HOST (0.0.0.0)
+                  # ENSEMBLE_DB_PATH (a file, never :memory:), ENSEMBLE_AUTH_IP_SECRET (>=32 bytes)
+                  # optional PORT (8080), HOST (0.0.0.0); verified proxy configuration below
 ```
 
 `tsx` is a development runner, not the production packaging decision — that choice (a `tsc`
 build versus native type stripping) is recorded on #1172.
+
+Proxy mode requires both `ENSEMBLE_AUTH_IP_HEADER` (lowercase header name) and
+`ENSEMBLE_AUTH_TRUSTED_PROXY_ADDRESSES` (comma-separated exact immediate socket IPs).
+There is no default Cloudflare/XFF header. Generate the HMAC secret randomly and provision it
+through operator tooling, never source control or chat. All identity configuration is validated
+before database creation. Passing configuration validation does not clear the live proxy gate.
 
 Dependencies are pinned exact (`--save-exact`): `hono@4.13.7`, `@hono/node-server@2.1.1`, both
 zero-runtime-dependency, alongside `@simplewebauthn/server@14.0.1`.
