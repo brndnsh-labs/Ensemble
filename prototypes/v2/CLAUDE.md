@@ -104,7 +104,7 @@ Coordinate heavy browser suites instead of competing for their ports. Emulator s
 physical iPhone/Edge acceptance, and audio assertions are not human by-ear approval.
 
 Test deployment is optional per story and never inferred from a push. The preview's own deploy
-script is distinct from the original root-app deployment, which can remove the `/v2` preview.
+script is distinct from the root-app deployment; both preserve the other's release paths.
 Read the README and deploy-test skill before deploying. Identify exact artifact/commit and
 report deployment separately from local/CI evidence. Never call an old deployed build current.
 

@@ -110,6 +110,34 @@ function copyStaticAssets(): Plugin {
     };
 }
 
+function buildProvenance(): Plugin {
+    let mode = '';
+    let e2eBridge = false;
+    const commit = execSync('git rev-parse HEAD').toString().trim();
+    return {
+        name: 'ensemble-build-provenance',
+        configResolved(config) {
+            mode = config.mode;
+            e2eBridge = config.env.VITE_E2E_BRIDGE === '1';
+        },
+        generateBundle() {
+            // Stamped by the build, not the later upload/sealing process. A test
+            // bridge bundle must remain unshippable after its env var is gone.
+            this.emitFile({
+                type: 'asset',
+                fileName: '.ensemble-build.json',
+                source: JSON.stringify({
+                    schema: 1,
+                    commit,
+                    revision: REV,
+                    mode,
+                    e2eBridge,
+                }),
+            });
+        },
+    };
+}
+
 export default defineConfig({
     root: 'public',
     publicDir: false,
@@ -143,6 +171,7 @@ export default defineConfig({
     plugins: [
         preact(),
         copyStaticAssets(),
+        buildProvenance(),
         visualizer({
             filename: 'stats.html',
             template: 'treemap',

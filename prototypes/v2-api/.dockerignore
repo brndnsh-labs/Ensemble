@@ -1,0 +1,10 @@
+# Allow only build inputs. In particular never send local DBs, env files or tests.
+**
+!package.json
+!package-lock.json
+!tsconfig.json
+!tsconfig.build.json
+!src/
+!src/**
+!migrations/
+!migrations/*.sql

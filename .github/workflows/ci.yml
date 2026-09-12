@@ -58,6 +58,19 @@ jobs:
       - name: Run the full gate (npm run ci)
         run: npm run ci
 
+      # The gate already built the production bundle. Seal and retain those exact
+      # bytes; the deploy job must never rebuild them (or use the E2E bridge build).
+      - name: Seal production static artifact
+        run: node scripts/static-artifact.mjs seal dist production
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ensemble-static-${{ github.sha }}
+          path: dist/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7
+
       # The v2 account API (#1187) is a standalone sibling package under
       # prototypes/v2-api/ with its own package-lock.json — same --prefix
       # pattern v2-preview.yml uses for prototypes/v2. Kept HERE, not in
@@ -176,8 +189,14 @@ jobs:
           node-version-file: '.nvmrc'
           cache: 'npm'
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Download the gated production artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: ensemble-static-${{ github.sha }}
+          path: dist/
+
+      - name: Verify artifact bytes and checkout provenance
+        run: node scripts/static-artifact.mjs verify dist prod
 
       - name: Connect to Tailscale
         uses: tailscale/github-action@v4
@@ -232,7 +251,7 @@ jobs:
             echo "  StrictHostKeyChecking accept-new"
           } >> ~/.ssh/config
 
-      # deploy.sh builds --mode production, rsyncs to prod, and self-verifies the
-      # live REV == built REV (its exit-1-on-mismatch is our post-deploy check).
+      # Host/layout cutover remains separately gated. Until then the same sealed
+      # artifact can use the existing LXC transport, without an npm install/build.
       - name: Deploy to prod
-        run: ./scripts/deploy.sh prod
+        run: ./scripts/deploy.sh prod --artifact dist

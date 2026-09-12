@@ -1,0 +1,39 @@
+# One runtime recipe; only the data directory and host port vary by environment.
+# Copy this reviewed recipe + nginx.conf through homelab config-as-code tooling.
+services:
+  static:
+    image: nginx:1.29-alpine@sha256:5616878291a2eed594aee8db4dade5878cf7edcb475e59193904b198d9b830de
+    user: "101:101"
+    entrypoint: ["nginx", "-g", "daemon off;"]
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 100
+    mem_limit: 128m
+    tmpfs: ["/tmp:size=32m,mode=1777"]
+    ports: ["${ENSEMBLE_STATIC_PORT:?set environment port}:8080"]
+    volumes:
+      - type: bind
+        source: ${ENSEMBLE_STATIC_ROOT:?set environment static root}
+        target: /site
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${ENSEMBLE_NGINX_CONFIG:?set absolute nginx config path}
+        target: /etc/nginx/nginx.conf
+        read_only: true
+        bind:
+          create_host_path: false
+    healthcheck:
+      test: [CMD, wget, -qO-, "http://127.0.0.1:8080/index.html"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"

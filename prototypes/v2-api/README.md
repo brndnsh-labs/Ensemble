@@ -262,16 +262,57 @@ Run from this directory, or via `npm run test:api` from the repo root:
 ```sh
 npm install       # first run only
 npm run typecheck
-npm test          # typecheck + vitest, node environment, no browser
-npm start         # tsx src/server.ts — needs ENSEMBLE_RP_ID, ENSEMBLE_RP_NAME, ENSEMBLE_ORIGIN,
+npm test          # typecheck + production build + vitest, node environment, no browser
+npm run build     # src/*.ts -> dist/*.js, NodeNext resolution, no runtime TS loader
+npm start         # node dist/server.js — needs ENSEMBLE_RP_ID, ENSEMBLE_RP_NAME, ENSEMBLE_ORIGIN,
                   # ENSEMBLE_DB_PATH (a file, never :memory:); optional PORT (8080), HOST (0.0.0.0)
+npm run dev       # tsx src/server.ts, development only
 ```
 
-`tsx` is a development runner, not the production packaging decision — that choice (a `tsc`
-build versus native type stripping) is recorded on #1172.
+Production uses compiled JavaScript. The process smoke tests execute `dist/server.js` with plain
+Node, including migration discovery, startup validation, readiness and persistence across restart.
 
 Dependencies are pinned exact (`--save-exact`): `hono@4.13.7`, `@hono/node-server@2.1.1`, both
 zero-runtime-dependency, alongside `@simplewebauthn/server@14.0.1`.
+
+## Container artifact
+
+Build from the repository root with the API directory as the context:
+
+```sh
+docker build --build-arg REVISION="$(git rev-parse HEAD)" \
+    -t ensemble-v2-api:local prototypes/v2-api
+```
+
+The multi-stage `Dockerfile` uses Node 26, lockfile-first cached dependency layers, and only
+production dependencies in the final image. It runs `node dist/server.js` as `node` (UID/GID
+1000), with no TypeScript source, tests, credentials or local databases in the runtime image.
+`.dockerignore` allows only explicit build inputs into the context. Migrations are copied to
+`/app/migrations`, which the compiled entrypoint resolves independently of its working directory.
+
+The container's internal port is **8080**; change the host-side mapping, not `PORT`/`HOST`, so
+the built-in loopback healthcheck continues to work. Mount the database directory at `/data`,
+owned by UID/GID 1000 before startup. The default database is `/data/ensemble.sqlite`; its WAL
+and SHM sidecars must live on the same persistent mount. The application tree can be read-only;
+all database writes stay in that directory. Supply origin/RP configuration and any subsequently
+required auth secrets at runtime, never as build arguments. Use one API replica: SQLite and
+the in-memory rate limiter are not a horizontally scaled service.
+
+`GET /healthz` (and bodyless `HEAD`) performs a read-only query against migration metadata and
+returns `{ "status": "ok", "revision": "<full SHA>" }`, or a bounded 503
+`{ "status": "unavailable" }` on database failure. It inherits the private/no-store security
+headers, never sets a cookie, and sits outside authentication rate-limit routes. Configure
+`REVISION` at image build time; local builds default to `development`. Any runtime override of
+`ENSEMBLE_BUILD_REVISION` must be a full lowercase Git SHA or `development`, validated before
+opening the database. The OCI revision label records the build argument independently.
+Expose only `/api/*` through Caddy; keep `/healthz` on the container/operator network.
+
+**Packaging is not approval to expose accounts.** Public routing still requires #1192's
+auth-hardening code and verified proxy trust contract. The container does not guess a trusted
+client-IP header. Startup currently applies migrations; before valuable persistent accounts
+exist, add the approved backup-before-migrate and restore rehearsal. Image rollback alone
+does not reverse a database migration, and an image tag is not proof that an older binary can
+read a newer schema. No live database migration or deployment is part of building this image.
 
 ## Why `node:sqlite`, not `better-sqlite3`
 
