@@ -44,6 +44,7 @@ describe('runMigrations', () => {
             [
                 '_migrations',
                 'accounts',
+                'auth_security_events',
                 'challenges',
                 'credentials',
                 'recovery_codes',

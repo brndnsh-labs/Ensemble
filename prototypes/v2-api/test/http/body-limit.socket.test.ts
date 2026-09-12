@@ -144,7 +144,13 @@ describe('body-limit enforcement over a real socket', () => {
 
     it('allows a well-formed, in-bounds request through to the application', async () => {
         await startServer();
-        const body = JSON.stringify({ id: 'x', rawId: 'x', response: {} });
+        const body = JSON.stringify({
+            id: 'x',
+            rawId: 'x',
+            type: 'public-key',
+            clientExtensionResults: {},
+            response: { clientDataJSON: 'x', attestationObject: 'x' },
+        });
         const request =
             'POST /api/auth/register/verify HTTP/1.1\r\n' +
             'Host: ensembletest.brndn.zip\r\n' +

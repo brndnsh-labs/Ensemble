@@ -361,7 +361,7 @@ describe('POST /api/auth/recovery/claim', () => {
     });
 });
 
-describe('recoveryClaimRateLimitIpHeader (adversarial-review P1 fix: proxy-shared-bucket denial-of-recovery)', () => {
+describe('verified proxy identity (proxy-shared-bucket denial-of-recovery)', () => {
     let testDb: TestDatabase;
 
     afterEach(() => {
@@ -375,16 +375,20 @@ describe('recoveryClaimRateLimitIpHeader (adversarial-review P1 fix: proxy-share
         ipHeaderValue?: string,
     ): Promise<Response> {
         const body = JSON.stringify({ code });
-        return app.request(`${HTTPS_URL}/api/auth/recovery/claim`, {
-            method: 'POST',
-            headers: {
-                origin: HTTPS_CONFIG.origin,
-                'content-type': 'application/json',
-                'content-length': String(Buffer.byteLength(body, 'utf8')),
-                ...(ipHeaderValue !== undefined ? { 'x-real-ip': ipHeaderValue } : {}),
+        return app.request(
+            `${HTTPS_URL}/api/auth/recovery/claim`,
+            {
+                method: 'POST',
+                headers: {
+                    origin: HTTPS_CONFIG.origin,
+                    'content-type': 'application/json',
+                    'content-length': String(Buffer.byteLength(body, 'utf8')),
+                    ...(ipHeaderValue !== undefined ? { 'x-real-ip': ipHeaderValue } : {}),
+                },
+                body,
             },
-            body,
-        });
+            { incoming: { socket: { remoteAddress: '192.0.2.1' } } },
+        );
     }
 
     it('without the option (default), two different callers behind the same proxy share ONE bucket — reproduces the finding', async () => {
@@ -396,12 +400,12 @@ describe('recoveryClaimRateLimitIpHeader (adversarial-review P1 fix: proxy-share
         // unset) x-real-ip header — this is the exact collapse the review flagged for a
         // single-shared-hop deployment.
         for (let i = 0; i < RECOVERY_CLAIM_RATE_LIMIT.max; i++) {
-            const res = await postClaim(app, 'invalid', 'caller-A');
+            const res = await postClaim(app, 'invalid', '198.51.100.1');
             expect(res.status).toBe(401);
         }
         // A DIFFERENT caller, same missing socket info, same shared bucket — denied even though
         // it never made a request itself.
-        const blocked = await postClaim(app, 'invalid', 'caller-B');
+        const blocked = await postClaim(app, 'invalid', '198.51.100.2');
         expect(blocked.status).toBe(429);
     });
 
@@ -410,18 +414,18 @@ describe('recoveryClaimRateLimitIpHeader (adversarial-review P1 fix: proxy-share
         const app = createApp({
             db: testDb.db,
             config: HTTPS_CONFIG,
-            recoveryClaimRateLimitIpHeader: 'x-real-ip',
+            clientIdentity: { header: 'x-real-ip', trustedProxyAddresses: ['192.0.2.1'] },
         });
 
         for (let i = 0; i < RECOVERY_CLAIM_RATE_LIMIT.max; i++) {
-            const res = await postClaim(app, 'invalid', 'caller-A');
+            const res = await postClaim(app, 'invalid', '198.51.100.1');
             expect(res.status).toBe(401);
         }
         // Caller A is now rate-limited...
-        expect((await postClaim(app, 'invalid', 'caller-A')).status).toBe(429);
+        expect((await postClaim(app, 'invalid', '198.51.100.1')).status).toBe(429);
         // ...but caller B, a distinct value of the trusted header, is NOT — proving the key is
         // actually per-header-value, not a shared fallback bucket.
-        expect((await postClaim(app, 'invalid', 'caller-B')).status).toBe(401);
+        expect((await postClaim(app, 'invalid', '198.51.100.2')).status).toBe(401);
     });
 
     it('with the option configured but the header absent on a given request, falls back to the shared bucket rather than throwing', async () => {
@@ -429,7 +433,7 @@ describe('recoveryClaimRateLimitIpHeader (adversarial-review P1 fix: proxy-share
         const app = createApp({
             db: testDb.db,
             config: HTTPS_CONFIG,
-            recoveryClaimRateLimitIpHeader: 'x-real-ip',
+            clientIdentity: { header: 'x-real-ip', trustedProxyAddresses: ['192.0.2.1'] },
         });
         const res = await postClaim(app, 'invalid', undefined);
         expect(res.status).toBe(401);
@@ -612,12 +616,36 @@ describe('every non-recovery-purpose route refuses a live recovery session (acce
 
     it('POST /api/auth/reauth/verify -> 401', async () => {
         ctx = await withLiveRecoverySession();
-        expect((await postJson(ctx, '/api/auth/reauth/verify', {})).status).toBe(401);
+        const authenticator = createSoftAuthenticator({
+            rpId: HTTPS_CONFIG.rpId,
+            origin: HTTPS_CONFIG.origin,
+        });
+        expect(
+            (
+                await postJson(
+                    ctx,
+                    '/api/auth/reauth/verify',
+                    authenticator.authenticate({ challenge: 'test' }),
+                )
+            ).status,
+        ).toBe(401);
     });
 
     it('POST /api/auth/passkeys/verify -> 401', async () => {
         ctx = await withLiveRecoverySession();
-        expect((await postJson(ctx, '/api/auth/passkeys/verify', {})).status).toBe(401);
+        const authenticator = createSoftAuthenticator({
+            rpId: HTTPS_CONFIG.rpId,
+            origin: HTTPS_CONFIG.origin,
+        });
+        expect(
+            (
+                await postJson(
+                    ctx,
+                    '/api/auth/passkeys/verify',
+                    authenticator.register({ challenge: 'test' }),
+                )
+            ).status,
+        ).toBe(401);
     });
 
     it('GET /api/auth/recovery/status -> 401', async () => {
