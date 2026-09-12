@@ -95,17 +95,24 @@ function sampleUrls(manifest: PackManifest): string[] {
 const FETCH_CONCURRENCY = 6;
 
 /**
- * Walk `urls` through `asset()` with bounded concurrency, preserving the serial
- * loop's contract: every file is still digest-verified, the first failure stops
- * new work and is rethrown, and `onSettled` counts completions (not indexes, which
- * no longer arrive in order). Workers drain before the throw so a rejected install
- * leaves no unhandled promise behind.
+ * Walk `urls` through `asset()`, preserving the serial loop's contract: every file is
+ * still digest-verified, the first failure stops new work and is rethrown, and
+ * `onSettled` counts completions (not indexes, which no longer arrive in order).
+ * Workers drain before the throw so a rejected walk leaves no unhandled promise behind.
+ *
+ * **Defaults to serial (`concurrency: 1`) on purpose.** Only the explicit install-all
+ * gesture opts into the pool — see `installAllSounds`. Feel preparation and the
+ * offline-readiness checks stay one-at-a-time because observers of those paths, including
+ * `checks/foundation.spec.ts`'s Stop-during-preparation harness, pin the app by holding a
+ * single in-flight request. With several outstanding, holding one no longer stops
+ * preparation and the rollback/Stop assertions stop proving what they claim.
  */
 async function fetchAssets(
     urls: string[],
     rev: number,
     cachedOnly: boolean,
     onSettled?: (completed: number) => void,
+    concurrency = 1,
 ): Promise<void> {
     let next = 0;
     let completed = 0;
@@ -132,14 +139,18 @@ async function fetchAssets(
         }
     };
     await Promise.all(
-        Array.from({ length: Math.min(FETCH_CONCURRENCY, urls.length) }, () => worker()),
+        Array.from({ length: Math.max(1, Math.min(concurrency, urls.length)) }, () => worker()),
     );
     if (failed) {
         throw failure;
     }
 }
 
-export async function prepareSound(id: string, progress: (text: string) => void): Promise<void> {
+export async function prepareSound(
+    id: string,
+    progress: (text: string) => void,
+    concurrency = 1,
+): Promise<void> {
     const pack = SOUND_PACKS.find((p) => p.id === id);
     if (!pack) {
         throw new Error('Unknown sound pack.');
@@ -147,9 +158,15 @@ export async function prepareSound(id: string, progress: (text: string) => void)
     progress(`Preparing ${pack.name}…`);
     const manifest = await manifestFor(id, false);
     const urls = sampleUrls(manifest);
-    await fetchAssets(urls, revForPack(id), false, (done) => {
-        progress(`${pack.name} · ${done}/${urls.length} files`);
-    });
+    await fetchAssets(
+        urls,
+        revForPack(id),
+        false,
+        (done) => {
+            progress(`${pack.name} · ${done}/${urls.length} files`);
+        },
+        concurrency,
+    );
     progress(`Loading ${pack.name}…`);
     await ensurePackLoaded(new OfflineAudioContext(1, 1, 44100), id);
     // The old runtime intentionally swallows decode failures; this UI must not.
@@ -176,7 +193,11 @@ export async function prepareSounds(
 /** One explicit install gesture; partial success is reusable but never earns "all ready". */
 export async function installAllSounds(progress: (text: string) => void): Promise<void> {
     for (const [i, pack] of SOUND_PACKS.entries()) {
-        await prepareSound(pack.id, (text) => progress(`${i + 1}/${SOUND_PACKS.length} · ${text}`));
+        await prepareSound(
+            pack.id,
+            (text) => progress(`${i + 1}/${SOUND_PACKS.length} · ${text}`),
+            FETCH_CONCURRENCY,
+        );
     }
 }
 
