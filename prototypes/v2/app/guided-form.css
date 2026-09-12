@@ -1,0 +1,121 @@
+.guided-form {
+    width: min(760px, calc(100vw - 24px));
+    overflow-wrap: anywhere;
+}
+.guided-form select,
+.guided-form input,
+.guided-form button {
+    min-height: 44px;
+    max-width: 100%;
+    font: inherit;
+}
+.guided-form select {
+    color: var(--ink);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 8px;
+}
+.guided-form button {
+    white-space: normal;
+}
+.guided-field,
+.guided-range-fields label {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+    margin: 12px 0;
+    font-size: 13px;
+}
+.guided-field span {
+    color: var(--muted);
+}
+.guided-groups,
+.guided-actions,
+.guided-brackets {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin: 16px 0;
+}
+.guided-ranges {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px;
+}
+.guided-ranges fieldset {
+    min-width: 0;
+    margin: 0;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 10px;
+}
+.guided-ranges legend {
+    font-size: 13px;
+    font-weight: 600;
+}
+.guided-range-fields {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+.guided-bars {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+    max-height: 280px;
+    overflow-y: auto;
+    padding: 4px;
+}
+.guided-bar {
+    display: grid;
+    gap: 6px;
+    text-align: left;
+    padding: 12px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--ink);
+    min-width: 0;
+}
+.guided-bar span {
+    font-size: 12px;
+}
+.guided-form [aria-pressed="true"] {
+    border-color: var(--accent);
+    background: var(--accent-light);
+    box-shadow: inset 0 0 0 1px var(--accent);
+}
+.guided-form :focus-visible {
+    outline: 3px solid var(--accent);
+    outline-offset: 2px;
+}
+.guided-preview {
+    border-top: 1px solid var(--line);
+    margin-top: 18px;
+    padding-top: 14px;
+}
+.guided-preview h3 {
+    font-size: 14px;
+}
+.guided-brackets > span {
+    padding: 10px;
+    font-size: 13px;
+}
+.guided-ending {
+    border: 2px solid var(--ink);
+    border-bottom: 0;
+}
+.guided-route {
+    max-height: 160px;
+    overflow-y: auto;
+    font-variant-numeric: tabular-nums;
+}
+@media (max-width: 500px) {
+    .guided-form {
+        padding: 18px;
+    }
+    .guided-bars {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}

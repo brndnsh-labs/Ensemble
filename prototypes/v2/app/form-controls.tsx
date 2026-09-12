@@ -15,7 +15,7 @@ export function FormControls({ value, onChange, disabled = false }: FormControls
     const id = useId();
     return (
         <details className="form-controls">
-            <summary>Repeats and endings</summary>
+            <summary>Advanced · per-bar repeat and ending markers</summary>
             <fieldset disabled={disabled} aria-describedby={`${id}-help`}>
                 <legend className="sr">Repeats and endings for this bar</legend>
                 <label className="form-controls-toggle">

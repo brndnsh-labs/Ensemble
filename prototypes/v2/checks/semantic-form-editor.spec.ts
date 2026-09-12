@@ -47,7 +47,7 @@ async function newSong(page: Page, title: string) {
     await page.getByLabel('Song title').fill(title);
     await expect(page.getByRole('button', { name: 'Song actions' })).toBeEnabled();
     await expect(page.getByLabel('Start repeat here', { exact: true })).not.toBeVisible();
-    await page.getByText('Repeats and endings', { exact: true }).click();
+    await page.getByText('Advanced · per-bar repeat and ending markers', { exact: true }).click();
 }
 
 async function selectBar(page: Page, index: number) {
@@ -187,7 +187,7 @@ test('pending forms save atomically from the hidden editor, transpose and reopen
     await expect(page.getByLabel('Key', { exact: true })).toHaveValue('D');
     await expectWrittenStand(page, ['D', 'A', 'Bm', 'G']);
     await page.getByRole('button', { name: 'Edit chart', exact: true }).click();
-    await page.getByText('Repeats and endings', { exact: true }).click();
+    await page.getByText('Advanced · per-bar repeat and ending markers', { exact: true }).click();
     await selectBar(page, 3);
     await expect(page.getByLabel('Ending passes', { exact: true })).toHaveValue('2');
     await expect(page.getByLabel('End ending here', { exact: true })).toBeChecked();
