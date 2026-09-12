@@ -3,21 +3,15 @@ import { existsSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
 import net from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 
 /**
- * Process-level smoke tests for `src/server.ts` (#1189 P2-8 review finding, later tightened by
- * P2-1/P2-2). The reviewer found `node src/server.ts` cannot even start: `ERR_MODULE_NOT_FOUND`
- * on the `.js` import specifiers (this repo's `moduleResolution: "Bundler"` convention, which
- * needs a resolver that understands it), then `ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX` on #1188's
- * `constructor(readonly reason...)` parameter property. `tsx` (added as an exact-pinned
- * devDependency, `"start": "tsx src/server.ts"`) is the fix — it strips types and understands the
- * repo's module resolution without a build step. These tests run ONE process —
- * `node --import <tsx loader> src/server.ts` — not `npm run start` and not tsx's CLI. The CLI
- * runs the script in a child `node` and relays signals to it, so a SIGKILL from `afterEach` would
- * kill only the wrapper and orphan the listening server (observed during mutation runs). With
- * the loader, the spawned PID is the server itself: SIGTERM and SIGKILL both land on it.
+ * Process-level smoke tests for the compiled production entrypoint. `npm test` builds first;
+ * these run ONE plain Node process with no tsx loader, exactly like the container CMD. The
+ * spawned PID is the server itself: SIGTERM and SIGKILL both land on it, never on a wrapper
+ * that could leave a listening child behind. Development still uses tsx via `npm run dev`.
  *
  * P2-1 found `server.ts` used to open and migrate the database BEFORE validating `PORT`/`HOST`,
  * so a bad `PORT` still left a migrated `db.sqlite` (+ `-wal`/`-shm`) behind before crashing. The
@@ -25,10 +19,8 @@ import { afterEach, describe, expect, it } from 'vitest';
  * failure, not just "no db.sqlite" — that would miss a stray sidecar file.
  */
 
-// A file URL, not a bare `tsx` specifier: children run with `cwd: tmpDir`, where `--import`
-// could not resolve the package.
-const TSX_LOADER = new URL('../../node_modules/tsx/dist/loader.mjs', import.meta.url).href;
-const SERVER_ENTRY = fileURLToPath(new URL('../../src/server.ts', import.meta.url));
+const SERVER_ENTRY = fileURLToPath(new URL('../../dist/server.js', import.meta.url));
+const REVISION = '0123456789abcdef0123456789abcdef01234567';
 
 function getFreePort(): Promise<number> {
     return new Promise((resolve, reject) => {
@@ -106,9 +98,9 @@ describe('server entrypoint spawn tests', () => {
         if (tmpDir === undefined) {
             throw new Error('spawnServer called before tmpDir was set up');
         }
-        const child = spawn(process.execPath, ['--import', TSX_LOADER, SERVER_ENTRY], {
+        const child = spawn(process.execPath, [SERVER_ENTRY], {
             cwd: tmpDir, // any stray relative-path file a bug might create lands in tmpDir
-            env: { ...process.env, ...env },
+            env: { ...process.env, ENSEMBLE_BUILD_REVISION: REVISION, ...env },
             stdio: ['ignore', 'pipe', 'pipe'],
         });
         activeChildren.push(child);
@@ -163,6 +155,11 @@ describe('server entrypoint spawn tests', () => {
         { name: "PORT='0x50'", envOverride: { PORT: '0x50' }, expectedStderrContains: 'PORT' },
         { name: "PORT='70000'", envOverride: { PORT: '70000' }, expectedStderrContains: 'PORT' },
         { name: "HOST=''", envOverride: { HOST: '' }, expectedStderrContains: 'HOST' },
+        {
+            name: 'invalid build revision',
+            envOverride: { ENSEMBLE_BUILD_REVISION: 'not-a-git-sha' },
+            expectedStderrContains: 'ENSEMBLE_BUILD_REVISION',
+        },
         {
             name: "ENSEMBLE_DB_PATH=':memory:'",
             envOverride: { ENSEMBLE_DB_PATH: ':memory:' },
@@ -236,5 +233,59 @@ describe('server entrypoint spawn tests', () => {
         // verified against the installed node:sqlite directly. If shutdown() skipped
         // `db.close()` (mutant N1), this file would still be here.
         expect(existsSync(`${dbPath}-wal`)).toBe(false);
+    }, 20_000);
+
+    it('serves readiness from compiled JS and preserves real data and migrations across restart', async () => {
+        tmpDir = mkdtempSync(join(tmpdir(), 'ensemble-v2-api-restart-'));
+        const dbPath = join(tmpDir, 'db.sqlite');
+        const port = await getFreePort();
+        const env = {
+            ENSEMBLE_RP_ID: 'localhost',
+            ENSEMBLE_RP_NAME: 'Test',
+            ENSEMBLE_ORIGIN: 'http://localhost:5173',
+            ENSEMBLE_DB_PATH: dbPath,
+            PORT: String(port),
+            HOST: '127.0.0.1',
+        };
+        const first = spawnServer(env);
+        await waitForListening(first);
+        const firstHealth = await fetch(`http://127.0.0.1:${port}/healthz`);
+        expect(firstHealth.status).toBe(200);
+        expect(await firstHealth.json()).toEqual({ status: 'ok', revision: REVISION });
+        first.child.kill('SIGTERM');
+        expect((await first.exit).code).toBe(0);
+
+        const seedDb = new DatabaseSync(dbPath);
+        let migrations: unknown;
+        try {
+            seedDb
+                .prepare('INSERT INTO accounts (id, created_at) VALUES (?, ?)')
+                .run('persisted', 123);
+            migrations = seedDb.prepare('SELECT * FROM _migrations ORDER BY filename').all();
+        } finally {
+            seedDb.close();
+        }
+
+        const second = spawnServer(env);
+        await waitForListening(second);
+        const health = await fetch(`http://127.0.0.1:${port}/healthz`);
+        expect(health.status).toBe(200);
+        expect(health.headers.get('cache-control')).toBe('private, no-store');
+        expect(health.headers.get('set-cookie')).toBeNull();
+        expect(await health.json()).toEqual({ status: 'ok', revision: REVISION });
+        second.child.kill('SIGTERM');
+        expect((await second.exit).code).toBe(0);
+
+        const persistedDb = new DatabaseSync(dbPath, { readOnly: true });
+        try {
+            expect(persistedDb.prepare('SELECT * FROM accounts').all()).toEqual([
+                { id: 'persisted', created_at: 123 },
+            ]);
+            expect(
+                persistedDb.prepare('SELECT * FROM _migrations ORDER BY filename').all(),
+            ).toEqual(migrations);
+        } finally {
+            persistedDb.close();
+        }
     }, 20_000);
 });

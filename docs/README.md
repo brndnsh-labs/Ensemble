@@ -18,7 +18,8 @@ This folder groups the living documentation for Ensemble.
 - [`docs/design/chords-3.md`](design/chords-3.md) — keyboard/guitar player architecture, Acoustic pilot, and listening comparison.
 - [`docs/design/ensemble-v2.md`](design/ensemble-v2.md) — approved home, local-first songbook and music-stand direction; isolated preview and later account/import boundaries.
 - [`docs/design/ensemble-v2-charts.md`](design/ensemble-v2-charts.md) — semantic-chart/full iReal compatibility direction, additive codec, live measure editor/conservative import, and remaining compatibility boundaries.
-- [`docs/design/ensemble-v2-sync.md`](design/ensemble-v2-sync.md) — approved recovery direction, implemented account-local outbox, staged cloud/offline acceptance and provisional hosting recommendation (#1172).
+- [`docs/design/ensemble-v2-sync.md`](design/ensemble-v2-sync.md) — approved recovery direction, implemented account-local outbox, staged cloud/offline acceptance and hosting decisions (#1172).
+- [`hosting/README.md`](../hosting/README.md) — shared test/production static runtime, verified build-once artifacts, atomic publishing and gated hosting transition; separate account API packaging.
 - [`prototypes/v2/CLAUDE.md`](../prototypes/v2/CLAUDE.md) — cross-provider v2 handoff, delivery rules, test gates and ownership boundaries.
 - [`docs/design/ensemble-v2-next-batch.md`](design/ensemble-v2-next-batch.md) — next bounded cycle batch; approval/filing state is explicit in the document.
 - [`docs/design/ensemble-v2-guided-form.md`](design/ensemble-v2-guided-form.md) — guided repeat/ending authoring, compiler-derived previews and advanced-form preservation (#1176).

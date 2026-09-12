@@ -337,10 +337,14 @@ Decisions:
    gzipped and rotated locally, plus a daily restic push to Backblaze B2, and the same
    stop → gunzip → drop `-wal`/`-shm` → chown → start restore procedure. Nothing to back up until
    a database exists; this lands with stage 3, not before.
-7. **Test and prod now differ at the hosting layer**, accepted deliberately. Prod remains the
+7. **Test and prod now differ at the hosting layer**, accepted deliberately at this checkpoint. Prod remains the
    plain nginx LXC. A container-only test result is therefore not automatically a prod result.
    Migrating the static site on both sides — and retiring the LXC pattern — is a separate,
-   post-v2 concern, not entangled with accounts.
+   post-v2 concern, not entangled with accounts. **Superseded on 2026-09-12:** Brandon asked
+   to make test and production "simpler, faster, and more consistent" and approved work now.
+   The [shared hosting transition](../../hosting/README.md) prepares consistent static runtimes,
+   build-once artifacts and atomic publishing, with API releases kept separate. Production
+   cutover and public v2/account release retain their own explicit gates.
 
 Docker is **not** mandated for the v1/v2 static app, and no production cutover is authorized by
 any of the above. What remains open on #1172 is operational, not architectural: backup/restore

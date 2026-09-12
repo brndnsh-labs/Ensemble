@@ -4,6 +4,7 @@ import { createWebAuthnConfig } from './auth/config.js';
 import { openDatabase } from './db/connection.js';
 import { runMigrations } from './db/migrate.js';
 import { createApp } from './http/app.js';
+import { registerHealthCheck } from './http/health.js';
 
 /**
  * The one file in this service that reads `process.env` (#1189 decision 7). Every other module
@@ -99,6 +100,10 @@ const config = createWebAuthnConfig({
 const dbPath = readDbPath();
 const port = readPort();
 const host = readHost();
+const revision = process.env.ENSEMBLE_BUILD_REVISION ?? 'development';
+if (revision !== 'development' && !/^[0-9a-f]{40}$/.test(revision)) {
+    throw new Error('ENSEMBLE_BUILD_REVISION must be a full lowercase Git SHA or development');
+}
 
 // Nothing above this line touches the filesystem or the network — every env value is validated
 // first. Only past this point does the process open (and, on failure, potentially leave behind)
@@ -109,6 +114,7 @@ const db = openDatabase(dbPath);
 runMigrations(db, fileURLToPath(new URL('../migrations', import.meta.url)));
 
 const app = createApp({ db, config });
+registerHealthCheck(app, db, revision);
 
 // This service's one intended startup log line. `noConsole` (biome.json) is scoped to
 // `public/**` only, so it does not apply here.

@@ -9,8 +9,10 @@
     },
     "scripts": {
         "typecheck": "tsc --noEmit",
-        "test": "npm run typecheck && vitest run --config vitest.api.config.ts",
-        "start": "tsx src/server.ts"
+        "build": "tsc --project tsconfig.build.json",
+        "test": "npm run typecheck && npm run build && vitest run --config vitest.api.config.ts",
+        "start": "node dist/server.js",
+        "dev": "tsx src/server.ts"
     },
     "devDependencies": {
         "@types/node": "^26.0.1",

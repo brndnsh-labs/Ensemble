@@ -213,16 +213,17 @@ coexistence/production migration has not shipped. Prefer a corrective release an
 
 After a successful build and checks, run `node scripts/deploy-test.mjs` from this directory.
 The script has no production target. It uploads an immutable release under
-`/var/www/html/.v2-previews/<artifact SHA256>-<unique deploy ID>/` and atomically switches the test-only `/v2`
+`/srv/ensemble-test/www/.v2-previews/<artifact SHA256>-<unique deploy ID>/` and atomically switches the test-only `/v2`
 symlink. It verifies every exported asset, the service worker and manifest through HTTPS and
 checks that the existing test root did not change. `build.json` fingerprints output bytes and the offline recipe, not
 just HEAD: a dirty audition build cannot masquerade as a clean commit.
 
-Rollback means repointing `/var/www/html/v2` to the previous verified release using the same
+Rollback means repointing `/srv/ensemble-test/www/v2` to the previous verified release using the same
 temporary-symlink/rename operation. No database migration occurs. Keep old releases through
-audition; this script never deletes them. The regular root `scripts/deploy.sh test` uses rsync
-deletion and can remove this separate preview: rebuild/redeploy it afterward. No nginx, Docker,
-production deployment or production data changes are needed for this checkpoint.
+audition; this script never deletes them. The regular root publisher protects these preview
+paths. The [shared hosting transition](../../hosting/README.md) also keeps root releases and
+this preview separate. No production deployment or production data changes are needed for
+this checkpoint.
 
 Compatibility caveat: manual-only preview builds before Follow feel support reject documents
 with `autoSound: true`. Do not roll a browser's songbook back to those builds after saving Follow

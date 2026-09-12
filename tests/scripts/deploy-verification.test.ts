@@ -33,6 +33,12 @@ function createFixture() {
     const curlCount = path.join(root, 'curl-count');
     mkdirSync(bin);
 
+    writeExecutable(path.join(bin, 'ssh'), [
+        '#!/usr/bin/env bash',
+        'exit "$DEPLOY_TEST_LAYOUT_STATUS"',
+    ]);
+    writeExecutable(path.join(bin, 'git'), ['#!/usr/bin/env bash', 'exit 0']);
+
     writeExecutable(path.join(bin, 'npx'), [
         '#!/usr/bin/env bash',
         'set -euo pipefail',
@@ -63,7 +69,7 @@ function createFixture() {
         '[ -f dist/index.html ] || exit 92',
         'request_url=""',
         'for request_url in "$@"; do :; done',
-        'if [ "$request_url" = "https://ensembletest.brndn.zip/sw.js" ]; then',
+        'if [ "$request_url" = "https://ensemble.brndn.zip/sw.js" ]; then',
         '    [ "$DEPLOY_TEST_WORKER" != unreachable ] || exit 22',
         '    headers=""; output=""',
         '    while [ "$#" -gt 0 ]; do',
@@ -104,10 +110,10 @@ function createFixture() {
 function runDeploy(
     post: PostDeployResult,
     preflight: 'available' | 'unreachable' = 'available',
-    worker: { result?: WorkerResult; cacheControl?: string } = {},
+    worker: { result?: WorkerResult; cacheControl?: string; atomicLayout?: boolean } = {},
 ) {
     const fixture = createFixture();
-    const result = spawnSync('bash', [DEPLOY_SCRIPT, 'test'], {
+    const result = spawnSync('bash', [DEPLOY_SCRIPT, 'prod'], {
         cwd: fixture.root,
         encoding: 'utf8',
         env: {
@@ -118,6 +124,7 @@ function runDeploy(
             DEPLOY_TEST_TRACE: fixture.trace,
             DEPLOY_TEST_URLS: fixture.urls,
             DEPLOY_TEST_WORKER: worker.result ?? 'match',
+            DEPLOY_TEST_LAYOUT_STATUS: worker.atomicLayout ? '1' : '0',
             DEPLOY_TEST_CACHE_CONTROL: worker.cacheControl ?? 'no-store',
             PATH: `${fixture.bin}:${process.env.PATH}`,
         },
@@ -132,6 +139,17 @@ function cleanup(root: string) {
 }
 
 describe('deploy post-transfer verification', () => {
+    it('refuses legacy rsync into a provisioned atomic root before transferring anything', () => {
+        const { fixture, result } = runDeploy('match', 'available', { atomicLayout: true });
+        try {
+            expect(result.status).not.toBe(0);
+            expect(result.stderr).toContain('Refusing legacy rsync into an atomic release layout');
+            expect(existsSync(fixture.trace)).toBe(false);
+            expect(existsSync(path.join(fixture.root, 'dist/sw.js'))).toBe(true);
+        } finally {
+            cleanup(fixture.root);
+        }
+    });
     it.each(['empty', 'unreachable'] as const)(
         'fails closed when the post-deploy origin is %s and retains dist',
         (post) => {
@@ -177,7 +195,7 @@ describe('deploy post-transfer verification', () => {
             expect(result.error).toBeUndefined();
             expect(result.signal).toBeNull();
             expect(result.status, result.stderr).toBe(0);
-            expect(result.stdout).toContain(`✅ Verified live on TEST: ${BUILT_REV}`);
+            expect(result.stdout).toContain(`✅ Verified live on PROD: ${BUILT_REV}`);
             expect(existsSync(path.join(fixture.root, 'dist'))).toBe(false);
             expect(readFileSync(fixture.trace, 'utf8').trim().split('\n')).toEqual([
                 'rsync:dist-present',
@@ -193,7 +211,7 @@ describe('deploy post-transfer verification', () => {
             expect(verificationUrls[0]).toContain('?cb=before-');
             expect(verificationUrls[1]).toContain('?cb=after-');
             expect(verificationUrls[0]).not.toBe(verificationUrls[1]);
-            expect(verificationUrls[2]).toBe('https://ensembletest.brndn.zip/sw.js');
+            expect(verificationUrls[2]).toBe('https://ensemble.brndn.zip/sw.js');
         } finally {
             cleanup(fixture.root);
         }
@@ -206,7 +224,7 @@ describe('deploy post-transfer verification', () => {
             expect(result.error).toBeUndefined();
             expect(result.signal).toBeNull();
             expect(result.status, result.stderr).toBe(0);
-            expect(result.stdout).toContain(`✅ Verified live on TEST: ${BUILT_REV}`);
+            expect(result.stdout).toContain(`✅ Verified live on PROD: ${BUILT_REV}`);
             expect(readFileSync(fixture.curlCount, 'utf8').trim()).toBe('3');
         } finally {
             cleanup(fixture.root);
