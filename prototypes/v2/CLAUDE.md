@@ -5,21 +5,28 @@ including companion changes outside this directory. It is provider-neutral: the 
 checked-in contracts and current branch are sufficient; do not require chat history,
 another model's private memories, or access to a sibling application's secrets.
 
-## Branch-only delivery
+## Delivery: normal pipeline, and what "landed" does not mean
 
-Brandon confirmed on 2026-09-10: "we'll keep building off of this branch for now since main=prod".
+The 2026-09-10 branch-only exception is **retired**. `feat/ensemble-v2-foundation` merged to
+`main` on 2026-09-12 via PR #1173; start v2 implementations from `main` like any other story,
+and follow the repository's normal cycle and merge defaults. Inspect branch, worktree and
+upstream before editing; preserve other work. A dirty shared tree is not permission to reset or
+sweep it into your commit. Stop if the task's files overlap someone else's uncommitted changes.
 
-Use `feat/ensemble-v2-foundation` and existing [draft PR #1173](https://github.com/brndnsh-labs/Ensemble/pull/1173).
-Do not start a v2 implementation from `main`. Inspect branch, worktree and upstream before
-editing; preserve other work. A dirty shared tree is not permission to reset or sweep it into
-your commit. Stop if the task's files overlap someone else's uncommitted changes.
+**Landing v2 code is not releasing v2, and merging is not a product decision.** Production
+deploys rsync `dist/` — the Vite build of `public/` — and nothing else. Neither this Next
+preview nor `../v2-api/` has a production deploy target, so a story confined to `prototypes/**`
+reaches no user when it merges. A story that also touches `public/**` ships live production
+code on that same merge and carries the full prod gate.
 
-The normal cycle becomes: read issue → implement → review → repair → verify → commit/push
-to the v2 branch → record handoff. **No merge, auto-merge, ready-for-review transition of
-PR #1173, issue closure, branch deletion, main sync, or production deployment.** This overrides
-generic cycle/done merge defaults. A request to cycle a child is not a v2 production release.
-Keep implemented children open in review, or at the actual device/listening gate. Record the
-commit SHA, checks and remaining gate so another agent does not implement them again.
+Putting v2 in front of users — a `/v2` path on prod, an in-app link, or a cutover from v1 — is
+separate unbuilt work needing its own decision. This app keeps its own IndexedDB and
+`localStorage` keys, so anything a user saves here is invisible to the v1 app and has no
+migration path yet. Do not treat a merged story as evidence that question is settled.
+
+Human gates are unchanged: a device or listening gate is still a hard stop, and a merged commit
+does not clear one. Record the commit SHA, checks and remaining gate so another agent does not
+implement the same story again.
 
 Use the local harness's installed workflow skills; their shared doctrine still supplies review,
 provenance, safety and verification rules. If those skills are unavailable, follow the same
@@ -124,9 +131,10 @@ isolation/integration; shared fixtures, configs and the large app component are 
 Suggested prompt once a child is filed and ready:
 
 > Work on Ensemble v2 issue #NUMBER. Read CLAUDE.md and prototypes/v2/CLAUDE.md, then the
-> issue and its dependencies. Run the cycle through reviewed commit/push on
-> feat/ensemble-v2-foundation only. Keep PR #1173 draft; do not merge or deploy production.
-> Stay within acceptance criteria, stop for unresolved decisions, and leave a test/commit receipt.
+> issue and its dependencies. Branch from main and run the normal cycle. If the story touches
+> `public/`, treat it as live production code; if it is confined to `prototypes/`, merging it
+> still releases nothing to users. Stay within acceptance criteria, stop for unresolved
+> decisions and human gates, and leave a test/commit receipt.
 
 The broader design parents are not single implementation tasks. Pick a ready child; never run
 an unattended cycle across the entire account or full-iReal umbrella.

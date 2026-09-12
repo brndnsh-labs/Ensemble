@@ -146,5 +146,7 @@ explicit dispositions. These are decisions to test with a chart corpus, not gues
 The [v2 handoff](../../prototypes/v2/CLAUDE.md) is the common Claude/Codex entrypoint. GitHub
 milestone 15 owns task status; design parents explain contracts, not a parallel task queue.
 The [next batch](ensemble-v2-next-batch.md) shapes bounded child work with independent acceptance.
-Brandon's 2026-09-10 branch decision keeps implementation on `feat/ensemble-v2-foundation` and
-PR #1173 draft. Normal cycle verification remains; its merge/main/production steps do not apply.
+The 2026-09-10 branch-only decision is retired: `feat/ensemble-v2-foundation` merged to `main`
+on 2026-09-12 via PR #1173, and v2 stories now use the normal cycle end to end. Merging is not
+a release — `prototypes/**` has no production deploy target, so the remaining acceptance items
+above still gate putting v2 in front of anyone.

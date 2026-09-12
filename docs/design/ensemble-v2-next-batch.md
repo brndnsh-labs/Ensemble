@@ -9,8 +9,9 @@ This is an issue index, **not a second status tracker**. Each issue owns its acc
 file boundaries, model labels, review requirements, prerequisites and verification receipts.
 Read current GitHub state before picking work; do not infer readiness from this index.
 
-Integrate serially on `feat/ensemble-v2-foundation` / draft PR #1173. Do not merge, enable
-auto-merge, mark the PR ready, close implemented children, sync main or deploy production.
+Stage 1 and stage 2's implemented modules merged to `main` on 2026-09-12 via PR #1173; later
+children use the normal branch/PR/auto-merge cycle. Merging releases nothing to users —
+`prototypes/**` has no production deploy target — so stage gates and human gates still bind.
 Shared tests/configs require one integration owner even when feature modules are disjoint.
 
 ## Stage 1 — local foundations (filed 2026-09-10, implemented)
@@ -25,9 +26,8 @@ Brandon approved this batch on 2026-09-10: "yes, go ahead and file these".
 | [#1180](https://github.com/brndnsh-labs/Ensemble/issues/1180) | Independent local/cloud/offline status facts |
 | [#1181](https://github.com/brndnsh-labs/Ensemble/issues/1181) | One bounded account outbox pass; depends on #1178 |
 
-All five are implemented on the branch and sit at `status:in-review` per the branch-only
-exception. They prove local behavior against injected fake transports; none of them is a live
-server, an authenticated session, or an end-to-end sync claim.
+All five are implemented and merged to `main`. They prove local behavior against injected fake
+transports; none of them is a live server, an authenticated session, or an end-to-end sync claim.
 
 ## Stage 2 — authentication and recovery in isolation (filed 2026-09-10)
 

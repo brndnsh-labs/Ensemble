@@ -9,7 +9,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 - Nested `CLAUDE.md` files (`public/CLAUDE.md`, `public/engine/CLAUDE.md`, `public/engine/grooves/CLAUDE.md`, `public/components/CLAUDE.md`, `tests/CLAUDE.md`) hold directory-scoped load-bearing invariants and traps — sharper than this map or the root file, auto-loaded by tooling that walks the directory tree. Read the one for a directory before editing in it.
 - Use `docs/README.md` for the docs index.
 - V2 application work starts at `prototypes/v2/CLAUDE.md`: scoped source map, provider-neutral
-  handoff and branch-only delivery. Its React shell is separate from the Preact host below.
+  handoff and delivery rules. Its React shell is separate from the Preact host below.
 - The v2 account API is a separate standalone Node service at `prototypes/v2-api/` (sibling of
   `prototypes/v2/`, not a subdirectory) — see `prototypes/v2-api/README.md`. `node:sqlite`
   schema/migrations as of #1187; WebAuthn registration/login ceremony modules (`src/auth/`) as

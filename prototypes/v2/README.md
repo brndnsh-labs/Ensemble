@@ -4,7 +4,8 @@ Isolated Next.js/React shell using Ensemble's existing browser engine and canoni
 This is a working checkpoint, not a production replacement. See [the product brief](../../docs/design/ensemble-v2.md).
 Tracker: milestone 15; #1170 (preview), #1171 (chart/import), #1172 (account/sync/hosting), #1174 (sounds/focused stand), #1175 (editing usability), #1177 (account-local outbox).
 Fresh Claude/Codex/other-agent sessions start with [the v2 handoff](CLAUDE.md).
-Work stays on `feat/ensemble-v2-foundation` / draft PR #1173; no merge to production `main`.
+Merged to `main` on 2026-09-12 via PR #1173. This preview has no production deploy target —
+production serves only the Vite `dist/` build — so landing v2 code releases nothing to users.
 
 ## Account storage foundation (#1177)
 

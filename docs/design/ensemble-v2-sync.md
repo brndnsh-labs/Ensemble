@@ -348,12 +348,13 @@ rehearsal on a real database, and the physical Edge/macOS + iPhone acceptance in
 
 ## Staged implementation acceptance
 
-#1177 is implemented on the v2 branch: separate account-local records, writer recovery,
+#1177 is implemented and merged to `main`: separate account-local records, writer recovery,
 transactional explicit-Save outbox, frozen retries, guarded acknowledgements and preserved
 conflicts. It has native Chromium/WebKit storage tests with injected transports, not a live
 account service or UI. Keep its review/delivery receipt distinct from deployment and user
 acceptance. The [next batch](ensemble-v2-next-batch.md) breaks the immediate work into bounded
-handoffs; the [v2 guide](../../prototypes/v2/CLAUDE.md) defines the common branch-only cycle.
+handoffs; the [v2 guide](../../prototypes/v2/CLAUDE.md) defines the common cycle and spells out
+why a merged v2 story still releases nothing to users.
 
 Later stages below are **acceptance contracts, not ready-to-cycle tickets**. Shape each into
 small implementation children with exact files, prerequisites and tests before scheduling.

@@ -14,23 +14,31 @@ Operational guide for AI agents working in the Ensemble codebase. Claude Code au
 
 If any guide drifts from live code/config, prefer live and update the docs.
 
-## V2 delivery exception — read before starting a v2 story
+## V2 lives on `main` — read before starting a v2 story
 
-Brandon's 2026-09-10 direction: "we'll keep building off of this branch for now since main=prod".
-For v2 work, including its shared-engine and test companions, first read
-[`prototypes/v2/CLAUDE.md`](prototypes/v2/CLAUDE.md). This is the common handoff for Claude,
-Codex and other agents; no previous conversation or private agent memory is required.
+The 2026-09-10 branch-only exception is **retired**. `feat/ensemble-v2-foundation` merged to
+`main` on 2026-09-12; v2 work now follows the normal work-loop delivery defaults in DOCTRINE
+§5/§6 — branch, PR, auto-merge on green. For v2 work, including its shared-engine and test
+companions, first read [`prototypes/v2/CLAUDE.md`](prototypes/v2/CLAUDE.md). This is the common
+handoff for Claude, Codex and other agents; no previous conversation or private agent memory
+is required.
 
-- Integrate on `feat/ensemble-v2-foundation`, through existing **draft PR #1173**.
-- `/cycle` still requires implementation, review and verification, but its delivery endpoint
-  here is a reviewed commit pushed to that branch. **Do not merge, enable auto-merge, mark the
-  PR ready, close implemented issues, prune the branch, sync to main, or deploy production.**
-  This exception overrides the normal work-loop delivery/merge defaults for v2 only.
-- Leave implemented child stories open at `status:in-review` (or their real human gate), with
-  a commit and test receipt. Check branch code/receipts before treating an open issue as unbuilt.
-- The original application's Preact/component conventions below still apply to `public/`.
-  The isolated v2 shell uses its existing React components; do not migrate either UI as a
-  side effect of a story. Engine/state/worker safeguards apply to both hosts.
+**Landing v2 code is not releasing v2.** The production deploy rsyncs `dist/` — the Vite build
+of `public/` — and nothing else. `prototypes/v2/` (Next static export) and `prototypes/v2-api/`
+(standalone Node service) have no production deploy target at all; `scripts/deploy.sh` prod
+deliberately carries empty `RSYNC_EXCLUDES` because a stray `/v2` there would be drift. So:
+
+- A story touching **only** `prototypes/**` reaches no user on merge. It is still real work under
+  the normal gates, but it cannot regress the live app, and shipping it is not a release decision.
+- A story touching **`public/**`** is live production code on that same merge, under the full
+  prod gate — the shared songbook codecs, engine hooks and state slices very much included.
+- Putting the v2 preview in front of users (a `/v2` path on prod, a link, or a cutover) is
+  **separate unbuilt work** with its own decision: v2 keeps its own IndexedDB and `localStorage`
+  keys, so anything saved there is invisible to the v1 app and has no migration path yet.
+
+The original application's Preact/component conventions below still apply to `public/`. The
+isolated v2 shell uses its existing React components; do not migrate either UI as a side effect
+of a story. Engine/state/worker safeguards apply to both hosts.
 
 ## Mandatory Checklist (before any change)
 
