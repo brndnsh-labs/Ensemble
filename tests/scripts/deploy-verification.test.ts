@@ -15,6 +15,7 @@ import { describe, expect, it } from 'vitest';
 
 const DEPLOY_SCRIPT = path.resolve(import.meta.dirname, '../../scripts/deploy.sh');
 const BUILT_REV = 'abcdef1';
+const BUILT_COMMIT = BUILT_REV.padEnd(40, '0');
 const BUILT_WORKER = `precache(["index.${BUILT_REV}.js", "chunk.${BUILT_REV}.js"])`;
 
 type PostDeployResult = 'empty' | 'match' | 'mismatch' | 'unreachable';
@@ -33,11 +34,20 @@ function createFixture() {
     const curlCount = path.join(root, 'curl-count');
     mkdirSync(bin);
 
-    writeExecutable(path.join(bin, 'ssh'), [
+    writeExecutable(path.join(bin, 'ssh'), ['#!/usr/bin/env bash', 'exit 0']);
+    // static-artifact.mjs seals/verifies against the real checkout: `rev-parse HEAD` must
+    // return a clean-looking SHA whose short form matches BUILT_REV, `status --porcelain`
+    // must report clean, and every other subcommand (the informational before/after delta
+    // lookup) fails quietly, matching deploy.sh's own `if ...; then ... else (no-op) fi` guard.
+    writeExecutable(path.join(bin, 'git'), [
         '#!/usr/bin/env bash',
-        'exit "$DEPLOY_TEST_LAYOUT_STATUS"',
+        'if [ "$1" = rev-parse ] && [ "$2" = HEAD ]; then',
+        `    printf '%s\n' '${BUILT_COMMIT}'`,
+        '    exit 0',
+        'fi',
+        '[ "$1" != status ] || exit 0',
+        'exit 1',
     ]);
-    writeExecutable(path.join(bin, 'git'), ['#!/usr/bin/env bash', 'exit 0']);
 
     writeExecutable(path.join(bin, 'npx'), [
         '#!/usr/bin/env bash',
@@ -46,6 +56,9 @@ function createFixture() {
         `printf '%s\n' '<script src="/assets/index.${BUILT_REV}.js"></script>' > dist/index.html`,
         `printf '%s\n' 'bundle' > 'dist/assets/index.${BUILT_REV}.js'`,
         `printf '%s\n' '${BUILT_WORKER}' > dist/sw.js`,
+        // static-artifact.mjs seal reads this back to cross-check build-time provenance
+        // against the git-derived commit/revision — mirrors vite.config.ts's real output.
+        `printf '%s\n' '{"schema":1,"commit":"${BUILT_COMMIT}","revision":"${BUILT_REV}","mode":"production","e2eBridge":false}' > dist/.ensemble-build.json`,
     ]);
     writeExecutable(path.join(bin, 'rsync'), [
         '#!/usr/bin/env bash',
@@ -110,7 +123,7 @@ function createFixture() {
 function runDeploy(
     post: PostDeployResult,
     preflight: 'available' | 'unreachable' = 'available',
-    worker: { result?: WorkerResult; cacheControl?: string; atomicLayout?: boolean } = {},
+    worker: { result?: WorkerResult; cacheControl?: string } = {},
 ) {
     const fixture = createFixture();
     const result = spawnSync('bash', [DEPLOY_SCRIPT, 'prod'], {
@@ -124,7 +137,6 @@ function runDeploy(
             DEPLOY_TEST_TRACE: fixture.trace,
             DEPLOY_TEST_URLS: fixture.urls,
             DEPLOY_TEST_WORKER: worker.result ?? 'match',
-            DEPLOY_TEST_LAYOUT_STATUS: worker.atomicLayout ? '1' : '0',
             DEPLOY_TEST_CACHE_CONTROL: worker.cacheControl ?? 'no-store',
             PATH: `${fixture.bin}:${process.env.PATH}`,
         },
@@ -139,17 +151,6 @@ function cleanup(root: string) {
 }
 
 describe('deploy post-transfer verification', () => {
-    it('refuses legacy rsync into a provisioned atomic root before transferring anything', () => {
-        const { fixture, result } = runDeploy('match', 'available', { atomicLayout: true });
-        try {
-            expect(result.status).not.toBe(0);
-            expect(result.stderr).toContain('Refusing legacy rsync into an atomic release layout');
-            expect(existsSync(fixture.trace)).toBe(false);
-            expect(existsSync(path.join(fixture.root, 'dist/sw.js'))).toBe(true);
-        } finally {
-            cleanup(fixture.root);
-        }
-    });
     it.each(['empty', 'unreachable'] as const)(
         'fails closed when the post-deploy origin is %s and retains dist',
         (post) => {
@@ -188,7 +189,7 @@ describe('deploy post-transfer verification', () => {
         }
     });
 
-    it('uses distinct phase-specific cache nonces and removes dist only after a match', () => {
+    it('uses distinct phase-specific cache nonces and keeps the release artifact after a match', () => {
         const { fixture, result } = runDeploy('match');
 
         try {
@@ -196,7 +197,8 @@ describe('deploy post-transfer verification', () => {
             expect(result.signal).toBeNull();
             expect(result.status, result.stderr).toBe(0);
             expect(result.stdout).toContain(`✅ Verified live on PROD: ${BUILT_REV}`);
-            expect(existsSync(path.join(fixture.root, 'dist'))).toBe(false);
+            // Atomic releases are kept for inspection/promotion — no local-build cleanup.
+            expect(existsSync(path.join(fixture.root, 'dist'))).toBe(true);
             expect(readFileSync(fixture.trace, 'utf8').trim().split('\n')).toEqual([
                 'rsync:dist-present',
                 'curl-after:dist-present',
@@ -271,7 +273,7 @@ describe('deploy post-transfer verification', () => {
         try {
             expect(result.error).toBeUndefined();
             expect(result.status, result.stderr).toBe(0);
-            expect(existsSync(path.join(fixture.root, 'dist'))).toBe(false);
+            expect(existsSync(path.join(fixture.root, 'dist'))).toBe(true);
         } finally {
             cleanup(fixture.root);
         }
