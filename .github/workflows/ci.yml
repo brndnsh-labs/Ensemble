@@ -20,6 +20,11 @@ on:
   pull_request:
     branches: [ main ]
   workflow_dispatch:
+    inputs:
+      hosting_probe:
+        description: Read-only docker04 deployment-account probe (does not deploy)
+        type: boolean
+        default: false
 
 # Supersede in-flight PR runs when a branch is pushed again; never cancel a run on
 # main, because a cancelled run on main is a half-finished deploy.
@@ -159,20 +164,27 @@ jobs:
   # commit — deploy it. `workflow_dispatch` on main is a manual break-glass redeploy
   # (no new commit).
   #
-  # NETWORK: prod is a LAN box (192.168.1.239) with nothing exposed to the internet,
+  # NETWORK: prod is a LAN backend with nothing exposed directly to the internet,
   # so a GitHub-hosted runner cannot reach it directly. It joins the tailnet as an
   # ephemeral, tag:ci node instead — see homelab-maintenance `tailscale/README.md`.
-  # The tailnet policy grants tag:ci exactly one thing: SSH to .239. If these
-  # credentials leaked, that is the entire blast radius, and behind that port is a
-  # scoped account whose only power is writing /var/www/html.
+  # The tailnet policy permits SSH to the old LXC and docker04 during migration.
+  # Both use scoped static-file accounts; CI never gets Docker or sudo access.
   #
   # Fork PRs cannot reach any of this: secrets are withheld from fork-PR runs, and
-  # this job doesn't run on `pull_request` at all.
+  # this job doesn't run on `pull_request` at all. An explicitly dispatched probe
+  # may run on a reviewed branch, but cannot execute the deployment step.
   deploy:
     runs-on: ubuntu-latest
     needs: [checks, e2e-tests]
-    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    if: (github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')) || (github.event_name == 'workflow_dispatch' && inputs.hosting_probe)
     timeout-minutes: 10
+    # One operator-controlled selector switches host, user and transport together.
+    # Empty/unset stays legacy until the separately approved hosting cutover.
+    env:
+      PROD_DEPLOY_PROFILE: ${{ inputs.hosting_probe && 'docker04' || vars.PROD_DEPLOY_PROFILE || 'legacy' }}
+      LEGACY_DEPLOY_HOST: ${{ vars.PROD_DEPLOY_HOST }}
+      LEGACY_DEPLOY_USER: ${{ secrets.DEPLOY_SSH_USER }}
+      DOCKER_DEPLOY_HOST: ${{ vars.PROD_DEPLOY_DOCKER_HOST }}
     # Serialize deploys across ALL runs. On the old self-hosted setup this came free
     # from having exactly one runner; hosted runners really do run in parallel, so it
     # has to be stated. Never cancel-in-progress — an interrupted rsync is a
@@ -197,6 +209,17 @@ jobs:
 
       - name: Verify artifact bytes and checkout provenance
         run: node scripts/static-artifact.mjs verify dist prod
+
+      - name: Select the production hosting profile
+        run: |
+          case "$PROD_DEPLOY_PROFILE" in
+            legacy) host="$LEGACY_DEPLOY_HOST"; user="$LEGACY_DEPLOY_USER" ;;
+            docker04) host="$DOCKER_DEPLOY_HOST"; user=ensemble-deploy ;;
+            *) echo '::error::Unknown production hosting profile'; exit 1 ;;
+          esac
+          [[ "$host" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*$ && "$user" =~ ^[a-z_][a-z0-9_-]*$ ]] \
+            || { echo '::error::Missing or invalid deployment host/user'; exit 1; }
+          printf 'PROD_DEPLOY_HOST=%s\nDEPLOY_SSH_USER=%s\n' "$host" "$user" >> "$GITHUB_ENV"
 
       - name: Connect to Tailscale
         uses: tailscale/github-action@v4
@@ -223,8 +246,6 @@ jobs:
       # Fail here with a clear message rather than 10 minutes later as an opaque
       # rsync timeout, if the tailnet path or the policy grant is wrong.
       - name: Verify the deploy target is reachable
-        env:
-          PROD_DEPLOY_HOST: ${{ vars.PROD_DEPLOY_HOST }}
         run: |
           tailscale status --peers=false
           timeout 20 bash -c "until </dev/tcp/$PROD_DEPLOY_HOST/22; do sleep 1; done" \
@@ -236,8 +257,6 @@ jobs:
       - name: Configure deploy SSH
         env:
           DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
-          DEPLOY_SSH_USER: ${{ secrets.DEPLOY_SSH_USER }}
-          PROD_DEPLOY_HOST: ${{ vars.PROD_DEPLOY_HOST }}
         run: |
           mkdir -p ~/.ssh && chmod 700 ~/.ssh
           printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/ci_deploy_key
@@ -251,7 +270,30 @@ jobs:
             echo "  StrictHostKeyChecking accept-new"
           } >> ~/.ssh/config
 
-      # Host/layout cutover remains separately gated. Until then the same sealed
-      # artifact can use the existing LXC transport, without an npm install/build.
+      - name: Probe docker04 without deploying
+        if: inputs.hosting_probe
+        run: |
+          ssh ensemble-admin 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          [[ $(id -un) = ensemble-deploy && $(id -Gn) = ensemble-deploy ]]
+          [[ $(cat /srv/ensemble-prod/www/.ensemble-static-root) = ensemble-static-v1 ]]
+          test -w /srv/ensemble-prod/www
+          test ! -w /srv/ensemble-test/www
+          test ! -w /srv/ensemble-prod/nginx.conf
+          test ! -w /var/run/docker.sock
+          cd /srv/ensemble-prod/www/current
+          sha256sum --check --strict --quiet .ensemble-checksums
+          REMOTE
+          for port in 8090 8091 2375 2376; do
+            if timeout 3 bash -c 'exec 3<>/dev/tcp/$1/$2' _ "$PROD_DEPLOY_HOST" "$port" 2>/dev/null; then
+              echo "::error::CI unexpectedly reached backend port $port"; exit 1
+            fi
+          done
+
+      # The selected profile binds the host/account and release layout together.
       - name: Deploy to prod
-        run: ./scripts/deploy.sh prod --artifact dist
+        if: ${{ github.ref == 'refs/heads/main' && !inputs.hosting_probe }}
+        run: |
+          args=()
+          [ "$PROD_DEPLOY_PROFILE" != docker04 ] || args+=(--atomic)
+          ./scripts/deploy.sh prod --artifact dist "${args[@]}"
