@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 #
-# Static deploy — build locally or consume a verified CI artifact. Test publishes
-# checksum-verified releases atomically; production retains its legacy transport
-# until the gated hosting cutover. This never manages the separate account API/DB.
+# Static deploy — build locally or consume a verified CI artifact. Both test and
+# production publish checksum-verified releases atomically on docker04, since the
+# 2026-09-13 hosting cutover. This never manages the separate account API/DB.
 #
-#   ./scripts/deploy.sh <test|prod> [--artifact DIRECTORY] [--atomic] [--dry-run] [--quiet]
+#   ./scripts/deploy.sh <test|prod> [--artifact DIRECTORY] [--dry-run] [--quiet]
 #
 # Prod is continuously deployed: the CI `deploy` job (.github/workflows/ci.yml)
 # runs `deploy.sh prod` on every merge to main. This script is also the manual
@@ -25,7 +25,7 @@
 set -euo pipefail
 
 usage() {
-    echo "Usage: $0 <test|prod> [--artifact DIRECTORY] [--atomic] [--dry-run] [--quiet]"
+    echo "Usage: $0 <test|prod> [--artifact DIRECTORY] [--dry-run] [--quiet]"
     exit 1
 }
 
@@ -34,19 +34,15 @@ shift || true
 
 DRY_RUN=false
 QUIET=false
-ATOMIC=false
 ARTIFACT=""
-PREBUILT=false
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 while [ "$#" -gt 0 ]; do
     case "$1" in
         -whatif | --dry-run) DRY_RUN=true ;;
         --quiet) QUIET=true ;;
-        --atomic) ATOMIC=true ;;
         --artifact)
             [ "$#" -ge 2 ] || usage
             ARTIFACT="$2"
-            PREBUILT=true
             shift
             ;;
         *)
@@ -60,25 +56,12 @@ done
 case "$ENV_NAME" in
     test)
         MODE="test"
-        ATOMIC=true
-        # TEST uses the shared atomic runtime on docker04 (2026-09-12).
-        # Production keeps its existing LXC transport until the gated cutover.
-        RSYNC_HOST="docker04-admin"
-        RSYNC_PATH="/srv/ensemble-test/www/"
-        # Root releases and the independent v2 preview never share upload paths.
-        RSYNC_EXCLUDES=()
         ORIGIN_URL="https://ensembletest.brndn.zip"
         LABEL="TEST"
         ICON="🚀"
         ;;
     prod)
         MODE="production"
-        RSYNC_HOST="ensemble-admin"
-        RSYNC_PATH="/var/www/html/"
-        # Deliberately empty: prod hosts no v2 preview (deploy-test.mjs has no
-        # production target at all), so a stray /v2 there is drift that `--delete`
-        # SHOULD clean up rather than something to protect.
-        RSYNC_EXCLUDES=()
         ORIGIN_URL="https://ensemble.brndn.zip"
         LABEL="PROD"
         ICON="🌟"
@@ -88,13 +71,14 @@ case "$ENV_NAME" in
         ;;
 esac
 
-if [ "$ATOMIC" = true ]; then
-    # Explicit until the operator cutover: merging tooling must not silently move
-    # production away from its current LXC or grant CI Docker administration.
-    RSYNC_HOST="docker04-admin"
-    RSYNC_PATH="/srv/ensemble-${ENV_NAME}/www/"
-    [ "$ENV_NAME" != prod ] || RSYNC_HOST="ensemble-admin"
-fi
+# Both environments are the shared atomic runtime on docker04. Test uses the
+# `docker04-admin` alias directly; prod uses `ensemble-admin`, which CI
+# materializes per-run pointing at docker04's scoped `ensemble-deploy` account
+# (see .github/workflows/ci.yml) and which an operator's ~/.ssh/config should
+# alias the same way for manual /deploy-prod runs.
+RSYNC_HOST="docker04-admin"
+RSYNC_PATH="/srv/ensemble-${ENV_NAME}/www/"
+[ "$ENV_NAME" != prod ] || RSYNC_HOST="ensemble-admin"
 
 log() { if [ "$QUIET" = false ]; then echo "$@"; fi; }
 
@@ -128,10 +112,8 @@ else
     log "${ICON} Building for ${LABEL}..."
     npx vite build --mode "$MODE" "${LOG_LEVEL_ARGS[@]}"
     ARTIFACT="$(pwd)/dist"
-    if [ "$ATOMIC" = true ]; then
-        node "$SCRIPT_DIR/static-artifact.mjs" seal "$ARTIFACT" "$MODE" >/dev/null
-        node "$SCRIPT_DIR/static-artifact.mjs" verify "$ARTIFACT" "$ENV_NAME" >/dev/null
-    fi
+    node "$SCRIPT_DIR/static-artifact.mjs" seal "$ARTIFACT" "$MODE" >/dev/null
+    node "$SCRIPT_DIR/static-artifact.mjs" verify "$ARTIFACT" "$ENV_NAME" >/dev/null
 fi
 
 # The rev the build baked into the asset filenames — the exact identity of what
@@ -165,28 +147,17 @@ if [ "$QUIET" = false ]; then
 fi
 
 if [ "$DRY_RUN" = true ]; then
-    log "🔍 Target: ${RSYNC_HOST}:${RSYNC_PATH} (atomic=$ATOMIC; artifact=$ARTIFACT)"
+    log "🔍 Target: ${RSYNC_HOST}:${RSYNC_PATH} (artifact=$ARTIFACT)"
     log "✅ Dry run complete."
     exit 0
 fi
 
-log "🚚 Syncing to ${LABEL} (scoped 'claude' account)..."
-if [ "$ATOMIC" = true ]; then
-    RELEASE_ID="${BUILT_REV}-$(node -e 'console.log(require("node:crypto").randomUUID())')"
-    RELEASE_ROOT="${RSYNC_PATH%/}"
-    PREVIOUS=$(ssh "$RSYNC_HOST" bash -s -- prepare "$RELEASE_ROOT" "$RELEASE_ID" < "$SCRIPT_DIR/publish-static.sh")
-    rsync -az --checksum -e ssh "$ARTIFACT/" "${RSYNC_HOST}:${RELEASE_ROOT}/.releases/${RELEASE_ID}/"
-    ssh "$RSYNC_HOST" bash -s -- activate "$RELEASE_ROOT" "$RELEASE_ID" "$PREVIOUS" < "$SCRIPT_DIR/publish-static.sh"
-else
-    # A converted host MUST NOT receive the old destructive-in-place transport.
-    # Check all layout sentinels, including a broken current symlink, before rsync.
-    # shellcheck disable=SC2029 # Fixed allowlisted target expands locally by design.
-    ssh "$RSYNC_HOST" "test ! -e '${RSYNC_PATH}.ensemble-static-root' && test ! -e '${RSYNC_PATH}.releases' && test ! -e '${RSYNC_PATH}current' && test ! -L '${RSYNC_PATH}current'" || {
-        echo '❌ Refusing legacy rsync into an atomic release layout; use --atomic.' >&2
-        exit 1
-    }
-    rsync -avz --delete "${RSYNC_EXCLUDES[@]}" -e ssh "$ARTIFACT/" "${RSYNC_HOST}:${RSYNC_PATH}"
-fi
+log "🚚 Syncing to ${LABEL} (scoped 'ensemble-deploy' account)..."
+RELEASE_ID="${BUILT_REV}-$(node -e 'console.log(require("node:crypto").randomUUID())')"
+RELEASE_ROOT="${RSYNC_PATH%/}"
+PREVIOUS=$(ssh "$RSYNC_HOST" bash -s -- prepare "$RELEASE_ROOT" "$RELEASE_ID" < "$SCRIPT_DIR/publish-static.sh")
+rsync -az --checksum -e ssh "$ARTIFACT/" "${RSYNC_HOST}:${RELEASE_ROOT}/.releases/${RELEASE_ID}/"
+ssh "$RSYNC_HOST" bash -s -- activate "$RELEASE_ROOT" "$RELEASE_ID" "$PREVIOUS" < "$SCRIPT_DIR/publish-static.sh"
 
 # Verify the running site now serves exactly what we built.
 AFTER_CACHE_NONCE="after-$(date +%s)"
@@ -226,9 +197,5 @@ if ! awk 'tolower($0) ~ /^cache-control:/ { print tolower($0) }' "$SW_HEADERS_FI
     exit 1
 fi
 
-# Keep atomic/prebuilt artifacts for inspection and promotion. Preserve the legacy
-# local-build cleanup until all callers have moved to the release layout.
-if [ "$ATOMIC" = false ] && [ "$PREBUILT" = false ] && [ "$ARTIFACT" = "$(pwd)/dist" ]; then
-    rm -r -- "$ARTIFACT"
-fi
+# Release artifacts are kept for inspection and promotion — no local-build cleanup.
 log "✅ Verified live on ${LABEL}: ${AFTER_REV} (HTML and service worker)"

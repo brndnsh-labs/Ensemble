@@ -1,9 +1,11 @@
 # Ensemble hosting: shared runtime, separate releases
 
-Brandon's 2026-09-12 direction is to make test and production "simpler, faster, and more
-consistent." This replaces the earlier plan to leave their static hosting divergent until
-after v2. It approves implementation and preparation, not a production route cutover or a
-public v2/account launch.
+Brandon's 2026-09-12 direction was to make test and production "simpler, faster, and more
+consistent." **The production cutover completed 2026-09-13** and has proven stable: prod now
+runs on `docker04` alongside test, and the old LXC hosts (115/116, 192.168.1.239/.224) have
+been retired and deleted from Proxmox. This doc's staged-transition and gated-approval
+language below is kept as historical record of how the migration was executed; the end state
+it describes is now live.
 
 ## One static layout
 
@@ -54,10 +56,11 @@ overwriting the winning release. Canonical public HTML/revision and service-work
 policy still gate success. A failed transfer leaves the current release untouched; failure
 after activation is reported as failure, retains evidence, and does not silently roll back.
 
-Test defaults to atomic publishing after its verified conversion. Production still requires
-`--atomic` at its separately gated cutover. Legacy publishing refuses any root containing the
-new layout's marker, releases directory or current symlink, so an old command cannot erase
-rollbacks. Existing production CD stays on the LXC until the separately approved cutover.
+Both environments default to atomic publishing (production since the 2026-09-13 cutover).
+Legacy publishing refuses any root containing the new layout's marker, releases directory or
+current symlink, so an old command cannot erase rollbacks. The pre-cutover non-atomic prod
+transport (`scripts/deploy.sh`'s legacy rsync branch, the `PROD_DEPLOY_PROFILE` CI selector) has
+been removed from the codebase — there is only the one path now.
 
 Rollback is a verified activation of the previous retained release using
 `scripts/publish-static.sh activate ROOT PREVIOUS_RELEASE CURRENT_TARGET` through the same
@@ -125,9 +128,11 @@ Test was converted on 2026-09-12 using the reviewed dirty audition artifact
 hashes match these recipes. Public HTML and canonical worker bytes match the artifact, private
 paths return 404, and the existing v2 fingerprint stayed unchanged. Old configuration files
 are retained under `/srv/ensemble-test/hosting-backup-20260912-atomic`; old root files remain.
-This is a test-only deployment receipt, not a production conversion or a claim of clean-commit
-deployment. Production remains on the LXC.
+This was a test-only deployment receipt at the time it was written — see the top of this doc
+for the completed production cutover.
 
-This is a staged transition, not a claim that both environments have already been converted.
-The final cutover should remove the legacy rsync path and the explicit migration flag once
-both environments use the same layout; do not retain permanent dual deployment mechanisms.
+**Cutover complete (2026-09-13):** both environments now use the same docker04 atomic release
+layout, and the legacy rsync path / `PROD_DEPLOY_PROFILE` migration selector have been removed
+from `scripts/deploy.sh` and `.github/workflows/ci.yml`. The old LXC hosts (115/116) were
+deleted from Proxmox the same day. Rollback for prod is now the same verified
+previous-release activation described above, not a redeploy to a different host.

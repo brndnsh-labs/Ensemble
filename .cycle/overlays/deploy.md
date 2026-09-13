@@ -7,13 +7,17 @@
   serving the bind mount `/srv/ensemble-test/www/`; SSH alias **`docker04-admin`**. It
   moved so the coming v2 account API can sit behind this same origin without
   hand-installed dependencies. Private, low-ceremony — the pre-merge audition box.
-- **Prod** — `ensemble.brndn.zip`: still the plain **nginx LXC**, static files out of
-  `/var/www/html/`, SSH alias **`ensemble-admin`**. **Test and prod now differ at the
-  hosting layer** — an accepted, deliberate divergence (2026-09-10), so a
-  container-specific test result is not automatically a prod result. **Continuously
-  deployed** — a green PR merge (branch-protected) triggers the CI `deploy` job, which
-  ships automatically. `/deploy-prod` is the manual break-glass path (CI down, or forcing
-  a known-good build), not the normal route.
+- **Prod** — `ensemble.brndn.zip`: since **2026-09-13** also a container on
+  **`docker04`** (`/srv/ensemble-prod/www/`), the same shared atomic release runtime
+  as test. The old nginx LXC was retired and deleted from Proxmox on cutover day —
+  a container-specific test result now generalizes to prod again. CI deploys through
+  a scoped, non-sudo, non-Docker **`ensemble-deploy`** account (distinct from
+  `docker04-admin`'s full-admin `claude` account that test/operator commands use);
+  SSH alias **`ensemble-admin`**, materialized per-run by CI and expected in your
+  own `~/.ssh/config` for a manual run. **Continuously deployed** — a green PR merge
+  (branch-protected) triggers the CI `deploy` job, which ships automatically.
+  `/deploy-prod` is the manual break-glass path (CI down, or forcing a known-good
+  build), not the normal route.
 - Both: `scripts/deploy.sh <test|prod>` builds (`vite build --mode <test|production>`),
   prints the **Built REV** + footprint + the delta vs. the live site, `rsync --delete`s,
   then **re-verifies the live asset hash itself** — the script's own exit code already
