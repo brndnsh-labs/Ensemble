@@ -167,8 +167,9 @@ jobs:
   # NETWORK: prod is a LAN backend with nothing exposed directly to the internet,
   # so a GitHub-hosted runner cannot reach it directly. It joins the tailnet as an
   # ephemeral, tag:ci node instead — see homelab-maintenance `tailscale/README.md`.
-  # The tailnet policy permits SSH to the old LXC and docker04 during migration.
-  # Both use scoped static-file accounts; CI never gets Docker or sudo access.
+  # The tailnet policy grants tag:ci SSH to docker04's scoped static-file account;
+  # CI never gets Docker or sudo access. The old LXC hosts (115/116) were retired
+  # and deleted from Proxmox 2026-09-13 — docker04 is the only production target.
   #
   # Fork PRs cannot reach any of this: secrets are withheld from fork-PR runs, and
   # this job doesn't run on `pull_request` at all. An explicitly dispatched probe
@@ -178,13 +179,9 @@ jobs:
     needs: [checks, e2e-tests]
     if: (github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')) || (github.event_name == 'workflow_dispatch' && inputs.hosting_probe)
     timeout-minutes: 10
-    # One operator-controlled selector switches host, user and transport together.
-    # Empty/unset stays legacy until the separately approved hosting cutover.
     env:
-      PROD_DEPLOY_PROFILE: ${{ inputs.hosting_probe && 'docker04' || vars.PROD_DEPLOY_PROFILE || 'legacy' }}
-      LEGACY_DEPLOY_HOST: ${{ vars.PROD_DEPLOY_HOST }}
-      LEGACY_DEPLOY_USER: ${{ secrets.DEPLOY_SSH_USER }}
-      DOCKER_DEPLOY_HOST: ${{ vars.PROD_DEPLOY_DOCKER_HOST }}
+      PROD_DEPLOY_HOST: ${{ vars.PROD_DEPLOY_DOCKER_HOST }}
+      DEPLOY_SSH_USER: ensemble-deploy
     # Serialize deploys across ALL runs. On the old self-hosted setup this came free
     # from having exactly one runner; hosted runners really do run in parallel, so it
     # has to be stated. Never cancel-in-progress — an interrupted rsync is a
@@ -210,16 +207,10 @@ jobs:
       - name: Verify artifact bytes and checkout provenance
         run: node scripts/static-artifact.mjs verify dist prod
 
-      - name: Select the production hosting profile
+      - name: Validate the deploy target
         run: |
-          case "$PROD_DEPLOY_PROFILE" in
-            legacy) host="$LEGACY_DEPLOY_HOST"; user="$LEGACY_DEPLOY_USER" ;;
-            docker04) host="$DOCKER_DEPLOY_HOST"; user=ensemble-deploy ;;
-            *) echo '::error::Unknown production hosting profile'; exit 1 ;;
-          esac
-          [[ "$host" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*$ && "$user" =~ ^[a-z_][a-z0-9_-]*$ ]] \
-            || { echo '::error::Missing or invalid deployment host/user'; exit 1; }
-          printf 'PROD_DEPLOY_HOST=%s\nDEPLOY_SSH_USER=%s\n' "$host" "$user" >> "$GITHUB_ENV"
+          [[ "$PROD_DEPLOY_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*$ ]] \
+            || { echo '::error::Missing or invalid PROD_DEPLOY_DOCKER_HOST variable'; exit 1; }
 
       - name: Connect to Tailscale
         uses: tailscale/github-action@v4
@@ -290,10 +281,6 @@ jobs:
             fi
           done
 
-      # The selected profile binds the host/account and release layout together.
       - name: Deploy to prod
         if: ${{ github.ref == 'refs/heads/main' && !inputs.hosting_probe }}
-        run: |
-          args=()
-          [ "$PROD_DEPLOY_PROFILE" != docker04 ] || args+=(--atomic)
-          ./scripts/deploy.sh prod --artifact dist "${args[@]}"
+        run: ./scripts/deploy.sh prod --artifact dist
