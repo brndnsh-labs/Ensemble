@@ -229,12 +229,53 @@ add replicas or change the shared transaction helper as an incidental optimizati
 | Bounded endpoint payloads/counts and real limiter blocks | `test/http/auth-hardening.test.ts` covers every registered route, collection/scalar bounds, independent thresholds and commit-time credential cap; real socket body tests retained. |
 | Private audit and deletion coverage | Sentinel-secret and deliberately failed SQLite audit-write tests; schema drift test adds an unclassified owner table and proves rejection. |
 | Real proxy identity verified safe | **Unmet:** live static-chain probes expose direct-origin CF spoofing; no actual API hop exists yet. Required operator work is specified above. |
-| Implementation choices and independent threat-model review complete | Code choices documented; independent correctness/security review and final gate results must be recorded by the integration owner on #1192/its PR. This author does not self-approve the review. |
+| Implementation choices and independent threat-model review complete | **Done.** An independent review ran against PR #1196 (branch `feat/v2-auth-hardening`) and returned two real findings, both fixed in that same PR — see below. Everything else the review examined (the client-identity HMAC scheme, the passkey transactional bound, the deletion registry, the route-policy drift guard) came back clean and unchanged. |
+
+### #1196 independent review findings
+
+- **Finding 1 (P1, fixed).** The `auth_failure` audit recorder (`src/http/app.ts`) audited every
+  `authErrorCode` reaching `/api/auth/*`, including four rejection paths reachable with zero
+  authentication and, for two of them, zero special headers: `sameOriginGuard`'s 403,
+  `jsonOnlyGuard`'s 415, `bodyLimit`'s 413, and `authPolicy`'s unknown-route 404 (which returns
+  before that file's own per-route limiter is ever consulted). None of the four carried any rate
+  limit of their own. Combined with `recordSecurityEvent`'s global 10,000-row retention ring
+  (`src/auth/security-events.ts`), an anonymous flood of the cheapest of these (a bare `GET` to a
+  made-up `/api/auth/*` path) could evict every genuine `passkey_added`/`session_revoked`/
+  `account_recovered` row — this table's only forensic record of the borrowed-session takeover
+  risk documented above. Fixed both halves the review recommended: (a) `security-events.ts` now
+  exports `isAuthDecisionCode`, an allowlist-based predicate covering only genuine
+  authentication/authorization outcomes (`authentication_failed`, `unauthenticated`,
+  `fresh_auth_required`, `last_credential`, `credential_limit`); the recorder in `app.ts` consults
+  it instead of auditing any string code. (b) A new shared per-identity limiter
+  (`src/http/rate-limit-guard.ts`) is registered as the first `/api/*` middleware, ahead of the
+  recorder and every guard below it, so the four previously-unmetered rejection paths are bounded
+  independently of `AUTH_POLICIES`' per-route budgets. Verified by a new test in
+  `test/http/auth-hardening.test.ts` that floods all three reachable-without-auth paths 400 times:
+  the shared limiter engages (some requests get `429`) and the audit table still holds exactly the
+  one genuine pre-flood auth decision — none of the 400 rejections produced a row.
+- **Finding 2 (P2, fixed).** `createClientIdentity` (`src/http/client-identity.ts`) already
+  refused a HALF-configured proxy setup (one of `ENSEMBLE_AUTH_IP_HEADER` /
+  `ENSEMBLE_AUTH_TRUSTED_PROXY_ADDRESSES` set, not the other), but with NEITHER set it silently
+  fell back to keying every rate limiter on the raw socket peer address — constant for every real
+  caller behind Caddy in production, collapsing every per-caller bucket into one shared global
+  bucket. Fixed in `src/server.ts`: a new fail-fast startup check refuses to start when neither
+  proxy-trust var is set unless a new, differently-named opt-in
+  (`ENSEMBLE_AUTH_IP_MODE=socket-only`) is also set, mirroring the existing half-configured-proxy
+  rejection's fail-loud style. Verified by new/extended cases in
+  `test/server/server-spawn.test.ts`'s `BAD_ENV_CASES` table (refuses to start with neither var
+  and no opt-in; refuses on a typo'd `ENSEMBLE_AUTH_IP_MODE` value) plus a new positive test
+  proving the legitimate local-dev shape (neither var, `ENSEMBLE_AUTH_IP_MODE=socket-only`) starts
+  cleanly.
+
+**Known limitation, unchanged by this patch:** the "Real proxy identity verified safe" row above
+is still unmet — the live static-chain probe evidence of direct-origin CF/Caddy spoofing stands,
+and no actual API hop is deployed yet. That is separate, pre-existing operator work, not part of
+either finding above.
 
 This receipt intentionally leaves stage 2 open. Stage 3 must not start until the unresolved
-identity proof and independent review are satisfied and the integration owner records the
-actual checked revision and gates. Physical passkey/device acceptance, backup/restore and public
-rollout remain later stages even after the stage-2 implementation gates pass.
+identity proof above is satisfied and the integration owner records the actual checked revision
+and gates. Physical passkey/device acceptance, backup/restore and public rollout remain later
+stages even after the stage-2 implementation gates pass.
 
 The local `test/http/client-identity.socket.test.ts` also drives a real Node/Hono listener past
 the recovery threshold while changing XFF, then proves a second configured client-header identity

@@ -24,6 +24,37 @@ const CODES = [
     'rate_limited',
     'credential_limit',
 ] as const;
+export type SecurityEventCode = (typeof CODES)[number];
+
+/**
+ * The subset of `CODES` that represents an actual authentication/authorization DECISION, as
+ * opposed to a transport-layer guard rejecting the request before any auth logic ran
+ * (`forbidden_origin` from `same-origin.ts`, `unsupported_media_type` from `content-type.ts`,
+ * `payload_too_large` from `app.ts`'s `bodyLimit`, an unknown-route `not_found` from
+ * `auth-policy.ts`), the limiter's own bookkeeping (`rate_limited`), a client-shape problem
+ * (`malformed_request`), or this service's own bug (`internal_error`). `app.ts`'s `auth_failure`
+ * recorder consults this predicate — not the full `CODES` list — before writing a row.
+ *
+ * #1196 independent-review Finding 1: every one of the excluded codes is reachable with zero
+ * authentication, and `forbidden_origin`/`not_found` need no special header at all. Auditing them
+ * let an anonymous flood of the cheapest possible request (a bare `GET` to a made-up
+ * `/api/auth/*` path) burn through `recordSecurityEvent`'s global 10,000-row ring below and evict
+ * every genuine `passkey_added`/`session_revoked`/`account_recovered` row — this table's only
+ * forensic record of the documented borrowed-session takeover risk. Narrowing to genuine
+ * authentication/authorization outcomes closes that off; see `src/http/app.ts` and
+ * `src/http/rate-limit-guard.ts` for the paired fix (a rate limiter ahead of these same guards).
+ */
+const AUTH_DECISION_CODES: readonly SecurityEventCode[] = [
+    'authentication_failed',
+    'unauthenticated',
+    'fresh_auth_required',
+    'last_credential',
+    'credential_limit',
+];
+
+export function isAuthDecisionCode(code: unknown): code is SecurityEventCode {
+    return typeof code === 'string' && (AUTH_DECISION_CODES as readonly string[]).includes(code);
+}
 
 export interface SecurityEvent {
     event: Event;

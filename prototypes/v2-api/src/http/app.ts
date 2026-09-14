@@ -30,7 +30,7 @@ import {
     verifyRegistration,
     type WebAuthnConfig,
 } from '../auth/index.js';
-import { recordSecurityEvent } from '../auth/security-events.js';
+import { isAuthDecisionCode, recordSecurityEvent } from '../auth/security-events.js';
 import { authPolicy } from './auth-policy.js';
 import { type ClientIdentityOptions, createClientIdentity } from './client-identity.js';
 import { jsonOnlyGuard, requestHasBody } from './content-type.js';
@@ -49,6 +49,7 @@ import {
     sendError,
 } from './errors.js';
 import { securityHeaders } from './headers.js';
+import { transportRateLimitGuard } from './rate-limit-guard.js';
 import { sameOriginGuard } from './same-origin.js';
 
 /**
@@ -115,10 +116,22 @@ export function createApp({
     // on every response this process ever sends — including a 404 for a path outside /api (a
     // typo'd route, a scanner probe) — not only the ones this app happens to route.
     app.use('*', securityHeaders());
+    // Finding 1(b) (#1196 review): a shared per-identity budget, registered as the FIRST
+    // /api/* middleware — ahead of the auth-failure recorder and every guard below it — so
+    // sameOriginGuard's 403, jsonOnlyGuard's 415, bodyLimit's 413, and authPolicy's
+    // unknown-route 404 (none of which have their own limiter) can't be hammered for free. See
+    // rate-limit-guard.ts's doc comment for why 300/min and why this doesn't replace the
+    // per-route budgets registered further down.
+    app.use('/api/*', transportRateLimitGuard(identify, now));
     app.use('/api/auth/*', async (c: Context, next) => {
         await next();
         const code: unknown = c.get('authErrorCode');
-        if (typeof code === 'string') {
+        // Finding 1(a) (#1196 review): only an actual authentication/authorization DECISION is
+        // audited — not a transport-guard rejection (403/415/413) or an unknown-route 404, all of
+        // which are reachable with zero authentication. See security-events.ts's
+        // AUTH_DECISION_CODES doc comment for the full rationale; this predicate is the single
+        // source of truth for that boundary, not a second list re-derived here.
+        if (isAuthDecisionCode(code)) {
             recordSecurityEvent(db, { event: 'auth_failure', code }, now());
         }
     });

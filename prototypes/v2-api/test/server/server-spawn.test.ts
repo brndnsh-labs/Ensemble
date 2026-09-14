@@ -98,14 +98,30 @@ describe('server entrypoint spawn tests', () => {
         if (tmpDir === undefined) {
             throw new Error('spawnServer called before tmpDir was set up');
         }
+        // None of these spawn tests run behind a real reverse proxy, so they are exactly the
+        // legitimate ENSEMBLE_AUTH_IP_MODE=socket-only case (#1196 Finding 2) — set as a default
+        // here so every pre-existing case below keeps exercising its own concern instead of
+        // tripping the new neither-proxy-var-set startup refusal. A case can still override or
+        // delete it (see the `undefined`-strip loop below) to specifically exercise that refusal.
+        const merged: NodeJS.ProcessEnv = {
+            ...process.env,
+            ENSEMBLE_BUILD_REVISION: REVISION,
+            ENSEMBLE_AUTH_IP_SECRET: 'test-only-secret-at-least-32-bytes-long',
+            ENSEMBLE_AUTH_IP_MODE: 'socket-only',
+            ...env,
+        };
+        for (const [key, value] of Object.entries(merged)) {
+            // A case that wants to prove "neither var set, no opt-in" passes
+            // `ENSEMBLE_AUTH_IP_MODE: undefined` to delete the default above — `spawn`'s `env`
+            // requires string values, so an explicit `undefined` here must be stripped, not
+            // stringified to the literal text "undefined".
+            if (value === undefined) {
+                delete merged[key];
+            }
+        }
         const child = spawn(process.execPath, [SERVER_ENTRY], {
             cwd: tmpDir, // any stray relative-path file a bug might create lands in tmpDir
-            env: {
-                ...process.env,
-                ENSEMBLE_BUILD_REVISION: REVISION,
-                ENSEMBLE_AUTH_IP_SECRET: 'test-only-secret-at-least-32-bytes-long',
-                ...env,
-            },
+            env: merged,
             stdio: ['ignore', 'pipe', 'pipe'],
         });
         activeChildren.push(child);
@@ -145,7 +161,7 @@ describe('server entrypoint spawn tests', () => {
 
     interface BadEnvCase {
         name: string;
-        envOverride: Record<string, string>;
+        envOverride: Record<string, string | undefined>;
         expectedStderrContains: string;
     }
 
@@ -159,6 +175,20 @@ describe('server entrypoint spawn tests', () => {
             name: 'unbound trusted header',
             envOverride: { ENSEMBLE_AUTH_IP_HEADER: 'cf-connecting-ip' },
             expectedStderrContains: 'configured together',
+        },
+        {
+            // #1196 Finding 2: the spawnServer default sets ENSEMBLE_AUTH_IP_MODE=socket-only for
+            // every other case; deleting it here (via the `undefined` override, stripped before
+            // spawn) reproduces the actual production-footgun shape — neither proxy-trust var
+            // set, and no opt-in either.
+            name: 'neither proxy header nor trusted addresses set, and no socket-only opt-in',
+            envOverride: { ENSEMBLE_AUTH_IP_MODE: undefined },
+            expectedStderrContains: 'ENSEMBLE_AUTH_IP_MODE',
+        },
+        {
+            name: 'invalid ENSEMBLE_AUTH_IP_MODE value (typo protection)',
+            envOverride: { ENSEMBLE_AUTH_IP_MODE: 'yes-please' },
+            expectedStderrContains: 'ENSEMBLE_AUTH_IP_MODE',
         },
         {
             name: 'non-canonical ENSEMBLE_ORIGIN (trailing slash)',
@@ -219,6 +249,24 @@ describe('server entrypoint spawn tests', () => {
         },
         20_000,
     );
+
+    it('starts fine with neither proxy-trust var set when ENSEMBLE_AUTH_IP_MODE=socket-only is the explicit opt-in (#1196 Finding 2, legitimate local-dev case)', async () => {
+        tmpDir = mkdtempSync(join(tmpdir(), 'ensemble-v2-api-spawn-'));
+        const spawned = spawnServer({
+            ENSEMBLE_RP_ID: 'localhost',
+            ENSEMBLE_RP_NAME: 'Test',
+            ENSEMBLE_ORIGIN: 'http://localhost:5173',
+            ENSEMBLE_DB_PATH: join(tmpDir, 'db.sqlite'),
+            PORT: String(await getFreePort()),
+            HOST: '127.0.0.1',
+            // Explicit for clarity even though spawnServer's own default already sets this —
+            // this test's entire point is that this exact combination starts successfully.
+            ENSEMBLE_AUTH_IP_MODE: 'socket-only',
+        });
+        await waitForListening(spawned);
+        spawned.child.kill('SIGTERM');
+        expect((await spawned.exit).code).toBe(0);
+    }, 20_000);
 
     it('starts with valid config, and exits 0 on SIGTERM after cleanly closing the DB (WAL file gone)', async () => {
         tmpDir = mkdtempSync(join(tmpdir(), 'ensemble-v2-api-spawn-'));

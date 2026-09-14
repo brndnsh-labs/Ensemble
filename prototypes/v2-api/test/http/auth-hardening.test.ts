@@ -200,6 +200,69 @@ describe('pseudonymous client identity', () => {
     });
 });
 
+describe('transport-guard flood protection (#1196 independent review, Finding 1)', () => {
+    it('rate-limits sameOriginGuard/jsonOnlyGuard/the unknown-route 404, and none of those rejections reach the audit table', async () => {
+        const app = setup();
+
+        // A single genuine authentication decision, recorded BEFORE the flood, standing in for
+        // the passkey_added/session_revoked/account_recovered class of forensic row the review
+        // found could be evicted by a flood of free, unauthenticated requests.
+        expect((await request(app, 'GET /api/auth/session')).status).toBe(401);
+
+        // Three zero-authentication rejection paths the review found unaudited-but-should-not-be
+        // AND unrated-limited: none of AUTH_POLICIES' own per-route limiters is ever reached by
+        // any of these three, because each fails before authPolicy's own rate check runs.
+        const floods: Array<() => Response | Promise<Response>> = [
+            // sameOriginGuard's 403 (same-origin.ts): no Origin/Referer header needed at all.
+            () => app.request(`${config.origin}/api/auth/logout`, { method: 'POST' }),
+            // authPolicy's unknown-route 404 (auth-policy.ts:172-174): returns before that
+            // file's own `limiters.get(route)!(...)` call on line 176 ever runs.
+            () => app.request(`${config.origin}/api/auth/does-not-exist`),
+            // jsonOnlyGuard's 415 (content-type.ts): a valid Origin so it clears sameOriginGuard
+            // first and actually exercises this guard specifically.
+            () =>
+                app.request(`${config.origin}/api/auth/register/verify`, {
+                    method: 'POST',
+                    headers: {
+                        origin: config.origin,
+                        'content-type': 'text/plain',
+                        'content-length': '2',
+                    },
+                    body: '{}',
+                }),
+        ];
+
+        const statuses: Record<number, number> = {};
+        const TOTAL = 400; // comfortably past rate-limit-guard.ts's shared 300/min budget
+        for (let i = 0; i < TOTAL; i++) {
+            const res = await (floods[i % floods.length] as () => Response | Promise<Response>)();
+            statuses[res.status] = (statuses[res.status] ?? 0) + 1;
+        }
+
+        // (1) The shared limiter actually engages: once its budget is spent, these otherwise
+        // free-forever rejections turn into 429s instead of running the flood unmetered.
+        expect(statuses[429]).toBeGreaterThan(0);
+        // Some requests got through to their real guard before the limiter kicked in, proving
+        // the 429s above are a genuine cutover and not the ONLY thing that ever happened.
+        expect((statuses[403] ?? 0) + (statuses[404] ?? 0) + (statuses[415] ?? 0)).toBeGreaterThan(
+            0,
+        );
+        // No 2xx, no 401/400/500 — every one of the 400 requests was rejected by exactly one of
+        // the three guards under test or by the shared limiter, nothing else.
+        expect(
+            Object.keys(statuses)
+                .map(Number)
+                .sort((a, b) => a - b),
+        ).toEqual([403, 404, 415, 429]);
+
+        // (2) None of the 400 guard/limiter rejections produced an audit row — the table still
+        // holds exactly the one genuine auth decision recorded before the flood started.
+        expect(
+            testDb.db.prepare('SELECT event, error_code FROM auth_security_events').all(),
+        ).toEqual([{ event: 'auth_failure', error_code: 'unauthenticated' }]);
+    });
+});
+
 describe('metadata audit and deletion coverage', () => {
     it('records only fixed metadata and swallows a failed audit insertion', async () => {
         const app = setup();
