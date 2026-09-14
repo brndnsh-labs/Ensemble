@@ -86,6 +86,28 @@ schema habits — app-minted text keys, epoch-millisecond timestamps, explicit i
 foreign key used in a `WHERE`, and an explicit account-deletion registry rather than trusting
 `ON DELETE CASCADE`.
 
+## Stage 3 — owner-bound revision API (filed 2026-09-14)
+
+Shaped from `ensemble-v2-sync.md` stage 3 at Brandon's direction, following stage 2's pattern:
+a foundation story, the core endpoint, a dedicated real-database concurrency proof, and an
+exit gate mirroring #1192's. All four are blocked on #1192 landing — stage 3 needs verified
+sessions to authenticate the caller before any of this can wire up for real.
+
+| Issue | Bounded deliverable | Depends on |
+| --- | --- | --- |
+| [#1201](https://github.com/brndnsh-labs/Ensemble/issues/1201) | Owner-scoped document/receipt/tombstone schema and query layer | #1192 |
+| [#1202](https://github.com/brndnsh-labs/Ensemble/issues/1202) | Atomic, idempotent Explicit Save endpoint (the six-step protocol) | #1201, #1192 |
+| [#1203](https://github.com/brndnsh-labs/Ensemble/issues/1203) | Concurrency/idempotency proofs on a real disposable database | #1202 |
+| [#1204](https://github.com/brndnsh-labs/Ensemble/issues/1204) | Stage-3 exit gate — independent authorization review | #1201–#1203 |
+
+**None of #1202/#1204 is unattended work** — both are frontier-tier authorization/concurrency
+surfaces requiring an independent correctness and security review with cold context, the same
+requirement stage 2 placed on #1188–#1192. Do not pick them up in a `/burndown` or `/nightly` run.
+
+Stage 3 is server-only, like stage 2: no child touches `prototypes/v2/`, the browser client, or
+the UI. Wiring the document API into the product is stage 5, after library download/reconciliation
+(stage 4) has something real to reconcile against.
+
 ## Starting a fresh session
 
 Read [the cross-provider handoff](../../prototypes/v2/CLAUDE.md), then one ready issue.
