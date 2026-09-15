@@ -4,6 +4,7 @@ import { createWebAuthnConfig } from './auth/config.js';
 import { openDatabase } from './db/connection.js';
 import { runMigrations } from './db/migrate.js';
 import { createApp } from './http/app.js';
+import { type ClientIdentityOptions, createClientIdentity } from './http/client-identity.js';
 import { registerHealthCheck } from './http/health.js';
 
 /**
@@ -72,6 +73,37 @@ function readHost(): string {
     return raw;
 }
 
+/**
+ * Finding 2 (#1196 independent review): `createClientIdentity` (`http/client-identity.ts`)
+ * already refuses a HALF-configured proxy setup (one of `ENSEMBLE_AUTH_IP_HEADER` /
+ * `ENSEMBLE_AUTH_TRUSTED_PROXY_ADDRESSES` set, not the other) — but with NEITHER set, it silently
+ * falls back to keying every rate limiter (authPolicy's per-route ones, and
+ * `rate-limit-guard.ts`'s shared one) on the raw socket peer address. Behind Caddy in production
+ * that address is constant for every real caller, collapsing every per-caller bucket into one
+ * shared global bucket for the entire internet — silently, with no error and a plausible-looking
+ * "it's rate limiting something" behavior.
+ *
+ * Neither-set is legitimate ONLY for local dev/tests with no reverse proxy in front, so it
+ * requires this separate, differently-named opt-in (never the same header/addresses vars a
+ * forgotten proxy config would leave half-set) — mirroring the fail-loud style of the
+ * half-configured check it sits next to, but living here rather than in `client-identity.ts`
+ * because it is a deployment-topology decision read from `process.env`, and this file is the only
+ * one that reads `process.env` at all.
+ */
+function readIpMode(): 'proxy' | 'socket-only' {
+    const raw = process.env.ENSEMBLE_AUTH_IP_MODE;
+    if (raw === undefined) {
+        return 'proxy';
+    }
+    if (raw !== 'socket-only') {
+        throw new Error(
+            `ENSEMBLE_AUTH_IP_MODE must be exactly "socket-only" when set (or unset entirely for ` +
+                `the normal trusted-proxy configuration), got ${JSON.stringify(raw)}`,
+        );
+    }
+    return 'socket-only';
+}
+
 function readDbPath(): string {
     const path = readRequiredEnv('ENSEMBLE_DB_PATH');
     // `node:sqlite` honors SQLite's URI-filename syntax, so `:memory:` is not the only way to
@@ -104,6 +136,30 @@ const revision = process.env.ENSEMBLE_BUILD_REVISION ?? 'development';
 if (revision !== 'development' && !/^[0-9a-f]{40}$/.test(revision)) {
     throw new Error('ENSEMBLE_BUILD_REVISION must be a full lowercase Git SHA or development');
 }
+const ipMode = readIpMode();
+const clientIdentity: ClientIdentityOptions = {
+    secret: readRequiredEnv('ENSEMBLE_AUTH_IP_SECRET'),
+    header: process.env.ENSEMBLE_AUTH_IP_HEADER,
+    trustedProxyAddresses: process.env.ENSEMBLE_AUTH_TRUSTED_PROXY_ADDRESSES?.split(','),
+};
+// Finding 2 (#1196 review): neither proxy-trust var set is only ever correct for local dev/tests
+// with no reverse proxy in front — refuse to start unless that has been explicitly opted into,
+// rather than silently keying every rate limiter off the constant Caddy-fronted socket peer.
+if (
+    clientIdentity.header === undefined &&
+    (clientIdentity.trustedProxyAddresses?.length ?? 0) === 0 &&
+    ipMode !== 'socket-only'
+) {
+    throw new Error(
+        'Neither ENSEMBLE_AUTH_IP_HEADER nor ENSEMBLE_AUTH_TRUSTED_PROXY_ADDRESSES is set. ' +
+            'Behind a reverse proxy this collapses every caller onto one raw-socket-peer rate ' +
+            'limit bucket. Configure both proxy-trust vars, or set ENSEMBLE_AUTH_IP_MODE=socket-only ' +
+            'to explicitly opt into running with no reverse proxy in front (local dev only).',
+    );
+}
+// Fail before database creation. No default Cloudflare/XFF choice: the current static route
+// does NOT sanitize direct-origin spoofing; see the #1192 threat-model evidence.
+createClientIdentity(clientIdentity);
 
 // Nothing above this line touches the filesystem or the network — every env value is validated
 // first. Only past this point does the process open (and, on failure, potentially leave behind)
@@ -113,7 +169,7 @@ const db = openDatabase(dbPath);
 // (`%20`), which readdirSync/readFileSync would then try to open literally rather than decoding.
 runMigrations(db, fileURLToPath(new URL('../migrations', import.meta.url)));
 
-const app = createApp({ db, config });
+const app = createApp({ db, config, clientIdentity });
 registerHealthCheck(app, db, revision);
 
 // This service's one intended startup log line. `noConsole` (biome.json) is scoped to

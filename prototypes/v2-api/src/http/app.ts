@@ -1,17 +1,14 @@
 import type { DatabaseSync } from 'node:sqlite';
-import { getConnInfo } from '@hono/node-server/conninfo';
 import type { AuthenticationResponseJSON, RegistrationResponseJSON } from '@simplewebauthn/server';
 import { type Context, Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import {
     claimRecoveryCode,
     confirmRecoveryCode,
-    createRateLimiter,
     enrollRecoveryCode,
     hasEnrolledRecoveryMaterial,
     issueSession,
     listPasskeys,
-    RECOVERY_CLAIM_RATE_LIMIT,
     RECOVERY_SESSION_TTL_MS,
     readSession,
     revokeOtherSessions,
@@ -33,6 +30,9 @@ import {
     verifyRegistration,
     type WebAuthnConfig,
 } from '../auth/index.js';
+import { isAuthDecisionCode, recordSecurityEvent } from '../auth/security-events.js';
+import { authPolicy } from './auth-policy.js';
+import { type ClientIdentityOptions, createClientIdentity } from './client-identity.js';
 import { jsonOnlyGuard, requestHasBody } from './content-type.js';
 import {
     clearCeremonyCookie,
@@ -49,6 +49,7 @@ import {
     sendError,
 } from './errors.js';
 import { securityHeaders } from './headers.js';
+import { transportRateLimitGuard } from './rate-limit-guard.js';
 import { sameOriginGuard } from './same-origin.js';
 
 /**
@@ -76,30 +77,8 @@ export interface CreateAppOptions {
      * forward to exercise expiry over HTTP.
      */
     sessionTtlMs?: number;
-    /**
-     * Name of a request header carrying the real client IP for the recovery-claim rate limiter
-     * (#1191 adversarial-review P1 finding). Undefined by default: the limiter then keys on the
-     * raw socket address via `getConnInfo`, which is only correct when NOTHING proxies to this
-     * service.
-     *
-     * Setting this (e.g. `'cf-connecting-ip'`) is a claim that the immediate hop in front of this
-     * process strips/overwrites that header for every external caller and only ever forwards its
-     * own verified value. This module does not verify that — it can't, because this standalone
-     * prototype has no fixed deployment topology yet, unlike `same-origin.ts`'s Caddy note or
-     * `headers.ts`'s Cloudflare note, which describe the MAIN app's already-live front door, not
-     * this service's. The deployer configuring `server.ts` is responsible for confirming the
-     * header is actually trustworthy in whatever sits in front of this process before setting it.
-     *
-     * Trusting an unverified header is strictly worse than the raw-socket fallback — it lets an
-     * external caller pick their own rate-limit bucket at will, rather than merely sharing one
-     * bucket with every other caller behind the same proxy (the bug this option exists to fix).
-     * If this service is ever deployed behind a single shared proxy/tunnel hop (the case the
-     * review flagged: every caller's socket address collapses to the proxy's own address, so 1
-     * request/minute from anyone denies recovery to everyone), this MUST be set to that proxy's
-     * verified client-IP header before going live — leaving it unset in that topology is a
-     * denial-of-recovery vector, not merely an imprecise rate limit.
-     */
-    recoveryClaimRateLimitIpHeader?: string;
+    /** HMAC keys; proxy mode requires BOTH exact peer addresses and an upstream-sanitized header. */
+    clientIdentity?: ClientIdentityOptions;
 }
 
 type JsonBodyResult = { ok: true; value: unknown } | { ok: false };
@@ -120,34 +99,10 @@ export function createApp({
     config,
     now = () => Date.now(),
     sessionTtlMs = SESSION_TTL_MS,
-    recoveryClaimRateLimitIpHeader,
+    clientIdentity,
 }: CreateAppOptions): Hono {
-    /**
-     * Caller key for the recovery-claim rate limiter (#1191 decision 10, tightened by
-     * adversarial-review P1). Prefers `recoveryClaimRateLimitIpHeader` when the caller configured
-     * one — see that option's doc comment for why this app never guesses a header to trust on its
-     * own. Falls back to the remote socket address via `@hono/node-server`'s `getConnInfo`,
-     * wrapped in a try/catch: `getConnInfo` reads `c.env.incoming.socket`, which only the real
-     * `@hono/node-server` request listener populates (verified against the installed
-     * `@hono/node-server@2.1.1` — `getRequestListener` passes `{ incoming, outgoing }` as `env`).
-     * Hono's own `app.request()` test helper leaves `c.env` empty unless a test passes a matching
-     * third `Env` argument, which would otherwise throw here. Final fallback is one shared
-     * `'unknown'` bucket — a missing address still rate-limits (just not per-caller) instead of
-     * taking the endpoint down.
-     */
-    function recoveryClaimRateLimitKey(c: Context): string {
-        if (recoveryClaimRateLimitIpHeader !== undefined) {
-            const headerValue = c.req.header(recoveryClaimRateLimitIpHeader);
-            if (headerValue !== undefined && headerValue.trim().length > 0) {
-                return headerValue.trim();
-            }
-        }
-        try {
-            return getConnInfo(c).remote.address ?? 'unknown';
-        } catch {
-            return 'unknown';
-        }
-    }
+    // No raw address reaches a limiter or audit row. Factory-only tests get an ephemeral secret.
+    const identify = createClientIdentity(clientIdentity);
 
     const app = new Hono();
 
@@ -161,6 +116,25 @@ export function createApp({
     // on every response this process ever sends — including a 404 for a path outside /api (a
     // typo'd route, a scanner probe) — not only the ones this app happens to route.
     app.use('*', securityHeaders());
+    // Finding 1(b) (#1196 review): a shared per-identity budget, registered as the FIRST
+    // /api/* middleware — ahead of the auth-failure recorder and every guard below it — so
+    // sameOriginGuard's 403, jsonOnlyGuard's 415, bodyLimit's 413, and authPolicy's
+    // unknown-route 404 (none of which have their own limiter) can't be hammered for free. See
+    // rate-limit-guard.ts's doc comment for why 300/min and why this doesn't replace the
+    // per-route budgets registered further down.
+    app.use('/api/*', transportRateLimitGuard(identify, now));
+    app.use('/api/auth/*', async (c: Context, next) => {
+        await next();
+        const code: unknown = c.get('authErrorCode');
+        // Finding 1(a) (#1196 review): only an actual authentication/authorization DECISION is
+        // audited — not a transport-guard rejection (403/415/413) or an unknown-route 404, all of
+        // which are reachable with zero authentication. See security-events.ts's
+        // AUTH_DECISION_CODES doc comment for the full rationale; this predicate is the single
+        // source of truth for that boundary, not a second list re-derived here.
+        if (isAuthDecisionCode(code)) {
+            recordSecurityEvent(db, { event: 'auth_failure', code }, now());
+        }
+    });
     // Same-origin and JSON-only run BEFORE bodyLimit deliberately: neither guard reads the
     // request body, so a cross-origin or wrong-content-type request carrying an oversized body
     // is rejected on headers alone, without ever buffering or streaming that body through
@@ -182,11 +156,10 @@ export function createApp({
             onError: (c) => sendError(c, 413, 'payload_too_large'),
         }),
     );
+    app.use('/api/auth/*', authPolicy(config, identify, now));
 
     app.notFound((c) => sendError(c, 404, 'not_found'));
-    // `_err` is intentionally unused — Hono's onError signature requires the param, and no
-    // failure reason or stack is ever surfaced to the response (decision 14: no library
-    // messages, ever). Recording it internally belongs to #1192, not this story.
+    // Never serialize an arbitrary exception, even internally; error messages may carry secrets.
     app.onError((_err, c) => sendError(c, 500, 'internal_error'));
 
     /**
@@ -208,6 +181,15 @@ export function createApp({
             const claims = readSession(db, presentedToken, nowMs);
             if (claims !== null) {
                 revokeSession(db, claims.sessionId, claims.accountId, nowMs);
+                recordSecurityEvent(
+                    db,
+                    {
+                        event: 'session_revoked',
+                        accountId: claims.accountId,
+                        credentialId: claims.credentialId ?? undefined,
+                    },
+                    nowMs,
+                );
             }
         }
         const issued = issueSession(db, accountId, nowMs, sessionTtlMs, credentialId);
@@ -287,6 +269,15 @@ export function createApp({
         }
 
         finishAuthentication(c, result.accountId, result.credentialId);
+        recordSecurityEvent(
+            db,
+            {
+                event: 'passkey_added',
+                accountId: result.accountId,
+                credentialId: result.credentialId,
+            },
+            now(),
+        );
         return c.json({ accountId: result.accountId });
     });
 
@@ -351,6 +342,15 @@ export function createApp({
                     return sendError(c, 401, 'unauthenticated');
                 }
                 revokeSession(db, claims.sessionId, claims.accountId, nowMs);
+                recordSecurityEvent(
+                    db,
+                    {
+                        event: 'session_revoked',
+                        accountId: claims.accountId,
+                        credentialId: claims.credentialId ?? undefined,
+                    },
+                    nowMs,
+                );
             }
         }
         clearSessionCookie(c, config);
@@ -363,6 +363,11 @@ export function createApp({
             return session.response;
         }
         revokeOtherSessions(db, session.claims.accountId, session.claims.sessionId, now());
+        recordSecurityEvent(
+            db,
+            { event: 'other_sessions_revoked', accountId: session.claims.accountId },
+            now(),
+        );
         return c.body(null, 204);
     });
 
@@ -491,6 +496,17 @@ export function createApp({
         // Unlike register/verify and login/verify, this does NOT call finishAuthentication —
         // adding a passkey is not itself an authentication event, and the presented session is
         // left exactly as it was.
+        if (!result.alreadyRegistered) {
+            recordSecurityEvent(
+                db,
+                {
+                    event: 'passkey_added',
+                    accountId: session.claims.accountId,
+                    credentialId: result.credentialId,
+                },
+                now(),
+            );
+        }
         return c.json({
             credentialId: result.credentialId,
             alreadyRegistered: result.alreadyRegistered,
@@ -534,6 +550,20 @@ export function createApp({
         if (result.signedOut) {
             clearSessionCookie(c, config);
         }
+        recordSecurityEvent(
+            db,
+            { event: 'passkey_revoked', accountId: session.claims.accountId, credentialId },
+            now(),
+        );
+        recordSecurityEvent(
+            db,
+            {
+                event: 'sessions_revoked_by_credential_revoke',
+                accountId: session.claims.accountId,
+                credentialId,
+            },
+            now(),
+        );
         return c.json({ signedOut: result.signedOut });
     });
 
@@ -590,14 +620,6 @@ export function createApp({
     });
 
     // --- #1191: recovery-code enrollment, claim, and recovery-only passkey enrollment --------
-
-    /**
-     * Factory-produced, closure-captured per `createApp()` call (#1191 decision 10) — never a
-     * module-level singleton — matching every other piece of app state (`now`, `sessionTtlMs`)
-     * and keeping tests isolated per app instance. See `rate-limit.ts`'s doc comment for the
-     * single-container deployment assumption this relies on.
-     */
-    const checkRecoveryClaimRate = createRateLimiter(RECOVERY_CLAIM_RATE_LIMIT);
 
     app.get('/api/auth/recovery/status', (c) => {
         const session = requireSession(c);
@@ -664,18 +686,8 @@ export function createApp({
     });
 
     app.post('/api/auth/recovery/claim', async (c) => {
-        // Rate limit FIRST, before any database lookup (decision 8/10, mutation target 9) — a
-        // rate-limited caller learns nothing about the code's validity, only that they are
-        // rate-limited.
+        // authPolicy checked the independent recovery budget before any database lookup.
         const nowMs = now();
-        const limit = checkRecoveryClaimRate(recoveryClaimRateLimitKey(c), nowMs);
-        if (!limit.allowed) {
-            // `retryAfterMs` was computed but unused before this fix (adversarial-review P3) —
-            // surface it as the standard header so a well-behaved caller backs off instead of
-            // hammering the endpoint again immediately.
-            c.header('Retry-After', String(Math.ceil(limit.retryAfterMs / 1000)));
-            return sendError(c, 429, 'rate_limited');
-        }
 
         const parsed = await parseJsonBody(c);
         if (!parsed.ok) {
@@ -792,6 +804,24 @@ export function createApp({
         // add-passkey, which deliberately does NOT call this) — mint a brand-new STANDARD
         // session bound to the new credential, immediately fresh (decision 12's closing note).
         finishAuthentication(c, result.accountId, result.credentialId);
+        recordSecurityEvent(
+            db,
+            {
+                event: 'account_recovered',
+                accountId: result.accountId,
+                credentialId: result.credentialId,
+            },
+            now(),
+        );
+        recordSecurityEvent(
+            db,
+            {
+                event: 'passkey_added',
+                accountId: result.accountId,
+                credentialId: result.credentialId,
+            },
+            now(),
+        );
         return c.json({ accountId: result.accountId });
     });
 

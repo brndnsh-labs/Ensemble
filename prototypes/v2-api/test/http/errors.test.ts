@@ -41,6 +41,7 @@ type AnyCeremonyFailureReason =
 
 const EXPECTED = {
     malformed_request: { status: 400, error: 'malformed_request' },
+    credential_limit: { status: 409, error: 'credential_limit' },
     ceremony_not_found: { status: 401, error: 'authentication_failed' },
     ceremony_expired: { status: 401, error: 'authentication_failed' },
     ceremony_type_mismatch: { status: 401, error: 'authentication_failed' },
