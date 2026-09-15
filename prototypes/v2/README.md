@@ -99,10 +99,12 @@ local browser projects and never deploys.
   import is available through Import chart; see its explicit boundaries below.
 - Account-local storage/outbox and bounded native form execution are implemented foundations;
   authenticated cloud sync, sharing, admin, remaining iReal semantics, chord discovery,
-  full settings inventory, section-practice controls and visualizer are later work. Genre
-  changes briefly stop/restart playback in this checkpoint, without expanding the focused chart.
-  A failed change restores the previous setup and resumes only if its sounds are still verified;
-  Stop cancels a pending restart. Do not use this as the only copy of important writing yet.
+  full settings inventory, section-practice controls and visualizer are later work. A feel
+  change during playback verifies (and downloads) its sounds while the band keeps playing, then
+  swaps in at the next bar using the engine's own staged-feel path, without expanding the focused
+  chart; the footer reports preparation and the pending bar honestly. A failed change stops,
+  restores the previous setup and resumes only if that setup's sounds are still verified; Stop
+  cancels a pending restart. Do not use this as the only copy of important writing yet.
 - Four bars per laptop/tablet row, two per portrait phone row, scrolling rather than pagination.
   The open song replaces the branding header; Sounds opens over the score without displacing it.
   Playback automatically focuses the chart, hiding editing/save chrome while leaving transport,

@@ -437,8 +437,14 @@ test('feel preparation keeps the stand stable, rolls back playback safely, and r
     await expect(page.locator('.workspace')).toHaveAttribute('data-focused', 'true');
     await expect(page.getByRole('button', { name: 'Stop playback' })).toBeEnabled();
     expect((await page.locator('.chart-scroll').boundingBox())!.y).toBe(chartTop);
+    // #1185 — the band keeps playing *through* preparation rather than being torn
+    // down and rebuilt around it, so sampled audio must keep arriving while this
+    // held download/verification is still in flight.
+    const duringPreparation = await sampleStarts(page);
+    await expect.poll(() => sampleStarts(page)).toBeGreaterThan(duringPreparation);
     await release();
     await expect(page.getByLabel('Feel', { exact: true })).toBeEnabled();
+    await expect(page.getByLabel('Feel', { exact: true })).toHaveValue('Jazz');
     await expect(page.getByRole('button', { name: 'Stop playback' })).toBeEnabled();
     await page.getByLabel('Feel', { exact: true }).selectOption('Blues');
     await expect(page.getByLabel('Feel', { exact: true })).toBeEnabled();
@@ -479,6 +485,38 @@ test('feel preparation keeps the stand stable, rolls back playback safely, and r
     await expect(page.getByLabel('Feel', { exact: true })).toBeEnabled();
     await expect(page.getByRole('button', { name: 'Start playback', exact: true })).toBeEnabled();
     await expect(page.locator('.error-banner')).toContainText('Could not change feel or resume');
+});
+
+test('a feel staged for the next bar settles when the musician stops inside it', async ({
+    page,
+}) => {
+    // Deliberately a built-in-sound band: no pack download can mask the engine
+    // half of a live feel change. A feel changed mid-performance is staged and
+    // swapped in at the next measure start, so the window between the choice and
+    // the swap is real, and a Stop landing inside it must not leave the engine on
+    // the old feel while the captured document already reads the new one (#1185).
+    await page.goto('/v2/');
+    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
+    await page.getByRole('button', { name: 'Start playback', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Stop playback' })).toBeEnabled();
+    await page.getByLabel('Feel', { exact: true }).selectOption('Rock');
+    await expect(page.locator('.playback-footer')).toContainText('Switching feel at the next bar');
+    await page.getByRole('button', { name: 'Stop playback' }).click();
+    await expect(page.getByLabel('Feel', { exact: true })).toBeEnabled();
+    await expect(page.getByLabel('Feel', { exact: true })).toHaveValue('Rock');
+    await expect(page.getByRole('button', { name: 'Start playback', exact: true })).toBeEnabled();
+    await page.getByRole('button', { name: 'Song actions' }).click();
+    const download = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Export file' }).click();
+    const exported = JSON.parse(await readFile((await (await download).path())!, 'utf8'));
+    // Blues would have left feel 'Blues', swing 90 and the 'Blues Shuffle' preset
+    // behind a 'Rock' picker label — one half-changed setup in one document.
+    expect(exported.chart.band.groove).toMatchObject({
+        lastSmartGenre: 'Rock',
+        genreFeel: 'Rock',
+        swing: 0,
+        lastDrumPreset: 'Basic Rock',
+    });
 });
 
 test('real runtime, local saves, reload recovery and offline playback', async ({

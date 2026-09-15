@@ -42,6 +42,14 @@ export { GENRE_NAMES };
 let boot: Promise<void> | undefined;
 let loading = false;
 let playIntent = 0;
+/** Lanes whose voice follows the feel while they are left on Auto (#675). */
+const AUTO_LANES = ['groove', 'bass', 'chords', 'harmony', 'soloist'] as const;
+/**
+ * Ceiling on waiting for the scheduler to swap in a staged feel (#1185). One bar
+ * at the engine's slowest tempo is ~6s; past this the audio clock is not running
+ * (a suspended context, a hidden tab) and waiting longer only strands the UI.
+ */
+const STAGED_FEEL_TIMEOUT_MS = 12_000;
 // Authored source belongs to the host document, never to generated runtime state.
 let currentScore: SemanticScore | null = null;
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
@@ -303,16 +311,29 @@ export async function setVoice(
     rebuild();
 }
 
-export function recommendedVoice(module: InstrumentModule): InstrumentVoice {
+/**
+ * The voice an Auto lane resolves to. `genre`/`chordStyle` default to the live
+ * setup; pass them to resolve against a feel that has not been applied yet.
+ */
+export function recommendedVoice(
+    module: InstrumentModule,
+    genre?: string,
+    chordStyle?: string,
+): InstrumentVoice {
     const state = getState();
     // Resolve the intended mapping, not a temporary synth fallback based on RAM.
     // Every caller prepares these files before committing the choice or playing.
-    return autoVoiceForGenre(state.groove.lastSmartGenre, module, () => true, state.chords.style);
+    return autoVoiceForGenre(
+        genre ?? state.groove.lastSmartGenre,
+        module,
+        () => true,
+        chordStyle ?? state.chords.style,
+    );
 }
 
 /** Called only after the explicit bulk install has fully succeeded. */
 export async function applyGenreSounds(progress: (text: string) => void): Promise<void> {
-    for (const module of ['groove', 'bass', 'chords', 'harmony', 'soloist'] as const) {
+    for (const module of AUTO_LANES) {
         const voice = recommendedVoice(module);
         if (voice !== 'synth') {
             await prepareSound(voice.slice(5), progress);
@@ -389,6 +410,51 @@ export function load(document: ChartDocument): void {
     }
 }
 
+/**
+ * Verify — downloading only if a file is missing — every sound the incoming feel
+ * will select for a lane still on Auto. Deliberately runs before any engine state
+ * changes: nothing is committed while this is in flight, so a failure has nothing
+ * to undo and a band that is already playing keeps its time straight through it.
+ */
+async function prepareFeelSounds(name: string, progress: (text: string) => void): Promise<void> {
+    const state = getState();
+    // `resolveAutoVoices` reads the style the feel is about to install, so resolve
+    // the chords lane against that rather than the outgoing style.
+    const chordStyle = SMART_GENRES[name].chord ?? state.chords.style;
+    for (const module of AUTO_LANES) {
+        if (!state[module].autoSound) {
+            continue;
+        }
+        const voice = recommendedVoice(module, name, chordStyle);
+        if (voice !== 'synth') {
+            await prepareSound(voice.slice(5), progress);
+        }
+    }
+}
+
+/**
+ * Resolve once the scheduler has swapped in a feel that was staged for the next
+ * measure start, or `false` if it never will. Polling is deliberate: the swap
+ * happens inside `applyPendingGenre` in the audio scheduling loop, which offers no
+ * completion signal to subscribe to, and a stopped scheduler never reaches a bar.
+ */
+function awaitStagedFeel(): Promise<boolean> {
+    const deadline = Date.now() + STAGED_FEEL_TIMEOUT_MS;
+    return new Promise((resolve) => {
+        const check = () => {
+            const { groove, playback } = getState();
+            if (!groove.pendingGenreFeel) {
+                resolve(true);
+            } else if (!playback.isPlaying || Date.now() > deadline) {
+                resolve(false);
+            } else {
+                setTimeout(check, 25);
+            }
+        };
+        check();
+    });
+}
+
 export async function setGenre(
     name: string,
     progress: (text: string) => void = () => {},
@@ -398,35 +464,73 @@ export async function setGenre(
     }
     const wasPlaying = getState().playback.isPlaying;
     const previous = captureSessionContent();
-    stop();
+    const payload = { genreName: name, ...SMART_GENRES[name] };
+    // Captured before anything can stop the transport, so a Stop pressed during
+    // preparation is still detectable as a cancellation further down.
     const intent = playIntent;
     try {
-        dispatch(ACTIONS.SET_GENRE_FEEL, { genreName: name, ...SMART_GENRES[name] });
-        for (const module of ['groove', 'bass', 'chords', 'harmony', 'soloist'] as const) {
-            if (getState()[module].autoSound) {
-                const voice = recommendedVoice(module);
-                if (voice !== 'synth') {
-                    await prepareSound(voice.slice(5), progress);
-                }
-            }
-        }
+        // #1185 — prepare first, commit second. The old order stopped the band up
+        // front so that preparation could not fail into a half-changed engine; the
+        // same protection comes free from mutating nothing until the sounds are
+        // verified, and the band plays on through the check.
+        await prepareFeelSounds(name, progress);
+        // Read before the dispatch, not after: the reducer only stages a feel when
+        // the transport is already running, and the scheduler can make the swap
+        // during the await below — so the state afterwards cannot tell the two
+        // paths apart.
+        const staged = getState().playback.isPlaying;
+        dispatch(ACTIONS.SET_GENRE_FEEL, payload);
+        // While playing, that reducer stages the feel and the scheduler swaps it in
+        // at the next measure start (`applyPendingGenre`), re-anchoring the beat and
+        // flushing the worker itself. So this dispatch plus the auto-voice effects
+        // are the entire engine change: no teardown, no rebuild, no restart. A
+        // `rebuild()` here would kill the notes the swap has just scheduled.
         await reconcileUrlGenreOnBoot(getState(), name, null, dispatch);
-        rebuild();
-        if (wasPlaying && intent === playIntent) {
-            await prepareSounds(captureContent(), progress);
-            if (intent === playIntent) {
-                dispatch(ACTIONS.TOGGLE_PLAY);
+        if (!staged) {
+            rebuild();
+            return;
+        }
+        progress('Switching feel at the next bar…');
+        if (await awaitStagedFeel()) {
+            if (payload.drum && getState().groove.lastDrumPreset !== payload.drum) {
+                // The swap fires its drum preset without awaiting it. Settle that
+                // here so the document the caller captures next cannot pair the new
+                // feel with the outgoing genre's pattern.
+                await loadDrumPreset(payload.drum);
             }
+        } else {
+            // Stopped before the bar line (or the audio clock stalled), so the swap
+            // will never happen on its own. Finish it here: with the transport
+            // stopped the same payload applies immediately and brings its drum
+            // preset with it, leaving the engine and the captured document
+            // describing one setup rather than half of each.
+            stop();
+            dispatch(ACTIONS.SET_GENRE_FEEL, payload);
+            await reconcileUrlGenreOnBoot(getState(), name, null, dispatch);
+            rebuild();
         }
     } catch (error) {
+        // A Stop that landed while we were preparing cancels the change outright:
+        // the musician asked for silence, not for a band that resurrects itself.
+        const cancelled = intent !== playIntent;
+        stop();
+        const resumeIntent = playIntent;
         loading = true;
         try {
+            // A failure after the dispatch on line ~482 can leave a staged feel
+            // behind: `apply()` restores the previous *document* content, but
+            // `pendingGenreFeel` is runtime-derived and not part of that content,
+            // so nothing else clears it. Left set, the scheduler would apply the
+            // very feel we just failed to verify at the next measure start once
+            // playback resumes below — landing the band on the failed genre while
+            // `groove.genreFeel`/the UI still (correctly) read the previous one.
+            param('groove', 'pendingGenreFeel', null);
             apply(previous);
             rebuild();
         } finally {
             loading = false;
         }
-        if (wasPlaying && intent === playIntent) {
+        if (wasPlaying && !cancelled) {
             // A failed new feel must not strand a still-playable old band. Recheck
             // its files too: an evicted old pack cannot earn silent synth fallback.
             try {
@@ -436,7 +540,7 @@ export async function setGenre(
                     'Could not change feel or resume the previous sounds. Reconnect and press Play.',
                 );
             }
-            if (intent === playIntent) {
+            if (resumeIntent === playIntent) {
                 dispatch(ACTIONS.TOGGLE_PLAY);
             }
         }
