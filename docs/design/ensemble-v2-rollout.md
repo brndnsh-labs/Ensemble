@@ -24,19 +24,29 @@ a further product decision.
    account whose SSH key is `restrict,command="ensemble-release"`. The script accepts only
    `<stack> <service> sha-<40 hex>`, writes the stack's env file, runs compose for that service
    and waits for the healthcheck. CI holds no docker socket, no sudo, no interactive access.
-3. **Parity bar: core parity.** Before v2 takes `/` it must have: share links (its own, and
-   opening v1's `?s=` links), import of v1 local data (`ensemble_userPresets`, current state)
-   as a one-time, source-preserving copy, the full instrument/sound settings inventory, MIDI and
-   audio export, the section practice loop, and offline install (service worker + manifest at
-   root scope). Visualizer, MIDI in/out and the manual ship after cutover as v2 features.
-4. **v1 retirement: hard cut.** The day v2 takes `/`, v1 is gone. No `/v1/` grace path. This
-   puts the whole weight on decision 3's import and share-link compatibility, so both are
-   cutover-blocking acceptance with fixture-backed tests, not best-effort.
+3. **Parity bar: core parity.** Before v2 takes `/` it must have: share links (v2-only,
+   #1212), import of v1 local data (`ensemble_userPresets`, current state) as a one-time,
+   source-preserving copy, the full instrument/sound settings inventory, MIDI and audio export,
+   the section practice loop (long-press on the section label, #1211), and offline install
+   (service worker + manifest at root scope). Visualizer, MIDI in/out and the manual ship after
+   cutover as v2 features. **Amended 2026-09-15 (Brandon: "don't over-engineer the cutover, we
+   don't have a significant userbase"):** opening v1 `?s=` links on the stand is best-effort,
+   not a fixture-backed gate.
+4. **v1 retirement: hard cut.** The day v2 takes `/`, v1 is gone. No `/v1/` grace path. The
+   v1 local-data import stays fixture-backed and cutover-blocking; old share links are
+   best-effort per decision 3.
 5. **Infra execution: Claude runs docker04 and Caddy changes** through `docker04-admin` and the
    homelab-maintenance scripts (`bin/docker-deploy`, `bin/caddy-deploy`). Brandon supplies
    secrets on request: the API identity HMAC secret, and restic/B2 credentials. GHCR packages for
    this public repo are public, so docker04 needs no pull credential for them.
-6. **Review gates stay.** The API stages keep the independent, cold-context review each exit
+6. **Edge origin authentication (#1227, decided 2026-09-15).** Cloudflare Authenticated Origin
+   Pulls on a dedicated Caddy site block for the two ensemble hosts, so only the real edge can
+   complete a TLS handshake to the origin. Lands before registration opens (phase 3).
+7. **API packaging (#1202, decided 2026-09-15).** The API bundles the canonical Save decoder
+   and songbook codecs from `prototypes/v2/lib` and `public/` with esbuild into one
+   `dist/server.js`; CI bundles before the image build so the Docker context stays the API
+   directory. One decoder, one codec, no reimplementation.
+8. **Review gates stay.** The API stages keep the independent, cold-context review each exit
    gate requires (#1192, #1204 and their successors). Those reviews run as fresh reviewer agents
    with the story's contract and no producer context; Brandon is not asked to re-approve each
    stage. A P0 finding, a destructive data operation on real user data, or a genuinely ambiguous
