@@ -1,7 +1,10 @@
 {
+    // "DOM" is in `lib` for TYPES only: the shared `public/` codecs the Save endpoint bundles
+    // (via prototypes/v2/lib/sync) reference Web Audio / DOM types in type positions. Nothing
+    // here runs in a browser; `platform: 'node'` in build.mjs is what the runtime gets.
     "compilerOptions": {
         "target": "ES2023",
-        "lib": ["ES2023"],
+        "lib": ["ES2023", "DOM"],
         "module": "ESNext",
         "moduleResolution": "Bundler",
         "types": ["node"],

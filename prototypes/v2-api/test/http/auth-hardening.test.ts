@@ -7,6 +7,7 @@ import { assertAccountDeletionCoverage } from '../../src/db/account-deletion-reg
 import { createApp } from '../../src/http/app.js';
 import { AUTH_POLICIES, validAuthBody } from '../../src/http/auth-policy.js';
 import { createClientIdentity } from '../../src/http/client-identity.js';
+import { DOCUMENT_POLICIES } from '../../src/http/documents.js';
 import { createCookieJar } from '../helpers/cookie-jar.js';
 import { createSoftAuthenticator } from '../helpers/soft-authenticator.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/test-db.js';
@@ -58,7 +59,9 @@ describe('deny-by-default HTTP contracts', () => {
             .filter((route) => route.method !== 'ALL')
             .map((route) => `${route.method} ${route.path}`)
             .sort();
-        expect(routes).toEqual(Object.keys(AUTH_POLICIES).sort());
+        expect(routes).toEqual(
+            [...Object.keys(AUTH_POLICIES), ...Object.keys(DOCUMENT_POLICIES)].sort(),
+        );
     });
     it.each(Object.entries(AUTH_POLICIES))(
         '%s rejects unexpected fields/query values before auth state changes',

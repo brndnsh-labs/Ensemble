@@ -35,7 +35,9 @@ export type ApiErrorCode =
     | 'rate_limited'
     | 'credential_limit'
     // Registration is closed by deployment policy (ENSEMBLE_REGISTRATION), not a caller fault.
-    | 'registration_closed';
+    | 'registration_closed'
+    /** #1202: this operation id already committed different bytes; never overwritten. */
+    | 'operation_mismatch';
 
 export function sendError(c: Context, status: ContentfulStatusCode, code: ApiErrorCode) {
     c.set('authErrorCode', code);
