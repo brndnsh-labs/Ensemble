@@ -232,6 +232,77 @@ jobs:
           path: prototypes/v2/test-results/
           retention-days: 7
 
+  # Publish the v2 account API as an immutable image on every merge to main —
+  # decision 1 of docs/design/ensemble-v2-rollout.md (#1216). The API suite itself
+  # already runs inside `checks`, so this job only builds, pushes and smoke-tests
+  # the image; nothing consumes it yet (that is #1219's release step). Fork PRs
+  # never reach it: it runs on the main push only, and the package is public so
+  # docker04 pulls without a credential.
+  api-image:
+    runs-on: ubuntu-latest
+    needs: checks
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
+    env:
+      IMAGE: ghcr.io/brndnsh-labs/ensemble-api
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v7
+        with:
+          context: prototypes/v2-api
+          push: true
+          provenance: false
+          build-args: REVISION=${{ github.sha }}
+          tags: |
+            ${{ env.IMAGE }}:sha-${{ github.sha }}
+            ${{ env.IMAGE }}:main
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Prove the pushed bytes boot: pull the sha tag back from the registry, start
+      # it with a throwaway config and read /healthz. Fails the run (and so the
+      # tag stays unreleased) if the container never becomes healthy or reports a
+      # different revision than the commit that built it.
+      - name: Smoke-test the pushed image
+        run: |
+          set -euo pipefail
+          docker pull --quiet "$IMAGE:sha-$GITHUB_SHA"
+          cid=$(docker run --detach --rm --publish 127.0.0.1:8080:8080 \
+            --env ENSEMBLE_RP_ID=localhost \
+            --env ENSEMBLE_RP_NAME=Ensemble \
+            --env ENSEMBLE_ORIGIN=http://localhost:8080 \
+            --env ENSEMBLE_AUTH_IP_MODE=socket-only \
+            --env "ENSEMBLE_AUTH_IP_SECRET=$(openssl rand -hex 32)" \
+            "$IMAGE:sha-$GITHUB_SHA")
+          trap 'docker logs "$cid" || true; docker stop "$cid" >/dev/null 2>&1 || true' EXIT
+          for _ in $(seq 1 30); do
+            if body=$(curl --silent --fail http://127.0.0.1:8080/healthz); then
+              echo "$body"
+              node --input-type=module --eval '
+                const h = JSON.parse(process.argv[1]);
+                if (h.status !== "ok") throw new Error(`status ${h.status}`);
+                if (h.revision !== process.env.GITHUB_SHA) throw new Error(`revision ${h.revision}`);
+              ' "$body"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::API image never answered /healthz" >&2
+          exit 1
+
   # Continuous deployment: main IS live. A push to main only happens via a green PR
   # merge, so reaching this job means the full gate already passed on this exact
   # commit — deploy it. `workflow_dispatch` on main is a manual break-glass redeploy
