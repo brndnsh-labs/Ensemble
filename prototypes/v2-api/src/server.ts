@@ -137,6 +137,21 @@ if (revision !== 'development' && !/^[0-9a-f]{40}$/.test(revision)) {
     throw new Error('ENSEMBLE_BUILD_REVISION must be a full lowercase Git SHA or development');
 }
 const ipMode = readIpMode();
+// Anonymous registration is CLOSED unless the deployment says `open` in so many words. Unset
+// is closed on purpose: a fresh environment must never accept accounts by omission.
+function readRegistrationOpen(): boolean {
+    const raw = process.env.ENSEMBLE_REGISTRATION;
+    if (raw === undefined || raw === 'closed') {
+        return false;
+    }
+    if (raw === 'open') {
+        return true;
+    }
+    throw new Error(
+        'ENSEMBLE_REGISTRATION must be exactly "open" or "closed" (unset means closed)',
+    );
+}
+const registrationOpen = readRegistrationOpen();
 const clientIdentity: ClientIdentityOptions = {
     secret: readRequiredEnv('ENSEMBLE_AUTH_IP_SECRET'),
     header: process.env.ENSEMBLE_AUTH_IP_HEADER,
@@ -169,14 +184,14 @@ const db = openDatabase(dbPath);
 // (`%20`), which readdirSync/readFileSync would then try to open literally rather than decoding.
 runMigrations(db, fileURLToPath(new URL('../migrations', import.meta.url)));
 
-const app = createApp({ db, config, clientIdentity });
+const app = createApp({ db, config, clientIdentity, registrationOpen });
 registerHealthCheck(app, db, revision);
 
 // This service's one intended startup log line. `noConsole` (biome.json) is scoped to
 // `public/**` only, so it does not apply here.
 const server = serve({ fetch: app.fetch, port, hostname: host }, (info) => {
     console.log(
-        `ensemble-v2-api listening on http://${host}:${info.port} (origin: ${config.origin})`,
+        `ensemble-v2-api listening on http://${host}:${info.port} (origin: ${config.origin}, registration: ${registrationOpen ? 'open' : 'closed'})`,
     );
 });
 

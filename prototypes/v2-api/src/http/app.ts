@@ -79,6 +79,16 @@ export interface CreateAppOptions {
     sessionTtlMs?: number;
     /** HMAC keys; proxy mode requires BOTH exact peer addresses and an upstream-sanitized header. */
     clientIdentity?: ClientIdentityOptions;
+    /**
+     * Whether anonymous passkey registration is accepted. The deployed service defaults this to
+     * CLOSED (`ENSEMBLE_REGISTRATION` in `server.ts`) until the product wires accounts in: the
+     * API is publicly routed since #1218, and an open registration endpoint with nothing calling
+     * it is pure attack surface. Closed returns `403 registration_closed` from both registration
+     * routes, after the same guards and rate limits as every other route, and touches nothing
+     * else — login, sessions, passkey management and recovery keep working for existing accounts.
+     * Defaults to open here so the ceremony test suites exercise the real paths.
+     */
+    registrationOpen?: boolean;
 }
 
 type JsonBodyResult = { ok: true; value: unknown } | { ok: false };
@@ -100,6 +110,7 @@ export function createApp({
     now = () => Date.now(),
     sessionTtlMs = SESSION_TTL_MS,
     clientIdentity,
+    registrationOpen = true,
 }: CreateAppOptions): Hono {
     // No raw address reaches a limiter or audit row. Factory-only tests get an ephemeral secret.
     const identify = createClientIdentity(clientIdentity);
@@ -230,6 +241,9 @@ export function createApp({
     }
 
     app.post('/api/auth/register/options', async (c) => {
+        if (!registrationOpen) {
+            return sendError(c, 403, 'registration_closed');
+        }
         const parsedLabel = await parseOptionalLabel(c);
         if (!parsedLabel.ok) {
             return parsedLabel.response;
@@ -254,6 +268,9 @@ export function createApp({
         // Every verify clears the ceremony cookie, success or failure (decision 13) — it is
         // single-use. Cleared unconditionally, before the outcome is even known.
         clearCeremonyCookie(c, config);
+        if (!registrationOpen) {
+            return sendError(c, 403, 'registration_closed');
+        }
 
         const parsed = await parseJsonBody(c);
         if (!parsed.ok) {

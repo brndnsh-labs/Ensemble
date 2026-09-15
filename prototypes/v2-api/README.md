@@ -327,6 +327,13 @@ passes. The package is public, so docker04 pulls it without a credential. Nothin
 yet; the docker04 stacks (#1217) and the forced-command release step (#1219) consume it. See
 [`docs/design/ensemble-v2-rollout.md`](../../docs/design/ensemble-v2-rollout.md).
 
+**Registration is closed by deployment policy.** `ENSEMBLE_REGISTRATION` must be exactly `open`
+or `closed`; unset means closed, so a fresh environment never accepts accounts by omission. Closed
+answers `403 registration_closed` from `register/options` and `register/verify` (after the same
+guards and rate limits as every route) and changes nothing else — login, sessions, passkey
+management and recovery keep working for existing accounts. Both deployed stacks run closed until
+the product wires accounts in (phase 3 of the rollout); the flip is one env line plus a release.
+
 **Packaging is not approval to expose accounts.** Public routing still requires #1192's
 auth-hardening code and verified proxy trust contract. The container does not guess a trusted
 client-IP header. Startup currently applies migrations; before valuable persistent accounts

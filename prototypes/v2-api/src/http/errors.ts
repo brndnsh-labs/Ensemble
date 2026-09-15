@@ -33,7 +33,9 @@ export type ApiErrorCode =
     | 'fresh_auth_required'
     | 'last_credential'
     | 'rate_limited'
-    | 'credential_limit';
+    | 'credential_limit'
+    // Registration is closed by deployment policy (ENSEMBLE_REGISTRATION), not a caller fault.
+    | 'registration_closed';
 
 export function sendError(c: Context, status: ContentfulStatusCode, code: ApiErrorCode) {
     c.set('authErrorCode', code);
