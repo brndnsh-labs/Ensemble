@@ -318,6 +318,15 @@ headers, never sets a cookie, and sits outside authentication rate-limit routes.
 opening the database. The OCI revision label records the build argument independently.
 Expose only `/api/*` through Caddy; keep `/healthz` on the container/operator network.
 
+### Published image (#1216)
+
+CI publishes this Dockerfile on every merge to `main` as
+`ghcr.io/brndnsh-labs/ensemble-api:sha-<commit>` (plus a moving `:main` tag), then pulls the
+`sha-` tag back and asserts `/healthz` answers `ok` with that exact revision before the job
+passes. The package is public, so docker04 pulls it without a credential. Nothing runs the image
+yet; the docker04 stacks (#1217) and the forced-command release step (#1219) consume it. See
+[`docs/design/ensemble-v2-rollout.md`](../../docs/design/ensemble-v2-rollout.md).
+
 **Packaging is not approval to expose accounts.** Public routing still requires #1192's
 auth-hardening code and verified proxy trust contract. The container does not guess a trusted
 client-IP header. Startup currently applies migrations; before valuable persistent accounts
