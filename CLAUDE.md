@@ -36,10 +36,11 @@ Node service) still has **no** deploy target; accounts and sync are parked. So:
 - A story touching **`public/**`** is live production code on that same merge, under the full
   prod gate — the shared songbook codecs, engine hooks and state slices very much included, and
   the v2 export compiles `public/` too, so `v2-checks` must stay green.
-- **This is not a v1→v2 cutover.** v1 stays at `/` and is the app the PWA install and share
+- **This is not yet the v1→v2 cutover.** v1 stays at `/` and is the app the PWA install and share
   links point at. v2 keeps its own IndexedDB and `localStorage` keys; anything saved there is
-  invisible to the v1 app and has no migration path. Replacing v1 with v2 (feature parity,
-  shared runtime extraction, storage migration) is separate, unshaped work with its own decision.
+  invisible to the v1 app. The cutover is planned and authorized as the end of
+  [`docs/design/ensemble-v2-rollout.md`](docs/design/ensemble-v2-rollout.md) (DECISION
+  2026-09-15): API online → document API → accounts in the product → core parity → hard cut.
 
 The original application's Preact/component conventions below still apply to `public/`. The
 isolated v2 shell uses its existing React components; do not migrate either UI as a side effect
