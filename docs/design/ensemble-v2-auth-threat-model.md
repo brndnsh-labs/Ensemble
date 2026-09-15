@@ -2,8 +2,10 @@
 
 Issue [#1192](https://github.com/brndnsh-labs/Ensemble/issues/1192), stage 2 of the
 [account/sync contract](ensemble-v2-sync.md). This document describes the standalone
-`prototypes/v2-api/` implementation on disposable data. It does not authorize deployment,
-production migration, a real account launch, or stage-3 work while the exit gate remains open.
+`prototypes/v2-api/` implementation on disposable data. It did not authorize deployment while the
+exit gate was open; since 2026-09-15 the service runs on docker04 behind Caddy's `/api/*` split
+(#1217, #1218) with **anonymous registration closed by deployment policy** (#1226). It still does
+not authorize production migration or a real account launch.
 
 ## Trust boundaries and ownership
 
@@ -169,13 +171,70 @@ The recommended future **API-scoped** route should accept only immediate Cloudfl
 CF-Connecting-IP, and reject direct non-Cloudflare API requests. The API then trusts that header
 only from measured exact Caddy socket addresses. If LAN access is intentionally allowed, the
 route must instead overwrite the canonical header from the real remote socket for non-CF peers.
-This is a deployment recommendation, not a deployed control. The existing static route was not
-changed. A future receipt must prove the actual API hop, XFF/custom-header spoof resistance,
-direct-origin rejection/canonicalization and distinct legitimate callers' independent buckets.
+Deployed 2026-09-15 as the second permitted shape (canonicalize, not reject, non-CF peers);
+the receipt is below.
 
-**Stage-exit gap:** the real chain is empirically assessed and demonstrably not ready to provide
-a trustworthy API identity. Operator-scoped route configuration and actual API socket probes
-remain required. Neither passing unit tests nor merely selecting `cf-connecting-ip` closes it.
+### Live proxy identity receipt (2026-09-15, #1218)
+
+Deployed control (homelab-maintenance `caddy/Caddyfile`): global `client_ip_headers
+CF-Connecting-IP X-Forwarded-For` beside the existing Cloudflare `trusted_proxies`, and per host
+a named-matcher `handle` for `/api/*` — placed before the host handles so the per-host
+`default_app_policy`/`ensemble_cache_policy` imports never touch API responses; the site-level
+`security_headers` (HSTS, nosniff) and `compress` still apply, verified by a live `GET` — that
+proxies to the API container with
+`header_up X-Ensemble-Client-IP {client_ip}`. The API (`ENSEMBLE_AUTH_IP_HEADER=
+x-ensemble-client-ip`, `ENSEMBLE_AUTH_TRUSTED_PROXY_ADDRESSES=192.168.1.244`) trusts the
+header only when its socket peer is Caddy's address, which Docker's DNAT preserves into the
+container. Nothing but `/api/*` is routed: `/healthz` and `/api/healthz` are public 404s.
+
+Observable: the `POST /api/auth/sessions/revoke-others` per-identity budget (10/min). Every
+probe carried a valid same-origin `Origin` and JSON body so it reached the per-route limiter.
+
+| Phase | Caller | Forged headers | Result |
+| --- | --- | --- | --- |
+| A | workstation via the Cloudflare edge | none | 10 × 401, then 429 |
+| B | same, immediately after A | `X-Forwarded-For`, `X-Ensemble-Client-IP` | 429 × 3 — same bucket as A |
+| B2 | same | `CF-Connecting-IP` | 403 × 2 from Cloudflare before the origin |
+| C | docker04 direct to Caddy's LAN address (non-CF peer) | none | 10 × 401, then 429 — independent of A's exhausted bucket |
+| D | same, immediately after C | `CF-Connecting-IP`, `X-Forwarded-For`, `X-Ensemble-Client-IP` | 429 × 3 — same bucket as C |
+
+Caddy's access log for the same requests: every edge request logged `client_ip` equal to the
+workstation's real address taken from `CF-Connecting-IP`, with the forged `203.0.113.9` visible
+only as an ignored `X-Forwarded-For` prefix; every direct-origin request logged `client_ip`
+`192.168.1.52` (the socket peer) with the forged `198.51.100.7` present in both `CF-Connecting-IP`
+and `X-Forwarded-For` and ignored. The API's `/api/auth/session` answers 401 with its own
+`Cache-Control: private, no-store` and `default-src 'none'` CSP through the edge, proving the
+per-host Caddy `header` imports do not overwrite API responses.
+
+Phases A and C are two different *paths* (edge-keyed on the header, LAN-keyed on the socket), so
+"two distinct public visitors get independent buckets" is an inference from the access-log line
+(`client_ip` = `CF-Connecting-IP` per request), not a measurement: no second public address was
+available in-session. Phase 3's physical-device acceptance measures it directly (two devices on
+different networks against the same budget).
+
+Residuals, after the independent review of this receipt (2026-09-15):
+
+- **A peer inside Cloudflare's IP ranges that reaches the origin directly is trusted like the
+  edge** and can set `CF-Connecting-IP` freely — unlimited rate-bucket identities and a poisoned
+  access-log `client_ip`. Preconditions: origin-IP disclosure and 443 accepting direct
+  connections. Pre-existing, but #1218 made `{client_ip}` a security control. Fix is Cloudflare
+  Authenticated Origin Pulls (#1227, needs-decision); until then anonymous registration is
+  closed by deployment policy (#1226), so the exposure is abuse of rate budgets, not accounts.
+- `client_ip_headers` is `CF-Connecting-IP` **only**. The initial deploy also listed
+  `X-Forwarded-For` as a fallback; the review showed Caddy takes the first parseable IP across
+  every listed header and XFF's leftmost element is client-supplied, so it was removed the same
+  day. Cloudflare's IPv6 ranges were added to `trusted_proxies` at the same time.
+- Non-CF peers are canonicalized to their socket address, not rejected (the second permitted
+  shape). All tailnet devices arrive as the subnet router's single LAN address, so they share
+  **one** bucket, not one per device; LAN hosts get one each.
+- The `client_ip_headers` change is global to the Caddy box. Before it, every site's access-log
+  `client_ip` came from XFF's leftmost element, which the 2026-09-12 probe showed survives the
+  edge attacker-controlled — so fail2ban could be steered to ban an arbitrary address. #1218
+  closed that for every site; the jails deserve a re-check rather than a "same value" footnote.
+
+**Stage-exit gap (2026-09-12) — closed 2026-09-15** by the deployed route and the receipt above.
+What closed it was the actual API hop plus live socket probes, not unit tests or header
+selection; the residuals above are what remains, and #1227 must land before registration opens.
 
 ## Audit privacy, retention and account deletion
 
@@ -228,7 +287,7 @@ add replicas or change the shared transaction helper as an incidental optimizati
 | Concurrent recovery claims; interruption preserves sole recovery route | Recovery suite proves one successful claim, expiry retry, transaction rollback and no premature consume. |
 | Bounded endpoint payloads/counts and real limiter blocks | `test/http/auth-hardening.test.ts` covers every registered route, collection/scalar bounds, independent thresholds and commit-time credential cap; real socket body tests retained. |
 | Private audit and deletion coverage | Sentinel-secret and deliberately failed SQLite audit-write tests; schema drift test adds an unclassified owner table and proves rejection. |
-| Real proxy identity verified safe | **Unmet:** live static-chain probes expose direct-origin CF spoofing; no actual API hop exists yet. Required operator work is specified above. |
+| Real proxy identity verified safe | **Met 2026-09-15 (#1218).** The API runs behind Caddy's `/api/*` split with `X-Ensemble-Client-IP` overwritten from `{client_ip}`; live probes below show edge and direct-origin header forgery cannot move a caller between rate buckets; edge and LAN paths are keyed independently, and per-visitor independence through the edge follows from the logged `client_ip` (measured directly in phase 3). Residuals: #1227. |
 | Implementation choices and independent threat-model review complete | **Done.** An independent review ran against PR #1196 (branch `feat/v2-auth-hardening`) and returned two real findings, both fixed in that same PR — see below. Everything else the review examined (the client-identity HMAC scheme, the passkey transactional bound, the deletion registry, the route-policy drift guard) came back clean and unchanged. |
 
 ### #1196 independent review findings
@@ -267,15 +326,10 @@ add replicas or change the shared transaction helper as an incidental optimizati
   proving the legitimate local-dev shape (neither var, `ENSEMBLE_AUTH_IP_MODE=socket-only`) starts
   cleanly.
 
-**Known limitation, unchanged by this patch:** the "Real proxy identity verified safe" row above
-is still unmet — the live static-chain probe evidence of direct-origin CF/Caddy spoofing stands,
-and no actual API hop is deployed yet. That is separate, pre-existing operator work, not part of
-either finding above.
-
-This receipt intentionally leaves stage 2 open. Stage 3 must not start until the unresolved
-identity proof above is satisfied and the integration owner records the actual checked revision
-and gates. Physical passkey/device acceptance, backup/restore and public rollout remain later
-stages even after the stage-2 implementation gates pass.
+**Historical note:** at the time of the #1196 review the "Real proxy identity verified safe" row
+was still unmet and this receipt left stage 2 open. The row was met on 2026-09-15 by #1218 (see
+"Live proxy identity receipt"), which is what closes stage 2. Physical passkey/device acceptance,
+backup/restore (#1220) and opening registration (#1226, gated on #1227) remain later stages.
 
 The local `test/http/client-identity.socket.test.ts` also drives a real Node/Hono listener past
 the recovery threshold while changing XFF, then proves a second configured client-header identity
