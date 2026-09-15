@@ -334,8 +334,8 @@ guards and rate limits as every route) and changes nothing else — login, sessi
 management and recovery keep working for existing accounts. Both deployed stacks run closed until
 the product wires accounts in (phase 3 of the rollout); the flip is one env line plus a release.
 
-**Packaging is not approval to expose accounts.** Public routing still requires #1192's
-auth-hardening code and verified proxy trust contract. The container does not guess a trusted
+**The API is publicly routed since 2026-09-15** (#1217 stacks, #1218 Caddy split with the verified
+proxy-trust receipt in the threat model). No account UI exists yet; the routes answer, nothing calls them. The container does not guess a trusted
 client-IP header. Startup currently applies migrations; before valuable persistent accounts
 exist, add the approved backup-before-migrate and restore rehearsal. Image rollback alone
 does not reverse a database migration, and an image tag is not proof that an older binary can
