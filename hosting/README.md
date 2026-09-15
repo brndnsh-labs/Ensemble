@@ -15,6 +15,11 @@ needed to publish static files. The entire parent directory is mounted read-only
 sees atomic symlink changes instead of Docker pinning one release's inode.
 
 ```text
+/opt/docker/{ensembletest,ensemble}/
+  docker-compose.yml          rendered stack: static runtime + api service (#1217)
+  .env                        ENSEMBLE_API_TAG=sha-… — written by the release step (#1219)
+/var/lib/docker-data/{ensembletest,ensemble}/env/api.env   root-only API secret
+/var/lib/docker/volumes/{ensembletest,ensemble}-api-data/   SQLite database (named volume)
 /srv/ensemble-{test,prod}/www/
   .ensemble-static-root       provisioning marker: ensemble-static-v1
   .releases/<revision>-<uuid>/ complete, checksum-verified static artifacts
@@ -78,23 +83,52 @@ migrations. No tsx, source/test tree, database or secret is baked into the runti
 runs non-root. `/healthz` performs a read-only schema query and returns bounded readiness and
 revision, without cookies or auth-rate-budget use. Keep it on the operator/container network.
 
-The future same-origin `/api/*` route must point directly from Caddy to this separate service.
-Static publishing never starts, restarts or migrates it. No API image publishing workflow or
-public route is enabled by this change. In particular, this packaging branch is not a substitute
-for the auth-hardening draft **#1196 / #1192**; combine and re-review those changes before any
-public account endpoint is exposed.
+The same-origin `/api/*` route points directly from Caddy to this separate service (#1218).
+Static publishing never starts, restarts or migrates it.
+
+### The `api` service in the shared stack (#1217)
+
+`static/compose.yml` carries a second service, `api`, that `render.mjs` emits as
+`ensembletest-api` / `ensemble-api` beside the static container in the same homelab stack:
+
+| Setting | Test | Prod |
+| --- | --- | --- |
+| Image | `ghcr.io/brndnsh-labs/ensemble-api:${ENSEMBLE_API_TAG:-<pinned>}` | same |
+| Host port (Caddy only, firewalled) | 8092 | 8093 |
+| `ENSEMBLE_RP_ID` / `ENSEMBLE_ORIGIN` | `ensembletest.brndn.zip` | `ensemble.brndn.zip` |
+| Database | named volume `ensembletest-api-data` at `/data` | `ensemble-api-data` |
+| Secret env file (root, 0600) | `/var/lib/docker-data/ensembletest/env/api.env` | `/var/lib/docker-data/ensemble/env/api.env` |
+
+The env file holds exactly one line, `ENSEMBLE_AUTH_IP_SECRET=<64 hex>`, generated on the box
+with `openssl rand -hex 32`. Everything else is plain `environment:` in the recipe, including
+the proxy-trust pair: `ENSEMBLE_AUTH_IP_HEADER=x-ensemble-client-ip` (lowercase — the API
+validates the name) and `ENSEMBLE_AUTH_TRUSTED_PROXY_ADDRESSES=192.168.1.244`. That address is
+Caddy's, and it is what the container actually sees as the socket peer: Docker DNATs published
+ports without rewriting the source (measured in the static container's nginx log, 2026-09-15).
+The API trusts the header from that peer alone; anything else is keyed on its own socket address.
+
+**The image tag is the one interpolation in a rendered stack, on purpose.** Render with the tag
+to pin as the default — `ENSEMBLE_API_TAG=sha-<full sha> node hosting/static/render.mjs prod` —
+and `docker compose config` validates the file anywhere with no `.env` present, which is what
+`bin/docker-deploy` does from `/tmp` on the box. On the box, `/opt/docker/<stack>/.env` holds
+the live `ENSEMBLE_API_TAG=` line written by the forced-command release step (#1219); Compose
+reads it from the project directory (the compose file's directory), so a config redeploy with
+`bin/docker-deploy` keeps the released tag rather than rolling the API back to the render-time
+pin. Rendering runs Compose with `--no-env-resolution` so the `env_file` reference survives
+into the output instead of being inlined (empty) at render time.
+
+`/healthz` is reachable from docker04 only (`curl http://127.0.0.1:8092/healthz`); Caddy
+routes `/api/*` and nothing else. One replica per environment: SQLite and the in-memory rate
+limiter are not horizontally scaled.
 
 Remaining API rollout requirements:
 
-- Immutable GHCR image identity and a separate test-only Compose stack; runtime env/secrets
-  via operator tooling, never chat or committed files. The database bind mount must be outside
-  the static root and writable by UID 1000, with no test/prod sharing.
-- Scoped Caddy client-IP sanitation and exact measured trusted socket peer; reject or safely
-  canonicalize direct-origin callers. Do not trust caller-supplied X-Forwarded-For or blindly
-  forward CF-Connecting-IP from a LAN request. Verify real routed independent rate budgets.
-- Fresh disposable auth data for initial verification. Before durable accounts/songbooks,
-  WAL-safe backup, actual restore rehearsal and backup-before-migrate must replace the current
-  disposable-stage migrate-on-start assumption. Static rollback is not database rollback.
+- Scoped Caddy client-IP sanitation on the `/api/*` route and the live spoof-resistance probes
+  (#1218). Do not trust caller-supplied X-Forwarded-For or blindly forward CF-Connecting-IP from
+  a LAN request. Verify real routed independent rate budgets.
+- WAL-safe backup, actual restore rehearsal and backup-before-migrate (#1220) before durable
+  accounts/songbooks replace the disposable-stage migrate-on-start assumption. Static rollback
+  is not database rollback.
 
 ## Releasing the API from CI (#1219)
 

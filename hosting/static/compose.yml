@@ -1,5 +1,8 @@
-# One runtime recipe; only the data directory and host port vary by environment.
-# Copy this reviewed recipe + nginx.conf through homelab config-as-code tooling.
+# One runtime recipe; only the data directory, host ports, origin and image tag vary
+# by environment. Copy this reviewed recipe + nginx.conf through homelab config-as-code
+# tooling (render.mjs resolves everything except the API image tag, which stays an
+# interpolation with a default so the forced-command release step can bump it through
+# the stack's .env without a config redeploy — see hosting/README.md).
 services:
   static:
     image: nginx:1.29-alpine@sha256:5616878291a2eed594aee8db4dade5878cf7edcb475e59193904b198d9b830de
@@ -37,3 +40,49 @@ services:
       options:
         max-size: 10m
         max-file: "3"
+
+  # The v2 account API (#1217): one replica, SQLite on a named volume, reachable only
+  # through Caddy's /api/* split on the same origin. The image is immutable per commit
+  # (#1216); ENSEMBLE_API_TAG is the one value the release step (#1219) changes.
+  api:
+    image: ghcr.io/brndnsh-labs/ensemble-api:${ENSEMBLE_API_TAG:?set the pinned image tag}
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 200
+    mem_limit: 256m
+    tmpfs: ["/tmp:size=16m,mode=1777"]
+    stop_grace_period: 30s
+    ports: ["${ENSEMBLE_API_PORT:?set environment api port}:8080"]
+    environment:
+      ENSEMBLE_RP_ID: ${ENSEMBLE_HOSTNAME:?set environment hostname}
+      ENSEMBLE_RP_NAME: Ensemble
+      ENSEMBLE_ORIGIN: https://${ENSEMBLE_HOSTNAME:?set environment hostname}
+      # Caddy overwrites this header from its verified client IP (#1218); the API
+      # trusts it only when the socket peer is exactly Caddy, whose LAN address
+      # survives Docker's DNAT into the container (measured 2026-09-15).
+      ENSEMBLE_AUTH_IP_HEADER: x-ensemble-client-ip
+      ENSEMBLE_AUTH_TRUSTED_PROXY_ADDRESSES: 192.168.1.244
+    # Root-only (0600) file holding ENSEMBLE_AUTH_IP_SECRET, nothing else. Compose
+    # stats it at config time; render.mjs satisfies that off-box with an empty temp
+    # file (config runs with --no-env-resolution so the reference survives) and
+    # rewrites the path to the on-box location in the output.
+    env_file:
+      - path: ${ENSEMBLE_API_ENV_FILE:?set absolute api env file path}
+        required: true
+    volumes:
+      - type: volume
+        source: api-data
+        target: /data
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+volumes:
+  api-data:
+    # Pinned per environment by render.mjs so backup/restore address a stable path
+    # under /var/lib/docker/volumes (the 100 GB Docker disk, never /var).
+    name: ${ENSEMBLE_API_VOLUME:?set environment api volume name}
