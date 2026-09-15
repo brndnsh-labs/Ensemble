@@ -96,6 +96,29 @@ Remaining API rollout requirements:
   WAL-safe backup, actual restore rehearsal and backup-before-migrate must replace the current
   disposable-stage migrate-on-start assumption. Static rollback is not database rollback.
 
+## Releasing the API from CI (#1219)
+
+CI never gets a shell on docker04. Two scoped accounts, two keys, two jobs of work:
+
+| Account | Key secret | Can do | Cannot do |
+| --- | --- | --- | --- |
+| `ensemble-deploy` | `DEPLOY_SSH_KEY` | write the production static root, activate `current` | sudo, Docker, test root, nginx config |
+| `ensemble-release` | `API_RELEASE_SSH_KEY` | `release <ensembletest\|ensemble> api sha-<40 hex>` | anything else — the key is `restrict,command=` to a gate script |
+
+The gate (`homelab-maintenance/docker/ensemble/release/ensemble-release-gate`) parses
+`SSH_ORIGINAL_COMMAND`, refuses anything but that exact shape, and sudoes — via a sudoers rule
+scoped to one path — into the root-owned `ensemble-release` script, which writes
+`ENSEMBLE_API_TAG` into `/opt/docker/<stack>/.env`, recreates only the `api` service and waits
+for its healthcheck. An unhealthy result restores the previous tag and recreates again, so a bad
+image fails the CI step without taking the API down. The account is in no `docker` group and
+has no password; its home, key file and scripts are root-owned. Provisioning is
+`docker/ensemble/release/provision.sh` (idempotent, run as root with the CI public key).
+
+The `deploy` job releases prod then test after the static publishes, and only for the image
+`api-image` built from the same commit (`deploy` now `needs` that job). A `workflow_dispatch`
+hosting probe exercises the release account negatively instead: shell, foreign stack, floating
+tag, short tag and wrong service must all be refused.
+
 ## Operator rollout and production gate
 
 1. Reconcile the homelab mirror with the live **Ensemble-only** files before deploying. The

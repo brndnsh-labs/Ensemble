@@ -241,7 +241,7 @@ jobs:
   api-image:
     runs-on: ubuntu-latest
     needs: checks
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     timeout-minutes: 15
     permissions:
       contents: read
@@ -320,8 +320,17 @@ jobs:
   # may run on a reviewed branch, but cannot execute the deployment step.
   deploy:
     runs-on: ubuntu-latest
-    needs: [checks, e2e-tests, v2-checks]
-    if: (github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')) || (github.event_name == 'workflow_dispatch' && inputs.hosting_probe)
+    needs: [checks, e2e-tests, v2-checks, api-image]
+    # `api-image` is skipped on a non-main hosting probe, and a skipped `needs`
+    # would skip this job too; spell out that the three gates must have passed
+    # and the image job must have passed or been skipped for that reason only.
+    if: >-
+      !cancelled()
+      && needs.checks.result == 'success'
+      && needs.e2e-tests.result == 'success'
+      && needs.v2-checks.result == 'success'
+      && (needs.api-image.result == 'success' || (needs.api-image.result == 'skipped' && github.ref != 'refs/heads/main'))
+      && ((github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')) || (github.event_name == 'workflow_dispatch' && inputs.hosting_probe))
     timeout-minutes: 10
     env:
       PROD_DEPLOY_HOST: ${{ vars.PROD_DEPLOY_DOCKER_HOST }}
@@ -405,6 +414,27 @@ jobs:
             echo "  StrictHostKeyChecking accept-new"
           } >> ~/.ssh/config
 
+      # The API release goes through a SECOND, separately scoped account (#1219):
+      # `ensemble-release`, whose key is a forced command that accepts only
+      # `release <stack> api sha-<sha>` and sudoes into one root-owned script on
+      # docker04 (homelab-maintenance docker/ensemble/release/). CI still holds
+      # no shell, no docker socket and no sudo of its own.
+      - name: Configure API release SSH
+        env:
+          API_RELEASE_SSH_KEY: ${{ secrets.API_RELEASE_SSH_KEY }}
+        run: |
+          [[ -n "$API_RELEASE_SSH_KEY" ]] || { echo '::error::Missing API_RELEASE_SSH_KEY secret'; exit 1; }
+          printf '%s\n' "$API_RELEASE_SSH_KEY" > ~/.ssh/ci_release_key
+          chmod 600 ~/.ssh/ci_release_key
+          {
+            echo "Host ensemble-release"
+            echo "  HostName $PROD_DEPLOY_HOST"
+            echo "  User ensemble-release"
+            echo "  IdentityFile ~/.ssh/ci_release_key"
+            echo "  IdentitiesOnly yes"
+            echo "  StrictHostKeyChecking accept-new"
+          } >> ~/.ssh/config
+
       - name: Probe docker04 without deploying
         if: inputs.hosting_probe
         run: |
@@ -419,6 +449,18 @@ jobs:
           cd /srv/ensemble-prod/www/current
           sha256sum --check --strict --quiet .ensemble-checksums
           REMOTE
+
+      - name: Probe the API release account without releasing
+        if: inputs.hosting_probe
+        run: |
+          set -euo pipefail
+          refused() { ! ssh -o BatchMode=yes ensemble-release "$@" >/dev/null 2>&1; }
+          refused 'id'                                   # no shell
+          refused 'release breakscope api sha-'"$GITHUB_SHA"   # foreign stack
+          refused 'release ensemble api latest'          # floating tag
+          refused 'release ensemble api sha-abc'         # short tag
+          refused 'release ensemble static sha-'"$GITHUB_SHA"  # wrong service
+          echo 'ensemble-release refuses every malformed command'
           for port in 8090 8091 2375 2376; do
             if timeout 3 bash -c 'exec 3<>/dev/tcp/$1/$2' _ "$PROD_DEPLOY_HOST" "$port" 2>/dev/null; then
               echo "::error::CI unexpectedly reached backend port $port"; exit 1
@@ -444,3 +486,15 @@ jobs:
         if: ${{ github.ref == 'refs/heads/main' && !inputs.hosting_probe }}
         run: node scripts/deploy.mjs prod
         working-directory: prototypes/v2
+
+      # Roll the image this exact commit built (api-image above) into prod, then
+      # test (test follows main until a branch-audition need appears). The script
+      # on the box waits for the healthcheck and rolls back on failure, so a red
+      # step here means the API is still serving the previous tag.
+      - name: Release the account API
+        if: ${{ github.ref == 'refs/heads/main' && !inputs.hosting_probe }}
+        run: |
+          set -euo pipefail
+          for stack in ensemble ensembletest; do
+            ssh -o BatchMode=yes ensemble-release "release $stack api sha-$GITHUB_SHA"
+          done
