@@ -20,8 +20,11 @@ if (!/^sha-[0-9a-f]{40}$/.test(pinnedTag ?? '')) {
     throw new Error('Set ENSEMBLE_API_TAG=sha-<full commit sha> to the tag to pin as the default');
 }
 const TAG_PLACEHOLDER = 'RENDER-API-TAG-PLACEHOLDER';
-// Compose stats env_file at config time, so an empty stand-in satisfies it here and
-// its path is rewritten to the on-box location in the rendered output.
+// Compose stats env_file at config time, so an empty stand-in satisfies the first pass.
+// The reference itself is then dropped from the model and re-inserted into the rendered
+// YAML by hand: whether `config` preserves env_file varies by Compose version (v5 keeps
+// it under --no-env-resolution, v2.38 on the CI runner drops it), and a rendered stack
+// that silently lost its secret file would start an API that refuses to boot.
 const apiEnvFile = `/var/lib/docker-data/${name}/env/api.env`;
 const scratch = mkdtempSync(path.join(tmpdir(), 'ensemble-render-'));
 const apiEnvStandIn = path.join(scratch, 'api.env');
@@ -66,6 +69,8 @@ model.services[name] = { ...model.services.static, container_name: name };
 delete model.services.static;
 model.services[`${name}-api`] = { ...model.services.api, container_name: `${name}-api` };
 delete model.services.api;
+delete model.services[`${name}-api`].env_file;
+delete model.services[`${name}-api`].environment?.ENSEMBLE_AUTH_IP_SECRET;
 const yaml = execFileSync(
     'docker',
     ['compose', '--project-name', name, '-f', '-', 'config', '--no-env-resolution'],
@@ -88,9 +93,12 @@ const rendered = substitute(
         `ensemble-api:${TAG_PLACEHOLDER}`,
         `ensemble-api:\${ENSEMBLE_API_TAG:-${pinnedTag}}`,
     ),
-    apiEnvStandIn,
-    apiEnvFile,
+    `    container_name: ${name}-api\n`,
+    `    container_name: ${name}-api\n    env_file:\n      - path: ${apiEnvFile}\n        required: true\n`,
 );
+if (rendered.includes(apiEnvStandIn) || rendered.includes('ENSEMBLE_AUTH_IP_SECRET')) {
+    throw new Error('Render-time stand-in leaked into the rendered stack');
+}
 console.log(
     `# Generated from Ensemble hosting/static/compose.yml via render.mjs ${environment}.\n# Do not edit independently; regenerate both environment recipes from the shared source.\n# The API image tag is the one interpolation here, by design: its default is the tag\n# pinned at render time and the on-box .env (written by the release step) overrides it.\n${rendered}`,
 );
