@@ -116,7 +116,7 @@ local browser projects and never deploys.
   by `color-scheme`; unset follows the system, a tap stores `ensemble-v2-preview:theme` as a
   per-device convenience (never a document field) and is applied before hydration. Band chips
   (#1210) read on/off at a distance — filled green versus dashed/hollow/struck — and toggling
-  never reflows the row; a muted chip's accessible name says "muted".
+  never reflows the row; the chip's name stays put and `aria-pressed` carries the state.
 
 ## Measure-based charts (#1171)
 

@@ -1152,9 +1152,6 @@ export default function Ensemble() {
                                 >
                                     <span className="dot" />
                                     <span className="label">{label}</span>
-                                    {!current.chart.band[key].enabled && (
-                                        <span className="sr"> muted</span>
-                                    )}
                                 </button>
                             ))}
                         </div>

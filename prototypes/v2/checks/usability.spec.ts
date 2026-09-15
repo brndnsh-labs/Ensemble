@@ -560,11 +560,11 @@ test('a muted lane reads as muted at a distance and toggling never reflows the r
     expect(on.borderStyle).toBe('solid');
     expect(on.background).not.toBe('rgba(0, 0, 0, 0)');
     await drums.click();
-    // #1210: hollow chip — dashed border, hollow dot, transparent fill — and the
-    // accessible name says so rather than relying on aria-pressed alone.
-    const muted = page.getByRole('button', { name: 'Drums muted' });
-    await expect(muted).toHaveAttribute('aria-pressed', 'false');
-    const off = await muted.evaluate((element) => {
+    // #1210: hollow chip — dashed border, hollow dot, transparent fill. The
+    // accessible name stays "Drums" (a toggle's label must not change with its
+    // state, per the ARIA button pattern); aria-pressed carries the state.
+    await expect(drums).toHaveAttribute('aria-pressed', 'false');
+    const off = await drums.evaluate((element) => {
         const style = getComputedStyle(element);
         const dot = getComputedStyle(element.querySelector('.dot') as HTMLElement);
         return {
