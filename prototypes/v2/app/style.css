@@ -1,15 +1,37 @@
 :root {
-    --paper: #f7f5ef;
-    --surface: #fffefa;
-    --ink: #222923;
-    --muted: #72766c;
-    --line: #e3e3d9;
-    --accent: #b34e34;
-    --accent-light: #f4e5da;
-    --green: #315d49;
-    --green-light: #e7eee7;
+    /* Day / stage palettes. Stage mode is the music-stand dark theme (#1208):
+       near-black paper, off-white ink, the same brass/green hues lifted for
+       contrast. `color-scheme` picks the side of every light-dark() pair —
+       the system preference by default, or the explicit choice stored by the
+       Stage toggle (html[data-theme]). Native controls follow it too. */
+    color-scheme: light dark;
+    --paper: light-dark(#f7f5ef, #15181a);
+    --surface: light-dark(#fffefa, #1d2124);
+    --ink: light-dark(#222923, #f1efe8);
+    --on-ink: light-dark(#fffefa, #15181a);
+    --muted: light-dark(#72766c, #a3a79c);
+    --muted-soft: light-dark(#8a8d82, #7d837a);
+    --line: light-dark(#e3e3d9, #33393b);
+    --hover: light-dark(#e8e9df, #2a2f32);
+    --chip: light-dark(#f2f4ed, #23282b);
+    --paper-raised: light-dark(#efeee6, #1a1e20);
+    --accent: light-dark(#b34e34, #e0785a);
+    --accent-light: light-dark(#f4e5da, #3b2820);
+    --green: light-dark(#315d49, #8fc9a6);
+    --green-light: light-dark(#e7eee7, #1f3328);
     --yellow: #e9bd5f;
-    --shadow: 0 16px 60px #232a2414;
+    --danger: light-dark(#8f3b22, #f0a58c);
+    --danger-bg: light-dark(#f8e6da, #3c2018);
+    --bar-line: light-dark(#969d905c, #5d655f80);
+    --bar-line-strong: light-dark(#788172, #8a9389);
+    --bar-number: light-dark(#91978a, #8e958b);
+    --bar-current: light-dark(#e6eadb, #263a2e);
+    --bar-looped: light-dark(#edf0e630, #2a3a3080);
+    --bar-repeat-ink: light-dark(#53644c, #b9c8b3);
+    --bar-hover: light-dark(#eeeade, #2b2f2a);
+    --chord-hover: light-dark(#e6decd, #383a30);
+    --backdrop: light-dark(#20272066, #000000a0);
+    --shadow: 0 16px 60px light-dark(#232a2414, #00000080);
     --radius: 16px;
     font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     color: var(--ink);
@@ -104,7 +126,7 @@ html [hidden] {
     border-radius: 9px;
 }
 .icon-button:hover {
-    background: #e8e9df;
+    background: var(--hover);
 }
 .btn {
     display: inline-flex;
@@ -121,7 +143,7 @@ html [hidden] {
 }
 .btn.primary {
     background: var(--ink);
-    color: #fffefa;
+    color: var(--on-ink);
     border-color: var(--ink);
 }
 .btn.soft {
@@ -271,7 +293,8 @@ html [hidden] {
     letter-spacing: -0.2px;
 }
 .continue-card {
-    background: var(--green);
+    /* Fixed deep green in both themes: its copy is always light. */
+    background: light-dark(#315d49, #27503d);
     color: #fffefa;
     display: grid;
     grid-template-columns: 1fr 210px;
@@ -468,7 +491,7 @@ html [hidden] {
 .quick-jam {
     border: 1px solid var(--line);
     border-radius: var(--radius);
-    background: #efeee6;
+    background: var(--paper-raised);
     padding: 23px;
 }
 .quick-jam h2 {
@@ -601,7 +624,7 @@ html [hidden] {
     gap: 8px;
 }
 .mode-switch {
-    background: #eaeae1;
+    background: var(--hover);
     padding: 3px;
     border-radius: 8px;
     display: flex;
@@ -639,7 +662,7 @@ html [hidden] {
     height: 43px;
     width: 48px;
     background: var(--ink);
-    color: white;
+    color: var(--on-ink);
     border-radius: 9px;
     display: grid;
     place-content: center;
@@ -711,16 +734,21 @@ html [hidden] {
     gap: 5px;
     align-items: center;
 }
+/* Band chips must read on/off at music-stand distance (#1210): a playing lane
+   is a filled green chip with a solid dot; a muted lane is hollow — dashed
+   border, hollow dot, struck and dimmed label. Same weight and padding in both
+   states so toggling never reflows the row. */
 .band-toggle {
     display: flex;
     align-items: center;
     gap: 6px;
     padding: 9px 10px;
-    border: 1px solid var(--line);
-    background: #f2f4ed;
+    border: 1px solid var(--green);
+    background: var(--green-light);
+    color: var(--green);
     border-radius: 7px;
     font-size: 11px;
-    font-weight: 550;
+    font-weight: 600;
 }
 .band-toggle svg {
     width: 15px;
@@ -730,20 +758,22 @@ html [hidden] {
     width: 7px;
     height: 7px;
     background: var(--green);
+    box-sizing: border-box;
+    flex-shrink: 0;
 }
 .band-toggle.off {
     background: transparent;
-    color: #8a8d82;
+    color: var(--muted-soft);
+    border: 1px dashed var(--muted-soft);
 }
 .band-toggle.off .dot {
     background: transparent;
-    border: 1px solid #96998f;
-    width: 5px;
-    height: 5px;
+    border: 1.5px solid var(--muted-soft);
 }
 .band-toggle.off span.label {
     text-decoration: line-through;
-    text-decoration-color: #aaa;
+    text-decoration-thickness: 1.5px;
+    text-decoration-color: var(--muted-soft);
 }
 .more-band {
     margin-left: 3px;
@@ -864,7 +894,7 @@ html [hidden] {
 .bar {
     min-height: 77px;
     padding: 21px 14px 10px 17px;
-    border-left: 1px solid #969d905c;
+    border-left: 1px solid var(--bar-line);
     position: relative;
     display: flex;
     align-items: center;
@@ -874,13 +904,13 @@ html [hidden] {
     isolation: isolate;
 }
 .bar:nth-child(4n) {
-    border-right: 1.5px solid #788172;
+    border-right: 1.5px solid var(--bar-line-strong);
 }
 .bar-number {
     position: absolute;
     top: 3px;
     left: 9px;
-    color: #91978a;
+    color: var(--bar-number);
     font-size: 9px;
     font-family: Inter, -apple-system, sans-serif;
     font-weight: 400;
@@ -901,7 +931,7 @@ html [hidden] {
     margin-left: 1px;
 }
 .bar.current {
-    background: #e6eadb;
+    background: var(--bar-current);
     border-radius: 5px;
     border-left-color: transparent;
     box-shadow: inset 0 -3px var(--green);
@@ -910,11 +940,11 @@ html [hidden] {
     color: var(--green);
 }
 .bar.looped {
-    background: #edf0e630;
+    background: var(--bar-looped);
 }
 .bar.repeat .chord {
     font-family: Georgia, serif;
-    color: #53644c;
+    color: var(--bar-repeat-ink);
     font-size: 29px;
 }
 .bar.end {
@@ -930,10 +960,10 @@ html [hidden] {
     cursor: pointer;
 }
 .editing .bar:hover {
-    background: #eeeade;
+    background: var(--bar-hover);
 }
 .editing .bar .chord:hover {
-    background: #e6decd;
+    background: var(--chord-hover);
     border-radius: 4px;
 }
 .chart-bottom {
@@ -1204,7 +1234,7 @@ dialog {
     overflow: auto;
 }
 dialog::backdrop {
-    background: #20272055;
+    background: var(--backdrop);
     backdrop-filter: blur(3px);
 }
 dialog h2 {
@@ -1659,7 +1689,7 @@ dialog textarea {
         padding: 22px 12px 10px;
     }
     .bar:nth-child(2n) {
-        border-right: 1.5px solid #788172;
+        border-right: 1.5px solid var(--bar-line-strong);
     }
     .bar.end {
         border-right: 4px double var(--ink);
@@ -1821,7 +1851,7 @@ dialog textarea {
         border-right: 0;
     }
     .bar:nth-child(4n) {
-        border-right: 1px solid #788172;
+        border-right: 1px solid var(--bar-line-strong);
     }
     .chart-scroll {
         padding: 15px 30px 25px;
@@ -1882,23 +1912,13 @@ dialog textarea {
     background: var(--green-light);
     box-shadow: inset 0 -3px var(--green);
 }
-.band-toggle[aria-pressed="true"] {
-    background: var(--green-light);
-    color: var(--green);
-    border-color: var(--green);
-}
-.band-toggle[aria-pressed="false"] {
-    color: #8a8d82;
-    background: transparent;
-    border-color: transparent;
-}
 .edit-panel .title-input {
     min-height: 0;
     font-family: inherit;
     line-height: 1.4;
 }
 .modal-box::backdrop {
-    background: #20272066;
+    background: var(--backdrop);
 }
 .dialog-actions {
     display: flex;
@@ -1934,8 +1954,8 @@ dialog textarea {
     margin-bottom: 12px;
 }
 .error-banner {
-    background: #f8e6da;
-    color: #8f3b22;
+    background: var(--danger-bg);
+    color: var(--danger);
     padding: 12px 20px;
     font-size: 13px;
     line-height: 1.6;
@@ -2006,7 +2026,7 @@ dialog textarea {
 .modal-backdrop {
     position: fixed;
     inset: 0;
-    background: #20272066;
+    background: var(--backdrop);
     display: grid;
     place-items: center;
     z-index: 80;
@@ -2462,4 +2482,17 @@ dialog textarea {
     .performance-focus .song-title {
         max-width: calc(100vw - 185px);
     }
+}
+/* Explicit Day/Stage choice (#1208) overrides the system preference by picking
+   the light-dark() side; no token is redefined anywhere else. */
+html[data-theme="day"] {
+    color-scheme: light;
+}
+html[data-theme="stage"] {
+    color-scheme: dark;
+}
+.theme-toggle[aria-pressed="true"] {
+    background: var(--ink);
+    color: var(--on-ink);
+    border-color: var(--ink);
 }

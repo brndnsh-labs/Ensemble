@@ -448,3 +448,137 @@ test('the stand scales to its screen, holds still across play/pause and keeps mu
     expect(off.strike).toContain('line-through');
     expect(on.strike).not.toContain('line-through');
 });
+
+const luminance = (css: string) => {
+    const [r, g, b] = css
+        .replace(/rgba?\(|\)/g, '')
+        .split(',')
+        .slice(0, 3)
+        .map((channel) => {
+            const c = Number(channel) / 255;
+            return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+        });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+const contrast = (a: string, b: string) => {
+    const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+    return (hi + 0.05) / (lo + 0.05);
+};
+
+test('stage mode darkens the stand, persists per device and follows the system when unset', async ({
+    page,
+}, info) => {
+    await page.emulateMedia({ colorScheme: 'light' });
+    const openStand = async () => {
+        await page.goto('/v2/');
+        await page.getByRole('button', { name: blue }).click();
+        await page.waitForSelector('.bar');
+    };
+    const paint = () =>
+        page.evaluate(() => {
+            const style = (selector: string) =>
+                getComputedStyle(document.querySelector(selector) as HTMLElement);
+            const bar = document.querySelector('.bar') as HTMLElement;
+            bar.classList.add('active');
+            const activeBar = getComputedStyle(bar).backgroundColor;
+            bar.classList.remove('active');
+            return {
+                paper: style('html').backgroundColor,
+                chord: style('.chord').color,
+                activeBar,
+                theme: document.documentElement.dataset.theme ?? null,
+            };
+        });
+    await openStand();
+    const stageButton = page.getByRole('button', { name: 'Stage' });
+    await expect(stageButton).toHaveAttribute('aria-pressed', 'false');
+    const day = await paint();
+    expect(day.theme).toBeNull();
+    expect(luminance(day.paper)).toBeGreaterThan(0.8);
+    expect(luminance(day.chord)).toBeLessThan(0.05);
+
+    // #1208: one tap turns the whole stand dark, with the chart still readable.
+    await stageButton.click();
+    await expect(stageButton).toHaveAttribute('aria-pressed', 'true');
+    const stage = await paint();
+    expect(stage.theme).toBe('stage');
+    expect(luminance(stage.paper)).toBeLessThan(0.02);
+    expect(luminance(stage.chord)).toBeGreaterThan(0.8);
+    expect(contrast(stage.chord, stage.paper)).toBeGreaterThan(12);
+    expect(contrast(stage.chord, stage.activeBar)).toBeGreaterThan(4.5);
+    await page.evaluate(() =>
+        document.querySelector('.app-shell')!.classList.add('performance-focus'),
+    );
+    // The toggle stays reachable while the chart is focused for playback.
+    await expect(stageButton).toBeVisible();
+    await page.screenshot({ path: info.outputPath('stage-mode.png') });
+    await page.evaluate(() =>
+        document.querySelector('.app-shell')!.classList.remove('performance-focus'),
+    );
+
+    // The choice is a per-device preference: it survives reload and is applied
+    // before hydration, and it is not written into the saved document.
+    await page.reload();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'stage');
+    await page.getByRole('button', { name: blue }).click();
+    await expect(stageButton).toHaveAttribute('aria-pressed', 'true');
+    expect(JSON.stringify(await savedBlue(page))).not.toContain('stage');
+
+    // Unset follows the system preference without writing a choice.
+    await page.evaluate(() => localStorage.removeItem('ensemble-v2-preview:theme'));
+    await page.emulateMedia({ colorScheme: 'dark' });
+    await openStand();
+    const system = await paint();
+    expect(system.theme).toBeNull();
+    expect(luminance(system.paper)).toBeLessThan(0.02);
+    await expect(stageButton).toHaveAttribute('aria-pressed', 'true');
+    await stageButton.click();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'day');
+    expect(luminance((await paint()).paper)).toBeGreaterThan(0.8);
+});
+
+test('a muted lane reads as muted at a distance and toggling never reflows the row', async ({
+    page,
+}) => {
+    await page.goto('/v2/');
+    await page.getByRole('button', { name: blue }).click();
+    await page.waitForSelector('.bar');
+    const drums = page.getByRole('button', { name: 'Drums', exact: true });
+    const chrome = () =>
+        drums.evaluate((element) => {
+            const style = getComputedStyle(element);
+            const dot = getComputedStyle(element.querySelector('.dot') as HTMLElement);
+            return {
+                width: element.getBoundingClientRect().width,
+                background: style.backgroundColor,
+                borderStyle: style.borderTopStyle,
+                dotFill: dot.backgroundColor,
+                weight: style.fontWeight,
+            };
+        });
+    const on = await chrome();
+    expect(on.borderStyle).toBe('solid');
+    expect(on.background).not.toBe('rgba(0, 0, 0, 0)');
+    await drums.click();
+    // #1210: hollow chip — dashed border, hollow dot, transparent fill. The
+    // accessible name stays "Drums" (a toggle's label must not change with its
+    // state, per the ARIA button pattern); aria-pressed carries the state.
+    await expect(drums).toHaveAttribute('aria-pressed', 'false');
+    const off = await drums.evaluate((element) => {
+        const style = getComputedStyle(element);
+        const dot = getComputedStyle(element.querySelector('.dot') as HTMLElement);
+        return {
+            width: element.getBoundingClientRect().width,
+            background: style.backgroundColor,
+            borderStyle: style.borderTopStyle,
+            dotFill: dot.backgroundColor,
+            weight: style.fontWeight,
+        };
+    });
+    expect(off.borderStyle).toBe('dashed');
+    expect(off.background).toBe('rgba(0, 0, 0, 0)');
+    expect(off.dotFill).toBe('rgba(0, 0, 0, 0)');
+    expect(off.dotFill).not.toBe(on.dotFill);
+    expect(off.weight).toBe(on.weight);
+    expect(Math.abs(off.width - on.width)).toBeLessThan(1);
+});

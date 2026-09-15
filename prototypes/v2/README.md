@@ -112,6 +112,12 @@ local browser projects and never deploys.
   tempo, key, feel and mutes visible. Show controls restores the setup actions without stopping.
   Playback highlights use the existing scheduler's lookahead (not a new musical clock); manual
   wheel/touch/keyboard browsing suspends following until explicitly resumed.
+- Stage mode (#1208) is the dark music-stand theme: the Stage button in the song header stays
+  reachable while the chart is focused. The palette is one set of `light-dark()` tokens picked
+  by `color-scheme`; unset follows the system, a tap stores `ensemble-v2-preview:theme` as a
+  per-device convenience (never a document field) and is applied before hydration. Band chips
+  (#1210) read on/off at a distance — filled green versus dashed/hollow/struck — and toggling
+  never reflows the row; the chip's name stays put and `aria-pressed` carries the state.
 
 ## Measure-based charts (#1171)
 

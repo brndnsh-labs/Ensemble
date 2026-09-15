@@ -15,7 +15,13 @@ import * as repository from '../lib/repository';
 import type { ChartDocument } from '../lib/runtime';
 import * as runtime from '../lib/runtime';
 import { directionLabel } from '../lib/score-labels';
-import { lastOpenedSong, rememberSong } from '../lib/session';
+import {
+    lastOpenedSong,
+    rememberSong,
+    rememberTheme,
+    type ThemeChoice,
+    themePreference,
+} from '../lib/session';
 import {
     allSoundsAvailableOffline,
     allSoundsSizeMB,
@@ -63,6 +69,12 @@ export default function Ensemble() {
     const [playing, setPlaying] = useState(false);
     const [playbackPending, setPlaybackPending] = useState(false);
     const [active, setActive] = useState<number | null>(null);
+    // Day/Stage is a per-device convenience (#1208), never a document field. Null
+    // follows the system; the stored choice is applied before hydration by the
+    // inline script in layout.tsx, and here on every change.
+    const [theme, setTheme] = useState<ThemeChoice | null>(null);
+    const [systemDark, setSystemDark] = useState(false);
+    const stage = theme ? theme === 'stage' : systemDark;
     const [following, setFollowing] = useState(true);
     const [offline, setOffline] = useState('Preparing offline access…');
     const [menu, setMenu] = useState(false);
@@ -92,6 +104,27 @@ export default function Ensemble() {
     const dirty = hasPendingText || !!(current && saved && !same(current, saved));
     const playbackActive = playing || playbackPending;
     const focused = playbackActive && !showControls && !editing;
+
+    useEffect(() => {
+        setTheme(themePreference());
+        const media = window.matchMedia('(prefers-color-scheme: dark)');
+        const readSystem = () => setSystemDark(media.matches);
+        readSystem();
+        media.addEventListener('change', readSystem);
+        return () => media.removeEventListener('change', readSystem);
+    }, []);
+    useEffect(() => {
+        if (theme) {
+            document.documentElement.dataset.theme = theme;
+        } else {
+            delete document.documentElement.dataset.theme;
+        }
+    }, [theme]);
+    const toggleTheme = () => {
+        const next: ThemeChoice = stage ? 'day' : 'stage';
+        setTheme(next);
+        rememberTheme(next);
+    };
 
     useEffect(() => {
         let alive = true;
@@ -153,14 +186,14 @@ export default function Ensemble() {
                     if (alive) {
                         setOffline(
                             registration.waiting
-                                ? 'Update ready · close all preview tabs to install'
+                                ? 'Update ready · close all music stand tabs to install'
                                 : 'App available offline',
                         );
                     }
                     registration.addEventListener('updatefound', () => {
                         registration.installing?.addEventListener('statechange', () => {
                             if (registration.waiting && alive) {
-                                setOffline('Update ready · close all preview tabs to install');
+                                setOffline('Update ready · close all music stand tabs to install');
                             }
                         });
                     });
@@ -690,7 +723,7 @@ export default function Ensemble() {
                 </div>
                 <div className="header-right">
                     <span className="local-status">{offline}</span>
-                    <span className="concept-tag">V2 · working preview</span>
+                    <span className="concept-tag">Music stand · beta</span>
                 </div>
             </header>
             {error && !soundMenu && (
@@ -913,7 +946,7 @@ export default function Ensemble() {
                             <section className="sync-card">
                                 <h3>Your band, wherever you play.</h3>
                                 <p>
-                                    Accounts and cloud songbooks are the next stage. This preview is
+                                    Accounts and cloud songbooks are a later stage. The stand is
                                     device-local, with real playback and portable Ensemble files.
                                 </p>
                                 <p className="preview-note">
@@ -925,7 +958,7 @@ export default function Ensemble() {
                     </div>
                     <footer className="home-footer">
                         <span>Made for practice, writing, and getting lost in a good groove.</span>
-                        <span>Foundation preview · {process.env.NEXT_PUBLIC_SOURCE_REV}</span>
+                        <span>Music stand beta · {process.env.NEXT_PUBLIC_SOURCE_REV}</span>
                     </footer>
                 </main>
             ) : (
@@ -958,6 +991,14 @@ export default function Ensemble() {
                             </div>
                         </div>
                         <div className="song-actions">
+                            <button
+                                className="btn theme-toggle"
+                                aria-pressed={stage}
+                                title={stage ? 'Switch to day mode' : 'Switch to stage mode'}
+                                onClick={toggleTheme}
+                            >
+                                Stage
+                            </button>
                             <button
                                 className="btn sounds-button"
                                 onClick={() => setSoundMenu(true)}

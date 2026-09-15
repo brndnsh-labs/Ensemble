@@ -96,7 +96,7 @@
     background: var(--accent-light);
 }
 .measure-editor-error {
-    color: #87351f;
+    color: var(--danger);
 }
 .measure-editor-footer {
     display: flex;
