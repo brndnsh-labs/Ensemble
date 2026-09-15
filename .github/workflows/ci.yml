@@ -159,6 +159,79 @@ jobs:
           path: playwright-report/
           retention-days: 30
 
+  # The v2 music stand (prototypes/v2, Next static export) ships to production
+  # at /v2 on the same merge as the root app, so it is gated the same way: build
+  # + its own Playwright suite here, required on main, and the exact `out/`
+  # bytes are retained for the deploy job (never rebuilt there). Runs on every
+  # PR, not only v2-touching ones — the export compiles public/ through
+  # webpack, so any engine change can break it.
+  v2-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: checks
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Use Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            prototypes/v2/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install v2 dependencies
+        run: npm ci --prefix prototypes/v2
+
+      - name: Get Playwright version
+        id: playwright-version
+        run: echo "PLAYWRIGHT_VERSION=$(npx playwright --version | cut -d' ' -f2)" >> $GITHUB_ENV
+        working-directory: prototypes/v2
+
+      - name: Cache Playwright Browsers
+        id: playwright-cache
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-v2-${{ env.PLAYWRIGHT_VERSION }}
+
+      - name: Install Playwright browsers + system deps
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium webkit
+        working-directory: prototypes/v2
+
+      - name: Install Playwright system deps (browsers came from cache)
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium webkit
+        working-directory: prototypes/v2
+
+      # Typechecks public/ again, exports the app, then scripts/offline.mjs copies
+      # the sound packs beside it and writes build.json (fingerprint + HEAD).
+      - name: Build the v2 static export
+        run: npm run build --prefix prototypes/v2
+
+      - name: Run the v2 Playwright suite
+        run: npm run test:e2e --prefix prototypes/v2
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ensemble-v2-static-${{ github.sha }}
+          path: prototypes/v2/out/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7
+
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: v2-playwright-failures
+          path: prototypes/v2/test-results/
+          retention-days: 7
+
   # Continuous deployment: main IS live. A push to main only happens via a green PR
   # merge, so reaching this job means the full gate already passed on this exact
   # commit — deploy it. `workflow_dispatch` on main is a manual break-glass redeploy
@@ -176,7 +249,7 @@ jobs:
   # may run on a reviewed branch, but cannot execute the deployment step.
   deploy:
     runs-on: ubuntu-latest
-    needs: [checks, e2e-tests]
+    needs: [checks, e2e-tests, v2-checks]
     if: (github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')) || (github.event_name == 'workflow_dispatch' && inputs.hosting_probe)
     timeout-minutes: 10
     env:
@@ -284,3 +357,19 @@ jobs:
       - name: Deploy to prod
         if: ${{ github.ref == 'refs/heads/main' && !inputs.hosting_probe }}
         run: ./scripts/deploy.sh prod --artifact dist
+
+      # Second release on the same merge: the v2 music stand at /v2. Same scoped
+      # account and key; its own immutable release dir + symlink swap under the
+      # prod static root, verified over the public origin. The root app was
+      # already activated above and must be byte-identical afterwards.
+      - name: Download the gated v2 artifact
+        if: ${{ github.ref == 'refs/heads/main' && !inputs.hosting_probe }}
+        uses: actions/download-artifact@v8
+        with:
+          name: ensemble-v2-static-${{ github.sha }}
+          path: prototypes/v2/out/
+
+      - name: Deploy the v2 music stand to prod
+        if: ${{ github.ref == 'refs/heads/main' && !inputs.hosting_probe }}
+        run: node scripts/deploy.mjs prod
+        working-directory: prototypes/v2

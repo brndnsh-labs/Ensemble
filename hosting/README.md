@@ -19,12 +19,16 @@ sees atomic symlink changes instead of Docker pinning one release's inode.
   .ensemble-static-root       provisioning marker: ensemble-static-v1
   .releases/<revision>-<uuid>/ complete, checksum-verified static artifacts
   current -> .releases/...    atomic activation
-  .v2-previews/...            test only; unchanged preview publisher
-  v2 -> .v2-previews/...      test only
+  .v2-previews/...            test: v2 audition releases (prototypes/v2/scripts/deploy.mjs test)
+  .v2-releases/...            prod: v2 releases, published by the CI deploy job after `current`
+  v2 -> .v2-{previews,releases}/...  atomic activation of the v2 music stand at /v2/
 ```
 
 The static root contains no database or credentials. Hidden paths, `/current`, and `/api/*`
-return 404. Production is not provisioned with a v2 preview. Missing files are real 404s,
+return 404. Both environments serve the v2 music stand at `/v2/` from the `v2` symlink; on
+production the scoped `ensemble-deploy` account (which owns the static root) creates
+`.v2-releases/` and the symlink itself, so no root provisioning was needed (#1207). The root
+publisher never touches `v2`, and the v2 publisher never touches `current`. Missing files are real 404s,
 never an SPA fallback. Service workers are no-store and mutable entry points no-cache.
 Old releases are retained for rollback; no automatic deletion/retention job is introduced.
 Retention is not a guarantee that old tabs can lazy-load old chunks through the current root.

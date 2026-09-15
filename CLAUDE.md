@@ -23,18 +23,23 @@ companions, first read [`prototypes/v2/CLAUDE.md`](prototypes/v2/CLAUDE.md). Thi
 handoff for Claude, Codex and other agents; no previous conversation or private agent memory
 is required.
 
-**Landing v2 code is not releasing v2.** The production deploy rsyncs `dist/` — the Vite build
-of `public/` — and nothing else. `prototypes/v2/` (Next static export) and `prototypes/v2-api/`
-(standalone Node service) have no production deploy target at all; `scripts/deploy.sh` prod
-deliberately carries empty `RSYNC_EXCLUDES` because a stray `/v2` there would be drift. So:
+**A merge to `main` releases the v2 music stand too (since #1207, 2026-09-15).** The CI
+`deploy` job publishes two static releases per merge: the root app (`dist/`, the Vite build of
+`public/`, at `/`) and the v2 music stand (`prototypes/v2/` Next static export, at `/v2/` on
+the same origin, via `prototypes/v2/scripts/deploy.mjs prod`). `prototypes/v2-api/` (standalone
+Node service) still has **no** deploy target; accounts and sync are parked. So:
 
-- A story touching **only** `prototypes/**` reaches no user on merge. It is still real work under
-  the normal gates, but it cannot regress the live app, and shipping it is not a release decision.
+- A story touching **`prototypes/v2/**`** is live at `ensemble.brndn.zip/v2/` on merge, gated by
+  the required `v2-checks` context (v2 build + its Playwright suite) alongside `checks` and
+  `e2e-tests`. It cannot regress the root app — the v2 publish asserts the root HTML is
+  byte-identical before and after — but it is a release.
 - A story touching **`public/**`** is live production code on that same merge, under the full
-  prod gate — the shared songbook codecs, engine hooks and state slices very much included.
-- Putting the v2 preview in front of users (a `/v2` path on prod, a link, or a cutover) is
-  **separate unbuilt work** with its own decision: v2 keeps its own IndexedDB and `localStorage`
-  keys, so anything saved there is invisible to the v1 app and has no migration path yet.
+  prod gate — the shared songbook codecs, engine hooks and state slices very much included, and
+  the v2 export compiles `public/` too, so `v2-checks` must stay green.
+- **This is not a v1→v2 cutover.** v1 stays at `/` and is the app the PWA install and share
+  links point at. v2 keeps its own IndexedDB and `localStorage` keys; anything saved there is
+  invisible to the v1 app and has no migration path. Replacing v1 with v2 (feature parity,
+  shared runtime extraction, storage migration) is separate, unshaped work with its own decision.
 
 The original application's Preact/component conventions below still apply to `public/`. The
 isolated v2 shell uses its existing React components; do not migrate either UI as a side effect
