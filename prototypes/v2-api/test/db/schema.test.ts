@@ -21,6 +21,9 @@ describe('schema (migrations/0001_init.sql)', () => {
         expect(indexNames).toContain('idx_recovery_codes_account_id');
         expect(indexNames).toContain('idx_challenges_ceremony_hash');
         expect(indexNames).toContain('idx_sessions_credential_id'); // #1190 migration 0004
+        expect(indexNames).toContain('idx_documents_owner_id'); // #1201 migration 0007
+        expect(indexNames).toContain('idx_receipts_owner_id');
+        expect(indexNames).toContain('idx_tombstones_owner_id');
     });
 
     it('rows come back null-prototype, not plain objects (node:sqlite behavior, not a mock)', () => {
