@@ -185,6 +185,8 @@
         "harmonies",
         "healthcheck",
         "healthchecks",
+        "healthz",
+        "HMAC",
         "irealb",
         "Herbie",
         "highpass",
