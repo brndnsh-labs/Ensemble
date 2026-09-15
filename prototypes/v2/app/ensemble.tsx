@@ -251,8 +251,9 @@ export default function Ensemble() {
         }
         working.current = true;
         setBusy(true);
-        // Genre preparation briefly pauses the engine, not the musician's intent.
-        // Keep the stand stable and Stop usable until this operation settles.
+        // A feel change now prepares its sounds while the band keeps playing and
+        // swaps in at the next bar (#1185); only a failed change stops and resumes.
+        // Either way the stand stays stable and Stop stays usable until it settles.
         setPlaybackPending(runtime.state().playback.isPlaying);
         setError('');
         try {
