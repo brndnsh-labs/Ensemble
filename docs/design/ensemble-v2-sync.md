@@ -332,11 +332,14 @@ Decisions:
 5. **Compose restart policy and healthcheck, not pm2.** The sibling runs pm2 *under* systemd, two
    supervisors stacked, with the attendant `PM2_HOME`/`dump.pm2`/disabled-`pm2-root` scar tissue.
    A fresh service inherits none of it.
-6. **Backup/restore is ported from `../songsiknow`**, adapted to the bind-mounted database:
+6. **Backup/restore is ported from `../songsiknow`**, adapted to the named-volume database:
    `sqlite3 .backup` (never `cp` — the WAL sidecar makes a plain copy silently near-empty),
-   gzipped and rotated locally, plus a daily restic push to Backblaze B2, and the same
-   stop → gunzip → drop `-wal`/`-shm` → chown → start restore procedure. Nothing to back up until
-   a database exists; this lands with stage 3, not before.
+   gzipped and rotated locally, and the same stop → gunzip → drop `-wal`/`-shm` → chown → start
+   restore procedure. **Landed 2026-09-15 (#1220)** with a correction: there is no restic/B2
+   job. docker04 is a VM that Proxmox Backup Server dumps nightly (both disks) and syncs
+   offsite to B2, so the nightly on-box dump at 01:25 rides that existing, monitored backup.
+   Restore was rehearsed on test the same day; runbook in homelab-maintenance
+   `docker/ensemble/README.md`.
 7. **Test and prod now differ at the hosting layer**, accepted deliberately at this checkpoint. Prod remains the
    plain nginx LXC. A container-only test result is therefore not automatically a prod result.
    Migrating the static site on both sides — and retiring the LXC pattern — is a separate,

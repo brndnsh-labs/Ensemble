@@ -76,8 +76,8 @@ picked through the normal work loop. Phases 3 and 4 interleave; 1 → 2 → 3 an
   until a branch-audition need appears). Negative tests: a malformed tag, a foreign stack name
   and a bare shell attempt are all refused.
 - **#1220 Backups.** Nightly WAL-safe `sqlite3 .backup` of each API database, gzipped and rotated on
-  docker04, pushed by restic to Backblaze B2, with a documented and rehearsed restore. Ported
-  from the `songsiknow` runbook per the 2026-09-10 decision.
+  docker04 ahead of the Proxmox Backup Server window that already carries the VM offsite to B2
+  (no restic job — one monitored backup system), with a documented and rehearsed restore.
 - **#1192 stage-2 exit.** Re-scoped to depend on #1216–#1218; its receipt gains the
   live-probe evidence and closes.
 
