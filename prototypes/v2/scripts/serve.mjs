@@ -3,6 +3,9 @@ import http from 'node:http';
 import path from 'node:path';
 
 const root = path.resolve('out');
+// 0 = ephemeral; the Playwright fixture (checks/fixtures.ts) starts one server per worker
+// and reads the bound port back from the startup line below.
+const port = Number(process.env.V2_PREVIEW_PORT ?? 3100);
 let networkDisconnected = false;
 const types = {
     '.html': 'text/html',
@@ -12,7 +15,7 @@ const types = {
     '.txt': 'text/plain',
     '.woff2': 'font/woff2',
 };
-http.createServer(async (request, response) => {
+async function handler(request, response) {
     try {
         const url = new URL(request.url, 'http://localhost');
         // Local test harness only; this server is never deployed. Disconnecting
@@ -48,4 +51,8 @@ http.createServer(async (request, response) => {
         response.writeHead(404);
         response.end('Not found');
     }
-}).listen(3100, '127.0.0.1', () => console.log('V2 preview: http://127.0.0.1:3100/v2/'));
+}
+const server = http.createServer(handler);
+server.listen(port, '127.0.0.1', () => {
+    console.log(`V2 preview: http://127.0.0.1:${server.address().port}/v2/`);
+});

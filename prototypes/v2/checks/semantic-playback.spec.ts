@@ -1,5 +1,6 @@
-import { expect, type Page, test } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import type { WorkerRequest, WorkerResponse } from '../../../public/worker-types.js';
+import { expect, test } from './fixtures';
 
 interface PlaybackEvidence {
     armed: boolean;

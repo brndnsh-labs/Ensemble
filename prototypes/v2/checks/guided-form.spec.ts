@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
-import { expect, type Page, test } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import type { ChartDocument } from '../lib/documents';
+import { expect, test } from './fixtures';
 
 async function start(page: Page, title = 'Guided study') {
     await page.goto('/v2/');

@@ -1,7 +1,8 @@
 import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
-import { test as base, expect, type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import type { ChartDocument } from '../lib/documents';
+import { test as base, expect } from './fixtures';
 
 const test = base.extend<{ disconnect: () => Promise<void> }>({
     disconnect: async ({ browserName, context, request }, use) => {

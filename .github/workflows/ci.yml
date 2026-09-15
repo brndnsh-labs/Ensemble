@@ -26,10 +26,14 @@ on:
         type: boolean
         default: false
 
-# Supersede in-flight PR runs when a branch is pushed again; never cancel a run on
-# main, because a cancelled run on main is a half-finished deploy.
+# Supersede in-flight PR runs when a branch is pushed again. Runs on main are NOT
+# grouped here (#1223): only publishing needs serializing and the `deploy` job carries
+# its own group, so two merges' gates run side by side. A workflow-level group on main
+# used to serialize every gate behind the previous merge's AND — GitHub keeps at most
+# one pending run per group — cancelled a queued main run outright, losing that
+# commit's receipt and api-image.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
@@ -87,11 +91,11 @@ jobs:
       - name: Run v2 account API tests
         run: npm run test:api
 
+  # No `needs: checks`: this is a required context in its own right, and the edge
+  # only put it (and v2-checks) behind checks' ~3 minutes on the critical path (#1223).
   e2e-tests:
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    # Gate first (fast, cheap) before spending a runner slot on the browser suite.
-    needs: checks
     steps:
       - uses: actions/checkout@v7
 
@@ -164,11 +168,12 @@ jobs:
   # + its own Playwright suite here, required on main, and the exact `out/`
   # bytes are retained for the deploy job (never rebuilt there). Runs on every
   # PR, not only v2-touching ones — the export compiles public/ through
-  # webpack, so any engine change can break it.
+  # webpack, so any engine change can break it. Starts alongside `checks`, not
+  # after it (#1223); its Playwright suite runs on three workers with one preview
+  # server per worker (prototypes/v2/checks/fixtures.ts).
   v2-checks:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    needs: checks
     steps:
       - uses: actions/checkout@v7
 

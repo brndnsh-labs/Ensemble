@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { test as base, expect } from '@playwright/test';
+import { test as base, expect } from './fixtures';
 
 async function observeSamples(page: import('@playwright/test').Page) {
     await page.addInitScript(() => {
