@@ -757,6 +757,26 @@ export function Settings() {
                                     </div>
                                 </div>
 
+                                {/* Music stand beta — the chart-first v2 stand, served beside
+                                    this app at /v2 on the same origin (#1207). Same-tab relative
+                                    link: works on test and prod, 404s harmlessly in dev. */}
+                                <div class="about-stand">
+                                    <h4>New: the music stand (beta)</h4>
+                                    <p>
+                                        A chart-first practice view with its own local songbook, at
+                                        the same address. Songs saved there stay there — this app's
+                                        songs and settings are untouched.
+                                    </p>
+                                    <a
+                                        id="musicStandLink"
+                                        data-testid="musicStandLink"
+                                        class="about-support-btn"
+                                        href="/v2/"
+                                    >
+                                        Open the music stand
+                                    </a>
+                                </div>
+
                                 {/* Support — prominent but no-pressure (no modal, no nag). */}
                                 <div class="about-support">
                                     <h4>Enjoying Ensemble?</h4>
