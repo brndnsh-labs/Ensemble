@@ -2,6 +2,11 @@ import type { DatabaseSync } from 'node:sqlite';
 
 /** Future deletion must explicitly walk these in order in ONE transaction; no deletion API yet. */
 const ACCOUNT_DELETION_WIPED = [
+    // #1201 document store: receipts and tombstones reference the owner, not the document, so
+    // order among the three is free; all three go before `accounts` like every other child.
+    'receipts',
+    'tombstones',
+    'documents',
     'auth_security_events',
     'challenges',
     'sessions',

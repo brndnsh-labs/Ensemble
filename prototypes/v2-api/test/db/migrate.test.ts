@@ -47,8 +47,11 @@ describe('runMigrations', () => {
                 'auth_security_events',
                 'challenges',
                 'credentials',
+                'documents', // #1201 migration 0007
+                'receipts',
                 'recovery_codes',
                 'sessions',
+                'tombstones',
             ].sort(),
         );
     });
