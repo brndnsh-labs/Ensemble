@@ -114,6 +114,12 @@ test.describe('Modals Responsiveness @ui', () => {
         await expect(settingsModal.locator('.about-tagline')).toHaveText('Your virtual band.');
         await expect(settingsModal.locator('#appVersion')).toBeVisible();
 
+        // Music stand beta card (#1209): a same-origin, same-tab link to /v2/.
+        const stand = page.getByTestId('musicStandLink');
+        await expect(stand).toBeVisible();
+        await expect(stand).toHaveAttribute('href', '/v2/');
+        await expect(stand).not.toHaveAttribute('target', /.+/);
+
         // Support card: the donate link, now a prominent button — still safe + accessible.
         const donate = page.locator('#donateLink');
         await expect(donate).toBeVisible();
