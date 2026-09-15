@@ -147,6 +147,8 @@ The [v2 handoff](../../prototypes/v2/CLAUDE.md) is the common Claude/Codex entry
 milestone 15 owns task status; design parents explain contracts, not a parallel task queue.
 The [next batch](ensemble-v2-next-batch.md) shapes bounded child work with independent acceptance.
 The 2026-09-10 branch-only decision is retired: `feat/ensemble-v2-foundation` merged to `main`
-on 2026-09-12 via PR #1173, and v2 stories now use the normal cycle end to end. Merging is not
-a release — `prototypes/**` has no production deploy target, so the remaining acceptance items
-above still gate putting v2 in front of anyone.
+on 2026-09-12 via PR #1173, and v2 stories now use the normal cycle end to end. Since #1207
+(2026-09-15) a merge **is** a release of the guest music stand at `ensemble.brndn.zip/v2/`,
+beside v1 — Brandon's call, with few users and no accounts involved. The remaining acceptance
+items above still gate accounts, sync, the API and any v1→v2 cutover; none of them gates the
+guest stand.

@@ -4,8 +4,9 @@ Isolated Next.js/React shell using Ensemble's existing browser engine and canoni
 This is a working checkpoint, not a production replacement. See [the product brief](../../docs/design/ensemble-v2.md).
 Tracker: milestone 15; #1170 (preview), #1171 (chart/import), #1172 (account/sync/hosting), #1174 (sounds/focused stand), #1175 (editing usability), #1177 (account-local outbox).
 Fresh Claude/Codex/other-agent sessions start with [the v2 handoff](CLAUDE.md).
-Merged to `main` on 2026-09-12 via PR #1173. This preview has no production deploy target —
-production serves only the Vite `dist/` build — so landing v2 code releases nothing to users.
+Merged to `main` on 2026-09-12 via PR #1173. Since #1207 (2026-09-15) every merge to `main`
+also publishes this export to production at `https://ensemble.brndn.zip/v2/`, beside the v1 app
+at `/` — see [Deployment](#deployment). Accounts, sync and the account API are still not deployed.
 
 ## Account storage foundation (#1177)
 
@@ -211,29 +212,37 @@ coexistence/production migration has not shipped. Prefer a corrective release an
   metadata. Opening a song does not alter saved revisions/timestamps. First visits offer a
   starter honestly rather than implying previous practice; preference failure never gates play.
 
-## Test deployment only
+## Deployment
 
-After a successful build and checks, run `node scripts/deploy-test.mjs` from this directory.
-The script has no production target. It uploads an immutable release under
-`/srv/ensemble-test/www/.v2-previews/<artifact SHA256>-<unique deploy ID>/` and atomically switches the test-only `/v2`
-symlink. It verifies every exported asset, the service worker and manifest through HTTPS and
-checks that the existing test root did not change. `build.json` fingerprints output bytes and the offline recipe, not
-just HEAD: a dirty audition build cannot masquerade as a clean commit.
+`node scripts/deploy.mjs <test|prod>` (from this directory, after a successful build) publishes
+`out/` as an immutable release beside the root app and atomically switches the `v2` symlink:
+`/srv/ensemble-test/www/.v2-previews/<artifact SHA256>-<unique deploy ID>/` on test,
+`/srv/ensemble-prod/www/.v2-releases/<…>/` on production. The shared nginx config serves
+`/v2/` from that symlink in both environments. The script verifies every exported asset, the
+service worker and manifest through HTTPS and checks that the existing root app's HTML did not
+change. `build.json` fingerprints output bytes and the offline recipe, not just HEAD: a dirty
+audition build cannot masquerade as a clean commit, and the prod target additionally refuses
+any build whose `sourceRevision` is not a clean checked-out HEAD.
 
-Rollback means repointing `/srv/ensemble-test/www/v2` to the previous verified release using the same
-temporary-symlink/rename operation. No database migration occurs. Keep old releases through
-audition; this script never deletes them. The regular root publisher protects these preview
-paths. The [shared hosting transition](../../hosting/README.md) also keeps root releases and
-this preview separate. No production deployment or production data changes are needed for
-this checkpoint.
+- **Test** is a workstation audition: `node scripts/deploy.mjs test` over `docker04-admin`.
+- **Production** is CI only: the `deploy` job in `.github/workflows/ci.yml` runs
+  `deploy.mjs prod` after the root release on every merge to `main`, over the scoped
+  `ensemble-deploy` account. The required `v2-checks` context (build + this suite) gates the
+  merge. There is no manual prod path from a laptop.
+
+Rollback means repointing the `v2` symlink to the previous verified release using the same
+temporary-symlink/rename operation. No database migration occurs. Old releases are retained;
+this script never deletes them. The root publisher never touches these paths, and this script
+never touches `current` or `.releases/`. Deploying this app moves no user data: v1 and v2
+storage stay separate.
 
 Compatibility caveat: manual-only preview builds before Follow feel support reject documents
 with `autoSound: true`. Do not roll a browser's songbook back to those builds after saving Follow
 feel setups; export first and prefer a corrective preview release. Existing manual saves and the
 canonical document schema are unchanged.
 
-The test-only Caddy rule now sets `Cache-Control: no-store` for `/v2/*` on the test hostname
-(homelab-maintenance commit `5ca32d7`). The old Cloudflare worker entry was purged on 2026-09-08;
+The Caddy rule sets `Cache-Control: no-store` for `/v2/*` on both hostnames (homelab-maintenance
+commit `5ca32d7` for test; the prod block mirrors it since #1207). The old Cloudflare worker entry was purged on 2026-09-08;
 the canonical worker now returns `BYPASS`. Explicit app/sound Cache Storage remains functional.
 The deploy verifier still refuses success if the canonical URL serves an older worker even when
 a cache-busted probe matches. If caching regresses, investigate the scoped edge policy and purge

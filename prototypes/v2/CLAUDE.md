@@ -13,16 +13,18 @@ and follow the repository's normal cycle and merge defaults. Inspect branch, wor
 upstream before editing; preserve other work. A dirty shared tree is not permission to reset or
 sweep it into your commit. Stop if the task's files overlap someone else's uncommitted changes.
 
-**Landing v2 code is not releasing v2, and merging is not a product decision.** Production
-deploys rsync `dist/` — the Vite build of `public/` — and nothing else. Neither this Next
-preview nor `../v2-api/` has a production deploy target, so a story confined to `prototypes/**`
-reaches no user when it merges. A story that also touches `public/**` ships live production
-code on that same merge and carries the full prod gate.
+**Merging to `main` releases this app (since #1207, 2026-09-15).** The CI `deploy` job
+publishes the root app and then this static export at `https://ensemble.brndn.zip/v2/` on every
+merge, gated by the required `v2-checks` context (build + `checks/` Playwright suite) next to
+`checks` and `e2e-tests`. Treat a v2 story as live production work: it reaches users, and a red
+v2 build or E2E blocks the merge. `../v2-api/` still has **no** deploy target; accounts, sync
+and hosting for it remain parked behind their own gates.
 
-Putting v2 in front of users — a `/v2` path on prod, an in-app link, or a cutover from v1 — is
-separate unbuilt work needing its own decision. This app keeps its own IndexedDB and
-`localStorage` keys, so anything a user saves here is invisible to the v1 app and has no
-migration path yet. Do not treat a merged story as evidence that question is settled.
+This is a release of the guest music stand beside v1, **not** a cutover. v1 stays at `/`. This
+app keeps its own IndexedDB and `localStorage` keys, so anything a user saves here is invisible
+to the v1 app and has no migration path yet; the v1 About tab links here as a beta. Replacing
+v1 is separate unshaped work with its own decision — do not treat a merged story as evidence
+that question is settled.
 
 Human gates are unchanged: a device or listening gate is still a hard stop, and a merged commit
 does not clear one. Record the commit SHA, checks and remaining gate so another agent does not
@@ -79,7 +81,7 @@ gate evidence. Do not copy old test totals or preview SHAs into a new claim of v
 | Account-local storage | `lib/sync/database.ts`, `lib/sync/repository.ts`, `lib/sync/records.ts` | Native IDB transactions, owner/generation fence |
 | Explicit Save wire contract | `lib/sync/protocol.ts`, `lib/sync/send.ts` | Immutable retry bytes, owner-bound receipts, separate drafts |
 | Portable chart / iReal semantics | `../../public/songbook/` | Root/scoped engine guides and canonical codecs apply |
-| Offline install / test deployment | `scripts/offline.mjs`, `scripts/deploy-test.mjs` | Anonymous shell + verified sounds; test-only release |
+| Offline install / deployment | `scripts/offline.mjs`, `scripts/deploy.mjs` | Anonymous shell + verified sounds; `deploy.mjs test` from a workstation, `deploy.mjs prod` only from the CI deploy job |
 | Browser evidence | `checks/`, `../../tests/browser/account-songbook.browser.test.ts` | Preview E2E plus real IndexedDB in Chromium/WebKit |
 | Server account API (stage 2, #1187+) | `../v2-api/` (sibling, not a subdirectory — see `../v2-api/README.md`) | Standalone Node service, own `package.json`/`node:sqlite` schema; ceremony (#1188), session + HTTP layer (#1189), passkey management + step-up reauth gated by one fresh-authentication predicate (#1190), and single-use recovery codes behind a restricted recovery-only session (#1191) modules land here; no client wiring until #1192 lands |
 
