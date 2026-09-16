@@ -16,6 +16,10 @@ review are complete."
 proofs). Stage-3 stories under review: #1201 (owner-scoped schema and query layer), #1202
 (Explicit Save endpoint), #1234 (per-owner storage quota), #1203 (concurrency proofs).
 
+**Changes since the review:** #1250 closed the P1 below (receipts charged against the byte cap)
+and #1253 closed the P2 (every document route proven session-gated). Both are reflected in place
+rather than appended, so this document describes live `main`, not the reviewed snapshot alone.
+
 **Independence.** The stage-3 stories were implemented by Claude (Opus 5) in the sessions that
 closed #1201/#1202/#1234/#1203. The review recorded here was performed by a **separate reviewer
 that did not write them**, against merged `main`, explicitly instructed to treat this repo's code
@@ -29,11 +33,11 @@ material finding (see P1). That is the strongest independence available without 
 
 | Contract requirement | Evidence / disposition |
 | --- | --- |
-| **1. No route derives `ownerId` from the request body or query params** | **Pass.** The document API is exactly **one route**: `POST /api/documents/save` (`prototypes/v2-api/src/http/documents.ts`), mounted in `src/http/app.ts`; the only other non-`/api` route is `/healthz`. `commitSave` receives `ownerId: session.claims.accountId`, and the decoded envelope's `ownerId` is referenced **nowhere** in the handler. The shared decoder (`prototypes/v2/lib/sync/request.ts`) *rejects* a body/session disagreement rather than correcting it — mutation-tested, 4 tests fail when that check is disabled — so it is defense in depth, not the load-bearing control. Any query string at all is refused `400` before the body is read. All nine exported statements in `src/db/documents.ts` fold `owner_id` into the WHERE clause or the inserted row, and all three tables are `PRIMARY KEY (owner_id, …)`. **There is no read or write reachable with only a `documentId`.** |
+| **1. No route derives `ownerId` from the request body or query params** | **Pass.** The document API is exactly **one route**: `POST /api/documents/save` (`prototypes/v2-api/src/http/documents.ts`), mounted in `src/http/app.ts`; the only other non-`/api` route is `/healthz`. `commitSave` receives `ownerId: session.claims.accountId`, and the decoded envelope's `ownerId` is referenced **nowhere** in the handler. The shared decoder (`prototypes/v2/lib/sync/request.ts`) *rejects* a body/session disagreement rather than correcting it — mutation-tested, 4 tests fail when that check is disabled — so it is defense in depth, not the load-bearing control. Any query string at all is refused `400` before the body is read. Every exported query function in `src/db/documents.ts` takes `ownerId` first and folds it into the WHERE clause or the inserted row, and all three tables are `PRIMARY KEY (owner_id, …)`. **There is no read or write reachable with only a `documentId`.** |
 | **2. Every response on the document API is `private, no-store`** | **Pass, verified by runtime probe rather than by the 200-path test.** `securityHeaders()` is registered first on `'*'` and sets headers *after* `await next()`, so it wraps `app.notFound` and `app.onError` too. The reviewer drove the real app across `401`, `403`, `415`, `413` (on `/save` and on an unknown documents path), `429`, `400` (malformed and query-string refusal), `409` (all three kinds), `200`, and the unknown-path `404` in six spellings: **all four security headers correct on every one**. *Named gap (cosmetic):* `test/http/headers.test.ts`'s parameterized table targets `/api/auth/*`; the documents prefix is covered by the shared middleware, by three assertions in `documents-save.test.ts` (200/409/401) and by the probe, but not by a dedicated table in that file. |
 | **3. `prototypes/v2/scripts/offline.mjs` does not enumerate or cache any document-API response** | **Pass, by reading both halves.** The allowlist is built purely by walking the Next static export plus copied packs, and every entry is `/v2/`-prefixed; no API path can enter, because nothing in the export *is* an API response. The generated service worker's fetch handler is triple-gated — it returns early unless `method === 'GET'` **and** same-origin **and** `pathname.startsWith('/v2/')` — and `POST /api/documents/save` fails two of the three. The sounds cache admits only pack-catalog entries with a matching SHA-256. **Stronger than the check asks:** the v2 client contains **zero** references to `/api/` anywhere; `lib/sync/send.ts` takes an injected transport and owns no URL. The document API is not wired to the client at all yet. |
 | **4. The account-deletion registry covers `documents`/`receipts`/`tombstones`, and the drift guard fails if a table is added to neither list** | **Pass, proven non-vacuous against a real migration.** All three are in `ACCOUNT_DELETION_WIPED`, and the guard is bidirectional — unclassified table, classified-but-missing table, and duplicate classification. The reviewer added a real `migrations/0008_probe_drift.sql` creating an unclassified table: **two independent test files failed** (`test/db/documents.test.ts`, `test/http/auth-hardening.test.ts`). Classifying it returned the suite to green. Both directions proven, so the guard is not merely counting migrations. |
-| **5. Stage 2/3 story acceptance holds under a fresh read of the merged code** | **Pass, with one named gap (P1).** `commitSave` is one `BEGIN IMMEDIATE` transaction running the protocol in order: receipt replay/mismatch → revision/tombstone decision → quota → document write → receipt write. Conflict is evaluated *before* quota deliberately, so an owner who is both full and stale gets the stale-revision answer (resolving it may be an update the cap permits). The "never refuse a write that does not grow the footprint" rule correctly requires `addedBytes > replacedBytes`. The concurrency proofs are real — separate OS processes, a two-file barrier, and a pause injected *inside* the transaction at the `mintRevision` seam — and the reviewer mutation-tested both load-bearing claims independently: a deferred `BEGIN` fails 7 of 9 proofs, and a quota read hoisted out of the transaction is caught **only** by the concurrency proofs while all 22 sequential quota tests still pass. The injectable-caps seam is itself guarded by a full-scale test of the shipped defaults. **Named gap: the quota bounds `documents` but not `receipts` — see P1.** |
+| **5. Stage 2/3 story acceptance holds under a fresh read of the merged code** | **Pass, with one named gap (P1).** `commitSave` is one `BEGIN IMMEDIATE` transaction running the protocol in order: receipt replay/mismatch → revision/tombstone decision → quota → document write → receipt write. Conflict is evaluated *before* quota deliberately, so an owner who is both full and stale gets the stale-revision answer (resolving it may be an update the cap permits). The "never refuse a write that does not grow the footprint" rule correctly requires `addedBytes > replacedBytes`. The concurrency proofs are real — separate OS processes, a two-file barrier, and a pause injected *inside* the transaction at the `mintRevision` seam — and the reviewer mutation-tested both load-bearing claims independently: a deferred `BEGIN` fails 7 of 9 proofs, and a quota read hoisted out of the transaction is caught **only** by the concurrency proofs while all 22 sequential quota tests still pass. The injectable-caps seam is itself guarded by a full-scale test of the shipped defaults. **Named gap at the reviewed revision: the quota bounded `documents` but not `receipts` — see P1, closed by #1250.** |
 | **6. Residual risks stated explicitly** | **Done** — see below. |
 
 ## Findings
@@ -75,9 +79,12 @@ the gate that is supposed to make "per-owner storage is capped" true.
 
 **Resolved by #1250.** Each retained receipt is now charged `RECEIPT_COST_BYTES` (768 — the
 measured worst case at the id grammar's 128-character ceiling, rounded up) against
-`MAX_BYTES_PER_OWNER`, so the byte cap bounds an owner's total stored bytes rather than their
-document bodies alone. Receipts are still never expired; a retention sweep was explicitly rejected
-as the fix, because that retention is what makes a replayed operation id detectable.
+`MAX_BYTES_PER_OWNER`, so the byte cap bounds document bodies **plus their receipts** rather than
+bodies alone. It is not yet literally every byte the owner causes to be stored — `tombstones` are
+still uncounted (see residual 4).
+
+Receipts are still never expired; a retention sweep was explicitly rejected as the fix, because
+that retention is what makes a replayed operation id detectable.
 
 Two things about that fix are worth carrying forward, because neither was obvious from the
 finding as written:
@@ -106,7 +113,10 @@ registered document route is session-gated, and the parameterized hardening case
 
 **Not a defect today** — there is one document route and it is gated. But stage 4 is precisely
 when a second one appears, so the guard should exist *before* that route is written, not after.
-Filed as #1251 against the stage-4 entry story.
+**Resolved by #1253** (#1251): `test/http/auth-hardening.test.ts` now runs a parameterized case
+over `DOCUMENT_POLICIES` asserting each route answers `401 unauthenticated` with no session, and
+it was mutation-proved — bypassing `requireSession` in the `/save` handler fails that test and
+only that test.
 
 ### P3 — smaller items, none urgent
 
@@ -129,21 +139,35 @@ Filed as #1251 against the stage-4 entry story.
 
 1. **Receipt growth is outside the quota** (P1). **Closed by #1250** — receipts are now charged
    against the byte cap. The residual is narrower but real: because receipts can never be deleted,
-   an owner who spends the whole 256 MiB budget on receipts alone (~350,000 saves at the flat
-   charge — roughly 20 years at 100 saves/day, or about 4 days of deliberate abuse at the shipped
-   120 saves/min) has no self-service remedy, since deleting documents will not free receipt
-   bytes. That is the cap working as intended against an abuser and an ops problem against a
-   legitimate user; it needs an admin-side prune before #1226 if it is judged unacceptable.
+   an owner who spends the whole 256 MiB budget on receipts alone has no self-service remedy,
+   since deleting documents does not free receipt bytes. The flat charge puts that at **349,525
+   saves** (268,435,456 / 768) — **~9.6 years** at 100 saves/day, but only **~2 days** of
+   deliberate abuse at the shipped 120 saves/min/identity. (An earlier draft of this document said
+   20 years and 4 days; both were exactly 2x too high, which understated how reachable the
+   residual is.) And today there is no delete route at all, so even the "delete a document" remedy
+   is unreachable over HTTP. That is the cap working as intended against an abuser and an ops
+   problem against a legitimate user; it wants an admin-side prune before #1226 if judged
+   unacceptable.
 2. **Global disk exhaustion is not bounded by a per-owner cap.** 256 MiB × N accounts, with no
    service-wide ceiling and no disk-pressure backstop. Fine at N≈1; a capacity decision the moment
    registration opens.
 3. **Stage 4 adds the first document *reads*, which is where IDOR risk actually begins.**
    `listDocuments` and `deleteDocument` already exist and already fold `owner_id`, but have no
    route consumer — today's surface is genuinely one write route. The guard that would catch a
-   stage-4 route wired without `requireSession` does not exist yet (P2).
+   stage-4 route wired without `requireSession` now exists (#1253), so a new document route
+   inherits the proof rather than needing someone to remember a hand-written test.
 4. **Tombstones are per `(owner_id, document_id)`** and `deleteDocument` is owner-scoped, so one
    owner's delete cannot reach another's id — but no delete *route* exists, so this is proven only
    at the DB layer. Re-verify when stage 4/5 exposes deletion over HTTP.
+
+   **Tombstones are also not counted by `readOwnerUsage`**, and unlike a document row a tombstone
+   is permanent. This is *not* a second unbounded hole, and the distinction is worth keeping: the
+   insert is an upsert keyed on `(owner_id, document_id)`, so deleting the same id repeatedly adds
+   no rows, and reaching a *fresh* id requires creating it first — which costs a charged receipt.
+   Tombstone count is therefore bounded by receipt count, and receipts are capped. The exposure is
+   a bounded multiplier on what the cap means in real disk, not an escape from it. When stage 4/5
+   ships a delete route, charge tombstones the way receipts are charged so the cap keeps meaning
+   what it says.
 5. **The `(ownerId, operationId)` receipt space is per owner** — confirmed by probe, not assumed:
    two owners both using `op-1` produce independent receipts, and a reuse with different bytes
    raises `operation_mismatch` against the caller's **own** receipt, never the other owner's. No
@@ -175,6 +199,7 @@ artifact cannot see an API response and the client is not wired to one; the dele
 bites on a real migration in both directions; and the transaction and concurrency proofs survive
 the two mutations that would have made them theatre.
 
-The P1 is a genuine gap in #1234's acceptance, but it is resource exhaustion rather than
-authorization — named, measured, and routed to the gate it actually blocks (#1226, opening
-registration), not to stage 4.
+The P1 was a genuine gap in #1234's acceptance, but it is resource exhaustion rather than
+authorization — named, measured, and since **closed by #1250** rather than merely routed. What it
+leaves behind is the bounded residual in item 1 above, which belongs to #1226 (opening
+registration), not to stage 4. The P2 is closed by #1253.
