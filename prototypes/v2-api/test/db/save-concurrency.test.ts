@@ -177,6 +177,21 @@ async function race(
     }
 }
 
+/** Fail with a useful reason instead of hanging to vitest's timeout. */
+async function withDeadline<T>(work: Promise<T>, what: string, ms = 30_000): Promise<T> {
+    let timer: NodeJS.Timeout | undefined;
+    try {
+        return await Promise.race([
+            work,
+            new Promise<never>((_, reject) => {
+                timer = setTimeout(() => reject(new Error(what)), ms);
+            }),
+        ]);
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
 /**
  * Two racers, released from the same barrier but SEQUENCED by hand once they are inside.
  *
@@ -196,7 +211,9 @@ async function race(
  */
 async function raceSequenced(
     dbPath: string,
-    commands: SaveCommand[],
+    // Exactly two: the whole point is one racer held while the other finishes, and the
+    // `1 - firstIndex` below has no meaning for a third.
+    commands: [SaveCommand, SaveCommand],
     options: RaceOptions = {},
 ): Promise<WorkerResult[]> {
     const dir = mkdtempSync(join(tmpdir(), 'ensemble-save-sequenced-'));
@@ -228,9 +245,15 @@ async function raceSequenced(
         }
 
         writeFileSync(workers[firstIndex].release as string, 'go');
-        await workers[firstIndex].finished;
+        // Bounded like every other wait in this file. Unbounded, a racer that never returns
+        // would hold the whole sequence open until vitest's own timeout, which fires OUTSIDE
+        // this `finally` and so leaves both children spinning on their release files.
+        await withDeadline(workers[firstIndex].finished, 'the first racer never finished');
         writeFileSync(workers[1 - firstIndex].release as string, 'go');
-        return await Promise.all(workers.map((worker) => worker.finished));
+        return await withDeadline(
+            Promise.all(workers.map((worker) => worker.finished)),
+            'the released racers never finished',
+        );
     } finally {
         for (const worker of workers) {
             worker.child.kill();
@@ -414,16 +437,10 @@ describe('Save concurrency and failure proofs on a real database (#1203)', () =>
         const [seed] = await race(path, [baseCommand()]);
         const base = (seed.outcome as Committed).revision;
 
-        const results = await raceSequenced(
-            path,
-            ['a', 'b'].map((tag) =>
-                baseCommand({
-                    operationId: `op-${tag}`,
-                    expectedRevision: base,
-                    body: `{"title":"${tag}"}`,
-                }),
-            ),
-        );
+        const results = await raceSequenced(path, [
+            baseCommand({ operationId: 'op-a', expectedRevision: base, body: '{"title":"a"}' }),
+            baseCommand({ operationId: 'op-b', expectedRevision: base, body: '{"title":"b"}' }),
+        ]);
         for (const result of results) {
             // A stale-snapshot upgrade surfaces as "database is locked", never as a commit.
             expect(result.error).toBeUndefined();
@@ -456,18 +473,24 @@ describe('Save concurrency and failure proofs on a real database (#1203)', () =>
      * raced at all. The defaults themselves are proven in save.test.ts, at full scale.
      *
      * What is asserted is the invariant, never who won: exactly one racer commits, the rest are
-     * refused, and the owner's final usage is AT the cap rather than one past it. "One past it"
-     * is precisely the damage a hoisted read does, and no rerun can make it look like a flake.
+     * refused, and the owner's final usage never lands PAST the cap. Past it is precisely the
+     * damage a hoisted read does, and no rerun can make it look like a flake.
      */
     describe('the storage quota under concurrency (#1247)', () => {
-        it('four racers for the last document slot: one commits, the count stops at the cap', async () => {
-            const { db, path } = setUp();
-            // One document already stored against a cap of two: exactly one slot is left, so
-            // the count landing on 3 means two racers were both told the slot was theirs.
+        /**
+         * One document already stored against a cap of two: exactly one slot is left, so a
+         * final count of 3 means two racers were both told the slot was theirs.
+         */
+        function seedOneDocument(db: TestDatabase['db']): void {
             db.prepare(
                 'INSERT INTO documents (owner_id, document_id, revision, body, updated_at)' +
                     " VALUES ('owner-a', 'seed', 'seed-rev', '{}', 1)",
             ).run();
+        }
+
+        it('four racers for the last document slot: one commits, the count stops at the cap', async () => {
+            const { db, path } = setUp();
+            seedOneDocument(db);
 
             const results = await race(
                 path,
@@ -506,6 +529,39 @@ describe('Save concurrency and failure proofs on a real database (#1203)', () =>
             expect(countRows(db, 'receipts')).toBe(1);
         }, 60_000);
 
+        it('sequenced at the document cap: the second racer sees the slot taken', async () => {
+            const { db, path } = setUp();
+            // The wall-clock proof above is the realistic one, but it needs the racers to
+            // overlap: measured with the usage read hoisted out of the transaction, it caught
+            // the bug 3 times in 6 on two loaded cores, where this caught it 3/3. Same pairing
+            // the rest of this file argues for — keep both.
+            seedOneDocument(db);
+
+            const results = await raceSequenced(
+                path,
+                [
+                    baseCommand({ documentId: 'doc-a', operationId: 'op-a', body: '{"t":"a"}' }),
+                    baseCommand({ documentId: 'doc-b', operationId: 'op-b', body: '{"t":"b"}' }),
+                ],
+                { caps: { maxDocumentsPerOwner: 2 } },
+            );
+            for (const result of results) {
+                expect(result.error).toBeUndefined();
+            }
+
+            const kinds = results.map((result) => result.outcome?.kind);
+            expect(kinds.filter((kind) => kind === 'committed')).toHaveLength(1);
+            const refused = results[kinds.indexOf('quota_exceeded')].outcome as QuotaExceeded;
+            expect(refused).toEqual({
+                kind: 'quota_exceeded',
+                limit: 'documents',
+                usage: 2,
+                cap: 2,
+            });
+            expect(readOwnerUsage(db, 'owner-a').documents).toBe(2);
+            expect(countRows(db, 'receipts')).toBe(1);
+        }, 60_000);
+
         it('sequenced at the byte cap: the second racer sees the first one spend the headroom', async () => {
             const { db, path } = setUp();
             // 200 bytes of headroom and two 120-byte bodies: either one fits, both do not.
@@ -517,9 +573,10 @@ describe('Save concurrency and failure proofs on a real database (#1203)', () =>
 
             const results = await raceSequenced(
                 path,
-                ['a', 'b'].map((tag) =>
-                    baseCommand({ documentId: `doc-${tag}`, operationId: `op-${tag}`, body }),
-                ),
+                [
+                    baseCommand({ documentId: 'doc-a', operationId: 'op-a', body }),
+                    baseCommand({ documentId: 'doc-b', operationId: 'op-b', body }),
+                ],
                 { caps: { maxBytesPerOwner: 200 } },
             );
             for (const result of results) {

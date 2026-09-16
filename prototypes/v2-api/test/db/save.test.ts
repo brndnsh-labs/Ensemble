@@ -291,11 +291,16 @@ describe('commitSave (#1202)', () => {
             }
         }
 
-        function seedBody(db: ReturnType<typeof setUp>, documentId: string, body: string) {
+        function seedBody(
+            db: ReturnType<typeof setUp>,
+            owner: string,
+            documentId: string,
+            body: string,
+        ) {
             db.prepare(
                 'INSERT INTO documents (owner_id, document_id, revision, body, updated_at)' +
                     ' VALUES (?, ?, ?, ?, 1)',
-            ).run('owner-a', documentId, `${documentId}-rev`, body);
+            ).run(owner, documentId, `${documentId}-rev`, body);
         }
 
         it('enforces the SHIPPED caps when nothing is injected', () => {
@@ -313,16 +318,18 @@ describe('commitSave (#1202)', () => {
             expect(readDocument(db, 'owner-a', 'doc-1')).toBeUndefined();
             expect(readReceipt(db, 'owner-a', 'op-1')).toBeUndefined();
 
-            const spacious = setUp();
-            seedBody(spacious, 'fill', 'x'.repeat(MAX_BYTES_PER_OWNER - 16));
-            expect(commitSave(spacious, command({ body: 'y'.repeat(16) }), deps)).toMatchObject({
-                kind: 'committed',
-            });
-            expect(readOwnerUsage(spacious, 'owner-a').bytes).toBe(MAX_BYTES_PER_OWNER);
+            // owner-b rather than a second database: usage is per owner, and a second `setUp()`
+            // would leak the first temp file, since afterEach only cleans up the last one.
+            seedBody(db, 'owner-b', 'fill', 'x'.repeat(MAX_BYTES_PER_OWNER - 16));
+            const ownerB = { ownerId: 'owner-b', documentId: 'doc-b', operationId: 'op-b' };
+            expect(
+                commitSave(db, command({ ...ownerB, body: 'y'.repeat(16) }), deps),
+            ).toMatchObject({ kind: 'committed' });
+            expect(readOwnerUsage(db, 'owner-b').bytes).toBe(MAX_BYTES_PER_OWNER);
             expect(
                 commitSave(
-                    spacious,
-                    command({ documentId: 'doc-2', operationId: 'op-2', body: 'z' }),
+                    db,
+                    command({ ...ownerB, documentId: 'doc-b2', operationId: 'op-b2', body: 'z' }),
                     deps,
                 ),
             ).toMatchObject({ kind: 'quota_exceeded', limit: 'bytes', cap: MAX_BYTES_PER_OWNER });
@@ -374,7 +381,7 @@ describe('commitSave (#1202)', () => {
             const db = setUp();
             const quota = capped({ maxBytesPerOwner: BYTE_CAP });
             const near = BYTE_CAP - 128;
-            seedBody(db, 'big', 'x'.repeat(near));
+            seedBody(db, 'owner-a', 'big', 'x'.repeat(near));
             expect(readOwnerUsage(db, 'owner-a').bytes).toBe(near);
 
             expect(commitSave(db, command({ body: 'y'.repeat(256) }), quota)).toEqual({
@@ -395,7 +402,7 @@ describe('commitSave (#1202)', () => {
             const quota = capped({ maxBytesPerOwner: BYTE_CAP });
             // Brackets the comparison itself: `>` vs `>=` is the off-by-one that a guard
             // tested only well inside the boundary would never catch.
-            seedBody(db, 'fill', 'x'.repeat(BYTE_CAP - 16));
+            seedBody(db, 'owner-a', 'fill', 'x'.repeat(BYTE_CAP - 16));
             expect(commitSave(db, command({ body: 'y'.repeat(16) }), quota)).toMatchObject({
                 kind: 'committed',
             });
@@ -413,7 +420,7 @@ describe('commitSave (#1202)', () => {
         it('allows a small shrink that leaves the owner still over the cap', () => {
             const db = setUp();
             const over = BYTE_CAP + 512;
-            seedBody(db, 'doc-1', 'x'.repeat(over));
+            seedBody(db, 'owner-a', 'doc-1', 'x'.repeat(over));
             // The point of the escape hatch is that progress is allowed while STILL over the
             // cap. Shrinking all the way under in one step would pass even without it.
             expect(
@@ -429,7 +436,7 @@ describe('commitSave (#1202)', () => {
         it('allows an equal-size replacement while over the cap', () => {
             const db = setUp();
             const over = BYTE_CAP + 512;
-            seedBody(db, 'doc-1', 'x'.repeat(over));
+            seedBody(db, 'owner-a', 'doc-1', 'x'.repeat(over));
             expect(
                 commitSave(
                     db,
@@ -439,28 +446,46 @@ describe('commitSave (#1202)', () => {
             ).toMatchObject({ kind: 'committed' });
         });
 
-        it('counts UTF-8 bytes, not characters, on both sides of the arithmetic', () => {
+        it('counts UTF-8 bytes, not characters, on all three sides of the arithmetic', () => {
             const db = setUp();
-            // Four bytes each; `length()` on TEXT would report half as many code units.
+            // 64 bytes: 16 characters, 16 code points, 32 UTF-16 code units. Every wrong way to
+            // count is a DIFFERENT number, and each cap below is chosen so that only the right
+            // one lands on the asserted side of it. A cap merely well past the boundary would
+            // be cleared by all three counts and prove nothing.
             const body = '𝄞'.repeat(16);
-            expect(commitSave(db, command({ body }), deps)).toMatchObject({ kind: 'committed' });
-            expect(readOwnerUsage(db, 'owner-a').bytes).toBe(Buffer.byteLength(body, 'utf8'));
+            expect(Buffer.byteLength(body, 'utf8')).toBe(64);
 
-            // And the cap compares against those bytes: 64 of them does not fit under 32,
-            // which a character count (16) would wrongly wave through.
+            // 1. The SQL side: `length()` on TEXT would report 32 code units, not 64 bytes.
+            expect(commitSave(db, command({ body }), deps)).toMatchObject({ kind: 'committed' });
+            expect(readOwnerUsage(db, 'owner-a').bytes).toBe(64);
+
+            // 2. `addedBytes`. Usage is 64, so the projection is 128 against a cap of 100 —
+            // refused. Counting code points (80) or UTF-16 units (96) would wave it through.
             expect(
                 commitSave(
                     db,
                     command({ documentId: 'doc-2', operationId: 'op-2', body }),
-                    capped({ maxBytesPerOwner: 32 }),
+                    capped({ maxBytesPerOwner: 100 }),
                 ),
             ).toMatchObject({ kind: 'quota_exceeded', limit: 'bytes' });
+
+            // 3. `replacedBytes`, the one side an assertion on usage cannot reach. Replacing
+            // those 64 bytes with 64 more leaves the footprint unchanged, so it commits under a
+            // cap of 80. Under-counting what is REPLACED projects 96 (UTF-16) or 112 (code
+            // points) and refuses an edit that does not grow the owner's storage at all.
+            expect(
+                commitSave(
+                    db,
+                    command({ operationId: 'op-3', expectedRevision: 'rev-1', body }),
+                    capped({ maxBytesPerOwner: 80 }),
+                ),
+            ).toMatchObject({ kind: 'committed' });
         });
 
         it('never refuses a write that shrinks the footprint, even from over the cap', () => {
             const db = setUp();
             // Over the cap already — as it would be if the cap were lowered under an account.
-            seedBody(db, 'doc-1', 'x'.repeat(BYTE_CAP + 512));
+            seedBody(db, 'owner-a', 'doc-1', 'x'.repeat(BYTE_CAP + 512));
             expect(
                 commitSave(
                     db,
