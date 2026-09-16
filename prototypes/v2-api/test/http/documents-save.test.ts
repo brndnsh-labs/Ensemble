@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { digest, snapshot } from '../../../v2/lib/sync/protocol.js';
 import { MAX_SAVE_REQUEST_BYTES } from '../../../v2/lib/sync/request.js';
 import { createWebAuthnConfig, type WebAuthnConfig } from '../../src/auth/config.js';
+import { issueSession } from '../../src/auth/session.js';
 import { readDocument, readReceipt } from '../../src/db/documents.js';
 import { createApp } from '../../src/http/app.js';
 import { DOCUMENT_POLICIES } from '../../src/http/documents.js';
@@ -110,6 +111,12 @@ async function save(
     const res = await post(ctx, SAVE, body);
     const text = await res.text();
     return { status: res.status, json: text.length > 0 ? JSON.parse(text) : undefined, res };
+}
+
+function sessionCookie(token: string): Response {
+    return new Response(null, {
+        headers: { 'set-cookie': `__Host-ensemble_session=${token}; Path=/; Secure; HttpOnly` },
+    });
 }
 
 describe('POST /api/documents/save (#1202)', () => {
@@ -353,5 +360,46 @@ describe('POST /api/documents/save (#1202)', () => {
         // An anonymous caller never reaches this budget: 401 first, every time.
         const anonymous: Ctx = { ...ctx, jar: createCookieJar() };
         expect((await save(anonymous, body)).status).toBe(401);
+    });
+
+    it('refuses a query string (deny-by-default, like every auth route) and a recovery-purpose session', async () => {
+        ctx = await setUp();
+        const body = freeze({
+            ownerId: ctx.accountId,
+            documentId: 'doc-1',
+            operationId: 'op-1',
+            expectedRevision: null,
+        });
+        const withQuery = await post(ctx, `${SAVE}?ownerId=attacker`, body);
+        expect(withQuery.status).toBe(400);
+        expect(await withQuery.json()).toEqual({ error: 'malformed_request' });
+        expect(readDocument(ctx.testDb.db, ctx.accountId, 'doc-1')).toBeUndefined();
+
+        // A recovery-only session can do nothing but enroll a passkey — not save a chart.
+        const recovery = issueSession(
+            ctx.testDb.db,
+            ctx.accountId,
+            Date.now(),
+            60_000,
+            null,
+            'recovery',
+        );
+        const recoveryJar = createCookieJar();
+        recoveryJar.ingest(sessionCookie(recovery.token));
+        expect((await save({ ...ctx, jar: recoveryJar }, body)).status).toBe(401);
+        expect(readDocument(ctx.testDb.db, ctx.accountId, 'doc-1')).toBeUndefined();
+        // Not a tautology: a STANDARD session minted the same way, carried the same way, saves.
+        const standard = issueSession(ctx.testDb.db, ctx.accountId, Date.now(), 60_000, null);
+        const standardJar = createCookieJar();
+        standardJar.ingest(sessionCookie(standard.token));
+        expect((await save({ ...ctx, jar: standardJar }, body)).status).toBe(200);
+
+        // Unknown document paths are body-bounded too, not only /save.
+        const unknown = await post(
+            ctx,
+            '/api/documents/nope',
+            'x'.repeat(MAX_SAVE_REQUEST_BYTES + 1),
+        );
+        expect(unknown.status).toBe(413);
     });
 });

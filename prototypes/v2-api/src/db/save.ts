@@ -28,6 +28,12 @@ import { withTransaction } from './transaction.js';
  * conflict resolution (stage 5) wants. The "different bytes under one id" rejection therefore
  * protects every operation id that ever changed server state, which is the integrity property
  * the protocol is after.
+ *
+ * A committed replay answers the ORIGINAL revision even if the document has since advanced.
+ * That is the protocol's promise ("returns the original result"); a client that acknowledges
+ * out of order would move its base backwards, which protocol steps 2 and 5 forbid a correct
+ * client from doing — stage 4/5 must keep acknowledging in queue order, not "whichever reply
+ * arrived last".
  */
 
 export interface SaveCommand {
@@ -73,60 +79,65 @@ export function commitSave(
     { mintRevision: mint = mintRevision }: SaveDependencies = {},
 ): SaveOutcome {
     const { ownerId, documentId, operationId, digest, expectedRevision, body, now } = command;
-    return withTransaction(db, () => {
-        // 1. Operation receipt: replay or reject before anything else is even read.
-        const receipt = readReceipt(db, ownerId, operationId);
-        if (receipt !== undefined) {
-            if (receipt.requestDigest !== digest || receipt.documentId !== documentId) {
-                return { kind: 'operation_mismatch' };
+    // IMMEDIATE: this transaction reads (receipt, document, tombstone) before it writes.
+    return withTransaction(
+        db,
+        () => {
+            // 1. Operation receipt: replay or reject before anything else is even read.
+            const receipt = readReceipt(db, ownerId, operationId);
+            if (receipt !== undefined) {
+                if (receipt.requestDigest !== digest || receipt.documentId !== documentId) {
+                    return { kind: 'operation_mismatch' };
+                }
+                return { kind: 'committed', revision: receipt.resultRevision, replayed: true };
             }
-            return { kind: 'committed', revision: receipt.resultRevision, replayed: true };
-        }
 
-        // 2. Expected revision against the server's current state.
-        const current = readDocument(db, ownerId, documentId);
-        if (expectedRevision === null) {
-            // Creating requires absence AND no tombstone: a deleted id is never resurrected.
-            const tombstone = readTombstone(db, ownerId, documentId);
-            if (tombstone !== undefined) {
-                return { kind: 'conflict', revision: tombstone.revision, remote: null };
-            }
-            if (current !== undefined) {
-                return {
-                    kind: 'conflict',
-                    revision: current.revision,
-                    remote: { revision: current.revision, body: current.body },
-                };
-            }
-        } else {
-            if (current === undefined) {
+            // 2. Expected revision against the server's current state.
+            const current = readDocument(db, ownerId, documentId);
+            if (expectedRevision === null) {
+                // Creating requires absence AND no tombstone: a deleted id is never resurrected.
                 const tombstone = readTombstone(db, ownerId, documentId);
-                return {
-                    kind: 'conflict',
-                    revision: tombstone?.revision ?? expectedRevision,
-                    remote: null,
-                };
+                if (tombstone !== undefined) {
+                    return { kind: 'conflict', revision: tombstone.revision, remote: null };
+                }
+                if (current !== undefined) {
+                    return {
+                        kind: 'conflict',
+                        revision: current.revision,
+                        remote: { revision: current.revision, body: current.body },
+                    };
+                }
+            } else {
+                if (current === undefined) {
+                    const tombstone = readTombstone(db, ownerId, documentId);
+                    return {
+                        kind: 'conflict',
+                        revision: tombstone?.revision ?? expectedRevision,
+                        remote: null,
+                    };
+                }
+                // Exact match only. The current revision is never substituted into the request.
+                if (current.revision !== expectedRevision) {
+                    return {
+                        kind: 'conflict',
+                        revision: current.revision,
+                        remote: { revision: current.revision, body: current.body },
+                    };
+                }
             }
-            // Exact match only. The current revision is never substituted into the request.
-            if (current.revision !== expectedRevision) {
-                return {
-                    kind: 'conflict',
-                    revision: current.revision,
-                    remote: { revision: current.revision, body: current.body },
-                };
-            }
-        }
 
-        // 3. Write the document and 4. record the receipt, in the same transaction.
-        const revision = mint();
-        writeDocument(db, ownerId, { documentId, revision, body, updatedAt: now });
-        writeReceipt(db, ownerId, {
-            operationId,
-            documentId,
-            requestDigest: digest,
-            resultRevision: revision,
-            createdAt: now,
-        });
-        return { kind: 'committed', revision, replayed: false };
-    });
+            // 3. Write the document and 4. record the receipt, in the same transaction.
+            const revision = mint();
+            writeDocument(db, ownerId, { documentId, revision, body, updatedAt: now });
+            writeReceipt(db, ownerId, {
+                operationId,
+                documentId,
+                requestDigest: digest,
+                resultRevision: revision,
+                createdAt: now,
+            });
+            return { kind: 'committed', revision, replayed: false };
+        },
+        { immediate: true },
+    );
 }

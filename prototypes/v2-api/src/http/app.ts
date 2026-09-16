@@ -169,8 +169,9 @@ export function createApp({
     app.use('/api/*', jsonOnlyGuard());
     // The 64 KB ceiling covers every /api/* route EXCEPT the document routes, which carry a
     // whole chart and apply their own `MAX_SAVE_REQUEST_BYTES` limit in documents.ts (#1202).
-    // Path-gated here rather than registered per prefix so an unknown /api/* path still gets
-    // the small limit, and so the two limits can never both apply to one request.
+    // Path-gated here so the two limits can never both apply to one request: outside the
+    // prefix every path (known or not) gets the small limit; inside it the sub-app's own
+    // catch-all limiter bounds every path, known or not.
     const apiBodyLimit = bodyLimit({
         maxSize: BODY_LIMIT_BYTES,
         onError: (c) => sendError(c, 413, 'payload_too_large'),

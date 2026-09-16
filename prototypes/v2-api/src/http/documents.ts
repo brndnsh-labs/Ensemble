@@ -66,8 +66,10 @@ export function documentRoutes({
     const routes = new Hono();
     const limiter = createRateLimiter(DOCUMENT_POLICIES['POST /api/documents/save']);
 
+    // On every path under the prefix, not only `/save`, so an unknown document path is bounded
+    // exactly like an unknown auth path is (the parent's 64 KB limit is gated OFF this prefix).
     routes.use(
-        '/save',
+        '*',
         bodyLimit({
             maxSize: MAX_SAVE_REQUEST_BYTES,
             onError: (c) => sendError(c, 413, 'payload_too_large'),
@@ -78,6 +80,11 @@ export function documentRoutes({
         const session = requireSession(c);
         if (!session.ok) {
             return session.response;
+        }
+        // Deny-by-default, same as every auth route (auth-policy.ts): the endpoint takes its
+        // whole input from the body, so any query string is an unexpected input, refused.
+        if (new URL(c.req.url).search.length !== 0) {
+            return sendError(c, 400, 'malformed_request');
         }
         const budget = limiter(identify(c), now());
         if (!budget.allowed) {
