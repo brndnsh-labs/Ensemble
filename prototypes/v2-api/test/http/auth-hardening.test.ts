@@ -63,6 +63,15 @@ describe('deny-by-default HTTP contracts', () => {
             [...Object.keys(AUTH_POLICIES), ...Object.keys(DOCUMENT_POLICIES)].sort(),
         );
     });
+    it.each(Object.keys(DOCUMENT_POLICIES))(
+        '%s rejects an unauthenticated caller with 401 unauthenticated',
+        async (route) => {
+            const app = setup();
+            const res = await request(app, route);
+            expect(res.status).toBe(401);
+            expect(await res.json()).toEqual({ error: 'unauthenticated' });
+        },
+    );
     it.each(Object.entries(AUTH_POLICIES))(
         '%s rejects unexpected fields/query values before auth state changes',
         async (route) => {
