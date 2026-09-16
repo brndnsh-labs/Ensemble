@@ -4,6 +4,11 @@ import {
     loadDrumPreset,
     togglePower,
 } from '@engine/controllers/instrument-controller';
+import {
+    loopSection as armSectionLoop,
+    clearPracticeLoop,
+    getSectionStepBounds,
+} from '@engine/controllers/practice-controller';
 import { autoVoiceForGenre } from '@engine/data/genre-sound-map';
 import { GENRE_NAMES, SMART_GENRES } from '@engine/data/smart-genres';
 import { registerScorePlaybackRenderer, validateProgression } from '@engine/engine/chords-engine';
@@ -270,9 +275,57 @@ export function initialize(): Promise<void> {
 
 export function stop(): void {
     playIntent++;
+    // #1211 — Stop always releases an armed/live practice loop; the drill is a
+    // performance-mode overlay on the transport, not a setting that survives it.
+    clearPracticeLoop();
     if (getState().playback.isPlaying) {
         dispatch(ACTIONS.TOGGLE_PLAY);
     }
+}
+
+/**
+ * Arm a section-practice loop (#1211). Wraps the practice controller so the app
+ * shell never imports `@engine/controllers/*` directly. Returns false (and
+ * changes nothing) when the section id doesn't resolve to a step span — e.g. a
+ * stale id from a chart that changed shape after this render.
+ */
+export function loopSection(sectionId: string): boolean {
+    if (!getSectionStepBounds(sectionId)) {
+        return false;
+    }
+    armSectionLoop(sectionId);
+    return true;
+}
+
+/** Drop out of a running or armed practice loop (#1211). */
+export function clearLoop(): void {
+    clearPracticeLoop();
+}
+
+/**
+ * The id of the section currently armed/looping, or null when no loop is set.
+ * Maps `playback.loopStartStep/loopEndStep` back to the `arranger.sectionMap`
+ * entry with the matching span — using `getSectionStepBounds` so a section with
+ * more than one map entry (a written repeat) resolves the same collapsed span
+ * `loopSection` armed it with, rather than a single raw map row (#1211).
+ */
+export function loopedSection(): string | null {
+    const { playback, arranger } = getState();
+    if (playback.loopStartStep < 0) {
+        return null;
+    }
+    const ids = new Set(arranger.sectionMap.map((entry) => entry.id));
+    for (const id of ids) {
+        const bounds = getSectionStepBounds(id);
+        if (
+            bounds &&
+            bounds.start === playback.loopStartStep &&
+            bounds.end === playback.loopEndStep
+        ) {
+            return id;
+        }
+    }
+    return null;
 }
 
 export async function toggle(progress: (text: string) => void): Promise<void> {
