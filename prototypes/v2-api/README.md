@@ -277,9 +277,21 @@ table is `src/db/save.ts` (`commitSave`, one `withTransaction`); the route is
 | Stale revision, create over an existing id | `409 { …receipt, revision: <current>, kind: 'conflict', remote: { revision, document } }` |
 | Create or update over a tombstone; update of an id the owner never had | `409 … kind: 'conflict', remote: null` |
 | Any decoder refusal — including an envelope `ownerId` that is not the session's account | `400 { error: 'malformed_request' }` |
+| Owner at a storage cap (#1234) — create at `MAX_DOCUMENTS_PER_OWNER`, or a write crossing `MAX_BYTES_PER_OWNER` | `409 { error: 'quota_exceeded' }` — nothing written |
 
 Design points worth knowing before changing it:
 
+- **The quota is per owner and lives inside the transaction.** `MAX_DOCUMENTS_PER_OWNER` (2,000)
+  and `MAX_BYTES_PER_OWNER` (256 MiB) in `src/db/save.ts` bound what one account accumulates;
+  `MAX_SAVE_REQUEST_BYTES` bounds one request and `DOCUMENT_POLICIES` bounds one identity's
+  rate, and neither of those bounds the total. Checked AFTER the conflict decision, so an owner
+  at the cap with a stale revision still hears about the stale revision — resolving it may be an
+  update, which the cap allows. A committed receipt replays regardless of the cap (the write
+  already happened), and a write that does not increase the footprint is never refused, so an
+  account somehow over the cap is not frozen out of the edits that shrink it back under. That
+  rule is only "does not grow" — one such write need not land under the cap, it just may not
+  push further over. The reply carries no numbers (see the taxonomy note in `src/http/errors.ts`
+  and #1245).
 - **The owner is the session's account id, full stop.** The envelope's `ownerId` is a routing
   hint that must AGREE with it; a disagreement is refused, never "corrected".
 - **One decoder, one codec.** The route decodes with `prototypes/v2/lib/sync/request.ts` —

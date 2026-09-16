@@ -37,7 +37,9 @@ export type ApiErrorCode =
     // Registration is closed by deployment policy (ENSEMBLE_REGISTRATION), not a caller fault.
     | 'registration_closed'
     /** #1202: this operation id already committed different bytes; never overwritten. */
-    | 'operation_mismatch';
+    | 'operation_mismatch'
+    /** #1234: this owner is at a storage cap. Terminal for the request — retrying cannot help. */
+    | 'quota_exceeded';
 
 export function sendError(c: Context, status: ContentfulStatusCode, code: ApiErrorCode) {
     c.set('authErrorCode', code);

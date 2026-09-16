@@ -129,6 +129,17 @@ export function documentRoutes({
         if (outcome.kind === 'operation_mismatch') {
             return sendError(c, 409, 'operation_mismatch');
         }
+        // 409 rather than 413 or 507, following `operation_mismatch` exactly: the server refuses
+        // this write against the account's current state and retrying the same bytes cannot
+        // help. 413 already means "this one request is too big", which is a different thing the
+        // client fixes differently, and a 5xx would invite the transport's retry logic for what
+        // is a terminal, user-actionable state ("your library is full").
+        if (outcome.kind === 'quota_exceeded') {
+            // Deliberately the bare code: `outcome.limit`/`usage`/`cap` stop here rather than
+            // going on the wire, because the taxonomy in errors.ts is `{ error: <code> }` and
+            // nothing yet consumes the distinction. #1245 decides whether stage 5's UX needs it.
+            return sendError(c, 409, 'quota_exceeded');
+        }
         if (outcome.kind === 'conflict') {
             return c.json(
                 {
