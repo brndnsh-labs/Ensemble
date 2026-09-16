@@ -381,3 +381,148 @@ test('repeat visits follow the real band while the music stand keeps four writte
     expect(evidence.nonzeroAudioSamples).toBeGreaterThan(0);
     expect(evidence.secondLapAudioSamples).toBeGreaterThan(0);
 });
+
+test('section practice loop (#1211) confines playback and clears on release, Escape and Stop', async ({
+    page,
+}) => {
+    test.setTimeout(60_000);
+    const pageErrors: string[] = [];
+    page.on('pageerror', (error) => pageErrors.push(error.message));
+    await observePlayback(page);
+    await page.goto('/v2/');
+    await page.getByRole('button', { name: '＋ New song', exact: true }).click();
+    await editorRevealed(page);
+    await page.getByLabel('Song title').fill('Section loop study');
+    // The new-song default already gives section A four distinct bars
+    // (C, G, Am, F) — no bar editing needed there. Add a second section with a
+    // chord name ('Dm7') that never appears in A, so the highlight sequence
+    // alone proves whether playback ever crossed the section boundary.
+    await page.getByRole('button', { name: '＋ Section', exact: true }).click();
+    await page.getByLabel('Chords in this bar').fill('Dm7');
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
+    await page.getByRole('button', { name: 'Chart', exact: true }).click();
+    const tempo = page.getByLabel('Tempo', { exact: true });
+    await tempo.fill('240');
+    await tempo.press('Enter');
+    await expect(tempo).toHaveValue('240');
+    await expect(page.locator('.error-banner')).toHaveCount(0);
+
+    const sectionA = page.getByRole('button', {
+        name: 'Section A · hold to practice-loop',
+        exact: true,
+    });
+    await expect(sectionA).toHaveAttribute('aria-pressed', 'false');
+    await expect(page.locator('.section-loop.active')).toHaveCount(0);
+
+    // Long-press (simulated as a held click) arms the loop on section A.
+    await sectionA.click({ delay: 600 });
+    await expect(sectionA).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('.section-loop.active')).toHaveCount(1);
+
+    await page.evaluate(() => {
+        const evidence = window.__semanticPlaybackEvidence;
+        evidence.highlights = [];
+        evidence.snapshots = [];
+        evidence.notes = [];
+        evidence.armed = true;
+    });
+    await page.getByRole('button', { name: 'Start playback', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Stop playback', exact: true })).toBeEnabled();
+
+    // Two-plus laps of the looped section (the fourth 'C' visit) must land
+    // with zero 'Dm7' visits: the loop fold never lets the form cross into B.
+    await expect
+        .poll(
+            () =>
+                page.evaluate(
+                    () =>
+                        window.__semanticPlaybackEvidence.highlights.filter(
+                            (chord) => chord.name === 'C',
+                        ).length,
+                ),
+            {
+                timeout: 25_000,
+                message: 'Section A should loop at least twice while armed',
+            },
+        )
+        .toBeGreaterThanOrEqual(3);
+    const confinedHighlights = await page.evaluate(
+        () => window.__semanticPlaybackEvidence.highlights,
+    );
+    expect(confinedHighlights.every((chord) => chord.name !== 'Dm7')).toBe(true);
+
+    // Long-press again releases the loop; the form then resumes into section B.
+    await sectionA.click({ delay: 600 });
+    await expect(sectionA).toHaveAttribute('aria-pressed', 'false');
+    await expect(page.locator('.section-loop.active')).toHaveCount(0);
+    await expect
+        .poll(
+            () =>
+                page.evaluate(() =>
+                    window.__semanticPlaybackEvidence.highlights.some(
+                        (chord) => chord.name === 'Dm7',
+                    ),
+                ),
+            {
+                timeout: 20_000,
+                message: 'Form should resume into section B once the loop is released',
+            },
+        )
+        .toBe(true);
+
+    // Stop clears an armed/live loop (#1211 acceptance): re-arm on A, start again,
+    // confirm the fold, then Stop and verify the loop drops immediately.
+    await page.getByRole('button', { name: 'Stop playback', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Start playback', exact: true })).toBeEnabled();
+    await sectionA.click({ delay: 600 });
+    await expect(sectionA).toHaveAttribute('aria-pressed', 'true');
+    await page.evaluate(() => {
+        const evidence = window.__semanticPlaybackEvidence;
+        evidence.highlights = [];
+        evidence.armed = true;
+    });
+    await page.getByRole('button', { name: 'Start playback', exact: true }).click();
+    await expect
+        .poll(
+            () =>
+                page.evaluate(
+                    () =>
+                        window.__semanticPlaybackEvidence.highlights.filter(
+                            (chord) => chord.name === 'C',
+                        ).length,
+                ),
+            { timeout: 20_000 },
+        )
+        .toBeGreaterThanOrEqual(2);
+    await page.getByRole('button', { name: 'Stop playback', exact: true }).click();
+    await expect(sectionA).toHaveAttribute('aria-pressed', 'false');
+    await expect(page.locator('.section-loop.active')).toHaveCount(0);
+
+    // Escape clears an armed (not-yet-playing) loop too.
+    await sectionA.click({ delay: 600 });
+    await expect(sectionA).toHaveAttribute('aria-pressed', 'true');
+    await page.keyboard.press('Escape');
+    await expect(sectionA).toHaveAttribute('aria-pressed', 'false');
+    await expect(page.locator('.section-loop.active')).toHaveCount(0);
+
+    // The keyboard path to the same toggle: a long-press has no keyboard
+    // equivalent, so 'L' on the focused label is the accessible route in.
+    // Enter must stay inert — that gesture is banked for #937.
+    await sectionA.focus();
+    await page.keyboard.press('Enter');
+    await expect(sectionA).toHaveAttribute('aria-pressed', 'false');
+    await page.keyboard.press('l');
+    await expect(sectionA).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('.section-loop.active')).toHaveCount(1);
+    await page.keyboard.press('l');
+    await expect(sectionA).toHaveAttribute('aria-pressed', 'false');
+
+    const evidence = await page.evaluate(() => {
+        window.__semanticPlaybackEvidence.armed = false;
+        return window.__semanticPlaybackEvidence;
+    });
+    expect(evidence.sourceLeaks).toEqual([]);
+    expect(evidence.errors).toEqual([]);
+    expect(pageErrors).toEqual([]);
+});

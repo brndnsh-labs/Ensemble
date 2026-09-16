@@ -70,6 +70,15 @@ export default function Ensemble() {
     const [playing, setPlaying] = useState(false);
     const [playbackPending, setPlaybackPending] = useState(false);
     const [active, setActive] = useState<number | null>(null);
+    // #1211 — id of the section a practice loop is armed/running on, or null.
+    // Polled alongside playing/active below; the engine is the source of truth.
+    const [loopedSectionId, setLoopedSectionId] = useState<string | null>(null);
+    // Long-press bookkeeping for the section-letter loop gesture: the pending
+    // timer so pointerup/leave/cancel can cancel it, and a suppression flag so
+    // the click that follows a fired long-press doesn't also fire the (reserved
+    // for #937) plain-tap handler.
+    const sectionLoopPress = useRef<number | null>(null);
+    const suppressSectionTap = useRef(false);
     // Day/Stage is a per-device convenience (#1208), never a document field. Null
     // follows the system; the stored choice is applied before hydration by the
     // inline script in layout.tsx, and here on every change.
@@ -154,6 +163,7 @@ export default function Ensemble() {
             const state = runtime.state();
             setPlaying(state.playback.isPlaying);
             setActive(state.playback.isPlaying ? state.chords.lastActiveChordIndex : null);
+            setLoopedSectionId(runtime.loopedSection());
         }, 60);
         const preventLoss = (event: BeforeUnloadEvent) => {
             if (volatileDrafts.current.size || pendingText.current) {
@@ -422,6 +432,24 @@ export default function Ensemble() {
         }
         pendingText.current = next.size > 0;
         setBuffers(next);
+    }
+    // #1211 — long-press on a section letter arms/releases a practice loop
+    // confined to that section. Idempotent toggle: re-reads the engine after
+    // dispatching rather than trusting local state, so it stays correct if the
+    // loop was cleared elsewhere (Stop, Escape, editing) between renders.
+    function toggleSectionLoop(id: string | undefined) {
+        // `LeadSheetSectionBlock.id` is optional in the shared model (legacy fixtures
+        // predate it); every live block sets it, but stay a no-op rather than arm a
+        // loop keyed on `undefined` if one ever doesn't.
+        if (!id) {
+            return;
+        }
+        if (runtime.loopedSection() === id) {
+            runtime.clearLoop();
+        } else {
+            runtime.loopSection(id);
+        }
+        setLoopedSectionId(runtime.loopedSection());
     }
     function revealEditor(id = sectionId) {
         runtime.stop();
@@ -1436,6 +1464,13 @@ export default function Ensemble() {
                                 ) {
                                     setFollowing(false);
                                 }
+                                // #1211 — Escape clears an active practice loop from
+                                // anywhere in the chart (bubbles up from a focused
+                                // section-letter button too).
+                                if (e.key === 'Escape' && loopedSectionId) {
+                                    runtime.clearLoop();
+                                    setLoopedSectionId(null);
+                                }
                             }}
                             tabIndex={0}
                             aria-label="Chord chart"
@@ -1447,9 +1482,83 @@ export default function Ensemble() {
                                         key={block.measures[0]?.chords[0]?.globalIndex}
                                     >
                                         <div className="section-head">
-                                            <span className="section-letter">
+                                            <button
+                                                type="button"
+                                                className="section-letter"
+                                                aria-pressed={loopedSectionId === block.id}
+                                                aria-label={`Section ${
+                                                    block.label || 'A'
+                                                } · hold to practice-loop`}
+                                                aria-keyshortcuts="L"
+                                                onPointerDown={() => {
+                                                    // A long-press whose click never arrived (a
+                                                    // touch released off-target) must not leave
+                                                    // the flag set and swallow the NEXT tap —
+                                                    // which #937 will make meaningful.
+                                                    suppressSectionTap.current = false;
+                                                    if (sectionLoopPress.current !== null) {
+                                                        window.clearTimeout(
+                                                            sectionLoopPress.current,
+                                                        );
+                                                    }
+                                                    sectionLoopPress.current = window.setTimeout(
+                                                        () => {
+                                                            sectionLoopPress.current = null;
+                                                            suppressSectionTap.current = true;
+                                                            toggleSectionLoop(block.id);
+                                                        },
+                                                        500,
+                                                    );
+                                                }}
+                                                onPointerUp={() => {
+                                                    if (sectionLoopPress.current !== null) {
+                                                        window.clearTimeout(
+                                                            sectionLoopPress.current,
+                                                        );
+                                                        sectionLoopPress.current = null;
+                                                    }
+                                                }}
+                                                onPointerLeave={() => {
+                                                    if (sectionLoopPress.current !== null) {
+                                                        window.clearTimeout(
+                                                            sectionLoopPress.current,
+                                                        );
+                                                        sectionLoopPress.current = null;
+                                                    }
+                                                }}
+                                                onPointerCancel={() => {
+                                                    if (sectionLoopPress.current !== null) {
+                                                        window.clearTimeout(
+                                                            sectionLoopPress.current,
+                                                        );
+                                                        sectionLoopPress.current = null;
+                                                    }
+                                                }}
+                                                onClick={() => {
+                                                    // A long-press above already acted and set
+                                                    // this flag; swallow the click that follows
+                                                    // it so the plain tap stays a no-op.
+                                                    if (suppressSectionTap.current) {
+                                                        suppressSectionTap.current = false;
+                                                        return;
+                                                    }
+                                                    // Plain tap is intentionally a no-op: this
+                                                    // gesture is reserved for the banked #937
+                                                    // conductor lens ("lead, don't play"). Don't
+                                                    // wire a handler here for anything else.
+                                                }}
+                                                onKeyDown={(e) => {
+                                                    // Long-press has no keyboard equivalent, so
+                                                    // 'l'/'L' is the keyboard path to the same
+                                                    // toggle. Enter/Space stay reserved for #937.
+                                                    if (e.key === 'l' || e.key === 'L') {
+                                                        e.preventDefault();
+                                                        toggleSectionLoop(block.id);
+                                                    }
+                                                }}
+                                            >
                                                 {block.label || 'A'}
-                                            </span>
+                                            </button>
                                             <span className="section-name">
                                                 {arrangementOf(current).sections.find(
                                                     (s) => s.id === block.id,
@@ -1468,6 +1577,9 @@ export default function Ensemble() {
                                                         }
                                                     </span>
                                                 )}
+                                            {loopedSectionId === block.id && (
+                                                <span className="section-loop active">Looping</span>
+                                            )}
                                             {editing && (
                                                 <button
                                                     className="section-edit"

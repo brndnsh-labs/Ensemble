@@ -848,14 +848,30 @@ html [hidden] {
     min-height: 24px;
 }
 .section-letter {
+    font: inherit;
     font-size: 12px;
     font-weight: 750;
+    color: inherit;
+    background: none;
     border: 1.5px solid var(--ink);
     border-radius: 2px;
     min-width: 24px;
     height: 23px;
     display: grid;
     place-content: center;
+    padding: 0;
+    cursor: pointer;
+    /* #1211 — long-press target. `manipulation`, NOT `none`: the chart is scrolled
+       with a thumb and this badge sits at the top-left of every section, so opting
+       out of browser panning here would swallow a drag that merely started on it.
+       A touch that turns into a scroll fires `pointercancel`, which the button's
+       handler uses to abandon the press timer. */
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+}
+.section-letter:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
 }
 .section-name {
     font-size: 11px;
