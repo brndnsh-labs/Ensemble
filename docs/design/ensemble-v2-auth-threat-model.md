@@ -214,12 +214,22 @@ different networks against the same budget).
 
 Residuals, after the independent review of this receipt (2026-09-15):
 
-- **A peer inside Cloudflare's IP ranges that reaches the origin directly is trusted like the
-  edge** and can set `CF-Connecting-IP` freely — unlimited rate-bucket identities and a poisoned
-  access-log `client_ip`. Preconditions: origin-IP disclosure and 443 accepting direct
-  connections. Pre-existing, but #1218 made `{client_ip}` a security control. Fix is Cloudflare
-  Authenticated Origin Pulls (#1227, needs-decision); until then anonymous registration is
-  closed by deployment policy (#1226), so the exposure is abuse of rate budgets, not accounts.
+- ~~**A peer inside Cloudflare's IP ranges that reaches the origin directly is trusted like the
+  edge**~~ — **closed 2026-09-16 by #1227.** The risk was that any peer reaching the origin
+  directly could set `CF-Connecting-IP` freely, minting unlimited rate-bucket identities and
+  poisoning the access-log `client_ip`; preconditions were origin-IP disclosure and 443 accepting
+  direct connections. Pre-existing, but #1218 made `{client_ip}` a security control. Cloudflare
+  Authenticated Origin Pulls is now on for the zone and the two ensemble hosts sit in their own
+  Caddy site block with `client_auth { mode require_and_verify; trust_pool file
+  <cloudflare-origin-pull-ca.pem> }`. Measured before and after from a host off the edge:
+  a direct request to the origin IP with either Host header returned `200` before and now fails
+  the handshake with `tlsv13 alert certificate required`, while both hosts still answer `200`
+  through Cloudflare. The requirement is scoped to those two names — the wildcard block's
+  LAN/tailnet apps still answer a direct probe. **Residual:** the trust boundary is now "any
+  client holding a Cloudflare origin-pull certificate", which is every Cloudflare customer, not
+  just this zone. Cloudflare's per-zone certificate would narrow it to this account; that is a
+  further hardening step, not a reopening of this finding, because the attacker must now also be
+  routing through Cloudflare rather than merely occupying one of its IP ranges.
 - `client_ip_headers` is `CF-Connecting-IP` **only**. The initial deploy also listed
   `X-Forwarded-For` as a fallback; the review showed Caddy takes the first parseable IP across
   every listed header and XFF's leftmost element is client-supplied, so it was removed the same
@@ -234,7 +244,9 @@ Residuals, after the independent review of this receipt (2026-09-15):
 
 **Stage-exit gap (2026-09-12) — closed 2026-09-15** by the deployed route and the receipt above.
 What closed it was the actual API hop plus live socket probes, not unit tests or header
-selection; the residuals above are what remains, and #1227 must land before registration opens.
+selection; the residuals above are what remains. #1227 was the one that had to land before
+registration opens, and it landed 2026-09-16 — the remaining gate on opening registration is
+#1234 (per-owner storage quota inside the Save transaction).
 
 ## Audit privacy, retention and account deletion
 
@@ -329,7 +341,8 @@ add replicas or change the shared transaction helper as an incidental optimizati
 **Historical note:** at the time of the #1196 review the "Real proxy identity verified safe" row
 was still unmet and this receipt left stage 2 open. The row was met on 2026-09-15 by #1218 (see
 "Live proxy identity receipt"), which is what closes stage 2. Physical passkey/device acceptance,
-backup/restore (#1220) and opening registration (#1226, gated on #1227) remain later stages.
+backup/restore (#1220) and opening registration (#1226) remain later stages. #1226's origin-pull
+gate (#1227) closed 2026-09-16; its storage-quota gate (#1234) has not.
 
 The local `test/http/client-identity.socket.test.ts` also drives a real Node/Hono listener past
 the recovery threshold while changing XFF, then proves a second configured client-header identity
