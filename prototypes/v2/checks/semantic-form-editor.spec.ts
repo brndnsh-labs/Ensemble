@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import type { Page } from '@playwright/test';
 import type { ChartDocument } from '../lib/documents';
-import { test as base, expect } from './fixtures';
+import { test as base, editorRevealed, expect } from './fixtures';
 
 const test = base.extend<{ disconnect: () => Promise<void> }>({
     disconnect: async ({ browserName, context, request }, use) => {
@@ -45,6 +45,7 @@ async function newSong(page: Page, title: string) {
     await page.getByRole('button', { name: '＋ New song', exact: true }).click();
     await expect(page.getByLabel('Chords in this bar')).toHaveValue('C');
     await expect(page.locator('.bar .chord')).toHaveText(['C', 'G', 'Am', 'F']);
+    await editorRevealed(page);
     await page.getByLabel('Song title').fill(title);
     await expect(page.getByRole('button', { name: 'Song actions' })).toBeEnabled();
     await expect(page.getByLabel('Start repeat here', { exact: true })).not.toBeVisible();

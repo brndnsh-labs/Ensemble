@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import type { Page } from '@playwright/test';
 import type { ChartDocument } from '../lib/documents';
-import { test as base, expect } from './fixtures';
+import { test as base, editorRevealed, expect } from './fixtures';
 
 const test = base.extend<{ disconnect: () => Promise<void> }>({
     disconnect: async ({ browserName, context, request }, use) => {
@@ -50,6 +50,7 @@ async function convertBlue(page: Page) {
         .getByRole('button', { name: 'Try the bar editor · keep original', exact: true })
         .click();
     await expect(page.getByLabel('Chords in this bar')).toBeVisible();
+    await editorRevealed(page);
 }
 
 async function exportCurrent(page: Page): Promise<ChartDocument> {
@@ -188,6 +189,7 @@ test('new charts support bar key/meter changes, growing the chart, recovery and 
 }) => {
     await page.goto('/v2/');
     await page.getByRole('button', { name: '＋ New song', exact: true }).click();
+    await editorRevealed(page);
     await page.getByLabel('Song title').fill('Mixed meter sketch');
     await page.getByRole('button', { name: 'Next bar', exact: true }).click();
     await page.getByText('Key or meter change', { exact: true }).click();
