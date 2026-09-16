@@ -39,9 +39,11 @@ a further product decision.
    homelab-maintenance scripts (`bin/docker-deploy`, `bin/caddy-deploy`). Brandon supplies
    secrets on request: the API identity HMAC secret, and restic/B2 credentials. GHCR packages for
    this public repo are public, so docker04 needs no pull credential for them.
-6. **Edge origin authentication (#1227, decided 2026-09-15).** Cloudflare Authenticated Origin
-   Pulls on a dedicated Caddy site block for the two ensemble hosts, so only the real edge can
-   complete a TLS handshake to the origin. Lands before registration opens (phase 3).
+6. **Edge origin authentication (#1227, decided 2026-09-15, shipped 2026-09-16).** Cloudflare
+   Authenticated Origin Pulls on a dedicated Caddy site block for the two ensemble hosts, so only
+   the real edge can complete a TLS handshake to the origin. Live: a direct request to the origin
+   IP now fails with `tlsv13 alert certificate required` where it returned `200` before, and both
+   hosts still answer `200` through Cloudflare. The requirement is scoped to those two names.
 7. **API packaging (#1202, decided 2026-09-15).** The API bundles the canonical Save decoder
    and songbook codecs from `prototypes/v2/lib` and `public/` with esbuild into one
    `dist/server.js`; CI bundles before the image build so the Docker context stays the API
