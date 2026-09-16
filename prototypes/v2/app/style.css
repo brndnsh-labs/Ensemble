@@ -861,9 +861,12 @@ html [hidden] {
     place-content: center;
     padding: 0;
     cursor: pointer;
-    /* #1211 — long-press target; touch-action:none stops the browser's own
-       press-and-hold/scroll gestures from racing the loop timer on mobile. */
-    touch-action: none;
+    /* #1211 — long-press target. `manipulation`, NOT `none`: the chart is scrolled
+       with a thumb and this badge sits at the top-left of every section, so opting
+       out of browser panning here would swallow a drag that merely started on it.
+       A touch that turns into a scroll fires `pointercancel`, which the button's
+       handler uses to abandon the press timer. */
+    touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
 }
 .section-letter:focus-visible {

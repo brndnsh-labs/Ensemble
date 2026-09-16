@@ -1491,6 +1491,11 @@ export default function Ensemble() {
                                                 } · hold to practice-loop`}
                                                 aria-keyshortcuts="L"
                                                 onPointerDown={() => {
+                                                    // A long-press whose click never arrived (a
+                                                    // touch released off-target) must not leave
+                                                    // the flag set and swallow the NEXT tap —
+                                                    // which #937 will make meaningful.
+                                                    suppressSectionTap.current = false;
                                                     if (sectionLoopPress.current !== null) {
                                                         window.clearTimeout(
                                                             sectionLoopPress.current,

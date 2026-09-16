@@ -506,6 +506,18 @@ test('section practice loop (#1211) confines playback and clears on release, Esc
     await expect(sectionA).toHaveAttribute('aria-pressed', 'false');
     await expect(page.locator('.section-loop.active')).toHaveCount(0);
 
+    // The keyboard path to the same toggle: a long-press has no keyboard
+    // equivalent, so 'L' on the focused label is the accessible route in.
+    // Enter must stay inert — that gesture is banked for #937.
+    await sectionA.focus();
+    await page.keyboard.press('Enter');
+    await expect(sectionA).toHaveAttribute('aria-pressed', 'false');
+    await page.keyboard.press('l');
+    await expect(sectionA).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('.section-loop.active')).toHaveCount(1);
+    await page.keyboard.press('l');
+    await expect(sectionA).toHaveAttribute('aria-pressed', 'false');
+
     const evidence = await page.evaluate(() => {
         window.__semanticPlaybackEvidence.armed = false;
         return window.__semanticPlaybackEvidence;
