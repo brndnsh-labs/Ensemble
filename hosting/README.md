@@ -78,7 +78,8 @@ with the corrective source change. Never downgrade browser data schemas incident
 
 ## API is a separate service and a separate release
 
-`prototypes/v2-api/Dockerfile` builds compiled Node 26 JavaScript, production dependencies and
+`prototypes/v2-api/Dockerfile` packages the prebuilt esbuild bundle (`npm run build` in that
+directory, run by CI before the image build — #1202), production dependencies and
 migrations. No tsx, source/test tree, database or secret is baked into the runtime. The process
 runs non-root. `/healthz` performs a read-only schema query and returns bounded readiness and
 revision, without cookies or auth-rate-budget use. Keep it on the operator/container network.

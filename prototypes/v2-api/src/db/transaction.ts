@@ -16,8 +16,24 @@ import type { DatabaseSync } from 'node:sqlite';
  * `cannot start a transaction within a transaction` rather than silently
  * nesting — that failure is intentional and should not be swallowed.
  */
-export function withTransaction<T>(db: DatabaseSync, fn: () => T): T {
-    db.exec('BEGIN');
+export interface TransactionOptions {
+    /**
+     * `BEGIN IMMEDIATE`: take the write lock up front. Required for any read-then-decide-then-
+     * write transaction (#1202's `commitSave`): a deferred transaction that reads under WAL and
+     * then upgrades to a write fails with `SQLITE_BUSY_SNAPSHOT` immediately — `busy_timeout`
+     * does NOT apply to a snapshot upgrade — the moment a second writer (a maintenance script,
+     * a migration against a live container) touches the file. Single-process today, so this is
+     * a no-op in practice; it is the correct default for that shape regardless.
+     */
+    immediate?: boolean;
+}
+
+export function withTransaction<T>(
+    db: DatabaseSync,
+    fn: () => T,
+    { immediate = false }: TransactionOptions = {},
+): T {
+    db.exec(immediate ? 'BEGIN IMMEDIATE' : 'BEGIN');
     try {
         const result = fn();
         db.exec('COMMIT');

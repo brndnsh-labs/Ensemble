@@ -13,4 +13,6 @@ export {
 } from './documents.js';
 export type { MigrationResult } from './migrate.js';
 export { runMigrations } from './migrate.js';
+export type { SaveCommand, SaveDependencies, SaveOutcome } from './save.js';
+export { commitSave, mintRevision } from './save.js';
 export { withTransaction } from './transaction.js';

@@ -1,15 +1,9 @@
 # syntax=docker/dockerfile:1
 # Build context: prototypes/v2-api, not the repository root.
-FROM node:26-bookworm-slim AS dependencies
-WORKDIR /app
-COPY package.json package-lock.json ./
-RUN --mount=type=cache,target=/root/.npm npm ci --no-audit --no-fund
-
-FROM dependencies AS build
-COPY tsconfig.json tsconfig.build.json ./
-COPY src ./src
-RUN npm run build
-
+# The bundle is built OUTSIDE the image (`npm run build` -> dist/server.js, see
+# build.mjs): it inlines shared TypeScript from the repository root (`public/`
+# songbook codecs via prototypes/v2/lib/sync) that this build context cannot see.
+# CI's api-image job bundles first, then builds; do the same locally.
 FROM node:26-bookworm-slim AS production-dependencies
 WORKDIR /app
 COPY package.json package-lock.json ./
@@ -27,7 +21,7 @@ ENV NODE_ENV=production \
 WORKDIR /app
 COPY --from=production-dependencies /app/package.json /app/package-lock.json ./
 COPY --from=production-dependencies /app/node_modules ./node_modules
-COPY --from=build /app/dist ./dist
+COPY dist ./dist
 COPY migrations ./migrations
 RUN mkdir /data && chown node:node /data
 USER node

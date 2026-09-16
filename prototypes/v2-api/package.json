@@ -9,13 +9,14 @@
     },
     "scripts": {
         "typecheck": "tsc --noEmit",
-        "build": "tsc --project tsconfig.build.json",
+        "build": "node build.mjs",
         "test": "npm run typecheck && npm run build && vitest run --config vitest.api.config.ts",
         "start": "node dist/server.js",
         "dev": "tsx src/server.ts"
     },
     "devDependencies": {
         "@types/node": "^26.0.1",
+        "esbuild": "^0.28.2",
         "tsx": "4.23.13",
         "typescript": "^7.0.2",
         "vitest": "^4.1.2"

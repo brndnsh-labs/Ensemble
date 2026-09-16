@@ -1,10 +1,10 @@
-# Allow only build inputs. In particular never send local DBs, env files or tests.
+# Allow only build outputs. `npm run build` (esbuild, see build.mjs) runs BEFORE
+# `docker build`, on the CI runner or the developer's machine — the image never
+# compiles anything, and never sees local DBs, env files, sources or tests.
 **
 !package.json
 !package-lock.json
-!tsconfig.json
-!tsconfig.build.json
-!src/
-!src/**
+!dist/
+!dist/**
 !migrations/
 !migrations/*.sql

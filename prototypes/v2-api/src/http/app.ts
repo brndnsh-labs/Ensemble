@@ -31,6 +31,7 @@ import {
     type WebAuthnConfig,
 } from '../auth/index.js';
 import { isAuthDecisionCode, recordSecurityEvent } from '../auth/security-events.js';
+import type { SaveDependencies } from '../db/save.js';
 import { authPolicy } from './auth-policy.js';
 import { type ClientIdentityOptions, createClientIdentity } from './client-identity.js';
 import { jsonOnlyGuard, requestHasBody } from './content-type.js';
@@ -42,6 +43,7 @@ import {
     setCeremonyCookie,
     setSessionCookie,
 } from './cookies.js';
+import { documentRoutes } from './documents.js';
 import {
     ceremonyFailureResponse,
     recoveryActionFailureResponse,
@@ -65,6 +67,8 @@ import { sameOriginGuard } from './same-origin.js';
  * certificates without opening the door to an oversized payload.
  */
 const BODY_LIMIT_BYTES = 64 * 1024;
+/** Mounted sub-app for the document routes (#1202); exempt from the small body limit above. */
+const DOCUMENTS_PREFIX = '/api/documents/';
 
 export interface CreateAppOptions {
     db: DatabaseSync;
@@ -89,6 +93,8 @@ export interface CreateAppOptions {
      * Defaults to open here so the ceremony test suites exercise the real paths.
      */
     registrationOpen?: boolean;
+    /** #1202: revision minting override for the Save endpoint's tests. */
+    saveDependencies?: SaveDependencies;
 }
 
 type JsonBodyResult = { ok: true; value: unknown } | { ok: false };
@@ -111,6 +117,7 @@ export function createApp({
     sessionTtlMs = SESSION_TTL_MS,
     clientIdentity,
     registrationOpen = true,
+    saveDependencies,
 }: CreateAppOptions): Hono {
     // No raw address reaches a limiter or audit row. Factory-only tests get an ephemeral secret.
     const identify = createClientIdentity(clientIdentity);
@@ -160,12 +167,17 @@ export function createApp({
     // route dispatch decides there is no handler.
     app.use('/api/*', sameOriginGuard(config));
     app.use('/api/*', jsonOnlyGuard());
-    app.use(
-        '/api/*',
-        bodyLimit({
-            maxSize: BODY_LIMIT_BYTES,
-            onError: (c) => sendError(c, 413, 'payload_too_large'),
-        }),
+    // The 64 KB ceiling covers every /api/* route EXCEPT the document routes, which carry a
+    // whole chart and apply their own `MAX_SAVE_REQUEST_BYTES` limit in documents.ts (#1202).
+    // Path-gated here so the two limits can never both apply to one request: outside the
+    // prefix every path (known or not) gets the small limit; inside it the sub-app's own
+    // catch-all limiter bounds every path, known or not.
+    const apiBodyLimit = bodyLimit({
+        maxSize: BODY_LIMIT_BYTES,
+        onError: (c) => sendError(c, 413, 'payload_too_large'),
+    });
+    app.use('/api/*', (c, next) =>
+        c.req.path.startsWith(DOCUMENTS_PREFIX) ? next() : apiBodyLimit(c, next),
     );
     app.use('/api/auth/*', authPolicy(config, identify, now));
 
@@ -841,6 +853,14 @@ export function createApp({
         );
         return c.json({ accountId: result.accountId });
     });
+
+    // --- #1202: the Explicit Save endpoint ----------------------------------------------------
+    // Session-gated through the same `requireSession` as every account route above, so a
+    // recovery-purpose session is refused here too.
+    app.route(
+        DOCUMENTS_PREFIX.slice(0, -1),
+        documentRoutes({ db, now, identify, requireSession, save: saveDependencies }),
+    );
 
     return app;
 }

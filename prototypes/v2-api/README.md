@@ -259,6 +259,49 @@ permanently gone account, so its failure modes bias hard toward "the code stays 
   itself, at every call site; no thrown error, log line, or response body other than the one-time
   `enroll` response ever carries it.
 
+## Explicit Save endpoint (#1202, stage 3 story 2)
+
+`POST /api/documents/save` is protocol step 4 of
+[`ensemble-v2-sync.md`](../../docs/design/ensemble-v2-sync.md#explicit-save-protocol): the
+server atomically checks owner, operation receipt and expected revision, writes the document
+and records the receipt. Owner-scoped storage is #1201's `src/db/documents.ts`; the decision
+table is `src/db/save.ts` (`commitSave`, one `withTransaction`); the route is
+`src/http/documents.ts`.
+
+| Situation | Reply |
+| --- | --- |
+| Create (`expectedRevision: null`), id absent, no tombstone | `200 { …receipt, revision, kind: 'committed' }` |
+| Update with the exact current revision | `200 … kind: 'committed'` (new revision) |
+| Same operation id, same bytes (retry after an uncertain response) | the original `200`, no second write, no new revision |
+| Same operation id, different bytes or document | `409 { error: 'operation_mismatch' }` — never overwritten |
+| Stale revision, create over an existing id | `409 { …receipt, revision: <current>, kind: 'conflict', remote: { revision, document } }` |
+| Create or update over a tombstone; update of an id the owner never had | `409 … kind: 'conflict', remote: null` |
+| Any decoder refusal — including an envelope `ownerId` that is not the session's account | `400 { error: 'malformed_request' }` |
+
+Design points worth knowing before changing it:
+
+- **The owner is the session's account id, full stop.** The envelope's `ownerId` is a routing
+  hint that must AGREE with it; a disagreement is refused, never "corrected".
+- **One decoder, one codec.** The route decodes with `prototypes/v2/lib/sync/request.ts` —
+  the exact mirror of the client's `prepare()` — which pins the canonical serialization and
+  digests the received bytes. That module pulls the `public/songbook` codecs in, which is why
+  this package is bundled with esbuild (`build.mjs`) rather than emitted per file, and why
+  `tsconfig.json` lists `DOM` in `lib` (type positions only).
+- **Receipts are recorded for committed saves only.** A conflict changes nothing on the
+  server and re-evaluates identically on retry (a revision is minted fresh per commit and never
+  reappears), while letting the retry see the *current* remote version to resolve against.
+- **No timestamp last-write-wins.** A conflict carries the current version back; it never
+  substitutes the current revision into the request.
+- The `/api/*` 64 KB body limit is path-gated off `/api/documents/`; this route applies
+  `MAX_SAVE_REQUEST_BYTES` (the 1 MiB document limit plus a 4 KiB envelope allowance) itself.
+  Per-identity budget: 120 saves/min after the session check (`DOCUMENT_POLICIES`), on top of
+  the shared 300/min transport budget.
+
+Tests: `test/db/save.test.ts` (decision table, deterministic revisions, rollback via a
+trigger that fails the receipt insert) and `test/http/documents-save.test.ts` (the route over
+`app.request()` with a real passkey session and bodies frozen exactly as `prepare()` freezes
+them).
+
 ## Commands
 
 Run from this directory, or via `npm run test:api` from the repo root:
@@ -267,14 +310,15 @@ Run from this directory, or via `npm run test:api` from the repo root:
 npm install       # first run only
 npm run typecheck
 npm test          # typecheck + production build + vitest, node environment, no browser
-npm run build     # src/*.ts -> dist/*.js, NodeNext resolution, no runtime TS loader
+npm run build     # esbuild bundle -> dist/server.js (+ .map); see build.mjs — inlines the
+                  # shared public/ songbook codecs the Save endpoint decodes with (#1202)
 npm start         # node dist/server.js — needs ENSEMBLE_RP_ID, ENSEMBLE_RP_NAME, ENSEMBLE_ORIGIN,
                   # ENSEMBLE_DB_PATH (a file, never :memory:), ENSEMBLE_AUTH_IP_SECRET (>=32 bytes)
                   # optional PORT (8080), HOST (0.0.0.0); verified proxy configuration below
 npm run dev       # tsx src/server.ts, development only
 ```
 
-Production uses compiled JavaScript. The process smoke tests execute `dist/server.js` with plain
+Production uses the esbuild bundle. The process smoke tests execute `dist/server.js` with plain
 Node, including migration discovery, startup validation, readiness and persistence across restart.
 
 Proxy mode requires both `ENSEMBLE_AUTH_IP_HEADER` (lowercase header name) and
@@ -288,9 +332,12 @@ zero-runtime-dependency, alongside `@simplewebauthn/server@14.0.1`.
 
 ## Container artifact
 
-Build from the repository root with the API directory as the context:
+Bundle first, then build from the repository root with the API directory as the context — the
+image copies `dist/` rather than compiling (the bundle inlines shared code from outside the
+context, see `build.mjs`):
 
 ```sh
+npm run build --prefix prototypes/v2-api
 docker build --build-arg REVISION="$(git rev-parse HEAD)" \
     -t ensemble-v2-api:local prototypes/v2-api
 ```
