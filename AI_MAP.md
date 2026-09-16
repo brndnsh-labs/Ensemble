@@ -155,7 +155,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/engine/drums-tick.ts` | Lane-free drum preamble + drum-block tick (keeps heavy lane generators off the main chunk; real-time scheduler imports this). | `runDrumTick`, `generateDrumsForStep` |
 | `public/engine/tick-types.ts` | Import-free leaf holding the shapes `tick-logic.ts` and `drums-tick.ts` share, so that pair stays one-directional. | `TickCursors`, `DrumHitInfo` |
 | `public/engine/audio-recovery.ts` | Context resumption and error handling. | `audioWatchdog` |
-| `public/engine/midi-utils.ts` | Shared MIDI byte conversion utilities. | `noteToMidi`, `midiToFreq` |
+| `public/engine/midi-utils.ts` | Shared MIDI byte conversion utilities. | `MidiEvent`, `writeString`, `writeInt32`, `writeInt16`, `entryBendToPitchWheel`, `normalizeMidiVelocity`, `MidiTrack` |
 | `public/engine/midi-worker-logic.ts` | Offline MIDI generation and file export. | `handleExport`, `ExportProcessor` |
 | `public/engine/midi-constants.ts` | Constants for MIDI logic like `DRUM_MAP`. | `DRUM_MAP` |
 | `public/engine/mute-contract.ts` | Import-free leaf owning what a note's `muted` field means — the bass's numeric palm-mute amount vs the chords lanes' boolean CC-only sentinel; audible ghosts carry reduced velocity with `muted: false`. Read the field through here, never with `!muted`. | `isSilentSentinel`, `normalizeMuteAmount`, `muteGain` |
