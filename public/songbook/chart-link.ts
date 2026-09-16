@@ -28,6 +28,7 @@
 import { validateChartDocument } from './codec.js';
 import { validateChartDocumentV2 } from './document-v2.js';
 import type { ChartDocumentV2 } from './score-types.js';
+import { SONGBOOK_MAX_INPUT_BYTES } from './structural-limits.js';
 import type { ChartDocument } from './types.js';
 
 export type ChartLinkDocument = ChartDocument | ChartDocumentV2;
@@ -88,9 +89,35 @@ async function deflate(bytes: Uint8Array): Promise<Uint8Array> {
     return new Uint8Array(await new Response(stream).arrayBuffer());
 }
 
-async function inflate(bytes: Uint8Array): Promise<Uint8Array> {
-    const stream = toStream(bytes).pipeThrough(new DecompressionStream('deflate'));
-    return new Uint8Array(await new Response(stream).arrayBuffer());
+/**
+ * Inflate with a hard ceiling on the OUTPUT. `MAX_ENCODED_LENGTH` bounds the input, but
+ * deflate expands up to ~1000:1, so a 200 KB fragment could otherwise materialise ~200 MB
+ * before the codec's own 1 MiB document limit ever sees it. Anything past
+ * `SONGBOOK_MAX_INPUT_BYTES` cannot be a valid document, so stop reading there and fail.
+ */
+async function inflate(bytes: Uint8Array): Promise<Uint8Array | undefined> {
+    const reader = toStream(bytes).pipeThrough(new DecompressionStream('deflate')).getReader();
+    const chunks: Uint8Array[] = [];
+    let total = 0;
+    for (;;) {
+        const { done, value } = await reader.read();
+        if (done) {
+            break;
+        }
+        total += value.byteLength;
+        if (total > SONGBOOK_MAX_INPUT_BYTES) {
+            await reader.cancel();
+            return undefined;
+        }
+        chunks.push(value);
+    }
+    const out = new Uint8Array(total);
+    let offset = 0;
+    for (const chunk of chunks) {
+        out.set(chunk, offset);
+        offset += chunk.byteLength;
+    }
+    return out;
 }
 
 /** Routes to the matching validator; fails closed rather than trusting the fragment. */
@@ -135,6 +162,9 @@ export async function decodeChartLink(fragment: string): Promise<ChartLinkDocume
     }
     try {
         const bytes = await inflate(compressed);
+        if (bytes === undefined) {
+            return undefined;
+        }
         const json = new TextDecoder().decode(bytes);
         const candidate = JSON.parse(json);
         return validateChartLinkDocument(candidate);

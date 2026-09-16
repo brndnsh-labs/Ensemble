@@ -268,4 +268,14 @@ describe('v2 shareable chart links', () => {
         const link = await encodeChartLink(tampered);
         await expect(decodeChartLink(link)).resolves.toBeUndefined();
     });
+
+    it('stops inflating a decompression bomb at the document byte ceiling', async () => {
+        // ~3 MB of spaces deflates to a few KB: well inside MAX_ENCODED_LENGTH, far past the
+        // 1 MiB document limit once inflated. Must resolve undefined without materialising it.
+        const { deflateSync } = await import('node:zlib');
+        const bomb = deflateSync(Buffer.alloc(3 * 1024 * 1024, 0x20));
+        const payload = bomb.toString('base64url');
+        expect(payload.length).toBeLessThan(200_000);
+        await expect(decodeChartLink(`#chart=${payload}`)).resolves.toBeUndefined();
+    });
 });
