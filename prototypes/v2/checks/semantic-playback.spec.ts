@@ -105,14 +105,19 @@ async function observePlayback(page: Page) {
 
         // Capture the visible active-chord sequence at DOM mutation time rather
         // than polling from Node and potentially missing a quarter-note chord.
-        new MutationObserver(() => {
-            if (!evidence.armed) {
-                return;
-            }
-            const chord = document.querySelector('.chord[aria-current="true"]');
-            if (!chord) {
-                return;
-            }
+        //
+        // Read the RECORDS, not the DOM: an observer callback runs once per
+        // microtask checkpoint with every mutation since the last one, so when
+        // the tab is starved (three CI workers on four cores, #1223) two chord
+        // transitions can land in one batch and `querySelector` would only ever
+        // see the last of them — the middle chord was highlighted, just never
+        // observed. The stand sets `aria-current="true"` and otherwise removes
+        // the attribute, so a record whose `oldValue` is not "true" is a chord
+        // becoming current, in commit order; a removal record is ignored (using
+        // it would misorder the lap wrap, where the first chord is set before the
+        // last one is cleared). A `data-start-step` change on the current chord
+        // (a repeat visit re-labelling the same element) still counts as a move.
+        const highlight = (chord: Element) => {
             const next = {
                 start: Number(chord.getAttribute('data-start-step')),
                 end: Number(chord.getAttribute('data-end-step')),
@@ -121,9 +126,29 @@ async function observePlayback(page: Page) {
             if (evidence.highlights.at(-1)?.start !== next.start) {
                 evidence.highlights.push(next);
             }
+        };
+        new MutationObserver((records) => {
+            if (!evidence.armed) {
+                return;
+            }
+            for (const record of records) {
+                const target = record.target as Element;
+                if (!target.classList?.contains('chord')) {
+                    continue;
+                }
+                if (record.attributeName === 'aria-current' && record.oldValue !== 'true') {
+                    highlight(target);
+                } else if (
+                    record.attributeName === 'data-start-step' &&
+                    target.getAttribute('aria-current') === 'true'
+                ) {
+                    highlight(target);
+                }
+            }
         }).observe(document, {
             subtree: true,
             attributes: true,
+            attributeOldValue: true,
             attributeFilter: ['aria-current', 'data-start-step'],
         });
 
