@@ -298,6 +298,28 @@ Design points worth knowing before changing it:
   before the first write, exactly when a transaction holds nothing but a read snapshot — so the
   parent sequences the interleaving instead of hoping for it. On those same two loaded cores it
   catches the mutation 8 times out of 8 on its own. Do not delete it as redundant.
+- **The storage caps are injectable so they can be raced (#1247).** `SaveDependencies` carries
+  optional `maxDocumentsPerOwner`/`maxBytesPerOwner`, defaulting to the shipped constants;
+  production passes neither, and `test/db/save.test.ts`'s first quota case proves the defaults
+  at full scale so forgetting to inject one can never quietly relax the gate. The reason for the
+  seam is that the quota's own claim — "a concurrent writer cannot slip past a cap this read just
+  saw" — needs two racers AT the cap, and the byte cap is 256 MiB: unreachable in a test without
+  lowering it. `save-concurrency.test.ts` now races both caps and asserts the owner's final usage
+  never lands past the cap, which is the exact damage the bug does.
+
+  Verified by mutation — hoisting the usage read out of `withTransaction`, on two loaded cores:
+
+  | proof | catches the hoist |
+  | --- | --- |
+  | four racers for the last document slot (wall clock) | 3/6 |
+  | sequenced at the document cap | 6/6 |
+  | sequenced at the byte cap | 6/6 |
+  | all 239 sequential `save`/HTTP tests | **0** |
+
+  The wall-clock case is the realistic one and the sequenced ones are the reliable ones, the same
+  pairing the proofs above need and for the same reason; keep both. Nothing outside this file
+  catches the hoist at all. Lowering the caps in the sequential cases also cut `save.test.ts`
+  from ~4.2s to ~0.6s, since each full-scale byte case pushed 256 MiB through SQLite.
 - **The quota is per owner and lives inside the transaction.** `MAX_DOCUMENTS_PER_OWNER` (2,000)
   and `MAX_BYTES_PER_OWNER` (256 MiB) in `src/db/save.ts` bound what one account accumulates;
   `MAX_SAVE_REQUEST_BYTES` bounds one request and `DOCUMENT_POLICIES` bounds one identity's

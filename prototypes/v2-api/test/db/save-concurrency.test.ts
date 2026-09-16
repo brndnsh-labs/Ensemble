@@ -4,8 +4,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
-import { readDocument, readReceipt } from '../../src/db/documents.js';
-import type { SaveCommand, SaveOutcome } from '../../src/db/save.js';
+import { readDocument, readOwnerUsage, readReceipt } from '../../src/db/documents.js';
+import type { SaveCommand, SaveDependencies, SaveOutcome } from '../../src/db/save.js';
+import type { SaveWorkerOptions } from '../helpers/save-worker.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/test-db.js';
 
 /**
@@ -39,6 +40,7 @@ interface WorkerResult {
 
 type Committed = Extract<SaveOutcome, { kind: 'committed' }>;
 type Conflict = Extract<SaveOutcome, { kind: 'conflict' }>;
+type QuotaExceeded = Extract<SaveOutcome, { kind: 'quota_exceeded' }>;
 
 function baseCommand(overrides: Partial<SaveCommand> = {}): SaveCommand {
     return {
@@ -61,30 +63,33 @@ interface Worker {
     finished: Promise<WorkerResult>;
 }
 
+interface RaceOptions {
+    pauseAtMint?: boolean;
+    /** Lowered per-owner caps for every racer, so a cap can be reached at all (#1247). */
+    caps?: Pick<SaveDependencies, 'maxDocumentsPerOwner' | 'maxBytesPerOwner'>;
+}
+
 function spawnWorker(
     dbPath: string,
     command: SaveCommand,
     dir: string,
     index: number,
-    { pauseAtMint = false } = {},
+    { pauseAtMint = false, caps }: RaceOptions = {},
 ): Worker {
     const ready = join(dir, `ready-${index}`);
     const paused = join(dir, `paused-${index}`);
     const release = join(dir, `release-${index}`);
-    const child = spawn(
-        process.execPath,
-        [
-            '--import',
-            'tsx',
-            WORKER,
-            dbPath,
-            ready,
-            join(dir, 'GO'),
-            JSON.stringify(command),
-            ...(pauseAtMint ? [paused, release] : []),
-        ],
-        { stdio: ['ignore', 'pipe', 'pipe'] },
-    );
+    const options: SaveWorkerOptions = {
+        dbPath,
+        readyPath: ready,
+        gatePath: join(dir, 'GO'),
+        command,
+        caps,
+        pause: pauseAtMint ? { pausedPath: paused, releasePath: release } : undefined,
+    };
+    const child = spawn(process.execPath, ['--import', 'tsx', WORKER, JSON.stringify(options)], {
+        stdio: ['ignore', 'pipe', 'pipe'],
+    });
     let stdout = '';
     let stderr = '';
     child.stdout.on('data', (chunk) => {
@@ -143,11 +148,17 @@ async function waitUntil(done: () => boolean, workers: Worker[], what: string): 
  * Run every command at once, each in its own process, all released from one barrier.
  * Results come back in the order the commands were given.
  */
-async function race(dbPath: string, commands: SaveCommand[]): Promise<WorkerResult[]> {
+async function race(
+    dbPath: string,
+    commands: SaveCommand[],
+    options: RaceOptions = {},
+): Promise<WorkerResult[]> {
     const dir = mkdtempSync(join(tmpdir(), 'ensemble-save-race-'));
     let workers: Worker[] = [];
     try {
-        workers = commands.map((command, index) => spawnWorker(dbPath, command, dir, index));
+        workers = commands.map((command, index) =>
+            spawnWorker(dbPath, command, dir, index, options),
+        );
         // Barrier: hold every racer until all of them are connected and parked on the gate.
         await waitUntil(
             () => workers.every((worker) => existsSync(worker.ready)),
@@ -159,6 +170,91 @@ async function race(dbPath: string, commands: SaveCommand[]): Promise<WorkerResu
     } finally {
         // On the failure path the surviving workers are spinning on `existsSync`; without this
         // they peg a core each until their own 30s deadline, alongside the rest of the suite.
+        for (const worker of workers) {
+            worker.child.kill();
+        }
+        rmSync(dir, { recursive: true, force: true });
+    }
+}
+
+/** Fail with a useful reason instead of hanging to vitest's timeout. */
+async function withDeadline<T>(work: Promise<T>, what: string, ms = 30_000): Promise<T> {
+    let timer: NodeJS.Timeout | undefined;
+    try {
+        return await Promise.race([
+            work,
+            new Promise<never>((_, reject) => {
+                timer = setTimeout(() => reject(new Error(what)), ms);
+            }),
+        ]);
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
+/**
+ * Two racers, released from the same barrier but SEQUENCED by hand once they are inside.
+ *
+ * Every worker is started with `pauseAtMint`, which stops it at `mintRevision` — called after
+ * the receipt/document/tombstone/usage reads and before the first write, i.e. exactly when a
+ * transaction holds nothing but a read snapshot. The parent releases whichever racer got there
+ * first, waits for it to COMMIT, and only then releases the other. So the interleaving under
+ * test happens whether or not the machine had a spare core at the moment of the race, which the
+ * wall-clock proofs above cannot promise (see this file's header).
+ *
+ * Under `BEGIN IMMEDIATE` only one racer is inside the transaction at all, so the second never
+ * reaches the pause: it waits for the write lock, then reads the state the winner committed.
+ * Its release file is written anyway — an unread file, not a missed step. Under a deferred
+ * `BEGIN` both get a read snapshot, both pause, and the second's write then has to upgrade a
+ * stale snapshot, which fails. Which racer wins is still the race's call; the assertions are
+ * invariants either way.
+ */
+async function raceSequenced(
+    dbPath: string,
+    // Exactly two: the whole point is one racer held while the other finishes, and the
+    // `1 - firstIndex` below has no meaning for a third.
+    commands: [SaveCommand, SaveCommand],
+    options: RaceOptions = {},
+): Promise<WorkerResult[]> {
+    const dir = mkdtempSync(join(tmpdir(), 'ensemble-save-sequenced-'));
+    let workers: Worker[] = [];
+    try {
+        workers = commands.map((command, index) =>
+            spawnWorker(dbPath, command, dir, index, { ...options, pauseAtMint: true }),
+        );
+        await waitUntil(
+            () => workers.every((worker) => existsSync(worker.ready)),
+            workers,
+            'ready',
+        );
+        writeFileSync(join(dir, 'GO'), 'go');
+
+        // Whichever reaches the pause first is the one we release first.
+        await waitUntil(
+            () => workers.some((worker) => existsSync(worker.paused as string)),
+            workers,
+            'reached the mint',
+        );
+        const firstIndex = workers.findIndex((worker) => existsSync(worker.paused as string));
+        // A bounded grace for the other to reach the same point. A TIMEOUT, not a race: if it
+        // never pauses that is the correct `BEGIN IMMEDIATE` behaviour, and every caller's
+        // assertions hold either way.
+        const grace = Date.now() + 500;
+        while (!existsSync(workers[1 - firstIndex].paused as string) && Date.now() < grace) {
+            await new Promise((resolve) => setTimeout(resolve, 5));
+        }
+
+        writeFileSync(workers[firstIndex].release as string, 'go');
+        // Bounded like every other wait in this file. Unbounded, a racer that never returns
+        // would hold the whole sequence open until vitest's own timeout, which fires OUTSIDE
+        // this `finally` and so leaves both children spinning on their release files.
+        await withDeadline(workers[firstIndex].finished, 'the first racer never finished');
+        writeFileSync(workers[1 - firstIndex].release as string, 'go');
+        return await withDeadline(
+            Promise.all(workers.map((worker) => worker.finished)),
+            'the released racers never finished',
+        );
+    } finally {
         for (const worker of workers) {
             worker.child.kill();
         }
@@ -330,89 +426,181 @@ describe('Save concurrency and failure proofs on a real database (#1203)', () =>
 
     /**
      * The wall-clock proofs above need the racers to actually overlap, which a loaded machine
-     * can deny them. This one does not: it stops a racer INSIDE the transaction, at
-     * `mintRevision` — called after the receipt/document/tombstone reads and before the first
-     * write, i.e. exactly when a transaction holds nothing but a read snapshot — and lets the
-     * parent sequence the interleaving by hand.
-     *
-     * Under `BEGIN IMMEDIATE` only one racer can be inside the transaction at all, so the second
-     * never reaches the pause; it waits for the write lock, then reads the committed state and
-     * conflicts. Under a deferred `BEGIN` both get a read snapshot, both pause, and the second's
-     * write then has to upgrade a stale snapshot — which fails. Measured by the review on two
-     * loaded cores: this catches the mutation 6/6 where the wall-clock proofs caught 8/12.
-     *
-     * Still symmetric: the race picks which worker pauses first, the harness only sequences from
-     * there, and the assertions are the same invariants as everywhere else in this file.
+     * can deny them: measured on two loaded cores the racers enter ~3-8ms apart while each
+     * transaction takes ~0.3ms, so they stop overlapping and their power to catch a locking bug
+     * drops. `raceSequenced` removes that dependency — see its doc comment for the mechanism.
+     * Measured by #1246's review on two loaded cores: this catches a deferred `BEGIN` 6/6 where
+     * the wall-clock proofs caught it 8/12. Do not delete either kind as redundant.
      */
     it('sequenced inside the transaction: the second writer cannot commit on a stale snapshot', async () => {
         const { db, path } = setUp();
         const [seed] = await race(path, [baseCommand()]);
         const base = (seed.outcome as Committed).revision;
 
-        const dir = mkdtempSync(join(tmpdir(), 'ensemble-save-sequenced-'));
-        let workers: Worker[] = [];
-        try {
-            workers = ['a', 'b'].map((tag, index) =>
-                spawnWorker(
-                    path,
+        const results = await raceSequenced(path, [
+            baseCommand({ operationId: 'op-a', expectedRevision: base, body: '{"title":"a"}' }),
+            baseCommand({ operationId: 'op-b', expectedRevision: base, body: '{"title":"b"}' }),
+        ]);
+        for (const result of results) {
+            // A stale-snapshot upgrade surfaces as "database is locked", never as a commit.
+            expect(result.error).toBeUndefined();
+        }
+        const kinds = results.map((result) => result.outcome?.kind);
+        expect(kinds.filter((kind) => kind === 'committed')).toHaveLength(1);
+        expect(kinds.filter((kind) => kind === 'conflict')).toHaveLength(1);
+
+        const winnerIndex = kinds.indexOf('committed');
+        const committed = results[winnerIndex].outcome as Committed;
+        const conflicted = results[1 - winnerIndex].outcome as Conflict;
+        const stored = readDocument(db, 'owner-a', 'doc-1');
+        expect(stored?.revision).toBe(committed.revision);
+        expect(conflicted.remote).toEqual({ revision: committed.revision, body: stored?.body });
+        expect(countRows(db, 'documents')).toBe(1);
+        expect(countRows(db, 'receipts')).toBe(2); // the seed create, plus the one winner
+    }, 60_000);
+
+    /**
+     * `src/db/save.ts` step 3 claims the quota is read "inside the same transaction, so a
+     * concurrent writer cannot slip past a cap this read just saw". That is a concurrency
+     * claim, and an uncontended test cannot prove it: a quota read hoisted OUT of the
+     * transaction passes every sequential quota test in save.test.ts and still lets two racers
+     * both see room for the last document and both take it. These two proofs are the only
+     * thing standing between that mutation and production (#1247).
+     *
+     * The caps come in through `SaveDependencies` because the shipped numbers are out of a
+     * test's reach — 2,000 documents is merely slow to seed, but reaching the byte cap means
+     * pushing 256 MiB through the database, so without injection the byte cap could not be
+     * raced at all. The defaults themselves are proven in save.test.ts, at full scale.
+     *
+     * What is asserted is the invariant, never who won: exactly one racer commits, the rest are
+     * refused, and the owner's final usage never lands PAST the cap. Past it is precisely the
+     * damage a hoisted read does, and no rerun can make it look like a flake.
+     */
+    describe('the storage quota under concurrency (#1247)', () => {
+        /**
+         * One document already stored against a cap of two: exactly one slot is left, so a
+         * final count of 3 means two racers were both told the slot was theirs.
+         */
+        function seedOneDocument(db: TestDatabase['db']): void {
+            db.prepare(
+                'INSERT INTO documents (owner_id, document_id, revision, body, updated_at)' +
+                    " VALUES ('owner-a', 'seed', 'seed-rev', '{}', 1)",
+            ).run();
+        }
+
+        it('four racers for the last document slot: one commits, the count stops at the cap', async () => {
+            const { db, path } = setUp();
+            seedOneDocument(db);
+
+            const results = await race(
+                path,
+                ['a', 'b', 'c', 'd'].map((tag) =>
                     baseCommand({
+                        documentId: `doc-${tag}`,
                         operationId: `op-${tag}`,
-                        expectedRevision: base,
                         body: `{"title":"${tag}"}`,
                     }),
-                    dir,
-                    index,
-                    { pauseAtMint: true },
                 ),
+                { caps: { maxDocumentsPerOwner: 2 } },
             );
-            await waitUntil(
-                () => workers.every((worker) => existsSync(worker.ready)),
-                workers,
-                'ready',
-            );
-            writeFileSync(join(dir, 'GO'), 'go');
-
-            // Whichever reaches the pause first is the one we release first.
-            await waitUntil(
-                () => workers.some((worker) => existsSync(worker.paused as string)),
-                workers,
-                'reached the mint',
-            );
-            const firstIndex = workers.findIndex((worker) => existsSync(worker.paused as string));
-            // A bounded grace for the other to reach the same point. A TIMEOUT, not a race: if
-            // it never pauses that is the correct `BEGIN IMMEDIATE` behaviour, and the
-            // assertions below hold either way.
-            const grace = Date.now() + 500;
-            while (!existsSync(workers[1 - firstIndex].paused as string) && Date.now() < grace) {
-                await new Promise((resolve) => setTimeout(resolve, 5));
-            }
-
-            writeFileSync(workers[firstIndex].release as string, 'go');
-            await workers[firstIndex].finished;
-            writeFileSync(workers[1 - firstIndex].release as string, 'go');
-
-            const results = await Promise.all(workers.map((worker) => worker.finished));
             for (const result of results) {
-                // A stale-snapshot upgrade surfaces as "database is locked", never as a commit.
                 expect(result.error).toBeUndefined();
             }
+
             const kinds = results.map((result) => result.outcome?.kind);
             expect(kinds.filter((kind) => kind === 'committed')).toHaveLength(1);
-            expect(kinds.filter((kind) => kind === 'conflict')).toHaveLength(1);
-
-            const winnerIndex = kinds.indexOf('committed');
-            const committed = results[winnerIndex].outcome as Committed;
-            const conflicted = results[1 - winnerIndex].outcome as Conflict;
-            const stored = readDocument(db, 'owner-a', 'doc-1');
-            expect(stored?.revision).toBe(committed.revision);
-            expect(conflicted.remote).toEqual({ revision: committed.revision, body: stored?.body });
-            expect(countRows(db, 'documents')).toBe(1);
-            expect(countRows(db, 'receipts')).toBe(2); // the seed create, plus the one winner
-        } finally {
-            for (const worker of workers) {
-                worker.child.kill();
+            expect(kinds.filter((kind) => kind === 'quota_exceeded')).toHaveLength(3);
+            for (const result of results) {
+                if (result.outcome?.kind !== 'quota_exceeded') {
+                    continue;
+                }
+                const refused = result.outcome as QuotaExceeded;
+                expect(refused.limit).toBe('documents');
+                expect(refused.cap).toBe(2);
+                // A refusal reports the owner's own usage, and a refusal only happens at or
+                // above the cap — never a number that would tell the caller a slot was free.
+                expect(refused.usage).toBeGreaterThanOrEqual(2);
             }
-            rmSync(dir, { recursive: true, force: true });
-        }
-    }, 60_000);
+
+            expect(readOwnerUsage(db, 'owner-a').documents).toBe(2);
+            expect(countRows(db, 'documents')).toBe(2);
+            // Three refusals wrote nothing at all, receipts included: a refused save must stay
+            // retryable once the owner makes room.
+            expect(countRows(db, 'receipts')).toBe(1);
+        }, 60_000);
+
+        it('sequenced at the document cap: the second racer sees the slot taken', async () => {
+            const { db, path } = setUp();
+            // The wall-clock proof above is the realistic one, but it needs the racers to
+            // overlap: measured with the usage read hoisted out of the transaction, it caught
+            // the bug 3 times in 6 on two loaded cores, where this caught it 3/3. Same pairing
+            // the rest of this file argues for — keep both.
+            seedOneDocument(db);
+
+            const results = await raceSequenced(
+                path,
+                [
+                    baseCommand({ documentId: 'doc-a', operationId: 'op-a', body: '{"t":"a"}' }),
+                    baseCommand({ documentId: 'doc-b', operationId: 'op-b', body: '{"t":"b"}' }),
+                ],
+                { caps: { maxDocumentsPerOwner: 2 } },
+            );
+            for (const result of results) {
+                expect(result.error).toBeUndefined();
+            }
+
+            const kinds = results.map((result) => result.outcome?.kind);
+            expect(kinds.filter((kind) => kind === 'committed')).toHaveLength(1);
+            const refused = results[kinds.indexOf('quota_exceeded')].outcome as QuotaExceeded;
+            expect(refused).toEqual({
+                kind: 'quota_exceeded',
+                limit: 'documents',
+                usage: 2,
+                cap: 2,
+            });
+            expect(readOwnerUsage(db, 'owner-a').documents).toBe(2);
+            expect(countRows(db, 'receipts')).toBe(1);
+        }, 60_000);
+
+        it('sequenced at the byte cap: the second racer sees the first one spend the headroom', async () => {
+            const { db, path } = setUp();
+            // 200 bytes of headroom and two 120-byte bodies: either one fits, both do not.
+            // Sequenced rather than wall-clock because the whole question is what the SECOND
+            // racer's usage read sees, and that is what sequencing pins down — the first is
+            // held inside its transaction, past its own quota read, until the parent lets go.
+            const body = `{"t":"${'x'.repeat(112)}"}`;
+            expect(Buffer.byteLength(body, 'utf8')).toBe(120);
+
+            const results = await raceSequenced(
+                path,
+                [
+                    baseCommand({ documentId: 'doc-a', operationId: 'op-a', body }),
+                    baseCommand({ documentId: 'doc-b', operationId: 'op-b', body }),
+                ],
+                { caps: { maxBytesPerOwner: 200 } },
+            );
+            for (const result of results) {
+                // Two transactions both holding a stale read snapshot surface as "database is
+                // locked" on the second one's write, never as a second commit.
+                expect(result.error).toBeUndefined();
+            }
+
+            const kinds = results.map((result) => result.outcome?.kind);
+            expect(kinds.filter((kind) => kind === 'committed')).toHaveLength(1);
+            expect(kinds.filter((kind) => kind === 'quota_exceeded')).toHaveLength(1);
+
+            const refused = results[kinds.indexOf('quota_exceeded')].outcome as QuotaExceeded;
+            expect(refused).toEqual({
+                kind: 'quota_exceeded',
+                limit: 'bytes',
+                usage: 120,
+                cap: 200,
+            });
+            // The cap held: 120 stored, not 240. This is the assertion a hoisted quota read
+            // fails, and it fails by exactly one document every time.
+            expect(readOwnerUsage(db, 'owner-a').bytes).toBe(120);
+            expect(countRows(db, 'documents')).toBe(1);
+            expect(countRows(db, 'receipts')).toBe(1);
+        }, 60_000);
+    });
 });

@@ -54,6 +54,20 @@ export interface SaveCommand {
 export interface SaveDependencies {
     /** Opaque server revision minter. Injectable so tests can assert exact values. */
     mintRevision?: () => string;
+    /**
+     * The per-owner caps to enforce, defaulting to `MAX_DOCUMENTS_PER_OWNER` /
+     * `MAX_BYTES_PER_OWNER` below. Production passes neither: `src/http/documents.ts` forwards
+     * only what its caller gave it, so the shipped service always enforces the real numbers.
+     *
+     * They are injectable for one reason (#1247): the caps are deliberately far above anything
+     * a test should write. The document cap can be reached by seeding 2,000 tiny rows, but the
+     * byte cap cannot be reached at all without putting 256 MiB through the database — which
+     * makes the quota's CONCURRENCY claim ("a concurrent writer cannot slip past a cap this
+     * read just saw", step 3 below) untestable, since racing it means two processes at the cap
+     * at once. Lowering the cap for a racer is the only way to prove that claim.
+     */
+    maxDocumentsPerOwner?: number;
+    maxBytesPerOwner?: number;
 }
 
 /**
@@ -101,7 +115,11 @@ export function mintRevision(): string {
 export function commitSave(
     db: DatabaseSync,
     command: SaveCommand,
-    { mintRevision: mint = mintRevision }: SaveDependencies = {},
+    {
+        mintRevision: mint = mintRevision,
+        maxDocumentsPerOwner = MAX_DOCUMENTS_PER_OWNER,
+        maxBytesPerOwner = MAX_BYTES_PER_OWNER,
+    }: SaveDependencies = {},
 ): SaveOutcome {
     const { ownerId, documentId, operationId, digest, expectedRevision, body, now } = command;
     // IMMEDIATE: this transaction reads (receipt, document, tombstone) before it writes.
@@ -160,12 +178,12 @@ export function commitSave(
             // songs over what is really a sync conflict.
             const usage = readOwnerUsage(db, ownerId);
             const addedBytes = Buffer.byteLength(body, 'utf8');
-            if (current === undefined && usage.documents >= MAX_DOCUMENTS_PER_OWNER) {
+            if (current === undefined && usage.documents >= maxDocumentsPerOwner) {
                 return {
                     kind: 'quota_exceeded',
                     limit: 'documents',
                     usage: usage.documents,
-                    cap: MAX_DOCUMENTS_PER_OWNER,
+                    cap: maxDocumentsPerOwner,
                 };
             }
             const replacedBytes =
@@ -176,12 +194,12 @@ export function commitSave(
             // would be frozen out of editing entirely, including the edits that shrink their way
             // back under. Note the rule is only "does not grow": one such write need not bring
             // the owner under the cap, it just may not push them further over.
-            if (projectedBytes > MAX_BYTES_PER_OWNER && addedBytes > replacedBytes) {
+            if (projectedBytes > maxBytesPerOwner && addedBytes > replacedBytes) {
                 return {
                     kind: 'quota_exceeded',
                     limit: 'bytes',
                     usage: usage.bytes,
-                    cap: MAX_BYTES_PER_OWNER,
+                    cap: maxBytesPerOwner,
                 };
             }
 
