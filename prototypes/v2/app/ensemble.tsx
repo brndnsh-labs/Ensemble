@@ -2,6 +2,7 @@
 
 import { KEY_ORDER, TIME_SIGNATURES } from '@engine/config';
 import { buildLeadSheetSections } from '@engine/song/lead-sheet-model';
+import { decodeChartLink, encodeChartLink } from '@engine/songbook/chart-link';
 import { resolveScoreContext } from '@engine/songbook/score-context';
 import { scoreMeter } from '@engine/songbook/score-duration';
 import { prepareScorePlayback } from '@engine/songbook/score-playback';
@@ -88,6 +89,14 @@ export default function Ensemble() {
     const [recoveryOptions, setRecoveryOptions] = useState<
         ReturnType<typeof repository.recoveriesFor>
     >([]);
+    // A chart opened from a `#chart=` share link: unsaved by definition (no `saved`
+    // baseline), until "Keep a copy" commits it as a normal library document.
+    const [sharedDraft, setSharedDraft] = useState(false);
+    // Set only when the Clipboard API is unavailable or the write is rejected
+    // (notably the Playwright WebKit project, which grants no clipboard
+    // permission) — the visible fallback the acceptance criteria calls for.
+    const [shareLinkFallback, setShareLinkFallback] = useState<string | null>(null);
+    const sharedLinkHandled = useRef(false);
     const dialog = useRef<HTMLDialogElement>(null);
     const soundsDialog = useRef<HTMLDialogElement>(null);
     const file = useRef<HTMLInputElement>(null);
@@ -101,7 +110,7 @@ export default function Ensemble() {
             ? arrangementOf(current).sections.find((section) => section.id === sectionId)?.value
             : '') ??
         '';
-    const dirty = hasPendingText || !!(current && saved && !same(current, saved));
+    const dirty = hasPendingText || sharedDraft || !!(current && saved && !same(current, saved));
     const playbackActive = playing || playbackPending;
     const focused = playbackActive && !showControls && !editing;
 
@@ -212,6 +221,74 @@ export default function Ensemble() {
             window.removeEventListener('beforeunload', preventLoss);
         };
     }, []);
+    useEffect(() => {
+        // Runtime must be initialized (awaited inside `start()`, gated on `ready`)
+        // before `runtime.load` is safe to call. `sharedLinkHandled` guards against
+        // re-processing on every `ready`-dependent re-render, not just the first.
+        if (!ready || sharedLinkHandled.current || !window.location.hash) {
+            return;
+        }
+        sharedLinkHandled.current = true;
+        const hash = window.location.hash;
+        let alive = true;
+        void decodeChartLink(hash).then((document) => {
+            // Consumed on load either way: a corrupt/foreign fragment must not
+            // resurrect on reload, and a successfully opened draft must not
+            // resurrect after "Keep a copy" replaces it with a saved document.
+            window.history.replaceState(
+                null,
+                '',
+                window.location.pathname + window.location.search,
+            );
+            if (!alive) {
+                return;
+            }
+            if (document) {
+                // Inlined rather than a separate `openSharedDraft` helper: this is
+                // its only call site, and keeping it inline avoids a
+                // useExhaustiveDependencies conflict (a plain function declaration
+                // is a new reference every render — biome rightly rejects it as a
+                // hook dependency, and this effect must only run once anyway,
+                // guarded by `sharedLinkHandled`). Deliberately not `open()`: no
+                // `saved` baseline (so it can't masquerade as already committed),
+                // no recovery-storage write (the sender's document id is untrusted
+                // and shouldn't collide with this device's own recovery keys), and
+                // `lastOpened`/`rememberSong` are left alone since this isn't a
+                // library entry yet. "Keep a copy" (`keepSharedCopy`) is what turns
+                // it into one.
+                runtime.load(document);
+                setSaved(null);
+                setCurrent(document);
+                setSharedDraft(true);
+                // Inlined clearBuffers()/selectSection(): both are plain function
+                // declarations (a new reference every render), which
+                // useExhaustiveDependencies rightly rejects as hook dependencies.
+                pendingText.current = false;
+                setBuffers(new Map());
+                setPendingMeasures(false);
+                measureEditor.current?.reset();
+                setRecoveryHealthy(true);
+                setEditing(false);
+                setFollowing(true);
+                setMessage('Opened from a shared link · not saved yet');
+                const section = arrangementOf(document).sections[0];
+                setSectionId(section.id);
+                if (document.schemaVersion === 2) {
+                    setMeasureId(
+                        document.chart.score.sections.find((s) => s.id === section.id)!.measures[0]
+                            .id,
+                    );
+                }
+            } else {
+                setError(
+                    'This link could not be opened. It may be corrupted or made with a different version of the app.',
+                );
+            }
+        });
+        return () => {
+            alive = false;
+        };
+    }, [ready]);
     useEffect(() => {
         if (editing && !busy && editorRequest !== revealedEditorRequest.current) {
             // Reveal the actual input, including an already-open editor's selected section.
@@ -448,6 +525,7 @@ export default function Ensemble() {
         runtime.load(next);
         setSaved(document);
         setCurrent(next);
+        setSharedDraft(false);
         clearBuffers();
         rememberSong(next.id);
         setLastOpened(next.id);
@@ -462,6 +540,50 @@ export default function Ensemble() {
                 : 'Saved on this device',
         );
         selectSection(next);
+    }
+    /** Commits the open shared draft as a new, independently-owned library document. */
+    async function keepSharedCopy() {
+        if (!current) {
+            return;
+        }
+        const candidate = updateChart();
+        const now = new Date().toISOString();
+        const copy = {
+            ...candidate,
+            id: crypto.randomUUID(),
+            revision: 0,
+            createdAt: now,
+            updatedAt: now,
+        };
+        const created = await repository.save(copy, null);
+        setSongs(await repository.list());
+        await open(created);
+        setMessage('Saved a local copy');
+    }
+    /**
+     * Copies a `#chart=` share link for the chart currently open. Falls back to
+     * showing the raw URL when the Clipboard API is unavailable or the write is
+     * rejected (the Playwright WebKit project grants no clipboard permission by
+     * default, matching some real mobile Safari contexts).
+     */
+    async function shareChartLink() {
+        if (!current) {
+            return;
+        }
+        const candidate = updateChart();
+        const encoded = await encodeChartLink(candidate);
+        const url = `${window.location.origin}${window.location.pathname}${encoded}`;
+        if (navigator.clipboard?.writeText) {
+            try {
+                await navigator.clipboard.writeText(url);
+                setShareLinkFallback(null);
+                setMessage('Link copied · opens as an unsaved draft');
+                return;
+            } catch {
+                /* Fall through to the visible fallback below. */
+            }
+        }
+        setShareLinkFallback(url);
     }
     function openSong(id: string) {
         void run(async () => {
@@ -950,8 +1072,9 @@ export default function Ensemble() {
                                     device-local, with real playback and portable Ensemble files.
                                 </p>
                                 <p className="preview-note">
-                                    iReal import, chord discovery, and sharing are not implemented
-                                    here yet.
+                                    iReal import and chord discovery are not implemented here yet.
+                                    Open a song and use its menu's "Copy link" to share it — the
+                                    link opens as an unsaved draft, with no account needed.
                                 </p>
                             </section>
                         </aside>
@@ -979,11 +1102,13 @@ export default function Ensemble() {
                                     <span className={dirty ? 'unsaved' : ''}>
                                         {hasPendingText
                                             ? 'Unsaved chord text · this tab only'
-                                            : dirty
-                                              ? recoveryHealthy
-                                                  ? 'Unsaved setup · locally recovered'
-                                                  : 'Unsaved setup · this tab only'
-                                              : 'Saved on this device'}
+                                            : sharedDraft
+                                              ? 'Opened from a shared link · not saved'
+                                              : dirty
+                                                ? recoveryHealthy
+                                                    ? 'Unsaved setup · locally recovered'
+                                                    : 'Unsaved setup · this tab only'
+                                                : 'Saved on this device'}
                                     </span>
                                     <span>{totalBars} bars</span>
                                     <span>{arrangementOf(current).timeSignature}</span>
@@ -1032,9 +1157,11 @@ export default function Ensemble() {
                             <button
                                 className="btn primary save-btn"
                                 disabled={busy || !dirty}
-                                onClick={() => void run(() => save())}
+                                onClick={() =>
+                                    void run(() => (sharedDraft ? keepSharedCopy() : save()))
+                                }
                             >
-                                Save
+                                {sharedDraft ? 'Keep a copy' : 'Save'}
                             </button>
                             <button
                                 className="icon-button menu-btn"
@@ -1840,6 +1967,13 @@ export default function Ensemble() {
                     <button
                         className="btn primary"
                         disabled={busy}
+                        onClick={() => void run(shareChartLink)}
+                    >
+                        Copy link
+                    </button>
+                    <button
+                        className="btn"
+                        disabled={busy || !saved}
                         onClick={() => void run(() => save(true))}
                     >
                         Save a copy
@@ -1868,7 +2002,7 @@ export default function Ensemble() {
                     </button>
                     <button
                         className="btn"
-                        disabled={busy || !dirty}
+                        disabled={busy || !dirty || !saved}
                         onClick={() =>
                             void run(() => {
                                 if (!saved) {
@@ -1888,6 +2022,21 @@ export default function Ensemble() {
                         Close
                     </button>
                 </div>
+                {shareLinkFallback && (
+                    <p className="share-link-fallback">
+                        <label htmlFor="share-link-url">
+                            Clipboard isn't available here — copy this link manually:
+                        </label>
+                        <input
+                            id="share-link-url"
+                            type="text"
+                            readOnly
+                            value={shareLinkFallback}
+                            data-testid="share-link-fallback"
+                            onFocus={(event) => event.currentTarget.select()}
+                        />
+                    </p>
+                )}
                 {recoveryOptions.length > 0 && (
                     <details className="recovery-list">
                         <summary>Preserved drafts ({recoveryOptions.length})</summary>
