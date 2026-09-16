@@ -281,6 +281,23 @@ table is `src/db/save.ts` (`commitSave`, one `withTransaction`); the route is
 
 Design points worth knowing before changing it:
 
+- **Concurrency is proven by processes, not argued.** `test/db/save-concurrency.test.ts` (#1203)
+  races real OS processes, each with its own `DatabaseSync` handle on one WAL file, released
+  from a two-file barrier in `test/helpers/save-worker.ts`. `node:sqlite` is synchronous, so two
+  connections in ONE process serialize on the interpreter and can never interleave — a
+  same-process concurrency test passes with or without `BEGIN IMMEDIATE`. Every assertion is an
+  invariant that holds whichever racer wins, so the race decides who and the protocol decides
+  what. Verified by mutation: swapping `BEGIN IMMEDIATE` for a deferred `BEGIN` is caught every
+  run.
+
+  The wall-clock proofs and the SEQUENCED one cover each other's weaknesses, which is why both
+  are there. The wall-clock proofs race for real but need cores to spare: measured on two loaded
+  cores the racers enter 3-8ms apart while each transaction takes ~0.3ms, so they stop
+  overlapping and the deferred-`BEGIN` mutation slipped through 4 runs in 12. The sequenced
+  proof pauses a racer INSIDE the transaction at the `mintRevision` seam — after the reads,
+  before the first write, exactly when a transaction holds nothing but a read snapshot — so the
+  parent sequences the interleaving instead of hoping for it. On those same two loaded cores it
+  catches the mutation 8 times out of 8 on its own. Do not delete it as redundant.
 - **The quota is per owner and lives inside the transaction.** `MAX_DOCUMENTS_PER_OWNER` (2,000)
   and `MAX_BYTES_PER_OWNER` (256 MiB) in `src/db/save.ts` bound what one account accumulates;
   `MAX_SAVE_REQUEST_BYTES` bounds one request and `DOCUMENT_POLICIES` bounds one identity's
