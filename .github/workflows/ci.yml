@@ -174,10 +174,18 @@ jobs:
   # 2026-09-16 on a 4-core box, 100 tests take 245s on three workers and still
   # 185s on six, because the playback tests spend their time waiting on real
   # laps. Adding workers to one runner barely helps and is what starves the tab
-  # (#1240). Two runners at three workers each cut the longest shard to 164s.
-  # Shards are uneven (Playwright splits by test count, and foundation.spec.ts
-  # is 42% of the suite's seconds) — 99s and 164s — so the win is the slower
-  # shard, not the average.
+  # enough to drop a chord from the chart (#1240).
+  #
+  # Sharding only pays off WITH `fullyParallel` in playwright.config.ts, which
+  # this change turns on. Playwright shards by group, and without it a
+  # file+project is one indivisible group: the first attempt here split 50/50 by
+  # test count and ran 1.5m against 4.0m, because `foundation.spec.ts` is 42% of
+  # the suite's seconds and landed whole on one shard. That is measured CI, not
+  # a projection — it made the job SLOWER than not sharding.
+  #
+  # Expect roughly a 4m job to become ~3.5m. The ceiling is `checks` at ~3.7m,
+  # so this takes v2 off the critical path rather than shortening it much
+  # further; more shards buy almost nothing against that floor.
   #
   # The REQUIRED context is the `v2-checks` aggregate below, not these shards, so
   # the shard count can change without touching branch protection.

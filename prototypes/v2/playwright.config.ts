@@ -6,6 +6,13 @@ import { defineConfig, devices } from '@playwright/test';
 const liveTest = process.env.V2_LIVE_TEST === '1';
 export default defineConfig({
     testDir: './checks',
+    // Tests inside one file run in parallel too, not just files against each
+    // other. Without this a file+project is ONE indivisible unit of work, and
+    // `foundation.spec.ts` is 42% of the suite's seconds — CI's two shards split
+    // 50/50 by test COUNT and came out 1.5m against 4.0m, because that one group
+    // cannot be divided. Playwright shards by group, so this is what makes
+    // sharding worth anything at all. Verified independent: 100/100 green.
+    fullyParallel: true,
     timeout: 45_000,
     expect: { timeout: 15_000 },
     // ubuntu-latest has 4 vCPUs; measured 2026-09-15 (#1223) the 90-test suite went from
