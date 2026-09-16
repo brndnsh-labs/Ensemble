@@ -1,12 +1,13 @@
 import { readFile } from 'node:fs/promises';
 import type { Page } from '@playwright/test';
 import type { ChartDocument } from '../lib/documents';
-import { expect, test } from './fixtures';
+import { editorRevealed, expect, test } from './fixtures';
 
 async function start(page: Page, title = 'Guided study') {
     await page.goto('/v2/');
     await page.getByRole('button', { name: '＋ New song', exact: true }).click();
     await expect(page.getByLabel('Chords in this bar')).toHaveValue('C');
+    await editorRevealed(page);
     await page.getByLabel('Song title').fill(title);
     await expect(page.getByRole('button', { name: 'Song actions' })).toBeEnabled();
 }

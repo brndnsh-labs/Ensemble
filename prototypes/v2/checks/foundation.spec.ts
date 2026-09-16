@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { test as base, expect } from './fixtures';
+import { test as base, editorRevealed, expect } from './fixtures';
 
 async function observeSamples(page: import('@playwright/test').Page) {
     await page.addInitScript(() => {
@@ -703,6 +703,7 @@ test('file export/import is detached; invalid input never changes the active son
     await page.goto('/v2/');
     await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
     await page.getByRole('button', { name: 'Edit chart', exact: true }).click();
+    await editorRevealed(page);
     await page.getByLabel('Song title').fill('My writing sketch');
     await page.getByLabel('Chord text').fill('Am7 | D7 | Gmaj7 | Cmaj7');
     await page.getByRole('button', { name: 'Update chart' }).click();

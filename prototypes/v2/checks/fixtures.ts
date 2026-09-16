@@ -1,7 +1,7 @@
 import { type ChildProcess, spawn } from 'node:child_process';
 import { once } from 'node:events';
 import path from 'node:path';
-import { test as base } from '@playwright/test';
+import { test as base, expect, type Page } from '@playwright/test';
 
 export { expect } from '@playwright/test';
 
@@ -64,3 +64,18 @@ export const test = base.extend<Record<never, never>, { previewServer: string }>
         await use(previewServer);
     },
 });
+
+/**
+ * Wait for the editor's reveal-focus to land before typing into any OTHER field (#1235).
+ *
+ * `revealEditor` in app/ensemble.tsx bumps `editorRequest`, and an effect gated on `!busy`
+ * then focuses the edit panel's first textarea. That effect can fire in the middle of a
+ * `fill()` on a different control: Playwright focuses its target and inserts the text as a
+ * separate step, so a focus steal in between sends the keystrokes to the textarea instead —
+ * observed on `webkit-phone` under three workers as `Chords in this bar` holding
+ * "Guided offlineC" while `Song title` stayed "Untitled song". Asserting the steal has already
+ * happened is both the barrier and a real assertion about the reveal contract.
+ */
+export async function editorRevealed(page: Page): Promise<void> {
+    await expect(page.locator('.edit-panel textarea').first()).toBeFocused();
+}

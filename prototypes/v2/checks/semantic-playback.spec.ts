@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test';
 import type { WorkerRequest, WorkerResponse } from '../../../public/worker-types.js';
-import { expect, test } from './fixtures';
+import { editorRevealed, expect, test } from './fixtures';
 
 interface PlaybackEvidence {
     armed: boolean;
@@ -200,6 +200,7 @@ test('semantic timing reaches the real worker, audio output and chart for two co
     await observePlayback(page);
     await page.goto('/v2/');
     await page.getByRole('button', { name: '＋ New song', exact: true }).click();
+    await editorRevealed(page);
     await page.getByLabel('Song title').fill('Two lap timing study');
     await page.getByLabel('Chords in this bar').fill('C Dm G7');
     await page.getByLabel('Length of chord 1 (C)', { exact: true }).selectOption('2');
@@ -305,6 +306,7 @@ test('repeat visits follow the real band while the music stand keeps four writte
     await observePlayback(page);
     await page.goto('/v2/');
     await page.getByRole('button', { name: '＋ New song', exact: true }).click();
+    await editorRevealed(page);
     await page.getByLabel('Song title').fill('Two endings study');
     await page.getByRole('button', { name: 'Repeats and endings', exact: true }).click();
     const guide = page.getByRole('dialog', { name: 'Repeats and endings', exact: true });
