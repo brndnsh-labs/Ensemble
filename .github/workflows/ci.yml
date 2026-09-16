@@ -190,14 +190,16 @@ jobs:
   # The REQUIRED context is the `v2-checks` aggregate below, not these shards, so
   # the shard count can change without touching branch protection.
   v2-suite:
-    name: v2-suite (shard ${{ matrix.shard }} of 2)
+    name: v2-suite (${{ matrix.shard }})
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
       # Both shards always run: a red shard 1 must not hide a red shard 2.
       fail-fast: false
       matrix:
-        shard: [1, 2]
+        # Duration-balanced, not Playwright's count-based `--shard` — see
+        # playwright.config.ts for the measurement that forced this.
+        shard: [heavy, rest]
     steps:
       - uses: actions/checkout@v7
 
@@ -244,13 +246,15 @@ jobs:
         run: npm run build --prefix prototypes/v2
 
       - name: Run the v2 Playwright suite
-        run: npm run test:e2e --prefix prototypes/v2 -- --shard=${{ matrix.shard }}/2
+        run: npm run test:e2e --prefix prototypes/v2
+        env:
+          V2_SHARD: ${{ matrix.shard }}
 
       # Every shard builds the export; exactly one uploads it, because two jobs
       # cannot publish the same artifact name. The deploy job downloads this
       # name, so it must keep matching `ensemble-v2-static-<sha>` exactly.
       - uses: actions/upload-artifact@v7
-        if: matrix.shard == 1
+        if: matrix.shard == 'heavy'
         with:
           name: ensemble-v2-static-${{ github.sha }}
           path: prototypes/v2/out/
@@ -261,7 +265,7 @@ jobs:
       - uses: actions/upload-artifact@v7
         if: failure()
         with:
-          name: v2-playwright-failures-shard-${{ matrix.shard }}
+          name: v2-playwright-failures-${{ matrix.shard }}
           path: prototypes/v2/test-results/
           retention-days: 7
 
