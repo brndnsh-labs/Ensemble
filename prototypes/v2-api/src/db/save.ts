@@ -81,6 +81,14 @@ export interface SaveDependencies {
  * documents is a library nobody reaches by playing music, and 256 MiB is roughly two orders of
  * magnitude of headroom above that. Raise them deliberately, with the storage on the box in mind;
  * do not raise them because one owner hit the wall.
+ *
+ * KNOWN GAP (#1250, found by the #1204 stage-3 review): these two caps bound the `documents`
+ * table and nothing else. `receipts` is never measured and never expired, and grows by a row on
+ * every committed save, so re-saving ONE document with fresh operation ids grows the database
+ * without limit while `readOwnerUsage` keeps reporting one small document. Measured: 20,000
+ * saves = 20,000 receipts ~= 4.19 MiB on disk, against a reported usage of 31 bytes. So do not
+ * read this file as proof that per-owner storage is bounded — half of it is, and #1250 is the
+ * gate on opening registration (#1226).
  */
 export const MAX_DOCUMENTS_PER_OWNER = 2_000;
 export const MAX_BYTES_PER_OWNER = 256 * 1024 * 1024;

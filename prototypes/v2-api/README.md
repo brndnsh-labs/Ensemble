@@ -320,8 +320,12 @@ Design points worth knowing before changing it:
   pairing the proofs above need and for the same reason; keep both. Nothing outside this file
   catches the hoist at all. Lowering the caps in the sequential cases also cut `save.test.ts`
   from ~4.2s to ~0.6s, since each full-scale byte case pushed 256 MiB through SQLite.
-- **The quota is per owner and lives inside the transaction.** `MAX_DOCUMENTS_PER_OWNER` (2,000)
-  and `MAX_BYTES_PER_OWNER` (256 MiB) in `src/db/save.ts` bound what one account accumulates;
+- **The quota is per owner and lives inside the transaction — but it bounds `documents` only.**
+  `MAX_DOCUMENTS_PER_OWNER` (2,000) and `MAX_BYTES_PER_OWNER` (256 MiB) in `src/db/save.ts` bound
+  what one account accumulates **in that one table**; `receipts` is outside both caps, never
+  expired, and grows by a row per committed save, so re-saving one document with fresh operation
+  ids is unbounded (#1250 — blocks opening registration, not stage 4). What follows describes the
+  document half;
   `MAX_SAVE_REQUEST_BYTES` bounds one request and `DOCUMENT_POLICIES` bounds one identity's
   rate, and neither of those bounds the total. Checked AFTER the conflict decision, so an owner
   at the cap with a stale revision still hears about the stale revision — resolving it may be an
