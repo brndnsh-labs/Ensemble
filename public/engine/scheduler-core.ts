@@ -673,6 +673,33 @@ function getChordAtStep(state: EnsembleState, step: number): ChordAtStep | null 
 }
 
 /**
+ * End an expired drum fill: clear `fillActive`, and drop an arrival crash the fill armed but
+ * never fired. Both callers below reach this at the same point in the lifecycle — one on the
+ * audible path inside `scheduleDrums`, one out-of-band for muted steps — and the two must stay
+ * identical, because a fill that ends on a muted step and one that ends on an audible step have
+ * to leave the drummer in the same state.
+ *
+ * The dispatch-or-mutate branch is the usual scheduler split: a real-time call with no
+ * `dispatch` writes the slice directly, which is sanctioned in this file. `pendingCrash` is
+ * `runtime-derived` (`public/songbook/state-ownership.ts`) and re-derived by the worker on the
+ * next fill, so it has no dispatch path of its own.
+ */
+function clearFillLifecycle(groove: EnsembleState['groove'], dispatch: Dispatch | undefined): void {
+    if (dispatch) {
+        dispatch(ACTIONS.SET_PARAM, {
+            module: 'groove',
+            param: 'fillActive',
+            value: false,
+        });
+    } else {
+        (groove as Mutable<typeof groove>).fillActive = false; // @direct-mutation
+    }
+    if (groove.pendingCrash) {
+        (groove as Mutable<typeof groove>).pendingCrash = false; // @direct-mutation
+    }
+}
+
+/**
  * Advance the drummer's fill lifecycle even when a section override mutes drum
  * emission. Fill state is transport state, not audio-output state: leaving the
  * cleanup inside `scheduleDrums` lets a muted section freeze an expired fill and
@@ -695,18 +722,7 @@ function expireMutedDrumFillAtStep(
     if (fillStep < (groove.fillLength || 0)) {
         return;
     }
-    if (dispatch) {
-        dispatch(ACTIONS.SET_PARAM, {
-            module: 'groove',
-            param: 'fillActive',
-            value: false,
-        });
-    } else {
-        (groove as Mutable<typeof groove>).fillActive = false; // @direct-mutation
-    }
-    if (groove.pendingCrash) {
-        (groove as Mutable<typeof groove>).pendingCrash = false; // @direct-mutation
-    }
+    clearFillLifecycle(groove, dispatch);
 }
 
 /**
@@ -749,18 +765,7 @@ export function scheduleDrums(
     if (groove.fillActive) {
         const fillStep = absoluteStep - (groove.fillStartStep || 0);
         if (fillStep >= (groove.fillLength || 0)) {
-            if (dispatch) {
-                dispatch(ACTIONS.SET_PARAM, {
-                    module: 'groove',
-                    param: 'fillActive',
-                    value: false,
-                });
-            } else {
-                (groove as Mutable<typeof groove>).fillActive = false; // @direct-mutation
-            }
-            if (groove.pendingCrash) {
-                (groove as Mutable<typeof groove>).pendingCrash = false; // @direct-mutation
-            }
+            clearFillLifecycle(groove, dispatch);
         }
 
         if (fillStep >= 0 && fillStep < (groove.fillLength || 0)) {
