@@ -117,6 +117,29 @@ export function listDocuments(
 }
 
 /**
+ * The owner's current storage footprint: how many documents they hold and how many bytes those
+ * bodies occupy. One statement, covered by `idx_documents_owner_id`, so the Save transaction can
+ * afford to ask on every write (#1234).
+ *
+ * `length()` on TEXT counts CHARACTERS, which would let a body of astral-plane characters occupy
+ * up to four times the bytes it appears to. Casting to BLOB first counts the UTF-8 bytes SQLite
+ * actually stores, which is the same unit `Buffer.byteLength` gives the caller for the incoming
+ * body — the two sides of the quota arithmetic must measure the same thing.
+ */
+export function readOwnerUsage(
+    db: DatabaseSync,
+    ownerId: string,
+): { documents: number; bytes: number } {
+    const row = db
+        .prepare(
+            `SELECT COUNT(*) AS documents, COALESCE(SUM(length(CAST(body AS BLOB))), 0) AS bytes
+             FROM documents WHERE owner_id = ?`,
+        )
+        .get(ownerId) as { documents: number; bytes: number };
+    return { documents: row.documents, bytes: row.bytes };
+}
+
+/**
  * Insert or replace the owner's document at a new revision. The CALLER decides whether the
  * write is allowed (absence + no tombstone for a create, exact base revision for an update)
  * inside the same transaction as this write — that is #1202's six-step commit. This function

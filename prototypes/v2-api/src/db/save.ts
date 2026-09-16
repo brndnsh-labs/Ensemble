@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
 import {
     readDocument,
+    readOwnerUsage,
     readReceipt,
     readTombstone,
     writeDocument,
@@ -55,6 +56,21 @@ export interface SaveDependencies {
     mintRevision?: () => string;
 }
 
+/**
+ * Per-owner storage caps (#1234). The request ceiling (`MAX_SAVE_REQUEST_BYTES`) and the rate
+ * limit (`DOCUMENT_POLICIES`) bound one request and one identity's request RATE; neither bounds
+ * what one account accumulates, and at the limits a single identity could write ~126 MB a minute
+ * into fresh document ids. Blast radius is nil while registration is closed (#1226) and real the
+ * day it opens, which is why this is the same gate.
+ *
+ * The numbers describe a songbook, not a backup target: a chart document is a few KB, so 2,000
+ * documents is a library nobody reaches by playing music, and 256 MiB is roughly two orders of
+ * magnitude of headroom above that. Raise them deliberately, with the storage on the box in mind;
+ * do not raise them because one owner hit the wall.
+ */
+export const MAX_DOCUMENTS_PER_OWNER = 2_000;
+export const MAX_BYTES_PER_OWNER = 256 * 1024 * 1024;
+
 export type SaveOutcome =
     /** Written now (`replayed: false`) or the original result of this same request again. */
     | { kind: 'committed'; revision: string; replayed: boolean }
@@ -66,7 +82,13 @@ export type SaveOutcome =
      */
     | { kind: 'conflict'; revision: string; remote: { revision: string; body: string } | null }
     /** This operation id already committed DIFFERENT bytes (or a different document). */
-    | { kind: 'operation_mismatch' };
+    | { kind: 'operation_mismatch' }
+    /**
+     * Nothing written: this owner is at a storage cap. `limit` names which one so the client can
+     * say something true ("too many songs" vs "too much stored"), and `usage`/`cap` are the
+     * owner's own numbers — never another account's, and nothing about the server at large.
+     */
+    | { kind: 'quota_exceeded'; limit: 'documents' | 'bytes'; usage: number; cap: number };
 
 /** A minted revision satisfies the client's `remoteRevision` grammar (`[A-Za-z0-9._:-]{1,200}`). */
 export function mintRevision(): string {
@@ -126,7 +148,39 @@ export function commitSave(
                 }
             }
 
-            // 3. Write the document and 4. record the receipt, in the same transaction.
+            // 3. Storage quota, checked AFTER the conflict decision and inside the same
+            // transaction, so a concurrent writer cannot slip past a cap this read just saw.
+            //
+            // Conflict first on purpose: an owner at the cap whose revision is also stale needs
+            // to hear about the stale revision, because resolving it may well be an UPDATE,
+            // which the cap does not forbid. Answering "full" there would send them to delete
+            // songs over what is really a sync conflict.
+            const usage = readOwnerUsage(db, ownerId);
+            const addedBytes = Buffer.byteLength(body, 'utf8');
+            if (current === undefined && usage.documents >= MAX_DOCUMENTS_PER_OWNER) {
+                return {
+                    kind: 'quota_exceeded',
+                    limit: 'documents',
+                    usage: usage.documents,
+                    cap: MAX_DOCUMENTS_PER_OWNER,
+                };
+            }
+            const replacedBytes =
+                current === undefined ? 0 : Buffer.byteLength(current.body, 'utf8');
+            const projectedBytes = usage.bytes - replacedBytes + addedBytes;
+            // Never refuse a write that does not INCREASE the footprint. Without this, an owner
+            // already over the cap — because it was lowered, or because their data predates it —
+            // could not even shrink a document to get back under it.
+            if (projectedBytes > MAX_BYTES_PER_OWNER && addedBytes > replacedBytes) {
+                return {
+                    kind: 'quota_exceeded',
+                    limit: 'bytes',
+                    usage: usage.bytes,
+                    cap: MAX_BYTES_PER_OWNER,
+                };
+            }
+
+            // 4. Write the document and 5. record the receipt, in the same transaction.
             const revision = mint();
             writeDocument(db, ownerId, { documentId, revision, body, updatedAt: now });
             writeReceipt(db, ownerId, {

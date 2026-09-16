@@ -4,6 +4,7 @@ import { MAX_SAVE_REQUEST_BYTES } from '../../../v2/lib/sync/request.js';
 import { createWebAuthnConfig, type WebAuthnConfig } from '../../src/auth/config.js';
 import { issueSession } from '../../src/auth/session.js';
 import { readDocument, readReceipt } from '../../src/db/documents.js';
+import { MAX_DOCUMENTS_PER_OWNER } from '../../src/db/save.js';
 import { createApp } from '../../src/http/app.js';
 import { DOCUMENT_POLICIES } from '../../src/http/documents.js';
 import { makeChartDocument } from '../fixtures/chart-document.js';
@@ -401,5 +402,32 @@ describe('POST /api/documents/save (#1202)', () => {
             'x'.repeat(MAX_SAVE_REQUEST_BYTES + 1),
         );
         expect(unknown.status).toBe(413);
+    });
+
+    it('an owner at the document cap gets 409 quota_exceeded, distinguishable from a conflict (#1234)', async () => {
+        ctx = await setUp();
+        const insert = ctx.testDb.db.prepare(
+            'INSERT INTO documents (owner_id, document_id, revision, body, updated_at)' +
+                ' VALUES (?, ?, ?, ?, 1)',
+        );
+        for (let i = 0; i < MAX_DOCUMENTS_PER_OWNER; i += 1) {
+            insert.run(ctx.accountId, `seed-${i}`, `seed-rev-${i}`, '{}');
+        }
+        const { status, json } = await save(
+            ctx,
+            freeze({
+                ownerId: ctx.accountId,
+                documentId: 'doc-1',
+                operationId: 'op-1',
+                expectedRevision: null,
+                document: makeChartDocument('doc-1'),
+            }),
+        );
+        expect(status).toBe(409);
+        // A distinct code, not the conflict envelope: the client must be able to tell "your
+        // library is full" from "someone else saved first", because the fixes differ.
+        expect(json).toEqual({ error: 'quota_exceeded' });
+        expect(readDocument(ctx.testDb.db, ctx.accountId, 'doc-1')).toBeUndefined();
+        expect(readReceipt(ctx.testDb.db, ctx.accountId, 'op-1')).toBeUndefined();
     });
 });
