@@ -84,9 +84,12 @@ export type SaveOutcome =
     /** This operation id already committed DIFFERENT bytes (or a different document). */
     | { kind: 'operation_mismatch' }
     /**
-     * Nothing written: this owner is at a storage cap. `limit` names which one so the client can
-     * say something true ("too many songs" vs "too much stored"), and `usage`/`cap` are the
-     * owner's own numbers — never another account's, and nothing about the server at large.
+     * Nothing written: this owner is at a storage cap. `limit` names which one and `usage`/`cap`
+     * are the owner's own numbers — never another account's, and nothing about the server at
+     * large. NOTE: none of the three reach the wire today. `src/http/documents.ts` answers the
+     * bare `{ error: 'quota_exceeded' }` the error taxonomy calls for, so the "too many songs"
+     * vs "too much stored" distinction a client would want is carried here and stopped at the
+     * boundary on purpose — see #1245 for the stage-5 decision on widening that reply.
      */
     | { kind: 'quota_exceeded'; limit: 'documents' | 'bytes'; usage: number; cap: number };
 
@@ -170,7 +173,9 @@ export function commitSave(
             const projectedBytes = usage.bytes - replacedBytes + addedBytes;
             // Never refuse a write that does not INCREASE the footprint. Without this, an owner
             // already over the cap — because it was lowered, or because their data predates it —
-            // could not even shrink a document to get back under it.
+            // would be frozen out of editing entirely, including the edits that shrink their way
+            // back under. Note the rule is only "does not grow": one such write need not bring
+            // the owner under the cap, it just may not push them further over.
             if (projectedBytes > MAX_BYTES_PER_OWNER && addedBytes > replacedBytes) {
                 return {
                     kind: 'quota_exceeded',

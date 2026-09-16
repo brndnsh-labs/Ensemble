@@ -135,6 +135,9 @@ export function documentRoutes({
         // client fixes differently, and a 5xx would invite the transport's retry logic for what
         // is a terminal, user-actionable state ("your library is full").
         if (outcome.kind === 'quota_exceeded') {
+            // Deliberately the bare code: `outcome.limit`/`usage`/`cap` stop here rather than
+            // going on the wire, because the taxonomy in errors.ts is `{ error: <code> }` and
+            // nothing yet consumes the distinction. #1245 decides whether stage 5's UX needs it.
             return sendError(c, 409, 'quota_exceeded');
         }
         if (outcome.kind === 'conflict') {

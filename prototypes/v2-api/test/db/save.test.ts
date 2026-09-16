@@ -335,6 +335,64 @@ describe('commitSave (#1202)', () => {
             ).toMatchObject({ kind: 'committed' });
         });
 
+        it('allows a write landing exactly ON the byte cap, and refuses one byte more', () => {
+            const db = setUp();
+            const seed = db.prepare(
+                'INSERT INTO documents (owner_id, document_id, revision, body, updated_at)' +
+                    ' VALUES (?, ?, ?, ?, 1)',
+            );
+            // Brackets the comparison itself: `>` vs `>=` is the off-by-one that a guard
+            // tested only well inside the boundary would never catch.
+            seed.run('owner-a', 'fill', 'fill-rev', 'x'.repeat(MAX_BYTES_PER_OWNER - 16));
+            expect(commitSave(db, command({ body: 'y'.repeat(16) }), deps)).toMatchObject({
+                kind: 'committed',
+            });
+            expect(readOwnerUsage(db, 'owner-a').bytes).toBe(MAX_BYTES_PER_OWNER);
+
+            expect(
+                commitSave(
+                    db,
+                    command({ documentId: 'doc-2', operationId: 'op-2', body: 'z' }),
+                    deps,
+                ),
+            ).toMatchObject({ kind: 'quota_exceeded', limit: 'bytes' });
+        });
+
+        it('allows a small shrink that leaves the owner still over the cap', () => {
+            const db = setUp();
+            const over = MAX_BYTES_PER_OWNER + 4096;
+            db.prepare(
+                'INSERT INTO documents (owner_id, document_id, revision, body, updated_at)' +
+                    ' VALUES (?, ?, ?, ?, 1)',
+            ).run('owner-a', 'doc-1', 'rev-0', 'x'.repeat(over));
+            // The point of the escape hatch is that progress is allowed while STILL over the
+            // cap. Shrinking all the way under in one step would pass even without it.
+            expect(
+                commitSave(
+                    db,
+                    command({ expectedRevision: 'rev-0', body: 'x'.repeat(over - 100) }),
+                    deps,
+                ),
+            ).toMatchObject({ kind: 'committed' });
+            expect(readOwnerUsage(db, 'owner-a').bytes).toBe(over - 100);
+        });
+
+        it('allows an equal-size replacement while over the cap', () => {
+            const db = setUp();
+            const over = MAX_BYTES_PER_OWNER + 4096;
+            db.prepare(
+                'INSERT INTO documents (owner_id, document_id, revision, body, updated_at)' +
+                    ' VALUES (?, ?, ?, ?, 1)',
+            ).run('owner-a', 'doc-1', 'rev-0', 'x'.repeat(over));
+            expect(
+                commitSave(
+                    db,
+                    command({ expectedRevision: 'rev-0', body: 'y'.repeat(over) }),
+                    deps,
+                ),
+            ).toMatchObject({ kind: 'committed' });
+        });
+
         it('counts UTF-8 bytes, not characters, on both sides of the arithmetic', () => {
             const db = setUp();
             // Four bytes each; `length()` on TEXT would report half as many code units.

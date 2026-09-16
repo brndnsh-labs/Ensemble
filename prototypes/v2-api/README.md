@@ -288,7 +288,10 @@ Design points worth knowing before changing it:
   at the cap with a stale revision still hears about the stale revision — resolving it may be an
   update, which the cap allows. A committed receipt replays regardless of the cap (the write
   already happened), and a write that does not increase the footprint is never refused, so an
-  account that is somehow over the cap can still shrink its way back under.
+  account somehow over the cap is not frozen out of the edits that shrink it back under. That
+  rule is only "does not grow" — one such write need not land under the cap, it just may not
+  push further over. The reply carries no numbers (see the taxonomy note in `src/http/errors.ts`
+  and #1245).
 - **The owner is the session's account id, full stop.** The envelope's `ownerId` is a routing
   hint that must AGREE with it; a disagreement is refused, never "corrected".
 - **One decoder, one codec.** The route decodes with `prototypes/v2/lib/sync/request.ts` —
