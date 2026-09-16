@@ -189,7 +189,15 @@
     min-width: 280px;
     max-width: 400px;
     width: auto;
-    animation: menuFadeIn 0.2s ease-out;
+}
+
+/* Same guard #888 put on the modals, toasts and mix sheet; panels.css was outside
+   that sweep. Opt IN to the fade instead of opting out, so a surface added here
+   later is still silent by default for a reader who asked for less motion. */
+@media (prefers-reduced-motion: no-preference) {
+    .action-menu-content {
+        animation: menuFadeIn 0.2s ease-out;
+    }
 }
 
 .action-menu-content.open {

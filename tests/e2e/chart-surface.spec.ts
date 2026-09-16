@@ -246,6 +246,30 @@ test.describe('ChartSurface @ui', () => {
             await page.keyboard.press('Escape');
             await expect(menu).toBeHidden();
         });
+
+        // #1131: panels.css was outside #888's reduced-motion sweep, so this menu
+        // faded in regardless of the preference. Asserted both ways — a test that
+        // only checks `reduce` would still pass if the animation were deleted
+        // outright, which is a different (and worse) fix.
+        test('fades in only when motion is welcome', async ({ page }) => {
+            await page.setViewportSize({ width: 1440, height: 900 });
+            const animationName = async () => {
+                await page.getByRole('button', { name: 'Unlock chart to edit' }).click();
+                await expect(page.locator('.inline-editor')).toBeVisible();
+                await page.getByRole('button', { name: 'Arrangement Tools Menu' }).click();
+                const menu = page.locator('.editor-action-menu');
+                await expect(menu).toBeVisible();
+                return menu.evaluate((node) => getComputedStyle(node).animationName);
+            };
+
+            await page.emulateMedia({ reducedMotion: 'reduce' });
+            await page.reload();
+            expect(await animationName()).toBe('none');
+
+            await page.emulateMedia({ reducedMotion: 'no-preference' });
+            await page.reload();
+            expect(await animationName()).toBe('menuFadeIn');
+        });
     });
 
     test.describe('Section settings popover', () => {
