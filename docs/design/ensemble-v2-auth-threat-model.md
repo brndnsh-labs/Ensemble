@@ -342,9 +342,10 @@ add replicas or change the shared transaction helper as an incidental optimizati
 was still unmet and this receipt left stage 2 open. The row was met on 2026-09-15 by #1218 (see
 "Live proxy identity receipt"), which is what closes stage 2. Physical passkey/device acceptance,
 backup/restore (#1220) and opening registration (#1226) remain later stages. #1226's origin-pull
-gate (#1227) closed 2026-09-16, and its storage-quota gate (#1234) closed the same day — but the
-stage-3 authorization review found that #1234 bounds the `documents` table only, so #1226 now
-waits on #1250 (receipt growth is outside both caps). See
+gate (#1227) closed 2026-09-16, and its storage-quota gate (#1234) closed the same day. The
+stage-3 authorization review then found that #1234 bounded the `documents` table only, leaving
+receipt growth unbounded; #1250 closed that by charging each retained receipt against the byte
+cap, so the cap now bounds an owner's total stored bytes. See
 [`ensemble-v2-document-authorization-review.md`](ensemble-v2-document-authorization-review.md).
 
 The local `test/http/client-identity.socket.test.ts` also drives a real Node/Hono listener past

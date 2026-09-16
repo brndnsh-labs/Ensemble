@@ -117,9 +117,44 @@ export function listDocuments(
 }
 
 /**
- * The owner's current storage footprint: how many documents they hold and how many bytes those
- * bodies occupy. One statement, covered by `idx_documents_owner_id`, so the Save transaction can
- * afford to ask on every write (#1234).
+ * What one committed receipt costs an owner's storage budget (#1250).
+ *
+ * A receipt is retained for the account lifetime and never expired — that retention is exactly
+ * what makes a replayed operation id detectable, so it is not negotiable. But it means every
+ * committed save leaves a permanent row, and #1234's original caps measured `documents` only,
+ * so re-saving ONE document with fresh operation ids grew the database without limit while the
+ * quota reported a single small document. This constant is what closes that.
+ *
+ * It is a FLAT charge rather than a per-row measurement, and deliberately so: the alternative
+ * needs the same size formula written twice, once in SQL over the table and once in TypeScript
+ * for the pending write, and those two copies are exactly the kind of thing that drifts apart
+ * silently. One number cannot drift.
+ *
+ * The number is the measured worst case, rounded up. On-disk growth per receipt row, including
+ * its primary key and both indexes (`PRAGMA wal_checkpoint(TRUNCATE)` before each sizing,
+ * 20,000 rows per sample):
+ *
+ *   short ids (8 chars)       123 B of text -> 193 B on disk
+ *   uuid-ish ids (36 chars)   179 B of text -> 314 B on disk
+ *   max-length ids (128, the `documentId`/`operationId` grammar's ceiling)
+ *                             363 B of text -> 737 B on disk
+ *
+ * So 768 covers the worst case an owner can actually construct. It over-charges a short-id
+ * receipt roughly fourfold, which is the safe direction and costs a real songbook nothing: even
+ * 20,000 saves is 15 MiB of a 256 MiB budget. Charging too LITTLE would be the bug, because
+ * then the cap would not actually bound what lands on the disk.
+ */
+export const RECEIPT_COST_BYTES = 768;
+
+/**
+ * The owner's current storage footprint: documents held, and the bytes their bodies plus their
+ * retained receipts occupy. One statement per table, each covered by an owner index, so the Save
+ * transaction can afford to ask on every write (#1234, extended by #1250).
+ *
+ * `bytes` is the TOTAL — it is what `MAX_BYTES_PER_OWNER` bounds, and the breakdown is returned
+ * alongside so a caller (and a test) can see which half is which. Before #1250 this returned the
+ * document half alone and called it the footprint, which is how the receipt table came to be
+ * unbounded.
  *
  * `length()` on TEXT counts CHARACTERS, which would let a body of astral-plane characters occupy
  * up to four times the bytes it appears to. Casting to BLOB first counts the UTF-8 bytes SQLite
@@ -129,14 +164,30 @@ export function listDocuments(
 export function readOwnerUsage(
     db: DatabaseSync,
     ownerId: string,
-): { documents: number; bytes: number } {
-    const row = db
+): {
+    documents: number;
+    documentBytes: number;
+    receipts: number;
+    receiptBytes: number;
+    bytes: number;
+} {
+    const documentRow = db
         .prepare(
             `SELECT COUNT(*) AS documents, COALESCE(SUM(length(CAST(body AS BLOB))), 0) AS bytes
              FROM documents WHERE owner_id = ?`,
         )
         .get(ownerId) as { documents: number; bytes: number };
-    return { documents: row.documents, bytes: row.bytes };
+    const receiptRow = db
+        .prepare('SELECT COUNT(*) AS receipts FROM receipts WHERE owner_id = ?')
+        .get(ownerId) as { receipts: number };
+    const receiptBytes = receiptRow.receipts * RECEIPT_COST_BYTES;
+    return {
+        documents: documentRow.documents,
+        documentBytes: documentRow.bytes,
+        receipts: receiptRow.receipts,
+        receiptBytes,
+        bytes: documentRow.bytes + receiptBytes,
+    };
 }
 
 /**

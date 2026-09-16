@@ -320,12 +320,22 @@ Design points worth knowing before changing it:
   pairing the proofs above need and for the same reason; keep both. Nothing outside this file
   catches the hoist at all. Lowering the caps in the sequential cases also cut `save.test.ts`
   from ~4.2s to ~0.6s, since each full-scale byte case pushed 256 MiB through SQLite.
-- **The quota is per owner and lives inside the transaction — but it bounds `documents` only.**
-  `MAX_DOCUMENTS_PER_OWNER` (2,000) and `MAX_BYTES_PER_OWNER` (256 MiB) in `src/db/save.ts` bound
-  what one account accumulates **in that one table**; `receipts` is outside both caps, never
-  expired, and grows by a row per committed save, so re-saving one document with fresh operation
-  ids is unbounded (#1250 — blocks opening registration, not stage 4). What follows describes the
-  document half;
+- **The quota is per owner, lives inside the transaction, and bounds the TOTAL — bodies plus
+  retained receipts (#1250).** `MAX_DOCUMENTS_PER_OWNER` (2,000) and `MAX_BYTES_PER_OWNER`
+  (256 MiB) in `src/db/save.ts` bound what one account accumulates. It did not always: #1234
+  shipped measuring `documents` alone, so re-saving ONE document with fresh operation ids grew
+  the database without limit — every commit leaves a permanent receipt, and receipts are never
+  expired because that retention is what makes a replayed operation id detectable. Measured
+  before the fix: 20,000 saves = 20,000 receipts = 4.19 MiB on disk, reported as 31 bytes.
+  `RECEIPT_COST_BYTES` (768, the measured worst case at the id grammar's 128-character ceiling,
+  rounded up) is the flat charge per receipt; flat rather than per-row because a per-row formula
+  would have to be written twice, once in SQL and once in TypeScript, and those two copies drift.
+  **Counting this write's own receipt in `addedBytes` is load-bearing, not bookkeeping:** measured
+  against body bytes alone, an equal-size re-save has `addedBytes === replacedBytes`, so the
+  "never refuse a write that does not grow the footprint" clause waved it through unconditionally
+  — which is precisely the unbounded loop. `readOwnerUsage` returns the breakdown
+  (`documentBytes`/`receiptBytes`) so which half filled the budget is visible. The rest of this
+  bullet describes the document half;
   `MAX_SAVE_REQUEST_BYTES` bounds one request and `DOCUMENT_POLICIES` bounds one identity's
   rate, and neither of those bounds the total. Checked AFTER the conflict decision, so an owner
   at the cap with a stale revision still hears about the stale revision — resolving it may be an

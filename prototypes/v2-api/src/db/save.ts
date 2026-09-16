@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
 import {
+    RECEIPT_COST_BYTES,
     readDocument,
     readOwnerUsage,
     readReceipt,
@@ -82,13 +83,12 @@ export interface SaveDependencies {
  * magnitude of headroom above that. Raise them deliberately, with the storage on the box in mind;
  * do not raise them because one owner hit the wall.
  *
- * KNOWN GAP (#1250, found by the #1204 stage-3 review): these two caps bound the `documents`
- * table and nothing else. `receipts` is never measured and never expired, and grows by a row on
- * every committed save, so re-saving ONE document with fresh operation ids grows the database
- * without limit while `readOwnerUsage` keeps reporting one small document. Measured: 20,000
- * saves = 20,000 receipts ~= 4.19 MiB on disk, against a reported usage of 31 bytes. So do not
- * read this file as proof that per-owner storage is bounded — half of it is, and #1250 is the
- * gate on opening registration (#1226).
+ * `MAX_BYTES_PER_OWNER` bounds the owner's TOTAL stored bytes — document bodies plus their
+ * retained receipts (#1250). It did not always: #1234 shipped measuring `documents` alone, which
+ * left re-saving ONE document with fresh operation ids growing the database without limit while
+ * the quota reported a single small document (measured: 20,000 saves = 20,000 receipts = 4.19 MiB
+ * on disk against a reported 31 bytes). `RECEIPT_COST_BYTES` in documents.ts is what closes that,
+ * and the growth clause below is where it has to be counted for the close to hold.
  */
 export const MAX_DOCUMENTS_PER_OWNER = 2_000;
 export const MAX_BYTES_PER_OWNER = 256 * 1024 * 1024;
@@ -185,7 +185,9 @@ export function commitSave(
             // which the cap does not forbid. Answering "full" there would send them to delete
             // songs over what is really a sync conflict.
             const usage = readOwnerUsage(db, ownerId);
-            const addedBytes = Buffer.byteLength(body, 'utf8');
+            // This write's own cost: the body, PLUS the receipt it will leave behind. Counting
+            // the receipt here is what makes the growth rule below honest — see #1250.
+            const addedBytes = Buffer.byteLength(body, 'utf8') + RECEIPT_COST_BYTES;
             if (current === undefined && usage.documents >= maxDocumentsPerOwner) {
                 return {
                     kind: 'quota_exceeded',
@@ -202,6 +204,14 @@ export function commitSave(
             // would be frozen out of editing entirely, including the edits that shrink their way
             // back under. Note the rule is only "does not grow": one such write need not bring
             // the owner under the cap, it just may not push them further over.
+            //
+            // `addedBytes` INCLUDES this write's receipt (#1250), and that is load-bearing, not
+            // bookkeeping. Measured against document bytes alone, an equal-size re-save has
+            // `addedBytes === replacedBytes`, so this clause waved it through unconditionally —
+            // and an equal-size re-save with a fresh operation id is exactly the shape that grew
+            // the receipt table without limit. With the receipt counted, re-saving the same bytes
+            // does grow the footprint, so an owner at the cap is refused; a genuine shrink still
+            // passes, as long as it gives back more than the new receipt takes.
             if (projectedBytes > maxBytesPerOwner && addedBytes > replacedBytes) {
                 return {
                     kind: 'quota_exceeded',
