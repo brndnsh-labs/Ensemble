@@ -2063,6 +2063,17 @@ dialog textarea {
 .modal-box .dialog-actions {
     margin-top: 18px;
 }
+.share-link-fallback {
+    margin-top: 12px;
+}
+.share-link-fallback label {
+    display: block;
+    margin-bottom: 6px;
+}
+.share-link-fallback input {
+    font-family: monospace;
+    font-size: 12px;
+}
 .status-detail {
     color: var(--muted);
     font-size: 11px;

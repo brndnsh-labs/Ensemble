@@ -78,6 +78,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/songbook/legacy-score.ts` | Pure conservative v1 conversion proposals retaining original JSON, with blocking timing/spelling diagnostics. | `proposeLegacyScoreConversion` |
 | `public/songbook/structural-limits.ts` | Pre-schema input ceilings for byte size, nesting depth, visited nodes, and section count. | `inspectSongbookStructure`, `SONGBOOK_MAX_INPUT_BYTES` |
 | `public/songbook/state-ownership.ts` | Exhaustive document/preferences/runtime ownership for every top-level state field, plus the legacy-writer reachability manifest. | `STATE_OWNERSHIP_MANIFEST`, `LEGACY_PERSISTED_FIELD_OWNERSHIP` |
+| `public/songbook/chart-link.ts` | v2 shareable-link codec: `#chart=<base64url(deflate(JSON))>` whole-document envelope (v1 or v2), distinct from `state/share-codec.ts`'s v1 sections-only `?s=` payload. Fails closed on any malformed/oversized/schema-invalid fragment. | `encodeChartLink`, `decodeChartLink` |
 
 ## Generative Engines (Worker Thread)
 
