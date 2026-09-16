@@ -40,7 +40,7 @@ material finding (see P1). That is the strongest independence available without 
 
 No P0. No finding blocks stage 4.
 
-### P1 — the per-owner storage quota does not bound what an owner accumulates: `receipts` is outside both caps
+### P1 — the per-owner storage quota did not bound what an owner accumulates: `receipts` was outside both caps — **RESOLVED by #1250**
 
 `readOwnerUsage` measures only `COUNT(*)` and `SUM(length(CAST(body AS BLOB)))` over `documents`.
 A receipt is immutable for the account lifetime and never expired — deliberately, because
@@ -68,13 +68,31 @@ at #1250. (The review named a third, `docs/design/ensemble-v2-sync.md`; re-check
 such claim — it mentions the quota only as a client-side failure case to test.) The rate limiter
 is keyed on client identity rather than account, so it is not a second bound on this.
 
-**Disposition: named gap, routed, does not block stage 4.** It is resource exhaustion, not
-authorization or IDOR — no cross-owner reach, no data disclosure. Blast radius is nil while
-registration is closed (#1226). It **does** block opening registration: #1234 is the gate that is
-supposed to make "per-owner storage is capped" true, and today that sentence is only half true.
-The structurally right fix is to fold a receipt allowance into the accounting (or add a
-`MAX_RECEIPTS_PER_OWNER`), **not** a retention sweep — expiring receipts is what would make replay
-unsafe. Filed as #1250 against #1226.
+**Disposition at review time: named gap, routed, does not block stage 4.** It is resource
+exhaustion, not authorization or IDOR — no cross-owner reach, no data disclosure. Blast radius was
+nil while registration is closed (#1226), but it blocked *opening* registration, since #1234 is
+the gate that is supposed to make "per-owner storage is capped" true.
+
+**Resolved by #1250.** Each retained receipt is now charged `RECEIPT_COST_BYTES` (768 — the
+measured worst case at the id grammar's 128-character ceiling, rounded up) against
+`MAX_BYTES_PER_OWNER`, so the byte cap bounds an owner's total stored bytes rather than their
+document bodies alone. Receipts are still never expired; a retention sweep was explicitly rejected
+as the fix, because that retention is what makes a replayed operation id detectable.
+
+Two things about that fix are worth carrying forward, because neither was obvious from the
+finding as written:
+
+- **Counting receipts in `readOwnerUsage` alone would not have closed the hole.** The growth
+  clause — "never refuse a write that does not increase the footprint", the escape hatch that
+  keeps an owner over a lowered cap from being frozen out — compared *document body* bytes only.
+  An equal-size re-save therefore had `addedBytes === replacedBytes` and was waved through
+  unconditionally, however far over the cap the owner was. That clause *was* the bypass. The fix
+  counts this write's own receipt in `addedBytes`, so re-saving identical bytes is correctly seen
+  as growth; a genuine shrink still passes, provided it gives back more than the new receipt costs.
+- **The escape hatch narrowed, deliberately.** An owner over the cap can no longer make an
+  equal-size edit — they must shrink by more than 768 bytes, or delete a document. This is a real
+  behaviour change, and the test that asserted the opposite ("allows an equal-size replacement
+  while over the cap") was inverted rather than deleted, with the reasoning recorded in place.
 
 ### P2 — the route drift guard proves a policy entry, not authorization
 
@@ -109,8 +127,13 @@ Filed as #1251 against the stage-4 entry story.
 
 ## Residual risks
 
-1. **Receipt growth is outside the quota** (P1). Zero exposure while registration is closed; must
-   close before #1226.
+1. **Receipt growth is outside the quota** (P1). **Closed by #1250** — receipts are now charged
+   against the byte cap. The residual is narrower but real: because receipts can never be deleted,
+   an owner who spends the whole 256 MiB budget on receipts alone (~350,000 saves at the flat
+   charge — roughly 20 years at 100 saves/day, or about 4 days of deliberate abuse at the shipped
+   120 saves/min) has no self-service remedy, since deleting documents will not free receipt
+   bytes. That is the cap working as intended against an abuser and an ops problem against a
+   legitimate user; it needs an admin-side prune before #1226 if it is judged unacceptable.
 2. **Global disk exhaustion is not bounded by a per-owner cap.** 256 MiB × N accounts, with no
    service-wide ceiling and no disk-pressure backstop. Fine at N≈1; a capacity decision the moment
    registration opens.

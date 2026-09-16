@@ -4,7 +4,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
-import { readDocument, readOwnerUsage, readReceipt } from '../../src/db/documents.js';
+import {
+    RECEIPT_COST_BYTES,
+    readDocument,
+    readOwnerUsage,
+    readReceipt,
+} from '../../src/db/documents.js';
 import type { SaveCommand, SaveDependencies, SaveOutcome } from '../../src/db/save.js';
 import type { SaveWorkerOptions } from '../helpers/save-worker.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/test-db.js';
@@ -564,12 +569,13 @@ describe('Save concurrency and failure proofs on a real database (#1203)', () =>
 
         it('sequenced at the byte cap: the second racer sees the first one spend the headroom', async () => {
             const { db, path } = setUp();
-            // 200 bytes of headroom and two 120-byte bodies: either one fits, both do not.
-            // Sequenced rather than wall-clock because the whole question is what the SECOND
-            // racer's usage read sees, and that is what sequencing pins down — the first is
-            // held inside its transaction, past its own quota read, until the parent lets go.
+            // Each save costs its body PLUS one `RECEIPT_COST_BYTES` receipt (#1250), so a
+            // 120-byte body costs 888. With 1,000 bytes of headroom either racer fits and both
+            // do not. Sequenced rather than wall-clock because the whole question is what the
+            // SECOND racer's usage read sees, and that is what sequencing pins down — the first
+            // is held inside its transaction, past its own quota read, until the parent lets go.
             const body = `{"t":"${'x'.repeat(112)}"}`;
-            expect(Buffer.byteLength(body, 'utf8')).toBe(120);
+            expect(Buffer.byteLength(body, 'utf8') + RECEIPT_COST_BYTES).toBe(888);
 
             const results = await raceSequenced(
                 path,
@@ -577,7 +583,7 @@ describe('Save concurrency and failure proofs on a real database (#1203)', () =>
                     baseCommand({ documentId: 'doc-a', operationId: 'op-a', body }),
                     baseCommand({ documentId: 'doc-b', operationId: 'op-b', body }),
                 ],
-                { caps: { maxBytesPerOwner: 200 } },
+                { caps: { maxBytesPerOwner: 1_000 } },
             );
             for (const result of results) {
                 // Two transactions both holding a stale read snapshot surface as "database is
@@ -593,12 +599,13 @@ describe('Save concurrency and failure proofs on a real database (#1203)', () =>
             expect(refused).toEqual({
                 kind: 'quota_exceeded',
                 limit: 'bytes',
-                usage: 120,
-                cap: 200,
+                usage: 888,
+                cap: 1_000,
             });
-            // The cap held: 120 stored, not 240. This is the assertion a hoisted quota read
-            // fails, and it fails by exactly one document every time.
-            expect(readOwnerUsage(db, 'owner-a').bytes).toBe(120);
+            // The cap held: one racer's 888, not both. This is the assertion a hoisted quota
+            // read fails, and it fails by exactly one document every time.
+            expect(readOwnerUsage(db, 'owner-a').bytes).toBe(888);
+            expect(readOwnerUsage(db, 'owner-a').documentBytes).toBe(120);
             expect(countRows(db, 'documents')).toBe(1);
             expect(countRows(db, 'receipts')).toBe(1);
         }, 60_000);
