@@ -165,15 +165,31 @@ jobs:
 
   # The v2 music stand (prototypes/v2, Next static export) ships to production
   # at /v2 on the same merge as the root app, so it is gated the same way: build
-  # + its own Playwright suite here, required on main, and the exact `out/`
-  # bytes are retained for the deploy job (never rebuilt there). Runs on every
-  # PR, not only v2-touching ones — the export compiles public/ through
-  # webpack, so any engine change can break it. Starts alongside `checks`, not
-  # after it (#1223); its Playwright suite runs on three workers with one preview
-  # server per worker (prototypes/v2/checks/fixtures.ts).
-  v2-checks:
+  # + its own Playwright suite here, and the exact `out/` bytes are retained for
+  # the deploy job (never rebuilt there). Runs on every PR, not only v2-touching
+  # ones — the export compiles public/ through webpack, so any engine change can
+  # break it. Starts alongside `checks`, not after it (#1223).
+  #
+  # SHARDED across two runners. The suite is wait-bound, not CPU-bound: measured
+  # 2026-09-16 on a 4-core box, 100 tests take 245s on three workers and still
+  # 185s on six, because the playback tests spend their time waiting on real
+  # laps. Adding workers to one runner barely helps and is what starves the tab
+  # (#1240). Two runners at three workers each cut the longest shard to 164s.
+  # Shards are uneven (Playwright splits by test count, and foundation.spec.ts
+  # is 42% of the suite's seconds) — 99s and 164s — so the win is the slower
+  # shard, not the average.
+  #
+  # The REQUIRED context is the `v2-checks` aggregate below, not these shards, so
+  # the shard count can change without touching branch protection.
+  v2-suite:
+    name: v2-suite (shard ${{ matrix.shard }} of 2)
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    strategy:
+      # Both shards always run: a red shard 1 must not hide a red shard 2.
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
     steps:
       - uses: actions/checkout@v7
 
@@ -220,9 +236,13 @@ jobs:
         run: npm run build --prefix prototypes/v2
 
       - name: Run the v2 Playwright suite
-        run: npm run test:e2e --prefix prototypes/v2
+        run: npm run test:e2e --prefix prototypes/v2 -- --shard=${{ matrix.shard }}/2
 
+      # Every shard builds the export; exactly one uploads it, because two jobs
+      # cannot publish the same artifact name. The deploy job downloads this
+      # name, so it must keep matching `ensemble-v2-static-<sha>` exactly.
       - uses: actions/upload-artifact@v7
+        if: matrix.shard == 1
         with:
           name: ensemble-v2-static-${{ github.sha }}
           path: prototypes/v2/out/
@@ -233,9 +253,27 @@ jobs:
       - uses: actions/upload-artifact@v7
         if: failure()
         with:
-          name: v2-playwright-failures
+          name: v2-playwright-failures-shard-${{ matrix.shard }}
           path: prototypes/v2/test-results/
           retention-days: 7
+
+  # The required status context. It exists so the shard count is an internal
+  # detail: branch protection names `v2-checks` and never has to learn about the
+  # matrix. `if: always()` is load-bearing — without it a failed shard would
+  # SKIP this job, the required context would never report, and the PR would
+  # block forever instead of going red.
+  v2-checks:
+    needs: v2-suite
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every v2 shard to have passed
+        # A matrix `needs` result is 'success' only when EVERY leg succeeded, so
+        # this one comparison covers a failed, cancelled or skipped shard.
+        run: |
+          echo "v2-suite matrix result: ${{ needs.v2-suite.result }}"
+          test "${{ needs.v2-suite.result }}" = success
 
   # Publish the v2 account API as an immutable image on every merge to main —
   # decision 1 of docs/design/ensemble-v2-rollout.md (#1216). The API suite itself
