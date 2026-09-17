@@ -54,6 +54,32 @@ a further product decision.
    stage. A P0 finding, a destructive data operation on real user data, or a genuinely ambiguous
    product choice still stops and surfaces (DOCTRINE §5).
 
+9. **Phase 3/4 simplifications (DECISION 2026-09-17, Brandon: "keep this simple and modern +
+   easy to maintain long term").** These supersede the matching paragraphs of
+   [`ensemble-v2-sync.md`](ensemble-v2-sync.md); do not build the superseded machinery from
+   that contract.
+   - **S1 — manifest diff, not a change feed.** The client pages an `(id, revision, deleted)`
+     manifest and diffs it against local records. No server watermark, cursor expiry or
+     cursor-reset handling. Sized for the 2,000-document per-owner cap.
+   - **S2 — sign-out needs a connection.** No persisted offline logout barrier. Offline, sign-out
+     is disabled with a reason and export stays available.
+   - **S3 — one account per browser profile.** No account switcher; switching is sign out, sign
+     in. The owner/generation fence in `prototypes/v2/lib/sync/` stays.
+   - **S4 — one new client dependency** (`@simplewebauthn/browser`). Plain `fetch`; no query,
+     cache or state library. Account code lives in `app/account/` and `lib/account/`.
+   - **S5 — root-scope offline install and the web manifest move to phase 5.** v2 already has a
+     verified service worker at `/v2/` scope; root scope is the basePath flip and the v1-worker
+     handover.
+10. **Account deletion ships in phase 3 (#1271)**, pulled forward from stage 7: accounts do not
+    launch without a way out.
+11. **Storage posture before prod registration (#1256, closed 2026-09-17).** Accept the
+    receipt-budget self-lock; add a registration cap of 25 and a docker04 disk-usage alert
+    (#1272). Nightly backups (#1220) are accepted in place of the contract's six-hourly target and
+    disclosed at sign-up. Opening prod registration is an explicit go after #1272 lands.
+12. **Parity bar amendments.** The chord-notation preference is in (#1276). Session timer,
+    Surprise Me and the song-seed control are not ported; themes are an unscheduled post-cutover
+    option (#1280).
+
 ## Phases
 
 Each phase is a GitHub milestone. Stories are filed with Why / Touches / Fix / Acceptance and
@@ -63,9 +89,9 @@ picked through the normal work loop. Phases 3 and 4 interleave; 1 → 2 → 3 an
 | --- | --- | --- |
 | 1. API online | V2 — API online | `ensemble-api` image built by CI, running on docker04 for test and prod behind Caddy `/api/*` with verified client identity, nightly backups, monitored; #1192's unmet row closed. |
 | 2. Document API | V2 — API online | Stage 3 (#1201–#1204): owner-bound documents, receipts, tombstones; atomic idempotent Save; concurrency proofs on a real database; independent authorization review. |
-| 3. Accounts in the product | V2 — accounts in the product | Stages 4–6 of `ensemble-v2-sync.md`: sign-in/recovery/passkey UI, library list and download, Save to cloud, local/cloud/offline status, Keep-both conflicts, account switch and sign-out, two-device and cold-start proofs on physical devices. |
-| 4. Parity | V2 — parity | Decision 3's list, each as its own story, plus the v2 share-link and section-loop issues already filed (#1212, #1211). |
-| 5. Cutover | V2 — cutover | `ensemble-web` image; v2 built at basePath `/`; service-worker handover from v1's worker; Caddy and compose switched; v1 source, its deploy path, `hosting/static` and the v1 CI jobs deleted; CLAUDE.md, AI_MAP.md and docs rewritten for the one app. |
+| 3. Accounts in the product | V2 — accounts in the product | Stages 4–6 of `ensemble-v2-sync.md` as simplified by decision 9: sign-in/recovery/passkey UI, library list and download, Save to cloud, local/cloud/offline status, Keep-both conflicts, cloud and account deletion, sign-out, two-device and cold-start proofs on physical devices. Stories #1258–#1273. |
+| 4. Parity | V2 — parity | Decision 3's list (less offline install, per S5), each as its own story: #1257 (split `ensemble.tsx`, first) and #1274–#1279, plus the shipped share-link and section-loop stories (#1212, #1211). |
+| 5. Cutover | V2 — cutover | `ensemble-web` image; v2 built at basePath `/`; root-scope service worker and web manifest (S5); service-worker handover from v1's worker; Caddy and compose switched; v1 source, its deploy path, `hosting/static` and the v1 CI jobs deleted; CLAUDE.md, AI_MAP.md and docs rewritten for the one app. |
 
 ## Phase 1 stories (filed 2026-09-15)
 
