@@ -410,9 +410,12 @@ describe('POST /api/documents/save (#1202)', () => {
             'INSERT INTO documents (owner_id, document_id, revision, body, updated_at)' +
                 ' VALUES (?, ?, ?, ?, 1)',
         );
+        // One transaction, not 2,000 autocommits — see `seedDocuments` in test/db/save.test.ts.
+        ctx.testDb.db.exec('BEGIN');
         for (let i = 0; i < MAX_DOCUMENTS_PER_OWNER; i += 1) {
             insert.run(ctx.accountId, `seed-${i}`, `seed-rev-${i}`, '{}');
         }
+        ctx.testDb.db.exec('COMMIT');
         const { status, json } = await save(
             ctx,
             freeze({
