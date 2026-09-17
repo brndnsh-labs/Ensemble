@@ -2302,6 +2302,22 @@ dialog textarea {
     gap: 16px;
     padding-top: 16px;
 }
+/* One compact block per lane (#1275): heading, sound/style/density/mode
+   selects, then the volume + reverb sliders — grouped so the whole lane
+   reads as one unit at music-stand distance instead of a flat control list. */
+.sound-lane {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 0;
+    padding: 12px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+}
+.sound-lane h3 {
+    font-size: 13px;
+    margin: 0;
+}
 .sound-choices label {
     display: flex;
     flex-direction: column;
@@ -2323,6 +2339,24 @@ dialog textarea {
     font-size: 10px;
     color: var(--muted);
     line-height: 1.4;
+}
+.sound-range-control {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.sound-range-control input[type="range"] {
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 32px;
+    accent-color: var(--green);
+}
+.sound-range-value {
+    flex: 0 0 auto;
+    width: 2.4em;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    color: var(--muted);
 }
 .resolved-sound {
     display: block;

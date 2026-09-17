@@ -865,6 +865,11 @@ export default function Ensemble() {
                                 }
                             });
                         }}
+                        onVolume={(lane, value) => change(() => runtime.setVolume(lane, value))}
+                        onReverb={(lane, value) => change(() => runtime.setReverb(lane, value))}
+                        onStyle={(lane, value) => change(() => runtime.setStyle(lane, value))}
+                        onDensity={(value) => change(() => runtime.setDensity(value))}
+                        onSoloistMode={(mode) => change(() => runtime.setSoloistMode(mode))}
                     />
                     <div className={`workspace-body ${editing ? 'editing' : ''}`}>
                         <div
