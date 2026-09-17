@@ -3,7 +3,11 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { hashCeremonyToken } from '../../src/auth/challenges.js';
 import { createWebAuthnConfig, type WebAuthnConfig } from '../../src/auth/config.js';
 import type { CredentialRow } from '../../src/auth/credential-row.js';
-import { startRegistration, verifyRegistration } from '../../src/auth/registration.js';
+import {
+    countAccounts,
+    startRegistration,
+    verifyRegistration,
+} from '../../src/auth/registration.js';
 import { createSoftAuthenticator } from '../helpers/soft-authenticator.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/test-db.js';
 
@@ -474,6 +478,109 @@ describe('registration ceremony (#1188)', () => {
             response: malformed as unknown as RegistrationResponseJSON,
         });
         expect(result).toEqual({ ok: false, reason: 'malformed_request' });
+    });
+
+    // --- #1272: service-wide registration cap ---------------------------------------------------
+
+    /** Registers one full account through the real verify path, ignoring the returned ids. */
+    async function registerOneAccount(db: TestDatabase['db']): Promise<void> {
+        const authenticator = createSoftAuthenticator({ rpId: CONFIG.rpId, origin: CONFIG.origin });
+        const { options, ceremonyToken } = await startRegistration(db, CONFIG);
+        const response = authenticator.register({ challenge: options.challenge });
+        const result = await verifyRegistration(db, CONFIG, { ceremonyToken, response });
+        expect(result.ok).toBe(true);
+    }
+
+    it('with N-1 accounts present, registration succeeds; the Nth+1 attempt is refused', async () => {
+        testDb = createTestDatabase();
+        const CAP = 3;
+        for (let i = 0; i < CAP - 1; i += 1) {
+            await registerOneAccount(testDb.db);
+        }
+        expect(countAccounts(testDb.db)).toBe(CAP - 1);
+
+        // The Nth registration (bringing the count to CAP) still succeeds.
+        const authenticator = createSoftAuthenticator({ rpId: CONFIG.rpId, origin: CONFIG.origin });
+        const { options, ceremonyToken } = await startRegistration(testDb.db, CONFIG);
+        const response = authenticator.register({ challenge: options.challenge });
+        const nth = await verifyRegistration(
+            testDb.db,
+            CONFIG,
+            { ceremonyToken, response },
+            {
+                registrationCap: CAP,
+            },
+        );
+        expect(nth.ok).toBe(true);
+        expect(countAccounts(testDb.db)).toBe(CAP);
+
+        // The CAP+1th attempt is refused, and creates no account.
+        const overflowAuthenticator = createSoftAuthenticator({
+            rpId: CONFIG.rpId,
+            origin: CONFIG.origin,
+        });
+        const overflow = await startRegistration(testDb.db, CONFIG);
+        const overflowResponse = overflowAuthenticator.register({
+            challenge: overflow.options.challenge,
+        });
+        const refused = await verifyRegistration(
+            testDb.db,
+            CONFIG,
+            { ceremonyToken: overflow.ceremonyToken, response: overflowResponse },
+            { registrationCap: CAP },
+        );
+        expect(refused).toEqual({ ok: false, reason: 'registration_cap_reached' });
+        expect(countAccounts(testDb.db)).toBe(CAP);
+    });
+
+    it('two registrations racing at cap-1 let exactly one succeed (different ceremony tokens)', async () => {
+        testDb = createTestDatabase();
+        const CAP = 5;
+        for (let i = 0; i < CAP - 1; i += 1) {
+            await registerOneAccount(testDb.db);
+        }
+        expect(countAccounts(testDb.db)).toBe(CAP - 1);
+
+        // Two DIFFERENT ceremonies (unlike the single-ceremony-token replay race above) — the
+        // race here is over the account-count slot, not the challenge row.
+        const authenticatorA = createSoftAuthenticator({
+            rpId: CONFIG.rpId,
+            origin: CONFIG.origin,
+        });
+        const authenticatorB = createSoftAuthenticator({
+            rpId: CONFIG.rpId,
+            origin: CONFIG.origin,
+        });
+        const a = await startRegistration(testDb.db, CONFIG);
+        const b = await startRegistration(testDb.db, CONFIG);
+        const responseA = authenticatorA.register({ challenge: a.options.challenge });
+        const responseB = authenticatorB.register({ challenge: b.options.challenge });
+
+        const [resultA, resultB] = await Promise.all([
+            verifyRegistration(
+                testDb.db,
+                CONFIG,
+                { ceremonyToken: a.ceremonyToken, response: responseA },
+                { registrationCap: CAP },
+            ),
+            verifyRegistration(
+                testDb.db,
+                CONFIG,
+                { ceremonyToken: b.ceremonyToken, response: responseB },
+                { registrationCap: CAP },
+            ),
+        ]);
+
+        const outcomes = [resultA, resultB];
+        const successes = outcomes.filter((r) => r.ok);
+        const failures = outcomes.filter((r) => !r.ok);
+        expect(successes).toHaveLength(1);
+        expect(failures).toHaveLength(1);
+        expect(failures[0]).toEqual({ ok: false, reason: 'registration_cap_reached' });
+
+        // Exactly CAP accounts exist afterward — not CAP+1 (both slipped through) and not CAP-1
+        // (the successful one somehow didn't land).
+        expect(countAccounts(testDb.db)).toBe(CAP);
     });
 
     it('does not consume the challenge when the request is malformed', async () => {

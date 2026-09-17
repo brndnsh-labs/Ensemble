@@ -59,8 +59,14 @@ export type {
     StartRegistrationInput,
     StartRegistrationResult,
     VerifyRegistrationInput,
+    VerifyRegistrationOptions,
 } from './registration.js';
-export { startRegistration, verifyRegistration } from './registration.js';
+export {
+    countAccounts,
+    DEFAULT_REGISTRATION_CAP,
+    startRegistration,
+    verifyRegistration,
+} from './registration.js';
 export type { IssuedSession, SessionClaims } from './session.js';
 export {
     issueSession,

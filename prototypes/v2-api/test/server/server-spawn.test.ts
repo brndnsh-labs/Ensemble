@@ -220,6 +220,46 @@ describe('server entrypoint spawn tests', () => {
             envOverride: { ENSEMBLE_DB_PATH: 'file:x.db?mode=memory' },
             expectedStderrContains: 'ENSEMBLE_DB_PATH',
         },
+        // #1272: ENSEMBLE_REGISTRATION_CAP gets the SAME digits-only validation as PORT above —
+        // same six malformed shapes (sign, exponent, hex prefix, surrounding whitespace, empty,
+        // and the semantically-invalid-but-digits-only zero).
+        {
+            name: "ENSEMBLE_REGISTRATION_CAP=''",
+            envOverride: { ENSEMBLE_REGISTRATION_CAP: '' },
+            expectedStderrContains: 'ENSEMBLE_REGISTRATION_CAP',
+        },
+        {
+            // Digits-only, so it passes the shape check — and Number() makes it Infinity, which
+            // would disable the cap outright rather than set a large one.
+            name: 'ENSEMBLE_REGISTRATION_CAP=<400 digits>',
+            envOverride: { ENSEMBLE_REGISTRATION_CAP: '9'.repeat(400) },
+            expectedStderrContains: 'ENSEMBLE_REGISTRATION_CAP',
+        },
+        {
+            name: "ENSEMBLE_REGISTRATION_CAP='0'",
+            envOverride: { ENSEMBLE_REGISTRATION_CAP: '0' },
+            expectedStderrContains: 'ENSEMBLE_REGISTRATION_CAP',
+        },
+        {
+            name: "ENSEMBLE_REGISTRATION_CAP='-1'",
+            envOverride: { ENSEMBLE_REGISTRATION_CAP: '-1' },
+            expectedStderrContains: 'ENSEMBLE_REGISTRATION_CAP',
+        },
+        {
+            name: "ENSEMBLE_REGISTRATION_CAP='1e3'",
+            envOverride: { ENSEMBLE_REGISTRATION_CAP: '1e3' },
+            expectedStderrContains: 'ENSEMBLE_REGISTRATION_CAP',
+        },
+        {
+            name: "ENSEMBLE_REGISTRATION_CAP='0x10'",
+            envOverride: { ENSEMBLE_REGISTRATION_CAP: '0x10' },
+            expectedStderrContains: 'ENSEMBLE_REGISTRATION_CAP',
+        },
+        {
+            name: "ENSEMBLE_REGISTRATION_CAP=' 25 '",
+            envOverride: { ENSEMBLE_REGISTRATION_CAP: ' 25 ' },
+            expectedStderrContains: 'ENSEMBLE_REGISTRATION_CAP',
+        },
     ];
 
     it.each(BAD_ENV_CASES)(
@@ -264,6 +304,23 @@ describe('server entrypoint spawn tests', () => {
             ENSEMBLE_AUTH_IP_MODE: 'socket-only',
         });
         await waitForListening(spawned);
+        spawned.child.kill('SIGTERM');
+        expect((await spawned.exit).code).toBe(0);
+    }, 20_000);
+
+    it('names the registration cap in the startup log line (#1272)', async () => {
+        tmpDir = mkdtempSync(join(tmpdir(), 'ensemble-v2-api-spawn-'));
+        const spawned = spawnServer({
+            ENSEMBLE_RP_ID: 'localhost',
+            ENSEMBLE_RP_NAME: 'Test',
+            ENSEMBLE_ORIGIN: 'http://localhost:5173',
+            ENSEMBLE_DB_PATH: join(tmpDir, 'db.sqlite'),
+            PORT: String(await getFreePort()),
+            HOST: '127.0.0.1',
+            ENSEMBLE_REGISTRATION_CAP: '7',
+        });
+        await waitForListening(spawned);
+        expect(spawned.stdout.join('')).toContain('cap: 7');
         spawned.child.kill('SIGTERM');
         expect((await spawned.exit).code).toBe(0);
     }, 20_000);
