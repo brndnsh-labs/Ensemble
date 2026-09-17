@@ -17,6 +17,7 @@ import { initAudio, playNote, restoreGains, syncBusReverbSend } from '@engine/en
 import { scheduler } from '@engine/engine/scheduler-core';
 import { isSoloistMonophonicMode } from '@engine/engine/soloist-mode-policy';
 import { transposeChordText } from '@engine/engine/transpose';
+import { exportToMidi } from '@engine/export/midi-export';
 import {
     prepareScorePlayback,
     renderScorePlayback,
@@ -696,6 +697,18 @@ export function audition(index: number): void {
             ignoreSustain: true,
         });
     }
+}
+/**
+ * Downloads a multi-track `.mid` of the current arrangement (#1277). Delegates
+ * to the shared `exportToMidi` entry point — the same detached-worker realm v1's
+ * ShareModal uses, so there is no second MIDI code path (root CLAUDE.md's "MIDI
+ * has three interpretation paths" rule: live, MIDI-out, `.mid` — never a fourth).
+ * The export clones state via `cloneStateForDetachedGeneration` and generates in
+ * a fresh Worker, so it never touches the live scheduler/audio graph — safe to
+ * call while the band is playing.
+ */
+export function exportMidi(filename: string): Promise<void> {
+    return exportToMidi({ filename });
 }
 export function state(): EnsembleState {
     return getState();
