@@ -45,6 +45,43 @@ export interface DocumentSummary {
     updatedAt: number;
 }
 
+/**
+ * One row of the S1 manifest (#1259; `docs/design/ensemble-v2-rollout.md` decision 9): the
+ * client pages this and diffs it against its local records. Identity, the current revision, and
+ * — for a deleted id — the tombstone that tells the client to drop its clean mirror. `bytes` is
+ * what the body costs against the owner's budget, so the client can show a library's size
+ * without downloading it.
+ *
+ * Never the body itself: a 2,000-document library (`MAX_DOCUMENTS_PER_OWNER`) has to be pageable
+ * over a phone connection, and a manifest is what makes the download decision, not the payload.
+ */
+export interface ManifestEntry {
+    documentId: string;
+    revision: string;
+    deleted: boolean;
+    bytes: number;
+}
+
+export interface ManifestPage {
+    entries: ManifestEntry[];
+    /** Cursor for the next page — the last id on this one — or null at the end of the library. */
+    nextAfter: string | null;
+}
+
+/**
+ * A type alias, not an `interface`, on purpose: only a mapped/aliased object type gets TypeScript's
+ * implicit index signature, which is what makes it castable from `all()`'s
+ * `Record<string, SQLOutputValue>` without laundering the row through `unknown` first. The
+ * `interface`s above are read through `get()`, which is not the same overload.
+ */
+type RawManifestRow = {
+    document_id: string;
+    revision: string;
+    /** SQLite has no boolean: the `UNION` legs select the literals 0 and 1. */
+    deleted: number;
+    bytes: number;
+};
+
 interface RawDocument {
     owner_id: string;
     document_id: string;
@@ -114,6 +151,80 @@ export function listDocuments(
         revision: row.revision,
         updatedAt: row.updated_at,
     }));
+}
+
+/**
+ * One page of the owner's S1 manifest: live documents and tombstones interleaved in a single
+ * `document_id`-ascending sequence, resumable from `after` (#1259).
+ *
+ * **Why not `listDocuments`.** That one is `updated_at DESC` with an `OFFSET`, which is fine for
+ * a "recently edited" view and unusable as a manifest cursor: every Save rewrites `updated_at`,
+ * so a document can cross the offset boundary between two page fetches and be either skipped or
+ * returned twice. Ordering by the immutable `document_id` and carrying the last id as the cursor
+ * makes a page boundary stable under concurrent writes — a Save can change a row's `revision`,
+ * but nothing can move it past the cursor. A create below the cursor is missed by the pass in
+ * progress and picked up by the next one, which is exactly what a manifest DIFF tolerates and
+ * why decision 9 needs no watermark or cursor-expiry machinery. `listDocuments` stays as it is;
+ * do not "unify" the two — they have opposite ordering requirements.
+ *
+ * `after` is compared with the same binary collation the `ORDER BY` uses (no `COLLATE` anywhere
+ * in the schema), which is what makes the cursor and the ordering agree. An empty/absent cursor
+ * starts at the beginning: every `document_id` is non-empty by the identifier grammar the write
+ * path enforces, so `document_id > ''` is every row.
+ *
+ * The `NOT EXISTS` makes "at most one row per id" a property of the QUERY rather than an
+ * assumption about the writers: `commitSave` refuses a create over a tombstone and
+ * `deleteDocument` removes the document row before inserting one, so the tables are disjoint
+ * today — but a duplicated id would hand the client two conflicting manifest rows, and a keyset
+ * page is the wrong place to discover that a future writer broke the invariant. A live document
+ * wins, because the live row is the one a client can download.
+ *
+ * Parameters are positional in this order: `ownerId`, `after`, `ownerId`, `after`, `limit + 1`.
+ * The extra row is a lookahead, never returned — it is only how `nextAfter` can be `null`
+ * exactly at the end of the library instead of after one wasted empty page.
+ *
+ * `limit` is clamped to `1..MAX_LIST_LIMIT`. The floor is 1, not 0, deliberately (#1259 review,
+ * F5): a zero or negative limit used to return `{ entries: [], nextAfter: null }`, which in this
+ * shape does not read as "you asked for nothing" — it reads as END OF LIBRARY, and a caller that
+ * computed its page size and got zero would conclude the account is empty and diff a whole
+ * library away against it. `listDocuments`' floor of 0 is a different contract: it returns a
+ * bare array with no end-of-list flag to misread. The HTTP layer rejects a zero `limit` outright
+ * before reaching here; this is the in-process backstop.
+ */
+export function listManifest(
+    db: DatabaseSync,
+    ownerId: string,
+    page: { after?: string | null; limit: number },
+): ManifestPage {
+    const limit = Math.min(Math.max(Math.trunc(page.limit), 1), MAX_LIST_LIMIT);
+    const after = page.after ?? '';
+    const rows = db
+        .prepare(
+            `SELECT document_id, revision, 0 AS deleted, length(CAST(body AS BLOB)) AS bytes
+               FROM documents
+              WHERE owner_id = ? AND document_id > ?
+             UNION ALL
+             SELECT t.document_id, t.revision, 1 AS deleted, 0 AS bytes
+               FROM tombstones t
+              WHERE t.owner_id = ? AND t.document_id > ?
+                AND NOT EXISTS (SELECT 1 FROM documents d
+                                 WHERE d.owner_id = t.owner_id AND d.document_id = t.document_id)
+              ORDER BY document_id ASC
+              LIMIT ?`,
+        )
+        .all(ownerId, after, ownerId, after, limit + 1) as RawManifestRow[];
+    const entries = rows.slice(0, limit).map((row) => ({
+        documentId: row.document_id,
+        revision: row.revision,
+        deleted: row.deleted === 1,
+        bytes: row.bytes,
+    }));
+    // The lookahead row existing means `entries` holds `limit` rows, and the floor of 1 means
+    // that is at least one — so the last entry is always there when this branch is taken.
+    return {
+        entries,
+        nextAfter: rows.length > limit ? entries[entries.length - 1]!.documentId : null,
+    };
 }
 
 /**

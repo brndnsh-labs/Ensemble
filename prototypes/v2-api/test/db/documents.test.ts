@@ -5,6 +5,7 @@ import { assertAccountDeletionCoverage } from '../../src/db/account-deletion-reg
 import {
     deleteDocument,
     listDocuments,
+    listManifest,
     MAX_LIST_LIMIT,
     readDocument,
     readReceipt,
@@ -135,6 +136,67 @@ describe('owner-scoped documents, receipts and tombstones (#1201)', () => {
         expect(
             listDocuments(db, 'owner-a', { limit: Number.POSITIVE_INFINITY, offset: 0 }),
         ).toHaveLength(6);
+    });
+
+    it('the manifest interleaves tombstones by id, is owner-scoped, and is resumable (#1259)', () => {
+        const db = seed();
+        for (const id of ['doc-2', 'doc-4', 'doc-6']) {
+            writeDocument(db, 'owner-a', {
+                documentId: id,
+                // Descending updatedAt, so a manifest that leaked `listDocuments`' ordering
+                // would come back reversed rather than merely in a different-but-valid order.
+                revision: `r-${id}`,
+                body: '{"body":"åå"}',
+                updatedAt: 9000 - Number(id.slice(-1)),
+            });
+        }
+        expect(deleteDocument(db, 'owner-a', 'doc-4', 700)).toBe(true);
+
+        const all = listManifest(db, 'owner-a', { limit: 10 });
+        expect(all).toEqual({
+            entries: [
+                // 'doc-1' is the seeded row; 'doc-4' is a tombstone sitting in its id position.
+                { documentId: 'doc-1', revision: 'r1', deleted: false, bytes: 17 },
+                { documentId: 'doc-2', revision: 'r-doc-2', deleted: false, bytes: 15 },
+                { documentId: 'doc-4', revision: 'r-doc-4', deleted: true, bytes: 0 },
+                { documentId: 'doc-6', revision: 'r-doc-6', deleted: false, bytes: 15 },
+            ],
+            nextAfter: null,
+        });
+        // `bytes` counts UTF-8 bytes, not characters: 13 characters, two of them 2-byte 'å'.
+        expect(all.entries[1]?.bytes).toBe(Buffer.byteLength('{"body":"åå"}', 'utf8'));
+
+        // Resuming from a cursor is exclusive, and crosses the tombstone without stalling on it.
+        const page = listManifest(db, 'owner-a', { after: 'doc-2', limit: 1 });
+        expect(page).toEqual({
+            entries: [{ documentId: 'doc-4', revision: 'r-doc-4', deleted: true, bytes: 0 }],
+            nextAfter: 'doc-4',
+        });
+        expect(listManifest(db, 'owner-a', { after: 'doc-6', limit: 10 })).toEqual({
+            entries: [],
+            nextAfter: null,
+        });
+        // `nextAfter` is null exactly at the end, never after one wasted empty page.
+        expect(listManifest(db, 'owner-a', { after: 'doc-4', limit: 1 }).nextAfter).toBeNull();
+
+        // Owner scoping: owner-b holds its own 'doc-1' and owner-c holds nothing.
+        expect(listManifest(db, 'owner-b', { limit: 10 }).entries).toEqual([
+            { documentId: 'doc-1', revision: 'r9', deleted: false, bytes: 26 },
+        ]);
+        expect(listManifest(db, 'owner-c', { limit: 10 }).entries).toEqual([]);
+        // Same ceiling contract as `listDocuments`: the cap clamps, it does not reject.
+        expect(listManifest(db, 'owner-a', { limit: 10_000 }).entries).toHaveLength(4);
+        // But the FLOOR is 1, not 0 (#1259 review, F5). An empty page with `nextAfter: null` is
+        // indistinguishable from the end of the library, so a caller whose computed page size
+        // came out zero must not be told its account holds nothing — it gets one row and a
+        // cursor, and can page from there.
+        expect(listManifest(db, 'owner-a', { limit: 0 })).toEqual({
+            entries: [{ documentId: 'doc-1', revision: 'r1', deleted: false, bytes: 17 }],
+            nextAfter: 'doc-1',
+        });
+        expect(listManifest(db, 'owner-a', { limit: -5 })).toEqual(
+            listManifest(db, 'owner-a', { limit: 1 }),
+        );
     });
 
     it('every exported query takes the owner as its mandatory first argument after db', () => {

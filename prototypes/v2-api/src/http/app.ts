@@ -71,6 +71,12 @@ import { sameOriginGuard } from './same-origin.js';
 const BODY_LIMIT_BYTES = 64 * 1024;
 /** Mounted sub-app for the document routes (#1202); exempt from the small body limit above. */
 const DOCUMENTS_PREFIX = '/api/documents/';
+/**
+ * The mount path for that sub-app — the prefix without its trailing slash, which is also the
+ * manifest route's own path (`GET /api/documents`, #1259). It is deliberately NOT added to the
+ * body-limit exemption below: see the comment there.
+ */
+const DOCUMENTS_ROOT = DOCUMENTS_PREFIX.slice(0, -1);
 
 export interface CreateAppOptions {
     db: DatabaseSync;
@@ -180,11 +186,18 @@ export function createApp({
     // route dispatch decides there is no handler.
     app.use('/api/*', sameOriginGuard(config));
     app.use('/api/*', jsonOnlyGuard());
-    // The 64 KB ceiling covers every /api/* route EXCEPT the document routes, which carry a
-    // whole chart and apply their own `MAX_SAVE_REQUEST_BYTES` limit in documents.ts (#1202).
-    // Path-gated here so the two limits can never both apply to one request: outside the
-    // prefix every path (known or not) gets the small limit; inside it the sub-app's own
-    // catch-all limiter bounds every path, known or not.
+    // The 64 KB ceiling covers every /api/* route EXCEPT the document routes BELOW the prefix,
+    // which carry a whole chart and apply their own `MAX_SAVE_REQUEST_BYTES` limit in
+    // documents.ts (#1202). Outside the prefix every path (known or not) gets the small limit;
+    // inside it the sub-app's own catch-all limiter bounds every path, known or not.
+    //
+    // The exemption is the prefix WITH its trailing slash, so `/api/documents` itself — the
+    // #1259 manifest route — keeps the 64 KB limit. Both limiters do then match that one bare
+    // path, which is fine and deliberate: the lower ceiling simply wins, and the route is a GET
+    // that reads no body at all. #1259's review (F2) proved the alternative over a real socket —
+    // exempting the bare path too raised the ceiling an UNAUTHENTICATED caller can make this
+    // process buffer on `/api/documents` from 64 KB to ~1 MiB, in exchange for nothing. Do not
+    // widen it again to make the comment above read more symmetrically.
     const apiBodyLimit = bodyLimit({
         maxSize: BODY_LIMIT_BYTES,
         onError: (c) => sendError(c, 413, 'payload_too_large'),
@@ -883,11 +896,11 @@ export function createApp({
         return c.json({ accountId: result.accountId });
     });
 
-    // --- #1202: the Explicit Save endpoint ----------------------------------------------------
+    // --- #1202: the Explicit Save endpoint; #1259: the library read routes --------------------
     // Session-gated through the same `requireSession` as every account route above, so a
-    // recovery-purpose session is refused here too.
+    // recovery-purpose session is refused on all three.
     app.route(
-        DOCUMENTS_PREFIX.slice(0, -1),
+        DOCUMENTS_ROOT,
         documentRoutes({ db, now, identify, requireSession, save: saveDependencies }),
     );
 
