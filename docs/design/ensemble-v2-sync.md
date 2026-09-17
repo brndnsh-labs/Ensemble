@@ -167,6 +167,13 @@ they store identity/digest/result, not an unlimited duplicate chart archive.
 
 ## Downloads, offline readiness, and switching accounts
 
+> **Superseded in part, DECISION 2026-09-17** ([rollout](ensemble-v2-rollout.md) decision 9).
+> S1 replaces the change feed, watermark and cursor with a paged manifest diff. S2 removes the
+> offline logout barrier: sign-out needs a connection. S3 removes account switching on one
+> profile. The preservation rules below — never overwrite drafts, queued saves or an active
+> chart; a partial download is never an empty-library success; the owner/generation fence — all
+> still hold.
+
 Fetch the library automatically after sign-in, reconnect, and foreground return. Use a
 bounded paged change feed with a server watermark and explicit deletion records. Commit a
 page and its cursor together. A partial download, invalid record, expired cursor or newer

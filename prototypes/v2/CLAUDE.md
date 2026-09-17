@@ -17,14 +17,15 @@ sweep it into your commit. Stop if the task's files overlap someone else's uncom
 publishes the root app and then this static export at `https://ensemble.brndn.zip/v2/` on every
 merge, gated by the required `v2-checks` context (build + `checks/` Playwright suite) next to
 `checks` and `e2e-tests`. Treat a v2 story as live production work: it reaches users, and a red
-v2 build or E2E blocks the merge. `../v2-api/` still has **no** deploy target; accounts, sync
-and hosting for it remain parked behind their own gates.
+v2 build or E2E blocks the merge. `../v2-api/` is deployed too: CI publishes its image and
+releases it to the test and prod stacks behind `/api/*` on the same origin. Prod registration is
+closed by policy until #1272 lands and Brandon says go; nothing in this app calls the API yet.
 
 This is a release of the guest music stand beside v1, **not** a cutover. v1 stays at `/`. This
 app keeps its own IndexedDB and `localStorage` keys, so anything a user saves here is invisible
-to the v1 app and has no migration path yet; the v1 About tab links here as a beta. Replacing
-v1 is separate unshaped work with its own decision — do not treat a merged story as evidence
-that question is settled.
+to the v1 app until the v1 import (#1274) lands; the v1 About tab links here as a beta. Replacing
+v1 is planned and authorized as the end of
+[the rollout](../../docs/design/ensemble-v2-rollout.md) — a hard cut after phases 3 and 4.
 
 Human gates are unchanged: a device or listening gate is still a hard stop, and a merged commit
 does not clear one. Record the commit SHA, checks and remaining gate so another agent does not
@@ -38,13 +39,16 @@ executing. Generated skill copies are renderer-managed, not task-local files to 
 ## Minimum context, in order
 
 1. Current issue body, dependency receipts and relevant decision comments. Check its state
-   against the branch: open does not mean unimplemented. GitHub
-   [milestone 15](https://github.com/brndnsh-labs/Ensemble/milestone/15) owns task status.
+   against the branch: open does not mean unimplemented. GitHub milestones own task status:
+   [accounts in the product](https://github.com/brndnsh-labs/Ensemble/milestone/17) and
+   [parity](https://github.com/brndnsh-labs/Ensemble/milestone/18).
 2. [Preview README](README.md): working behavior, commands, storage and deployment caveats.
 3. Only the contract relevant to the task:
    [product](../../docs/design/ensemble-v2.md),
    [chart/import](../../docs/design/ensemble-v2-charts.md), or
-   [accounts/sync](../../docs/design/ensemble-v2-sync.md).
+   [accounts/sync](../../docs/design/ensemble-v2-sync.md) — read with
+   [rollout](../../docs/design/ensemble-v2-rollout.md) decision 9, which removes the change
+   feed, the offline logout barrier and account switching. Do not build those.
 4. Target code and its tests. Read applicable nested guides before changing `public/` or
    `tests/`. Fetch current library documentation when implementing library-specific APIs.
 
@@ -59,7 +63,9 @@ gate evidence. Do not copy old test totals or preview SHAs into a new claim of v
   it never silently uploads it. A later cloud acknowledgement cannot overwrite newer editing.
 - Portable v1/v2 charts contain musical intent, not account/session/retry metadata. Preserve
   originals on conversion/import; unknown or corrupt data is not an empty-library success.
-- The account-local database/outbox exists but is not wired to authentication or the UI.
+- The account-local database/outbox exists but is not yet wired to authentication or the UI
+  (#1261 onward). Account code goes in `app/account/` and `lib/account/`; plain `fetch`, and
+  `@simplewebauthn/browser` is the only new client dependency.
   `AccountScope` is a local fence, **not authentication**. Production authorization must come
   from a verified server session. Fake transports are contract tests, not cloud support.
 - Never migrate/delete guest or legacy stores incidentally. Do not cache private API/auth
@@ -83,7 +89,7 @@ gate evidence. Do not copy old test totals or preview SHAs into a new claim of v
 | Portable chart / iReal semantics | `../../public/songbook/` | Root/scoped engine guides and canonical codecs apply |
 | Offline install / deployment | `scripts/offline.mjs`, `scripts/deploy.mjs` | Anonymous shell + verified sounds; `deploy.mjs test` from a workstation, `deploy.mjs prod` only from the CI deploy job |
 | Browser evidence | `checks/`, `../../tests/browser/account-songbook.browser.test.ts` | Preview E2E plus real IndexedDB in Chromium/WebKit |
-| Server account API (stage 2, #1187+) | `../v2-api/` (sibling, not a subdirectory — see `../v2-api/README.md`) | Standalone Node service, own `package.json`/`node:sqlite` schema; ceremony (#1188), session + HTTP layer (#1189), passkey management + step-up reauth gated by one fresh-authentication predicate (#1190), and single-use recovery codes behind a restricted recovery-only session (#1191) modules land here; no client wiring until #1192 lands |
+| Server account API (stage 2, #1187+) | `../v2-api/` (sibling, not a subdirectory — see `../v2-api/README.md`) | Standalone Node service, own `package.json`/`node:sqlite` schema; ceremony (#1188), session + HTTP layer (#1189), passkey management + step-up reauth gated by one fresh-authentication predicate (#1190), and single-use recovery codes behind a restricted recovery-only session (#1191) modules land here; #1192 closed, client wiring starts at #1261 |
 
 ## Verification and receipt
 
