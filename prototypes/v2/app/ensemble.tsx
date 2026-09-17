@@ -1,47 +1,32 @@
 'use client';
 
-import { KEY_ORDER, TIME_SIGNATURES } from '@engine/config';
-import { buildLeadSheetSections } from '@engine/song/lead-sheet-model';
+import { KEY_ORDER } from '@engine/config';
 import { decodeChartLink, encodeChartLink } from '@engine/songbook/chart-link';
-import { resolveScoreContext } from '@engine/songbook/score-context';
-import { scoreMeter } from '@engine/songbook/score-duration';
 import { prepareScorePlayback } from '@engine/songbook/score-playback';
 import type { SemanticScore } from '@engine/songbook/score-types';
 import type { InstrumentVoice } from '@engine/types';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { arrangementOf, convertedCopy } from '../lib/documents';
+import { arrangementOf, blankSong, convertedCopy, extendedScore } from '../lib/documents';
 import { validateEditorText } from '../lib/editor';
-import { scoreDisplayIndices, scoreLeadSheet } from '../lib/lead-sheet';
 import * as repository from '../lib/repository';
 import type { ChartDocument } from '../lib/runtime';
 import * as runtime from '../lib/runtime';
-import { directionLabel } from '../lib/score-labels';
-import {
-    lastOpenedSong,
-    rememberSong,
-    rememberTheme,
-    type ThemeChoice,
-    themePreference,
-} from '../lib/session';
-import {
-    allSoundsAvailableOffline,
-    allSoundsSizeMB,
-    installAllSounds,
-    packsForInstrument,
-    soundsAvailableOffline,
-} from '../lib/sounds';
+import { lastOpenedSong, rememberSong } from '../lib/session';
+import { allSoundsAvailableOffline, installAllSounds, soundsAvailableOffline } from '../lib/sounds';
 import { start } from '../lib/starters';
-import { downloadImportSource, ImportDialog } from './import-dialog';
-import { MeasureEditor, type MeasureEditorHandle } from './measure-editor';
-import { TempoControl } from './tempo-control';
+import { ChartSheet } from './chart-sheet';
+import { EditPanel } from './edit-panel';
+import { ImportDialog } from './import-dialog';
+import type { MeasureEditorHandle } from './measure-editor';
+import { SongHeader } from './song-header';
+import { SongMenu } from './song-menu';
+import { Songbook } from './songbook';
+import { SoundsPanel } from './sounds-panel';
+import { TransportBar } from './transport-bar';
+import { useChartView } from './use-chart-view';
+import { useOfflineInstall } from './use-offline-install';
+import { useStageTheme } from './use-stage-theme';
 
-const lanes = [
-    ['groove', 'Drums'],
-    ['bass', 'Bass'],
-    ['chords', 'Chords'],
-    ['harmony', 'Harmony'],
-    ['soloist', 'Soloist'],
-] as const;
 const same = (a: ChartDocument, b: ChartDocument) =>
     a.title === b.title && JSON.stringify(a.chart) === JSON.stringify(b.chart);
 
@@ -73,20 +58,9 @@ export default function Ensemble() {
     // #1211 — id of the section a practice loop is armed/running on, or null.
     // Polled alongside playing/active below; the engine is the source of truth.
     const [loopedSectionId, setLoopedSectionId] = useState<string | null>(null);
-    // Long-press bookkeeping for the section-letter loop gesture: the pending
-    // timer so pointerup/leave/cancel can cancel it, and a suppression flag so
-    // the click that follows a fired long-press doesn't also fire the (reserved
-    // for #937) plain-tap handler.
-    const sectionLoopPress = useRef<number | null>(null);
-    const suppressSectionTap = useRef(false);
-    // Day/Stage is a per-device convenience (#1208), never a document field. Null
-    // follows the system; the stored choice is applied before hydration by the
-    // inline script in layout.tsx, and here on every change.
-    const [theme, setTheme] = useState<ThemeChoice | null>(null);
-    const [systemDark, setSystemDark] = useState(false);
-    const stage = theme ? theme === 'stage' : systemDark;
+    const { stage, toggleTheme } = useStageTheme();
     const [following, setFollowing] = useState(true);
-    const [offline, setOffline] = useState('Preparing offline access…');
+    const offline = useOfflineInstall();
     const [menu, setMenu] = useState(false);
     const [importing, setImporting] = useState(false);
     const [soundProgress, setSoundProgress] = useState('');
@@ -110,7 +84,6 @@ export default function Ensemble() {
     const soundsDialog = useRef<HTMLDialogElement>(null);
     const file = useRef<HTMLInputElement>(null);
     const scroll = useRef<HTMLDivElement>(null);
-    const editor = useRef<HTMLTextAreaElement>(null);
     const editPanel = useRef<HTMLElement>(null);
     const hasPendingText = buffers.size > 0 || pendingMeasures;
     const text =
@@ -122,27 +95,6 @@ export default function Ensemble() {
     const dirty = hasPendingText || sharedDraft || !!(current && saved && !same(current, saved));
     const playbackActive = playing || playbackPending;
     const focused = playbackActive && !showControls && !editing;
-
-    useEffect(() => {
-        setTheme(themePreference());
-        const media = window.matchMedia('(prefers-color-scheme: dark)');
-        const readSystem = () => setSystemDark(media.matches);
-        readSystem();
-        media.addEventListener('change', readSystem);
-        return () => media.removeEventListener('change', readSystem);
-    }, []);
-    useEffect(() => {
-        if (theme) {
-            document.documentElement.dataset.theme = theme;
-        } else {
-            delete document.documentElement.dataset.theme;
-        }
-    }, [theme]);
-    const toggleTheme = () => {
-        const next: ThemeChoice = stage ? 'day' : 'stage';
-        setTheme(next);
-        rememberTheme(next);
-    };
 
     useEffect(() => {
         let alive = true;
@@ -172,59 +124,6 @@ export default function Ensemble() {
             }
         };
         window.addEventListener('beforeunload', preventLoss);
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker
-                .register('/v2/sw.js', { scope: '/v2/', updateViaCache: 'none' })
-                .then(async (registration) => {
-                    // navigator.serviceWorker.ready may resolve the old root app's
-                    // worker. Only this registration earns the preview's ready label.
-                    if (registration.active?.state !== 'activated') {
-                        await new Promise<void>((resolve, reject) => {
-                            const worker =
-                                registration.installing ||
-                                registration.waiting ||
-                                registration.active;
-                            if (!worker) {
-                                reject(new Error('No preview worker'));
-                                return;
-                            }
-                            const check = () => {
-                                if (worker.state === 'activated') {
-                                    worker.removeEventListener('statechange', check);
-                                    resolve();
-                                }
-                                if (worker.state === 'redundant') {
-                                    worker.removeEventListener('statechange', check);
-                                    reject(new Error('Offline installation failed'));
-                                }
-                            };
-                            worker.addEventListener('statechange', check);
-                            check();
-                        });
-                    }
-                    if (alive) {
-                        setOffline(
-                            registration.waiting
-                                ? 'Update ready · close all music stand tabs to install'
-                                : 'App available offline',
-                        );
-                    }
-                    registration.addEventListener('updatefound', () => {
-                        registration.installing?.addEventListener('statechange', () => {
-                            if (registration.waiting && alive) {
-                                setOffline('Update ready · close all music stand tabs to install');
-                            }
-                        });
-                    });
-                })
-                .catch(() => {
-                    if (alive) {
-                        setOffline('Offline download unavailable · retry by reloading');
-                    }
-                });
-        } else {
-            setOffline('Offline installation unavailable in this browser');
-        }
         return () => {
             alive = false;
             window.clearInterval(timer);
@@ -659,39 +558,7 @@ export default function Ensemble() {
             if (!base) {
                 throw new Error('Starter library is not ready.');
             }
-            const document = repository.validated({
-                schemaVersion: 2,
-                id: crypto.randomUUID(),
-                title: 'Untitled song',
-                revision: 0,
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-                chart: {
-                    performance: base.chart.performance,
-                    band: base.chart.band,
-                    score: {
-                        key: 'C',
-                        isMinor: false,
-                        notation: 'name',
-                        meter: '4/4',
-                        grouping: null,
-                        sections: [
-                            {
-                                id: crypto.randomUUID(),
-                                label: 'A',
-                                repeat: 1,
-                                measures: ['C', 'G', 'Am', 'F'].map((symbol) => ({
-                                    id: crypto.randomUUID(),
-                                    content: {
-                                        kind: 'events',
-                                        events: [{ kind: 'chord', symbol, duration: [4, 1] }],
-                                    },
-                                })),
-                            },
-                        ],
-                    },
-                },
-            });
+            const document = repository.validated(blankSong(base));
             const created = await repository.save(document, null);
             setSongs(await repository.list());
             await open(created);
@@ -720,42 +587,10 @@ export default function Ensemble() {
             if (next.schemaVersion !== 2) {
                 return;
             }
-            const score = structuredClone(next.chart.score);
-            const selectedSection =
-                score.sections.find((s) => s.measures.some((m) => m.id === measureId)) ??
-                score.sections[0];
-            const section = newSection
-                ? {
-                      id: crypto.randomUUID(),
-                      label: String.fromCharCode(65 + (score.sections.length % 26)),
-                      repeat: 1,
-                      measures: [],
-                  }
-                : selectedSection;
-            if (newSection) {
-                score.sections.push(section);
-            }
-            let context = resolveScoreContext(score, section);
-            for (const measure of section.measures) {
-                context = resolveScoreContext(context, measure);
-            }
-            const id = crypto.randomUUID();
-            section.measures.push({
-                id,
-                content: {
-                    kind: 'events',
-                    events: [
-                        {
-                            kind: 'chord',
-                            symbol: context.key + (context.isMinor ? 'm' : ''),
-                            duration: scoreMeter(context.meter).length,
-                        },
-                    ],
-                },
-            });
-            applyScore(score);
-            setMeasureId(id);
-            setSectionId(section.id);
+            const extended = extendedScore(next.chart.score, measureId, newSection);
+            applyScore(extended.score);
+            setMeasureId(extended.measureId);
+            setSectionId(extended.sectionId);
         });
     }
     function exportSong() {
@@ -774,52 +609,8 @@ export default function Ensemble() {
         anchor.click();
         window.setTimeout(() => URL.revokeObjectURL(url), 1000);
     }
-    const blocks = useMemo(() => {
-        if (!current) {
-            return [];
-        }
-        const a = runtime.state().arranger;
-        if (current.schemaVersion === 2) {
-            const writtenCount = current.chart.score.sections.reduce(
-                (n, section) => n + section.measures.length,
-                0,
-            );
-            const visitedCount = new Set(a.progression.map((chord) => chord.measureId)).size;
-            return scoreLeadSheet(
-                a,
-                current.chart.score,
-                visitedCount < writtenCount ? runtime.writtenChart() : undefined,
-            );
-        }
-        return buildLeadSheetSections(a.progression, a.sections, TIME_SIGNATURES[a.timeSignature]);
-    }, [current]);
-    const displayIndices = useMemo(
-        () => (current?.schemaVersion === 2 ? scoreDisplayIndices(runtime.state().arranger) : []),
-        [current],
-    );
-    const displayActive = active === null ? null : (displayIndices[active] ?? active);
-    const activeEvent = active === null ? null : runtime.state().arranger.stepMap[active];
-    const totalBars = blocks.reduce((n, b) => n + b.measures.length, 0);
-    const writtenBars = useMemo(
-        () =>
-            new Map(
-                current?.schemaVersion === 2
-                    ? current.chart.score.sections.flatMap((section) =>
-                          section.measures.map((bar) => [bar.id, bar] as const),
-                      )
-                    : [],
-            ),
-        [current],
-    );
-    const writtenSections = useMemo(
-        () =>
-            new Map(
-                current?.schemaVersion === 2
-                    ? current.chart.score.sections.map((section) => [section.id, section] as const)
-                    : [],
-            ),
-        [current],
-    );
+    const { blocks, displayActive, activeEvent, totalBars, writtenBars, writtenSections } =
+        useChartView(current, active);
     const continuedSave = songs.find((song) => song.id === lastOpened);
     const featuredSave =
         continuedSave || songs.find((song) => song.id === 'starter-blues') || songs[0];
@@ -840,7 +631,6 @@ export default function Ensemble() {
             return volatileDrafts.current.get(featuredSave.id) || featuredSave;
         }
     }, [featuredSave, current]);
-    let barNumber = 0;
 
     return (
         <div
@@ -947,504 +737,124 @@ export default function Ensemble() {
                     <p>Loading your local songbook and musical engine.</p>
                 </main>
             ) : !current ? (
-                <main className="home">
-                    <div className="home-intro">
-                        <div>
-                            <span className="eyebrow">Your next good session</span>
-                            <h1>Let’s play something.</h1>
-                            <p>A chart, a backing band, and a little room to explore.</p>
-                        </div>
-                        <div className="home-actions">
-                            <button
-                                className="btn"
-                                disabled={busy}
-                                onClick={() => setImporting(true)}
-                            >
-                                Import chart
-                            </button>
-                            <button className="btn primary" disabled={busy} onClick={newSong}>
-                                ＋ New song
-                            </button>
-                        </div>
-                    </div>
-                    <div className="home-grid">
-                        <div>
-                            {featured && (
-                                <section className="continue-card">
-                                    <div className="continue-copy">
-                                        <span className="eyebrow">
-                                            {continuedSave
-                                                ? 'Pick up where you left off'
-                                                : 'A good place to start'}
-                                        </span>
-                                        <h3>{featured.title}</h3>
-                                        <p>
-                                            {featured.chart.band.groove.lastSmartGenre} ·{' '}
-                                            {featured.chart.performance.bpm} BPM ·{' '}
-                                            {arrangementOf(featured).key}
-                                            {arrangementOf(featured).isMinor ? 'm' : ''}
-                                        </p>
-                                        <button
-                                            className="btn"
-                                            disabled={busy}
-                                            onClick={() => openSong(featured.id)}
-                                        >
-                                            Open chart →
-                                        </button>
-                                    </div>
-                                    <div className="continue-art" aria-hidden="true">
-                                        <div className="mini-heading">
-                                            A little room to improvise
-                                        </div>
-                                        <div className="mini-grid">
-                                            {['C7', 'F7', 'C7', 'G7', 'F7', 'F7', 'C7', 'G7'].map(
-                                                (c, i) => (
-                                                    // biome-ignore lint/suspicious/noArrayIndexKey: Fixed decorative sample, never reordered.
-                                                    <span key={i}>{c}</span>
-                                                ),
-                                            )}
-                                        </div>
-                                    </div>
-                                </section>
-                            )}
-                            <div className="section-heading library-heading">
-                                <h2>Your songbook</h2>
-                                <label className="search">
-                                    <span className="sr">Search songs</span>
-                                    <input
-                                        placeholder="Find a song…"
-                                        value={search}
-                                        onChange={(e) => setSearch(e.target.value)}
-                                    />
-                                </label>
-                            </div>
-                            <table className="song-table">
-                                <thead>
-                                    <tr>
-                                        <th>Song</th>
-                                        <th>Key</th>
-                                        <th className="hide-mobile">Tempo</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {songs
-                                        .filter((s) =>
-                                            s.title.toLowerCase().includes(search.toLowerCase()),
-                                        )
-                                        .map((s) => (
-                                            <tr className="song-row" key={s.id}>
-                                                <td>
-                                                    <button
-                                                        className="song-link"
-                                                        disabled={busy}
-                                                        onClick={() => openSong(s.id)}
-                                                    >
-                                                        <span className="song-glyph">♪</span>
-                                                        <span>
-                                                            <span className="song-name">
-                                                                {s.title}
-                                                            </span>
-                                                            <span className="song-detail">
-                                                                {s.chart.band.groove.lastSmartGenre}{' '}
-                                                                · Saved locally
-                                                            </span>
-                                                        </span>
-                                                    </button>
-                                                </td>
-                                                <td className="song-key">
-                                                    {arrangementOf(s).key}
-                                                    {arrangementOf(s).isMinor ? 'm' : ''}
-                                                </td>
-                                                <td className="hide-mobile">
-                                                    {s.chart.performance.bpm}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                </tbody>
-                            </table>
-                            <p className="offline-note">
-                                {offline}. Browser storage can be cleared; export songs you want to
-                                keep.
-                            </p>
-                        </div>
-                        <aside>
-                            <section className="quick-jam">
-                                <span className="eyebrow">No blank page required</span>
-                                <h2>Just start playing.</h2>
-                                <p>
-                                    Pick a chart, change the key or the feel, and make it your own.
-                                </p>
-                                {songs
-                                    .filter((s) => s.id.startsWith('starter-'))
-                                    .map((s) => (
-                                        <button
-                                            className="jam-tile"
-                                            key={s.id}
-                                            disabled={busy}
-                                            onClick={() => openSong(s.id)}
-                                        >
-                                            <span className="jam-symbol">♭</span>
-                                            <span>
-                                                <strong>
-                                                    {s.chart.band.groove.lastSmartGenre}
-                                                </strong>
-                                                <small>{s.title}</small>
-                                            </span>
-                                        </button>
-                                    ))}
-                            </section>
-                            <section className="sync-card">
-                                <h3>Your band, wherever you play.</h3>
-                                <p>
-                                    Accounts and cloud songbooks are a later stage. The stand is
-                                    device-local, with real playback and portable Ensemble files.
-                                </p>
-                                <p className="preview-note">
-                                    iReal import and chord discovery are not implemented here yet.
-                                    Open a song and use its menu's "Copy link" to share it — the
-                                    link opens as an unsaved draft, with no account needed.
-                                </p>
-                            </section>
-                        </aside>
-                    </div>
-                    <footer className="home-footer">
-                        <span>Made for practice, writing, and getting lost in a good groove.</span>
-                        <span>Music stand beta · {process.env.NEXT_PUBLIC_SOURCE_REV}</span>
-                    </footer>
-                </main>
+                <Songbook
+                    songs={songs}
+                    featured={featured}
+                    continued={!!continuedSave}
+                    busy={busy}
+                    offline={offline}
+                    search={search}
+                    onSearch={setSearch}
+                    onImport={() => setImporting(true)}
+                    onNewSong={newSong}
+                    onOpenSong={openSong}
+                />
             ) : (
                 <main className="workspace" data-focused={focused}>
-                    <div className="song-header">
-                        <div className="song-heading">
-                            <button
-                                className="icon-button back-btn"
-                                aria-label="Back to songbook"
-                                disabled={busy}
-                                onClick={goHome}
-                            >
-                                ←
-                            </button>
-                            <div>
-                                <h1 className="song-title">{current.title}</h1>
-                                <div className="song-subtitle">
-                                    <span className={dirty ? 'unsaved' : ''}>
-                                        {hasPendingText
-                                            ? 'Unsaved chord text · this tab only'
-                                            : sharedDraft
-                                              ? 'Opened from a shared link · not saved'
-                                              : dirty
-                                                ? recoveryHealthy
-                                                    ? 'Unsaved setup · locally recovered'
-                                                    : 'Unsaved setup · this tab only'
-                                                : 'Saved on this device'}
-                                    </span>
-                                    <span>{totalBars} bars</span>
-                                    <span>{arrangementOf(current).timeSignature}</span>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="song-actions">
-                            <button
-                                className="btn theme-toggle"
-                                aria-pressed={stage}
-                                title={stage ? 'Switch to day mode' : 'Switch to stage mode'}
-                                onClick={toggleTheme}
-                            >
-                                Stage
-                            </button>
-                            <button
-                                className="btn sounds-button"
-                                onClick={() => setSoundMenu(true)}
-                            >
-                                Sounds
-                            </button>
-                            {playbackActive && (
-                                <button
-                                    className="btn focus-toggle"
-                                    aria-pressed={focused}
-                                    onClick={() => setShowControls(!showControls)}
-                                >
-                                    {focused ? 'Show controls' : 'Focus chart'}
-                                </button>
-                            )}
-                            <div className="mode-switch">
-                                <button
-                                    className={!editing ? 'active' : ''}
-                                    onClick={() => setEditing(false)}
-                                >
-                                    Chart
-                                </button>
-                                <button
-                                    className={editing ? 'active' : ''}
-                                    disabled={busy}
-                                    onClick={() => revealEditor()}
-                                >
-                                    Edit chart
-                                </button>
-                            </div>
-                            <button
-                                className="btn primary save-btn"
-                                disabled={busy || !dirty}
-                                onClick={() =>
-                                    void run(() => (sharedDraft ? keepSharedCopy() : save()))
-                                }
-                            >
-                                {sharedDraft ? 'Keep a copy' : 'Save'}
-                            </button>
-                            <button
-                                className="icon-button menu-btn"
-                                aria-label="Song actions"
-                                disabled={busy}
-                                onClick={() =>
-                                    void run(() => {
-                                        setRecoveryOptions(repository.recoveriesFor(current));
-                                        setMenu(true);
-                                    })
-                                }
-                            >
-                                •••
-                            </button>
-                        </div>
-                    </div>
-                    <div className="transport-bar">
-                        <div className="transport-cluster">
-                            <button
-                                className="play-button"
-                                aria-label={playbackActive ? 'Stop playback' : 'Start playback'}
-                                disabled={busy && !playbackActive}
-                                onClick={() => {
-                                    if (runtime.state().playback.isPlaying || playbackPending) {
-                                        runtime.stop();
-                                        setPlaying(false);
-                                        setPlaybackPending(false);
-                                        return;
-                                    }
-                                    void run(async () => {
-                                        const next = updateChart();
-                                        setEditing(false);
-                                        setShowControls(false);
-                                        setSoundMenu(false);
-                                        await runtime.toggle(setSoundProgress);
-                                        setPlaying(runtime.state().playback.isPlaying);
-                                        setSoundsOffline(await soundsAvailableOffline(next.chart));
-                                        setSoundProgress('');
-                                    });
-                                }}
-                            >
-                                {playbackActive ? '■' : '▶'}
-                            </button>
-                            <TempoControl
-                                key={current.id}
-                                value={current.chart.performance.bpm}
-                                disabled={busy}
-                                onCommit={(value) => change(() => runtime.setTempo(value))}
-                            />
-                        </div>
-                        <div className="key-setting">
-                            <label className="setting-label" htmlFor="song-key">
-                                Key
-                            </label>
-                            <select
-                                id="song-key"
-                                className="setting-select"
-                                disabled={busy}
-                                value={arrangementOf(current).key}
-                                onChange={(event) =>
-                                    change(
-                                        () =>
-                                            runtime.transpose(
-                                                KEY_ORDER.indexOf(event.target.value) -
-                                                    KEY_ORDER.indexOf(arrangementOf(current).key),
-                                            ),
-                                        true,
-                                    )
-                                }
-                            >
-                                {KEY_ORDER.map((key) => (
-                                    <option key={key} value={key}>
-                                        {key}
-                                        {arrangementOf(current).isMinor ? 'm' : ''}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                        <div className="genre-setting">
-                            <label className="setting-label" htmlFor="genre">
-                                Feel
-                            </label>
-                            <select
-                                id="genre"
-                                className="setting-select"
-                                disabled={busy}
-                                value={current.chart.band.groove.lastSmartGenre}
-                                onChange={(e) =>
-                                    change(
-                                        () => runtime.setGenre(e.target.value, setSoundProgress),
-                                        true,
-                                    )
-                                }
-                            >
-                                {runtime.GENRE_NAMES.map((g) => (
-                                    <option key={g}>{g}</option>
-                                ))}
-                            </select>
-                        </div>
-                        <div className="band-controls" aria-label="Band instruments">
-                            {lanes.map(([key, label]) => (
-                                <button
-                                    key={key}
-                                    className={`band-toggle ${current.chart.band[key].enabled ? 'on' : 'off'}`}
-                                    disabled={busy}
-                                    aria-pressed={current.chart.band[key].enabled}
-                                    onClick={() =>
-                                        change(() =>
-                                            runtime.setEnabled(
-                                                key,
-                                                !current.chart.band[key].enabled,
-                                            ),
-                                        )
-                                    }
-                                >
-                                    <span className="dot" />
-                                    <span className="label">{label}</span>
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                    <dialog
-                        className="sound-panel"
-                        ref={soundsDialog}
-                        aria-labelledby="sounds-title"
+                    <SongHeader
+                        current={current}
+                        busy={busy}
+                        dirty={dirty}
+                        hasPendingText={hasPendingText}
+                        sharedDraft={sharedDraft}
+                        recoveryHealthy={recoveryHealthy}
+                        totalBars={totalBars}
+                        stage={stage}
+                        playbackActive={playbackActive}
+                        focused={focused}
+                        editing={editing}
+                        onHome={goHome}
+                        onToggleTheme={toggleTheme}
+                        onSounds={() => setSoundMenu(true)}
+                        onToggleControls={() => setShowControls(!showControls)}
+                        onShowChart={() => setEditing(false)}
+                        onEditChart={() => revealEditor()}
+                        onSave={() => void run(() => (sharedDraft ? keepSharedCopy() : save()))}
+                        onMenu={() =>
+                            void run(() => {
+                                setRecoveryOptions(repository.recoveriesFor(current));
+                                setMenu(true);
+                            })
+                        }
+                    />
+                    <TransportBar
+                        current={current}
+                        busy={busy}
+                        playbackActive={playbackActive}
+                        onPlayToggle={() => {
+                            if (runtime.state().playback.isPlaying || playbackPending) {
+                                runtime.stop();
+                                setPlaying(false);
+                                setPlaybackPending(false);
+                                return;
+                            }
+                            void run(async () => {
+                                const next = updateChart();
+                                setEditing(false);
+                                setShowControls(false);
+                                setSoundMenu(false);
+                                await runtime.toggle(setSoundProgress);
+                                setPlaying(runtime.state().playback.isPlaying);
+                                setSoundsOffline(await soundsAvailableOffline(next.chart));
+                                setSoundProgress('');
+                            });
+                        }}
+                        onTempo={(value) => change(() => runtime.setTempo(value))}
+                        onKey={(key) =>
+                            change(
+                                () =>
+                                    runtime.transpose(
+                                        KEY_ORDER.indexOf(key) -
+                                            KEY_ORDER.indexOf(arrangementOf(current).key),
+                                    ),
+                                true,
+                            )
+                        }
+                        onGenre={(genre) =>
+                            change(() => runtime.setGenre(genre, setSoundProgress), true)
+                        }
+                        onToggleLane={(key) =>
+                            change(() => runtime.setEnabled(key, !current.chart.band[key].enabled))
+                        }
+                    />
+                    <SoundsPanel
+                        dialogRef={soundsDialog}
+                        open={soundMenu}
+                        current={current}
+                        busy={busy}
+                        error={error}
+                        soundProgress={soundProgress}
+                        soundsOffline={soundsOffline}
+                        allSoundsOffline={allSoundsOffline}
+                        pendingSound={pendingSound}
                         onClose={() => setSoundMenu(false)}
-                    >
-                        <div className="sounds-heading">
-                            <div>
-                                <h2 id="sounds-title">Your band's sound</h2>
-                                <p>Install once. Play anywhere.</p>
-                            </div>
-                            <button
-                                className="icon-button"
-                                aria-label="Close sounds"
-                                onClick={() => setSoundMenu(false)}
-                            >
-                                ✕
-                            </button>
-                        </div>
-                        <div className="sound-install">
-                            <button
-                                className="btn primary"
-                                disabled={busy}
-                                onClick={() =>
-                                    change(async () => {
-                                        await installAllSounds(setSoundProgress);
-                                        await runtime.applyGenreSounds(setSoundProgress);
-                                    })
+                        onInstallAll={() =>
+                            change(async () => {
+                                await installAllSounds(setSoundProgress);
+                                await runtime.applyGenreSounds(setSoundProgress);
+                            })
+                        }
+                        onChooseSound={(lane, value) => {
+                            if (working.current) {
+                                return;
+                            }
+                            setPendingSound({ lane, value });
+                            change(async () => {
+                                try {
+                                    await runtime.setVoice(
+                                        lane,
+                                        value === 'auto'
+                                            ? runtime.recommendedVoice(lane)
+                                            : (value as InstrumentVoice),
+                                        setSoundProgress,
+                                        value === 'auto',
+                                    );
+                                } finally {
+                                    setPendingSound(null);
                                 }
-                            >
-                                {busy ? 'Preparing sounds…' : 'Install all & use genre sounds'}
-                            </button>
-                            <p>
-                                About {allSoundsSizeMB.toFixed(1)} MB. Chooses sounds for this
-                                song's feel; changing the feel follows along. Save to keep this
-                                setup.
-                            </p>
-                            <small>
-                                {allSoundsOffline === null
-                                    ? 'Checking installed sounds…'
-                                    : allSoundsOffline
-                                      ? 'All sound packs available offline'
-                                      : 'Missing downloads will be installed. Completed files are reused.'}
-                            </small>
-                        </div>
-                        {error && soundMenu && (
-                            <div className="error-banner" role="alert">
-                                {error}
-                            </div>
-                        )}
-                        <p className="sound-progress" role="status">
-                            {soundProgress}
-                        </p>
-                        <div className="sounds-status">
-                            <span>
-                                {soundsOffline === null
-                                    ? 'Checking downloads…'
-                                    : soundsOffline
-                                      ? 'Song sounds available offline'
-                                      : 'Some sounds need downloading'}
-                            </span>
-                            <span>Or choose each instrument:</span>
-                        </div>
-                        <div className="sound-choices">
-                            {lanes.map(([lane, label]) => (
-                                <label key={lane}>
-                                    {label} sound
-                                    <select
-                                        aria-label={`${label} sound`}
-                                        value={
-                                            pendingSound?.lane === lane
-                                                ? pendingSound.value
-                                                : current.chart.band[lane].autoSound
-                                                  ? 'auto'
-                                                  : current.chart.band[lane].voice
-                                        }
-                                        disabled={busy}
-                                        onChange={(event) => {
-                                            const value = event.target.value;
-                                            if (working.current) {
-                                                return;
-                                            }
-                                            setPendingSound({ lane, value });
-                                            change(async () => {
-                                                try {
-                                                    await runtime.setVoice(
-                                                        lane,
-                                                        value === 'auto'
-                                                            ? runtime.recommendedVoice(lane)
-                                                            : (value as InstrumentVoice),
-                                                        setSoundProgress,
-                                                        value === 'auto',
-                                                    );
-                                                } finally {
-                                                    setPendingSound(null);
-                                                }
-                                            });
-                                        }}
-                                    >
-                                        <option value="auto">Follow feel</option>
-                                        <option value="synth">Built-in</option>
-                                        {packsForInstrument(lane).map((pack) => (
-                                            <option key={pack.id} value={`pack:${pack.id}`}>
-                                                {pack.name} · {pack.approxSizeMB} MB
-                                            </option>
-                                        ))}
-                                    </select>
-                                    <small>
-                                        {current.chart.band[lane].autoSound && (
-                                            <span className="resolved-sound">
-                                                Using{' '}
-                                                {packsForInstrument(lane).find(
-                                                    (pack) =>
-                                                        current.chart.band[lane].voice ===
-                                                        `pack:${pack.id}`,
-                                                )?.name || 'Built-in'}
-                                            </span>
-                                        )}
-                                        {
-                                            packsForInstrument(lane).find(
-                                                (pack) =>
-                                                    current.chart.band[lane].voice ===
-                                                    `pack:${pack.id}`,
-                                            )?.attribution
-                                        }
-                                    </small>
-                                </label>
-                            ))}
-                        </div>
-                        <p>
-                            Choosing a sound downloads it for offline use. Save keeps your choices
-                            with this song. Browser storage can still be cleared or evicted.
-                        </p>
-                    </dialog>
+                            });
+                        }}
+                    />
                     <div className={`workspace-body ${editing ? 'editing' : ''}`}>
                         <div
                             className="chart-scroll"
@@ -1475,579 +885,102 @@ export default function Ensemble() {
                             tabIndex={0}
                             aria-label="Chord chart"
                         >
-                            <article className="sheet">
-                                {blocks.map((block) => (
-                                    <section
-                                        className="section"
-                                        key={block.measures[0]?.chords[0]?.globalIndex}
-                                    >
-                                        <div className="section-head">
-                                            <button
-                                                type="button"
-                                                className="section-letter"
-                                                aria-pressed={loopedSectionId === block.id}
-                                                aria-label={`Section ${
-                                                    block.label || 'A'
-                                                } · hold to practice-loop`}
-                                                aria-keyshortcuts="L"
-                                                onPointerDown={() => {
-                                                    // A long-press whose click never arrived (a
-                                                    // touch released off-target) must not leave
-                                                    // the flag set and swallow the NEXT tap —
-                                                    // which #937 will make meaningful.
-                                                    suppressSectionTap.current = false;
-                                                    if (sectionLoopPress.current !== null) {
-                                                        window.clearTimeout(
-                                                            sectionLoopPress.current,
-                                                        );
-                                                    }
-                                                    sectionLoopPress.current = window.setTimeout(
-                                                        () => {
-                                                            sectionLoopPress.current = null;
-                                                            suppressSectionTap.current = true;
-                                                            toggleSectionLoop(block.id);
-                                                        },
-                                                        500,
-                                                    );
-                                                }}
-                                                onPointerUp={() => {
-                                                    if (sectionLoopPress.current !== null) {
-                                                        window.clearTimeout(
-                                                            sectionLoopPress.current,
-                                                        );
-                                                        sectionLoopPress.current = null;
-                                                    }
-                                                }}
-                                                onPointerLeave={() => {
-                                                    if (sectionLoopPress.current !== null) {
-                                                        window.clearTimeout(
-                                                            sectionLoopPress.current,
-                                                        );
-                                                        sectionLoopPress.current = null;
-                                                    }
-                                                }}
-                                                onPointerCancel={() => {
-                                                    if (sectionLoopPress.current !== null) {
-                                                        window.clearTimeout(
-                                                            sectionLoopPress.current,
-                                                        );
-                                                        sectionLoopPress.current = null;
-                                                    }
-                                                }}
-                                                onClick={() => {
-                                                    // A long-press above already acted and set
-                                                    // this flag; swallow the click that follows
-                                                    // it so the plain tap stays a no-op.
-                                                    if (suppressSectionTap.current) {
-                                                        suppressSectionTap.current = false;
-                                                        return;
-                                                    }
-                                                    // Plain tap is intentionally a no-op: this
-                                                    // gesture is reserved for the banked #937
-                                                    // conductor lens ("lead, don't play"). Don't
-                                                    // wire a handler here for anything else.
-                                                }}
-                                                onKeyDown={(e) => {
-                                                    // Long-press has no keyboard equivalent, so
-                                                    // 'l'/'L' is the keyboard path to the same
-                                                    // toggle. Enter/Space stay reserved for #937.
-                                                    if (e.key === 'l' || e.key === 'L') {
-                                                        e.preventDefault();
-                                                        toggleSectionLoop(block.id);
-                                                    }
-                                                }}
-                                            >
-                                                {block.label || 'A'}
-                                            </button>
-                                            <span className="section-name">
-                                                {arrangementOf(current).sections.find(
-                                                    (s) => s.id === block.id,
-                                                )?.key || arrangementOf(current).key}
-                                            </span>
-                                            {current.schemaVersion === 2 &&
-                                                (current.chart.score.sections.find(
-                                                    (s) => s.id === block.id,
-                                                )?.repeat ?? 1) > 1 && (
-                                                    <span className="section-repeat">
-                                                        Section ×
-                                                        {
-                                                            current.chart.score.sections.find(
-                                                                (s) => s.id === block.id,
-                                                            )?.repeat
-                                                        }
-                                                    </span>
-                                                )}
-                                            {loopedSectionId === block.id && (
-                                                <span className="section-loop active">Looping</span>
-                                            )}
-                                            {editing && (
-                                                <button
-                                                    className="section-edit"
-                                                    disabled={busy}
-                                                    onClick={() => {
-                                                        if (current.schemaVersion === 2) {
-                                                            setMeasureId(
-                                                                block.measures[0]?.chords[0]
-                                                                    ?.measureId ?? '',
-                                                            );
-                                                        }
-                                                        revealEditor(block.id);
-                                                    }}
-                                                >
-                                                    Edit section
-                                                </button>
-                                            )}
-                                        </div>
-                                        <div className="bars">
-                                            {block.measures.map((measure, i) => {
-                                                barNumber++;
-                                                const writtenBar = writtenBars.get(
-                                                    measure.chords[0]?.measureId ?? '',
-                                                );
-                                                const notes = writtenBar?.annotations ?? [];
-                                                const measureRepeat =
-                                                    writtenBar?.content.kind === 'repeat'
-                                                        ? writtenBar.content
-                                                        : null;
-                                                const navigation = [
-                                                    ...(writtenBar?.start ?? []),
-                                                    ...(writtenBar?.end ?? []),
-                                                ].filter((mark) =>
-                                                    ['segno', 'coda', 'fine', 'jump'].includes(
-                                                        mark.kind,
-                                                    ),
-                                                );
-                                                const owningSection = writtenSections.get(
-                                                    measure.sectionId ?? '',
-                                                );
-                                                const sectionSeam =
-                                                    measure.isSeamlessStart &&
-                                                    measure.sectionId !== block.id;
-                                                const repeatStart = writtenBar?.start?.some(
-                                                    (mark) => mark.kind === 'repeat-start',
-                                                );
-                                                const repeatEnd = writtenBar?.end?.find(
-                                                    (mark) => mark.kind === 'repeat-end',
-                                                );
-                                                const endingStart = writtenBar?.start?.find(
-                                                    (mark) => mark.kind === 'ending-start',
-                                                );
-                                                const endingEnd = writtenBar?.end?.some(
-                                                    (mark) => mark.kind === 'ending-end',
-                                                );
-                                                const endingEndBefore = writtenBar?.start?.some(
-                                                    (mark) => mark.kind === 'ending-end',
-                                                );
-                                                return (
-                                                    <div
-                                                        className={`bar ${measure.chords.some((c) => c.globalIndex === displayActive) ? 'active' : ''} ${i === block.measures.length - 1 ? 'end' : ''} ${repeatStart ? 'repeat-start' : ''} ${repeatEnd ? 'repeat-end' : ''} ${endingStart ? 'ending-start' : ''} ${endingEnd ? 'ending-end' : ''}`}
-                                                        data-measure-id={writtenBar?.id}
-                                                        data-active={measure.chords.some(
-                                                            (c) => c.globalIndex === displayActive,
-                                                        )}
-                                                        key={measure.chords[0]?.globalIndex}
-                                                    >
-                                                        <span className="bar-number">
-                                                            {barNumber}
-                                                        </span>
-                                                        {navigation.length > 0 && (
-                                                            <span className="bar-navigation">
-                                                                {navigation
-                                                                    .map(directionLabel)
-                                                                    .join(' · ')}
-                                                            </span>
-                                                        )}
-                                                        {endingStart && (
-                                                            <span
-                                                                className="ending-label"
-                                                                aria-label={`Ending passes ${endingStart.passes.join(', ')}`}
-                                                                title={`Ending passes ${endingStart.passes.join(', ')}`}
-                                                            >
-                                                                {endingStart.passes.join(', ')}.
-                                                            </span>
-                                                        )}
-                                                        {endingEnd && !endingStart && (
-                                                            <span
-                                                                className="ending-close"
-                                                                aria-label="End ending after this bar"
-                                                            />
-                                                        )}
-                                                        {endingEndBefore && (
-                                                            <span
-                                                                className="ending-close ending-close-before"
-                                                                aria-label="End previous ending before this bar"
-                                                            />
-                                                        )}
-                                                        {repeatStart && (
-                                                            <span
-                                                                className="repeat-sign repeat-sign-start"
-                                                                aria-label="Start repeat"
-                                                            >
-                                                                𝄆
-                                                            </span>
-                                                        )}
-                                                        {repeatEnd && (
-                                                            <span
-                                                                className="repeat-sign repeat-sign-end"
-                                                                aria-label={`End repeat, ${repeatEnd.times} total passes`}
-                                                            >
-                                                                𝄇
-                                                                {repeatEnd.times !== 2 && (
-                                                                    <small>
-                                                                        ×{repeatEnd.times}
-                                                                    </small>
-                                                                )}
-                                                            </span>
-                                                        )}
-                                                        {current.schemaVersion === 2 && editing && (
-                                                            <button
-                                                                className="bar-edit"
-                                                                disabled={busy}
-                                                                aria-label={`Edit bar ${barNumber}`}
-                                                                onClick={() => {
-                                                                    setMeasureId(
-                                                                        measure.chords[0]
-                                                                            ?.measureId ?? '',
-                                                                    );
-                                                                    revealEditor(measure.sectionId);
-                                                                }}
-                                                            >
-                                                                Edit
-                                                            </button>
-                                                        )}
-                                                        {current.schemaVersion === 2 &&
-                                                            (i === 0 ||
-                                                                sectionSeam ||
-                                                                measure.chords[0]?.key !==
-                                                                    block.measures[i - 1]?.chords[0]
-                                                                        ?.key ||
-                                                                measure.chords[0]?.keyIsMinor !==
-                                                                    block.measures[i - 1]?.chords[0]
-                                                                        ?.keyIsMinor ||
-                                                                measure.chords[0]?.timeSignature !==
-                                                                    block.measures[i - 1]?.chords[0]
-                                                                        ?.timeSignature) && (
-                                                                <span className="bar-context">
-                                                                    {sectionSeam &&
-                                                                        owningSection && (
-                                                                            <b
-                                                                                aria-label={`Section ${owningSection.label}, ${owningSection.repeat} total passes`}
-                                                                                title={`Section ${owningSection.label}, ${owningSection.repeat} total passes`}
-                                                                            >
-                                                                                {
-                                                                                    owningSection.label
-                                                                                }{' '}
-                                                                                · ×
-                                                                                {
-                                                                                    owningSection.repeat
-                                                                                }{' '}
-                                                                                ·{' '}
-                                                                            </b>
-                                                                        )}
-                                                                    {measure.chords[0]?.key}
-                                                                    {measure.chords[0]?.keyIsMinor
-                                                                        ? 'm'
-                                                                        : ''}{' '}
-                                                                    ·{' '}
-                                                                    {
-                                                                        measure.chords[0]
-                                                                            ?.timeSignature
-                                                                    }
-                                                                </span>
-                                                            )}
-                                                        {notes
-                                                            .filter(
-                                                                (note) =>
-                                                                    note.placement === 'above',
-                                                            )
-                                                            .map((note, index) => (
-                                                                <span
-                                                                    className="bar-note"
-                                                                    // biome-ignore lint/suspicious/noArrayIndexKey: Authored annotations have no IDs; these display-only spans hold no local state.
-                                                                    key={`${note.at.join('/')}-${index}`}
-                                                                >
-                                                                    {note.text}
-                                                                </span>
-                                                            ))}
-                                                        {measure.chords
-                                                            .filter(
-                                                                (_, index) =>
-                                                                    !measureRepeat || index === 0,
-                                                            )
-                                                            .map((c) => (
-                                                                <button
-                                                                    className="chord chord-button"
-                                                                    aria-current={
-                                                                        (
-                                                                            measureRepeat
-                                                                                ? measure.chords.some(
-                                                                                      (event) =>
-                                                                                          event.globalIndex ===
-                                                                                          displayActive,
-                                                                                  )
-                                                                                : displayActive ===
-                                                                                  c.globalIndex
-                                                                        )
-                                                                            ? 'true'
-                                                                            : undefined
-                                                                    }
-                                                                    data-start-step={
-                                                                        (measureRepeat
-                                                                            ? measure.chords.some(
-                                                                                  (event) =>
-                                                                                      event.globalIndex ===
-                                                                                      displayActive,
-                                                                              )
-                                                                            : displayActive ===
-                                                                              c.globalIndex) &&
-                                                                        activeEvent
-                                                                            ? activeEvent.start
-                                                                            : c.start
-                                                                    }
-                                                                    data-end-step={
-                                                                        (measureRepeat
-                                                                            ? measure.chords.some(
-                                                                                  (event) =>
-                                                                                      event.globalIndex ===
-                                                                                      displayActive,
-                                                                              )
-                                                                            : displayActive ===
-                                                                              c.globalIndex) &&
-                                                                        activeEvent
-                                                                            ? activeEvent.end
-                                                                            : c.end
-                                                                    }
-                                                                    style={
-                                                                        current.schemaVersion === 2
-                                                                            ? {
-                                                                                  flex:
-                                                                                      c.end -
-                                                                                      c.start,
-                                                                              }
-                                                                            : undefined
-                                                                    }
-                                                                    key={c.globalIndex}
-                                                                    disabled={
-                                                                        playing ||
-                                                                        busy ||
-                                                                        c.globalIndex < 0
-                                                                    }
-                                                                    aria-label={
-                                                                        measureRepeat
-                                                                            ? `Repeated bar: ${measure.chords.map((event) => event.absName).join(', ')}`
-                                                                            : `Audition ${c.absName}`
-                                                                    }
-                                                                    title={
-                                                                        measureRepeat
-                                                                            ? measure.chords
-                                                                                  .map(
-                                                                                      (event) =>
-                                                                                          event.absName,
-                                                                                  )
-                                                                                  .join(' · ')
-                                                                            : undefined
-                                                                    }
-                                                                    onClick={() =>
-                                                                        runtime.audition(
-                                                                            c.globalIndex,
-                                                                        )
-                                                                    }
-                                                                >
-                                                                    {measureRepeat
-                                                                        ? measureRepeat.display ===
-                                                                          'one-bar'
-                                                                            ? '%'
-                                                                            : measureRepeat.display ===
-                                                                                'two-bar-start'
-                                                                              ? '𝄎 1'
-                                                                              : '𝄎 2'
-                                                                        : c.absName}
-                                                                </button>
-                                                            ))}
-                                                        {notes
-                                                            .filter(
-                                                                (note) =>
-                                                                    note.placement === 'below',
-                                                            )
-                                                            .map((note, index) => (
-                                                                <span
-                                                                    className="bar-note"
-                                                                    // biome-ignore lint/suspicious/noArrayIndexKey: Authored annotations have no IDs; these display-only spans hold no local state.
-                                                                    key={`${note.at.join('/')}-${index}`}
-                                                                >
-                                                                    {note.text}
-                                                                </span>
-                                                            ))}
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    </section>
-                                ))}
-                                <div className="chart-bottom" hidden={playbackActive}>
-                                    <span>Tap a chord to hear it while stopped.</span>
-                                    <span>{totalBars} bars · repeats continuously</span>
-                                </div>
-                            </article>
-                        </div>
-                        <aside className="edit-panel" ref={editPanel} hidden={!editing}>
-                            <h2>Edit your chart</h2>
-                            <p hidden={current.schemaVersion === 2}>
-                                Separate bars with |. Chords in the same bar share its beats
-                                equally.
-                            </p>
-                            <label className="panel-label" htmlFor="title">
-                                Song title
-                            </label>
-                            <input
-                                id="title"
-                                disabled={busy}
-                                className="section-text title-input"
-                                maxLength={160}
-                                value={current.title}
-                                onChange={(e) => draft({ ...current, title: e.target.value })}
+                            <ChartSheet
+                                current={current}
+                                blocks={blocks}
+                                displayActive={displayActive}
+                                activeEvent={activeEvent}
+                                writtenBars={writtenBars}
+                                writtenSections={writtenSections}
+                                loopedSectionId={loopedSectionId}
+                                editing={editing}
+                                busy={busy}
+                                playing={playing}
+                                playbackActive={playbackActive}
+                                totalBars={totalBars}
+                                onToggleLoop={toggleSectionLoop}
+                                onEditSection={(block) => {
+                                    if (current.schemaVersion === 2) {
+                                        setMeasureId(block.measures[0]?.chords[0]?.measureId ?? '');
+                                    }
+                                    revealEditor(block.id);
+                                }}
+                                onEditBar={(measure) => {
+                                    setMeasureId(measure.chords[0]?.measureId ?? '');
+                                    revealEditor(measure.sectionId);
+                                }}
+                                onAudition={(index) => runtime.audition(index)}
                             />
-                            {current.schemaVersion === 2 ? (
-                                <>
-                                    <MeasureEditor
-                                        key={current.id}
-                                        ref={measureEditor}
-                                        score={current.chart.score}
-                                        selectedMeasureId={measureId}
-                                        onSelect={setMeasureId}
-                                        disabled={busy}
-                                        onPendingChange={(pending) => {
-                                            pendingText.current = pending;
-                                            setPendingMeasures(pending);
-                                        }}
-                                        onApply={(score) =>
-                                            void run(() => {
-                                                applyScore(score);
-                                            })
-                                        }
-                                        onApplyForm={(score) => {
-                                            if (working.current) {
-                                                throw new Error(
-                                                    'Wait for the current change, then Apply again.',
-                                                );
-                                            }
-                                            applyScore(score);
-                                        }}
-                                    />
-                                    <div className="dialog-actions">
-                                        <button
-                                            className="btn"
-                                            disabled={busy}
-                                            onClick={() => extendScore(false)}
-                                        >
-                                            ＋ Bar
-                                        </button>
-                                        <button
-                                            className="btn"
-                                            disabled={busy}
-                                            onClick={() => extendScore(true)}
-                                        >
-                                            ＋ Section
-                                        </button>
-                                    </div>
-                                    <p className="preview-note">
-                                        Save includes all edited bars. Unchecked typing stays in
-                                        this tab until you update or save.
-                                    </p>
-                                </>
-                            ) : (
-                                <>
-                                    <button className="btn" disabled={busy} onClick={upgradeEditor}>
-                                        Try the bar editor · keep original
-                                    </button>
-                                    <label className="panel-label" htmlFor="section">
-                                        Section
-                                    </label>
-                                    <select
-                                        id="section"
-                                        disabled={busy}
-                                        value={sectionId}
-                                        onChange={(e) => selectSection(current, e.target.value)}
-                                    >
-                                        {arrangementOf(current).sections.map((s) => (
-                                            <option key={s.id} value={s.id}>
-                                                {s.label}
-                                                {buffers.has(s.id) ? ' · edited' : ''}
-                                            </option>
-                                        ))}
-                                    </select>
-                                    <label className="panel-label" htmlFor="chord-text">
-                                        Chord text
-                                    </label>
-                                    <textarea
-                                        id="chord-text"
-                                        ref={editor}
-                                        className="section-text"
-                                        disabled={busy}
-                                        aria-describedby="editor-help"
-                                        value={text}
-                                        onChange={(e) => editText(e.target.value)}
-                                    />
-                                    <div className="dialog-actions">
-                                        <button
-                                            className="btn primary"
-                                            disabled={busy}
-                                            onClick={() =>
-                                                void run(() => {
-                                                    updateChart();
-                                                })
-                                            }
-                                        >
-                                            Update chart
-                                        </button>
-                                        <button
-                                            className="btn"
-                                            disabled={busy}
-                                            onClick={() =>
-                                                void run(() => {
-                                                    const next = updateChart();
-                                                    const id = crypto.randomUUID();
-                                                    const sections = [
-                                                        ...arrangementOf(next).sections,
-                                                        {
-                                                            id,
-                                                            label: String.fromCharCode(
-                                                                65 +
-                                                                    (arrangementOf(current).sections
-                                                                        .length %
-                                                                        26),
-                                                            ),
-                                                            value: 'C | C | F | G',
-                                                            repeat: 1,
-                                                        },
-                                                    ];
-                                                    repository.validated({
-                                                        ...next,
-                                                        chart: {
-                                                            ...next.chart,
-                                                            arrangement: {
-                                                                ...arrangementOf(next),
-                                                                sections,
-                                                            },
-                                                        },
-                                                    });
-                                                    runtime.editSections(sections);
-                                                    draft(runtime.captureDocument(next));
-                                                    revealEditor(id);
-                                                })
-                                            }
-                                        >
-                                            ＋ Section
-                                        </button>
-                                    </div>
-                                    <p className="preview-note" id="editor-help">
-                                        Save includes your typed chords. Update chart previews them
-                                        without saving. Unchecked text stays in this tab only;
-                                        playback and returning to your songbook check it first.
-                                    </p>
-                                </>
-                            )}
-                        </aside>
+                        </div>
+                        <EditPanel
+                            panelRef={editPanel}
+                            measureEditorRef={measureEditor}
+                            current={current}
+                            editing={editing}
+                            busy={busy}
+                            measureId={measureId}
+                            sectionId={sectionId}
+                            buffers={buffers}
+                            text={text}
+                            onTitle={(title) => draft({ ...current, title })}
+                            onSelectMeasure={setMeasureId}
+                            onPendingChange={(pending) => {
+                                pendingText.current = pending;
+                                setPendingMeasures(pending);
+                            }}
+                            onApply={(score) =>
+                                void run(() => {
+                                    applyScore(score);
+                                })
+                            }
+                            onApplyForm={(score) => {
+                                if (working.current) {
+                                    throw new Error(
+                                        'Wait for the current change, then Apply again.',
+                                    );
+                                }
+                                applyScore(score);
+                            }}
+                            onExtend={extendScore}
+                            onUpgrade={upgradeEditor}
+                            onSelectSection={(id) => selectSection(current, id)}
+                            onEditText={editText}
+                            onUpdateChart={() =>
+                                void run(() => {
+                                    updateChart();
+                                })
+                            }
+                            onAddSection={() =>
+                                void run(() => {
+                                    const next = updateChart();
+                                    const id = crypto.randomUUID();
+                                    const sections = [
+                                        ...arrangementOf(next).sections,
+                                        {
+                                            id,
+                                            label: String.fromCharCode(
+                                                65 + (arrangementOf(current).sections.length % 26),
+                                            ),
+                                            value: 'C | C | F | G',
+                                            repeat: 1,
+                                        },
+                                    ];
+                                    repository.validated({
+                                        ...next,
+                                        chart: {
+                                            ...next.chart,
+                                            arrangement: {
+                                                ...arrangementOf(next),
+                                                sections,
+                                            },
+                                        },
+                                    });
+                                    runtime.editSections(sections);
+                                    draft(runtime.captureDocument(next));
+                                    revealEditor(id);
+                                })
+                            }
+                        />
                     </div>
                     <footer className="playback-footer">
                         <span role="status">
@@ -2064,135 +997,51 @@ export default function Ensemble() {
                     </footer>
                 </main>
             )}
-            <dialog
-                ref={dialog}
-                className="modal-box"
-                onCancel={() => setMenu(false)}
+            <SongMenu
+                dialogRef={dialog}
+                current={current}
+                saved={saved}
+                busy={busy}
+                dirty={dirty}
+                shareLinkFallback={shareLinkFallback}
+                recoveryOptions={recoveryOptions}
                 onClose={() => setMenu(false)}
-            >
-                <h2>Keep a good take.</h2>
-                <p>
-                    Saved setups and recovered drafts stay on this device. Export a file to move a
-                    song to another computer.
-                </p>
-                <div className="dialog-actions">
-                    <button
-                        className="btn primary"
-                        disabled={busy}
-                        onClick={() => void run(shareChartLink)}
-                    >
-                        Copy link
-                    </button>
-                    <button
-                        className="btn"
-                        disabled={busy || !saved}
-                        onClick={() => void run(() => save(true))}
-                    >
-                        Save a copy
-                    </button>
-                    <button className="btn" disabled={busy} onClick={() => void run(exportSong)}>
-                        Export file
-                    </button>
-                    {current?.schemaVersion === 2 && current.importSource && (
-                        <button
-                            className="btn"
-                            disabled={busy}
-                            onClick={() => downloadImportSource(current.importSource!.text)}
-                        >
-                            Download original source
-                        </button>
-                    )}
-                    <button
-                        className="btn"
-                        disabled={busy}
-                        onClick={() => {
-                            setMenu(false);
-                            setImporting(true);
-                        }}
-                    >
-                        Import chart
-                    </button>
-                    <button
-                        className="btn"
-                        disabled={busy || !dirty || !saved}
-                        onClick={() =>
-                            void run(() => {
-                                if (!saved) {
-                                    return;
-                                }
-                                runtime.load(saved);
-                                draft(saved);
-                                clearBuffers();
-                                selectSection(saved);
-                                setMenu(false);
-                            })
+                onShare={() => void run(shareChartLink)}
+                onSaveCopy={() => void run(() => save(true))}
+                onExport={() => void run(exportSong)}
+                onImport={() => {
+                    setMenu(false);
+                    setImporting(true);
+                }}
+                onRevert={() =>
+                    void run(() => {
+                        if (!saved) {
+                            return;
                         }
-                    >
-                        Revert to saved
-                    </button>
-                    <button className="btn" onClick={() => setMenu(false)}>
-                        Close
-                    </button>
-                </div>
-                {shareLinkFallback && (
-                    <p className="share-link-fallback">
-                        <label htmlFor="share-link-url">
-                            Clipboard isn't available here — copy this link manually:
-                        </label>
-                        <input
-                            id="share-link-url"
-                            type="text"
-                            readOnly
-                            value={shareLinkFallback}
-                            data-testid="share-link-fallback"
-                            onFocus={(event) => event.currentTarget.select()}
-                        />
-                    </p>
-                )}
-                {recoveryOptions.length > 0 && (
-                    <details className="recovery-list">
-                        <summary>Preserved drafts ({recoveryOptions.length})</summary>
-                        <p>
-                            Older or competing drafts are kept here even after a newer save. Open
-                            one as an independent copy, leaving your current setup intact.
-                        </p>
-                        {recoveryOptions.map((record) => (
-                            <button
-                                className="jam-tile"
-                                key={`${record.capturedAt}-${record.document.revision}-${JSON.stringify(record.document.chart)}`}
-                                disabled={busy}
-                                onClick={() =>
-                                    void run(async () => {
-                                        updateChart();
-                                        const copy = await repository.save(
-                                            {
-                                                ...record.document,
-                                                id: crypto.randomUUID(),
-                                                title: `${record.document.title.slice(0, 140)} — recovered`,
-                                            },
-                                            null,
-                                        );
-                                        setSongs(await repository.list());
-                                        await open(copy);
-                                        setMenu(false);
-                                    })
-                                }
-                            >
-                                <span>
-                                    <strong>
-                                        Open copy of {record.document.title} ·{' '}
-                                        {record.document.chart.performance.bpm} BPM
-                                    </strong>
-                                    <small>
-                                        {new Date(record.capturedAt).toLocaleString()} · based on
-                                        revision {record.document.revision}
-                                    </small>
-                                </span>
-                            </button>
-                        ))}
-                    </details>
-                )}
-            </dialog>
+                        runtime.load(saved);
+                        draft(saved);
+                        clearBuffers();
+                        selectSection(saved);
+                        setMenu(false);
+                    })
+                }
+                onOpenRecovery={(record) =>
+                    void run(async () => {
+                        updateChart();
+                        const copy = await repository.save(
+                            {
+                                ...record.document,
+                                id: crypto.randomUUID(),
+                                title: `${record.document.title.slice(0, 140)} — recovered`,
+                            },
+                            null,
+                        );
+                        setSongs(await repository.list());
+                        await open(copy);
+                        setMenu(false);
+                    })
+                }
+            />
         </div>
     );
 }

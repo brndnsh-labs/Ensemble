@@ -81,7 +81,11 @@ gate evidence. Do not copy old test totals or preview SHAs into a new claim of v
 
 | Surface | Start here | Boundary |
 | --- | --- | --- |
-| Home, songbook, music stand | `app/ensemble.tsx`, `app/style.css` | Shared integration files; one owner at a time |
+| Session shell: open/save/recover, editing buffers, playback wiring | `app/ensemble.tsx`, `app/style.css` | Owns all state and hands each surface props; the one shared integration file, one owner at a time |
+| Songbook home | `app/songbook.tsx` | Presentational; library list, featured card, starters |
+| Music stand surfaces | `app/song-header.tsx`, `app/transport-bar.tsx`, `app/chart-sheet.tsx` (+ `app/use-chart-view.ts`), `app/edit-panel.tsx` | Presentational; the section-letter long-press lives in `chart-sheet.tsx` |
+| Sounds and song actions | `app/sounds-panel.tsx`, `app/song-menu.tsx` | The shell owns both `<dialog>` refs and their `showModal()` effects |
+| Per-device conveniences | `app/use-stage-theme.ts`, `app/use-offline-install.ts` | Never document fields |
 | Bar editing / runtime bridge | `app/measure-editor.tsx`, `lib/form-editing.ts`, `lib/runtime.ts` | Preserve authored/runtime separation and stop/load/sync lifecycle |
 | Guest saves and recovery | `lib/repository.ts`, `lib/session.ts` | Not the account store; no implicit guest uploads |
 | Account-local storage | `lib/sync/database.ts`, `lib/sync/repository.ts`, `lib/sync/records.ts` | Native IDB transactions, owner/generation fence |

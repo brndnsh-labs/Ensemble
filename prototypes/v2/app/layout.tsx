@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 
 // Apply a stored Day/Stage choice before first paint so a stage-mode user never
 // sees a white flash. Mirrors themePreference() in lib/session.ts; the React
-// effect in ensemble.tsx owns the attribute after hydration, hence
+// effect in use-stage-theme.ts owns the attribute after hydration, hence
 // suppressHydrationWarning on <html>.
 const applyStoredTheme = `try{var t=localStorage.getItem('ensemble-v2-preview:theme');if(t==='day'||t==='stage')document.documentElement.dataset.theme=t}catch(e){}`;
 
