@@ -1,9 +1,17 @@
 export type { OpenDatabaseOptions } from './connection.js';
 export { openDatabase } from './connection.js';
-export type { DocumentRow, DocumentSummary, ReceiptRow, TombstoneRow } from './documents.js';
+export type {
+    DocumentRow,
+    DocumentSummary,
+    ManifestEntry,
+    ManifestPage,
+    ReceiptRow,
+    TombstoneRow,
+} from './documents.js';
 export {
     deleteDocument,
     listDocuments,
+    listManifest,
     MAX_LIST_LIMIT,
     readDocument,
     readReceipt,

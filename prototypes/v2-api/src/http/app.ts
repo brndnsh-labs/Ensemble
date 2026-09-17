@@ -71,6 +71,13 @@ import { sameOriginGuard } from './same-origin.js';
 const BODY_LIMIT_BYTES = 64 * 1024;
 /** Mounted sub-app for the document routes (#1202); exempt from the small body limit above. */
 const DOCUMENTS_PREFIX = '/api/documents/';
+/**
+ * The sub-app's mount path itself, which is `GET /api/documents` (#1259) and does NOT carry the
+ * prefix's trailing slash. Listed alongside the prefix so the "exactly one body limit inside the
+ * sub-app" invariant below holds for the manifest route too — the sub-app's own catch-all
+ * limiter already covers it.
+ */
+const DOCUMENTS_ROOT = DOCUMENTS_PREFIX.slice(0, -1);
 
 export interface CreateAppOptions {
     db: DatabaseSync;
@@ -190,7 +197,9 @@ export function createApp({
         onError: (c) => sendError(c, 413, 'payload_too_large'),
     });
     app.use('/api/*', (c, next) =>
-        c.req.path.startsWith(DOCUMENTS_PREFIX) ? next() : apiBodyLimit(c, next),
+        c.req.path === DOCUMENTS_ROOT || c.req.path.startsWith(DOCUMENTS_PREFIX)
+            ? next()
+            : apiBodyLimit(c, next),
     );
     app.use('/api/auth/*', authPolicy(config, identify, now));
 
@@ -883,11 +892,11 @@ export function createApp({
         return c.json({ accountId: result.accountId });
     });
 
-    // --- #1202: the Explicit Save endpoint ----------------------------------------------------
+    // --- #1202: the Explicit Save endpoint; #1259: the library read routes --------------------
     // Session-gated through the same `requireSession` as every account route above, so a
-    // recovery-purpose session is refused here too.
+    // recovery-purpose session is refused on all three.
     app.route(
-        DOCUMENTS_PREFIX.slice(0, -1),
+        DOCUMENTS_ROOT,
         documentRoutes({ db, now, identify, requireSession, save: saveDependencies }),
     );
 
