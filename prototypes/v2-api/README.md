@@ -458,7 +458,8 @@ a client** — no new branch, no distinct error code. It defaults to `25` when u
 because one deployment happened to fill up. Malformed values fail loudly at startup with the same
 digits-only validation as `PORT` (no sign, decimal point, exponent, hex prefix, or surrounding
 whitespace) — `0` and negative values are rejected too, since a cap of zero or less can never
-admit a registration. The check is enforced twice: a cheap count in `register/options` refuses
+admit a registration. So is anything that is not a safe integer: a long enough digit string
+passes the shape check and parses to `Infinity`, which would silently remove the cap. The check is enforced twice: a cheap count in `register/options` refuses
 early, and the authoritative count runs INSIDE the same database transaction that inserts the new
 account, so two registrations racing at cap-minus-one cannot both succeed. Existing accounts are
 completely unaffected at the cap — login, sessions, saves and adding a second passkey all keep

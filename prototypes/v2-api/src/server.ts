@@ -174,9 +174,12 @@ function readRegistrationCap(): number {
         );
     }
     const cap = Number(raw);
-    if (cap < 1) {
+    // Bounded above as well as below, like `readPort`. A long enough digit string passes the
+    // regex and becomes `Infinity` (`Number('9'.repeat(400))`), and `count >= Infinity` is never
+    // true — a fat-fingered value would silently REMOVE the cap this variable exists to set.
+    if (cap < 1 || !Number.isSafeInteger(cap)) {
         throw new Error(
-            `ENSEMBLE_REGISTRATION_CAP must be a positive integer, got ${JSON.stringify(raw)}`,
+            `ENSEMBLE_REGISTRATION_CAP must be a positive safe integer, got ${JSON.stringify(raw)}`,
         );
     }
     return cap;

@@ -229,6 +229,13 @@ describe('server entrypoint spawn tests', () => {
             expectedStderrContains: 'ENSEMBLE_REGISTRATION_CAP',
         },
         {
+            // Digits-only, so it passes the shape check — and Number() makes it Infinity, which
+            // would disable the cap outright rather than set a large one.
+            name: 'ENSEMBLE_REGISTRATION_CAP=<400 digits>',
+            envOverride: { ENSEMBLE_REGISTRATION_CAP: '9'.repeat(400) },
+            expectedStderrContains: 'ENSEMBLE_REGISTRATION_CAP',
+        },
+        {
             name: "ENSEMBLE_REGISTRATION_CAP='0'",
             envOverride: { ENSEMBLE_REGISTRATION_CAP: '0' },
             expectedStderrContains: 'ENSEMBLE_REGISTRATION_CAP',
