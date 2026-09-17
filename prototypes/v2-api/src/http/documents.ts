@@ -55,6 +55,9 @@ import { sendError } from './errors.js';
  *       somebody could later get wrong. A caller who is not entitled to know that an id exists
  *       cannot learn it from the status, the body, or the headers.
  *   401 `{ error: 'unauthenticated' }` — including a recovery-purpose session, via `requireSession`
+ *   500 `{ error: 'internal_error' }` — the stored body is not one well-formed JSON object, which
+ *       the write path already guarantees; the download re-checks it rather than splicing an
+ *       unvalidated string into its reply. See the handler for why.
  *
  * **Why a safe method is not a cross-site read.** `sameOriginGuard` and `jsonOnlyGuard` exempt
  * `GET`/`HEAD`/`OPTIONS` (`http-safe-methods.ts`), so neither runs here. That is not a hole: the
@@ -85,16 +88,26 @@ export interface DocumentRoutesOptions {
  * a policy — a new document route without an entry here fails that test, and the companion test
  * added by #1253 proves each key answers `401` to a cookie-less caller.
  *
- * The numbers are sized against the per-owner document cap (2,000) and the shared 300/min
- * transport ceiling, which is the real bound on a cold start: a manifest page carries up to
- * `MAX_LIST_LIMIT` rows, so 60/min is twenty pages of a full library several times over, while a
- * download is one request per document and wants the most room any single route can usefully
- * have under 300/min.
+ * **These must not add up to the transport budget.** `transportRateLimitGuard`'s 300/min is a
+ * SHARED ceiling over every `/api/*` request from one identity — `/api/auth/*` included — so a
+ * per-route budget is only a promise the caller can keep if the transport budget still has room
+ * left when it does. The read routes shipped at 60 + 240 = exactly 300, which the #1259
+ * authorization review demonstrated: a client that spent both documented read budgets got `429`
+ * on its next `GET /api/auth/session` AND on Save, both of which it is entitled to. 30 + 180 =
+ * 210 leaves 90/min of the shared ceiling for the session check, Save and logout that a sync
+ * pass needs in the same window. Any new document route has to come out of that 90, not be
+ * added on top of it.
+ *
+ * Sized against the per-owner document cap (2,000): a manifest page carries up to
+ * `MAX_LIST_LIMIT` rows, so 30/min re-reads a full four-page library seven times a minute, and
+ * a cold start of 2,000 documents at 180/min is a paced ~11 minutes of downloads. The pacing is
+ * deliberate — a full library is a one-time cost on a new device, and the alternative is
+ * starving the account routes it takes to stay signed in while it happens.
  */
 export const DOCUMENT_POLICIES: Readonly<Record<string, { max: number; windowMs: number }>> =
     Object.freeze({
-        'GET /api/documents': { max: 60, windowMs: 60_000 },
-        'GET /api/documents/:id': { max: 240, windowMs: 60_000 },
+        'GET /api/documents': { max: 30, windowMs: 60_000 },
+        'GET /api/documents/:id': { max: 180, windowMs: 60_000 },
         'POST /api/documents/save': { max: 120, windowMs: 60_000 },
     });
 
@@ -256,11 +269,34 @@ export function documentRoutes({
         // digested (`decodeSaveRequest` refuses a body that is not that canonical serialization),
         // and a `JSON.parse` -> `JSON.stringify` round trip is not guaranteed to reproduce them
         // byte for byte — an object with integer-like keys comes back reordered. Handing back the
-        // stored bytes keeps the download identical to what the receipt's digest covers, and
-        // costs no parse of a document up to 1 MiB. `JSON.stringify` on the two string fields is
-        // what keeps the hand-assembled envelope well-formed JSON. The Save route's conflict
-        // reply parses instead, because there the document is nested inside a reply object built
-        // from computed values; that is not an inconsistency to "unify" in this direction.
+        // stored bytes keeps the download identical to what the receipt's digest covers.
+        // `JSON.stringify` on the two string fields is what keeps the hand-assembled envelope
+        // well-formed JSON. The Save route's conflict reply parses instead, because there the
+        // document is nested inside a reply object built from computed values; that is not an
+        // inconsistency to "unify" in this direction.
+        //
+        // **Splicing is only safe while `body` is ONE well-formed JSON object, and this is the
+        // backstop for that** (#1259 review, F3). The guarantee itself comes from the write path:
+        // `commitSave` only ever stores `JSON.stringify(decoded.document)`, and `decodeSaveRequest`
+        // has already accepted that document through the portable codec. But nothing asserted it
+        // HERE, and a body of `{"a":1},"injected":true` — reachable through `writeDocument`, which
+        // the Save transaction is not the only conceivable caller of — splices into an envelope
+        // with a smuggled top-level key that the client would then read as protocol. So: parse
+        // purely as a validity check and throw the result away, keeping the verbatim text as the
+        // thing actually sent. A bare parse is not enough either, because `1`, `"x"` and `[]` are
+        // all valid JSON values that would land in the `document` slot and shape-shift the reply;
+        // a plain object is the only acceptable top-level form. A row that fails this is a broken
+        // server, not a bad request, so it answers `500` through the normal taxonomy and the body
+        // is never echoed — a malformed row may be the one carrying something worth not logging.
+        let stored: unknown;
+        try {
+            stored = JSON.parse(row.body);
+        } catch {
+            return sendError(c, 500, 'internal_error');
+        }
+        if (stored === null || typeof stored !== 'object' || Array.isArray(stored)) {
+            return sendError(c, 500, 'internal_error');
+        }
         const envelope = `{"documentId":${JSON.stringify(row.documentId)},"revision":${JSON.stringify(row.revision)},"document":${row.body}}`;
         return c.body(envelope, 200, { 'content-type': 'application/json' });
     });

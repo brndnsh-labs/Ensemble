@@ -182,13 +182,21 @@ export function listDocuments(
  * Parameters are positional in this order: `ownerId`, `after`, `ownerId`, `after`, `limit + 1`.
  * The extra row is a lookahead, never returned — it is only how `nextAfter` can be `null`
  * exactly at the end of the library instead of after one wasted empty page.
+ *
+ * `limit` is clamped to `1..MAX_LIST_LIMIT`. The floor is 1, not 0, deliberately (#1259 review,
+ * F5): a zero or negative limit used to return `{ entries: [], nextAfter: null }`, which in this
+ * shape does not read as "you asked for nothing" — it reads as END OF LIBRARY, and a caller that
+ * computed its page size and got zero would conclude the account is empty and diff a whole
+ * library away against it. `listDocuments`' floor of 0 is a different contract: it returns a
+ * bare array with no end-of-list flag to misread. The HTTP layer rejects a zero `limit` outright
+ * before reaching here; this is the in-process backstop.
  */
 export function listManifest(
     db: DatabaseSync,
     ownerId: string,
     page: { after?: string | null; limit: number },
 ): ManifestPage {
-    const limit = Math.min(Math.max(Math.trunc(page.limit), 0), MAX_LIST_LIMIT);
+    const limit = Math.min(Math.max(Math.trunc(page.limit), 1), MAX_LIST_LIMIT);
     const after = page.after ?? '';
     const rows = db
         .prepare(
@@ -211,12 +219,11 @@ export function listManifest(
         deleted: row.deleted === 1,
         bytes: row.bytes,
     }));
+    // The lookahead row existing means `entries` holds `limit` rows, and the floor of 1 means
+    // that is at least one — so the last entry is always there when this branch is taken.
     return {
         entries,
-        nextAfter:
-            rows.length > limit && entries.length > 0
-                ? entries[entries.length - 1]!.documentId
-                : null,
+        nextAfter: rows.length > limit ? entries[entries.length - 1]!.documentId : null,
     };
 }
 

@@ -184,9 +184,19 @@ describe('owner-scoped documents, receipts and tombstones (#1201)', () => {
             { documentId: 'doc-1', revision: 'r9', deleted: false, bytes: 26 },
         ]);
         expect(listManifest(db, 'owner-c', { limit: 10 }).entries).toEqual([]);
-        // Same clamp contract as `listDocuments`: the cap is the ceiling, not a rejection.
+        // Same ceiling contract as `listDocuments`: the cap clamps, it does not reject.
         expect(listManifest(db, 'owner-a', { limit: 10_000 }).entries).toHaveLength(4);
-        expect(listManifest(db, 'owner-a', { limit: -5 }).entries).toEqual([]);
+        // But the FLOOR is 1, not 0 (#1259 review, F5). An empty page with `nextAfter: null` is
+        // indistinguishable from the end of the library, so a caller whose computed page size
+        // came out zero must not be told its account holds nothing — it gets one row and a
+        // cursor, and can page from there.
+        expect(listManifest(db, 'owner-a', { limit: 0 })).toEqual({
+            entries: [{ documentId: 'doc-1', revision: 'r1', deleted: false, bytes: 17 }],
+            nextAfter: 'doc-1',
+        });
+        expect(listManifest(db, 'owner-a', { limit: -5 })).toEqual(
+            listManifest(db, 'owner-a', { limit: 1 }),
+        );
     });
 
     it('every exported query takes the owner as its mandatory first argument after db', () => {

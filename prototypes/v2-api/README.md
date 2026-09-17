@@ -384,7 +384,8 @@ cursor-expiry machinery — do not add one. The manifest query is `listManifest`
 | Absent id, tombstoned id, or another owner's id | `404 { error: 'not_found' }` — one status, one body, all three |
 | Unknown or repeated query key, `limit` outside `1..MAX_LIST_LIMIT` or not an exact integer, `after`/`:id` outside the identifier grammar | `400 { error: 'malformed_request' }` |
 | No session, or a recovery-purpose session | `401 { error: 'unauthenticated' }` |
-| Past the per-identity budget (60/min manifest, 240/min download) | `429 { error: 'rate_limited' }` with `Retry-After` |
+| Past the per-identity budget (30/min manifest, 180/min download) | `429 { error: 'rate_limited' }` with `Retry-After` |
+| Stored body that is not one well-formed JSON object | `500 { error: 'internal_error' }` — nothing echoed |
 
 Design points worth knowing before changing it:
 
@@ -419,6 +420,14 @@ Design points worth knowing before changing it:
   an object with integer-like keys comes back reordered. Save's *conflict* reply parses instead,
   because there the document is nested in a reply built from computed values; that is not an
   inconsistency to unify in this direction.
+  **Splicing is only safe while the body is one well-formed JSON object, so the read site checks
+  it** (review F3): it parses purely as a validity check, discards the result, and still sends the
+  verbatim text. The guarantee lives in `save.ts`/`decodeSaveRequest`; this is the backstop,
+  because it was asserted nowhere at the read site and a body of `{"a":1},"injected":true` written
+  through `writeDocument` spliced into a reply with a smuggled top-level key. A bare parse is not
+  enough — `1`, `"x"` and `[]` are valid JSON values that would shape-shift the `document`
+  member, so a plain object is required. A failing row is a broken server, not a bad request:
+  `500 internal_error`, body never echoed, and the manifest still lists the row.
 - **A safe method is exempt from same-origin and JSON-only, and that does not open a cross-site
   read.** `sameOriginGuard`/`jsonOnlyGuard` gate unsafe methods only (`http-safe-methods.ts`), so
   neither runs on a `GET`. The session cookie is `__Host-`-prefixed and `SameSite=Strict`
@@ -432,21 +441,46 @@ Design points worth knowing before changing it:
   defense in depth for a future in-process caller). Deny-by-default, the same posture as
   `auth-policy.ts`'s exact-key-set check: a client that asked for 10,000 rows has a bug, and
   answering 500 teaches it the wrong page size. Repeated keys are refused for the same reason —
-  `?limit=1&limit=500` must not resolve to whichever one `get` happens to return.
+  `?limit=1&limit=500` must not resolve to whichever one `get` happens to return. In
+  `listManifest` the clamp floor is **1, not 0** (review F5): an empty page with
+  `nextAfter: null` reads as *end of library*, so a caller whose computed page size came out
+  zero would diff a whole library away against it.
 - **Guard order is Save's, unchanged:** session → syntactic refusal → this route's own budget →
   the database. The budget is spent only by an authenticated identity, so an anonymous caller
-  can never exhaust one; it only ever spends the shared 300/min transport budget, which is also
-  the real ceiling on a cold start of a full library.
+  can never exhaust one.
+- **The 300/min transport budget is SHARED, and the read budgets must fit inside it with room
+  left over** (review F1 — the P1 of the review). `transportRateLimitGuard`'s 300/min covers
+  every `/api/*` request from one identity, **`/api/auth/*` included**, and it is keyed by
+  **network identity, not by account** — two accounts behind one NAT share it, and so do two tabs
+  of one account. So a per-route budget is only a promise the caller can keep while the shared
+  ceiling still has room. The routes shipped at 60 + 240 = *exactly* 300, and the review
+  demonstrated the consequence: a client that spent both documented read budgets got `429` on its
+  next `GET /api/auth/session` **and** on Save. They are now 30 + 180 = 210, leaving 90/min for
+  the session check, Save and logout a sync pass needs in the same window. **A new document route
+  has to come out of that 90, not be added on top of it.** A client must therefore treat any
+  `429` as a **global** back-off with the response's `Retry-After`, not as "this endpoint is
+  busy" — the next request to a different route is just as likely to be refused.
+  Cold-start arithmetic for a full 2,000-document library: 4 manifest pages at
+  `MAX_LIST_LIMIT`, then 2,000 downloads at 180/min ≈ **11 minutes**, paced. That is deliberate —
+  a full library is a one-time cost on a new device, and the alternative is starving the account
+  routes it takes to stay signed in while it happens.
+- **`GET /api/documents` keeps the 64 KB `/api/*` body limit.** The exemption in `src/http/app.ts`
+  is the prefix *with* its trailing slash, so the bare mount path is not exempt, and both
+  limiters match it — which is fine, the lower ceiling wins and the route reads no body. Review
+  F2 proved over a real socket that exempting the bare path too (which the first cut did, for
+  comment symmetry) only raised the ceiling an **unauthenticated** caller can make this process
+  buffer on that path from 64 KB to ~1 MiB, in exchange for nothing. Don't widen it again.
 - **Wire vocabulary follows the client's.** `documentId` matches the Save reply, and
   `nextAfterDocumentId` is the name `SongPage` already uses for this cursor in
   `prototypes/v2/lib/sync/repository.ts`, so the transport and the local store speak one
   language. (The issue's draft wrote `id`/`nextAfter`; the API-wide names won.)
 
 Tests: `test/http/documents-read.test.ts` (both routes over `app.request()` with two real
-passkey accounts, every document written through the real Save route) and the `listManifest`
+passkey accounts, every document written through the real Save route — including the
+cross-owner tombstone case and the three malformed stored bodies) and the `listManifest`
 case in `test/db/documents.test.ts` (tombstone interleaving, owner scoping, cursor exclusivity,
-UTF-8 `bytes`). The deny-by-default pair in `test/http/auth-hardening.test.ts` covers both new
-routes automatically, since it is parameterized over `DOCUMENT_POLICIES`.
+UTF-8 `bytes`, the clamp floor). The deny-by-default pair in `test/http/auth-hardening.test.ts`
+covers both new routes automatically, since it is parameterized over `DOCUMENT_POLICIES`.
 
 ## Commands
 

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { snapshot } from '../../../v2/lib/sync/protocol.js';
 import { createWebAuthnConfig, type WebAuthnConfig } from '../../src/auth/config.js';
 import { issueSession } from '../../src/auth/session.js';
-import { deleteDocument, MAX_LIST_LIMIT } from '../../src/db/documents.js';
+import { deleteDocument, MAX_LIST_LIMIT, writeDocument } from '../../src/db/documents.js';
 import { createApp } from '../../src/http/app.js';
 import { DEFAULT_MANIFEST_LIMIT, DOCUMENT_POLICIES } from '../../src/http/documents.js';
 import { makeChartDocument } from '../fixtures/chart-document.js';
@@ -277,6 +277,80 @@ describe('GET /api/documents and GET /api/documents/:id (#1259)', () => {
         expect(page.documents).toEqual([]);
         // Not a tautology: the same id IS visible to the account that owns it.
         expect((await get(ctx, `${MANIFEST}/private-chart`, ctx.stranger.jar)).status).toBe(200);
+    });
+
+    it("a foreign owner's TOMBSTONE never reaches another account's manifest", async () => {
+        ctx = await setUp();
+        // The tombstone leg is a second owner predicate in the manifest query, and until #1259's
+        // review (F4) only the db-layer test covered it — an HTTP-level proof matters because
+        // this is the row that tells a client to DELETE its local copy. Leaking one across owners
+        // would make another account's delete destroy this account's song.
+        await save(ctx, ctx.stranger, 'shared-id', 'op-stranger');
+        expect(deleteDocument(ctx.testDb.db, ctx.stranger.accountId, 'shared-id', 9)).toBe(true);
+        // The owner holds a LIVE document at the very same id, so a leak would also be visible
+        // as a duplicate row rather than only as an extra one.
+        const own = await save(ctx, ctx.owner, 'shared-id', 'op-owner');
+
+        const page = (await get(ctx, MANIFEST)).json as ManifestReply;
+        expect(page.documents).toEqual([
+            {
+                documentId: 'shared-id',
+                revision: own.revision,
+                deleted: false,
+                bytes: expect.any(Number),
+            },
+        ]);
+        expect(page.documents.filter((row) => row.deleted)).toEqual([]);
+        // Not a tautology: the tombstone IS in the stranger's own manifest, exactly once.
+        const strangerPage = (await get(ctx, MANIFEST, ctx.stranger.jar)).json as ManifestReply;
+        expect(strangerPage.documents).toEqual([
+            { documentId: 'shared-id', revision: expect.any(String), deleted: true, bytes: 0 },
+        ]);
+    });
+
+    it('refuses to splice a stored body that is not one well-formed JSON object', async () => {
+        ctx = await setUp();
+        // The write path guarantees `documents.body` is `JSON.stringify(<validated document>)`;
+        // the download re-checks it rather than trusting it, because it splices the text into its
+        // reply verbatim (#1259 review, F3). `writeDocument` is the primitive that can put
+        // anything there, so it is what a test has to use to reach the backstop.
+        const bodies = {
+            // Two JSON values where the envelope expects one: without the check this splices to
+            // `{"documentId":…,"document":{"a":1},"injected":true}` — a smuggled top-level key
+            // the client would read as protocol.
+            smuggled: '{"a":1},"injected":true',
+            garbage: 'not json at all',
+            // Valid JSON, but not an object: it would shape-shift the `document` member.
+            array: '[]',
+        };
+        for (const [id, body] of Object.entries(bodies)) {
+            writeDocument(ctx.testDb.db, ctx.owner.accountId, {
+                documentId: `bad-${id}`,
+                revision: `rev-bad-${id}`,
+                body,
+                updatedAt: 1,
+            });
+            const res = await get(ctx, `${MANIFEST}/bad-${id}`);
+            expect({ id, status: res.status, json: res.json }).toEqual({
+                id,
+                status: 500,
+                json: { error: 'internal_error' },
+            });
+            // The refusal never echoes the stored body back.
+            expect(res.text).not.toContain('injected');
+            expect(res.text).not.toContain('not json');
+        }
+        // Not a tautology: a row the real Save wrote still downloads.
+        await save(ctx, ctx.owner, 'doc-good', 'op-good');
+        expect((await get(ctx, `${MANIFEST}/doc-good`)).status).toBe(200);
+        // And a bad row does not break the manifest — it is listed, just not downloadable.
+        const page = (await get(ctx, MANIFEST)).json as ManifestReply;
+        expect(page.documents.map((row) => row.documentId)).toEqual([
+            'bad-array',
+            'bad-garbage',
+            'bad-smuggled',
+            'doc-good',
+        ]);
     });
 
     it('downloads the stored bytes verbatim with the revision the Save minted', async () => {
