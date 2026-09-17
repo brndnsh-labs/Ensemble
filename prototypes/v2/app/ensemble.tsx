@@ -8,10 +8,18 @@ import type { InstrumentVoice } from '@engine/types';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { arrangementOf, blankSong, convertedCopy, extendedScore } from '../lib/documents';
 import { validateEditorText } from '../lib/editor';
+import {
+    describeV1Outcome,
+    findV1Data,
+    importV1,
+    type V1Finding,
+    v1ImportContext,
+    v1ImportOffer,
+} from '../lib/import-v1';
 import * as repository from '../lib/repository';
 import type { ChartDocument } from '../lib/runtime';
 import * as runtime from '../lib/runtime';
-import { lastOpenedSong, rememberSong } from '../lib/session';
+import { lastOpenedSong, rememberSong, rememberV1Import, v1ImportLedger } from '../lib/session';
 import { allSoundsAvailableOffline, installAllSounds, soundsAvailableOffline } from '../lib/sounds';
 import { start } from '../lib/starters';
 import { ChartSheet } from './chart-sheet';
@@ -80,6 +88,12 @@ export default function Ensemble() {
     // permission) — the visible fallback the acceptance criteria calls for.
     const [shareLinkFallback, setShareLinkFallback] = useState<string | null>(null);
     const sharedLinkHandled = useRef(false);
+    // #1274 — the v1 import offer: what this browser's old-Ensemble profile holds
+    // (`finding`), what is still on offer after the ledger (`offer`), and the result
+    // line of a run that just happened. Read once, after the songbook is ready.
+    const [v1Data, setV1Data] = useState<{ finding: V1Finding; offer: V1Finding } | null>(null);
+    const [v1Result, setV1Result] = useState<string | null>(null);
+    const v1Checked = useRef(false);
     const dialog = useRef<HTMLDialogElement>(null);
     const soundsDialog = useRef<HTMLDialogElement>(null);
     const file = useRef<HTMLInputElement>(null);
@@ -197,6 +211,25 @@ export default function Ensemble() {
         return () => {
             alive = false;
         };
+    }, [ready]);
+    useEffect(() => {
+        // #1274 — look for v1 data only once the songbook is ready: guest startup owns
+        // the critical path, and nothing here may delay or block it. A profile whose v1
+        // data is corrupt still reaches this (findV1Data reports it as a problem), and a
+        // storage read that throws outright leaves the stand exactly as it was.
+        if (!ready || v1Checked.current) {
+            return;
+        }
+        v1Checked.current = true;
+        try {
+            const finding = findV1Data(window.localStorage);
+            const offer = v1ImportOffer(finding, v1ImportLedger());
+            if (offer.sources.length || offer.problems.length) {
+                setV1Data({ finding, offer });
+            }
+        } catch {
+            // The old app's data is a bonus, never a prerequisite for playing here.
+        }
     }, [ready]);
     useEffect(() => {
         if (editing && !busy && editorRequest !== revealedEditorRequest.current) {
@@ -565,6 +598,66 @@ export default function Ensemble() {
             revealEditor(arrangementOf(created).sections[0].id);
         });
     }
+    /**
+     * Copy the offered v1 songs into the guest songbook (#1274).
+     *
+     * Item-atomic and resumable: each song that lands is saved and remembered on its
+     * own, so a failure partway through keeps everything before it and a rerun picks up
+     * only what is still missing. The v1 keys are never written — `findV1Data` was only
+     * ever handed a read-only storage view.
+     */
+    function importV1Songs() {
+        if (!v1Data) {
+            return;
+        }
+        void run(async () => {
+            const existing = await repository.list();
+            const base = current ?? existing[0];
+            if (!base) {
+                throw new Error('Songbook is not ready yet. Reload and try again.');
+            }
+            const outcome = await importV1({
+                offer: v1Data.offer,
+                // The whole finding, not the offer: a progression imported now still
+                // wants the key and meter of the v1 session, even if that session was
+                // already brought over on an earlier run.
+                context: v1ImportContext(v1Data.finding, {
+                    performance: base.chart.performance,
+                    band: base.chart.band,
+                }),
+                existingIds: new Set(existing.map((song) => song.id)),
+                save: async (document) => {
+                    await repository.save(document, null);
+                },
+                remember: (digest) => rememberV1Import([digest], 'imported'),
+            });
+            setSongs(await repository.list());
+            setV1Data({
+                finding: v1Data.finding,
+                offer: v1ImportOffer(v1Data.finding, v1ImportLedger()),
+            });
+            setV1Result(describeV1Outcome(outcome));
+        });
+    }
+    /**
+     * "Not now" / "Done". Declining remembers these exact v1 bytes so the offer stays
+     * gone, while v1 data that changes or appears later is still offered. Dismissing a
+     * finished run's result does NOT record anything: an item that failed to convert
+     * should stay visible until it is imported or explicitly declined.
+     */
+    function dismissV1(record: boolean) {
+        if (record && v1Data) {
+            rememberV1Import(
+                [
+                    ...v1Data.offer.sources.map((source) => source.digest),
+                    ...v1Data.offer.problems.map((problem) => problem.digest),
+                ],
+                'declined',
+            );
+        }
+        setV1Data(null);
+        setV1Result(null);
+    }
     function upgradeEditor() {
         void run(async () => {
             const original = updateChart();
@@ -748,6 +841,17 @@ export default function Ensemble() {
                     onImport={() => setImporting(true)}
                     onNewSong={newSong}
                     onOpenSong={openSong}
+                    v1Import={
+                        v1Data
+                            ? {
+                                  songs: v1Data.offer.sources.length,
+                                  unreadable: v1Data.offer.problems.length,
+                                  result: v1Result,
+                              }
+                            : null
+                    }
+                    onImportV1={importV1Songs}
+                    onDismissV1={() => dismissV1(!v1Result)}
                 />
             ) : (
                 <main className="workspace" data-focused={focused}>

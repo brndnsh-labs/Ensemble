@@ -1,6 +1,16 @@
 import { arrangementOf } from '../lib/documents';
 import type { ChartDocument } from '../lib/runtime';
 
+/** The v1 import offer (#1274). Counts and copy only; the shell owns the work. */
+export interface V1ImportOffer {
+    /** Importable v1 songs still on offer. */
+    songs: number;
+    /** v1 data that exists but could not be read. Shown, never hidden. */
+    unreadable: number;
+    /** One-line result of the run that just finished, or null before one. */
+    result: string | null;
+}
+
 interface SongbookProps {
     songs: ChartDocument[];
     /** The card at the top: the last-opened song (with any recovered draft), else a starter. */
@@ -14,6 +24,9 @@ interface SongbookProps {
     onImport: () => void;
     onNewSong: () => void;
     onOpenSong: (id: string) => void;
+    v1Import: V1ImportOffer | null;
+    onImportV1: () => void;
+    onDismissV1: () => void;
 }
 
 export function Songbook({
@@ -27,6 +40,9 @@ export function Songbook({
     onImport,
     onNewSong,
     onOpenSong,
+    v1Import,
+    onImportV1,
+    onDismissV1,
 }: SongbookProps) {
     return (
         <main className="home">
@@ -81,6 +97,62 @@ export function Songbook({
                                     )}
                                 </div>
                             </div>
+                        </section>
+                    )}
+                    {v1Import && (
+                        <section className="quick-jam import-card" data-testid="v1-import">
+                            <span className="eyebrow">From the old Ensemble</span>
+                            {v1Import.result ? (
+                                <>
+                                    <h3>Brought over from the old Ensemble</h3>
+                                    <p role="status" data-testid="v1-import-result">
+                                        {v1Import.result}
+                                    </p>
+                                    <div className="import-actions">
+                                        <button
+                                            className="btn"
+                                            disabled={busy}
+                                            onClick={onDismissV1}
+                                        >
+                                            Done
+                                        </button>
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    <h3>
+                                        {v1Import.songs > 0
+                                            ? `Bring over ${v1Import.songs} song${v1Import.songs === 1 ? '' : 's'} from the old Ensemble?`
+                                            : 'Some music in the old Ensemble could not be read'}
+                                    </h3>
+                                    <p>
+                                        {v1Import.songs > 0
+                                            ? 'They are copied into this songbook. Nothing in the old app is changed or removed.'
+                                            : 'Nothing was changed there. Open the old Ensemble to check those songs.'}
+                                        {v1Import.unreadable > 0 && v1Import.songs > 0
+                                            ? ` ${v1Import.unreadable} item${v1Import.unreadable === 1 ? '' : 's'} could not be read and will be listed.`
+                                            : ''}
+                                    </p>
+                                    <div className="import-actions">
+                                        {v1Import.songs > 0 && (
+                                            <button
+                                                className="btn primary"
+                                                disabled={busy}
+                                                onClick={onImportV1}
+                                            >
+                                                Import
+                                            </button>
+                                        )}
+                                        <button
+                                            className="btn"
+                                            disabled={busy}
+                                            onClick={onDismissV1}
+                                        >
+                                            Not now
+                                        </button>
+                                    </div>
+                                </>
+                            )}
                         </section>
                     )}
                     <div className="section-heading library-heading">

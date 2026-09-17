@@ -544,6 +544,26 @@ html [hidden] {
     margin-top: 14px;
     font-size: 12px;
 }
+/* The v1 import offer (#1274) borrows the raised-card box above; it only needs to sit
+   over the library and size its own heading and button row. */
+.import-card {
+    margin-bottom: 22px;
+}
+.import-card h3 {
+    font-size: 15px;
+    font-weight: 650;
+    margin: 7px 0 8px;
+}
+.import-card p {
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--muted);
+}
+.import-actions {
+    display: flex;
+    gap: 9px;
+    margin-top: 15px;
+}
 .sync-card {
     padding: 22px 7px 0;
 }

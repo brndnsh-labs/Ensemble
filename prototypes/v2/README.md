@@ -74,6 +74,13 @@ local browser projects and never deploys.
   The original app's engine typecheck also runs before every preview build.
 - Persistence calls are compile-time redirected to a no-op. Neither `ensemble_currentState`
   nor `ensemble_userPresets` is migrated or overwritten. Playwright pins a legacy sentinel.
+  The v1 import (#1274, `lib/import-v1.ts`) is a **copy**, not a migration: it is handed a
+  read-only `getItem` view of those keys, reuses v1's own hydration normalizers plus the
+  canonical songbook codec, and reports v1 data it cannot read instead of showing an empty
+  library. The offer is remembered per v1 item (digest, not a boolean) under v2's own
+  `ensemble-v2-preview:v1-import` key, so changed or newly-saved v1 data is offered again;
+  imported documents carry deterministic `v1-session-…`/`v1-preset-…` ids, which is both
+  their provenance and a second guard against a duplicate copy.
 - IndexedDB `ensemble-v2-preview` holds explicit saves with atomic revision comparison. Local
   recovery keys are writer-scoped; older competing drafts remain accessible in Song actions.
   Quota errors retain the current draft in memory and warn before leaving the page where the

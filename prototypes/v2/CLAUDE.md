@@ -23,7 +23,8 @@ closed by policy until #1272 lands and Brandon says go; nothing in this app call
 
 This is a release of the guest music stand beside v1, **not** a cutover. v1 stays at `/`. This
 app keeps its own IndexedDB and `localStorage` keys, so anything a user saves here is invisible
-to the v1 app until the v1 import (#1274) lands; the v1 About tab links here as a beta. Replacing
+to the v1 app; the v1 import (#1274) copies the other way only — v1's songs into this songbook,
+never a write back to a v1 key. The v1 About tab links here as a beta. Replacing
 v1 is planned and authorized as the end of
 [the rollout](../../docs/design/ensemble-v2-rollout.md) — a hard cut after phases 3 and 4.
 
@@ -88,6 +89,7 @@ gate evidence. Do not copy old test totals or preview SHAs into a new claim of v
 | Per-device conveniences | `app/use-stage-theme.ts`, `app/use-offline-install.ts` | Never document fields |
 | Bar editing / runtime bridge | `app/measure-editor.tsx`, `lib/form-editing.ts`, `lib/runtime.ts` | Preserve authored/runtime separation and stop/load/sync lifecycle |
 | Guest saves and recovery | `lib/repository.ts`, `lib/session.ts` | Not the account store; no implicit guest uploads |
+| v1 local-data import (#1274) | `lib/import-v1.ts` (+ the songbook card) | Read-only `getItem` view of `ensemble_*`; v1's own normalizers then the canonical codec; per-item digests |
 | Account-local storage | `lib/sync/database.ts`, `lib/sync/repository.ts`, `lib/sync/records.ts` | Native IDB transactions, owner/generation fence |
 | Explicit Save wire contract | `lib/sync/protocol.ts`, `lib/sync/send.ts` | Immutable retry bytes, owner-bound receipts, separate drafts |
 | Portable chart / iReal semantics | `../../public/songbook/` | Root/scoped engine guides and canonical codecs apply |
