@@ -292,9 +292,14 @@ describe('commitSave (#1202)', () => {
                 'INSERT INTO documents (owner_id, document_id, revision, body, updated_at)' +
                     ' VALUES (?, ?, ?, ?, 1)',
             );
+            // One transaction, not `count` autocommits: at the shipped 2,000-document cap each
+            // autocommit is its own WAL sync, which measured 6.9s on a good CI runner and 16.5s
+            // on a slow one — past the 10s test timeout, for seeding that proves nothing itself.
+            db.exec('BEGIN');
             for (let i = 0; i < count; i += 1) {
                 insert.run(owner, `seed-${i}`, `seed-rev-${i}`, '{}');
             }
+            db.exec('COMMIT');
         }
 
         function seedBody(
