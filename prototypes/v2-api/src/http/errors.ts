@@ -64,6 +64,11 @@ export function sendError(c: Context, status: ContentfulStatusCode, code: ApiErr
  * all collapse to the same `401 authentication_failed` as every other non-`malformed_request`
  * ceremony reason — none of them get `fresh_auth_required`'s `403`, because a recovery session's
  * liveness is not the same concept as a standard session's freshness.
+ *
+ * `registration_cap_reached` (#1272, registration only) is the one other reason with its own
+ * status: the service-wide account cap was already reached, which is a deployment-posture
+ * refusal — the SAME `403 registration_closed` as the closed-by-policy check `http/app.ts` makes
+ * before ever calling `verifyRegistration` — never the collapsed `401 authentication_failed`.
  */
 export function ceremonyFailureResponse(
     c: Context,
@@ -82,6 +87,9 @@ export function ceremonyFailureResponse(
     }
     if (reason === 'fresh_auth_required') {
         return sendError(c, 403, 'fresh_auth_required');
+    }
+    if (reason === 'registration_cap_reached') {
+        return sendError(c, 403, 'registration_closed');
     }
     return sendError(c, 401, 'authentication_failed');
 }

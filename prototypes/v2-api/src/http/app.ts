@@ -5,6 +5,8 @@ import { bodyLimit } from 'hono/body-limit';
 import {
     claimRecoveryCode,
     confirmRecoveryCode,
+    countAccounts,
+    DEFAULT_REGISTRATION_CAP,
     enrollRecoveryCode,
     hasEnrolledRecoveryMaterial,
     issueSession,
@@ -93,6 +95,16 @@ export interface CreateAppOptions {
      * Defaults to open here so the ceremony test suites exercise the real paths.
      */
     registrationOpen?: boolean;
+    /**
+     * Service-wide account ceiling (#1272), on top of `registrationOpen`'s open/closed policy.
+     * At or above this many existing accounts, both registration routes answer the SAME
+     * `403 registration_closed` as the closed policy — a client needs no new branch, and reaching
+     * the cap looks identical to closed registration. Defaults to `DEFAULT_REGISTRATION_CAP`;
+     * the deployed service always passes the real `ENSEMBLE_REGISTRATION_CAP` value from
+     * `server.ts`. The count here is a CHEAP EARLY refusal only — the authoritative,
+     * race-safe check lives inside `verifyRegistration`'s own transaction (see its doc comment).
+     */
+    registrationCap?: number;
     /** #1202: revision minting override for the Save endpoint's tests. */
     saveDependencies?: SaveDependencies;
 }
@@ -117,6 +129,7 @@ export function createApp({
     sessionTtlMs = SESSION_TTL_MS,
     clientIdentity,
     registrationOpen = true,
+    registrationCap = DEFAULT_REGISTRATION_CAP,
     saveDependencies,
 }: CreateAppOptions): Hono {
     // No raw address reaches a limiter or audit row. Factory-only tests get an ephemeral secret.
@@ -256,6 +269,14 @@ export function createApp({
         if (!registrationOpen) {
             return sendError(c, 403, 'registration_closed');
         }
+        // Cheap early refusal only (#1272) — not the enforcement point. A count-then-decide
+        // check outside a transaction can race a concurrent registration, so this exists purely
+        // to avoid minting a ceremony that `verifyRegistration`'s own race-safe count would
+        // refuse anyway; the SAME `403 registration_closed` either way, so a client at the cap
+        // never distinguishes "closed by policy" from "closed because it's full".
+        if (countAccounts(db) >= registrationCap) {
+            return sendError(c, 403, 'registration_closed');
+        }
         const parsedLabel = await parseOptionalLabel(c);
         if (!parsedLabel.ok) {
             return parsedLabel.response;
@@ -289,11 +310,19 @@ export function createApp({
             return sendError(c, 400, 'malformed_request');
         }
 
-        const result = await verifyRegistration(db, config, {
-            ceremonyToken,
-            response: parsed.value as RegistrationResponseJSON,
-        });
+        const result = await verifyRegistration(
+            db,
+            config,
+            {
+                ceremonyToken,
+                response: parsed.value as RegistrationResponseJSON,
+            },
+            { registrationCap },
+        );
         if (!result.ok) {
+            // `ceremonyFailureResponse` maps `registration_cap_reached` (#1272) to the SAME
+            // `403 registration_closed` as the closed-by-policy check above, never its collapsed
+            // `401 authentication_failed` — see that function's doc comment.
             return ceremonyFailureResponse(c, result.reason);
         }
 

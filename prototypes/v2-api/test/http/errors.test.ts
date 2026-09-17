@@ -58,6 +58,9 @@ const EXPECTED = {
     // a recovery session's liveness is a different concept from a standard session's freshness.
     recovery_session_invalid: { status: 401, error: 'authentication_failed' },
     recovery_code_not_found: { status: 401, error: 'authentication_failed' },
+    // #1272: the service-wide registration cap was already reached — a deployment-posture
+    // refusal, the SAME 403 as the closed-by-policy check, never the collapsed 401.
+    registration_cap_reached: { status: 403, error: 'registration_closed' },
 } satisfies Record<AnyCeremonyFailureReason, { status: number; error: string }>;
 
 describe('ceremonyFailureResponse (collapsed error table, exhaustive over both unions)', () => {

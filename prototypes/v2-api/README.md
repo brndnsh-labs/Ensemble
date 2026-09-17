@@ -379,7 +379,8 @@ npm run build     # esbuild bundle -> dist/server.js (+ .map); see build.mjs —
                   # shared public/ songbook codecs the Save endpoint decodes with (#1202)
 npm start         # node dist/server.js — needs ENSEMBLE_RP_ID, ENSEMBLE_RP_NAME, ENSEMBLE_ORIGIN,
                   # ENSEMBLE_DB_PATH (a file, never :memory:), ENSEMBLE_AUTH_IP_SECRET (>=32 bytes)
-                  # optional PORT (8080), HOST (0.0.0.0); verified proxy configuration below
+                  # optional PORT (8080), HOST (0.0.0.0), ENSEMBLE_REGISTRATION (closed),
+                  # ENSEMBLE_REGISTRATION_CAP (25); verified proxy configuration below
 npm run dev       # tsx src/server.ts, development only
 ```
 
@@ -445,6 +446,23 @@ answers `403 registration_closed` from `register/options` and `register/verify` 
 guards and rate limits as every route) and changes nothing else — login, sessions, passkey
 management and recovery keep working for existing accounts. Both deployed stacks run closed until
 the product wires accounts in (phase 3 of the rollout); the flip is one env line plus a release.
+
+**A service-wide registration cap backstops the per-owner storage caps (#1272 — DECISION
+2026-09-17 on #1256).** `MAX_BYTES_PER_OWNER` (`src/db/save.ts`, 256 MiB) bounds one account's
+footprint, but nothing bounded how many accounts could exist — an unbounded account count has no
+disk ceiling at all. `ENSEMBLE_REGISTRATION_CAP` sets that ceiling: at or above this many existing
+accounts, `register/options` and `register/verify` answer the SAME `403 registration_closed` as
+the closed-by-policy case above, so **reaching the cap looks identical to closed registration to
+a client** — no new branch, no distinct error code. It defaults to `25` when unset (worst case
+25 × 256 MiB = **6.4 GiB**); size it against the box's real free disk before raising it, not
+because one deployment happened to fill up. Malformed values fail loudly at startup with the same
+digits-only validation as `PORT` (no sign, decimal point, exponent, hex prefix, or surrounding
+whitespace) — `0` and negative values are rejected too, since a cap of zero or less can never
+admit a registration. The check is enforced twice: a cheap count in `register/options` refuses
+early, and the authoritative count runs INSIDE the same database transaction that inserts the new
+account, so two registrations racing at cap-minus-one cannot both succeed. Existing accounts are
+completely unaffected at the cap — login, sessions, saves and adding a second passkey all keep
+working.
 
 **The API is publicly routed since 2026-09-15** (#1217 stacks, #1218 Caddy split with the verified
 proxy-trust receipt in the threat model). No account UI exists yet; the routes answer, nothing calls them. The container does not guess a trusted
