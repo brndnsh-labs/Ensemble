@@ -12,8 +12,11 @@ const liveTest = process.env.V2_LIVE_TEST === '1';
 // everything else — including any spec added later, which needs no change here — gets the other.
 const heavy = '**/foundation.spec.ts';
 const shard = process.env.V2_SHARD;
+// Passkey specs drive a CDP virtual authenticator, which only Chromium has.
+const chromiumOnly = '**/*.chromium.spec.ts';
 export default defineConfig({
     testDir: './checks',
+    globalSetup: './checks/global-setup.ts',
     testMatch: shard === 'heavy' ? heavy : undefined,
     testIgnore: shard === 'rest' ? heavy : undefined,
     // Tests inside one file run in parallel too, not just files against each
@@ -39,6 +42,8 @@ export default defineConfig({
         {
             name: 'webkit-phone',
             use: { ...devices['iPhone 13'], viewport: { width: 402, height: 874 } },
+            // A project-level `testIgnore` REPLACES the top-level one, so restate the shard's.
+            testIgnore: shard === 'rest' ? [heavy, chromiumOnly] : chromiumOnly,
         },
     ],
 });

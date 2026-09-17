@@ -89,6 +89,7 @@ gate evidence. Do not copy old test totals or preview SHAs into a new claim of v
 | Portable chart / iReal semantics | `../../public/songbook/` | Root/scoped engine guides and canonical codecs apply |
 | Offline install / deployment | `scripts/offline.mjs`, `scripts/deploy.mjs` | Anonymous shell + verified sounds; `deploy.mjs test` from a workstation, `deploy.mjs prod` only from the CI deploy job |
 | Browser evidence | `checks/`, `../../tests/browser/account-songbook.browser.test.ts` | Preview E2E plus real IndexedDB in Chromium/WebKit |
+| Account E2E harness (#1258) | `checks/fixtures.ts` (`accountTest`), `checks/global-setup.ts`, `scripts/serve.mjs` | Opt-in: runs the real API bundle on a throwaway database behind the worker's preview server, one `http://localhost` origin. Name passkey specs `*.chromium.spec.ts` (CDP virtual authenticator); needs `npm ci --prefix prototypes/v2-api` |
 | Server account API (stage 2, #1187+) | `../v2-api/` (sibling, not a subdirectory — see `../v2-api/README.md`) | Standalone Node service, own `package.json`/`node:sqlite` schema; ceremony (#1188), session + HTTP layer (#1189), passkey management + step-up reauth gated by one fresh-authentication predicate (#1190), and single-use recovery codes behind a restricted recovery-only session (#1191) modules land here; #1192 closed, client wiring starts at #1261 |
 
 ## Verification and receipt

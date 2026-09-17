@@ -211,12 +211,18 @@ jobs:
           cache-dependency-path: |
             package-lock.json
             prototypes/v2/package-lock.json
+            prototypes/v2-api/package-lock.json
 
       - name: Install dependencies
         run: npm ci
 
       - name: Install v2 dependencies
         run: npm ci --prefix prototypes/v2
+
+      # The account specs run the real API behind the preview server (#1258); the suite's
+      # global setup bundles it from these dependencies.
+      - name: Install v2 API dependencies
+        run: npm ci --prefix prototypes/v2-api
 
       - name: Get Playwright version
         id: playwright-version
