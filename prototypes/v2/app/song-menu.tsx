@@ -18,6 +18,7 @@ interface SongMenuProps {
     onShare: () => void;
     onSaveCopy: () => void;
     onExport: () => void;
+    onExportMidi: () => void;
     onImport: () => void;
     onRevert: () => void;
     onOpenRecovery: (record: Recovery) => void;
@@ -35,6 +36,7 @@ export function SongMenu({
     onShare,
     onSaveCopy,
     onExport,
+    onExportMidi,
     onImport,
     onRevert,
     onOpenRecovery,
@@ -55,6 +57,9 @@ export function SongMenu({
                 </button>
                 <button className="btn" disabled={busy} onClick={onExport}>
                     Export file
+                </button>
+                <button className="btn" disabled={busy} onClick={onExportMidi}>
+                    Export MIDI
                 </button>
                 {current?.schemaVersion === 2 && current.importSource && (
                     <button

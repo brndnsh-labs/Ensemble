@@ -609,6 +609,17 @@ export default function Ensemble() {
         anchor.click();
         window.setTimeout(() => URL.revokeObjectURL(url), 1000);
     }
+    // #1277 — reuse the shared `.mid` exporter (runs in its own detached worker
+    // realm, so it never touches the live scheduler/audio and is safe to call
+    // mid-playback). `exportToMidi` sanitizes the filename itself, matching how
+    // `exportSong` above applies pending text first.
+    async function exportMidiFile() {
+        if (!current) {
+            return;
+        }
+        const candidate = updateChart();
+        await runtime.exportMidi(candidate.title);
+    }
     const { blocks, displayActive, activeEvent, totalBars, writtenBars, writtenSections } =
         useChartView(current, active);
     const continuedSave = songs.find((song) => song.id === lastOpened);
@@ -1009,6 +1020,7 @@ export default function Ensemble() {
                 onShare={() => void run(shareChartLink)}
                 onSaveCopy={() => void run(() => save(true))}
                 onExport={() => void run(exportSong)}
+                onExportMidi={() => void run(exportMidiFile)}
                 onImport={() => {
                     setMenu(false);
                     setImporting(true);
