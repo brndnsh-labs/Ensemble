@@ -24,7 +24,7 @@ import {
     scoreArrangement,
 } from '@engine/songbook/score-playback';
 import type { SemanticScore } from '@engine/songbook/score-types';
-import type { ChartContent, ChartLaneMix } from '@engine/songbook/types';
+import type { ChartContent, ChartLaneMix, SoloistMode } from '@engine/songbook/types';
 import { dispatch, getState, subscribe } from '@engine/state';
 import {
     deriveSoloistModeOnBoot,
@@ -33,6 +33,7 @@ import {
 } from '@engine/state/state-effects';
 import {
     ACTIONS,
+    type ChordDensity,
     type EnsembleState,
     type InstrumentModule,
     type InstrumentVoice,
@@ -363,6 +364,45 @@ export async function setVoice(
         deriveSoloistModeOnBoot(getState(), dispatch);
     }
     rebuild();
+}
+
+/** Live bus gain — mirrors `InstrumentSettings.tsx`'s `updateInstrumentAudio`. */
+export function setVolume(module: InstrumentModule, value: number): void {
+    dispatch(ACTIONS.SET_VOLUME, { module, value });
+}
+
+/** Live reverb send — the `SET_REVERB` sibling of `setVolume`. */
+export function setReverb(module: InstrumentModule, value: number): void {
+    dispatch(ACTIONS.SET_REVERB, { module, value });
+}
+
+/**
+ * Bass/chords/harmony/soloist all read `<lane>.style` live at note-generation
+ * time (see `instrument-styles.ts`); this is the one manual style picker each
+ * of those four lanes has ever had in either app. Flush the worker's
+ * lookahead buffer afterward so the new style is audible at the next
+ * scheduled note rather than waiting for the pre-generated buffer to drain —
+ * `InstrumentSettings.tsx`'s chords-style handler does the same
+ * (`refreshArrangerUI`) for the one style picker v1 exposes.
+ */
+export function setStyle(module: InstrumentModule, style: string): void {
+    dispatch(ACTIONS.SET_STYLE, { module, style });
+    rebuild();
+}
+
+/** Chords-only: `SET_DENSITY`'s reducer writes `chords.density` unconditionally. */
+export function setDensity(density: ChordDensity): void {
+    dispatch(ACTIONS.SET_DENSITY, density);
+}
+
+/** Soloist phrasing mode — mirrors `InstrumentSettings.tsx`'s Auto/Monophonic/Guitar group. */
+export function setSoloistMode(mode: 'auto' | SoloistMode): void {
+    if (mode === 'auto') {
+        dispatch(ACTIONS.SET_SOLOIST_AUTO_MODE, true);
+    } else {
+        dispatch(ACTIONS.SET_SOLOIST_MODE, mode);
+        dispatch(ACTIONS.SET_SOLOIST_AUTO_MODE, false);
+    }
 }
 
 /**
