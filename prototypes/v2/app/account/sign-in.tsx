@@ -10,9 +10,12 @@ import {
     passkeysSupported,
     signIn,
 } from '../../lib/account/passkeys';
+import { AccountFailureNotice } from './account-failure';
+import { RecoverFlow } from './recover';
+import { RecoveryCodeStep } from './recovery-code-step';
 
 /**
- * Sign in, or create an account and save its recovery code (#1262).
+ * Sign in, create an account and save its recovery code (#1262), or recover one (#1263).
  *
  * The recovery code is the single most sensitive value this app ever holds, and it exists ONLY in
  * this component's `code` state for the life of the dialog. It is never written to
@@ -27,6 +30,11 @@ import {
  * account — so the header says so and reopens here, and a second `recovery/enroll` issues a
  * replacement code (the server replaces any live unconfirmed row, so the abandoned code stops
  * working; showing a stale code again would be a lie about what still opens the account).
+ *
+ * Recovery (#1263) is a `stage` of this same dialog rather than a second one: the shell owns one
+ * `<dialog>` ref and one `showModal()` effect, and the person arrives from the entry choice's
+ * "Lost your passkey?" line. `recover.tsx` owns that flow's steps; the code step at the end of it
+ * is the same `RecoveryCodeStep` the create flow finishes with, on purpose.
  */
 
 /** `'recovery'` resumes an abandoned enrolment; `'signIn'` opens at the entry choice. */
@@ -50,28 +58,16 @@ export function SignInDialog({
     onAccountChanged,
 }: SignInDialogProps) {
     const [code, setCode] = useState('');
-    const [savedCode, setSavedCode] = useState(false);
     const [busy, setBusy] = useState(false);
     const [failure, setFailure] = useState<AccountFailure | null>(null);
-    const [copyHint, setCopyHint] = useState('');
+    /** `'recover'` swaps the dialog's body for the #1263 flow until the dialog closes. */
+    const [stage, setStage] = useState<'entry' | 'recover'>('entry');
     // Resolved after mount: `browserSupportsWebAuthn()` reads `window`, which the static export's
     // prerender does not have.
     const [supported, setSupported] = useState(true);
     useEffect(() => {
         setSupported(passkeysSupported());
     }, []);
-
-    /**
-     * The recovery-code step replaces whatever was focused (usually the Create-account button,
-     * which unmounts), so focus would otherwise fall back to `<body>` — outside the dialog and
-     * silent for a screen reader. Move it to the step's own heading the moment the code appears.
-     */
-    const codeHeadingRef = useRef<HTMLHeadingElement>(null);
-    useEffect(() => {
-        if (code !== '') {
-            codeHeadingRef.current?.focus();
-        }
-    }, [code]);
 
     /**
      * Every await below outlives a possible close — a passkey prompt is a human pressing a
@@ -104,12 +100,12 @@ export function SignInDialog({
     useEffect(() => {
         openRef.current = open;
         if (!open) {
-            // Drop the code the moment the dialog closes, whatever closed it.
+            // Drop the code the moment the dialog closes, whatever closed it. `stage` resets with
+            // it, which unmounts `RecoverFlow` and takes any typed or replacement code with it.
             setCode('');
-            setSavedCode(false);
             setBusy(false);
             setFailure(null);
-            setCopyHint('');
+            setStage('entry');
         }
         // Opening in recovery mode used to fire `beginRecovery()` automatically here. That DELETEs
         // the live recovery row server-side and spends one of the 5 `recovery/enroll` calls per 10
@@ -186,30 +182,6 @@ export function SignInDialog({
         onClose();
     }
 
-    async function copyCode() {
-        setCopyHint('');
-        try {
-            await navigator.clipboard.writeText(code);
-            setCopyHint('Copied.');
-        } catch {
-            // No clipboard permission (the Playwright WebKit project, a locked-down profile):
-            // say so instead of failing silently. The code is already selectable in one click.
-            setCopyHint('Copy isn’t available here — select the code above and copy it by hand.');
-        }
-    }
-
-    function downloadCode() {
-        // A Blob URL is the only way to hand over a file, and it is revoked on the next tick —
-        // it is never navigated to, so the code never appears in the address bar or history.
-        const note = `${code}\n\nEnsemble recovery code — the only way back into your account if you lose your passkey. Keep it somewhere safe and private.\n`;
-        const url = URL.createObjectURL(new Blob([note], { type: 'text/plain;charset=utf-8' }));
-        const anchor = document.createElement('a');
-        anchor.href = url;
-        anchor.download = 'ensemble-recovery-code.txt';
-        anchor.click();
-        window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-    }
-
     return (
         <dialog
             ref={dialogRef}
@@ -234,62 +206,21 @@ export function SignInDialog({
                     </div>
                 </>
             ) : code !== '' ? (
-                <>
-                    <h2 id="account-dialog-title" ref={codeHeadingRef} tabIndex={-1}>
-                        Save your recovery code.
-                    </h2>
-                    <p>
-                        You’re signed in. This code is shown once and never again — it’s the only
-                        way back into your account if you lose your passkey. Copy it or download it,
-                        then keep it somewhere safe and offline.
-                    </p>
-                    <p className="recovery-code" data-testid="recovery-code">
-                        {code}
-                    </p>
-                    <div className="dialog-actions">
-                        <button className="btn" onClick={() => void copyCode()}>
-                            Copy
-                        </button>
-                        <button className="btn" onClick={downloadCode}>
-                            Download
-                        </button>
-                    </div>
-                    {copyHint !== '' && <p className="status-detail">{copyHint}</p>}
-                    {renderFailure(failure)}
-                    <label className="recovery-confirm">
-                        <input
-                            type="checkbox"
-                            checked={savedCode}
-                            data-testid="recovery-saved"
-                            onChange={(event) => setSavedCode(event.currentTarget.checked)}
-                        />
-                        I’ve saved this code somewhere safe
-                    </label>
-                    <div className="dialog-actions">
-                        <button
-                            className="btn primary"
-                            data-testid="recovery-finish"
-                            disabled={!savedCode || busy}
-                            onClick={() => void finish()}
-                        >
-                            Finish
-                        </button>
-                        <button
-                            className="btn"
-                            data-testid="recovery-not-now"
-                            disabled={busy}
-                            onClick={onClose}
-                        >
-                            Not now
-                        </button>
-                    </div>
-                    <p className="status-detail">
-                        There’s no email reset and no support override. Lose every passkey and this
-                        code, and the account can’t be recovered — songs already on this device stay
-                        exportable either way. Adding a second passkey later is the cheapest
-                        insurance.
-                    </p>
-                </>
+                <RecoveryCodeStep
+                    heading="Save your recovery code."
+                    lead="You’re signed in. This code is shown once and never again — it’s the only way back into your account if you lose your passkey. Copy it or download it, then keep it somewhere safe and offline."
+                    code={code}
+                    busy={busy}
+                    failure={failure}
+                    onFinish={() => void finish()}
+                    onClose={onClose}
+                />
+            ) : stage === 'recover' ? (
+                <RecoverFlow
+                    onBack={() => setStage('entry')}
+                    onClose={onClose}
+                    onAccountChanged={onAccountChanged}
+                />
             ) : mode === 'recovery' ? (
                 <>
                     <h2 id="account-dialog-title">Finish protecting your account.</h2>
@@ -298,7 +229,7 @@ export function SignInDialog({
                             ? 'Getting a new recovery code…'
                             : 'Your account has no recovery code yet.'}
                     </p>
-                    {renderFailure(failure)}
+                    <AccountFailureNotice failure={failure} />
                     <div className="dialog-actions">
                         <button
                             className="btn primary"
@@ -343,7 +274,20 @@ export function SignInDialog({
                             Close
                         </button>
                     </div>
-                    {renderFailure(failure)}
+                    <AccountFailureNotice failure={failure} />
+                    <p>
+                        <button
+                            className="recovery-link"
+                            data-testid="account-recover"
+                            disabled={busy}
+                            onClick={() => {
+                                setFailure(null);
+                                setStage('recover');
+                            }}
+                        >
+                            Lost your passkey? Use your recovery code
+                        </button>
+                    </p>
                     <p className="status-detail">
                         Signing in is optional. The songbook on this device works without an
                         account, and every chart exports to a file.
@@ -351,25 +295,5 @@ export function SignInDialog({
                 </>
             )}
         </dialog>
-    );
-}
-
-/**
- * A `notice` is an expected answer, not a fault — `registration_closed` is what the server says
- * while sign-ups are closed by policy or the account cap is full — so it gets calm styling and
- * `role="status"`, never the error treatment.
- */
-function renderFailure(failure: AccountFailure | null) {
-    if (failure === null || failure.kind === 'cancelled') {
-        return null;
-    }
-    return failure.kind === 'notice' ? (
-        <p className="account-notice" role="status" data-testid="account-notice">
-            {failure.message}
-        </p>
-    ) : (
-        <p className="account-error" role="alert" data-testid="account-error">
-            {failure.message}
-        </p>
     );
 }

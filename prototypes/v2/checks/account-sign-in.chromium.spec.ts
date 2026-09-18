@@ -1,5 +1,11 @@
 import { readFile } from 'node:fs/promises';
 import type { Page } from '@playwright/test';
+import {
+    CODE_SHAPE,
+    createAccountThroughDialog,
+    openWithAccounts,
+    persistedState,
+} from './account-helpers';
 import { expect, accountTest as test } from './fixtures';
 import { addVirtualAuthenticator } from './virtual-authenticator';
 
@@ -21,69 +27,13 @@ import { addVirtualAuthenticator } from './virtual-authenticator';
  * The security-review follow-ups (focus-on-code, the offline sign-out disable, and a failed
  * Finish rendering its error) are folded into these same four enrolments rather than adding a
  * fifth — the budget stays at 4/10min.
+ *
+ * Measured 2026-09-17 (#1263) and worth knowing before adding a fifth: "a worker" is not "a
+ * file". Under `fullyParallel` Playwright hands out one TEST at a time, so these five spread
+ * across workers AND share a worker with tests from other files — including
+ * `account-recovery.chromium.spec.ts`'s two enrolments, which are drawn from the same bucket
+ * whenever they meet. Four here plus two there is the whole account suite's spend; keep it there.
  */
-
-const CODE_SHAPE = /^[A-Za-z0-9_-]{43}$/;
-
-/** Opt this device into the dark-launched account UI, then land on the songbook. */
-async function openWithAccounts(page: Page): Promise<void> {
-    await page.goto('/v2/?accounts=on');
-    await expect(page.getByRole('heading', { name: 'Let’s play something.' })).toBeVisible();
-}
-
-async function createAccountThroughDialog(page: Page): Promise<string> {
-    await page.getByTestId('account-sign-in').click();
-    await expect(page.locator('dialog.account-dialog')).toBeVisible();
-    await page.getByTestId('account-create').click();
-    const shown = page.getByTestId('recovery-code');
-    await expect(shown).toBeVisible();
-    const code = (await shown.textContent()) ?? '';
-    expect(code).toMatch(CODE_SHAPE);
-    return code;
-}
-
-/** Everything this origin can be asked for, to search for a leaked recovery code. */
-async function persistedState(page: Page) {
-    return page.evaluate(async () => {
-        const pack = (storage: Storage) => {
-            const entries: string[] = [];
-            for (let index = 0; index < storage.length; index += 1) {
-                const key = storage.key(index);
-                entries.push(`${key}=${key === null ? '' : storage.getItem(key)}`);
-            }
-            return entries.join('\n');
-        };
-        let indexed = '';
-        const databases = (await indexedDB.databases?.()) ?? [];
-        for (const { name } of databases) {
-            if (!name) {
-                continue;
-            }
-            const db = await new Promise<IDBDatabase>((resolve, reject) => {
-                const request = indexedDB.open(name);
-                request.onsuccess = () => resolve(request.result);
-                request.onerror = () => reject(request.error);
-            });
-            for (const store of Array.from(db.objectStoreNames)) {
-                indexed += await new Promise<string>((resolve) => {
-                    const request = db.transaction(store, 'readonly').objectStore(store).getAll();
-                    request.onsuccess = () => resolve(JSON.stringify(request.result));
-                    request.onerror = () => resolve('');
-                });
-            }
-            db.close();
-        }
-        return {
-            href: location.href,
-            local: pack(localStorage),
-            session: pack(sessionStorage),
-            indexed,
-            // HttpOnly, so this should be empty — but an accidental readable cookie is exactly
-            // the kind of thing worth failing on.
-            cookie: document.cookie,
-        };
-    });
-}
 
 test('creating an account shows the recovery code once, downloads it, and survives a reload', async ({
     page,

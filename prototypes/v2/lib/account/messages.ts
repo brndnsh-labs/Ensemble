@@ -34,6 +34,7 @@ export const ACCOUNT_MESSAGES = {
     rateLimited: 'Too many attempts — try again later.',
     network: 'Can’t reach the server. You can keep playing as a guest.',
     generic: 'Something went wrong. Try again in a moment.',
+    badCode: 'That code isn’t right, or it has already been used. Check it and try again.',
 } as const;
 
 export function failureFromApi(error: ApiError): AccountFailure {
@@ -57,4 +58,27 @@ export function failureFromApi(error: ApiError): AccountFailure {
             // try again. Naming the code would leak service vocabulary for no user benefit.
             return { kind: 'error', message: ACCOUNT_MESSAGES.generic };
     }
+}
+
+/**
+ * The same mapping, for `POST /api/auth/recovery/claim` alone (#1263).
+ *
+ * That route collapses every way a claim can fail — the code doesn't exist, the hash doesn't
+ * match, it was never confirmed, it was already spent, another attempt holds the claim lock — to
+ * one `401 authentication_failed`, deliberately, so a caller learns nothing about which. The
+ * generic `failed` copy for that code ("use a different passkey") would be nonsense here: there
+ * is no passkey in this ceremony, only a typed code. So the one place the code IS the credential
+ * gets the one sentence that fits, and the mapping stays in this module rather than becoming an
+ * `if` in the dialog — the whole point of `messages.ts` is that copy lives in exactly one file.
+ *
+ * Everything else — rate limiting, an unreachable server, a code this client has never seen —
+ * falls through to `failureFromApi` unchanged. It is deliberately NOT a "wrong code" answer for
+ * any other status: a 429 must read as a 429, or someone retyping a perfectly good code would be
+ * told it is wrong.
+ */
+export function failureFromClaim(error: ApiError): AccountFailure {
+    if (error.kind === 'code' && error.code === 'authentication_failed') {
+        return { kind: 'error', message: ACCOUNT_MESSAGES.badCode };
+    }
+    return failureFromApi(error);
 }
