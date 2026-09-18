@@ -2826,3 +2826,32 @@ html[data-theme="stage"] {
     border-radius: 8px;
     padding: 9px 12px;
 }
+/* Sync status chip (#1266). Three separate facts, laid out as three separate lines rather
+   than one badge — a musician who saved offline needs to see local safety and cloud
+   confirmation disagree. Rendered only on the music stand, and only for a device with an
+   account, so the guest DOM and the songbook page are both unchanged. */
+.sync-status {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    font-size: 11px;
+    line-height: 1.5;
+    color: var(--muted);
+    min-width: 0;
+}
+.sync-fact {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.sync-failure {
+    color: var(--accent);
+    /* The reason can be a full sentence; it wraps rather than being clipped like the facts. */
+    white-space: normal;
+}
+/* "We haven't read your account library yet" — never the empty-library table (#1266). */
+.library-loading {
+    color: var(--muted);
+    font-size: 13px;
+    padding: 14px 0;
+}

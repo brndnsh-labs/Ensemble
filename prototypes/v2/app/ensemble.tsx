@@ -6,6 +6,7 @@ import { prepareScorePlayback } from '@engine/songbook/score-playback';
 import type { SemanticScore } from '@engine/songbook/score-types';
 import type { InstrumentVoice } from '@engine/types';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { accountSync } from '../lib/account/sync-loop';
 import { arrangementOf, blankSong, convertedCopy, extendedScore } from '../lib/documents';
 import { validateEditorText } from '../lib/editor';
 import * as repository from '../lib/repository';
@@ -14,8 +15,11 @@ import * as runtime from '../lib/runtime';
 import { lastOpenedSong, rememberSong } from '../lib/session';
 import { allSoundsAvailableOffline, installAllSounds, soundsAvailableOffline } from '../lib/sounds';
 import { start } from '../lib/starters';
+import type { SavedSong } from '../lib/sync/protocol';
+import type { Progress } from '../lib/sync/status';
 import { AccountEntry } from './account/account-entry';
 import { AccountPage } from './account/account-page';
+import { SyncStatus, useAccountLibrary } from './account/library';
 import { type AccountDialogMode, SignInDialog } from './account/sign-in';
 import { useAccountSession, useAccountsEnabled } from './account/use-account-session';
 import { ChartSheet } from './chart-sheet';
@@ -35,6 +39,18 @@ import { useStageTheme } from './use-stage-theme';
 const same = (a: ChartDocument, b: ChartDocument) =>
     a.title === b.title && JSON.stringify(a.chart) === JSON.stringify(b.chart);
 
+/**
+ * The account library in the order the songbook already reads in (#1266): most recently updated
+ * first, exactly as `lib/repository.ts`'s guest `list()` returns it. `AccountSongbook.list` pages
+ * in document-ID order instead — the right choice for a resumable cursor, and an arbitrary one to
+ * a musician — so the ordering a person sees is the shell's to apply, not storage's to change.
+ */
+function libraryDocuments(library: SavedSong[]): ChartDocument[] {
+    return library
+        .map((song) => song.document)
+        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+}
+
 /** Read the live engine values the Feel sheet needs but `ChartDocument` doesn't carry. */
 function feelSnapshot(): FeelSnapshot {
     const { playback } = runtime.state();
@@ -47,13 +63,33 @@ function feelSnapshot(): FeelSnapshot {
 }
 
 export default function Ensemble() {
-    const [songs, setSongs] = useState<ChartDocument[]>([]);
+    // Two songbooks, never merged and never switched between by a control (#1266, rollout
+    // decision 9 S3): the guest library is what a signed-out device plays from, the account
+    // library is what a signed-in one plays from, and signing in copies nothing either way.
+    const [guestSongs, setGuestSongs] = useState<ChartDocument[]>([]);
+    // Null until the account library has actually been read — an empty array is a claim.
+    const [accountSongs, setAccountSongs] = useState<ChartDocument[] | null>(null);
     const [current, setCurrent] = useState<ChartDocument | null>(null);
     const [saved, setSaved] = useState<ChartDocument | null>(null);
+    /**
+     * Which songbook the chart on the stand came from, or null when nothing is open (#1266).
+     *
+     * A session can expire without any user gesture — `createSaveTransport`/`createLibraryTransport`
+     * call `session.markExpired()` on any 401 — and `signedIn` flips to false underneath a chart
+     * that is still the account's. Without this, `storeSave` would silently re-route to the guest
+     * repository: plain Save reports a nonsense conflict, and `Save a copy` (which passes
+     * `expected = null`) SUCCEEDS and writes account content into guest IndexedDB. A ref rather
+     * than state on purpose — nothing renders it, and `newSong` has to set it and read it back in
+     * the same tick.
+     */
+    const currentStore = useRef<'guest' | 'account' | null>(null);
     const [ready, setReady] = useState(false);
     const [busy, setBusy] = useState(false);
     const volatileDrafts = useRef(new Map<string, ChartDocument>());
     const [recoveryHealthy, setRecoveryHealthy] = useState(true);
+    // #1266 — whether the LAST explicit Save failed locally. `status.ts` ranks that above an
+    // older successful revision, so it cannot be inferred from `saved` and needs its own fact.
+    const [saveFailed, setSaveFailed] = useState(false);
     const working = useRef(false);
     const [error, setError] = useState('');
     const [message, setMessage] = useState('');
@@ -113,6 +149,24 @@ export default function Ensemble() {
     // dialog from the sign-in one above — opening it never touches `accountDialog`, and vice
     // versa, so the two can't fight over the same `showModal()`/`close()` pair.
     const [accountPageOpen, setAccountPageOpen] = useState(false);
+    // #1266 — signed in, the songbook IS the account library. `current?.id` is the chart on the
+    // stand: the loop hands it to the download's `isActive` so a remote update can never be
+    // swapped in underneath whoever is playing.
+    const signedIn = accountsOn && account.session.status === 'signedIn';
+    const sync = useAccountLibrary(accountsOn, account.session, current?.id ?? null);
+    // `?? []` is the LIST, not the claim: "we haven't read the account library yet" is carried
+    // separately to the songbook as `loading`, so an unread library never renders as an empty one.
+    const songs = signedIn ? (accountSongs ?? []) : guestSongs;
+    // Two things the songbook cannot yet claim: WHICH library this is (the first session read is
+    // still out — rendering the guest list and then swapping it for the account library is a
+    // wrong answer, not a loading state), and, once signed in, what the account library holds.
+    // `settled` flips on any answer, so an offline cold start still shows the guest songbook.
+    const songbookLoading =
+        (accountsOn && ready && !account.settled) || (signedIn && accountSongs === null);
+    // The band/sound defaults a brand-new or imported song is built from. It falls back to the
+    // guest starters because a fresh account's library is legitimately empty, and "New song" and
+    // "Import" must still work on the very first visit after signing in.
+    const template = songs[0] ?? guestSongs[0];
     const dialog = useRef<HTMLDialogElement>(null);
     const accountDialogRef = useRef<HTMLDialogElement>(null);
     const accountPageDialogRef = useRef<HTMLDialogElement>(null);
@@ -137,7 +191,7 @@ export default function Ensemble() {
         start()
             .then((result) => {
                 if (alive) {
-                    setSongs(result);
+                    setGuestSongs(result);
                     setLastOpened(lastOpenedSong());
                     setReady(true);
                 }
@@ -204,6 +258,8 @@ export default function Ensemble() {
                 runtime.load(document);
                 setSaved(null);
                 setCurrent(document);
+                // A shared draft belongs to no songbook yet; "Keep a copy" decides that.
+                currentStore.current = null;
                 setSharedDraft(true);
                 // Inlined clearBuffers()/selectSection(): both are plain function
                 // declarations (a new reference every render), which
@@ -265,6 +321,36 @@ export default function Ensemble() {
             accountDialogRef.current?.close();
         }
     }, [accountDialog]);
+    // #1266 — the account library is re-read on sign-in and whenever the loop reports it changed
+    // on disk (a Save committed, a download advanced or removed a record). `sync.owner` rather
+    // than `signedIn` is the gate: it is published only once the loop has a scope, so the first
+    // read cannot race the attach. Nothing here touches `current`/`saved` — the list changing is
+    // never allowed to change the chart on the stand.
+    // `libraryVersion` is not read in the body: it is the loop's "the stored library moved"
+    // signal, and re-running this read is exactly why the effect depends on it.
+    // biome-ignore lint/correctness/useExhaustiveDependencies: deliberate re-run trigger.
+    useEffect(() => {
+        if (sync.owner === null) {
+            setAccountSongs(null);
+            return;
+        }
+        let alive = true;
+        accountSync
+            .listLibrary()
+            .then((library) => {
+                if (alive) {
+                    setAccountSongs(libraryDocuments(library));
+                }
+            })
+            .catch((e: unknown) => {
+                if (alive) {
+                    setError(e instanceof Error ? e.message : String(e));
+                }
+            });
+        return () => {
+            alive = false;
+        };
+    }, [sync.owner, sync.libraryVersion]);
     useEffect(() => {
         if (accountPageOpen) {
             accountPageDialogRef.current?.showModal();
@@ -494,6 +580,7 @@ export default function Ensemble() {
             updateChart();
             runtime.stop();
             setCurrent(null);
+            currentStore.current = null;
         });
     }
     function selectSection(document: ChartDocument, id?: string) {
@@ -513,11 +600,16 @@ export default function Ensemble() {
         runtime.load(next);
         setSaved(document);
         setCurrent(next);
+        currentStore.current = signedIn ? 'account' : 'guest';
         setSharedDraft(false);
         clearBuffers();
         rememberSong(next.id);
         setLastOpened(next.id);
         setRecoveryHealthy(!volatileDrafts.current.has(document.id));
+        // `lastSave` is a fact about the chart on the stand, and this is a different chart:
+        // carrying a previous song's failed Save into it would rank "Save failed on this device"
+        // above a local status that is, for this document, simply true (#1266).
+        setSaveFailed(false);
         setEditing(false);
         setFollowing(true);
         setMessage(
@@ -543,8 +635,8 @@ export default function Ensemble() {
             createdAt: now,
             updatedAt: now,
         };
-        const created = await repository.save(copy, null);
-        setSongs(await repository.list());
+        const created = await storeSave(copy, null);
+        await refreshSongs();
         await open(created);
         setMessage('Saved a local copy');
     }
@@ -573,10 +665,61 @@ export default function Ensemble() {
         }
         setShareLinkFallback(url);
     }
+    /**
+     * Re-reads whichever songbook this device is playing from. Signed in that is the account
+     * library (#1266); signed out it is the guest one. The two are never merged and never
+     * switched between by a control (rollout decision 9 S3) — which is also why this only ever
+     * writes the LIST state: re-listing must never reach into `current`/`saved` and change the
+     * chart on the stand.
+     */
+    async function refreshSongs(): Promise<ChartDocument[]> {
+        if (signedIn) {
+            const documents = libraryDocuments(await accountSync.listLibrary());
+            setAccountSongs(documents);
+            return documents;
+        }
+        const fresh = await repository.list();
+        setGuestSongs(fresh);
+        return fresh;
+    }
+    /**
+     * Commits a version and, signed in, queues those exact bytes for the owner and asks the loop
+     * to send them. Save never waits for the network: an offline Save is an ordinary successful
+     * Save with an upload still owed, which is the whole reason local safety and cloud
+     * confirmation are reported as two separate facts.
+     */
+    async function storeSave(document: ChartDocument, expected: number | null) {
+        try {
+            if (currentStore.current === 'account' && !signedIn) {
+                // The session lapsed under an account chart. Falling through would write it to
+                // the GUEST songbook — a conflict that isn't one on a plain Save, and a silent
+                // copy of account content into guest storage on `Save a copy` (#1266). The full
+                // sign-out flow, including what to offer instead, is #1269's.
+                throw new Error(
+                    'Your session expired — sign in again to save this to your account. Your changes stay on this device.',
+                );
+            }
+            if (!signedIn) {
+                const committed = await repository.save(document, expected);
+                currentStore.current = 'guest';
+                setSaveFailed(false);
+                return committed;
+            }
+            const song = await accountSync.save(document, expected);
+            currentStore.current = 'account';
+            setSaveFailed(false);
+            // Save is one of the four things that runs a pass. Not awaited: the commit is
+            // already durable, and the upload is the loop's problem from here.
+            void accountSync.run();
+            return song.document;
+        } catch (failure) {
+            setSaveFailed(true);
+            throw failure;
+        }
+    }
     function openSong(id: string) {
         void run(async () => {
-            const fresh = await repository.list();
-            setSongs(fresh);
+            const fresh = await refreshSongs();
             const document = fresh.find((s) => s.id === id);
             if (!document) {
                 throw new Error('Song no longer exists.');
@@ -597,7 +740,7 @@ export default function Ensemble() {
               }
             : candidate;
         // A recovered stale draft must not borrow the newer saved revision.
-        const result = await repository.save(next, copy ? null : current.revision);
+        const result = await storeSave(next, copy ? null : current.revision);
         setSaved(result);
         setCurrent(result);
         rememberSong(result.id);
@@ -609,19 +752,21 @@ export default function Ensemble() {
         } catch {
             /* The committed save is authoritative; retained recovery is harmless. */
         }
-        setSongs(await repository.list());
+        await refreshSongs();
         setMessage('Saved on this device');
         setMenu(false);
     }
     function newSong() {
         void run(async () => {
-            const base = songs[0];
-            if (!base) {
+            if (!template) {
                 throw new Error('Starter library is not ready.');
             }
-            const document = repository.validated(blankSong(base));
-            const created = await repository.save(document, null);
-            setSongs(await repository.list());
+            // A brand-new song belongs to whichever songbook is live right now, not to whatever
+            // was last on the stand — set before `storeSave` so its expiry guard reads the truth.
+            currentStore.current = signedIn ? 'account' : 'guest';
+            const document = repository.validated(blankSong(template));
+            const created = await storeSave(document, null);
+            await refreshSongs();
             await open(created);
             revealEditor(arrangementOf(created).sections[0].id);
         });
@@ -635,8 +780,8 @@ export default function Ensemble() {
             const converted = convertedCopy(original);
             // Capability preflight before creating a copy or changing the active song.
             prepareScorePlayback(converted.chart.score);
-            const created = await repository.save(converted, null);
-            setSongs(await repository.list());
+            const created = await storeSave(converted, null);
+            await refreshSongs();
             await open(created);
             revealEditor(arrangementOf(created).sections[0].id);
             setMessage('Editable copy created · your original song is unchanged');
@@ -703,6 +848,42 @@ export default function Ensemble() {
             return volatileDrafts.current.get(featuredSave.id) || featuredSave;
         }
     }, [featuredSave, current]);
+    /**
+     * `offline.sounds` for the status chip. `soundsAvailableOffline` answers one yes/no about the
+     * whole set the open chart needs, so the honest count is that single requirement — verified
+     * or not — and `null` for as long as nothing has actually checked. A per-pack count would
+     * need `lib/sounds.ts` to report one; inventing numbers here would over-claim readiness,
+     * which is the exact failure this fact exists to prevent.
+     */
+    const soundsProgress: Progress =
+        soundsOffline === null
+            ? { required: null, verified: null }
+            : { required: 1, verified: soundsOffline ? 1 : 0 };
+    /**
+     * Three separate facts, never one badge (#1266). Rendered only on the MUSIC STAND, and only
+     * for a device with an account.
+     *
+     * Not on the songbook page: with no chart open, `savedRevision`, the open chart's sounds and
+     * the cloud observation are all genuinely unobserved, so the chip there was three permanent
+     * "we haven't checked" lines — an honest projection of nothing, which reads as a broken
+     * badge rather than as a fact.
+     *
+     * `expired` is included alongside `signedIn` deliberately: that is precisely when the loop's
+     * "sign in again to upload it" sentence is true, and unmounting the chip on the state change
+     * that produces it would make the sentence unreachable.
+     */
+    const syncStatus =
+        accountsOn && current && (signedIn || account.session.status === 'expired') ? (
+            <SyncStatus
+                savedRevision={saved ? saved.revision : null}
+                editing={dirty ? 'dirty' : 'clean'}
+                lastSave={saveFailed ? 'failed' : 'idle'}
+                recovery={!dirty ? 'none' : recoveryHealthy ? 'confirmed' : 'failed'}
+                shell={offline.shell}
+                sounds={soundsProgress}
+                sync={sync}
+            />
+        ) : null;
 
     return (
         <div
@@ -716,6 +897,7 @@ export default function Ensemble() {
                         onClick={() => {
                             runtime.stop();
                             setCurrent(null);
+                            currentStore.current = null;
                         }}
                     >
                         ♬ ensemble
@@ -727,6 +909,7 @@ export default function Ensemble() {
                             onClick={() => {
                                 runtime.stop();
                                 setCurrent(null);
+                                currentStore.current = null;
                             }}
                         >
                             My songbook
@@ -734,7 +917,7 @@ export default function Ensemble() {
                     </nav>
                 </div>
                 <div className="header-right">
-                    <span className="local-status">{offline}</span>
+                    <span className="local-status">{offline.label}</span>
                     <span className="concept-tag">Music stand · beta</span>
                     {accountsOn && (
                         <AccountEntry
@@ -786,18 +969,18 @@ export default function Ensemble() {
                         if (candidate.schemaVersion === 2) {
                             prepareScorePlayback(candidate.chart.score);
                         }
-                        const result = await repository.save(
+                        const result = await storeSave(
                             { ...candidate, id: crypto.randomUUID() },
                             null,
                         );
-                        setSongs(await repository.list());
+                        await refreshSongs();
                         await open(result);
                     });
                 }}
             />
-            {importing && (current || songs[0]) && (
+            {importing && (current || template) && (
                 <ImportDialog
-                    base={current ?? songs[0]}
+                    base={current ?? template}
                     onClose={() => setImporting(false)}
                     onAdd={async (candidate) => {
                         const checked = repository.validated(candidate);
@@ -807,11 +990,11 @@ export default function Ensemble() {
                         if (current) {
                             updateChart();
                         }
-                        const result = await repository.save(
+                        const result = await storeSave(
                             { ...checked, id: crypto.randomUUID() },
                             null,
                         );
-                        setSongs(await repository.list());
+                        await refreshSongs();
                         await open(result);
                     }}
                 />
@@ -823,11 +1006,13 @@ export default function Ensemble() {
                 </main>
             ) : !current ? (
                 <Songbook
-                    songs={songs}
+                    songs={songbookLoading ? [] : songs}
                     featured={featured}
                     continued={!!continuedSave}
                     busy={busy}
-                    offline={offline}
+                    offline={offline.label}
+                    accountLibrary={signedIn}
+                    loading={songbookLoading}
                     search={search}
                     onSearch={setSearch}
                     onImport={() => setImporting(true)}
@@ -1117,7 +1302,8 @@ export default function Ensemble() {
                                   ? 'Band is playing'
                                   : message}
                         </span>
-                        <span className="footer-tip">{offline}</span>
+                        {syncStatus}
+                        <span className="footer-tip">{offline.label}</span>
                         <button className="follow-btn" onClick={() => setFollowing(!following)}>
                             {following ? 'Following' : 'Resume follow'}
                         </button>
@@ -1156,7 +1342,7 @@ export default function Ensemble() {
                 onOpenRecovery={(record) =>
                     void run(async () => {
                         updateChart();
-                        const copy = await repository.save(
+                        const copy = await storeSave(
                             {
                                 ...record.document,
                                 id: crypto.randomUUID(),
@@ -1164,7 +1350,7 @@ export default function Ensemble() {
                             },
                             null,
                         );
-                        setSongs(await repository.list());
+                        await refreshSongs();
                         await open(copy);
                         setMenu(false);
                     })

@@ -3,6 +3,18 @@ import type { ChartDocument } from '../lib/runtime';
 
 interface SongbookProps {
     songs: ChartDocument[];
+    /**
+     * True when `songs` is the signed-in account library rather than the guest one (#1266).
+     * There is no switcher — guest signed out, account signed in (rollout decision 9 S3) — so
+     * this only changes what the page SAYS about the list it was handed.
+     */
+    accountLibrary: boolean;
+    /**
+     * True while the account library has not been read yet (#1266). An empty `songs` is a claim —
+     * "your account has no songs" — and it must not be made from a read that hasn't finished, or
+     * from one that failed. This is the difference between the two.
+     */
+    loading: boolean;
     /** The card at the top: the last-opened song (with any recovered draft), else a starter. */
     featured: ChartDocument | null;
     /** True when `featured` is the song the musician last had open. */
@@ -18,6 +30,8 @@ interface SongbookProps {
 
 export function Songbook({
     songs,
+    accountLibrary,
+    loading,
     featured,
     continued,
     busy,
@@ -84,7 +98,9 @@ export function Songbook({
                         </section>
                     )}
                     <div className="section-heading library-heading">
-                        <h2>Your songbook</h2>
+                        <h2 data-testid="library-heading">
+                            {accountLibrary ? 'Your account songbook' : 'Your songbook'}
+                        </h2>
                         <label className="search">
                             <span className="sr">Search songs</span>
                             <input
@@ -94,7 +110,14 @@ export function Songbook({
                             />
                         </label>
                     </div>
-                    <table className="song-table">
+                    {loading && (
+                        <p className="library-loading" role="status" data-testid="library-loading">
+                            {accountLibrary
+                                ? 'Loading your account songbook…'
+                                : 'Loading your songbook…'}
+                        </p>
+                    )}
+                    <table className="song-table" hidden={loading}>
                         <thead>
                             <tr>
                                 <th>Song</th>
@@ -117,8 +140,10 @@ export function Songbook({
                                                 <span>
                                                     <span className="song-name">{s.title}</span>
                                                     <span className="song-detail">
-                                                        {s.chart.band.groove.lastSmartGenre} · Saved
-                                                        locally
+                                                        {s.chart.band.groove.lastSmartGenre} ·{' '}
+                                                        {accountLibrary
+                                                            ? 'In your account'
+                                                            : 'Saved locally'}
                                                     </span>
                                                 </span>
                                             </button>
@@ -160,10 +185,19 @@ export function Songbook({
                     </section>
                     <section className="sync-card">
                         <h3>Your band, wherever you play.</h3>
-                        <p>
-                            Accounts and cloud songbooks are a later stage. The stand is
-                            device-local, with real playback and portable Ensemble files.
-                        </p>
+                        {accountLibrary ? (
+                            // The three sync facts are a music-stand surface: they describe the
+                            // chart on the stand, and there isn't one here (#1266).
+                            <p>
+                                Save on one device and open it on another. Your guest songbook stays
+                                on this device and is separate from your account.
+                            </p>
+                        ) : (
+                            <p>
+                                Accounts and cloud songbooks are a later stage. The stand is
+                                device-local, with real playback and portable Ensemble files.
+                            </p>
+                        )}
                         <p className="preview-note">
                             iReal import and chord discovery are not implemented here yet. Open a
                             song and use its menu's "Copy link" to share it — the link opens as an

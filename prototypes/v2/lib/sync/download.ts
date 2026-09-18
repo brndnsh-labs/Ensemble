@@ -56,10 +56,16 @@ export const MANIFEST_PAGE_LIMIT = 500;
 export const MANIFEST_PAGE_BUDGET = 2_000;
 export const DOWNLOAD_CONCURRENCY = 4;
 /**
- * 400ms between requests is 150/min: under the download route's own 180/min budget and inside
- * the 300/min transport budget it SHARES with `/api/auth/*` and Save, which is keyed by network
- * identity rather than by account. Bursting here would refuse the session check that keeps the
- * user signed in, so a full cold-start library is ~11 paced minutes by design.
+ * 400ms between requests is 150/min: under the BODY route's 180/min budget
+ * (`GET /api/documents/:id`, `DOCUMENT_POLICIES` in `prototypes/v2-api/src/http/documents.ts`)
+ * and inside the 300/min transport budget it SHARES with `/api/auth/*` and Save, which is keyed
+ * by network identity rather than by account. Bursting here would refuse the session check that
+ * keeps the user signed in, so a full cold-start library is ~11 paced minutes by design.
+ *
+ * The MANIFEST route is a tighter 30/min (`GET /api/documents`), and this interval does not on
+ * its own keep a pass under it. It does not have to: a 2,000-document library is four manifest
+ * pages, so one pass spends four of those thirty, and a device that somehow exhausts the budget
+ * gets a `backoff` outcome rather than a wrong answer.
  */
 export const DOWNLOAD_INTERVAL_MS = 400;
 /** Used only when a 429 arrives with no parseable `Retry-After`. */

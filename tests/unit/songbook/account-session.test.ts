@@ -78,8 +78,11 @@ describe('createAccountSession', () => {
         expect(session.getSnapshot()).toEqual({ status: 'unknown' });
     });
 
-    it('markExpired forces expired and notifies subscribers exactly once', async () => {
-        const session = createAccountSession(apiReturning());
+    it('markExpired moves a signed-in session to expired and notifies subscribers once', async () => {
+        const session = createAccountSession(
+            apiReturning({ ok: true, value: { accountId: 'acct-1' }, status: 200 }),
+        );
+        await session.refresh();
         const listener = vi.fn();
         session.subscribe(listener);
         session.markExpired();
@@ -87,12 +90,37 @@ describe('createAccountSession', () => {
         expect(listener).toHaveBeenCalledTimes(1);
     });
 
+    it('markExpired leaves a guest or never-refreshed session exactly where it was', async () => {
+        // The same rule `refresh()` keeps, enforced here rather than trusted to every caller:
+        // only a session that WAS signed in can expire. A device that meets a 401 having never
+        // signed in has learned nothing, and "sign in again" would be a lie to whoever reads it.
+        const never = createAccountSession(apiReturning());
+        never.markExpired();
+        expect(never.getSnapshot()).toEqual({ status: 'unknown' });
+
+        const guest = createAccountSession(
+            apiReturning({
+                ok: false,
+                error: { kind: 'code', code: 'unauthenticated', status: 401 },
+            }),
+        );
+        await guest.refresh();
+        guest.markExpired();
+        expect(guest.getSnapshot()).toEqual({ status: 'guest' });
+    });
+
     it('unsubscribe stops further notifications', async () => {
-        const session = createAccountSession(apiReturning());
+        // Signed in first, so `markExpired()` is a REAL state change: from `unknown` it is a
+        // no-op, and this would then pass without unsubscribe doing anything at all.
+        const session = createAccountSession(
+            apiReturning({ ok: true, value: { accountId: 'acct-1' }, status: 200 }),
+        );
+        await session.refresh();
         const listener = vi.fn();
         const unsubscribe = session.subscribe(listener);
         unsubscribe();
         session.markExpired();
+        expect(session.getSnapshot()).toEqual({ status: 'expired' });
         expect(listener).not.toHaveBeenCalled();
     });
 
