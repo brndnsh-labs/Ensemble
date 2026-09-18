@@ -44,6 +44,9 @@ export class AccountDatabase {
                         keyPath: ['ownerId', 'documentId', 'writerId'],
                     });
                     drafts.createIndex('song', ['ownerId', 'documentId']);
+                    // Generic keyed store: the `'active'` account pointer, plus the
+                    // `remote:<owner>:<document>` candidates a library download preserves
+                    // (see `candidateKey` in `protocol.ts` for why they live here).
                     db.createObjectStore('meta', { keyPath: 'key' });
                 };
                 request.onblocked = () => {

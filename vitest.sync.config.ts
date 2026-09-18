@@ -12,6 +12,7 @@ export default defineConfig({
             'tests/browser/account-songbook.browser.test.ts',
             'tests/browser/account-songbook-list.browser.test.ts',
             'tests/browser/account-outbox-pass.browser.test.ts',
+            'tests/browser/account-library-download.browser.test.ts',
         ],
         browser: {
             enabled: true,
