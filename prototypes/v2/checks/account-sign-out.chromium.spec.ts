@@ -32,16 +32,22 @@ import { addVirtualAuthenticator } from './virtual-authenticator';
  * switch is the point of it) and 1 in the second. Do not add another account; fold a new claim
  * into one of these two journeys instead.
  *
- * This file is also the only place the preflight's UNSAVED-EDIT half can be proven. The count the
- * sync loop returns reads the account database's `drafts` store, which no production path writes
- * to yet; what an account chart's unsaved text really sits in is a guest recovery slot (#1299), so
- * the honest answer is composed in the shell (`withLocalDrafts` in `app/ensemble.tsx`) and only a
- * real browser holds both halves at once.
+ * This file is also the only place the preflight's UNSAVED-EDIT half can be proven end to end, and
+ * since #1299 it proves two things at once: the count comes from the account database's `drafts`
+ * store — which is where the shell now retains an account chart's experiment — and the guest
+ * `localStorage` namespace holds NOTHING for that chart while it does. A count sourced from the
+ * wrong store would fail the first; a shell still writing to guest storage would fail the second.
  */
 
 const RECOVERY_PREFIX = 'ensemble-v2-preview:recovery:';
 
-/** How many per-writer chart recoveries this origin is holding, whoever wrote them. */
+/**
+ * How many per-writer chart recoveries the GUEST namespace is holding, whoever wrote them.
+ *
+ * Expected to stay 0 for an account chart (#1299): account content belongs in the account
+ * database, which is what sign-out and delete-account remove. Read from the page rather than
+ * through `lib/repository.ts` because this drives a real browser, not the module.
+ */
 function recoverySlots(page: Page): Promise<number> {
     return page.evaluate(
         (prefix) => Object.keys(localStorage).filter((key) => key.startsWith(prefix)).length,
@@ -91,23 +97,25 @@ test('sign-out names the work it would destroy, then leaves nothing of that acco
     await page.context().setOffline(false);
     await expect(page.getByTestId('account-sign-out')).toBeEnabled();
 
-    // Editing the chart writes a per-writer recovery slot, which is where an account chart's
-    // unsaved text actually lives today (known gap #1299 — the GUEST localStorage namespace).
+    // Editing the chart retains the experiment — in the ACCOUNT's own database (#1299), which is
+    // what the zero below measures: not one byte of this account's chart text is in the guest
+    // namespace. The sign-out step's own count, asserted a few lines down, is the other half; the
+    // draft has to be somewhere for it to find one at all.
     await openSong(page, 'Set list two');
     await revealEditor(page);
     await page.getByLabel('Song title').fill('Set list three');
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeEnabled();
-    expect(await recoverySlots(page)).toBeGreaterThan(0);
+    expect(await recoverySlots(page)).toBe(0);
     await backToSongbook(page);
 
     await page.getByTestId('account-sign-out').click();
     await expect(page.getByTestId('sign-out-unsent')).toContainText(
         'hasn’t reached your account yet',
     );
-    // The unsaved retitle is NAMED, not silently included in the queue's count. The account
-    // database cannot see it — an account chart's unsaved text lives in the guest recovery
-    // namespace (#1299) — so the shell composes it in, and without that this step would print
-    // "everything on this device has reached your account" moments before deleting it.
+    // The unsaved retitle is NAMED, not silently included in the queue's count — read from the
+    // account's own `drafts` store (#1299), which is the store sign-out is about to empty. Without
+    // it this step would print "everything on this device has reached your account" moments before
+    // deleting the edit.
     await expect(page.getByTestId('sign-out-drafts')).toContainText(
         'One unsaved experiment is kept on this device',
     );
@@ -143,11 +151,10 @@ test('sign-out names the work it would destroy, then leaves nothing of that acco
     await expect(page.getByTestId('account-expired-banner')).toHaveCount(0);
     await expect(page.getByTestId('library-heading')).toHaveText('Your songbook');
     expect(await songTitles(page).allInnerTexts()).toEqual(guestSongs);
-    // The account chart's recovery slot went with it — every writer's, not just this page load's.
-    // Those live in the GUEST localStorage namespace today (known gap #1299), so clearing the
-    // account's IndexedDB alone would leave account chart text readable on a shared device after
-    // sign-out. (One page load can only produce its own slot, so the across-writers half of that
-    // is proven in `tests/unit/songbook/repository-recovery.test.ts`.)
+    // Still nothing in the guest namespace — it never held this account's text (#1299), and the
+    // clear that runs over `documentIds` anyway is belt and braces for a slot an older build could
+    // have left. (One page load can only produce its own slot, so the across-writers half of that
+    // clear is proven in `tests/unit/songbook/repository-recovery.test.ts`.)
     expect(await recoverySlots(page)).toBe(0);
 
     // A second account on the SAME browser profile — which is what switching accounts is

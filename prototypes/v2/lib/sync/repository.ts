@@ -11,7 +11,9 @@ import {
     deletionPrefix,
     digest,
     identifier,
+    type LastOpened,
     LocalRevisionError,
+    lastOpenedKey,
     localRevision,
     MAX_PENDING_SAVES,
     type PendingDeletion,
@@ -65,8 +67,9 @@ export type ReconcileOutcome =
 
 /**
  * What `keepBoth` moved (#1267). Returned rather than inferred, because the SHELL has to finish the
- * move: an account chart's unsaved experiment does not live in this database yet (#1299), and the
- * chart on the stand has to follow its line to the new identity without its content changing.
+ * move: the drafts this transaction re-keys are what a PREVIOUS edit captured, and the experiment
+ * live in the editor right now is the shell's — so the chart on the stand has to follow its line to
+ * the new identity, and re-retain itself there (#1299), without its content changing.
  *
  * `conflict` is which refusal was resolved, carried through rather than flattened, for the same
  * reason `CloudObservation.conflict` keeps the two apart: `'version'` had a remote version to adopt
@@ -166,6 +169,26 @@ function commitDeleted(
     return 'removed';
 }
 
+/**
+ * Read one stored `last-opened` record (#1299), or null for anything this build cannot trust.
+ *
+ * Re-proves the record against the scope AND its own key, the posture `savedCandidate` and
+ * `savedDeletion` take — `meta` is one generic keyed store shared by four namespaces, so the key is
+ * part of the record's identity. What differs is the verdict on a bad record: a corrupt preference
+ * is simply no preference, because nothing downstream reads it as content.
+ */
+function storedLastOpened(value: LastOpened | undefined, scope: AccountScope): string | null {
+    if (!value || value.ownerId !== scope.ownerId || value.key !== lastOpenedKey(scope.ownerId)) {
+        return null;
+    }
+    try {
+        identifier(value.documentId);
+        return value.documentId;
+    } catch {
+        return null;
+    }
+}
+
 function operations<T>(
     tx: Transaction<T>,
     scope: AccountScope,
@@ -225,7 +248,8 @@ export class AccountSongbook {
 
     /**
      * Remove every record this device holds for one account (#1269) — songs, the outbox and its
-     * receipts, drafts, preserved remote candidates and frozen deletions. Nothing else is touched:
+     * receipts, drafts, preserved remote candidates, frozen deletions and the `last-opened`
+     * preference (#1299). Nothing else is touched:
      * the guest songbook lives in a different database entirely, and another owner's records are
      * outside every range below.
      *
@@ -258,6 +282,10 @@ export class AccountSongbook {
             for (const prefix of [candidatePrefix(ownerId), deletionPrefix(ownerId)]) {
                 tx.table('meta').delete(IDBKeyRange.bound(prefix, `${prefix}￿`, false, true));
             }
+            // One key rather than a range: there is exactly one per owner (#1299). It names a song
+            // that is being removed in this same transaction, so leaving it would point the next
+            // sign-in at a chart this device no longer holds.
+            tx.table('meta').delete(lastOpenedKey(ownerId));
             tx.finish(undefined);
         });
     }
@@ -468,6 +496,59 @@ export class AccountSongbook {
             };
             tx.table('drafts').put(draft);
             tx.finish(undefined);
+        });
+    }
+
+    /**
+     * Drop THIS writer's retained draft for one document (#1299) — what a committed Save does with
+     * the experiment it has just superseded, and the account half of `clearOwnRecovery`.
+     *
+     * This writer's row only. Another tab editing the same song is holding its own live experiment,
+     * and a Save here has no business discarding it; removing every writer's rows is `clearAccount`'s
+     * job, and that only ever runs when the account itself is leaving this device.
+     */
+    async discardDraft(scope: AccountScope, documentId: string, writerId: string): Promise<void> {
+        scope = copyScope(scope);
+        identifier(documentId);
+        identifier(writerId);
+        return this.database.run('readwrite', scope, (tx) => {
+            tx.table('drafts').delete([scope.ownerId, documentId, writerId]);
+            tx.finish(undefined);
+        });
+    }
+
+    /**
+     * Remember which chart this account had on the stand (#1299) — a preference, never an edit, and
+     * the account's own answer to `lib/session.ts`'s guest `rememberSong`.
+     */
+    async rememberOpened(scope: AccountScope, documentId: string): Promise<void> {
+        scope = copyScope(scope);
+        identifier(documentId);
+        return this.database.run('readwrite', scope, (tx) => {
+            tx.table('meta').put({
+                key: lastOpenedKey(scope.ownerId),
+                ownerId: scope.ownerId,
+                documentId,
+            } satisfies LastOpened);
+            tx.finish(undefined);
+        });
+    }
+
+    /**
+     * The chart this account last had on the stand here, or null.
+     *
+     * A record that does not read back cleanly answers null rather than throwing, unlike every
+     * other read in this class: this one feeds the songbook's Continue card, and failing the whole
+     * library read over a cosmetic preference would turn a stale byte into a broken page. Nothing
+     * is written back — the next `rememberOpened` replaces it.
+     */
+    async lastOpened(scope: AccountScope): Promise<string | null> {
+        scope = copyScope(scope);
+        return this.database.run('readonly', scope, (tx) => {
+            tx.read(
+                tx.table('meta').get(lastOpenedKey(scope.ownerId)),
+                (value: LastOpened | undefined) => tx.finish(storedLastOpened(value, scope)),
+            );
         });
     }
 
@@ -817,8 +898,7 @@ export class AccountSongbook {
                                             // The experiment is unchanged; what it is an
                                             // experiment ON is the create above, so its base is
                                             // that revision — always 0, because the create is
-                                            // always a create. A placeholder in practice until
-                                            // #1299 gives this store a writer in the app.
+                                            // always a create.
                                             baseRevision: carried.revision,
                                         };
                                     } catch {

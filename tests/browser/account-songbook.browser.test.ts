@@ -6,6 +6,7 @@ import {
     type AccountScope,
     type ChartDocument,
     LocalRevisionError,
+    lastOpenedKey,
     MAX_PENDING_SAVES,
     type PreparedSave,
 } from '../../prototypes/v2/lib/sync/protocol.js';
@@ -972,5 +973,91 @@ describe('account songbook on real IndexedDB', () => {
                 'does not match the authenticated account',
             );
         }
+    });
+});
+
+/**
+ * The two stores an account chart's unsaved experiment needs beside `recover`/`drafts` (#1299):
+ * dropping THIS writer's row after a Save, and remembering which chart was on the stand.
+ *
+ * Both are proven here rather than against a fake store because both are key-shape claims — a
+ * three-part `drafts` key path, and one `meta` key in a store shared by four namespaces.
+ */
+describe('retention beside the account songbook', () => {
+    it('drops only this writer’s draft, leaving another tab’s live experiment alone', async () => {
+        await book.save(scope, accountChart('Set list'), null);
+        await book.recover(scope, 'writer-1', accountChart('mine'), 0);
+        await book.recover(scope, 'writer-2', accountChart('theirs'), 0);
+
+        await book.discardDraft(scope, 'study', 'writer-1');
+
+        const left = await book.drafts(scope, 'study');
+        expect(left.map((draft) => draft.writerId)).toEqual(['writer-2']);
+        expect(left[0].document.title).toBe('theirs');
+        // A writer with nothing stored is not an error: a Save with no experiment behind it is
+        // the ordinary case, and it must not fail the thing that just committed.
+        await expect(book.discardDraft(scope, 'study', 'writer-3')).resolves.toBeUndefined();
+    });
+
+    it('refuses to discard a draft for an account that is no longer the active one', async () => {
+        await book.recover(scope, 'writer-1', accountChart('mine'), 0);
+        await book.switchAccount('owner-b');
+
+        await expect(book.discardDraft(scope, 'study', 'writer-1')).rejects.toBeInstanceOf(
+            AccountChangedError,
+        );
+        const back = (await book.switchAccount('owner-a'))!;
+        expect(await book.drafts(back, 'study')).toHaveLength(1);
+    });
+
+    it('remembers the chart on the stand per account, and answers null before anything opened', async () => {
+        expect(await book.lastOpened(scope)).toBeNull();
+
+        await book.rememberOpened(scope, 'study');
+        expect(await book.lastOpened(scope)).toBe('study');
+        // Replaced, never appended: it is one fact per account.
+        await book.rememberOpened(scope, 'take');
+        expect(await book.lastOpened(scope)).toBe('take');
+
+        // Another account on the same device has its own, and cannot read this one.
+        const other = (await book.switchAccount('owner-b'))!;
+        expect(await book.lastOpened(other)).toBeNull();
+        await book.rememberOpened(other, 'b-song');
+        const mine = (await book.switchAccount('owner-a'))!;
+        expect(await book.lastOpened(mine)).toBe('take');
+    });
+
+    it('reads a corrupt preference as no preference rather than failing the songbook', async () => {
+        // Unlike every other read in the repository: nothing downstream treats this as content,
+        // and failing a library read over a cosmetic Continue card is the worse answer.
+        await book.rememberOpened(scope, 'study');
+        const raw = await rawDatabase();
+        try {
+            await rawWrite(raw, 'meta', (table) =>
+                table.put({
+                    key: lastOpenedKey('owner-a'),
+                    ownerId: 'owner-a',
+                    documentId: { not: 'an id' },
+                }),
+            );
+        } finally {
+            raw.close();
+        }
+
+        expect(await book.lastOpened(scope)).toBeNull();
+        // And a record belonging to another owner is never read through this owner's key.
+        const planted = await rawDatabase();
+        try {
+            await rawWrite(planted, 'meta', (table) =>
+                table.put({
+                    key: lastOpenedKey('owner-a'),
+                    ownerId: 'owner-b',
+                    documentId: 'study',
+                }),
+            );
+        } finally {
+            planted.close();
+        }
+        expect(await book.lastOpened(scope)).toBeNull();
     });
 });

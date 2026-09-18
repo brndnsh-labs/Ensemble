@@ -23,12 +23,11 @@ import { accountChart } from '../utils/account-songbook-fixture.js';
  *    through the key ranges, but a shared device also requires A's records to be GONE, which is
  *    what `clearAccount` is for — across all six places one account's data lives.
  *
- * The `recover()` calls below write `drafts` rows this file writes ITSELF, purely so `clearAccount`
- * has something in that store to prove its key range reaches. They are not a reproduction of live
- * storage: no production path calls `AccountSongbook.recover` yet, and an account chart's unsaved
- * text still lands in the guest `localStorage` namespace instead (the known #1299 gap). Nothing
- * here should be read as evidence about what the sign-out PREFLIGHT can see — that is the shell's
- * composition, proven in `prototypes/v2/checks/account-sign-out.chromium.spec.ts`.
+ * The `recover()` calls below are the shape the app itself now writes (#1299): an account chart's
+ * unsaved experiment is a row in this database's `drafts` store, so `clearAccount` reaching it is
+ * what keeps that text off a shared device. What is NOT proven here is the shell's half of the
+ * preflight — the in-tab drafts no store holds — which needs a real browser driving the app
+ * (`prototypes/v2/checks/account-sign-out.chromium.spec.ts`).
  */
 
 const A = 'owner-a';
@@ -123,6 +122,9 @@ describe('signing out removes every trace of that account from this device', () 
         await book.save(scope, chart('Set list', 'study'), null);
         await book.save(scope, chart('Scratch', 'take'), null);
         await book.recover(scope, 'writer-1', chart('Scratch', 'take', 1), 0);
+        // The `last-opened` preference is this account's too (#1299): it names a song being
+        // removed here, so leaving it would point the next sign-in at a chart nobody holds.
+        await book.rememberOpened(scope, 'take');
         // A preserved remote candidate and a frozen deletion are the two `meta` namespaces an
         // account owns beside its records, and the two a range bug would most easily miss.
         await book.reconcile(scope, {
@@ -141,6 +143,7 @@ describe('signing out removes every trace of that account from this device', () 
         expect((await book.list(back, { limit: 100 })).songs).toEqual([]);
         expect(await book.pending(back, 'study')).toEqual([]);
         expect(await book.drafts(back, 'take')).toEqual([]);
+        expect(await book.lastOpened(back)).toBeNull();
         expect(await book.remoteCandidates(back)).toEqual([]);
         // Only the active pointer is left. Nothing else belonged to anyone else, either.
         expect(await metaKeys()).toEqual(['active']);
@@ -153,6 +156,7 @@ describe('signing out removes every trace of that account from this device', () 
         const other = (await book.switchAccount(B))!;
         await book.save(other, chart('B only', 'b-song'), null);
         await book.recover(other, 'writer-b', chart('B only', 'b-song', 1), 0);
+        await book.rememberOpened(other, 'b-song');
 
         const mine = (await book.switchAccount(A))!;
         await book.save(mine, chart('A only', 'a-song'), null);
@@ -166,6 +170,7 @@ describe('signing out removes every trace of that account from this device', () 
             ['b-song'],
         );
         expect(await book.drafts(asB, 'b-song')).toHaveLength(1);
+        expect(await book.lastOpened(asB)).toBe('b-song');
 
         const asA = (await book.switchAccount(A))!;
         expect((await book.list(asA, { limit: 100 })).songs).toEqual([]);

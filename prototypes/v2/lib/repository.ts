@@ -1,13 +1,12 @@
 import type { InstrumentModule } from '@engine/types';
 import { type ChartDocument, validateDocument } from './documents';
 import { validateVoice } from './sounds';
+// Each page load is a separate writer; the account `drafts` store keys on the same id (#1299).
+import { writerId as writer } from './writer';
 
 const DATABASE = 'ensemble-v2-preview';
 const STORE = 'documents';
 const RECOVERY = 'ensemble-v2-preview:recovery:';
-// Each page load is a separate writer. Recoveries are discoverable across reloads;
-// a duplicated tab cannot inherit a live writer identity.
-const writer = typeof crypto !== 'undefined' ? crypto.randomUUID() : 'unavailable';
 let database: Promise<IDBDatabase> | undefined;
 
 export class ConflictError extends Error {
@@ -118,7 +117,13 @@ export async function save(
     });
 }
 
-/** Synchronous, per-writer recovery protects the final edit on close. */
+/**
+ * Synchronous, per-writer recovery protects the final edit on close.
+ *
+ * A GUEST chart's, and only a guest chart's (#1299): an account chart's unsaved experiment is
+ * retained in that account's own database (`AccountSongbook.recover`), so it is cleared by
+ * signing out and never leaves account content in this shared `localStorage` namespace.
+ */
 export function recover(document: ChartDocument): void {
     validated(document);
     const key = `${RECOVERY}${writer}:${document.id}`;

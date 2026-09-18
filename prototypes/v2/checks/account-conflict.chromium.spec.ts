@@ -49,10 +49,13 @@ async function openExactSong(page: Page, title: string): Promise<void> {
 }
 
 /**
- * Recovery slots this device holds for one document id — `lib/repository.ts`'s key shape, read
- * from the page rather than through that module because an account chart's unsaved experiment
- * still lives in the GUEST `localStorage` namespace (the known #1299 gap) and this spec drives a
- * real browser, not the module.
+ * Guest recovery slots this device holds for one document id — `lib/repository.ts`'s key shape,
+ * read from the page rather than through that module because this spec drives a real browser.
+ *
+ * Expected to be 0 for both ids since #1299: an account chart's unsaved experiment is a row in the
+ * account database, so keeping both moves it there and neither the kept line nor the refused one
+ * leaves account chart text in the guest namespace. What the experiment DID survive is asserted
+ * the only way that matters — by reloading and reading the bar back.
  */
 function recoverySlots(page: Page, documentId: string): Promise<number> {
     return page.evaluate((id) => {
@@ -298,9 +301,9 @@ test('a Save the account can no longer hold becomes a song of its own', async ({
  * `key={current.id}` — so without a commit in front of it the remount takes every unapplied bar
  * with it, silently, while the chip goes on saying "Unsaved changes" about text that no longer
  * exists anywhere. Save has always committed the editor first; this proves the resolution does too,
- * through to the recovery slot that has to survive a reload under the NEW identity.
+ * through to the retained draft that has to survive a reload under the NEW identity.
  */
-test('a bar typed but not applied survives keeping both, and its recovery slot moves', async ({
+test('a bar typed but not applied survives keeping both, and its retained draft moves', async ({
     page,
     browser,
     accountApi,
@@ -355,9 +358,10 @@ test('a bar typed but not applied survives keeping both, and its recovery slot m
         const refusedId = sent[0].documentId;
         const keptId = sent.find((save) => save.documentId !== refusedId)?.documentId ?? '';
         expect(keptId).not.toBe('');
-        // The experiment follows its line: recorded under the identity it now belongs to, and
-        // dropped from the id that holds the account's own version from here on.
-        expect(await recoverySlots(second, keptId)).toBe(1);
+        // The experiment follows its line, and it follows it INTO THE ACCOUNT STORE (#1299):
+        // neither the new identity nor the refused one leaves account chart text sitting in the
+        // guest namespace, where a sign-out would have to go hunting for it.
+        expect(await recoverySlots(second, keptId)).toBe(0);
         expect(await recoverySlots(second, refusedId)).toBe(0);
 
         // Which is the whole point of writing it: it is what a reload has to find.

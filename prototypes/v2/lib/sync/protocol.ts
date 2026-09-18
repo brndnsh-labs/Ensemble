@@ -110,6 +110,31 @@ export function deletionKey(ownerId: string, documentId: string): string {
     return `${deletionPrefix(ownerId)}${documentId}`;
 }
 
+/**
+ * Which chart this account last had on the stand (#1299), in the SAME generic `meta` store as the
+ * remote candidates and frozen deletions above — and for the same reason: a store of its own would
+ * need an IndexedDB version bump on a database that already exists wherever this app has run.
+ *
+ * One key per owner, because it is one fact per account. `'last-opened:'` sorts strictly between
+ * `'delete:'` and `'remote:'`, so neither prefix range can see it, and the `'active'` pointer sorts
+ * below all three. The identifier grammar excludes `':'`, so no owner ID can collide across them.
+ *
+ * It is a convenience preference and never a document edit — the guest half is `lib/session.ts`'s
+ * `last-opened` key. An account chart's belongs in the account database so that it is removed by
+ * the same sign-out that removes the songs it names, rather than outliving them in guest storage.
+ */
+export function lastOpenedKey(ownerId: string): string {
+    identifier(ownerId);
+    return `last-opened:${ownerId}`;
+}
+
+/** The stored form. An absent record means this account has not opened a chart on this device. */
+export interface LastOpened {
+    key: string;
+    ownerId: string;
+    documentId: string;
+}
+
 /** The stored frozen delete. Four scalars: everything the canonical request bytes are made of. */
 export interface PendingDeletion {
     key: string;
