@@ -42,6 +42,11 @@ export const ACCOUNT_MESSAGES = {
     badCode:
         'That code isn’t right, or it’s already been used. If you started a recovery and ' +
         'stopped, wait ten minutes and try the same code again.',
+    /** `409 last_credential` (#1264): the account page also blocks this in the UI (the Remove
+     * button is disabled on the last passkey), so a real caller only ever sees this message if
+     * the direct route is called some other way — but the server is the actual enforcement point,
+     * never the disabled button alone, so the words still have to exist. */
+    lastPasskey: 'Add another passkey before removing your last one.',
 } as const;
 
 /**
@@ -67,6 +72,8 @@ export function failureFromApi(error: ApiError): AccountFailure {
             return { kind: 'error', message: ACCOUNT_MESSAGES.failed };
         case 'rate_limited':
             return { kind: 'error', message: ACCOUNT_MESSAGES.rateLimited };
+        case 'last_credential':
+            return { kind: 'error', message: ACCOUNT_MESSAGES.lastPasskey };
         default:
             // `unauthenticated`, `malformed_request`, `fresh_auth_required` (only ever reached
             // here after a step-up retry already failed), `not_found`, `internal_error` and every
