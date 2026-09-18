@@ -1,4 +1,8 @@
-import { type LibraryDownloadResult, runLibraryDownload } from '../sync/download';
+import {
+    BACKOFF_FALLBACK_MS,
+    type LibraryDownloadResult,
+    runLibraryDownload,
+} from '../sync/download';
 import { OUTBOX_PAGE_LIMIT, runOutboxPass } from '../sync/drain';
 import {
     AccountChangedError,
@@ -44,8 +48,22 @@ import { createSaveTransport, SaveTransportError } from './transport';
  * the cloud is exactly the case the separation exists for.
  */
 
-/** Why the last pass could not finish sending. Never a raw server code or exception text. */
-export type SyncFailureReason = 'expired' | 'offline' | 'rate-limited' | 'quota' | 'server';
+/**
+ * Why the last pass could not finish sending. Never a raw server code or exception text.
+ *
+ * `too-large` is deliberately its own reason rather than a second spelling of `quota`: a full
+ * library is fixed by deleting a song in the cloud and a chart the server will not accept is not
+ * fixed by anything the musician can do to their account, so the two must not be one word. It is
+ * also the one reason that is a fact about ONE document — `drain()` steps over that song and keeps
+ * sending the rest, which no other reason permits.
+ */
+export type SyncFailureReason =
+    | 'expired'
+    | 'offline'
+    | 'rate-limited'
+    | 'quota'
+    | 'too-large'
+    | 'server';
 
 export interface SyncFailure {
     reason: SyncFailureReason;
@@ -114,7 +132,7 @@ function failureFromApi(error: ApiError): SyncFailure {
         case 'quota_exceeded':
             return { reason: 'quota', message: SYNC_MESSAGES.quota };
         case 'payload_too_large':
-            return { reason: 'quota', message: SYNC_MESSAGES.tooLarge };
+            return { reason: 'too-large', message: SYNC_MESSAGES.tooLarge };
         case 'rate_limited':
             return { reason: 'rate-limited', message: SYNC_MESSAGES.rateLimited };
         default:
@@ -140,17 +158,26 @@ function failureFromDownload(result: LibraryDownloadResult): SyncFailure | null 
     }
 }
 
+/** The last rejection this pass's transport saw, and the song it was about. */
+interface Refusal {
+    error: ApiError;
+    documentId: string;
+}
+
 /**
- * Records a `SaveTransportError`'s reason on its way past and rethrows it UNCHANGED, so
- * `sendNext` sees the same rejection it always did and keeps the operation queued.
+ * Records a `SaveTransportError`'s reason — and WHICH document it was about — on its way past,
+ * then rethrows it UNCHANGED, so `sendNext` sees the same rejection it always did and keeps the
+ * operation queued. The document id is what lets `drain()` tell "this server has stopped talking
+ * to us" apart from "this one chart is too big", which are the same `'retry'` to the outbox and
+ * must not be the same decision here.
  */
-function capturing(inner: SaveTransport, onReason: (reason: ApiError) => void): SaveTransport {
+function capturing(inner: SaveTransport, onRefusal: (refusal: Refusal) => void): SaveTransport {
     return async (request) => {
         try {
             return await inner(request);
         } catch (error) {
             if (error instanceof SaveTransportError) {
-                onReason(error.reason);
+                onRefusal({ error: error.reason, documentId: request.documentId });
             }
             throw error;
         }
@@ -312,8 +339,20 @@ export function createSyncLoop(
      * silently stalls one version short. A sweep that commits nothing ends the loop, so this
      * cannot spin; `MAX_PENDING_SAVES` is the deepest one song's queue can be, which makes it
      * the most sweeps a full drain can ever need.
+     *
+     * `refusedTooLarge` is the one rejection that does NOT end the pass. `sendNext` reports every
+     * transport failure as `'retry'`, which is right for the outbox but wrong as a stop rule: a
+     * 413 is a verdict on one chart's bytes, not on the server or the network, so ending the sweep
+     * there would park every song behind it behind a document no retry will ever fix. So that one
+     * song is stepped over — the cursor moves PAST it, its queued Save stays queued, and the
+     * reason is still reported at the end of the pass. Every other reason keeps the early return,
+     * because a 401, a 429 or a dead network would refuse the next song for the same reason.
      */
-    async function drain(current: AccountScope, transport: SaveTransport): Promise<boolean> {
+    async function drain(
+        current: AccountScope,
+        transport: SaveTransport,
+        refusedTooLarge: () => string | null,
+    ): Promise<boolean> {
         let changed = false;
         for (let sweep = 0; sweep < MAX_PENDING_SAVES; sweep += 1) {
             let committed = 0;
@@ -328,7 +367,13 @@ export function createSyncLoop(
                     // A transport failure ends the drain outright: another sweep would only
                     // fail again on the same song, and the reason is already captured.
                     if (result.kind === 'retry' || result.kind === 'aborted') {
-                        return changed;
+                        const refused = result.kind === 'retry' ? refusedTooLarge() : null;
+                        if (refused === null) {
+                            return changed;
+                        }
+                        // Strictly past the refused song, so the page ceiling still bounds this.
+                        cursor = refused;
+                        continue;
                     }
                     break;
                 }
@@ -352,32 +397,63 @@ export function createSyncLoop(
             return;
         }
         const mine = epoch;
-        let reason: ApiError | null = null;
+        let refusal: Refusal | null = null;
         const transport = capturing(createSaveTransport(api, session), (captured) => {
-            reason = captured;
+            refusal = captured;
         });
-        publish({ running: true, sending: true });
+        // Read through a call: control-flow analysis does not follow an assignment made inside
+        // the wrapper above, so a direct read narrows to the `null` it was initialized with.
+        const lastRefusal = (): Refusal | null => refusal;
+        // A 429 answers for the whole ORIGIN — the 300/min transport budget is shared by
+        // `/api/auth/*`, Save and the read routes alike, and it is keyed by network identity
+        // rather than by account. So the back-off silences BOTH halves of the pass: re-POSTing
+        // the outbox inside the window is exactly what the server asked this device not to do.
+        const backedOff = Date.now() < backoffUntil;
+        publish({ running: true, sending: !backedOff });
         let changed = false;
-        let failure: SyncFailure | null = null;
+        // A pass that does nothing but wait must keep SAYING it is waiting: clearing the sentence
+        // here would leave the musician with a queued Save and no explanation for it.
+        let failure: SyncFailure | null = backedOff
+            ? { reason: 'rate-limited', message: SYNC_MESSAGES.rateLimited }
+            : null;
         try {
-            try {
-                changed = await drain(current, transport);
-            } catch (error) {
-                if (error instanceof AccountChangedError) {
-                    return;
+            if (!backedOff) {
+                try {
+                    changed = await drain(current, transport, () => {
+                        const captured = lastRefusal();
+                        return captured?.error.kind === 'code' &&
+                            captured.error.code === 'payload_too_large'
+                            ? captured.documentId
+                            : null;
+                    });
+                } catch (error) {
+                    if (error instanceof AccountChangedError) {
+                        return;
+                    }
+                    // A storage or validation failure is local, not a server verdict. It is still
+                    // a reason the queue did not move — and the Save is still on this device.
+                    failure = { reason: 'server', message: SYNC_MESSAGES.server };
                 }
-                // A storage or validation failure is local, not a server verdict. It is still a
-                // reason the queue did not move — and the queued Save is still on this device.
-                failure = { reason: 'server', message: SYNC_MESSAGES.server };
-            }
-            if (mine !== epoch) {
-                return;
             }
             // The captured transport reason outranks the generic storage one: it names what the
             // server actually said, which is the whole point of the wrapper.
-            const captured: ApiError | null = reason;
+            const captured = lastRefusal();
             if (captured !== null) {
-                failure = failureFromApi(captured);
+                failure = failureFromApi(captured.error);
+                if (failure.reason === 'rate-limited') {
+                    backoffUntil = Math.max(backoffUntil, Date.now() + BACKOFF_FALLBACK_MS);
+                }
+                if (failure.reason === 'expired') {
+                    // Published BEFORE the epoch check below, and deliberately: a 401 is a fact
+                    // about the ACCOUNT, not about the scope this pass was attached to. The app's
+                    // own order is `markExpired()` -> re-render -> `detach()`, so by the time this
+                    // pass unwinds the epoch has usually moved — and dropping the publish there
+                    // would silently delete the one sentence that explains why nothing uploaded.
+                    publish({ failure });
+                }
+            }
+            if (mine !== epoch) {
+                return;
             }
             publish({ sending: false });
 
@@ -385,10 +461,10 @@ export function createSyncLoop(
             // a budget shared across every route, and a dead network has already answered. The
             // download learns nothing in any of those cases that the outbox has not just proved.
             const skipDownload =
+                backedOff ||
                 failure?.reason === 'expired' ||
                 failure?.reason === 'rate-limited' ||
-                failure?.reason === 'offline' ||
-                Date.now() < backoffUntil;
+                failure?.reason === 'offline';
             if (!skipDownload) {
                 try {
                     const result = await runLibraryDownload(songbook, current, library, {
@@ -405,7 +481,9 @@ export function createSyncLoop(
                         result.candidates.length > 0 ||
                         result.retainedDeleted.length > 0;
                     if (result.backoffUntil !== undefined) {
-                        backoffUntil = result.backoffUntil;
+                        // Never shortened: the outbox half may already have met a 429 with a
+                        // longer `Retry-After` than this one carries.
+                        backoffUntil = Math.max(backoffUntil, result.backoffUntil);
                     }
                     publish({ documents: result.documents });
                     failure = failure ?? failureFromDownload(result);
@@ -488,11 +566,14 @@ export function createSyncLoop(
             epoch += 1;
             scope = null;
             backoffUntil = 0;
+            // `failure` is deliberately NOT cleared. The commonest reason this runs at all is a
+            // session that just expired, and the sentence explaining that a Save is still owed is
+            // the one thing a musician needs at that moment. `attach()` clears it on the way back
+            // in, which is the honest place: a fresh session has no failure to report yet.
             publish({
                 owner: null,
                 running: false,
                 sending: false,
-                failure: null,
                 observation: null,
                 documents: UNOBSERVED,
             });
@@ -550,7 +631,10 @@ export function createSyncLoop(
                     inFlight = null;
                     if (rerun) {
                         rerun = false;
-                        void loop.run();
+                        // Detached, so nothing awaits it: a throwing subscriber (or any other
+                        // surprise a pass can raise) must not become an unhandled rejection in
+                        // the shell. The pass has already published whatever it learned.
+                        void loop.run().catch(() => {});
                     }
                 }
             })();

@@ -1,4 +1,3 @@
-import type { ReactNode } from 'react';
 import { arrangementOf } from '../lib/documents';
 import type { ChartDocument } from '../lib/runtime';
 
@@ -10,8 +9,12 @@ interface SongbookProps {
      * this only changes what the page SAYS about the list it was handed.
      */
     accountLibrary: boolean;
-    /** The three sync facts, or null for a guest device, which has no cloud to report on. */
-    syncStatus: ReactNode;
+    /**
+     * True while the account library has not been read yet (#1266). An empty `songs` is a claim —
+     * "your account has no songs" — and it must not be made from a read that hasn't finished, or
+     * from one that failed. This is the difference between the two.
+     */
+    loading: boolean;
     /** The card at the top: the last-opened song (with any recovered draft), else a starter. */
     featured: ChartDocument | null;
     /** True when `featured` is the song the musician last had open. */
@@ -28,7 +31,7 @@ interface SongbookProps {
 export function Songbook({
     songs,
     accountLibrary,
-    syncStatus,
+    loading,
     featured,
     continued,
     busy,
@@ -107,7 +110,12 @@ export function Songbook({
                             />
                         </label>
                     </div>
-                    <table className="song-table">
+                    {loading && (
+                        <p className="library-loading" role="status" data-testid="library-loading">
+                            Loading your account songbook…
+                        </p>
+                    )}
+                    <table className="song-table" hidden={loading}>
                         <thead>
                             <tr>
                                 <th>Song</th>
@@ -176,13 +184,12 @@ export function Songbook({
                     <section className="sync-card">
                         <h3>Your band, wherever you play.</h3>
                         {accountLibrary ? (
-                            <>
-                                <p>
-                                    Save on one device and open it on another. Your guest songbook
-                                    stays on this device and is separate from your account.
-                                </p>
-                                {syncStatus}
-                            </>
+                            // The three sync facts are a music-stand surface: they describe the
+                            // chart on the stand, and there isn't one here (#1266).
+                            <p>
+                                Save on one device and open it on another. Your guest songbook stays
+                                on this device and is separate from your account.
+                            </p>
                         ) : (
                             <p>
                                 Accounts and cloud songbooks are a later stage. The stand is

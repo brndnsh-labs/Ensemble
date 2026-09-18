@@ -92,7 +92,13 @@ export function createAccountSession(api: AccountApi): AccountSession {
             // it was. A transient blip must never flip a live signed-in session to guest.
         },
         markExpired() {
-            set(EXPIRED);
+            // Enforces this module's own rule rather than trusting the caller: only a session
+            // that WAS signed in can expire. A `guest` or `unknown` device that meets a 401 has
+            // learned nothing new, and moving it to `expired` would put "sign in again" in front
+            // of somebody who never signed in — the exact distinction `refresh()` preserves above.
+            if (state.status === 'signedIn') {
+                set(EXPIRED);
+            }
         },
     };
 }

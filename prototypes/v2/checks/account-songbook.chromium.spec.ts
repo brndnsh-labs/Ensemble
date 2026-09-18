@@ -71,6 +71,10 @@ test('a song saved on one device opens on another, and the guest songbook is unt
     // Rollout decision 9 S3: no switcher. Signed in, the songbook IS the account library —
     // a separate store, which on a brand-new account is legitimately empty.
     await expect(page.getByTestId('library-heading')).toHaveText('Your account songbook');
+    // The read has to have actually FINISHED before an empty table means anything: "we haven't
+    // looked yet" and "your account has no songs" render as the same zero rows otherwise, so a
+    // failed or still-running library read would pass this assertion as a success.
+    await expect(page.getByTestId('library-loading')).toHaveCount(0);
     await expect(page.locator('.song-row')).toHaveCount(0);
 
     await newSongOnTheStand(page);

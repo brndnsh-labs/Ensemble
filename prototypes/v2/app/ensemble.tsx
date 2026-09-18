@@ -71,6 +71,18 @@ export default function Ensemble() {
     const [accountSongs, setAccountSongs] = useState<ChartDocument[] | null>(null);
     const [current, setCurrent] = useState<ChartDocument | null>(null);
     const [saved, setSaved] = useState<ChartDocument | null>(null);
+    /**
+     * Which songbook the chart on the stand came from, or null when nothing is open (#1266).
+     *
+     * A session can expire without any user gesture — `createSaveTransport`/`createLibraryTransport`
+     * call `session.markExpired()` on any 401 — and `signedIn` flips to false underneath a chart
+     * that is still the account's. Without this, `storeSave` would silently re-route to the guest
+     * repository: plain Save reports a nonsense conflict, and `Save a copy` (which passes
+     * `expected = null`) SUCCEEDS and writes account content into guest IndexedDB. A ref rather
+     * than state on purpose — nothing renders it, and `newSong` has to set it and read it back in
+     * the same tick.
+     */
+    const currentStore = useRef<'guest' | 'account' | null>(null);
     const [ready, setReady] = useState(false);
     const [busy, setBusy] = useState(false);
     const volatileDrafts = useRef(new Map<string, ChartDocument>());
@@ -142,6 +154,8 @@ export default function Ensemble() {
     // swapped in underneath whoever is playing.
     const signedIn = accountsOn && account.session.status === 'signedIn';
     const sync = useAccountLibrary(accountsOn, account.session, current?.id ?? null);
+    // `?? []` is the LIST, not the claim: "we haven't read the account library yet" is carried
+    // separately to the songbook as `loading`, so an unread library never renders as an empty one.
     const songs = signedIn ? (accountSongs ?? []) : guestSongs;
     // The band/sound defaults a brand-new or imported song is built from. It falls back to the
     // guest starters because a fresh account's library is legitimately empty, and "New song" and
@@ -238,6 +252,8 @@ export default function Ensemble() {
                 runtime.load(document);
                 setSaved(null);
                 setCurrent(document);
+                // A shared draft belongs to no songbook yet; "Keep a copy" decides that.
+                currentStore.current = null;
                 setSharedDraft(true);
                 // Inlined clearBuffers()/selectSection(): both are plain function
                 // declarations (a new reference every render), which
@@ -558,6 +574,7 @@ export default function Ensemble() {
             updateChart();
             runtime.stop();
             setCurrent(null);
+            currentStore.current = null;
         });
     }
     function selectSection(document: ChartDocument, id?: string) {
@@ -577,6 +594,7 @@ export default function Ensemble() {
         runtime.load(next);
         setSaved(document);
         setCurrent(next);
+        currentStore.current = signedIn ? 'account' : 'guest';
         setSharedDraft(false);
         clearBuffers();
         rememberSong(next.id);
@@ -666,12 +684,23 @@ export default function Ensemble() {
      */
     async function storeSave(document: ChartDocument, expected: number | null) {
         try {
+            if (currentStore.current === 'account' && !signedIn) {
+                // The session lapsed under an account chart. Falling through would write it to
+                // the GUEST songbook — a conflict that isn't one on a plain Save, and a silent
+                // copy of account content into guest storage on `Save a copy` (#1266). The full
+                // sign-out flow, including what to offer instead, is #1269's.
+                throw new Error(
+                    'Your session expired — sign in again to save this to your account. Your changes stay on this device.',
+                );
+            }
             if (!signedIn) {
                 const committed = await repository.save(document, expected);
+                currentStore.current = 'guest';
                 setSaveFailed(false);
                 return committed;
             }
             const song = await accountSync.save(document, expected);
+            currentStore.current = 'account';
             setSaveFailed(false);
             // Save is one of the four things that runs a pass. Not awaited: the commit is
             // already durable, and the upload is the loop's problem from here.
@@ -726,6 +755,9 @@ export default function Ensemble() {
             if (!template) {
                 throw new Error('Starter library is not ready.');
             }
+            // A brand-new song belongs to whichever songbook is live right now, not to whatever
+            // was last on the stand — set before `storeSave` so its expiry guard reads the truth.
+            currentStore.current = signedIn ? 'account' : 'guest';
             const document = repository.validated(blankSong(template));
             const created = await storeSave(document, null);
             await refreshSongs();
@@ -822,20 +854,30 @@ export default function Ensemble() {
             ? { required: null, verified: null }
             : { required: 1, verified: soundsOffline ? 1 : 0 };
     /**
-     * Three separate facts, never one badge (#1266). Rendered only for a signed-in device: a
-     * guest has no cloud to report on, and the guest DOM stays exactly as it was.
+     * Three separate facts, never one badge (#1266). Rendered only on the MUSIC STAND, and only
+     * for a device with an account.
+     *
+     * Not on the songbook page: with no chart open, `savedRevision`, the open chart's sounds and
+     * the cloud observation are all genuinely unobserved, so the chip there was three permanent
+     * "we haven't checked" lines — an honest projection of nothing, which reads as a broken
+     * badge rather than as a fact.
+     *
+     * `expired` is included alongside `signedIn` deliberately: that is precisely when the loop's
+     * "sign in again to upload it" sentence is true, and unmounting the chip on the state change
+     * that produces it would make the sentence unreachable.
      */
-    const syncStatus = signedIn ? (
-        <SyncStatus
-            savedRevision={current ? (saved ? saved.revision : null) : 'unknown'}
-            editing={current && dirty ? 'dirty' : 'clean'}
-            lastSave={saveFailed ? 'failed' : 'idle'}
-            recovery={!current || !dirty ? 'none' : recoveryHealthy ? 'confirmed' : 'failed'}
-            shell={offline.shell}
-            sounds={soundsProgress}
-            sync={sync}
-        />
-    ) : null;
+    const syncStatus =
+        accountsOn && current && (signedIn || account.session.status === 'expired') ? (
+            <SyncStatus
+                savedRevision={saved ? saved.revision : null}
+                editing={dirty ? 'dirty' : 'clean'}
+                lastSave={saveFailed ? 'failed' : 'idle'}
+                recovery={!dirty ? 'none' : recoveryHealthy ? 'confirmed' : 'failed'}
+                shell={offline.shell}
+                sounds={soundsProgress}
+                sync={sync}
+            />
+        ) : null;
 
     return (
         <div
@@ -849,6 +891,7 @@ export default function Ensemble() {
                         onClick={() => {
                             runtime.stop();
                             setCurrent(null);
+                            currentStore.current = null;
                         }}
                     >
                         ♬ ensemble
@@ -860,6 +903,7 @@ export default function Ensemble() {
                             onClick={() => {
                                 runtime.stop();
                                 setCurrent(null);
+                                currentStore.current = null;
                             }}
                         >
                             My songbook
@@ -962,7 +1006,7 @@ export default function Ensemble() {
                     busy={busy}
                     offline={offline.label}
                     accountLibrary={signedIn}
-                    syncStatus={syncStatus}
+                    loading={signedIn && accountSongs === null}
                     search={search}
                     onSearch={setSearch}
                     onImport={() => setImporting(true)}

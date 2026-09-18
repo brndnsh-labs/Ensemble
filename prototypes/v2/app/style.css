@@ -2828,7 +2828,8 @@ html[data-theme="stage"] {
 }
 /* Sync status chip (#1266). Three separate facts, laid out as three separate lines rather
    than one badge — a musician who saved offline needs to see local safety and cloud
-   confirmation disagree. Rendered only for a signed-in device, so the guest DOM is unchanged. */
+   confirmation disagree. Rendered only on the music stand, and only for a device with an
+   account, so the guest DOM and the songbook page are both unchanged. */
 .sync-status {
     display: flex;
     flex-direction: column;
@@ -2848,7 +2849,9 @@ html[data-theme="stage"] {
     /* The reason can be a full sentence; it wraps rather than being clipped like the facts. */
     white-space: normal;
 }
-.sync-card .sync-status {
-    font-size: 12px;
-    margin-top: 12px;
+/* "We haven't read your account library yet" — never the empty-library table (#1266). */
+.library-loading {
+    color: var(--muted);
+    font-size: 13px;
+    padding: 14px 0;
 }
