@@ -320,6 +320,57 @@ describe('finding v1 data', () => {
         expect(first.digest).not.toBe(second.digest);
         expect(first.id).toBe(`v1-session-${first.digest}`);
     });
+
+    it('keeps a preset’s identity stable across an earlier deletion (#1274 P1-a)', () => {
+        // The old digest folded in the ARRAY INDEX: deleting `presetMajor` shifts
+        // `presetMinor` from index 1 to index 0, which used to mint it a brand-new
+        // digest/id — offering (and re-importing) a song already in the songbook.
+        const before = findV1Data(
+            storageOf({ [V1_PRESETS_KEY]: JSON.stringify([presetMajor, presetMinor]) }),
+        );
+        const minorBefore = before.sources.find((source) => source.title === 'Minor thing')!;
+
+        const after = findV1Data(storageOf({ [V1_PRESETS_KEY]: JSON.stringify([presetMinor]) }));
+        const minorAfter = after.sources[0];
+
+        expect(minorAfter.digest).toBe(minorBefore.digest);
+        expect(minorAfter.id).toBe(minorBefore.id);
+    });
+
+    it('gives two byte-identical presets distinct identities, but collapses onto the survivor when the earlier one is removed', () => {
+        const duplicate = JSON.parse(JSON.stringify(presetMajor));
+        const both = findV1Data(
+            storageOf({ [V1_PRESETS_KEY]: JSON.stringify([presetMajor, duplicate]) }),
+        );
+        expect(both.sources).toHaveLength(2);
+        const [firstDigest, secondDigest] = both.sources.map((source) => source.digest);
+        expect(firstDigest).not.toBe(secondDigest);
+
+        // Removing the FIRST of the two identical rows: the survivor becomes the first
+        // occurrence of that content and takes over the first row's (already-offered)
+        // digest, rather than minting a third, never-before-seen identity.
+        const afterDelete = findV1Data(
+            storageOf({ [V1_PRESETS_KEY]: JSON.stringify([duplicate]) }),
+        );
+        expect(afterDelete.sources[0].digest).toBe(firstDigest);
+    });
+
+    it('reports the remainder instead of silently dropping progressions past the per-run cap (#1274 P1-c)', () => {
+        const many = Array.from({ length: 501 }, (_, i) => ({
+            name: `Song ${i}`,
+            sections: [{ id: 'a', label: 'A', value: 'I' }],
+            isMinor: false,
+        }));
+        const finding = findV1Data(storageOf({ [V1_PRESETS_KEY]: JSON.stringify(many) }));
+        expect(finding.sources.filter((source) => source.kind === 'preset')).toHaveLength(500);
+        expect(finding.problems).toEqual([
+            {
+                digest: expect.any(String),
+                label: 'Your saved progressions',
+                reason: expect.stringContaining('1 more progression'),
+            },
+        ]);
+    });
 });
 
 describe('round-tripping a real v1 session', () => {
@@ -442,6 +493,63 @@ describe('round-tripping a real v1 session', () => {
         expect(arrangement.sections).toHaveLength(3);
     });
 
+    it('flags a landed document when a v1 voice names a sound pack this build no longer offers (#1274 P2-3)', () => {
+        const blob = JSON.parse(multiSection);
+        blob.bass.voice = 'pack:pack-that-no-longer-exists';
+        const { source, finding } = onlySource(JSON.stringify(blob));
+        const result = convertV1(source, v1ImportContext(finding, BASE));
+        expect(result.kind).toBe('ok');
+        expect(result.kind === 'ok' && result.soundFallback).toBe(true);
+        expect(result.kind === 'ok' && result.document.chart.band.bass.voice).toBe('synth');
+    });
+
+    it('does not flag an import whose voices are all synth or a pack this build has', () => {
+        const { source, finding } = onlySource(tunedBand);
+        const result = convertV1(source, v1ImportContext(finding, BASE));
+        expect(result.kind === 'ok' && result.soundFallback).toBe(false);
+    });
+
+    it('bounds a repeatedly-colliding section id at the codec cap instead of growing past it (#1274 P2-7)', () => {
+        // Builds the exact chain the (unfixed) while-loop would walk: every rung one
+        // more `-${targetIndex + 1}` suffix longer than the last, stopping just short of
+        // the codec's 100-char id cap.
+        const targetIndex = 60;
+        const suffix = `-${targetIndex + 1}`;
+        let chain = `v1-section-${targetIndex + 1}`;
+        const chainIds: string[] = [chain];
+        while (chainIds[chainIds.length - 1].length < 100) {
+            chain = `${chain}${suffix}`;
+            chainIds.push(chain);
+        }
+        chainIds.pop(); // that last rung is already >=100; keep only the shorter ones "used".
+        expect(chainIds.length).toBeLessThan(targetIndex);
+
+        const seedSections = chainIds.map((id, i) => ({ id, label: `Seed ${i}`, value: 'I' }));
+        const fillerSections = Array.from(
+            { length: targetIndex - seedSections.length },
+            (_, i) => ({ id: `filler-${i}`, label: `Filler ${i}`, value: 'I' }),
+        );
+        const preset = {
+            name: 'Chained ids',
+            sections: [
+                ...seedSections,
+                ...fillerSections,
+                // A prototype-member id at exactly `targetIndex`: rejected outright, so
+                // it falls to the fallback `v1-section-${targetIndex + 1}` — already
+                // `used` from the seeded chain above, forcing the while-loop to walk
+                // every rung up to the one that would, uncapped, exceed 100 chars.
+                { id: '__proto__', label: 'Target', value: 'IV | V' },
+            ],
+            isMinor: false,
+        };
+        const document = convert(undefined, [preset]);
+        const ids = document.chart.arrangement.sections.map((section) => section.id);
+        expect(new Set(ids).size).toBe(ids.length);
+        for (const id of ids) {
+            expect(id.length).toBeLessThanOrEqual(100);
+        }
+    });
+
     it('rejects prototype-member keys instead of indexing a table with them', () => {
         const blob = JSON.parse(multiSection);
         blob.sections[0].id = 'constructor';
@@ -541,6 +649,21 @@ describe('round-tripping a real v1 saved progression', () => {
         expect(document.chart.arrangement.key).toBe('C');
         expect(document.chart.arrangement.timeSignature).toBe('4/4');
     });
+
+    it('caps a long preset name at the codec lastChordPreset limit, not the title limit (#1274 P2-6)', () => {
+        const longName = `${'A'.repeat(90)} — a very long saved progression name`;
+        expect(longName.length).toBeGreaterThan(100);
+        expect(longName.length).toBeLessThanOrEqual(200);
+        const preset = {
+            name: longName,
+            sections: [{ id: 'a', label: 'A', value: 'I | IV | V | I' }],
+            isMinor: false,
+        };
+        const document = convert(undefined, [preset]);
+        expect(document.title).toBe(longName);
+        expect(document.chart.arrangement.lastChordPreset.length).toBeLessThanOrEqual(100);
+        expect(document.chart.arrangement.lastChordPreset).toBe(longName.slice(0, 100));
+    });
 });
 
 describe('importing', () => {
@@ -599,6 +722,49 @@ describe('importing', () => {
         expect(outcome.failures).toEqual([]);
     });
 
+    it('imports nothing new after an earlier preset is deleted from v1 and the run repeats (#1274 P1-a)', async () => {
+        const ledger = new Map<string, 'imported' | 'declined'>();
+        const existingIds = new Set<string>();
+        const save = async (document: { id: string }) => {
+            existingIds.add(document.id);
+        };
+        const remember = (digest: string) => ledger.set(digest, 'imported');
+
+        const before = findV1Data(
+            storageOf({ [V1_PRESETS_KEY]: JSON.stringify([presetMajor, presetMinor]) }),
+        );
+        const first = await importV1({
+            offer: v1ImportOffer(before, ledger),
+            context: v1ImportContext(before, BASE),
+            existingIds,
+            save,
+            remember,
+        });
+        expect(first.imported.map((document) => document.title)).toEqual([
+            'My Tune',
+            'Minor thing',
+        ]);
+
+        // Delete the FIRST v1 preset: every later index shifts down by one. The old,
+        // index-folded digest would have re-minted "Minor thing" as a brand-new item —
+        // caught by neither the ledger nor the existing-id guard, since both are keyed
+        // off that same unstable digest.
+        const after = findV1Data(storageOf({ [V1_PRESETS_KEY]: JSON.stringify([presetMinor]) }));
+        const second = await importV1({
+            offer: v1ImportOffer(after, ledger),
+            context: v1ImportContext(after, BASE),
+            existingIds,
+            save,
+            remember,
+        });
+        expect(second.imported).toEqual([]);
+        expect(second.failures).toEqual([]);
+        // "Minor thing" is recognized as already handled either way: the ledger still
+        // carries its (stable) digest as imported, so `v1ImportOffer` drops it from the
+        // offer before `importV1` ever sees it.
+        expect(v1ImportOffer(after, ledger).sources).toEqual([]);
+    });
+
     it('keeps what landed, reports the failure, and resumes only the rest', async () => {
         const ledger = new Map<string, 'imported' | 'declined'>();
         const finding = profile();
@@ -630,6 +796,17 @@ describe('importing', () => {
         ]);
         expect(describeV1Outcome(outcome)).toBe(
             "Imported 1 · 2 couldn't be converted: Your last session in the old Ensemble — its saved data is not readable. · Saved progression “Broken tune” — its chords could not be read.",
+        );
+    });
+
+    it('surfaces sound-pack fallbacks in the outcome and its summary line (#1274 P2-3)', async () => {
+        const blob = JSON.parse(multiSection);
+        blob.bass.voice = 'pack:pack-that-no-longer-exists';
+        const finding = findV1Data(storageOf({ [V1_STATE_KEY]: JSON.stringify(blob) }));
+        const outcome = await runner(finding, new Map()).run();
+        expect(outcome.soundFallbacks).toBe(1);
+        expect(describeV1Outcome(outcome)).toBe(
+            "Imported 1 · 1 song had sounds this app doesn't have; it uses the synth instead",
         );
     });
 

@@ -1,8 +1,18 @@
+import { fileURLToPath } from 'node:url';
 import preact from '@preact/preset-vite';
 import { configDefaults, defineConfig } from 'vitest/config';
 
 export default defineConfig({
     plugins: [preact()],
+    resolve: {
+        // Mirrors `prototypes/v2/tsconfig.json`'s `@engine/*` -> `public/*` path, so a
+        // `prototypes/v2/lib/*.test.ts` file (in scope for this config; only its `checks/`
+        // Playwright dir and `v2-api` are excluded below) can import the real preview
+        // modules without a separate Vite config.
+        alias: {
+            '@engine': fileURLToPath(new URL('./public', import.meta.url)),
+        },
+    },
     test: {
         globals: true,
         environment: 'node',

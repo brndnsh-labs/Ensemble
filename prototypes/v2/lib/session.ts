@@ -43,8 +43,14 @@ export type V1ImportState = 'imported' | 'declined';
 /**
  * A cap, not a quota: the ledger holds one short digest per v1 item this device has
  * imported or declined, and the oldest entries fall off first.
+ *
+ * Set comfortably above `import-v1.ts`'s own `MAX_PRESETS` (500) plus the one session
+ * item: a profile at that cap produces 501 digests in a single run, and a limit set to
+ * exactly 500 would evict one of THIS run's own just-written entries on the very write
+ * that recorded it — a permanent re-offer for whichever digest fell off, indistinguishable
+ * from the ledger never having seen it. 1,024 covers that plus real headroom for later runs.
  */
-const V1_IMPORT_LIMIT = 500;
+const V1_IMPORT_LIMIT = 1024;
 
 /**
  * What this device has already done about each piece of v1 data, keyed by the digest

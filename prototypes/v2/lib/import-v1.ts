@@ -27,6 +27,12 @@
  * lands in the songbook that the rest of the app cannot open. Conversion is per item:
  * one unconvertible progression is reported with a reason, never dropped silently and
  * never fatal to the rest of the import.
+ *
+ * Deliberately NOT `public/songbook/legacy-score.ts`'s `proposeLegacyScoreConversion`:
+ * that conversion blocks the WHOLE song on one unparseable bar, which is the wrong
+ * failure mode for an import whose only other option is losing the song outright. Every
+ * imported document therefore lands as `schemaVersion: 1` — read-only until the user
+ * makes an "editable copy" — the same landing state a v2 starter song has.
  */
 
 import { KEY_ORDER, TIME_SIGNATURES } from '../../../public/config.js';
@@ -132,10 +138,18 @@ export interface V1ImportContext {
     key: string;
     timeSignature: string;
     grouping: number[] | null;
+    /**
+     * Lanes whose v1 voice named a sound pack this build doesn't offer, coerced to
+     * `synth` by `laneVoice` (#1274 P2-3). Computed once here because every preset item
+     * inherits `band` verbatim from the v1 session (or the v2 baseline, which is never
+     * coerced) — so this is the one place that needs to detect it, and every item that
+     * lands with this `band` shares the same answer.
+     */
+    coercedLanes: InstrumentModule[];
 }
 
 export type V1Conversion =
-    | { kind: 'ok'; document: ChartDocument }
+    | { kind: 'ok'; document: ChartDocument; soundFallback: boolean }
     | { kind: 'failed'; reason: string };
 
 export interface V1ImportOutcome {
@@ -145,10 +159,24 @@ export interface V1ImportOutcome {
     /** Items already in the songbook from an earlier run; not re-saved, not failures. */
     alreadyPresent: number;
     problems: V1Problem[];
+    /**
+     * How many landed songs play at least one lane through the synth because v1 named a
+     * sound pack this build doesn't offer (#1274 P2-3) — never a failure, since the song
+     * itself still plays; just not with the exact sound it had in v1.
+     */
+    soundFallbacks: number;
 }
 
 const SESSION_TITLE = 'Last session from the old Ensemble';
-/** Mirrors `validateSections`' own 500-section cap; a profile cannot hold more usefully. */
+/**
+ * How many saved progressions ONE import run reads, oldest-first in the v1 array. A
+ * different axis from `presetSections`' own 500-section-per-song cap below (sections
+ * within one progression, not progressions in the library) — the two just happen to
+ * share a round number. A profile with more than this is not silently truncated:
+ * `findV1Data` reports the remainder as a problem naming the count still unread. That
+ * remainder becomes visible on a later run once enough earlier rows are imported/removed
+ * in v1 to shift it inside this window — this cap does not promise it arrives next run.
+ */
 const MAX_PRESETS = 500;
 const PROTOTYPE_MEMBER_NAMES: ReadonlySet<string> = new Set(
     Object.getOwnPropertyNames(Object.prototype),
@@ -250,11 +278,22 @@ export function findV1Data(storage: V1ReadOnlyStorage): V1Finding {
                 reason: 'the saved list has an unexpected shape.',
             });
         } else {
+            // Content-only, keyed by occurrence WITHIN a run of identical bytes — not the
+            // array index. An index-based digest looked stable but wasn't: deleting an
+            // earlier v1 preset shifts every later index, so a rerun would see "new" bytes
+            // at each shifted position and re-import them as duplicates. Two genuinely
+            // identical library rows (same name, same chords, same save time) still need
+            // distinct digests, so the Nth occurrence of one exact byte string gets an
+            // ordinal suffix; the first occurrence stays bare so a later deletion of an
+            // EARLIER duplicate just relabels who is "first" without losing ledger/id
+            // continuity for the row(s) that remain.
+            const occurrences = new Map<string, number>();
             for (const [index, entry] of presets.value.slice(0, MAX_PRESETS).entries()) {
-                // Stable per entry, so editing or adding one progression re-offers only
-                // that one. Index is in the digest because two identically-named saves
-                // with identical chords are genuinely two library rows in v1.
-                const digest = digestOf(`${index}:${JSON.stringify(entry) ?? 'null'}`);
+                const bytes = JSON.stringify(entry) ?? 'null';
+                const base = digestOf(bytes);
+                const occurrence = occurrences.get(base) ?? 0;
+                occurrences.set(base, occurrence + 1);
+                const digest = occurrence === 0 ? base : `${base}-${occurrence}`;
                 const name =
                     isPlainRecord(entry) && typeof entry.name === 'string' ? entry.name : '';
                 if (!isPlainRecord(entry) || !name || !presetSections(entry)) {
@@ -273,6 +312,16 @@ export function findV1Data(storage: V1ReadOnlyStorage): V1Finding {
                     id: `v1-preset-${digest}`,
                     title: sanitizeDisplayString(name, 'Untitled progression', 200),
                     record: entry,
+                });
+            }
+            const overflow = presets.value.length - MAX_PRESETS;
+            if (overflow > 0) {
+                problems.push({
+                    // Stable across reruns of an unchanged profile so "Not now" sticks;
+                    // it moves only when the overflow count itself changes.
+                    digest: digestOf(`v1-presets-overflow:${presets.value.length}`),
+                    label: 'Your saved progressions',
+                    reason: `this run reads at most ${MAX_PRESETS} at a time; ${overflow} more progression${overflow === 1 ? '' : 's'} could not be read this time.`,
                 });
             }
         }
@@ -332,14 +381,17 @@ export function v1ImportContext(
         key: chartKey(session?.key),
         timeSignature,
         grouping: grouping(session?.grouping, timeSignature),
+        coercedLanes: [],
     };
     if (!session) {
         return context;
     }
+    const coerced = new Set<InstrumentModule>();
     return {
         ...context,
         performance: sessionPerformance(session, context),
-        band: sessionBand(session, context),
+        band: sessionBand(session, context, coerced),
+        coercedLanes: [...coerced],
     };
 }
 
@@ -383,14 +435,23 @@ function wholeNumber(saved: unknown, min: number, max: number, fallback: number)
  * The lane's voice, coerced to `synth` when it names a pack this build does not offer
  * for that lane. Losing a whole song over a retired sound pack would be the wrong
  * trade: `lib/repository.ts` rejects an unknown voice outright, and the music is the
- * part that cannot be recreated.
+ * part that cannot be recreated. `coerced`, when given, records which lane this happened
+ * to (#1274 P2-3) so the caller can tell the musician instead of the fallback being silent.
  */
-function laneVoice(module: InstrumentModule, saved: unknown): InstrumentVoice {
+function laneVoice(
+    module: InstrumentModule,
+    saved: unknown,
+    coerced?: Set<InstrumentModule>,
+): InstrumentVoice {
     const voice = hydrateVoice(saved);
     if (voice === 'synth') {
         return 'synth';
     }
-    return packsForInstrument(module).some((pack) => `pack:${pack.id}` === voice) ? voice : 'synth';
+    if (packsForInstrument(module).some((pack) => `pack:${pack.id}` === voice)) {
+        return voice;
+    }
+    coerced?.add(module);
+    return 'synth';
 }
 
 /**
@@ -414,7 +475,11 @@ function codecSafeSections(sections: Array<Record<string, unknown>>): ChartSecti
                 ? savedId
                 : `v1-section-${index + 1}`;
         while (used.has(id)) {
-            id = `${id}-${index + 1}`;
+            // Re-truncate the base on every pass, not just append: the codec's id cap is
+            // 100 chars, and an id already near that limit growing a suffix on top of its
+            // own bytes would sail past it and fail the whole song (#1274 P2-7).
+            const suffix = `-${index + 1}`;
+            id = `${id.slice(0, Math.max(0, 100 - suffix.length))}${suffix}`;
         }
         used.add(id);
         const key = typeof section.key === 'string' ? normalizeKey(section.key) : '';
@@ -494,7 +559,11 @@ function patternLanes(saved: unknown): ChartGroovePatternLane[] {
  * returns volumes/reverbs to defaults for a pre-#1257 save. Anything this file decides
  * differently from v1 is a codec requirement, and says so.
  */
-function sessionBand(saved: Record<string, unknown>, context: V1ImportContext): ChartBand {
+function sessionBand(
+    saved: Record<string, unknown>,
+    context: V1ImportContext,
+    coerced?: Set<InstrumentModule>,
+): ChartBand {
     const shouldResetMixer = Number(saved.mixerVersion) !== MIXER_SETTINGS_VERSION;
     const chords = isPlainRecord(saved.chords) ? saved.chords : {};
     const bass = isPlainRecord(saved.bass) ? saved.bass : {};
@@ -521,7 +590,7 @@ function sessionBand(saved: Record<string, unknown>, context: V1ImportContext): 
         chords: {
             ...context.band.chords,
             enabled: boolOr(chords.enabled, true),
-            voice: laneVoice('chords', chords.voice),
+            voice: laneVoice('chords', chords.voice, coerced),
             autoSound: hydrateAutoSound(chords.autoSound, hydrateVoice(chords.voice)),
             style: knownStyle(chordStyle, isKnownChordStyle),
             octave: wholeNumber(chords.octave, 0, 127, 48),
@@ -532,7 +601,7 @@ function sessionBand(saved: Record<string, unknown>, context: V1ImportContext): 
         bass: {
             ...context.band.bass,
             enabled: boolOr(bass.enabled, true),
-            voice: laneVoice('bass', bass.voice),
+            voice: laneVoice('bass', bass.voice, coerced),
             autoSound: hydrateAutoSound(bass.autoSound, hydrateVoice(bass.voice)),
             style: knownStyle(bass.style, isKnownBassStyle),
             octave: wholeNumber(bass.octave, 0, 127, 36),
@@ -542,7 +611,7 @@ function sessionBand(saved: Record<string, unknown>, context: V1ImportContext): 
         soloist: {
             ...context.band.soloist,
             enabled: boolOr(soloist.enabled, false),
-            voice: laneVoice('soloist', soloist.voice),
+            voice: laneVoice('soloist', soloist.voice, coerced),
             autoSound: hydrateAutoSound(soloist.autoSound, hydrateVoice(soloist.voice)),
             style: knownStyle(soloist.style, isKnownSoloistStyle),
             preset: normalizeSoloistPreset(soloist.preset, 'trumpet') as 'trumpet',
@@ -566,7 +635,7 @@ function sessionBand(saved: Record<string, unknown>, context: V1ImportContext): 
         harmony: {
             ...context.band.harmony,
             enabled: boolOr(harmony.enabled, false),
-            voice: laneVoice('harmony', harmony.voice),
+            voice: laneVoice('harmony', harmony.voice, coerced),
             autoSound: hydrateAutoSound(harmony.autoSound, hydrateVoice(harmony.voice)),
             style: knownStyle(harmony.style, isKnownHarmonyStyle),
             octave: wholeNumber(harmony.octave, 0, 127, 60),
@@ -577,7 +646,7 @@ function sessionBand(saved: Record<string, unknown>, context: V1ImportContext): 
         groove: {
             ...context.band.groove,
             enabled: boolOr(groove.enabled, true),
-            voice: laneVoice('groove', groove.voice),
+            voice: laneVoice('groove', groove.voice, coerced),
             autoSound: hydrateAutoSound(groove.autoSound, hydrateVoice(groove.voice)),
             // `measures` is not in v1's persisted payload at all, so v1 itself reloads
             // every session at 1. Mirrored rather than "improved": a 2-measure drum
@@ -659,7 +728,11 @@ function content(source: V1Source, context: V1ImportContext): ChartContent | str
             grouping: context.grouping,
             isMinor: !!source.record.isMinor,
             notation: 'roman',
-            lastChordPreset: source.title,
+            // `title` (the document field) allows up to 200 chars, matching `findV1Data`'s
+            // own sanitize call; `lastChordPreset` is a DIFFERENT codec field capped at 100
+            // (#1274 P2-6) — reusing `source.title` unsliced here failed the whole song for
+            // any name past 100 chars even though the title itself was perfectly valid.
+            lastChordPreset: source.title.slice(0, 100),
         },
         performance: context.performance,
         band: context.band,
@@ -710,7 +783,7 @@ export function convertV1(
                     : 'it is not a version this songbook can read.',
         };
     }
-    return { kind: 'ok', document: checked.value };
+    return { kind: 'ok', document: checked.value, soundFallback: context.coercedLanes.length > 0 };
 }
 
 /** A saved progression remembers when it was saved; keep it as the document's origin. */
@@ -752,6 +825,7 @@ export async function importV1(run: V1ImportRun): Promise<V1ImportOutcome> {
         failures: [],
         alreadyPresent: 0,
         problems: run.offer.problems,
+        soundFallbacks: 0,
     };
     for (const source of run.offer.sources) {
         if (run.existingIds.has(source.id)) {
@@ -774,6 +848,9 @@ export async function importV1(run: V1ImportRun): Promise<V1ImportOutcome> {
             continue;
         }
         outcome.imported.push(conversion.document);
+        if (conversion.soundFallback) {
+            outcome.soundFallbacks++;
+        }
         run.remember(source.digest);
     }
     return outcome;
@@ -784,6 +861,12 @@ export function describeV1Outcome(outcome: V1ImportOutcome): string {
     const parts = [`Imported ${outcome.imported.length}`];
     if (outcome.alreadyPresent) {
         parts.push(`${outcome.alreadyPresent} already here`);
+    }
+    if (outcome.soundFallbacks) {
+        const singular = outcome.soundFallbacks === 1;
+        parts.push(
+            `${outcome.soundFallbacks} song${singular ? '' : 's'} had sounds this app doesn't have; ${singular ? 'it uses' : 'they use'} the synth instead`,
+        );
     }
     const trouble = [
         ...outcome.failures.map((failure) => `${failure.title} — ${failure.reason}`),
