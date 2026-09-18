@@ -46,6 +46,7 @@ function stubSongbook(overrides: Record<string, unknown> = {}): AccountSongbook 
         reconcile: async () => 'unchanged',
         prepare: async () => 'idle',
         acknowledge: async () => 'committed',
+        refuse: async () => 'refused',
         ...overrides,
     } as unknown as AccountSongbook;
 }
@@ -183,24 +184,37 @@ describe('the sync loop surfaces the reason a Save could not be sent', () => {
     it('says a refusal is permanent rather than promising a retry that cannot work', async () => {
         // #1268 patch review P1: `operation_mismatch` fell through to the generic server sentence,
         // which ends "We’ll try again" — and the retry is refused for exactly the same reason
-        // every time, because the account has already answered about these bytes. Same for a
-        // `not_found`: an id the account holds neither a row nor a tombstone for.
-        for (const code of ['operation_mismatch', 'not_found'] as const) {
-            const { snapshot } = await passWith({
-                ok: false,
-                error: { kind: 'code', code, status: code === 'not_found' ? 404 : 409 },
-            });
+        // every time, because the account has already answered about these bytes.
+        const { snapshot } = await passWith({
+            ok: false,
+            error: { kind: 'code', code: 'operation_mismatch', status: 409 },
+        });
 
-            expect(snapshot.failure).toEqual({
-                reason: 'refused',
-                message: SYNC_MESSAGES.refused,
-            });
-            // Still leads with the local truth, still names no server vocabulary — and, unlike
-            // every other sentence here, makes no promise about trying again.
-            expect(snapshot.failure?.message).toContain('Saved on this device');
-            expect(snapshot.failure?.message).not.toContain(code);
-            expect(snapshot.failure?.message).not.toContain('try again');
-        }
+        expect(snapshot.failure).toEqual({
+            reason: 'refused',
+            message: SYNC_MESSAGES.refused,
+        });
+        // Still leads with the local truth, still names no server vocabulary — and, unlike
+        // every other sentence here, makes no promise about trying again.
+        expect(snapshot.failure?.message).toContain('Saved on this device');
+        expect(snapshot.failure?.message).not.toContain('operation_mismatch');
+        expect(snapshot.failure?.message).not.toContain('try again');
+    });
+
+    it('does not call a 404 a refusal of this chart — the Save route never answers one', async () => {
+        // #1298 patch review P1: `commitSave` resolves an unknown or tombstoned id as a
+        // `conflict` with `remote: null`, so the only thing that answers 404 for
+        // `POST /api/documents/save` is the server's catch-all `app.notFound` — an unmounted
+        // route, an older image, a proxy rewrite. That is account-wide, so "save it as a copy"
+        // would send the musician to make copies that 404 for the same reason. It is the
+        // ordinary server sentence, which promises the retry that does work once the deployment
+        // is fixed.
+        const { snapshot } = await passWith({
+            ok: false,
+            error: { kind: 'code', code: 'not_found', status: 404 },
+        });
+
+        expect(snapshot.failure).toEqual({ reason: 'server', message: SYNC_MESSAGES.server });
     });
 
     it('names no code at all for a verdict this client has no specific answer to', async () => {
@@ -318,6 +332,11 @@ describe('the sync loop empties the queue rather than leaving it one version sho
             documentId,
             body: JSON.stringify({ song: documentId }),
         });
+        let refusedFlag = false;
+        const refuse = vi.fn(async () => {
+            refusedFlag = true;
+            return 'refused' as const;
+        });
         const songbook = stubSongbook({
             // Honours the resume cursor, because stepping over the refused song IS the cursor.
             list: async (_scope: unknown, options: { afterDocumentId?: string } = {}) => ({
@@ -327,21 +346,29 @@ describe('the sync loop empties the queue rather than leaving it one version sho
                 ].filter((song) => song.documentId > (options.afterDocumentId ?? '')),
                 nextAfterDocumentId: null,
             }),
-            prepare: async (_scope: unknown, documentId: string) =>
-                documentId === 'song-1' || queued > 0 ? queuedFor(documentId) : 'idle',
+            // #1298: once `refuse()` has marked the head, real storage answers `'refused'` here
+            // without a request. A fake that kept handing back a queued Save would model the
+            // pre-#1298 store and quietly assert the re-POST this story exists to stop.
+            prepare: async (_scope: unknown, documentId: string) => {
+                if (documentId === 'song-1') {
+                    return refusedFlag ? 'refused' : queuedFor(documentId);
+                }
+                return queued > 0 ? queuedFor(documentId) : 'idle';
+            },
             acknowledge: async () => {
                 queued -= 1;
                 return 'committed';
             },
+            refuse,
         });
         const loop = createSyncLoop(api, createAccountSession(api), songbook);
         await loop.attach(OWNER);
 
         await loop.run();
 
-        // The refused song, then the song behind it — in the SAME pass. The third post is the
-        // re-sweep that a commit earns; it ends as soon as song-2 has nothing queued left.
-        expect(posts).toEqual(['song-1', 'song-2', 'song-1']);
+        // The refused song, then the song behind it — in the SAME pass. The re-sweep a commit
+        // earns costs song-1 no second request: its head is marked by then.
+        expect(posts).toEqual(['song-1', 'song-2']);
         expect(queued).toBe(0);
         // Still reported, and as its own reason: a chart the server will not take is not a full
         // account library, and deleting a song in the cloud would not fix it.
@@ -349,6 +376,15 @@ describe('the sync loop empties the queue rather than leaving it one version sho
             reason: 'too-large',
             message: SYNC_MESSAGES.tooLarge,
         });
+        // #1298: the durable half — persisted on the head so the NEXT pass answers `'refused'`
+        // without spending a request, rather than rediscovering this same rejection. By OPERATION
+        // id, so a head another tab committed underneath the rejection is not refused in its place.
+        expect(refuse).toHaveBeenCalledWith(
+            expect.objectContaining({ ownerId: OWNER }),
+            'song-1',
+            'op-1',
+            'too-large',
+        );
     });
 
     it('steps over a song the account has permanently refused, and keeps sending the rest', async () => {
@@ -375,6 +411,11 @@ describe('the sync loop empties the queue rather than leaving it one version sho
             documentId,
             body: JSON.stringify({ song: documentId }),
         });
+        let refusedFlag = false;
+        const refuse = vi.fn(async () => {
+            refusedFlag = true;
+            return 'refused' as const;
+        });
         const songbook = stubSongbook({
             list: async (_scope: unknown, options: { afterDocumentId?: string } = {}) => ({
                 songs: [
@@ -383,24 +424,144 @@ describe('the sync loop empties the queue rather than leaving it one version sho
                 ].filter((song) => song.documentId > (options.afterDocumentId ?? '')),
                 nextAfterDocumentId: null,
             }),
-            prepare: async (_scope: unknown, documentId: string) =>
-                documentId === 'song-1' || queued > 0 ? queuedFor(documentId) : 'idle',
+            prepare: async (_scope: unknown, documentId: string) => {
+                if (documentId === 'song-1') {
+                    return refusedFlag ? 'refused' : queuedFor(documentId);
+                }
+                return queued > 0 ? queuedFor(documentId) : 'idle';
+            },
             acknowledge: async () => {
                 queued -= 1;
                 return 'committed';
             },
+            refuse,
         });
         const loop = createSyncLoop(api, createAccountSession(api), songbook);
         await loop.attach(OWNER);
 
         await loop.run();
 
-        expect(posts).toEqual(['song-1', 'song-2', 'song-1']);
+        expect(posts).toEqual(['song-1', 'song-2']);
         expect(queued).toBe(0);
         expect(loop.getSnapshot().failure).toEqual({
             reason: 'refused',
             message: SYNC_MESSAGES.refused,
         });
+        expect(refuse).toHaveBeenCalledWith(
+            expect.objectContaining({ ownerId: OWNER }),
+            'song-1',
+            'op-1',
+            'refused',
+        );
+    });
+
+    it('ends the pass on a 404 instead of stepping over it — that is the whole route, not one song', async () => {
+        // #1298 patch review P1: a 404 for `POST /api/documents/save` can only come from the
+        // server's catch-all (`app.notFound`), never from `commitSave`. Stepping over it would
+        // spend a request per song for an outage that answers every one of them the same way —
+        // and, now that a step-over is DURABLE, would permanently refuse an entire library over a
+        // deployment mistake.
+        const posts: string[] = [];
+        const api: AccountApi = {
+            get: vi.fn(async () => EMPTY_MANIFEST),
+            post: vi.fn(async (_path: string, body: string) => {
+                posts.push((JSON.parse(body) as { song: string }).song);
+                return { ok: false, error: { kind: 'code', code: 'not_found', status: 404 } };
+            }),
+        } as unknown as AccountApi;
+        const refuse = vi.fn(async () => 'refused' as const);
+        const songbook = stubSongbook({
+            list: async (_scope: unknown, options: { afterDocumentId?: string } = {}) => ({
+                songs: [
+                    { documentId: 'song-1', remoteRevision: null },
+                    { documentId: 'song-2', remoteRevision: null },
+                ].filter((song) => song.documentId > (options.afterDocumentId ?? '')),
+                nextAfterDocumentId: null,
+            }),
+            prepare: async (_scope: unknown, documentId: string) => ({
+                ...PREPARED,
+                documentId,
+                body: JSON.stringify({ song: documentId }),
+            }),
+            refuse,
+        });
+        const loop = createSyncLoop(api, createAccountSession(api), songbook);
+        await loop.attach(OWNER);
+
+        await loop.run();
+
+        expect(posts).toEqual(['song-1']);
+        // Nothing is durably refused, because nothing about one chart was refused.
+        expect(refuse).not.toHaveBeenCalled();
+        expect(loop.getSnapshot().failure).toEqual({
+            reason: 'server',
+            message: SYNC_MESSAGES.server,
+        });
+    });
+
+    it('stops re-sending a step-over refusal once it is durably marked, unlike a fresh capture', async () => {
+        // The bug #1298 fixes: `sendNext` collapses every transport rejection to `'retry'`, so
+        // without a durable record the refusal is re-discovered — and the body re-POSTed — once
+        // per pass. Once `refuse()` marks the head, `prepare()` answers `'refused'` without
+        // spending a request, which this fake models directly rather than through real storage.
+        const posts: string[] = [];
+        let queuedSong2 = 1;
+        let refusedFlag = false;
+        const api: AccountApi = {
+            get: vi.fn(async () => EMPTY_MANIFEST),
+            post: vi.fn(async (_path: string, body: string) => {
+                const documentId = (JSON.parse(body) as { song: string }).song;
+                posts.push(documentId);
+                return documentId === 'song-1'
+                    ? { ok: false, error: { kind: 'code', code: 'payload_too_large', status: 413 } }
+                    : { ok: true, value: { kind: 'committed' }, status: 200 };
+            }),
+        } as unknown as AccountApi;
+        const queuedFor = (documentId: string) => ({
+            ...PREPARED,
+            documentId,
+            body: JSON.stringify({ song: documentId }),
+        });
+        const refuse = vi.fn(async () => {
+            refusedFlag = true;
+            return 'refused' as const;
+        });
+        const songbook = stubSongbook({
+            list: async (_scope: unknown, options: { afterDocumentId?: string } = {}) => ({
+                songs: [
+                    { documentId: 'song-1', remoteRevision: null },
+                    { documentId: 'song-2', remoteRevision: null },
+                ].filter((song) => song.documentId > (options.afterDocumentId ?? '')),
+                nextAfterDocumentId: null,
+            }),
+            prepare: async (_scope: unknown, documentId: string) => {
+                if (documentId === 'song-1') {
+                    return refusedFlag ? 'refused' : queuedFor(documentId);
+                }
+                return queuedSong2 > 0 ? queuedFor(documentId) : 'idle';
+            },
+            acknowledge: async () => {
+                queuedSong2 -= 1;
+                return 'committed';
+            },
+            refuse,
+        });
+        const loop = createSyncLoop(api, createAccountSession(api), songbook);
+        await loop.attach(OWNER);
+
+        await loop.run();
+
+        // Exactly one POST for song-1, not two: the durable mark stops the re-sweep from
+        // re-preparing it, so `prepare()` answers `'refused'` with no network call at all.
+        expect(posts).toEqual(['song-1', 'song-2']);
+        expect(refuse).toHaveBeenCalledTimes(1);
+
+        posts.length = 0;
+        await loop.run();
+
+        // The next trigger (an `online` event, a later Save) sends nothing for song-1 either:
+        // the refusal is a fact this device already recorded, not one it has to ask about again.
+        expect(posts).toEqual([]);
     });
 
     it('bounds the re-sweep at the deepest a single song’s queue can be', async () => {
@@ -502,6 +663,52 @@ describe('the sync loop never publishes a stale observation over a fresher one',
         await stale;
 
         expect(loop.getSnapshot().observation?.pendingCount).toBe(1);
+    });
+});
+
+describe('the sync loop names a refused document on its own observation (#1298)', () => {
+    it('reads a refused head off storage, not off whichever document the last pass failed on', async () => {
+        const song = {
+            ownerId: OWNER,
+            documentId: 'song-1',
+            document: { id: 'song-1' },
+            remoteRevision: null,
+        };
+        const songbook = stubSongbook({
+            read: async () => song,
+            pending: async () => [{ status: 'refused', reason: 'too-large' }],
+        });
+        const { api } = fakeApi({ ok: true, value: { kind: 'committed' }, status: 200 });
+        const loop = createSyncLoop(api, createAccountSession(api), songbook);
+        await loop.attach(OWNER);
+
+        await loop.watch('song-1');
+
+        expect(loop.getSnapshot().observation).toMatchObject({
+            pendingCount: 1,
+            conflict: 'none',
+            refused: 'too-large',
+        });
+    });
+
+    it('reports no refusal for an ordinary queued or conflicted head', async () => {
+        const song = {
+            ownerId: OWNER,
+            documentId: 'song-1',
+            document: { id: 'song-1' },
+            remoteRevision: 'rev-1',
+        };
+        const songbook = stubSongbook({
+            read: async () => song,
+            pending: async () => [{ status: 'conflict', remote: null }],
+        });
+        const { api } = fakeApi({ ok: true, value: { kind: 'committed' }, status: 200 });
+        const loop = createSyncLoop(api, createAccountSession(api), songbook);
+        await loop.attach(OWNER);
+
+        await loop.watch('song-1');
+
+        expect(loop.getSnapshot().observation).toMatchObject({ conflict: 'gone', refused: null });
     });
 });
 
@@ -1214,7 +1421,38 @@ describe('signing out moves the fence before it asks the server for anything', (
             // Save, the other an unsaved experiment. Export has to reach both.
             atRisk: ['song-1', 'song-2'],
             unsentSaves: 2,
+            refusedSaves: 0,
             drafts: 1,
+        });
+    });
+
+    it('counts a refused head’s whole queue as unsyncable, so the step never offers a dead Sync now', async () => {
+        // #1298 patch review P2: "Sync now" is the one move that can empty a queue before it is
+        // discarded — and against a refused head it provably cannot, because `prepare()` answers
+        // `'refused'` for it without sending. The Save queued BEHIND that head counts too: nothing
+        // advances past a refusal, so it is exactly as stuck as the marked row.
+        const { api } = fakeApi({ ok: true, value: {}, status: 204 });
+        const loop = createSyncLoop(
+            api,
+            createAccountSession(api),
+            stubSongbook({
+                list: async () => ({
+                    songs: [{ documentId: 'song-1' }, { documentId: 'song-2' }],
+                    nextAfterDocumentId: null,
+                }),
+                pending: async (_scope: unknown, documentId: string) =>
+                    documentId === 'song-1'
+                        ? [{ status: 'refused', reason: 'too-large' }, { status: 'queued' }]
+                        : [{ status: 'queued' }],
+                drafts: async () => [],
+            }),
+        );
+        await loop.attach(OWNER);
+
+        expect(await loop.signOutPreflight()).toMatchObject({
+            unsentSaves: 3,
+            // song-1's two, never song-2's: an ordinary queue behind an ordinary head still syncs.
+            refusedSaves: 2,
         });
     });
 });

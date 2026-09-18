@@ -20,7 +20,10 @@ import type { SignOutPreflight } from '../../lib/account/sync-loop';
  *    differently — one can still be sent, the other can only be exported.
  * 2. **Export and Sync now are real buttons, beside the destructive one.** Export is the only thing
  *    that survives this whatever the network does, because it never leaves the device; Sync now is
- *    the one move that can make the queue empty before it is discarded.
+ *    the one move that can make the queue empty before it is discarded — **unless every unsent
+ *    Save has been permanently refused** (#1298), in which case Sync now is a button that provably
+ *    cannot do anything (`prepare()` answers `'refused'` for those heads and sends nothing), so it
+ *    is not offered at all and the sentence names Export as the step that works.
  * 3. **Offline, the destructive button is DISABLED with a reason** (rollout decision 9 S2:
  *    sign-out needs a connection — there is no persisted logout barrier, so a device that cannot
  *    reach the server cannot honestly claim the session was revoked). The header's Sign out button
@@ -68,6 +71,10 @@ export function SignOutDialog({
     const drafts = preflight?.drafts ?? 0;
     const exposed = preflight?.atRisk.length ?? 0;
     const atRisk = exposed > 0;
+    // Every unsent Save is one the account has already refused, so there is nothing left for a
+    // sync to send. A partial overlap still offers Sync now: it can empty the rest of the queue,
+    // and the refused ones were never going anywhere either way.
+    const onlyRefused = unsent > 0 && (preflight?.refusedSaves ?? 0) >= unsent;
     return (
         <dialog
             ref={dialogRef}
@@ -98,7 +105,11 @@ export function SignOutDialog({
                             {unsent === 1
                                 ? 'One saved version hasn’t reached your account yet.'
                                 : `${unsent} saved versions haven’t reached your account yet.`}{' '}
-                            Signing out discards them. Sync now, or export the song first.
+                            {onlyRefused
+                                ? unsent === 1
+                                    ? 'Your account won’t accept this version — export it before signing out.'
+                                    : 'Your account won’t accept these versions — export them before signing out.'
+                                : 'Signing out discards them. Sync now, or export the song first.'}
                         </p>
                     )}
                     {drafts > 0 && (
@@ -144,7 +155,7 @@ export function SignOutDialog({
                         {exposed === 1 ? 'Export that song' : `Export those ${exposed} songs`}
                     </button>
                 )}
-                {unsent > 0 && (
+                {unsent > 0 && !onlyRefused && (
                     <button
                         className="btn"
                         data-testid="sign-out-sync"

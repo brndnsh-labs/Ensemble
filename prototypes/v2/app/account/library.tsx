@@ -108,6 +108,18 @@ const CLOUD_LABELS = {
     'not-uploaded': 'Not in your account yet',
 } as const;
 
+/**
+ * #1298: a permanent transport-level refusal, named per document rather than folded into the
+ * pass-level `sync.failure` sentence — that one describes whichever document a LAST pass happened
+ * to touch, and would silently go stale or point at the wrong song once a later pass runs against
+ * a different one. `'too-large'` says what actually fixes it (shrink the chart); `'refused'` names
+ * the one action that works (save it under a fresh identity), never the server's own vocabulary.
+ */
+const CLOUD_REFUSAL_LABELS = {
+    'too-large': 'This chart is too large to upload',
+    refused: 'Your account refused this upload — save it as a copy',
+} as const;
+
 const OFFLINE_LABELS = {
     unknown: 'Checking offline readiness…',
     incomplete: 'Not ready to play offline yet',
@@ -169,7 +181,9 @@ export function SyncStatus({
                 {LOCAL_LABELS[view.local.status]}
             </span>
             <span className="sync-fact" data-testid="sync-cloud">
-                {CLOUD_LABELS[view.cloud.status]}
+                {view.cloud.status === 'refused'
+                    ? CLOUD_REFUSAL_LABELS[view.cloud.refused ?? 'refused']
+                    : CLOUD_LABELS[view.cloud.status]}
                 {view.cloud.status === 'queued' && view.cloud.pendingCount !== null
                     ? ` (${view.cloud.pendingCount})`
                     : ''}

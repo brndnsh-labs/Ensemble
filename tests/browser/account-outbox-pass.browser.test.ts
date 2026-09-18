@@ -141,7 +141,7 @@ describe('one bounded outbox pass on real IndexedDB', () => {
         expect(result).toEqual({
             kind: 'complete',
             resumeAfterDocumentId: null,
-            counts: { idle: 0, committed: 0, conflict: 0, retry: 0 },
+            counts: { idle: 0, committed: 0, conflict: 0, retry: 0, refused: 0 },
         });
         expect(cloudTransport.calls).toHaveLength(0);
     });
@@ -151,7 +151,7 @@ describe('one bounded outbox pass on real IndexedDB', () => {
         const cloudTransport = cloud({ conflict: new Set([ids[0]]) });
         const result = await runOutboxPass(book, scope, cloudTransport.transport);
         expect(result.kind).toBe('complete');
-        expect(result.counts).toEqual({ idle: 0, committed: 1, conflict: 1, retry: 0 });
+        expect(result.counts).toEqual({ idle: 0, committed: 1, conflict: 1, retry: 0, refused: 0 });
         expect(cloudTransport.calls.map((call) => call.documentId)).toEqual(ids);
     });
 
@@ -222,7 +222,7 @@ describe('one bounded outbox pass on real IndexedDB', () => {
         expect(result).toMatchObject({
             kind: 'retry',
             resumeAfterDocumentId: ids[0],
-            counts: { idle: 0, committed: 1, conflict: 0, retry: 1 },
+            counts: { idle: 0, committed: 1, conflict: 0, retry: 1, refused: 0 },
         });
         expect(failing.calls.map((call) => call.documentId)).toEqual([ids[0], ids[1]]);
         const frozenBody = failing.calls[1].body;
@@ -259,7 +259,7 @@ describe('one bounded outbox pass on real IndexedDB', () => {
             signal: controller.signal,
         });
         expect(result.kind).toBe('aborted');
-        expect(result.counts).toEqual({ idle: 0, committed: 0, conflict: 0, retry: 1 });
+        expect(result.counts).toEqual({ idle: 0, committed: 0, conflict: 0, retry: 1, refused: 0 });
         expect(result.resumeAfterDocumentId).toBeNull();
     });
 
@@ -274,7 +274,7 @@ describe('one bounded outbox pass on real IndexedDB', () => {
         expect(result).toEqual({
             kind: 'aborted',
             resumeAfterDocumentId: null,
-            counts: { idle: 0, committed: 0, conflict: 0, retry: 0 },
+            counts: { idle: 0, committed: 0, conflict: 0, retry: 0, refused: 0 },
         });
         expect(cloudTransport.calls).toHaveLength(0);
     });
@@ -297,7 +297,7 @@ describe('one bounded outbox pass on real IndexedDB', () => {
         expect(result).toEqual({
             kind: 'aborted',
             resumeAfterDocumentId: null,
-            counts: { idle: 0, committed: 0, conflict: 0, retry: 0 },
+            counts: { idle: 0, committed: 0, conflict: 0, retry: 0, refused: 0 },
         });
         expect(cloudTransport.calls).toHaveLength(0);
         listSpy.mockRestore();
@@ -324,7 +324,7 @@ describe('one bounded outbox pass on real IndexedDB', () => {
         expect(result).toEqual({
             kind: 'aborted',
             resumeAfterDocumentId: null,
-            counts: { idle: 0, committed: 0, conflict: 0, retry: 0 },
+            counts: { idle: 0, committed: 0, conflict: 0, retry: 0, refused: 0 },
         });
         expect(cloudTransport.calls).toHaveLength(0);
         listSpy.mockRestore();
@@ -342,7 +342,7 @@ describe('one bounded outbox pass on real IndexedDB', () => {
         deferred.respond(committedResponse(request, 'cloud-1'));
         const result = await pending;
         expect(result.kind).toBe('aborted');
-        expect(result.counts).toEqual({ idle: 0, committed: 1, conflict: 0, retry: 0 });
+        expect(result.counts).toEqual({ idle: 0, committed: 1, conflict: 0, retry: 0, refused: 0 });
         expect(result.resumeAfterDocumentId).toBe(id);
         // Truly committed, not just counted: a fresh read agrees.
         expect((await book.read(scope, id))?.remoteRevision).toBe('cloud-1');
