@@ -84,6 +84,111 @@ export function candidateKey(ownerId: string, documentId: string): string {
     return `${candidatePrefix(ownerId)}${documentId}`;
 }
 
+/**
+ * The frozen half of an explicit cloud deletion (#1270), keyed into the SAME generic `meta` store
+ * the remote candidates live in — and for the same reason: a store of its own would need an
+ * IndexedDB version bump on a database that already exists wherever this app has run, and a schema
+ * upgrade is a destructive-data decision a delete feature does not get to make on its own.
+ *
+ * `'delete:'` sorts strictly below `'remote:'`, so `remoteCandidates`' prefix range cannot see one,
+ * and the `'active'` pointer sorts below both. The identifier grammar excludes `':'`, so no owner
+ * or document ID can be spelled to collide across the two namespaces.
+ *
+ * It is persisted BEFORE the request leaves, and that is the whole point: a lost response (the tab
+ * closed, the network died mid-flight) leaves the server's receipt written and this device unsure.
+ * Retrying with the SAME operation id is what makes the second attempt a replay the server answers
+ * from its receipt rather than a second delete — so the id has to outlive a reload, which a
+ * module-level variable would not.
+ */
+export function deletionKey(ownerId: string, documentId: string): string {
+    identifier(ownerId);
+    identifier(documentId);
+    return `delete:${ownerId}:${documentId}`;
+}
+
+/** The stored frozen delete. Four scalars: everything the canonical request bytes are made of. */
+export interface PendingDeletion {
+    key: string;
+    ownerId: string;
+    documentId: string;
+    operationId: string;
+    /** The confirmed remote revision this delete was aimed at. Never null: see `DeleteCommand`. */
+    expectedRevision: string;
+}
+
+export interface PreparedDelete {
+    ownerId: string;
+    documentId: string;
+    operationId: string;
+    expectedRevision: string;
+    body: string;
+    digest: string;
+}
+
+/**
+ * The canonical delete envelope, in the exact key set and ORDER the server's decoder pins
+ * (`prototypes/v2-api/src/http/document-delete-request.ts`, which rebuilds this string and refuses
+ * a body that differs by so much as a space).
+ *
+ * Unlike a Save, this is DERIVED at send time rather than frozen as bytes. A Save freezes its
+ * `wireBody` because the document inside it is a whole chart that keeps being edited; a delete is
+ * four scalars that `PendingDeletion` already holds immutably, so re-deriving them is byte-identical
+ * by construction and there is no second copy to keep in agreement with the first.
+ */
+export function deleteBody(request: Omit<PendingDeletion, 'key'>): string {
+    identifier(request.ownerId);
+    identifier(request.documentId);
+    identifier(request.operationId);
+    remoteRevision(request.expectedRevision);
+    return JSON.stringify({
+        ownerId: request.ownerId,
+        documentId: request.documentId,
+        operationId: request.operationId,
+        expectedRevision: request.expectedRevision,
+    });
+}
+
+export type DeleteReply = {
+    ownerId: string;
+    documentId: string;
+    operationId: string;
+    digest: string;
+    revision: string;
+} & ({ kind: 'deleted' } | { kind: 'conflict' });
+
+/**
+ * Validate a delete reply before starting an IDB write, exactly as `reply()` does for a Save.
+ *
+ * The 409 conflict body carries a `remote` version too, and it is deliberately NOT read here: a
+ * delete conflict is reported, never resolved — the id is still live at a revision this request did
+ * not expect, and the next library download is what brings that version in under the ordinary
+ * preservation rules. Decoding it here would put a second adoption path beside `reconcile`'s.
+ */
+export function deleteReply(candidate: unknown, request: PreparedDelete): DeleteReply {
+    if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) {
+        throw new Error('Invalid delete response. Nothing was removed from this device.');
+    }
+    const value = candidate as Record<string, unknown>;
+    if (
+        value.ownerId !== request.ownerId ||
+        value.documentId !== request.documentId ||
+        value.operationId !== request.operationId ||
+        value.digest !== request.digest ||
+        (value.kind !== 'deleted' && value.kind !== 'conflict')
+    ) {
+        throw new Error('Delete response does not match the request.');
+    }
+    remoteRevision(value.revision);
+    return {
+        ownerId: request.ownerId,
+        documentId: request.documentId,
+        operationId: request.operationId,
+        digest: request.digest,
+        revision: value.revision,
+        kind: value.kind,
+    };
+}
+
 export interface SaveOperation {
     ownerId: string;
     documentId: string;

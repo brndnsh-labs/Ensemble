@@ -1,7 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { AccountApi, ApiResult } from '../../../prototypes/v2/lib/account/api.js';
 import { createAccountSession } from '../../../prototypes/v2/lib/account/session.js';
-import { createSyncLoop, SYNC_MESSAGES } from '../../../prototypes/v2/lib/account/sync-loop.js';
+import {
+    createSyncLoop,
+    DELETE_MESSAGES,
+    SYNC_MESSAGES,
+} from '../../../prototypes/v2/lib/account/sync-loop.js';
 import { MAX_PENDING_SAVES, type PreparedSave } from '../../../prototypes/v2/lib/sync/protocol.js';
 import type { AccountSongbook } from '../../../prototypes/v2/lib/sync/repository.js';
 
@@ -506,5 +510,348 @@ describe('the sync loop runs one pass at a time', () => {
 
         expect(reads).toEqual([]);
         expect(loop.getSnapshot().owner).toBeNull();
+    });
+});
+
+/**
+ * Explicit cloud deletion (#1270). What is proven here is the loop's CLASSIFICATION: which server
+ * answer becomes which sentence, and — the part that actually protects data — when the frozen
+ * operation id may be forgotten. The storage rules it drives sit on real IndexedDB in
+ * `tests/browser/account-cloud-delete.browser.test.ts`; a stub store would agree with a wrong
+ * transaction as readily as with a right one.
+ */
+describe('the sync loop deletes from the cloud as one explicit, retry-safe operation', () => {
+    const PREPARED_DELETE = {
+        ownerId: OWNER,
+        documentId: 'song-1',
+        operationId: 'del-1',
+        expectedRevision: 'cloud-1',
+        body: '{"canonical":"delete"}',
+        digest: 'b'.repeat(64),
+    };
+
+    /** A songbook whose delete half is fully stubbed, recording what the loop asked it to do. */
+    function deletable(overrides: Record<string, unknown> = {}) {
+        const discarded: string[] = [];
+        const acknowledged: unknown[] = [];
+        const songbook = stubSongbook({
+            prepareDelete: async () => PREPARED_DELETE,
+            discardDelete: async (_scope: unknown, documentId: string) => {
+                discarded.push(documentId);
+            },
+            acknowledgeDelete: async (
+                _scope: unknown,
+                _request: unknown,
+                response: unknown,
+                options: unknown,
+            ) => {
+                acknowledged.push(options);
+                return (response as { outcome?: string }).outcome ?? 'removed';
+            },
+            ...overrides,
+        });
+        return { songbook, discarded, acknowledged };
+    }
+
+    async function deleting(post: ApiResult<unknown>, parts = deletable()) {
+        const { api } = fakeApi(post);
+        const loop = createSyncLoop(api, createAccountSession(api), parts.songbook);
+        await loop.attach(OWNER);
+        const result = await loop.deleteFromCloud('song-1');
+        return { loop, result, ...parts };
+    }
+
+    it('sends the frozen bytes verbatim to the delete route and reports the removal', async () => {
+        const { api } = fakeApi({ ok: true, value: { outcome: 'removed' }, status: 200 });
+        const parts = deletable();
+        const loop = createSyncLoop(api, createAccountSession(api), parts.songbook);
+        await loop.attach(OWNER);
+        loop.setActiveDocument(null);
+        const before = loop.getSnapshot().libraryVersion;
+
+        const result = await loop.deleteFromCloud('song-1');
+
+        expect(api.post).toHaveBeenCalledWith('/api/documents/delete', PREPARED_DELETE.body);
+        expect(result).toEqual({
+            kind: 'deleted',
+            retained: false,
+            message: DELETE_MESSAGES.deleted,
+        });
+        // The library moved on disk, so the shell's list is asked to re-read.
+        expect(loop.getSnapshot().libraryVersion).toBeGreaterThan(before);
+        // The active predicate is answered at the moment of the commit, not from a stale list.
+        expect(parts.acknowledged).toEqual([{ active: false }]);
+        expect(parts.discarded).toEqual([]);
+    });
+
+    it('says so when the cloud copy went but local work kept the one on this device', async () => {
+        const { result } = await deleting({
+            ok: true,
+            value: { outcome: 'retained-deleted' },
+            status: 200,
+        });
+        expect(result).toEqual({
+            kind: 'deleted',
+            retained: true,
+            message: DELETE_MESSAGES.retained,
+        });
+    });
+
+    it('carries the open chart into the active predicate rather than guessing it', async () => {
+        const { api } = fakeApi({ ok: true, value: { outcome: 'removed' }, status: 200 });
+        const parts = deletable();
+        const loop = createSyncLoop(api, createAccountSession(api), parts.songbook);
+        await loop.attach(OWNER);
+        loop.setActiveDocument('song-1');
+        await loop.deleteFromCloud('song-1');
+        expect(parts.acknowledged).toEqual([{ active: true }]);
+    });
+
+    it('reports a changed cloud version without deleting or retrying', async () => {
+        const { result, discarded } = await deleting({
+            ok: true,
+            value: { outcome: 'conflict' },
+            status: 409,
+        });
+        expect(result).toEqual({ kind: 'refused', retry: false, message: DELETE_MESSAGES.changed });
+        // `acknowledgeDelete` forgets the frozen id inside its own transaction on this path, so
+        // the loop must NOT also ask — a second discard would be a second write for one decision.
+        expect(discarded).toEqual([]);
+    });
+
+    it('asks for a pass after a conflict, so the stale local revision is not a dead end', async () => {
+        const { api, reads } = fakeApi({ ok: true, value: { outcome: 'conflict' }, status: 409 });
+        const parts = deletable();
+        const loop = createSyncLoop(api, createAccountSession(api), parts.songbook);
+        await loop.attach(OWNER);
+        expect(documentReads(reads)).toEqual([]);
+
+        expect((await loop.deleteFromCloud('song-1')).kind).toBe('refused');
+
+        // Kicked detached — nothing awaits it inside the delete — so this waits for the pass the
+        // refusal asked for rather than starting one of its own, which would prove nothing.
+        await vi.waitFor(() => {
+            expect(documentReads(reads).length).toBeGreaterThan(0);
+        });
+    });
+
+    it('cleans up a mirror the account has never held, through the download’s own rule', async () => {
+        const reconciled: unknown[] = [];
+        const parts = deletable({
+            reconcile: async (_scope: unknown, outcome: unknown, options: unknown) => {
+                reconciled.push({ outcome, options });
+                return 'removed';
+            },
+        });
+        const { loop, result, discarded } = await deleting(
+            { ok: false, error: { kind: 'code', code: 'not_found', status: 404 } },
+            parts,
+        );
+
+        expect(result).toEqual({ kind: 'refused', retry: false, message: DELETE_MESSAGES.absent });
+        expect(discarded).toEqual(['song-1']);
+        // A 404 is the account saying it holds neither the id nor a tombstone for it, so the local
+        // record's confirmed revision is a claim about a cloud copy that does not exist. It is
+        // retired by the same rule a downloaded tombstone runs, aimed at the revision this device
+        // last confirmed — the only one a 404 leaves it holding.
+        expect(reconciled).toEqual([
+            {
+                outcome: { kind: 'deleted', documentId: 'song-1', revision: 'cloud-1' },
+                options: { active: false, expectedRemoteRevision: 'cloud-1' },
+            },
+        ]);
+        // The library moved on disk, so the shell's list is asked to re-read.
+        expect(loop.getSnapshot().libraryVersion).toBeGreaterThan(0);
+    });
+
+    it('refuses a delete inside the back-off window rather than sending it', async () => {
+        const { api } = fakeApi({
+            ok: false,
+            error: { kind: 'code', code: 'rate_limited', status: 429 },
+        });
+        let prepared = 0;
+        const parts = deletable({
+            prepareDelete: async () => {
+                prepared += 1;
+                return PREPARED_DELETE;
+            },
+        });
+        const loop = createSyncLoop(api, createAccountSession(api), parts.songbook);
+        await loop.attach(OWNER);
+
+        const first = await loop.deleteFromCloud('song-1');
+        expect(first).toEqual({
+            kind: 'refused',
+            retry: true,
+            message: DELETE_MESSAGES.rateLimited,
+        });
+        expect(api.post).toHaveBeenCalledTimes(1);
+        expect(prepared).toBe(1);
+
+        // The 429 answers for the whole ORIGIN, so the next attempt is refused here: a destructive
+        // POST inside the window is what the server just asked this device not to send, and
+        // nothing is frozen for a request that never left.
+        const second = await loop.deleteFromCloud('song-1');
+        expect(second).toEqual({
+            kind: 'refused',
+            retry: true,
+            message: DELETE_MESSAGES.rateLimited,
+        });
+        expect(api.post).toHaveBeenCalledTimes(1);
+        expect(prepared).toBe(1);
+    });
+
+    it('keeps the frozen id after an uncertain outcome, so a retry is a replay', async () => {
+        const uncertain: ApiResult<unknown>[] = [
+            { ok: false, error: { kind: 'network' } },
+            { ok: false, error: { kind: 'unknown', status: 502 } },
+            { ok: false, error: { kind: 'code', code: 'internal_error', status: 500 } },
+            { ok: false, error: { kind: 'code', code: 'rate_limited', status: 429 } },
+            { ok: false, error: { kind: 'code', code: 'unauthenticated', status: 401 } },
+        ];
+        for (const post of uncertain) {
+            const { result, discarded } = await deleting(post);
+            expect(result.kind).toBe('refused');
+            // The server may well have committed; the same bytes under the same id are still the
+            // only safe way to ask again.
+            expect(discarded).toEqual([]);
+        }
+    });
+
+    it('forgets the frozen id only when the server answered about those exact bytes', async () => {
+        for (const code of ['not_found', 'operation_mismatch', 'malformed_request'] as const) {
+            const { discarded } = await deleting({
+                ok: false,
+                error: { kind: 'code', code, status: 400 },
+            });
+            expect(discarded).toEqual(['song-1']);
+        }
+    });
+
+    it('turns each refusal into a sentence, never a server code', async () => {
+        const cases: Array<[ApiResult<unknown>, string]> = [
+            [
+                { ok: false, error: { kind: 'code', code: 'unauthenticated', status: 401 } },
+                DELETE_MESSAGES.expired,
+            ],
+            [
+                { ok: false, error: { kind: 'code', code: 'rate_limited', status: 429 } },
+                DELETE_MESSAGES.rateLimited,
+            ],
+            [
+                { ok: false, error: { kind: 'code', code: 'not_found', status: 404 } },
+                DELETE_MESSAGES.absent,
+            ],
+            [
+                { ok: false, error: { kind: 'code', code: 'malformed_request', status: 400 } },
+                DELETE_MESSAGES.refused,
+            ],
+            [
+                { ok: false, error: { kind: 'code', code: 'operation_mismatch', status: 409 } },
+                DELETE_MESSAGES.refused,
+            ],
+        ];
+        for (const [post, message] of cases) {
+            const { result } = await deleting(post);
+            expect(result).toMatchObject({ kind: 'refused', message });
+            expect(message).not.toMatch(
+                /rate_limited|not_found|malformed_request|operation_mismatch|unauthenticated/,
+            );
+        }
+    });
+
+    /**
+     * The half of the vocabulary that is about what this device can KNOW. Each of these outcomes
+     * is compatible with the server having committed the delete and the reply going missing — the
+     * lost-response case `checks/account-delete.chromium.spec.ts` stages end to end — so a sentence
+     * claiming nothing was deleted would be a guess this device cannot make.
+     */
+    it('never claims nothing was deleted when it cannot know', async () => {
+        const unknowable: ApiResult<unknown>[] = [
+            { ok: false, error: { kind: 'network' } },
+            { ok: false, error: { kind: 'unknown', status: 502 } },
+            { ok: false, error: { kind: 'code', code: 'internal_error', status: 500 } },
+        ];
+        for (const post of unknowable) {
+            const { result } = await deleting(post);
+            expect(result).toEqual({
+                kind: 'refused',
+                retry: true,
+                message: DELETE_MESSAGES.uncertain,
+            });
+            expect(result.message).not.toMatch(/Nothing was deleted/);
+        }
+        // And the sentences that DO make that claim are only the ones the account answered.
+        for (const message of [
+            DELETE_MESSAGES.expired,
+            DELETE_MESSAGES.rateLimited,
+            DELETE_MESSAGES.refused,
+            DELETE_MESSAGES.changed,
+        ]) {
+            expect(message).toMatch(/Nothing was deleted/);
+        }
+    });
+
+    it('never builds a request for a song the cloud has never held', async () => {
+        const absent = [
+            ['missing', DELETE_MESSAGES.absent],
+            ['unconfirmed', DELETE_MESSAGES.unconfirmed],
+        ] as const;
+        for (const [reply, message] of absent) {
+            const { api } = fakeApi({ ok: true, value: {}, status: 200 });
+            const songbook = stubSongbook({ prepareDelete: async () => reply });
+            const loop = createSyncLoop(api, createAccountSession(api), songbook);
+            await loop.attach(OWNER);
+            expect(await loop.deleteFromCloud('song-1')).toEqual({
+                kind: 'refused',
+                retry: false,
+                message,
+            });
+            expect(api.post).not.toHaveBeenCalled();
+        }
+    });
+});
+
+describe('a Save the cloud can no longer hold reads differently from a two-sided conflict', () => {
+    /** One conflicted operation in the outbox, with whatever remote version the server offered. */
+    function conflicted(remote: unknown) {
+        return stubSongbook({
+            read: async () => ({ remoteRevision: 'cloud-1' }),
+            pending: async () => [{ status: 'conflict', remote }],
+        });
+    }
+
+    it('names a tombstoned id as gone, and a real divergence as a version conflict', async () => {
+        const cases = [
+            [null, 'gone'],
+            [{ revision: 'cloud-2', document: {} }, 'version'],
+        ] as const;
+        for (const [remote, expected] of cases) {
+            const { api } = fakeApi({ ok: true, value: { kind: 'committed' }, status: 200 });
+            const loop = createSyncLoop(api, createAccountSession(api), conflicted(remote));
+            await loop.attach(OWNER);
+            await loop.watch('song-1');
+            // `remote === null` is the server saying it has nothing to offer — a tombstone, or an
+            // id it never held. Either way there is no version to choose between (#1270).
+            expect(loop.getSnapshot().observation?.conflict).toBe(expected);
+        }
+    });
+
+    it('reports no conflict at all for an ordinary queued Save', async () => {
+        const { api } = fakeApi({ ok: true, value: { kind: 'committed' }, status: 200 });
+        const loop = createSyncLoop(
+            api,
+            createAccountSession(api),
+            stubSongbook({
+                read: async () => ({ remoteRevision: 'cloud-1' }),
+                pending: async () => [{ status: 'queued' }],
+            }),
+        );
+        await loop.attach(OWNER);
+        await loop.watch('song-1');
+        expect(loop.getSnapshot().observation).toMatchObject({
+            conflict: 'none',
+            pendingCount: 1,
+        });
     });
 });

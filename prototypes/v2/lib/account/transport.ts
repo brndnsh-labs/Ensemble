@@ -1,4 +1,4 @@
-import type { PreparedSave } from '../sync/protocol';
+import type { PreparedDelete, PreparedSave } from '../sync/protocol';
 import type { SaveTransport } from '../sync/send';
 import type { AccountApi, ApiError } from './api';
 import type { AccountSession } from './session';
@@ -58,5 +58,52 @@ export function createSaveTransport(api: AccountApi, session: AccountSession): S
             session.markExpired();
         }
         throw new SaveTransportError(result.error);
+    };
+}
+
+/** The delete route's half of `SaveTransportError`: the reason, kept for the caller to classify. */
+export class DeleteTransportError extends Error {
+    readonly reason: ApiError;
+
+    constructor(reason: ApiError) {
+        super(
+            reason.kind === 'network'
+                ? 'Delete request failed: network unreachable.'
+                : reason.kind === 'code'
+                  ? `Delete request failed: ${reason.code}.`
+                  : 'Delete request failed: unrecognized server response.',
+        );
+        this.name = 'DeleteTransportError';
+        this.reason = reason;
+    }
+}
+
+export type DeleteTransport = (request: PreparedDelete) => Promise<unknown>;
+
+/**
+ * `POST /api/documents/delete` (#1260's route, #1270's caller), built exactly like the Save
+ * transport above and for the same reasons.
+ *
+ * The RESOLVE/THROW split is the load-bearing part, and it is the server's taxonomy that draws it:
+ * a `200 deleted` and a `409 conflict` are protocol replies with no `error` key, so `api.ts` reports
+ * them as successes and they go straight to `deleteReply()` to be validated. Everything else is a
+ * bare `{ error: <code> }` — including the `404 not_found` and `409 operation_mismatch` this route
+ * adds — and is thrown, so which code it was survives for the caller to act on. That matters more
+ * here than on the Save path: the caller has to decide from the reason whether the FROZEN OPERATION
+ * ID may be dropped, and an outcome collapsed to "it failed" cannot answer that question.
+ *
+ * Nothing here retries. One delete is one deliberate human act, so the retry decision belongs to the
+ * person, not to a transport that would be re-POSTing a destructive operation on its own.
+ */
+export function createDeleteTransport(api: AccountApi, session: AccountSession): DeleteTransport {
+    return async (request: PreparedDelete): Promise<unknown> => {
+        const result = await api.post<unknown>('/api/documents/delete', request.body);
+        if (result.ok) {
+            return result.value;
+        }
+        if (result.error.kind === 'code' && result.error.code === 'unauthenticated') {
+            session.markExpired();
+        }
+        throw new DeleteTransportError(result.error);
     };
 }

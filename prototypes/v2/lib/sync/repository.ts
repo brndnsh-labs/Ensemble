@@ -4,11 +4,16 @@ import {
     candidateKey,
     candidatePrefix,
     type Draft,
+    deleteBody,
+    deleteReply,
+    deletionKey,
     digest,
     identifier,
     LocalRevisionError,
     localRevision,
     MAX_PENDING_SAVES,
+    type PendingDeletion,
+    type PreparedDelete,
     type PreparedSave,
     type RemoteCandidate,
     type RemoteOutcome,
@@ -23,6 +28,7 @@ import {
     copyScope,
     remoteOutcome,
     savedCandidate,
+    savedDeletion,
     savedDraft,
     savedOperation,
     savedSong,
@@ -75,6 +81,60 @@ export interface ReconcileOptions {
      * holds a record must pass its revision or it will simply be told the record moved.
      */
     expectedRemoteRevision?: string | null;
+}
+
+/**
+ * The whole commit rule for "the cloud no longer has this document", shared by the two callers that
+ * can learn it (#1270): a library download reading an explicit tombstone row, and this device's own
+ * acknowledged delete. It is one rule because it answers one question — may this device drop its
+ * copy? — and a second spelling of it would be the exact place the two paths silently disagreed.
+ *
+ * Writes through `tx` and returns the outcome; the CALLER owns `tx.finish`, because the download
+ * path reaches this from inside a larger decision and the delete path does not.
+ */
+function commitDeleted(
+    // Only the store handles: typed as the one method it uses so a `Transaction<T>` of any result
+    // type can be passed without a cast, and so this can never reach for `finish` by accident.
+    tx: Pick<Transaction<never>, 'table'>,
+    scope: AccountScope,
+    documentId: string,
+    candidate: () => RemoteCandidate,
+    song: SavedSong | null,
+    held: boolean,
+    expected: string | null | undefined,
+): ReconcileOutcome {
+    const key = candidateKey(scope.ownerId, documentId);
+    if (held || song?.remoteRevision === null) {
+        // Local work exists only here: a draft, a queued Save, or the chart on the stand. It stays,
+        // and the candidate is the flag that explains why the cloud copy is gone.
+        tx.table('meta').put(candidate());
+        return 'retained-deleted';
+    }
+    if (song && song.remoteRevision !== expected) {
+        // The record moved under the plan that asked for this removal. Removing it would delete a
+        // revision nobody ever diffed — so it stays, flagged like any other divergence.
+        tx.table('meta').put(candidate());
+        return 'retained-deleted';
+    }
+    if (!song) {
+        // Nothing was ever mirrored here, so there is nothing to remove and nothing to explain.
+        // Any candidate left from an earlier pass is stale.
+        tx.table('meta').delete(key);
+        return 'unchanged';
+    }
+    // A clean mirror of a document the cloud no longer has. Receipts stay: they are the idempotency
+    // record of Saves already acknowledged, and this document has no queued Save left that could
+    // resurrect the cloud ID.
+    //
+    // The frozen delete goes too, and it is the download path that needs this: a tombstone arriving
+    // while this device held a prepared delete of its own would otherwise leave a permanent
+    // `delete:` row. `prepareDelete` is the only other thing that clears one, and it cannot run for
+    // a song that is no longer in the library. The delete path has already forgotten its own row in
+    // this same transaction, so there it is a no-op.
+    tx.table('songs').delete([scope.ownerId, documentId]);
+    tx.table('meta').delete(key);
+    tx.table('meta').delete(deletionKey(scope.ownerId, documentId));
+    return 'removed';
 }
 
 function operations<T>(
@@ -471,6 +531,174 @@ export class AccountSongbook {
         });
     }
 
+    /**
+     * Freeze an explicit cloud deletion for this document and hand back the bytes to send (#1270).
+     *
+     * The operation id is minted ONCE and stored before anything leaves this device, so a lost
+     * response — the tab closed, the network died after the server committed — retries the identical
+     * request and the server answers it from its receipt instead of deleting a second time. An
+     * existing frozen record is therefore reused VERBATIM, including its `expectedRevision`: a retry
+     * is a retry of that request, not a fresh request wearing its id, which the server would refuse
+     * as `operation_mismatch`.
+     *
+     * `'missing'` — no saved record here at all. `'unconfirmed'` — a record the cloud has never
+     * acknowledged (`remoteRevision === null`), so there is nothing in the account to delete and no
+     * revision to name; the local copy is the only copy and removing it is not this operation.
+     * Either way any frozen record is dropped: it can only be left over from a delete that already
+     * landed and was reconciled by a download pass.
+     */
+    async prepareDelete(
+        scope: AccountScope,
+        documentId: string,
+    ): Promise<PreparedDelete | 'missing' | 'unconfirmed'> {
+        scope = copyScope(scope);
+        identifier(documentId);
+        const frozen = await this.database.run<PendingDeletion | 'missing' | 'unconfirmed'>(
+            'readwrite',
+            scope,
+            (tx) => {
+                const key = deletionKey(scope.ownerId, documentId);
+                tx.read(
+                    tx.table('songs').get([scope.ownerId, documentId]),
+                    (stored: SavedSong | undefined) => {
+                        const song = stored ? savedSong(stored, scope, documentId) : null;
+                        if (!song || song.remoteRevision === null) {
+                            tx.table('meta').delete(key);
+                            return tx.finish(song ? 'unconfirmed' : 'missing');
+                        }
+                        const expectedRevision = song.remoteRevision;
+                        tx.read(
+                            tx.table('meta').get(key),
+                            (existing: PendingDeletion | undefined) => {
+                                if (existing !== undefined) {
+                                    return tx.finish(savedDeletion(existing, scope, documentId));
+                                }
+                                const record: PendingDeletion = {
+                                    key,
+                                    ownerId: scope.ownerId,
+                                    documentId,
+                                    operationId: crypto.randomUUID(),
+                                    expectedRevision,
+                                };
+                                tx.table('meta').put(record);
+                                tx.finish(record);
+                            },
+                        );
+                    },
+                );
+            },
+        );
+        if (typeof frozen === 'string') {
+            return frozen;
+        }
+        const body = deleteBody(frozen);
+        const hash = await digest(body);
+        // Crypto runs outside IDB. Recheck the fence before publishing a prepared request, exactly
+        // as `prepare()` does for a Save.
+        await this.database.run('readonly', scope, (tx) => tx.finish(undefined));
+        return {
+            ownerId: scope.ownerId,
+            documentId,
+            operationId: frozen.operationId,
+            expectedRevision: frozen.expectedRevision,
+            body,
+            digest: hash,
+        };
+    }
+
+    /**
+     * Forget a frozen delete, so a later attempt mints a fresh operation id.
+     *
+     * Only ever correct after the server answered definitively ABOUT THESE BYTES and wrote no
+     * receipt for them — a stale `expectedRevision`, an id it has never held, or an operation id
+     * already spent on something else. After an UNCERTAIN outcome (a dead network, a 401, a 429)
+     * the same bytes are still the right request and the frozen id must survive, or a retry would
+     * risk deleting twice under two ids.
+     */
+    async discardDelete(scope: AccountScope, documentId: string): Promise<void> {
+        scope = copyScope(scope);
+        identifier(documentId);
+        return this.database.run('readwrite', scope, (tx) => {
+            tx.table('meta').delete(deletionKey(scope.ownerId, documentId));
+            tx.finish(undefined);
+        });
+    }
+
+    /**
+     * Apply the server's answer to a frozen delete, in one transaction (#1270).
+     *
+     * A `deleted` reply — a fresh delete, a replay of this operation id, and a delete of an id
+     * already deleted are ONE reply by design — runs the same `commitDeleted` rule a downloaded
+     * tombstone does, re-read here rather than taken from the caller: a Save can have been queued,
+     * or the chart opened, while the request was in flight, and local work that exists only on this
+     * device is never removed by a cloud operation. `request.expectedRevision` is the
+     * compare-and-swap base, so a record that advanced meanwhile is retained rather than dropped.
+     *
+     * A `conflict` reply means nothing was deleted and the server wrote no receipt, so the frozen
+     * id is dropped: the id is live at another revision, and a later attempt has to name THAT
+     * revision — which is different bytes, and reusing the id for them is exactly what the server's
+     * `operation_mismatch` refuses.
+     */
+    async acknowledgeDelete(
+        scope: AccountScope,
+        request: PreparedDelete,
+        candidate: unknown,
+        options: { active?: boolean } = {},
+    ): Promise<ReconcileOutcome | 'conflict'> {
+        scope = copyScope(scope);
+        request = { ...request };
+        if (request.ownerId !== scope.ownerId || (await digest(request.body)) !== request.digest) {
+            throw new Error('Invalid prepared delete.');
+        }
+        if (!options || typeof options !== 'object' || Array.isArray(options)) {
+            throw new Error('Invalid delete options.');
+        }
+        const active = options.active === true;
+        const response = deleteReply(candidate, request);
+        const documentId = request.documentId;
+        return this.database.run('readwrite', scope, (tx) => {
+            tx.table('meta').delete(deletionKey(scope.ownerId, documentId));
+            if (response.kind === 'conflict') {
+                return tx.finish('conflict');
+            }
+            const observed = remoteOutcome({
+                kind: 'deleted',
+                documentId,
+                revision: response.revision,
+            });
+            const candidateRecord = (): RemoteCandidate =>
+                Object.assign(
+                    { key: candidateKey(scope.ownerId, documentId), ownerId: scope.ownerId },
+                    observed,
+                );
+            tx.read(
+                tx.table('songs').get([scope.ownerId, documentId]),
+                (stored: SavedSong | undefined) => {
+                    const song = stored ? savedSong(stored, scope, documentId) : null;
+                    tx.read(
+                        tx.table('drafts').index('song').count([scope.ownerId, documentId]),
+                        (drafts: number) => {
+                            operations(tx, scope, documentId, (queue) => {
+                                const held = active || drafts > 0 || queue.length > 0;
+                                tx.finish(
+                                    commitDeleted(
+                                        tx,
+                                        scope,
+                                        documentId,
+                                        candidateRecord,
+                                        song,
+                                        held,
+                                        request.expectedRevision,
+                                    ),
+                                );
+                            });
+                        },
+                    );
+                },
+            );
+        });
+    }
+
     /** The remote observation this device kept but did not adopt. Null when there is none. */
     async remoteCandidate(
         scope: AccountScope,
@@ -589,32 +817,17 @@ export class AccountSongbook {
                                     return tx.finish('unsupported');
                                 }
                                 if (observed.kind === 'deleted') {
-                                    if (held || song?.remoteRevision === null) {
-                                        tx.table('meta').put(candidate());
-                                        return tx.finish('retained-deleted');
-                                    }
-                                    if (song && song.remoteRevision !== expected) {
-                                        // The record moved under the plan that asked for this
-                                        // removal. Removing it would delete a revision nobody
-                                        // ever diffed — so it stays, flagged like any other
-                                        // divergence from a cloud deletion.
-                                        tx.table('meta').put(candidate());
-                                        return tx.finish('retained-deleted');
-                                    }
-                                    if (!song) {
-                                        // Nothing was ever mirrored here, so there is nothing to
-                                        // remove and nothing to explain. Any candidate left from
-                                        // an earlier pass is stale.
-                                        tx.table('meta').delete(key);
-                                        return tx.finish('unchanged');
-                                    }
-                                    // A clean mirror of a document the cloud deleted. Receipts
-                                    // stay: they are the idempotency record of Saves already
-                                    // acknowledged, and this document has no queued Save left
-                                    // that could resurrect the cloud ID.
-                                    tx.table('songs').delete([scope.ownerId, documentId]);
-                                    tx.table('meta').delete(key);
-                                    return tx.finish('removed');
+                                    return tx.finish(
+                                        commitDeleted(
+                                            tx,
+                                            scope,
+                                            documentId,
+                                            candidate,
+                                            song,
+                                            held,
+                                            expected,
+                                        ),
+                                    );
                                 }
                                 if (song && song.remoteRevision === observed.revision) {
                                     // Already the confirmed local state — including on a rerun
