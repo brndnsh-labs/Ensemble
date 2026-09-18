@@ -90,6 +90,11 @@ export default function Ensemble() {
     const [feel, setFeel] = useState<FeelSnapshot>(() => feelSnapshot());
     const [showControls, setShowControls] = useState(false);
     const [pendingSound, setPendingSound] = useState<{ lane: string; value: string } | null>(null);
+    // #1278 — a distinct busy flag from `busy` (which `run()` sets for every
+    // action) so the audio-export Cancel button in `SongMenu` stays clickable
+    // for the whole render, not just disabled the instant the export starts.
+    const [exportingAudio, setExportingAudio] = useState(false);
+    const [exportAudioProgress, setExportAudioProgress] = useState('');
     const [recoveryOptions, setRecoveryOptions] = useState<
         ReturnType<typeof repository.recoveriesFor>
     >([]);
@@ -668,6 +673,33 @@ export default function Ensemble() {
         const candidate = updateChart();
         await runtime.exportMidi(candidate.title);
     }
+    // #1278 — reuse the same detached-clone WAV renderer v1's `ShareModal` uses
+    // (`renderCurrentSessionToWav`/`renderStemsToWav` in
+    // public/export/audio-export.ts). Deliberately NOT routed through `run()`:
+    // that helper's shared `busy` flag would also disable the Cancel button
+    // this needs to stay clickable for the whole render, so this mirrors `run()`'s
+    // shape (the same `working` mutex, so it still can't overlap another action)
+    // with its own `exportingAudio` flag layered on top.
+    async function exportAudioFile(kind: 'mix' | 'stems') {
+        if (!current || working.current) {
+            return;
+        }
+        working.current = true;
+        setBusy(true);
+        setExportingAudio(true);
+        setError('');
+        try {
+            const candidate = updateChart();
+            await runtime.exportAudio(kind, candidate.title, setExportAudioProgress);
+        } catch (e) {
+            setError(e instanceof Error ? e.message : String(e));
+        } finally {
+            working.current = false;
+            setBusy(false);
+            setExportingAudio(false);
+            setExportAudioProgress('');
+        }
+    }
     const { blocks, displayActive, activeEvent, totalBars, writtenBars, writtenSections } =
         useChartView(current, active);
     const continuedSave = songs.find((song) => song.id === lastOpened);
@@ -1123,6 +1155,11 @@ export default function Ensemble() {
                 onSaveCopy={() => void run(() => save(true))}
                 onExport={() => void run(exportSong)}
                 onExportMidi={() => void run(exportMidiFile)}
+                exportingAudio={exportingAudio}
+                exportAudioProgress={exportAudioProgress}
+                onExportAudioMix={() => void exportAudioFile('mix')}
+                onExportAudioStems={() => void exportAudioFile('stems')}
+                onCancelExportAudio={() => runtime.cancelExportAudio()}
                 onImport={() => {
                     setMenu(false);
                     setImporting(true);

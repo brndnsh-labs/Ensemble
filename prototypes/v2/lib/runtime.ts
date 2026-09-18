@@ -17,6 +17,13 @@ import { initAudio, playNote, restoreGains, syncBusReverbSend } from '@engine/en
 import { scheduler } from '@engine/engine/scheduler-core';
 import { isSoloistMonophonicMode } from '@engine/engine/soloist-mode-policy';
 import { transposeChordText } from '@engine/engine/transpose';
+import {
+    downloadExportResult,
+    renderCurrentSessionToWav,
+    renderStemsToWav,
+    STEM_INSTRUMENTS,
+    type StemInstrument,
+} from '@engine/export/audio-export';
 import { exportToMidi } from '@engine/export/midi-export';
 import {
     prepareScorePlayback,
@@ -50,12 +57,24 @@ import { type ChartDocument, type DocumentContent, validateDocument } from './do
 import { masterVolumePreference, rememberMasterVolume } from './session';
 import { initializeSounds, prepareSound, prepareSounds, validateVoice } from './sounds';
 
-export type { ChartContent, ChartDocument };
+export type { ChartContent, ChartDocument, StemInstrument };
 export { GENRE_NAMES };
 
 let boot: Promise<void> | undefined;
 let loading = false;
 let playIntent = 0;
+/**
+ * Bumped by {@link cancelExportAudio}; an in-flight {@link exportAudio} call
+ * checks this after every await and discards its work (no download) once its
+ * own captured value falls behind. Same superseded-intent shape as
+ * `playIntent` above — the one difference is a cancelled export is expected
+ * (a user action), not a race to quietly lose, so callers must not surface it
+ * as an error.
+ */
+let exportIntent = 0;
+
+/** Thrown from inside {@link exportAudio}'s stem-progress hook to unwind `renderStemsToWav`'s loop the moment a cancel lands, rather than waiting for it to finish every remaining stem. Never escapes {@link exportAudio}. */
+class ExportCancelled extends Error {}
 /** Lanes whose voice follows the feel while they are left on Auto (#675). */
 const AUTO_LANES = ['groove', 'bass', 'chords', 'harmony', 'soloist'] as const;
 /**
@@ -849,6 +868,81 @@ export function audition(index: number): void {
 export function exportMidi(filename: string): Promise<void> {
     return exportToMidi({ filename });
 }
+
+/** Cancels the in-flight {@link exportAudio} call, if any (#1278). Cooperative,
+ * not a true mid-render abort — see {@link exportAudio}'s doc comment. */
+export function cancelExportAudio(): void {
+    exportIntent++;
+}
+
+/**
+ * Downloads a WAV mix, or one WAV per stem, of the current arrangement
+ * (#1278). Delegates to the shared `renderCurrentSessionToWav`/
+ * `renderStemsToWav` (public/export/audio-export.ts) — the same detached-clone
+ * offline render v1's `ShareModal` uses (`cloneStateForRender`), so the live
+ * scheduler/state tree is never written during the render; nothing here
+ * dispatches.
+ *
+ * Sampled voices must be installed before the render can use them —
+ * `resolveInstrumentSource` (instrument-registry.ts) silently resolves an
+ * uninstalled `pack:<id>` voice to the built-in synth, which would export
+ * audio that doesn't match what the Sounds picker shows as selected for this
+ * chart. Reuse the exact install path `toggle()` (Play) already runs before
+ * playback — `prepareSounds` with the same progress callback shape — so a
+ * missing pack visibly downloads first instead of the render silently
+ * proceeding on a synth stand-in; a failed/declined install throws here and
+ * the caller surfaces that as an error rather than exporting anyway.
+ *
+ * Cancellation is cooperative: `OfflineAudioContext` has no cancel primitive,
+ * so a mix export (one render) can only be discarded after it finishes
+ * (checked once more before the download fires). A stems export can stop
+ * between stems — `onStemProgress` fires synchronously before each one starts,
+ * so throwing {@link ExportCancelled} there unwinds `renderStemsToWav`'s loop
+ * before any further stem renders — but a stem already in flight still
+ * finishes. Either way, a cancelled call never reaches `downloadExportResult`.
+ */
+export async function exportAudio(
+    kind: 'mix' | 'stems',
+    filename: string,
+    progress: (text: string) => void,
+    instruments: StemInstrument[] = STEM_INSTRUMENTS,
+): Promise<void> {
+    const intent = ++exportIntent;
+    await prepareSounds(captureContent(), progress);
+    if (intent !== exportIntent) {
+        return;
+    }
+    if (kind === 'mix') {
+        progress('Rendering mix…');
+        const result = await renderCurrentSessionToWav({ filename });
+        if (intent !== exportIntent) {
+            return;
+        }
+        downloadExportResult(result);
+        return;
+    }
+    try {
+        const results = await renderStemsToWav(instruments, {
+            filename,
+            onStemProgress: ({ instrument, index, total }) => {
+                if (intent !== exportIntent) {
+                    throw new ExportCancelled();
+                }
+                progress(`Rendering ${instrument} (${index + 1}/${total})…`);
+            },
+        });
+        if (intent === exportIntent) {
+            for (const result of results) {
+                downloadExportResult(result);
+            }
+        }
+    } catch (error) {
+        if (!(error instanceof ExportCancelled)) {
+            throw error;
+        }
+    }
+}
+
 export function state(): EnsembleState {
     return getState();
 }
