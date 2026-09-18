@@ -24,6 +24,7 @@ import {
     type SavedSong,
     type SaveOperation,
     type SaveReceipt,
+    type SaveRefusalReason,
     snapshot,
 } from './protocol';
 import {
@@ -382,7 +383,16 @@ export class AccountSongbook {
                         throw new LocalRevisionError();
                     }
                     operations(tx, scope, document.id, (queue) => {
-                        if (queue.length >= MAX_PENDING_SAVES) {
+                        // A refused HEAD (#1298) is a verdict on bytes a retry cannot change: the
+                        // account has answered about THESE bytes and will answer the same way
+                        // forever, so a fresh Save of this same document is a request it has never
+                        // seen and deserves to be sent, not parked behind a head `prepare()` will
+                        // never advance past. Only the head is ever dropped — anything queued
+                        // behind it is an ordinary unacknowledged Save that still gets its turn —
+                        // so the queue becomes `[new]`, not `[refused, new]`.
+                        const refusedHead = queue[0]?.status === 'refused' ? queue[0] : null;
+                        const active = refusedHead ? queue.slice(1) : queue;
+                        if (active.length >= MAX_PENDING_SAVES) {
                             throw new Error(
                                 'Too many pending Saves for this song. Sync or export before saving again.',
                             );
@@ -400,7 +410,7 @@ export class AccountSongbook {
                             document: saved,
                             remoteRevision: previous?.remoteRevision ?? null,
                         };
-                        const predecessor = queue.at(-1);
+                        const predecessor = active.at(-1);
                         const operation: SaveOperation = {
                             ownerId: scope.ownerId,
                             documentId: saved.id,
@@ -413,6 +423,9 @@ export class AccountSongbook {
                             wireBody: null,
                             status: 'queued',
                         };
+                        if (refusedHead) {
+                            tx.table('operations').delete([scope.ownerId, refusedHead.operationId]);
+                        }
                         tx.table('songs').put(song);
                         tx.table('operations').add(operation);
                         tx.finish(song);
@@ -462,10 +475,10 @@ export class AccountSongbook {
     async prepare(
         scope: AccountScope,
         documentId: string,
-    ): Promise<PreparedSave | 'idle' | 'conflict'> {
+    ): Promise<PreparedSave | 'idle' | 'conflict' | 'refused'> {
         scope = copyScope(scope);
         identifier(documentId);
-        const operation = await this.database.run<SaveOperation | 'idle' | 'conflict'>(
+        const operation = await this.database.run<SaveOperation | 'idle' | 'conflict' | 'refused'>(
             'readwrite',
             scope,
             (tx) => {
@@ -476,6 +489,9 @@ export class AccountSongbook {
                     }
                     if (head.status === 'conflict') {
                         return tx.finish('conflict');
+                    }
+                    if (head.status === 'refused') {
+                        return tx.finish('refused');
                     }
                     if (head.wireBody !== null) {
                         return tx.finish(head);
@@ -602,6 +618,48 @@ export class AccountSongbook {
                     );
                 },
             );
+        });
+    }
+
+    /**
+     * Persist that the queued Save at the head of this document's outbox has been permanently
+     * refused by the account (#1298) — the durable half of `sync-loop.ts`'s step-over: a 413, an
+     * `operation_mismatch` or a `not_found` is a verdict on THESE bytes that no retry can change,
+     * unlike `acknowledge`'s `'conflict'` write for a two-sided version disagreement.
+     *
+     * Same posture as `acknowledge`'s conflict write: the row is never removed, so `prepare()`
+     * answers `'refused'` for this document from here on and sends nothing further for it, while
+     * every OTHER document's queue keeps moving (`drain`'s step-over in `sync-loop.ts`). The one
+     * way out is a fresh Save of this same document — `save()` deletes a refused head the moment
+     * a new op is enqueued for its id — or `save(copy)`'s fresh identity.
+     *
+     * Marks whatever is CURRENTLY the head rather than matching a frozen request: the caller
+     * (`drain`) knows only which DOCUMENT the transport refused, from a `SaveTransportError` it
+     * captured on the way past a generic `'retry'` — the frozen request itself is not carried
+     * that far. Nothing else advances a queue between a refused send and this call in the same
+     * pass, so marking the current head is safe.
+     *
+     * `'none'` when the head is no longer a plain queued Save — already resolved a different way,
+     * or the queue emptied — under this call. The caller's own capture is then a moment stale, and
+     * stepping over the document by its already-known id is still correct either way.
+     */
+    async refuse(
+        scope: AccountScope,
+        documentId: string,
+        reason: SaveRefusalReason,
+    ): Promise<'refused' | 'none'> {
+        scope = copyScope(scope);
+        identifier(documentId);
+        return this.database.run('readwrite', scope, (tx) => {
+            operations(tx, scope, documentId, (queue) => {
+                const head = queue[0];
+                if (head?.status !== 'queued') {
+                    return tx.finish('none');
+                }
+                const refused: SaveOperation = { ...head, status: 'refused', reason };
+                tx.table('operations').put(refused);
+                tx.finish('refused');
+            });
         });
     }
 

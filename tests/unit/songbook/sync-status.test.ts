@@ -18,7 +18,7 @@ const CLEAN_LOCAL: StatusFacts['local'] = {
     recovery: 'none',
 };
 const IDLE_CLOUD: StatusFacts['cloud'] = {
-    observation: { remoteRevision: 'cloud-3', pendingCount: 0, conflict: 'none' },
+    observation: { remoteRevision: 'cloud-3', pendingCount: 0, conflict: 'none', refused: null },
     activity: 'idle',
 };
 const READY_OFFLINE: StatusFacts['offline'] = {
@@ -105,6 +105,7 @@ describe('cloud confirmation never borrows a local fact', () => {
         remoteRevision: 'cloud-3' as string | null,
         pendingCount: 0,
         conflict: 'none' as NonNullable<StatusFacts['cloud']['observation']>['conflict'],
+        refused: null as NonNullable<StatusFacts['cloud']['observation']>['refused'],
         ...patch,
     });
 
@@ -145,6 +146,24 @@ describe('cloud confirmation never borrows a local fact', () => {
         expect(() =>
             cloud({ observation: observed({ pendingCount: 0, conflict: 'gone' }) }),
         ).toThrow('conflict cannot exist with an empty pending queue');
+    });
+
+    it('a permanent refusal is its own status, distinct from a version conflict (#1298)', () => {
+        const tooLarge = cloud({
+            observation: observed({ pendingCount: 1, refused: 'too-large' }),
+        });
+        expect(tooLarge.status).toBe('refused');
+        expect(tooLarge.refused).toBe('too-large');
+        expect(tooLarge.pendingCount).toBe(1);
+
+        const refused = cloud({ observation: observed({ pendingCount: 2, refused: 'refused' }) });
+        expect(refused.status).toBe('refused');
+        expect(refused.refused).toBe('refused');
+
+        // Every other status passes `refused` through as null, so a caller never has to guess
+        // which reading is honest.
+        expect(cloud({ observation: observed({ pendingCount: 1 }) }).refused).toBeNull();
+        expect(cloud({ observation: null }).refused).toBeNull();
     });
 
     it('a nonempty queue is never confirmed, whatever the remote revision says', () => {
@@ -264,7 +283,12 @@ describe('the offline Save journey keeps the three results independent', () => {
                     recovery: 'confirmed',
                 },
                 cloud: {
-                    observation: { remoteRevision: null, pendingCount: 1, conflict: 'none' },
+                    observation: {
+                        remoteRevision: null,
+                        pendingCount: 1,
+                        conflict: 'none',
+                        refused: null,
+                    },
                     activity: 'idle',
                 },
                 offline: {
@@ -285,7 +309,12 @@ describe('the offline Save journey keeps the three results independent', () => {
                     recovery: 'confirmed',
                 },
                 cloud: {
-                    observation: { remoteRevision: null, pendingCount: 2, conflict: 'none' },
+                    observation: {
+                        remoteRevision: null,
+                        pendingCount: 2,
+                        conflict: 'none',
+                        refused: null,
+                    },
                     activity: 'sending',
                 },
             }),
@@ -301,7 +330,12 @@ describe('the offline Save journey keeps the three results independent', () => {
                     recovery: 'confirmed',
                 },
                 cloud: {
-                    observation: { remoteRevision: 'cloud-1', pendingCount: 1, conflict: 'none' },
+                    observation: {
+                        remoteRevision: 'cloud-1',
+                        pendingCount: 1,
+                        conflict: 'none',
+                        refused: null,
+                    },
                     activity: 'idle',
                 },
             }),
@@ -317,7 +351,12 @@ describe('the offline Save journey keeps the three results independent', () => {
                     recovery: 'confirmed',
                 },
                 cloud: {
-                    observation: { remoteRevision: 'cloud-2', pendingCount: 0, conflict: 'none' },
+                    observation: {
+                        remoteRevision: 'cloud-2',
+                        pendingCount: 0,
+                        conflict: 'none',
+                        refused: null,
+                    },
                     activity: 'idle',
                 },
             }),
@@ -337,6 +376,7 @@ describe('the offline Save journey keeps the three results independent', () => {
                         remoteRevision: 'cloud-1',
                         pendingCount: 1,
                         conflict: 'version',
+                        refused: null,
                     },
                     activity: 'idle',
                 },
@@ -353,7 +393,12 @@ describe('the offline Save journey keeps the three results independent', () => {
                     recovery: 'failed',
                 },
                 cloud: {
-                    observation: { remoteRevision: 'cloud-1', pendingCount: 0, conflict: 'none' },
+                    observation: {
+                        remoteRevision: 'cloud-1',
+                        pendingCount: 0,
+                        conflict: 'none',
+                        refused: null,
+                    },
                     activity: 'idle',
                 },
             }),
@@ -364,7 +409,12 @@ describe('the offline Save journey keeps the three results independent', () => {
             facts({
                 local: { savedRevision: 1, editing: 'clean', lastSave: 'idle', recovery: 'none' },
                 cloud: {
-                    observation: { remoteRevision: 'cloud-1', pendingCount: 2, conflict: 'none' },
+                    observation: {
+                        remoteRevision: 'cloud-1',
+                        pendingCount: 2,
+                        conflict: 'none',
+                        refused: null,
+                    },
                     activity: 'reauth',
                 },
             }),
@@ -443,15 +493,38 @@ describe('inputs that would require guessing are rejected, never defaulted', () 
     it('rejects a conflict with an empty queue', () => {
         expect(() =>
             cloud({
-                observation: { remoteRevision: 'cloud-3', pendingCount: 0, conflict: 'version' },
+                observation: {
+                    remoteRevision: 'cloud-3',
+                    pendingCount: 0,
+                    conflict: 'version',
+                    refused: null,
+                },
             }),
         ).toThrow('conflict cannot exist with an empty pending queue');
+    });
+
+    it('rejects a refusal with an empty queue', () => {
+        expect(() =>
+            cloud({
+                observation: {
+                    remoteRevision: 'cloud-3',
+                    pendingCount: 0,
+                    conflict: 'none',
+                    refused: 'too-large',
+                },
+            }),
+        ).toThrow('refusal cannot exist with an empty pending queue');
     });
 
     it('rejects sending without an observed positive queue', () => {
         expect(() =>
             cloud({
-                observation: { remoteRevision: 'cloud-3', pendingCount: 0, conflict: 'none' },
+                observation: {
+                    remoteRevision: 'cloud-3',
+                    pendingCount: 0,
+                    conflict: 'none',
+                    refused: null,
+                },
                 activity: 'sending',
             }),
         ).toThrow('positive pending queue');
@@ -467,6 +540,7 @@ describe('inputs that would require guessing are rejected, never defaulted', () 
                     remoteRevision: 'cloud-3',
                     pendingCount: null,
                     conflict: 'none',
+                    refused: null,
                 } as unknown as StatusFacts['cloud']['observation'],
             }),
         ).toThrow('must be observed');
@@ -479,6 +553,7 @@ describe('inputs that would require guessing are rejected, never defaulted', () 
                     remoteRevision: 'not a revision!',
                     pendingCount: 0,
                     conflict: 'none',
+                    refused: null,
                 },
             }),
         ).toThrow('Invalid remote revision');
@@ -503,10 +578,24 @@ describe('inputs that would require guessing are rejected, never defaulted', () 
                         remoteRevision: 'cloud-3',
                         pendingCount: 1,
                         conflict: wrong as unknown as 'none',
+                        refused: null,
                     },
                 }),
             ).toThrow('must be one of: none, version, gone');
         }
+    });
+
+    it('rejects a refusal term outside the closed set', () => {
+        expect(() =>
+            cloud({
+                observation: {
+                    remoteRevision: 'cloud-3',
+                    pendingCount: 1,
+                    conflict: 'none',
+                    refused: 'quota' as unknown as 'refused',
+                },
+            }),
+        ).toThrow('must be one of: too-large, refused');
     });
 
     it('rejects an unsafe integer count, not just a negative one', () => {

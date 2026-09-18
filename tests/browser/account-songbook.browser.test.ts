@@ -379,6 +379,69 @@ describe('account songbook on real IndexedDB', () => {
         expect(await book.prepare(scope, 'study')).toBe('conflict');
     });
 
+    describe('a permanent transport-level refusal (#1298)', () => {
+        it('stops preparing a refused head, and a fresh Save of the same document replaces it', async () => {
+            await book.save(scope, accountChart(), null);
+            await prepared();
+
+            expect(await book.refuse(scope, 'study', 'too-large')).toBe('refused');
+            expect(await book.prepare(scope, 'study')).toBe('refused');
+            const refusedOps = await book.pending(scope, 'study');
+            expect(refusedOps).toHaveLength(1);
+            expect(refusedOps[0]).toMatchObject({ status: 'refused', reason: 'too-large' });
+
+            // A smaller re-Save of the SAME document: the queue becomes [new], not
+            // [refused, new] — the refused head is deleted, not queued behind.
+            const smaller = await book.save(scope, { ...refusedOps[0].snapshot, title: 'B' }, 0);
+            const ops = await book.pending(scope, 'study');
+            expect(ops).toHaveLength(1);
+            expect(ops[0]).toMatchObject({ status: 'queued', documentId: 'study' });
+            expect(ops[0].reason).toBeUndefined();
+            expect(smaller.document.title).toBe('B');
+
+            // Prepares cleanly and can now actually send — no `'refused'` verdict blocking it.
+            const next = await prepared();
+            expect(JSON.parse(next.body).document.title).toBe('B');
+        });
+
+        it('is a no-op once the head has already resolved a different way', async () => {
+            await book.save(scope, accountChart(), null);
+            const request = await prepared();
+            await book.acknowledge(scope, request, {
+                ...committed(request, 'remote-1'),
+                kind: 'conflict',
+                remote: { revision: 'remote-1', document: accountChart('remote') },
+            });
+
+            // The queue's head is already 'conflict', not the plain 'queued' this call expects.
+            expect(await book.refuse(scope, 'study', 'refused')).toBe('none');
+            expect(await book.prepare(scope, 'study')).toBe('conflict');
+        });
+
+        it('reports none against an empty queue rather than inventing a refusal', async () => {
+            expect(await book.refuse(scope, 'never-saved', 'refused')).toBe('none');
+        });
+
+        it('does not strip a CONFLICTED head — only a refused one — so Keep-both still has both bytes', async () => {
+            // #1298 patch scope: `save()`'s new stripping logic checks `status === 'refused'`
+            // specifically. A conflicted head (#1267's Keep-both target) must keep queuing
+            // ordinary Saves behind it exactly as before, since Keep-both reads the newest
+            // queued snapshot to carry forward.
+            const a = await book.save(scope, accountChart(), null);
+            const request = await prepared();
+            await book.acknowledge(scope, request, {
+                ...committed(request, 'remote-1'),
+                kind: 'conflict',
+                remote: { revision: 'remote-1', document: accountChart('remote') },
+            });
+            await book.save(scope, { ...a.document, title: 'C' }, 0);
+
+            const ops = await book.pending(scope, 'study');
+            expect(ops.map((op) => op.status)).toEqual(['conflict', 'queued']);
+            expect(await book.prepare(scope, 'study')).toBe('conflict');
+        });
+    });
+
     it('account switching fences late responses, reads, saves and recoveries without relabeling work', async () => {
         const a = await book.save(scope, accountChart('private A'), null);
         const other = connection();

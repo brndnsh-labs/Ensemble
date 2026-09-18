@@ -38,6 +38,15 @@ export interface StatusFacts {
              * draws by sending `remote: null`, carried through rather than flattened here.
              */
             conflict: 'none' | 'version' | 'gone';
+            /**
+             * Why the head is instead a permanent transport-level refusal (#1298), never a version
+             * to choose between: `'too-large'` (a 413 — fixed by shrinking the chart, not by
+             * anything to do with identity) and `'refused'` (`operation_mismatch`/`not_found` — an
+             * id/operation combination the account will never accept for these bytes). Null when
+             * the head is not refused. Mutually exclusive with a non-`'none'` `conflict`: only one
+             * status ever occupies a given head.
+             */
+            refused: null | 'too-large' | 'refused';
         };
         activity: 'idle' | 'sending' | 'reauth' | 'retry';
     };
@@ -57,12 +66,15 @@ export interface StatusView {
             | 'unknown'
             | 'conflict'
             | 'gone'
+            | 'refused'
             | 'queued'
             | 'sending'
             | 'confirmed'
             | 'not-uploaded';
         pendingCount: number | null;
         activity: StatusFacts['cloud']['activity'];
+        /** Passed through so a caller can pick the exact sentence for `status === 'refused'`. */
+        refused: null | 'too-large' | 'refused';
     };
     offline: StatusFacts['offline'] & { status: 'unknown' | 'incomplete' | 'ready' };
 }
@@ -72,6 +84,7 @@ const LAST_SAVE = ['idle', 'failed'] as const;
 const RECOVERY = ['unknown', 'none', 'confirmed', 'failed'] as const;
 const ACTIVITY = ['idle', 'sending', 'reauth', 'retry'] as const;
 const CONFLICT = ['none', 'version', 'gone'] as const;
+const REFUSED = ['too-large', 'refused'] as const;
 const SHELL = ['unknown', 'verified', 'missing'] as const;
 
 /** Deny by default: an unknown key is a caller mistake, not a fact to ignore. */
@@ -170,6 +183,7 @@ function readCloud(facts: unknown): StatusView['cloud'] {
                       'remoteRevision',
                       'pendingCount',
                       'conflict',
+                      'refused',
                   ]);
                   const pendingCount = count(value.pendingCount, 'cloud.observation.pendingCount');
                   if (pendingCount === null) {
@@ -185,10 +199,20 @@ function readCloud(facts: unknown): StatusView['cloud'] {
                   if (conflict !== 'none' && pendingCount === 0) {
                       throw new Error('A conflict cannot exist with an empty pending queue.');
                   }
+                  const refused =
+                      value.refused === null
+                          ? null
+                          : member(value.refused, 'cloud.observation.refused', REFUSED);
+                  // Same invariant as a conflict, and for the same reason: a refusal is always a
+                  // specific queued Save that failed, never a fact about an empty queue.
+                  if (refused !== null && pendingCount === 0) {
+                      throw new Error('A refusal cannot exist with an empty pending queue.');
+                  }
                   return {
                       remoteRevision: value.remoteRevision as string | null,
                       pendingCount,
                       conflict,
+                      refused,
                   };
               })();
     // Claiming an upload is in flight without an observed queue to send would let a transient
@@ -205,16 +229,24 @@ function readCloud(facts: unknown): StatusView['cloud'] {
             ('gone' as const)
           : observation.conflict === 'version'
             ? ('conflict' as const)
-            : observation.pendingCount > 0
-              ? activity === 'sending'
-                  ? ('sending' as const)
-                  : ('queued' as const)
-              : observation.remoteRevision !== null
-                ? ('confirmed' as const)
-                : ('not-uploaded' as const);
+            : observation.refused !== null
+              ? // A permanent transport-level refusal (#1298), never a version to choose between.
+                ('refused' as const)
+              : observation.pendingCount > 0
+                ? activity === 'sending'
+                    ? ('sending' as const)
+                    : ('queued' as const)
+                : observation.remoteRevision !== null
+                  ? ('confirmed' as const)
+                  : ('not-uploaded' as const);
     // Activity survives independently: reauth and retry are wait reasons, not lost work, and
     // they never erase a conflict or the queued count beside them.
-    return { status, pendingCount: observation ? observation.pendingCount : null, activity };
+    return {
+        status,
+        pendingCount: observation ? observation.pendingCount : null,
+        activity,
+        refused: observation ? observation.refused : null,
+    };
 }
 
 function readOffline(facts: unknown): StatusView['offline'] {

@@ -28,13 +28,16 @@ export interface OutboxPassResult {
      * only `kind === 'complete'` means that.
      */
     resumeAfterDocumentId: string | null;
-    counts: { idle: number; committed: number; conflict: number; retry: number };
+    counts: { idle: number; committed: number; conflict: number; retry: number; refused: number };
 }
 
 /**
- * A song whose head is in conflict, or idle with nothing queued, still counts as visited and
- * lets the pass continue to the next song — only a transport failure ends the pass early, so
- * one stuck song can never starve every other song behind it.
+ * A song whose head is in conflict, permanently refused (#1298), or idle with nothing queued,
+ * still counts as visited and lets the pass continue to the next song — only a transport
+ * failure ends the pass early, so one stuck song can never starve every other song behind it.
+ * A refused head costs no network request at all: `prepare()` answers `'refused'` without
+ * sending anything, which is what stops a step-over from re-POSTing the same rejected bytes
+ * on every later pass.
  *
  * Invalid identifiers and storage/validation failures always reject rather than resolving with
  * fabricated progress; only a genuine transport failure resolves as `'retry'`. Abort is checked
@@ -63,7 +66,7 @@ export async function runOutboxPass(
     scope = copyScope(scope);
     const { afterDocumentId, signal } = options;
     const incomingCursor = afterDocumentId ?? null;
-    const counts = { idle: 0, committed: 0, conflict: 0, retry: 0 };
+    const counts = { idle: 0, committed: 0, conflict: 0, retry: 0, refused: 0 };
 
     if (signal?.aborted) {
         return { kind: 'aborted', resumeAfterDocumentId: incomingCursor, counts };
@@ -103,7 +106,7 @@ export async function runOutboxPass(
                 counts,
             };
         }
-        // idle / committed / conflict: this document is safely visited.
+        // idle / committed / conflict / refused: this document is safely visited.
         cursor = song.documentId;
         if (signal?.aborted) {
             return { kind: 'aborted', resumeAfterDocumentId: cursor, counts };

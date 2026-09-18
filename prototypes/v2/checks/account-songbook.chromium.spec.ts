@@ -149,3 +149,59 @@ test('an offline Save is safe here and confirms on reconnect; a refusal arrives 
     await expect(page.getByTestId('sync-local')).toHaveText('Saved on this device');
     await page.unroute('**/api/documents/save');
 });
+
+/**
+ * A per-document, permanent refusal (#1298) — the chip names it durably, distinct from the
+ * pass-level `sync-failure` sentence above, and a fresh Save of the same document clears it
+ * rather than queuing behind it forever. Forced with the same `page.route` intercept the quota
+ * case above already uses; the 413 the account API would emit for an oversized chart is not
+ * something this suite needs a real oversized chart to reproduce.
+ */
+test('a 413 names the refusal on the chip, and a fresh Save clears it (#1298)', async ({
+    page,
+}) => {
+    await addVirtualAuthenticator(page);
+    await openWithAccounts(page);
+    await signUp(page);
+
+    await newSongOnTheStand(page);
+    // Waited on the manifest GET, not just the chip: the chip's "Saved to your account" can read
+    // true the instant the Save half of the pass acknowledges, while the DOWNLOAD half is still
+    // in flight — and starting the next Save while THIS pass is still running would coalesce into
+    // a second, overlapping pass (`run()`'s documented "duplicate senders" case) that resends the
+    // same frozen bytes and would make the call count below flaky for reasons unrelated to #1298.
+    const firstPassSettled = page.waitForResponse(
+        (response) => response.url().includes('/api/documents?') && response.ok(),
+    );
+    await saveAs(page, 'Big chart');
+    await firstPassSettled;
+    await expect(page.getByTestId('sync-cloud')).toHaveText('Saved to your account');
+
+    await page.route('**/api/documents/save', (route) =>
+        route.fulfill({
+            status: 413,
+            contentType: 'application/json',
+            body: '{"error":"payload_too_large"}',
+        }),
+    );
+    await saveAs(page, 'Big chart two');
+    // Named per document, on the cloud fact itself — not folded into the transient pass-level
+    // `sync-failure` sentence, which would go stale the moment a later pass touches another song.
+    // (A strict request COUNT is not asserted here: an overlapping "duplicate sender" pass, from
+    // an `online`/`visibilitychange` firing while this one is still in flight, is a documented,
+    // safe case elsewhere in this suite and would make a call-count assertion flaky for reasons
+    // unrelated to #1298. The unit-level proof that the SECOND, later pass sends nothing further
+    // lives in `tests/unit/songbook/account-sync-loop.test.ts`.)
+    await expect(page.getByTestId('sync-cloud')).toHaveText('This chart is too large to upload');
+    await expect(page.getByTestId('sync-local')).toHaveText('Saved on this device');
+
+    await page.unroute('**/api/documents/save');
+    // A fresh Save of the SAME document is a request the account has never seen, and it clears
+    // the refusal instead of queuing behind it — the queue becomes [new], not [refused, new].
+    const uploaded = page.waitForResponse(
+        (response) => response.url().includes('/api/documents/save') && response.ok(),
+    );
+    await saveAs(page, 'Big chart three');
+    await uploaded;
+    await expect(page.getByTestId('sync-cloud')).toHaveText('Saved to your account');
+});

@@ -10,6 +10,7 @@ import {
     type ChartDocument,
     MAX_PENDING_SAVES,
     type SavedSong,
+    type SaveRefusalReason,
 } from '../sync/protocol';
 import {
     AccountSongbook,
@@ -96,6 +97,16 @@ export interface CloudObservation {
     pendingCount: number;
     /** See `StatusFacts['cloud']['observation']` in `sync/status.ts` for what each term means. */
     conflict: 'none' | 'version' | 'gone';
+    /**
+     * Why the queued Save at the head of this document's outbox was permanently refused (#1298),
+     * read durably off the operation's own `status`/`reason` — never re-derived from whichever
+     * document a transient pass-level `failure` last happened to name. Null when the head is not
+     * refused. Distinct from `conflict`: a conflict is a two-sided version disagreement the
+     * musician resolves with Keep-both; a refusal is a verdict about the REQUEST itself (payload
+     * size, or an id/operation combination the account will never accept) that a retry cannot fix
+     * — the two never apply to the same head at once, since only one status wins it.
+     */
+    refused: null | 'too-large' | 'refused';
 }
 
 export interface SyncSnapshot {
@@ -296,7 +307,8 @@ function sameObservation(a: CloudObservation | null, b: CloudObservation | null)
     return (
         a.remoteRevision === b.remoteRevision &&
         a.pendingCount === b.pendingCount &&
-        a.conflict === b.conflict
+        a.conflict === b.conflict &&
+        a.refused === b.refused
     );
 }
 
@@ -558,12 +570,22 @@ export function createSyncLoop(
             // `remote === null` is the server saying it has no version to offer: the id is
             // tombstoned (#1270), or it never existed. Either way there is nothing to choose
             // between, which is a different sentence from an ordinary conflict.
-            const refused = queue.find((operation) => operation.status === 'conflict');
+            const conflicted = queue.find((operation) => operation.status === 'conflict');
+            // Only ever the HEAD: `prepare()` never advances past a refused or conflicted head,
+            // so nothing behind one can ever be marked either status. Read durably off storage
+            // rather than the last pass's transient `failure`, which can already be describing a
+            // DIFFERENT document by the time this one is watched again.
+            const refusal = queue.find((operation) => operation.status === 'refused');
             publish({
                 observation: {
                     remoteRevision: song?.remoteRevision ?? null,
                     pendingCount: queue.length,
-                    conflict: !refused ? 'none' : refused.remote === null ? 'gone' : 'version',
+                    conflict: !conflicted
+                        ? 'none'
+                        : conflicted.remote === null
+                          ? 'gone'
+                          : 'version',
+                    refused: refusal?.reason ?? null,
                 },
             });
         } catch {
@@ -584,20 +606,24 @@ export function createSyncLoop(
      * cannot spin; `MAX_PENDING_SAVES` is the deepest one song's queue can be, which makes it
      * the most sweeps a full drain can ever need.
      *
-     * `refusedDocument` names the rejections that do NOT end the pass. `sendNext` reports every
-     * transport failure as `'retry'`, which is right for the outbox but wrong as a stop rule: a
-     * 413, an `operation_mismatch` and a `not_found` are verdicts on ONE document, not on the
-     * server or the network, so ending the sweep there would park every song behind it behind a
-     * document no retry will ever fix — and with no timer here, "the next trigger" can be days
-     * away. So that one song is stepped over — the cursor moves PAST it, its queued Save stays
-     * queued, and the reason is still reported at the end of the pass. Every other reason keeps
-     * the early return, because a 401, a 429 or a dead network would refuse the next song for the
-     * same reason.
+     * `refusedDocument` names the rejections that do NOT end the pass, and — since #1298 —
+     * PERSISTS them: `sendNext` reports every transport failure as `'retry'`, which is right for
+     * the outbox but wrong as a stop rule, and the durable record is what stops next pass from
+     * re-discovering (and re-POSTing) the same rejection. A 413, an `operation_mismatch` and a
+     * `not_found` are verdicts on ONE document, not on the server or the network, so ending the
+     * sweep there would park every song behind it behind a document no retry will ever fix — and
+     * with no timer here, "the next trigger" can be days away. So that one song is stepped over —
+     * `refusedDocument` marks its head `status: 'refused'` (`AccountSongbook.refuse`, the same
+     * transaction shape `acknowledge` uses for `'conflict'`) so `prepare()` answers `'refused'`
+     * for it from here on without spending a request, the cursor moves PAST it, its queued Save
+     * stays queued, and the reason is still reported at the end of the pass. Every other reason
+     * keeps the early return, because a 401, a 429 or a dead network would refuse the next song
+     * for the same reason.
      */
     async function drain(
         current: AccountScope,
         transport: SaveTransport,
-        refusedDocument: () => string | null,
+        refusedDocument: () => Promise<string | null>,
     ): Promise<boolean> {
         let changed = false;
         for (let sweep = 0; sweep < MAX_PENDING_SAVES; sweep += 1) {
@@ -608,12 +634,15 @@ export function createSyncLoop(
                     ...(cursor === undefined ? {} : { afterDocumentId: cursor }),
                 });
                 committed += result.counts.committed;
-                changed ||= result.counts.committed > 0 || result.counts.conflict > 0;
+                changed ||=
+                    result.counts.committed > 0 ||
+                    result.counts.conflict > 0 ||
+                    result.counts.refused > 0;
                 if (result.kind !== 'more' || result.resumeAfterDocumentId === null) {
                     // A transport failure ends the drain outright: another sweep would only
                     // fail again on the same song, and the reason is already captured.
                     if (result.kind === 'retry' || result.kind === 'aborted') {
-                        const refused = result.kind === 'retry' ? refusedDocument() : null;
+                        const refused = result.kind === 'retry' ? await refusedDocument() : null;
                         if (refused === null) {
                             return changed;
                         }
@@ -665,12 +694,21 @@ export function createSyncLoop(
         try {
             if (!backedOff) {
                 try {
-                    changed = await drain(current, transport, () => {
+                    changed = await drain(current, transport, async () => {
                         const captured = lastRefusal();
-                        return captured?.error.kind === 'code' &&
-                            STEP_OVER_CODES.has(captured.error.code)
-                            ? captured.documentId
-                            : null;
+                        if (
+                            captured?.error.kind !== 'code' ||
+                            !STEP_OVER_CODES.has(captured.error.code)
+                        ) {
+                            return null;
+                        }
+                        // #1298: persisted BEFORE the cursor steps over it, so the durable record
+                        // — not this pass's transient capture — is what stops the next pass from
+                        // re-discovering (and re-POSTing) the exact same rejection.
+                        const reason: SaveRefusalReason =
+                            captured.error.code === 'payload_too_large' ? 'too-large' : 'refused';
+                        await songbook.refuse(current, captured.documentId, reason);
+                        return captured.documentId;
                     });
                 } catch (error) {
                     if (error instanceof AccountChangedError) {

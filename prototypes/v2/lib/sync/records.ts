@@ -11,6 +11,7 @@ import {
     remoteRevision,
     type SavedSong,
     type SaveOperation,
+    type SaveRefusalReason,
     snapshot,
     type UnsupportedReason,
 } from './protocol';
@@ -64,6 +65,7 @@ export function savedDraft(value: Draft, scope: AccountScope, id: string): Draft
 }
 
 const UNSUPPORTED_REASONS: readonly UnsupportedReason[] = ['needs-app-update', 'invalid'];
+const REFUSAL_REASONS: readonly SaveRefusalReason[] = ['too-large', 'refused'];
 
 /**
  * Validate one remote observation BEFORE a transaction opens, and rebuild it from the validated
@@ -157,7 +159,7 @@ export function savedOperation(
     if (
         document.id !== id ||
         document.revision !== value.localRevision ||
-        !['queued', 'conflict'].includes(value.status)
+        !['queued', 'conflict', 'refused'].includes(value.status)
     ) {
         throw new Error('Invalid queued Save. Source is unchanged.');
     }
@@ -210,6 +212,12 @@ export function savedOperation(
                 throw new Error('Invalid remote conflict identity.');
             }
         }
+    }
+    if (
+        value.status === 'refused' &&
+        !REFUSAL_REASONS.includes(value.reason as SaveRefusalReason)
+    ) {
+        throw new Error('Refused Save has no valid reason.');
     }
     return { ...value, snapshot: document };
 }
