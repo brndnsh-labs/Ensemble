@@ -1,3 +1,5 @@
+export type { DeleteAccountFailureReason, DeleteAccountResult } from './account-deletion.js';
+export { deleteAccount } from './account-deletion.js';
 export type { WebAuthnConfig, WebAuthnConfigInput } from './config.js';
 export { createWebAuthnConfig } from './config.js';
 export { FRESH_AUTH_WINDOW_MS, isFreshlyAuthenticated } from './fresh-auth.js';

@@ -38,6 +38,43 @@ export async function createAccountThroughDialog(page: Page): Promise<string> {
     return code;
 }
 
+/**
+ * Intercepts exactly ONE matching request with a fake `403 fresh_auth_required`, then lets every
+ * later request through untouched (#1264, shared with #1271).
+ *
+ * Faking the refusal alone proves nothing on its own — the session really IS fresh in these specs,
+ * so a client that simply retried without re-authenticating would sail through. It is the pair of
+ * this and `countStepUps` below that proves the step-up: the fake makes the stale path run, and
+ * the `reauth/verify` counter proves a real ceremony answered it. The fake response never reaches
+ * the server and costs nothing against any route's budget.
+ */
+export async function refuseOnceWithFreshAuthRequired(page: Page, urlGlob: string): Promise<void> {
+    let used = false;
+    await page.route(urlGlob, async (route) => {
+        if (used) {
+            await route.continue();
+            return;
+        }
+        used = true;
+        await route.fulfill({
+            status: 403,
+            contentType: 'application/json',
+            body: JSON.stringify({ error: 'fresh_auth_required' }),
+        });
+    });
+}
+
+/** Counts completed step-up ceremonies: one `reauth/verify` per successful re-authentication. */
+export function countStepUps(page: Page): () => number {
+    let count = 0;
+    page.on('request', (request) => {
+        if (new URL(request.url()).pathname === '/api/auth/reauth/verify') {
+            count += 1;
+        }
+    });
+    return () => count;
+}
+
 /** Everything this origin can be asked for, to search for a leaked recovery code. */
 export async function persistedState(page: Page) {
     return page.evaluate(async () => {

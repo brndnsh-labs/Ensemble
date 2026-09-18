@@ -18,7 +18,7 @@ import { syncAccountsFlag } from '../../lib/account/feature';
 import type { AccountFailure } from '../../lib/account/messages';
 import { recoveryEnrolled, signOut } from '../../lib/account/passkeys';
 import type { SessionState } from '../../lib/account/session';
-import { accountSync, type SignOutOutcome } from '../../lib/account/sync-loop';
+import { accountSync, SIGN_OUT_MESSAGES, type SignOutOutcome } from '../../lib/account/sync-loop';
 
 // Module scope keeps both references stable across renders, which is what `useSyncExternalStore`
 // requires to avoid resubscribing (and, for the snapshot, re-rendering) on every pass.
@@ -75,6 +75,25 @@ export interface AccountView {
      * belongs to a hook that knows only about the session.
      */
     signOut: () => Promise<SignOutOutcome>;
+    /**
+     * The local half of sign-out, for an account the server has ALREADY deleted (#1271).
+     *
+     * Same ordered work as `signOut` — fence first, then forget this device's account records —
+     * but with no revocation request in front of it: `POST /api/auth/account/delete` deleted the
+     * session row and cleared the cookie on its own response, so a logout round trip could only
+     * answer "already gone", and a failure of it would be indistinguishable from the account still
+     * existing. The revoke step is therefore a resolved `true`, which is the honest answer here: it
+     * means "the server has confirmed this session is gone", and it has, by deleting it.
+     *
+     * Unlike `signOut` this cannot resolve `'kept'`. There is nothing to keep.
+     *
+     * THROWS when the local half did not finish — the fence write (`songbook.switchAccount`)
+     * itself failed on unreadable storage — so the caller's own error handling (`ensemble.tsx`'s
+     * `run()`) shows `SIGN_OUT_MESSAGES.notCleared` instead of a misleading "Account deleted"
+     * success message. `markSignedOut` still runs first: the account is gone on the server
+     * whatever this device's storage did, and the header must not offer "sign in again" to it.
+     */
+    forgetDeletedAccount: () => Promise<void>;
 }
 
 /**
@@ -181,6 +200,36 @@ export function useAccountSession(active: boolean): AccountView {
         }
     }, [refresh]);
 
+    const forgetDeletedAccount = useCallback(async (): Promise<void> => {
+        // The loop turns a failed record WIPE into its own `notCleared` failure and returns
+        // normally (`accountSync`'s own `state.failure`, read by `ensemble.tsx` via
+        // `accountSync.getSnapshot().failure`) — that path needs nothing extra here. What reaches
+        // this `catch` is the FENCE write (`songbook.switchAccount`) itself throwing: `signOut`
+        // re-attaches this device to the (deleted) owner and restores whatever `state.failure`
+        // held before the attempt — typically `null` — before rethrowing, so by the time this
+        // catch runs, the loop no longer has any record that anything went wrong. Left silent,
+        // that would send `ensemble.tsx`'s `forgetDeletedAccount` (which reads exactly that
+        // now-blank `state.failure`) straight to "Account deleted · your guest songbook is
+        // unchanged" while the account's records — re-attached, not cleared — are still on this
+        // device. Rethrowing the friendly sentence routes it through the same `run()` error
+        // handling every other failure in the shell already uses.
+        let localWipeFailed = false;
+        try {
+            await accountSync.signOut(async () => true);
+        } catch {
+            localWipeFailed = true;
+        } finally {
+            // A deletion that has already committed must reach `markSignedOut` whatever storage
+            // did. Being told to "sign in again" to an account that no longer exists is the one
+            // reading this must never produce.
+            accountSession.markSignedOut();
+            refresh();
+        }
+        if (localWipeFailed) {
+            throw new Error(SIGN_OUT_MESSAGES.notCleared);
+        }
+    }, [refresh]);
+
     return {
         session,
         recoveryEnrolled: enrolled,
@@ -190,5 +239,6 @@ export function useAccountSession(active: boolean): AccountView {
         signOutFailure,
         refresh,
         signOut: runSignOut,
+        forgetDeletedAccount,
     };
 }

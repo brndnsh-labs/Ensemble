@@ -6,6 +6,7 @@ import { ACCOUNT_MESSAGES, type AccountFailure } from '../../lib/account/message
 import {
     addPasskey,
     confirmRecoveryCode,
+    deleteAccount,
     enrollRecoveryCode,
     listPasskeys,
     type PasskeySummary,
@@ -14,6 +15,7 @@ import {
     revokePasskey,
 } from '../../lib/account/passkeys';
 import { AccountFailureNotice } from './account-failure';
+import { DeleteAccountStep } from './delete-account';
 import { RecoveryCodeStep } from './recovery-code-step';
 
 /**
@@ -32,6 +34,13 @@ import { RecoveryCodeStep } from './recovery-code-step';
  * calls `requireSession` and nothing else — so it is not wrapped in that retry, and never will
  * show a step-up prompt.
  *
+ * #1271 adds the way out: a Delete account section, whose confirmation step (`delete-account.tsx`)
+ * replaces this page's content the same way the recovery-code step does. It is the one action here
+ * with no undo, so it is also the only one behind a typed confirmation — and, like every other
+ * mutation on this page, it is fresh-auth-gated on the server and steps up through the same
+ * `withFreshAuth` retry. The local half (removing this device's account data, marking the session
+ * signed out) belongs to the shell, which passes it in as `onAccountDeleted`.
+ *
  * The account is never left able to remove its last passkey from THIS page: the Remove button is
  * disabled once the list is down to one, mirroring (not replacing) the server's own
  * `409 last_credential` refusal — the disabled button is a courtesy, the server call in
@@ -45,11 +54,40 @@ interface AccountPageProps {
     onClose: () => void;
     /** Re-read the session (and recovery status) after a mutation changes it. */
     onAccountChanged: () => void;
+    /**
+     * `navigator.onLine`, kept live by the shell. Deleting an account needs a connection for the
+     * same reason signing out does (rollout decision 9 S2): a device that cannot reach the server
+     * cannot honestly claim anything was deleted.
+     */
+    online: boolean;
+    /**
+     * How many songs the account library holds on this device, `null` while it is still being
+     * read (#1271's export offer writes files FROM that library). The shell owns it; this page
+     * never reads storage itself.
+     */
+    accountSongCount: number | null;
+    /** Write one file per song in the account library, before deletion takes them (#1271). */
+    onExportAccountSongs: () => void;
+    /**
+     * The account is gone on the server (#1271). The shell clears this device's account data and
+     * marks the session signed out; this page stays open on its own closing section, the same way
+     * revoking the current session's passkey does.
+     */
+    onAccountDeleted: () => Promise<void>;
 }
 
-type Section = 'main' | 'replaceCode' | 'signedOut';
+type Section = 'main' | 'replaceCode' | 'signedOut' | 'deleteAccount' | 'deleted';
 
-export function AccountPage({ dialogRef, open, onClose, onAccountChanged }: AccountPageProps) {
+export function AccountPage({
+    dialogRef,
+    open,
+    onClose,
+    onAccountChanged,
+    online,
+    accountSongCount,
+    onExportAccountSongs,
+    onAccountDeleted,
+}: AccountPageProps) {
     const [section, setSection] = useState<Section>('main');
     const [passkeys, setPasskeys] = useState<PasskeySummary[] | null>(null);
     const [listFailure, setListFailure] = useState<AccountFailure | null>(null);
@@ -62,7 +100,7 @@ export function AccountPage({ dialogRef, open, onClose, onAccountChanged }: Acco
     // busy, both because two ceremonies can't interleave on one profile (`passkeys.ts`'s doc
     // comment) and because a stale list read mid-mutation would be confusing either way.
     const [busyAction, setBusyAction] = useState<
-        'add' | 'revoke' | 'signOutOthers' | 'replaceCode' | null
+        'add' | 'revoke' | 'signOutOthers' | 'replaceCode' | 'delete' | null
     >(null);
     const [actionFailure, setActionFailure] = useState<AccountFailure | null>(null);
     const [signedOutOthers, setSignedOutOthers] = useState(false);
@@ -100,7 +138,10 @@ export function AccountPage({ dialogRef, open, onClose, onAccountChanged }: Acco
      */
     const signedOutHeadingRef = useRef<HTMLHeadingElement>(null);
     useEffect(() => {
-        if (section === 'signedOut') {
+        // `'deleted'` (#1271) is the same shape: the Delete button that was pressed is gone with
+        // the step it lived in, so this closing heading has to take the focus it left behind. The
+        // two sections are mutually exclusive, so one ref serves both.
+        if (section === 'signedOut' || section === 'deleted') {
             signedOutHeadingRef.current?.focus();
         }
     }, [section]);
@@ -271,6 +312,40 @@ export function AccountPage({ dialogRef, open, onClose, onAccountChanged }: Acco
         refreshPasskeys();
     }
 
+    /**
+     * Delete the account (#1271). The one action here that cannot be undone, and the one whose
+     * local half is not a list refresh: on success the shell removes this device's account data
+     * and marks the session signed out (`onAccountDeleted`), and this dialog stays open on its own
+     * closing section rather than vanishing the moment the header behind it flips to signed-out —
+     * the same reading `runRevoke`'s `signedOut` branch exists to preserve.
+     *
+     * `openRef` is NOT consulted before the local clear: a deletion that has already committed on
+     * the server must be followed through on this device even if the dialog closed underneath it
+     * (Escape during the step-up prompt), or the account's songs would sit here for an account
+     * that no longer exists. Only the state writes below are gated on the dialog still being open.
+     */
+    async function runDelete() {
+        setActionFailure(null);
+        setBusyAction('delete');
+        const outcome = await deleteAccount(accountApi);
+        if (!outcome.ok) {
+            if (!openRef.current) {
+                return;
+            }
+            setBusyAction(null);
+            if (outcome.failure.kind !== 'cancelled') {
+                setActionFailure(outcome.failure);
+            }
+            return;
+        }
+        await onAccountDeleted();
+        if (!openRef.current) {
+            return;
+        }
+        setBusyAction(null);
+        setSection('deleted');
+    }
+
     function abandonReplaceCode() {
         setCode('');
         setSection('main');
@@ -303,6 +378,37 @@ export function AccountPage({ dialogRef, open, onClose, onAccountChanged }: Acco
                     onFinish={() => void finishReplaceCode()}
                     onClose={abandonReplaceCode}
                 />
+            ) : section === 'deleteAccount' ? (
+                <DeleteAccountStep
+                    headingId="account-page-title"
+                    online={online}
+                    busy={busy}
+                    songCount={accountSongCount}
+                    failure={actionFailure}
+                    onExport={onExportAccountSongs}
+                    onConfirm={() => void runDelete()}
+                    onCancel={() => {
+                        setActionFailure(null);
+                        setSection('main');
+                    }}
+                />
+            ) : section === 'deleted' ? (
+                <>
+                    <h2 id="account-page-title" ref={signedOutHeadingRef} tabIndex={-1}>
+                        Your account is deleted.
+                    </h2>
+                    <p>
+                        Your songs, passkeys and recovery code are gone from the server, and this
+                        device is signed out. Your guest songbook is untouched — you can keep
+                        playing right now, and make a new account whenever you like, with the same
+                        passkey if you want.
+                    </p>
+                    <div className="dialog-actions">
+                        <button className="btn" data-testid="delete-account-done" onClick={onClose}>
+                            Close
+                        </button>
+                    </div>
+                </>
             ) : section === 'signedOut' ? (
                 <>
                     <h2 id="account-page-title" ref={signedOutHeadingRef} tabIndex={-1}>
@@ -415,6 +521,28 @@ export function AccountPage({ dialogRef, open, onClose, onAccountChanged }: Acco
                             onClick={() => void beginReplaceCode()}
                         >
                             Replace recovery code
+                        </button>
+                    </section>
+
+                    <section
+                        className="account-danger"
+                        aria-labelledby="account-page-delete-heading"
+                    >
+                        <h3 id="account-page-delete-heading">Delete account</h3>
+                        <p className="status-detail">
+                            Deletes your account songbook, your passkeys and your recovery code.
+                            Your guest songbook stays on this device.
+                        </p>
+                        <button
+                            className="btn danger"
+                            data-testid="delete-account-open"
+                            disabled={busy}
+                            onClick={() => {
+                                setActionFailure(null);
+                                setSection('deleteAccount');
+                            }}
+                        >
+                            Delete my account
                         </button>
                     </section>
 

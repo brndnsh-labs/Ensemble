@@ -34,7 +34,10 @@ import { sendError } from './errors.js';
  *   400 `{ error: 'malformed_request' }` — anything the decoder refuses, INCLUDING an envelope
  *       whose `ownerId` is not the session's account (the body's owner is a routing hint, never
  *       authority; the decoder rejects a disagreement rather than "correcting" it)
- *   401 `{ error: 'unauthenticated' }`
+ *   401 `{ error: 'unauthenticated' }` — including a Save that raced #1271's account deletion:
+ *       `commitSave` re-checks the owner still exists inside its transaction, so a session
+ *       whose account was deleted between `requireSession` and the commit answers `401`, not a
+ *       foreign-key `500`
  *
  * The parent app's `/api/*` chain already applied security headers (`private, no-store`), the
  * transport rate limit, same-origin, JSON-only and the 64 KB body limit EXCEPT for this
@@ -382,6 +385,13 @@ export function documentRoutes({
             operationId: decoded.operationId,
             digest: decoded.digest,
         };
+        if (outcome.kind === 'owner_gone') {
+            // The session's account was deleted (#1271) after `requireSession` read the cookie
+            // but before this write committed. `401`, the same answer every other route gives a
+            // deleted account's cookie — not `500`: nothing about this request or the server is
+            // broken, the account this session names is simply gone.
+            return sendError(c, 401, 'unauthenticated');
+        }
         if (outcome.kind === 'operation_mismatch') {
             return sendError(c, 409, 'operation_mismatch');
         }

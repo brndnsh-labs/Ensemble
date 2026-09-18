@@ -429,6 +429,28 @@ export async function revokeOtherSessions(api: AccountApi): Promise<AccountOutco
 }
 
 /**
+ * Deletes the signed-in account, everything in it, and the session this call was made on (#1271).
+ *
+ * Fresh-auth-gated on the server (`POST /api/auth/account/delete`, one transaction), so it goes
+ * through the SAME `withFreshAuth` step-up every other gated mutation on the account page uses: a
+ * session older than the ten-minute window gets exactly one re-authentication prompt and one
+ * retry. Re-proving the passkey is the point here, not friction — this is the one action nothing
+ * can undo.
+ *
+ * `204`, no body: there is no account left to describe. There is deliberately NO logout call after
+ * it — the server deleted the session row itself and cleared the cookie on this very response, so
+ * a `POST /api/auth/logout` would be a round trip that could only answer "already gone". The
+ * caller's remaining work is local (see `app/ensemble.tsx`'s `forgetDeletedAccount`).
+ */
+export async function deleteAccount(api: AccountApi): Promise<AccountOutcome<null>> {
+    const result = await withFreshAuth(
+        api,
+        gatedRequest(() => api.post<undefined>('/api/auth/account/delete', NO_BODY)),
+    );
+    return result.ok ? { ok: true, value: null } : result;
+}
+
+/**
  * Spends a recovery code for a RECOVERY-ONLY session (#1263). `204`, no body: the cookie the
  * server sets is the entire result, and there is nothing else to disclose.
  *
