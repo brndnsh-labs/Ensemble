@@ -39,6 +39,23 @@ export async function createAccountThroughDialog(page: Page): Promise<string> {
 }
 
 /**
+ * Dismiss the guest-songs adoption prompt (#1268), which auto-opens once the sign-in dialog
+ * closes on a device whose guest songbook holds anything (every fresh preview does: `lib/starters.ts`
+ * seeds three). It is unrelated to what these specs are testing, so they decline it and move on —
+ * `adopt-guest.chromium.spec.ts` is the one spec that exercises this dialog's own contract.
+ *
+ * A fresh account on a fresh device/browser context reliably has candidates to offer, so this is
+ * NOT a conditional skip: if the dialog fails to appear, that is worth this helper failing loudly
+ * rather than silently waving every future caller through.
+ */
+export async function dismissAdoptGuestPrompt(page: Page): Promise<void> {
+    const dialog = page.locator('dialog[aria-labelledby="adopt-guest-title"]');
+    await expect(dialog).toBeVisible();
+    await page.getByTestId('adopt-guest-decline').click();
+    await expect(dialog).toBeHidden();
+}
+
+/**
  * Intercepts exactly ONE matching request with a fake `403 fresh_auth_required`, then lets every
  * later request through untouched (#1264, shared with #1271).
  *

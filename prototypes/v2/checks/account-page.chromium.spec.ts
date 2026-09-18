@@ -3,6 +3,7 @@ import {
     CODE_SHAPE,
     countStepUps,
     createAccountThroughDialog,
+    dismissAdoptGuestPrompt,
     openWithAccounts,
     persistedState,
     refuseOnceWithFreshAuthRequired,
@@ -53,6 +54,8 @@ test('passkeys can be added and revoked (each stepping up when stale), the last 
     await page.getByTestId('recovery-not-now').click();
     await expect(page.locator('dialog.account-dialog')).toBeHidden();
     await expect(page.getByTestId('account-finish-protecting')).toBeVisible();
+    // Unrelated to this spec (#1268 owns it) but blocks every click below until it's answered.
+    await dismissAdoptGuestPrompt(page);
 
     // Captured now, while it is the only credential on the authenticator — reused at the very end
     // to sign the SAME (surviving) passkey in on a genuinely fresh browser profile.
@@ -285,6 +288,7 @@ test('revoking the passkey that signed this device in ends the session, with the
     await createAccountThroughDialog(page);
     await page.getByTestId('recovery-not-now').click();
     await expect(page.getByTestId('account-finish-protecting')).toBeVisible();
+    await dismissAdoptGuestPrompt(page);
 
     // A second passkey, purely so removing the first isn't blocked by the last-credential guard —
     // this test is about the SIGN-OUT reaction, not that guard (covered above).

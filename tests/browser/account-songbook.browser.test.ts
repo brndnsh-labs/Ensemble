@@ -449,6 +449,39 @@ describe('account songbook on real IndexedDB', () => {
         expect(await book.read(scope, 'study')).toBeNull();
     });
 
+    it('accepts a caller-supplied operation id, rejects an invalid one, and defaults to a fresh one', async () => {
+        // #1268: guest-to-account adoption derives its operation id deterministically, so the
+        // queue must actually carry the id the caller passed, not a fresh random one alongside it.
+        await book.save(scope, accountChart('adopted', 'guest-song'), null, 'fixed-adopt-op');
+        const [queued] = await book.pending(scope, 'guest-song');
+        expect(queued.operationId).toBe('fixed-adopt-op');
+
+        // The same `identifier()` shape every other id in this store is held to.
+        await expect(
+            book.save(scope, accountChart('bad id', 'other-song'), null, 'has spaces'),
+        ).rejects.toThrow('Invalid sync identifier');
+        expect(await book.pending(scope, 'other-song')).toEqual([]);
+
+        // Omitted, as every non-adoption caller (the editor's own Save button) does: a fresh id
+        // every call, exactly the prior behavior.
+        const a = await book.save(scope, accountChart('C', 'study'), null);
+        const b = await book.save(scope, { ...a.document, title: 'D' }, a.document.revision);
+        const [firstQueued, secondQueued] = await book.pending(scope, 'study');
+        expect(firstQueued.operationId).not.toBe(secondQueued.operationId);
+        expect(b.document.title).toBe('D');
+    });
+
+    it('rejects recreating a document under its own deterministic id, so a retried adoption cannot duplicate it', async () => {
+        // The retry-safety #1268 relies on: the SAME (documentId, operationId) pair, re-submitted
+        // as a create (`expected = null`) exactly as a rerun after an interrupted copy would,
+        // finds the song already there and refuses rather than creating a second one.
+        await book.save(scope, accountChart('adopted', 'guest-song'), null, 'fixed-adopt-op');
+        await expect(
+            book.save(scope, accountChart('adopted', 'guest-song'), null, 'fixed-adopt-op'),
+        ).rejects.toBeInstanceOf(LocalRevisionError);
+        expect(await book.pending(scope, 'guest-song')).toHaveLength(1);
+    });
+
     it('retries opening after storage was unavailable instead of memoizing a rejected promise', async () => {
         await book.close();
         const fault = vi.spyOn(indexedDB, 'open').mockImplementationOnce(() => {

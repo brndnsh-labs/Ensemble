@@ -385,8 +385,17 @@ export interface SyncLoop {
     watch(documentId: string | null): Promise<void>;
     /** Every saved song for this account, paged to the end. */
     listLibrary(): Promise<SavedSong[]>;
-    /** Commit locally and queue that exact version. Does NOT send; the caller triggers a pass. */
-    save(document: ChartDocument, expected: number | null): Promise<SavedSong>;
+    /**
+     * Commit locally and queue that exact version. Does NOT send; the caller triggers a pass.
+     *
+     * `operationId` is optional and passed straight through to `AccountSongbook.save` — see its
+     * doc comment. Guest-to-account adoption (#1268) is the one caller that supplies it.
+     */
+    save(
+        document: ChartDocument,
+        expected: number | null,
+        operationId?: string,
+    ): Promise<SavedSong>;
     /**
      * Delete one document from the cloud (#1270): an explicit ONLINE operation with a frozen,
      * retry-safe operation id, never a side effect of removing a local copy. Sends immediately
@@ -801,9 +810,9 @@ export function createSyncLoop(
             }
             throw new Error('Account library paging did not terminate.');
         },
-        async save(document, expected) {
+        async save(document, expected, operationId) {
             const current = await settledScope();
-            const song = await songbook.save(current, document, expected);
+            const song = await songbook.save(current, document, expected, operationId);
             publish({ libraryVersion: state.libraryVersion + 1 });
             await observe();
             return song;

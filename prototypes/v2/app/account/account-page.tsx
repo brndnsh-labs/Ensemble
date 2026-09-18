@@ -74,6 +74,13 @@ interface AccountPageProps {
      * revoking the current session's passkey does.
      */
     onAccountDeleted: () => Promise<void>;
+    /**
+     * Open the guest-songs adoption dialog (#1268). A separate top-level `<dialog>` the shell
+     * owns, not a section here — so this closes the account page first, mirroring how
+     * `onDeleteFromAccount` elsewhere in the shell hands off to its own dialog rather than
+     * nesting one modal inside another.
+     */
+    onOpenAdopt: () => void;
 }
 
 type Section = 'main' | 'replaceCode' | 'signedOut' | 'deleteAccount' | 'deleted';
@@ -87,6 +94,7 @@ export function AccountPage({
     accountSongCount,
     onExportAccountSongs,
     onAccountDeleted,
+    onOpenAdopt,
 }: AccountPageProps) {
     const [section, setSection] = useState<Section>('main');
     const [passkeys, setPasskeys] = useState<PasskeySummary[] | null>(null);
@@ -433,6 +441,22 @@ export function AccountPage({
                     <h2 id="account-page-title" ref={mainHeadingRef} tabIndex={-1}>
                         Your account.
                     </h2>
+
+                    <section aria-labelledby="account-page-adopt-heading">
+                        <h3 id="account-page-adopt-heading">This device’s songs</h3>
+                        <p className="status-detail">
+                            Copy any guest songs on this device into your account. Your guest
+                            songbook stays exactly as it is.
+                        </p>
+                        <button
+                            className="btn"
+                            data-testid="account-page-adopt-guest"
+                            disabled={busy}
+                            onClick={onOpenAdopt}
+                        >
+                            Add this device’s songs
+                        </button>
+                    </section>
 
                     <section aria-labelledby="account-page-passkeys-heading">
                         <h3 id="account-page-passkeys-heading">Passkeys</h3>

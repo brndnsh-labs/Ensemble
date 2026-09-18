@@ -332,11 +332,20 @@ export class AccountSongbook {
         scope: AccountScope,
         candidate: unknown,
         expected: number | null,
+        /**
+         * A caller-supplied operation id, for the one caller that needs a RETRY-SAFE id rather
+         * than a fresh one every call: guest-to-account adoption (#1268) derives this
+         * deterministically from `(ownerId, guestId)` so a repeated adoption attempt for the same
+         * guest song reuses the exact same id. Every other caller (the editor's own Save button)
+         * omits it and gets the usual fresh `crypto.randomUUID()` — a human pressing Save twice
+         * means two distinct edits, which is exactly what a fresh id per call is for.
+         */
+        operationId: string = crypto.randomUUID(),
     ): Promise<SavedSong> {
         scope = copyScope(scope);
         const document = snapshot(candidate);
         localRevision(expected);
-        const operationId = crypto.randomUUID();
+        identifier(operationId);
         return this.database.run('readwrite', scope, (tx) => {
             tx.read(
                 tx.table('songs').get([scope.ownerId, document.id]),
