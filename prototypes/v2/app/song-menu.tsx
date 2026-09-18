@@ -14,6 +14,13 @@ interface SongMenuProps {
     dirty: boolean;
     shareLinkFallback: string | null;
     recoveryOptions: Recovery[];
+    /**
+     * Whether this chart is one the musician's ACCOUNT holds a confirmed copy of (#1270) — signed
+     * in, opened from the account songbook, and acknowledged by the cloud at some revision. False
+     * for every other case: a guest song, an account song that has never uploaded, or a shared
+     * draft. Deleting from the cloud is only offered for a song that is actually in the cloud.
+     */
+    inAccount: boolean;
     onClose: () => void;
     onShare: () => void;
     onSaveCopy: () => void;
@@ -22,6 +29,7 @@ interface SongMenuProps {
     onImport: () => void;
     onRevert: () => void;
     onOpenRecovery: (record: Recovery) => void;
+    onDeleteFromAccount: () => void;
 }
 
 export function SongMenu({
@@ -32,6 +40,7 @@ export function SongMenu({
     dirty,
     shareLinkFallback,
     recoveryOptions,
+    inAccount,
     onClose,
     onShare,
     onSaveCopy,
@@ -40,6 +49,7 @@ export function SongMenu({
     onImport,
     onRevert,
     onOpenRecovery,
+    onDeleteFromAccount,
 }: SongMenuProps) {
     return (
         <dialog ref={dialogRef} className="modal-box" onCancel={onClose} onClose={onClose}>
@@ -76,6 +86,19 @@ export function SongMenu({
                 <button className="btn" disabled={busy || !dirty || !saved} onClick={onRevert}>
                     Revert to saved
                 </button>
+                {inAccount && (
+                    // Offered only for a song the cloud actually holds, and disabled rather than
+                    // hidden while offline — a control that vanishes teaches nothing, and the
+                    // reason lives in the confirm step (#1270).
+                    <button
+                        className="btn"
+                        data-testid="delete-from-account"
+                        disabled={busy}
+                        onClick={onDeleteFromAccount}
+                    >
+                        Delete from my account
+                    </button>
+                )}
                 <button className="btn" onClick={onClose}>
                     Close
                 </button>

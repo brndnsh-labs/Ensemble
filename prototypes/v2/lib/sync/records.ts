@@ -2,8 +2,10 @@ import {
     type AccountScope,
     candidateKey,
     type Draft,
+    deletionKey,
     identifier,
     localRevision,
+    type PendingDeletion,
     type RemoteCandidate,
     type RemoteOutcome,
     remoteRevision,
@@ -116,6 +118,31 @@ export function savedCandidate(
         throw new Error('Stored remote candidate does not match its key.');
     }
     return Object.assign({ key: value.key, ownerId: scope.ownerId }, remoteOutcome(value));
+}
+
+/**
+ * Re-prove a stored frozen delete (#1270) against the scope AND its own key, never only the record
+ * it was found at — the same posture `savedCandidate` takes, and for the same reason: `meta` is one
+ * generic keyed store shared by three namespaces, so the key is part of the record's identity.
+ */
+export function savedDeletion(
+    value: PendingDeletion,
+    scope: AccountScope,
+    id: string,
+): PendingDeletion {
+    owned(value, scope, id);
+    if (value.key !== deletionKey(scope.ownerId, id)) {
+        throw new Error('Stored pending deletion does not match its key.');
+    }
+    identifier(value.operationId);
+    remoteRevision(value.expectedRevision);
+    return {
+        key: value.key,
+        ownerId: scope.ownerId,
+        documentId: id,
+        operationId: value.operationId,
+        expectedRevision: value.expectedRevision,
+    };
 }
 
 export function savedOperation(

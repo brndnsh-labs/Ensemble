@@ -19,6 +19,7 @@ import type { SavedSong } from '../lib/sync/protocol';
 import type { Progress } from '../lib/sync/status';
 import { AccountEntry } from './account/account-entry';
 import { AccountPage } from './account/account-page';
+import { DeleteSongDialog } from './account/delete-song';
 import { SyncStatus, useAccountLibrary } from './account/library';
 import { type AccountDialogMode, SignInDialog } from './account/sign-in';
 import { useAccountSession, useAccountsEnabled } from './account/use-account-session';
@@ -149,11 +150,30 @@ export default function Ensemble() {
     // dialog from the sign-in one above — opening it never touches `accountDialog`, and vice
     // versa, so the two can't fight over the same `showModal()`/`close()` pair.
     const [accountPageOpen, setAccountPageOpen] = useState(false);
+    // #1270 — the cloud-delete confirm step, and the sentence the last refused attempt produced.
+    // Both are the shell's, because the shell owns every `<dialog>` in this app.
+    const [deleteOpen, setDeleteOpen] = useState(false);
+    const [deleteFailure, setDeleteFailure] = useState<string | null>(null);
     // #1266 — signed in, the songbook IS the account library. `current?.id` is the chart on the
     // stand: the loop hands it to the download's `isActive` so a remote update can never be
     // swapped in underneath whoever is playing.
     const signedIn = accountsOn && account.session.status === 'signedIn';
     const sync = useAccountLibrary(accountsOn, account.session, current?.id ?? null);
+    /**
+     * Is the chart on the stand one the ACCOUNT holds a confirmed copy of (#1270)?
+     *
+     * All four clauses are load-bearing. `signedIn` and `currentStore` together are what keep a
+     * guest chart, and an account chart whose session lapsed underneath it, out of a destructive
+     * cloud operation — the same pairing `storeSave`'s expiry guard rests on. `sync.observation` is
+     * the watched document's own cloud fact, read from storage rather than inferred, and a null
+     * `remoteRevision` means the cloud has never acknowledged this song: there is nothing up there
+     * to delete, so the action is not offered rather than offered and then refused.
+     */
+    const inAccount =
+        accountsOn &&
+        signedIn &&
+        currentStore.current === 'account' &&
+        sync.observation?.remoteRevision != null;
     // `?? []` is the LIST, not the claim: "we haven't read the account library yet" is carried
     // separately to the songbook as `loading`, so an unread library never renders as an empty one.
     const songs = signedIn ? (accountSongs ?? []) : guestSongs;
@@ -170,6 +190,7 @@ export default function Ensemble() {
     const dialog = useRef<HTMLDialogElement>(null);
     const accountDialogRef = useRef<HTMLDialogElement>(null);
     const accountPageDialogRef = useRef<HTMLDialogElement>(null);
+    const deleteDialogRef = useRef<HTMLDialogElement>(null);
     const soundsDialog = useRef<HTMLDialogElement>(null);
     const feelDialog = useRef<HTMLDialogElement>(null);
     const file = useRef<HTMLInputElement>(null);
@@ -358,6 +379,20 @@ export default function Ensemble() {
             accountPageDialogRef.current?.close();
         }
     }, [accountPageOpen]);
+    // `inAccount` is a dependency, not just a guard: the confirm step unmounts when the answer
+    // turns false (a session expiring under an account chart is the realistic way), and a flag
+    // left true would spring the dialog open again on the next chart that qualifies.
+    useEffect(() => {
+        if (!inAccount) {
+            setDeleteOpen(false);
+            return;
+        }
+        if (deleteOpen) {
+            deleteDialogRef.current?.showModal();
+        } else {
+            deleteDialogRef.current?.close();
+        }
+    }, [deleteOpen, inAccount]);
     useEffect(() => {
         if (feelMenu) {
             // Refreshed on every open: these four fields can drift from what the
@@ -716,6 +751,49 @@ export default function Ensemble() {
             setSaveFailed(true);
             throw failure;
         }
+    }
+    /**
+     * Delete the open chart from the cloud (#1270) — the one destructive account operation in the
+     * product, and deliberately not a side effect of anything else.
+     *
+     * The chart gives up its ACTIVE claim before the request goes out, and that is the point.
+     * `reconcile`'s preservation rule counts the chart on the stand as local work worth keeping, so
+     * deleting with the song still claimed would retain the very copy the musician just asked to
+     * remove — and leave it in the account songbook list, flagged, with no way to finish the job. A
+     * draft or an unsent Save still retains it, which is that rule working as intended: that work
+     * exists nowhere else.
+     *
+     * The claim is dropped through `setActiveDocument` rather than by unmounting the chart, so a
+     * refused delete leaves the musician exactly where they were. It is called explicitly rather
+     * than left to the `useAccountLibrary` effect that normally mirrors `current?.id`: effects run
+     * after the render that follows a state change, and the loop reads `activeDocumentId` at the
+     * moment it commits.
+     */
+    function deleteFromAccount() {
+        if (!current) {
+            return;
+        }
+        const documentId = current.id;
+        void run(async () => {
+            accountSync.setActiveDocument(null);
+            const result = await accountSync.deleteFromCloud(documentId);
+            if (result.kind === 'refused') {
+                // Nothing was deleted, so nothing about this session changes: the chart keeps its
+                // claim and the dialog stays open carrying the reason. Closing it and dropping a
+                // toast would leave the musician guessing whether it worked.
+                accountSync.setActiveDocument(documentId);
+                setDeleteFailure(result.message);
+                return;
+            }
+            runtime.stop();
+            setDeleteOpen(false);
+            setCurrent(null);
+            setSaved(null);
+            currentStore.current = null;
+            clearBuffers();
+            await refreshSongs();
+            setMessage(result.message);
+        });
     }
     function openSong(id: string) {
         void run(async () => {
@@ -1318,6 +1396,7 @@ export default function Ensemble() {
                 dirty={dirty}
                 shareLinkFallback={shareLinkFallback}
                 recoveryOptions={recoveryOptions}
+                inAccount={inAccount}
                 onClose={() => setMenu(false)}
                 onShare={() => void run(shareChartLink)}
                 onSaveCopy={() => void run(() => save(true))}
@@ -1339,6 +1418,11 @@ export default function Ensemble() {
                         setMenu(false);
                     })
                 }
+                onDeleteFromAccount={() => {
+                    setDeleteFailure(null);
+                    setMenu(false);
+                    setDeleteOpen(true);
+                }}
                 onOpenRecovery={(record) =>
                     void run(async () => {
                         updateChart();
@@ -1371,6 +1455,20 @@ export default function Ensemble() {
                     open={accountPageOpen}
                     onClose={() => setAccountPageOpen(false)}
                     onAccountChanged={account.refresh}
+                />
+            )}
+            {inAccount && current && (
+                <DeleteSongDialog
+                    dialogRef={deleteDialogRef}
+                    title={current.title}
+                    online={account.online}
+                    busy={busy}
+                    unsavedEdits={dirty}
+                    pendingCount={sync.observation?.pendingCount ?? 0}
+                    failure={deleteFailure}
+                    onExport={() => void run(exportSong)}
+                    onConfirm={deleteFromAccount}
+                    onClose={() => setDeleteOpen(false)}
                 />
             )}
         </div>

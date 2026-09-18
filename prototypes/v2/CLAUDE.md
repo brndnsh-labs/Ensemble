@@ -90,6 +90,7 @@ gate evidence. Do not copy old test totals or preview SHAs into a new claim of v
 | Guest saves and recovery | `lib/repository.ts`, `lib/session.ts` | Not the account store; no implicit guest uploads |
 | Account-local storage | `lib/sync/database.ts`, `lib/sync/repository.ts`, `lib/sync/records.ts` | Native IDB transactions, owner/generation fence |
 | Explicit Save wire contract | `lib/sync/protocol.ts`, `lib/sync/send.ts` | Immutable retry bytes, owner-bound receipts, separate drafts |
+| Explicit cloud delete (#1270) | `lib/sync/protocol.ts` (`deleteBody`/`deleteReply`), `lib/sync/repository.ts` (`prepareDelete`), `app/account/delete-song.tsx` | Online-only, export preflight, operation id frozen in IDB before the request; one `commitDeleted` rule shared with a downloaded tombstone |
 | Portable chart / iReal semantics | `../../public/songbook/` | Root/scoped engine guides and canonical codecs apply |
 | Offline install / deployment | `scripts/offline.mjs`, `scripts/deploy.mjs` | Anonymous shell + verified sounds; `deploy.mjs test` from a workstation, `deploy.mjs prod` only from the CI deploy job |
 | Browser evidence | `checks/`, `../../tests/browser/account-songbook.browser.test.ts` | Preview E2E plus real IndexedDB in Chromium/WebKit |

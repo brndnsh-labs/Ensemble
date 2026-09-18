@@ -99,6 +99,9 @@ const LOCAL_LABELS = {
 const CLOUD_LABELS = {
     unknown: 'Account library not checked yet',
     conflict: 'This song differs from your account — choose which to keep',
+    // #1270: the one-sided refusal. The cloud has no version to weigh this one against, so the
+    // sentence must not offer a choice — it says where the work actually is instead.
+    gone: 'No longer in your account — this version is still on this device',
     queued: 'Waiting to upload to your account',
     sending: 'Uploading to your account…',
     confirmed: 'Saved to your account',

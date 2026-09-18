@@ -14,11 +14,16 @@ import {
 import { AccountSongbook, MAX_LIST_LIMIT, MAX_REMOTE_CANDIDATES } from '../sync/repository';
 import type { SaveTransport } from '../sync/send';
 import type { Progress } from '../sync/status';
-import type { AccountApi, ApiError } from './api';
+import type { AccountApi, ApiError, ApiErrorCode } from './api';
 import { accountApi, accountSession } from './client';
 import { createLibraryTransport } from './library-transport';
 import type { AccountSession } from './session';
-import { createSaveTransport, SaveTransportError } from './transport';
+import {
+    createDeleteTransport,
+    createSaveTransport,
+    DeleteTransportError,
+    SaveTransportError,
+} from './transport';
 
 /**
  * The account songbook's sync loop (#1266): the one place that decides WHEN the shipped
@@ -74,7 +79,8 @@ export interface SyncFailure {
 export interface CloudObservation {
     remoteRevision: string | null;
     pendingCount: number;
-    conflict: boolean;
+    /** See `StatusFacts['cloud']['observation']` in `sync/status.ts` for what each term means. */
+    conflict: 'none' | 'version' | 'gone';
 }
 
 export interface SyncSnapshot {
@@ -110,6 +116,34 @@ export const SYNC_MESSAGES = {
     tooLarge: 'Saved on this device · this chart is too large to upload.',
     expired: 'Saved on this device · sign in again to upload it.',
     server: 'Saved on this device · we couldn’t reach your account library. We’ll try again.',
+} as const;
+
+/**
+ * The same posture as `SYNC_MESSAGES` for the one operation that is not a Save (#1270): lead with
+ * what is true of this device, never print the server's vocabulary, and never claim something was
+ * removed that was not.
+ *
+ * Deliberately a separate table rather than more `SYNC_MESSAGES` entries: every sentence there
+ * begins "Saved on this device", because every one of them is about a Save that is safe here and
+ * has not reached the cloud. A delete has the opposite shape — the request is the thing that did
+ * or did not happen in the cloud — and stretching that prefix over it would be a template, not
+ * an honest sentence.
+ */
+export const DELETE_MESSAGES = {
+    offline: 'Deleting from your account needs a connection. Nothing was deleted.',
+    rateLimited: 'Your account asked us to wait. Nothing was deleted — try again shortly.',
+    expired: 'Sign in again to delete this from your account. Nothing was deleted.',
+    server: 'We couldn’t reach your account. Nothing was deleted.',
+    /** 409 conflict: the id is live at a revision this request did not expect. */
+    changed:
+        'This song changed in your account since you opened it. Nothing was deleted — reopen it and try again.',
+    /** 404: the owner has no such id and no tombstone for it. */
+    absent: 'That song isn’t in your account.',
+    /** Local: a record the cloud has never confirmed. There is nothing up there to delete. */
+    unconfirmed: 'This song hasn’t reached your account yet, so there’s nothing there to delete.',
+    /** The delete landed, but local work meant the copy on this device was kept. */
+    retained: 'Deleted from your account. Your unsent work stays on this device.',
+    deleted: 'Deleted from your account.',
 } as const;
 
 const UNOBSERVED: Progress = { required: null, verified: null };
@@ -209,6 +243,53 @@ function sameSnapshot(a: SyncSnapshot, b: SyncSnapshot): boolean {
     );
 }
 
+/**
+ * What one explicit cloud deletion did (#1270). `message` is always a sentence a musician can read.
+ *
+ * `retained` is the honest half of a successful delete: the cloud copy is gone, and this device
+ * kept its own because a draft, a queued Save or the open chart meant dropping it would destroy
+ * work that exists nowhere else.
+ */
+export type CloudDeleteResult =
+    | { kind: 'deleted'; retained: boolean; message: string }
+    /** Nothing was deleted. `retry` is true only when trying the same thing again could work. */
+    | { kind: 'refused'; retry: boolean; message: string };
+
+/**
+ * Reasons the FROZEN OPERATION ID must be forgotten, because the server answered definitively about
+ * these exact bytes and wrote no receipt for them: a stale expected revision (`conflict`, handled in
+ * `acknowledgeDelete`), an id it has never held (`not_found`), an operation id already spent on
+ * something else (`operation_mismatch`), or a request it would not parse (`malformed_request`).
+ *
+ * Everything else — a dead network, an unrecognized body, a 401, a 429, a 5xx — is UNCERTAIN or
+ * transient, and the same bytes remain the right request. The id survives so a retry is a replay
+ * the server answers from its receipt rather than a second delete under a second id.
+ */
+const FORGET_FROZEN_ID: ReadonlySet<ApiErrorCode> = new Set<ApiErrorCode>([
+    'not_found',
+    'operation_mismatch',
+    'malformed_request',
+]);
+
+function deleteFailure(error: ApiError): { retry: boolean; message: string } {
+    if (error.kind === 'network') {
+        return { retry: true, message: DELETE_MESSAGES.offline };
+    }
+    if (error.kind === 'unknown') {
+        return { retry: true, message: DELETE_MESSAGES.server };
+    }
+    switch (error.code) {
+        case 'unauthenticated':
+            return { retry: false, message: DELETE_MESSAGES.expired };
+        case 'rate_limited':
+            return { retry: true, message: DELETE_MESSAGES.rateLimited };
+        case 'not_found':
+            return { retry: false, message: DELETE_MESSAGES.absent };
+        default:
+            return { retry: true, message: DELETE_MESSAGES.server };
+    }
+}
+
 export interface SyncLoop {
     getSnapshot(): SyncSnapshot;
     /** `useSyncExternalStore`'s contract: returns the unsubscribe function. */
@@ -230,6 +311,13 @@ export interface SyncLoop {
     listLibrary(): Promise<SavedSong[]>;
     /** Commit locally and queue that exact version. Does NOT send; the caller triggers a pass. */
     save(document: ChartDocument, expected: number | null): Promise<SavedSong>;
+    /**
+     * Delete one document from the cloud (#1270): an explicit ONLINE operation with a frozen,
+     * retry-safe operation id, never a side effect of removing a local copy. Sends immediately
+     * rather than joining the outbox — a delete is a deliberate human act that must report its own
+     * outcome, not a queued intention the musician walks away from.
+     */
+    deleteFromCloud(documentId: string): Promise<CloudDeleteResult>;
     /** One outbox + download pass, coalesced: a request during a pass re-runs once after it. */
     run(): Promise<void>;
 }
@@ -241,6 +329,7 @@ export function createSyncLoop(
 ): SyncLoop {
     const listeners = new Set<() => void>();
     const library = createLibraryTransport(api, session);
+    const deleteTransport = createDeleteTransport(api, session);
     let state: SyncSnapshot = {
         owner: null,
         running: false,
@@ -313,13 +402,20 @@ export function createSyncLoop(
             if (mine !== epoch || token !== observation) {
                 return;
             }
+            // Read from the queue, never from a request result: `status.ts` refuses a conflict
+            // with an empty queue, and this is why that can never happen. The queue is sorted by
+            // local revision, so the FIRST conflicted operation is the head the outbox is stuck
+            // on — the one whose refusal the musician is looking at.
+            //
+            // `remote === null` is the server saying it has no version to offer: the id is
+            // tombstoned (#1270), or it never existed. Either way there is nothing to choose
+            // between, which is a different sentence from an ordinary conflict.
+            const refused = queue.find((operation) => operation.status === 'conflict');
             publish({
                 observation: {
                     remoteRevision: song?.remoteRevision ?? null,
                     pendingCount: queue.length,
-                    // Read from the queue, never from a request result: `status.ts` refuses a
-                    // conflict with an empty queue, and this is why that can never happen.
-                    conflict: queue.some((operation) => operation.status === 'conflict'),
+                    conflict: !refused ? 'none' : refused.remote === null ? 'gone' : 'version',
                 },
             });
         } catch {
@@ -619,6 +715,57 @@ export function createSyncLoop(
             publish({ libraryVersion: state.libraryVersion + 1 });
             await observe();
             return song;
+        },
+        async deleteFromCloud(documentId) {
+            const current = await settledScope();
+            const request = await songbook.prepareDelete(current, documentId);
+            if (request === 'missing') {
+                // Nothing here mirrors that id, so there is no confirmed revision to name and no
+                // honest request to build. Reported rather than thrown: the list this was invoked
+                // from can legitimately be a moment stale.
+                return { kind: 'refused', retry: false, message: DELETE_MESSAGES.absent };
+            }
+            if (request === 'unconfirmed') {
+                return { kind: 'refused', retry: false, message: DELETE_MESSAGES.unconfirmed };
+            }
+            let response: unknown;
+            try {
+                response = await deleteTransport(request);
+            } catch (error) {
+                if (!(error instanceof DeleteTransportError)) {
+                    throw error;
+                }
+                if (error.reason.kind === 'code' && FORGET_FROZEN_ID.has(error.reason.code)) {
+                    // A storage failure while cleaning up is not worth losing the real reason
+                    // over: a stale frozen record costs nothing but a later `operation_mismatch`
+                    // the musician is already being told to retry through.
+                    await songbook.discardDelete(current, documentId).catch(() => {});
+                }
+                if (error.reason.kind === 'code' && error.reason.code === 'rate_limited') {
+                    // A 429 answers for the whole origin, exactly as on the Save path.
+                    backoffUntil = Math.max(backoffUntil, Date.now() + BACKOFF_FALLBACK_MS);
+                }
+                const failure = deleteFailure(error.reason);
+                return { kind: 'refused', ...failure };
+            }
+            const outcome = await songbook.acknowledgeDelete(current, request, response, {
+                // Asked at the moment of the commit, never from a list captured before the
+                // request went out — the same rule the download pass follows.
+                active: documentId === activeDocumentId,
+            });
+            if (outcome === 'conflict') {
+                // Nothing was deleted and nothing local changed; the next download brings the
+                // version the server is holding, under the ordinary preservation rules.
+                return { kind: 'refused', retry: false, message: DELETE_MESSAGES.changed };
+            }
+            const retained = outcome === 'retained-deleted';
+            publish({ libraryVersion: state.libraryVersion + 1 });
+            await observe();
+            return {
+                kind: 'deleted',
+                retained,
+                message: retained ? DELETE_MESSAGES.retained : DELETE_MESSAGES.deleted,
+            };
         },
         run() {
             if (!scope) {
