@@ -9,6 +9,7 @@ import {
 } from '../../../prototypes/v2/lib/account/sync-loop.js';
 import { MAX_PENDING_SAVES, type PreparedSave } from '../../../prototypes/v2/lib/sync/protocol.js';
 import type { AccountSongbook } from '../../../prototypes/v2/lib/sync/repository.js';
+import { accountChart } from '../../utils/account-songbook-fixture.js';
 
 /**
  * The half of #1266 that needs neither IndexedDB nor a browser: WHICH pass runs, and what a
@@ -1381,14 +1382,15 @@ describe('signing out moves the fence before it asks the server for anything', (
     });
 
     /**
-     * The `drafts` half of this plan is the ACCOUNT DATABASE's, and today it is always zero: the
-     * one writer of that store (`AccountSongbook.recover`) has no caller in the app yet. The rows
-     * below are therefore a contract for the #1299 future, not a reproduction of live storage —
-     * what an account chart's unsaved text actually sits in today is a guest recovery slot, which
-     * the loop cannot see and the SHELL adds (`withLocalDrafts` in `app/ensemble.tsx`). That
-     * composition is proven end to end in `prototypes/v2/checks/account-sign-out.chromium.spec.ts`.
+     * The `drafts` half of this plan is the ACCOUNT DATABASE's, which since #1299 is where an
+     * account chart's unsaved text actually sits. What it cannot see is a draft whose storage
+     * write was refused and a guest slot left under an account id by an older build; the SHELL
+     * adds those (`withLocalDrafts` in `app/ensemble.tsx`), and that composition is proven end to
+     * end in `prototypes/v2/checks/account-sign-out.chromium.spec.ts`.
      */
     it('counts unsent Saves and unsaved drafts as two separate facts', async () => {
+        /** What every song below has committed; the draft rows are placed either side of it. */
+        const SAVED_AT = '2026-09-18T10:00:00.000Z';
         const { api } = fakeApi({ ok: true, value: {}, status: 204 });
         const loop = createSyncLoop(
             api,
@@ -1396,18 +1398,27 @@ describe('signing out moves the fence before it asks the server for anything', (
             stubSongbook({
                 list: async () => ({
                     // `song-3` holds neither: it is already safely in the account, so an export
-                    // that wrote it out too would bury the files that actually matter.
+                    // that wrote it out too would bury the files that actually matter. It DOES
+                    // hold a draft row — one an earlier page load's Save has already moved past,
+                    // which is not an experiment anybody can be offered or shown (#1299 patch
+                    // review P1).
                     songs: [
-                        { documentId: 'song-1' },
-                        { documentId: 'song-2' },
-                        { documentId: 'song-3' },
+                        { documentId: 'song-1', document: { updatedAt: SAVED_AT } },
+                        { documentId: 'song-2', document: { updatedAt: SAVED_AT } },
+                        { documentId: 'song-3', document: { updatedAt: SAVED_AT } },
                     ],
                     nextAfterDocumentId: null,
                 }),
                 pending: async (_scope: unknown, documentId: string) =>
                     documentId === 'song-1' ? [{ status: 'queued' }, { status: 'queued' }] : [],
-                drafts: async (_scope: unknown, documentId: string) =>
-                    documentId === 'song-2' ? [{ writerId: 'w' }] : [],
+                drafts: async (_scope: unknown, documentId: string) => {
+                    if (documentId === 'song-2') {
+                        return [{ writerId: 'w', capturedAt: '2026-09-18T10:30:00.000Z' }];
+                    }
+                    return documentId === 'song-3'
+                        ? [{ writerId: 'stale', capturedAt: '2026-09-18T09:00:00.000Z' }]
+                        : [];
+                },
             }),
         );
         await loop.attach(OWNER);
@@ -1418,7 +1429,9 @@ describe('signing out moves the fence before it asks the server for anything', (
         expect(await loop.signOutPreflight()).toEqual({
             documentIds: ['song-1', 'song-2', 'song-3'],
             // Both songs hold work the account has not got, by two different routes: one a queued
-            // Save, the other an unsaved experiment. Export has to reach both.
+            // Save, the other an unsaved experiment. Export has to reach both — and song-3's
+            // superseded row reaches neither this list nor the count below, or the step would
+            // warn about an experiment no export could write and no musician could point at.
             atRisk: ['song-1', 'song-2'],
             unsentSaves: 2,
             refusedSaves: 0,
@@ -1454,5 +1467,227 @@ describe('signing out moves the fence before it asks the server for anything', (
             // song-1's two, never song-2's: an ordinary queue behind an ordinary head still syncs.
             refusedSaves: 2,
         });
+    });
+});
+
+/**
+ * Where an account chart's unsaved experiment goes, and which one comes back (#1299).
+ *
+ * The STORE's behavior is proven against real IndexedDB in `tests/browser/account-*`; what is
+ * decided here is the loop's own logic — which scope a draft may be written under, and which of
+ * several retained rows is still worth offering a musician.
+ */
+describe('the sync loop retains an account chart’s unsaved experiment', () => {
+    const SONG = {
+        documentId: 'song-1',
+        remoteRevision: 'r1',
+        document: {
+            id: 'song-1',
+            title: 'Set list',
+            revision: 2,
+            updatedAt: '2026-09-18T10:00:00.000Z',
+        },
+    };
+    const EDIT = { ...accountChart('Set list three', 'song-1'), revision: 2 };
+
+    function draftRow(title: string, capturedAt: string, baseRevision = 2) {
+        return {
+            writerId: 'writer-1',
+            document: { id: 'song-1', title, revision: baseRevision },
+            baseRevision,
+            capturedAt,
+        };
+    }
+
+    async function attached(songbook: AccountSongbook) {
+        const { api } = fakeApi({ ok: true, value: {}, status: 204 });
+        const loop = createSyncLoop(api, createAccountSession(api), songbook);
+        await loop.attach(OWNER);
+        return loop;
+    }
+
+    it('offers the newest retained draft, whatever order the rows come back in', async () => {
+        const loop = await attached(
+            stubSongbook({
+                read: async () => SONG,
+                drafts: async () => [
+                    draftRow('second', '2026-09-18T10:30:00.000Z'),
+                    draftRow('newest', '2026-09-18T11:00:00.000Z'),
+                    draftRow('first', '2026-09-18T10:05:00.000Z'),
+                ],
+            }),
+        );
+
+        const held = await loop.retainedDraft('song-1');
+
+        expect(held?.document.title).toBe('newest');
+        // Captured against the revision that is committed now, so restoring it loses nothing.
+        expect(held?.conflict).toBe(false);
+    });
+
+    it('does not offer a draft captured before the version it sits on', async () => {
+        // A Save — this tab's, another tab's, or a Keep-both — has moved past this experiment.
+        // Offering it would invite the musician to restore text they have already replaced.
+        const loop = await attached(
+            stubSongbook({
+                read: async () => SONG,
+                drafts: async () => [draftRow('stale', '2026-09-18T09:00:00.000Z')],
+            }),
+        );
+
+        expect(await loop.retainedDraft('song-1')).toBeNull();
+    });
+
+    it('flags a draft based on a different committed revision, so the menu can say so', async () => {
+        const loop = await attached(
+            stubSongbook({
+                read: async () => SONG,
+                drafts: async () => [draftRow('mine', '2026-09-18T11:00:00.000Z', 1)],
+            }),
+        );
+
+        expect(await loop.retainedDraft('song-1')).toMatchObject({ conflict: true });
+    });
+
+    it('answers nothing for a song this account does not hold here', async () => {
+        const loop = await attached(
+            stubSongbook({
+                read: async () => null,
+                drafts: async () => [draftRow('orphan', '2026-09-18T11:00:00.000Z')],
+            }),
+        );
+
+        expect(await loop.retainedDraft('song-1')).toBeNull();
+    });
+
+    it('reads a whole at-risk set in one call, for an export that cannot await between files', async () => {
+        const loop = await attached(
+            stubSongbook({
+                read: async (_scope: unknown, documentId: string) => ({
+                    ...SONG,
+                    documentId,
+                    document: { ...SONG.document, id: documentId },
+                }),
+                drafts: async (_scope: unknown, documentId: string) =>
+                    documentId === 'song-2' ? [] : [draftRow('edited', '2026-09-18T11:00:00.000Z')],
+            }),
+        );
+
+        const held = await loop.retainedDrafts(['song-1', 'song-2']);
+
+        expect(held.get('song-1')?.title).toBe('edited');
+        // A song with nothing retained is absent rather than present-and-committed: the caller
+        // falls back to the library copy, and an entry here would claim an edit that is not one.
+        expect(held.has('song-2')).toBe(false);
+    });
+
+    it('still retains a draft after the session expired, under the account this device holds', async () => {
+        // Expiry detaches the loop (`app/account/library.tsx`), which is right for everything that
+        // sends — but the chart on the stand is still the account's, and its text has to go
+        // somewhere that is not the guest namespace. The local fence has not moved.
+        const written: unknown[][] = [];
+        const loop = await attached(
+            stubSongbook({
+                recover: async (...args: unknown[]) => {
+                    written.push(args);
+                },
+            }),
+        );
+        loop.detach();
+
+        // Named with the account the CHART belongs to, which is still the one this device holds.
+        await loop.recover(EDIT, 2, OWNER);
+        await loop.recover({ ...EDIT, title: 'again' }, 2, OWNER);
+
+        expect(written).toHaveLength(2);
+        expect(written[0][0]).toEqual(SCOPE);
+        expect(written[0][3]).toBe(2);
+        // One writer per page load, shared with the guest namespace's key shape: two edits are one
+        // experiment, not two competing rows.
+        expect(typeof written[0][1]).toBe('string');
+        expect(written[1][1]).toBe(written[0][1]);
+        // And it is only the DRAFT that reaches past the detached scope — a Save still waits for
+        // reauthentication, which is the whole point of pausing the outbox.
+        await expect(loop.save(EDIT, 2)).rejects.toThrow(/signed out/);
+    });
+
+    it('refuses to retain anything once the device is genuinely signed out', async () => {
+        // No account is held here at all, so there is nowhere this text belongs. The shell's
+        // in-tab fallback is what catches this, exactly as it catches a refused storage write.
+        const { api } = fakeApi({ ok: true, value: {}, status: 204 });
+        const signedOut = createSyncLoop(
+            api,
+            createAccountSession(api),
+            stubSongbook({ currentScope: async () => null }),
+        );
+
+        await expect(signedOut.recover(EDIT, 2, OWNER)).rejects.toThrow(/signed out/);
+    });
+
+    it('refuses to retain one account’s chart under a different account (#1299 patch review)', async () => {
+        // The transition this fence exists for: the session expires under A's chart, "Sign in
+        // again" is answered with B's passkey, and the very next keystroke would write A's chart
+        // text into B's database — where B's sign-out is what removes it and B's library download
+        // is what it protects. Refused, so the shell's in-tab fallback keeps it exportable.
+        const written: unknown[][] = [];
+        const loop = await attached(
+            stubSongbook({
+                recover: async (...args: unknown[]) => {
+                    written.push(args);
+                },
+            }),
+        );
+
+        await expect(loop.recover(EDIT, 2, 'owner-b')).rejects.toThrow(/different account/);
+
+        expect(written).toEqual([]);
+        // And the same call naming the attached account still writes: the fence is about the
+        // MISMATCH, not about naming an owner at all.
+        await loop.recover(EDIT, 2, OWNER);
+        expect(written).toHaveLength(1);
+    });
+
+    it('rethrows an unreadable store rather than answering "no retained draft"', async () => {
+        // The shell tells those two apart (`retainedDraftFor` in `app/ensemble.tsx`): a song with
+        // no draft opens silently, a store that could not be asked opens with a warning and does
+        // not replace what this tab already believed. Collapsing them here would make that
+        // impossible — an unreadable store would open the committed copy as the whole truth and
+        // the first keystroke would retain an experiment over a draft nobody ever saw.
+        const loop = await attached(
+            stubSongbook({
+                read: async () => {
+                    throw new Error('Account storage unavailable.');
+                },
+            }),
+        );
+
+        await expect(loop.retainedDraft('song-1')).rejects.toThrow(/storage unavailable/);
+    });
+
+    it('offers every live retained draft to the menu, newest first, and no superseded one', async () => {
+        // The song menu's "Preserved drafts" list (#1299 patch review P2). Without it a SECOND
+        // tab's experiment on this song is unreachable: nothing in the product can open it, and
+        // the only thing that mentions it is a sign-out warning.
+        const loop = await attached(
+            stubSongbook({
+                read: async () => SONG,
+                drafts: async () => [
+                    { ...draftRow('mine', '2026-09-18T10:30:00.000Z'), writerId: 'writer-1' },
+                    { ...draftRow('theirs', '2026-09-18T11:00:00.000Z'), writerId: 'writer-2' },
+                    { ...draftRow('superseded', '2026-09-18T09:00:00.000Z'), writerId: 'writer-0' },
+                ],
+            }),
+        );
+
+        expect(await loop.preservedDrafts('song-1')).toEqual([
+            {
+                document: { id: 'song-1', title: 'theirs', revision: 2 },
+                capturedAt: '2026-09-18T11:00:00.000Z',
+            },
+            {
+                document: { id: 'song-1', title: 'mine', revision: 2 },
+                capturedAt: '2026-09-18T10:30:00.000Z',
+            },
+        ]);
     });
 });

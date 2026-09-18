@@ -11,7 +11,9 @@ import {
     deletionPrefix,
     digest,
     identifier,
+    type LastOpened,
     LocalRevisionError,
+    lastOpenedKey,
     localRevision,
     MAX_PENDING_SAVES,
     type PendingDeletion,
@@ -65,8 +67,9 @@ export type ReconcileOutcome =
 
 /**
  * What `keepBoth` moved (#1267). Returned rather than inferred, because the SHELL has to finish the
- * move: an account chart's unsaved experiment does not live in this database yet (#1299), and the
- * chart on the stand has to follow its line to the new identity without its content changing.
+ * move: the drafts this transaction re-keys are what a PREVIOUS edit captured, and the experiment
+ * live in the editor right now is the shell's — so the chart on the stand has to follow its line to
+ * the new identity, and re-retain itself there (#1299), without its content changing.
  *
  * `conflict` is which refusal was resolved, carried through rather than flattened, for the same
  * reason `CloudObservation.conflict` keeps the two apart: `'version'` had a remote version to adopt
@@ -134,8 +137,9 @@ function commitDeleted(
 ): ReconcileOutcome {
     const key = candidateKey(scope.ownerId, documentId);
     if (held || song?.remoteRevision === null) {
-        // Local work exists only here: a draft, a queued Save, or the chart on the stand. It stays,
-        // and the candidate is the flag that explains why the cloud copy is gone.
+        // Local work exists only here: a LIVE draft (`liveDraft`), a queued Save, or the chart on
+        // the stand. It stays, and the candidate is the flag that explains why the cloud copy is
+        // gone.
         tx.table('meta').put(candidate());
         return 'retained-deleted';
     }
@@ -164,6 +168,67 @@ function commitDeleted(
     tx.table('meta').delete(key);
     tx.table('meta').delete(deletionKey(scope.ownerId, documentId));
     return 'removed';
+}
+
+/**
+ * Read one stored `last-opened` record (#1299), or null for anything this build cannot trust.
+ *
+ * Re-proves the record against the scope AND its own key, the posture `savedCandidate` and
+ * `savedDeletion` take — `meta` is one generic keyed store shared by four namespaces, so the key is
+ * part of the record's identity. What differs is the verdict on a bad record: a corrupt preference
+ * is simply no preference, because nothing downstream reads it as content.
+ */
+function storedLastOpened(value: LastOpened | undefined, scope: AccountScope): string | null {
+    if (!value || value.ownerId !== scope.ownerId || value.key !== lastOpenedKey(scope.ownerId)) {
+        return null;
+    }
+    try {
+        identifier(value.documentId);
+        return value.documentId;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Is one stored draft row still an experiment on the version this device has committed (#1299
+ * patch review P1)? The same rule `sync-loop.ts`'s `newestDraft` offers a draft under, and guest
+ * recovery before it (`recoveryFor` in `lib/repository.ts`): only a row captured at or after the
+ * committed version it sits on.
+ *
+ * It has to be the rule HERE too, because a counted row is what keeps a remote body off this
+ * record. A writer id is per PAGE LOAD, and `save()` used to drop only the writer that saved, so
+ * an edit, a reload, another edit and a Save left the first page load's row behind forever: every
+ * later remote advance became a preserved candidate for the life of the account, the sign-out step
+ * announced an unsaved experiment nobody had, and a cloud delete answered `retained`.
+ *
+ * Two shapes are deliberately LIVE. A row this build cannot read a `capturedAt` off stays
+ * protective — unreadable is not the same as superseded, and nothing else holds a copy of it. So
+ * does a row for a document with no saved record at all: there is no committed version for it to
+ * be older than, and the draft is then the only copy of that music here.
+ */
+function liveDraft(row: Draft, song: SavedSong | null): boolean {
+    if (!row || typeof row.capturedAt !== 'string') {
+        return true;
+    }
+    return song === null || row.capturedAt >= song.document.updatedAt;
+}
+
+/**
+ * How many of one document's retained drafts are still live, read through the `song` index inside
+ * the caller's transaction. A count of rows rather than `count()` on the index, because the whole
+ * point is that a raw row count answers a different question (see `liveDraft`).
+ */
+function liveDrafts<T>(
+    tx: Transaction<T>,
+    scope: AccountScope,
+    documentId: string,
+    song: SavedSong | null,
+    consume: (live: number) => void,
+) {
+    tx.read(tx.table('drafts').index('song').getAll([scope.ownerId, documentId]), (rows: Draft[]) =>
+        consume(rows.filter((row) => liveDraft(row, song)).length),
+    );
 }
 
 function operations<T>(
@@ -225,7 +290,8 @@ export class AccountSongbook {
 
     /**
      * Remove every record this device holds for one account (#1269) — songs, the outbox and its
-     * receipts, drafts, preserved remote candidates and frozen deletions. Nothing else is touched:
+     * receipts, drafts, preserved remote candidates, frozen deletions and the `last-opened`
+     * preference (#1299). Nothing else is touched:
      * the guest songbook lives in a different database entirely, and another owner's records are
      * outside every range below.
      *
@@ -258,6 +324,10 @@ export class AccountSongbook {
             for (const prefix of [candidatePrefix(ownerId), deletionPrefix(ownerId)]) {
                 tx.table('meta').delete(IDBKeyRange.bound(prefix, `${prefix}￿`, false, true));
             }
+            // One key rather than a range: there is exactly one per owner (#1299). It names a song
+            // that is being removed in this same transaction, so leaving it would point the next
+            // sign-in at a chart this device no longer holds.
+            tx.table('meta').delete(lastOpenedKey(ownerId));
             tx.finish(undefined);
         });
     }
@@ -440,7 +510,35 @@ export class AccountSongbook {
                         }
                         tx.table('songs').put(song);
                         tx.table('operations').add(operation);
-                        tx.finish(song);
+                        // EVERY writer's superseded rows go with the commit (#1299 patch review
+                        // P1), not only the saving writer's. A row captured before the version
+                        // just written is one `liveDraft` will never count or offer again, so
+                        // leaving it only lets dead rows pile up under a document — one per page
+                        // load that ever edited it — for `clearAccount` to find years later.
+                        //
+                        // Safe across tabs precisely because of that rule: a row another tab is
+                        // holding as a LIVE experiment is, by construction, captured at or after
+                        // this commit's `updatedAt`, so it is not in the range below. What is in
+                        // range is only what nothing would offer a musician again.
+                        tx.read(
+                            tx.table('drafts').index('song').getAll([scope.ownerId, saved.id]),
+                            (rows: Draft[]) => {
+                                for (const row of rows) {
+                                    if (
+                                        typeof row?.capturedAt === 'string' &&
+                                        typeof row.writerId === 'string' &&
+                                        row.capturedAt < saved.updatedAt
+                                    ) {
+                                        tx.table('drafts').delete([
+                                            scope.ownerId,
+                                            saved.id,
+                                            row.writerId,
+                                        ]);
+                                    }
+                                }
+                                tx.finish(song);
+                            },
+                        );
                     });
                 },
             );
@@ -468,6 +566,92 @@ export class AccountSongbook {
             };
             tx.table('drafts').put(draft);
             tx.finish(undefined);
+        });
+    }
+
+    /**
+     * Drop THIS writer's retained draft for one document (#1299) — what a committed Save does with
+     * the experiment it has just superseded, and the account half of `clearOwnRecovery`.
+     *
+     * This writer's row only. Another tab editing the same song is holding its own live experiment,
+     * and a Save here has no business discarding it; removing every writer's rows is `clearAccount`'s
+     * job, and that only ever runs when the account itself is leaving this device.
+     */
+    async discardDraft(scope: AccountScope, documentId: string, writerId: string): Promise<void> {
+        scope = copyScope(scope);
+        identifier(documentId);
+        identifier(writerId);
+        return this.database.run('readwrite', scope, (tx) => {
+            tx.table('drafts').delete([scope.ownerId, documentId, writerId]);
+            tx.finish(undefined);
+        });
+    }
+
+    /**
+     * Drop EVERY writer's retained draft for one document — the account's answer to
+     * `lib/repository.ts`'s guest `clearRecovery`, and the one thing `discardDraft` cannot do.
+     *
+     * The shell calls it when the chart on the stand has come back to its committed version
+     * ("Revert to saved", or any change that lands on the saved text), and that is a statement
+     * about the SONG, not about this page load: the experiment being abandoned was very often
+     * captured by an earlier page load — a writer id is minted per load, so the row the chart was
+     * recovered FROM is not this writer's — and dropping only this writer's would leave the next
+     * open recovering the very edit the musician just reverted away from.
+     *
+     * A concurrent tab's live experiment goes with it, which is the same trade `clearRecovery`
+     * makes: that tab still holds its text and retains it again on its next keystroke.
+     */
+    async discardDrafts(scope: AccountScope, documentId: string): Promise<void> {
+        scope = copyScope(scope);
+        identifier(documentId);
+        return this.database.run('readwrite', scope, (tx) => {
+            // The writer id is the third key element, so an array upper bound stops at this
+            // document's last row and cannot reach the next document's — the same bound
+            // `clearAccount` pages an owner with.
+            tx.table('drafts').delete(
+                IDBKeyRange.bound(
+                    [scope.ownerId, documentId],
+                    [scope.ownerId, documentId, []],
+                    false,
+                    true,
+                ),
+            );
+            tx.finish(undefined);
+        });
+    }
+
+    /**
+     * Remember which chart this account had on the stand (#1299) — a preference, never an edit, and
+     * the account's own answer to `lib/session.ts`'s guest `rememberSong`.
+     */
+    async rememberOpened(scope: AccountScope, documentId: string): Promise<void> {
+        scope = copyScope(scope);
+        identifier(documentId);
+        return this.database.run('readwrite', scope, (tx) => {
+            tx.table('meta').put({
+                key: lastOpenedKey(scope.ownerId),
+                ownerId: scope.ownerId,
+                documentId,
+            } satisfies LastOpened);
+            tx.finish(undefined);
+        });
+    }
+
+    /**
+     * The chart this account last had on the stand here, or null.
+     *
+     * A record that does not read back cleanly answers null rather than throwing, unlike every
+     * other read in this class: this one feeds the songbook's Continue card, and failing the whole
+     * library read over a cosmetic preference would turn a stale byte into a broken page. Nothing
+     * is written back — the next `rememberOpened` replaces it.
+     */
+    async lastOpened(scope: AccountScope): Promise<string | null> {
+        scope = copyScope(scope);
+        return this.database.run('readonly', scope, (tx) => {
+            tx.read(
+                tx.table('meta').get(lastOpenedKey(scope.ownerId)),
+                (value: LastOpened | undefined) => tx.finish(storedLastOpened(value, scope)),
+            );
         });
     }
 
@@ -817,8 +1001,7 @@ export class AccountSongbook {
                                             // The experiment is unchanged; what it is an
                                             // experiment ON is the create above, so its base is
                                             // that revision — always 0, because the create is
-                                            // always a create. A placeholder in practice until
-                                            // #1299 gives this store a writer in the app.
+                                            // always a create.
                                             baseRevision: carried.revision,
                                         };
                                     } catch {
@@ -1035,25 +1218,22 @@ export class AccountSongbook {
                 tx.table('songs').get([scope.ownerId, documentId]),
                 (stored: SavedSong | undefined) => {
                     const song = stored ? savedSong(stored, scope, documentId) : null;
-                    tx.read(
-                        tx.table('drafts').index('song').count([scope.ownerId, documentId]),
-                        (drafts: number) => {
-                            operations(tx, scope, documentId, (queue) => {
-                                const held = active || drafts > 0 || queue.length > 0;
-                                tx.finish(
-                                    commitDeleted(
-                                        tx,
-                                        scope,
-                                        documentId,
-                                        candidateRecord,
-                                        song,
-                                        held,
-                                        request.expectedRevision,
-                                    ),
-                                );
-                            });
-                        },
-                    );
+                    liveDrafts(tx, scope, documentId, song, (drafts: number) => {
+                        operations(tx, scope, documentId, (queue) => {
+                            const held = active || drafts > 0 || queue.length > 0;
+                            tx.finish(
+                                commitDeleted(
+                                    tx,
+                                    scope,
+                                    documentId,
+                                    candidateRecord,
+                                    song,
+                                    held,
+                                    request.expectedRevision,
+                                ),
+                            );
+                        });
+                    });
                 },
             );
         });
@@ -1125,9 +1305,11 @@ export class AccountSongbook {
      * since a document already at this revision costs nothing and changes nothing. The chart on
      * the stand is the one fact storage cannot re-read, so the caller supplies it per call.
      *
-     * `held` is the single preservation predicate: a draft, a queued Save, or the chart on the
-     * stand each mean adopting the remote body would destroy something that exists only on this
-     * device. A held document keeps everything it has and gets a separate candidate instead.
+     * `held` is the single preservation predicate: a LIVE draft (`liveDraft` — an experiment on
+     * the version this device has committed, not a row some earlier page load's Save has already
+     * moved past), a queued Save, or the chart on the stand each mean adopting the remote body
+     * would destroy something that exists only on this device. A held document keeps everything
+     * it has and gets a separate candidate instead.
      * `remoteRevision === null` counts as divergent for the same reason: the local record has
      * never been confirmed by the cloud, so it cannot be treated as a clean mirror of it.
      *
@@ -1164,64 +1346,61 @@ export class AccountSongbook {
                 tx.table('songs').get([scope.ownerId, documentId]),
                 (stored: SavedSong | undefined) => {
                     const song = stored ? savedSong(stored, scope, documentId) : null;
-                    tx.read(
-                        tx.table('drafts').index('song').count([scope.ownerId, documentId]),
-                        (drafts: number) => {
-                            operations(tx, scope, documentId, (queue) => {
-                                const held = active || drafts > 0 || queue.length > 0;
-                                if (observed.kind === 'unsupported') {
-                                    // Never touches the saved record, held or not: a body this
-                                    // build cannot validate must not become the local song, and
-                                    // discarding it would lose the only copy of it here.
-                                    tx.table('meta').put(candidate());
-                                    return tx.finish('unsupported');
-                                }
-                                if (observed.kind === 'deleted') {
-                                    return tx.finish(
-                                        commitDeleted(
-                                            tx,
-                                            scope,
-                                            documentId,
-                                            candidate,
-                                            song,
-                                            held,
-                                            expected,
-                                        ),
-                                    );
-                                }
-                                if (song && song.remoteRevision === observed.revision) {
-                                    // Already the confirmed local state — including on a rerun
-                                    // of an interrupted pass. A candidate from an earlier pass
-                                    // no longer describes a divergence.
-                                    tx.table('meta').delete(key);
-                                    return tx.finish('unchanged');
-                                }
-                                if (held || song?.remoteRevision === null) {
-                                    tx.table('meta').put(candidate());
-                                    return tx.finish('candidate');
-                                }
-                                if (song?.remoteRevision !== expected) {
-                                    // Clean, unheld — and NOT the record the caller diffed. It
-                                    // moved between the plan and this transaction, so this body
-                                    // is an observation about a state that no longer exists here
-                                    // and may not be written over the one that does.
-                                    tx.table('meta').put(candidate());
-                                    return tx.finish('candidate');
-                                }
-                                // Clean: the saved body and its remote revision advance together
-                                // in this one transaction, so no reader can ever see a document
-                                // labelled with a revision it is not.
-                                tx.table('songs').put({
-                                    ownerId: scope.ownerId,
-                                    documentId,
-                                    document: observed.document,
-                                    remoteRevision: observed.revision,
-                                } satisfies SavedSong);
+                    liveDrafts(tx, scope, documentId, song, (drafts: number) => {
+                        operations(tx, scope, documentId, (queue) => {
+                            const held = active || drafts > 0 || queue.length > 0;
+                            if (observed.kind === 'unsupported') {
+                                // Never touches the saved record, held or not: a body this
+                                // build cannot validate must not become the local song, and
+                                // discarding it would lose the only copy of it here.
+                                tx.table('meta').put(candidate());
+                                return tx.finish('unsupported');
+                            }
+                            if (observed.kind === 'deleted') {
+                                return tx.finish(
+                                    commitDeleted(
+                                        tx,
+                                        scope,
+                                        documentId,
+                                        candidate,
+                                        song,
+                                        held,
+                                        expected,
+                                    ),
+                                );
+                            }
+                            if (song && song.remoteRevision === observed.revision) {
+                                // Already the confirmed local state — including on a rerun
+                                // of an interrupted pass. A candidate from an earlier pass
+                                // no longer describes a divergence.
                                 tx.table('meta').delete(key);
-                                tx.finish('advanced');
-                            });
-                        },
-                    );
+                                return tx.finish('unchanged');
+                            }
+                            if (held || song?.remoteRevision === null) {
+                                tx.table('meta').put(candidate());
+                                return tx.finish('candidate');
+                            }
+                            if (song?.remoteRevision !== expected) {
+                                // Clean, unheld — and NOT the record the caller diffed. It
+                                // moved between the plan and this transaction, so this body
+                                // is an observation about a state that no longer exists here
+                                // and may not be written over the one that does.
+                                tx.table('meta').put(candidate());
+                                return tx.finish('candidate');
+                            }
+                            // Clean: the saved body and its remote revision advance together
+                            // in this one transaction, so no reader can ever see a document
+                            // labelled with a revision it is not.
+                            tx.table('songs').put({
+                                ownerId: scope.ownerId,
+                                documentId,
+                                document: observed.document,
+                                remoteRevision: observed.revision,
+                            } satisfies SavedSong);
+                            tx.table('meta').delete(key);
+                            tx.finish('advanced');
+                        });
+                    });
                 },
             );
         });

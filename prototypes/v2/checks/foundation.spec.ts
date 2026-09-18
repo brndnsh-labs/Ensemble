@@ -87,6 +87,21 @@ test('manual sounds save, revert, export/import and play sampled audio after off
     await page.getByRole('button', { name: 'Song actions' }).click();
     await page.getByRole('button', { name: 'Revert to saved' }).click();
     await expect(page.getByLabel('Chords sound', { exact: true })).toHaveValue('pack:grand');
+    // Nothing is retained for a chart that matches its committed version (#1299 patch review P1).
+    // A revert used to leave a recovery slot identical to the save — a draft of nothing, which
+    // for an ACCOUNT chart then held that record against every remote advance for good and told
+    // the sign-out step an experiment was at stake. The guest half is the same write, and this is
+    // where it is cheap to prove.
+    await expect
+        .poll(() =>
+            page.evaluate(
+                () =>
+                    Object.keys(localStorage).filter((key) =>
+                        key.startsWith('ensemble-v2-preview:recovery:'),
+                    ).length,
+            ),
+        )
+        .toBe(0);
     await page.getByRole('button', { name: 'Song actions' }).click();
     const download = page.waitForEvent('download');
     await page.getByRole('button', { name: 'Export file' }).click();

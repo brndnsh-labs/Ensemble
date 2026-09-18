@@ -8,6 +8,7 @@ import {
     AccountChangedError,
     type AccountScope,
     type ChartDocument,
+    type Draft,
     MAX_PENDING_SAVES,
     type SavedSong,
     type SaveRefusalReason,
@@ -20,6 +21,7 @@ import {
 } from '../sync/repository';
 import type { SaveTransport } from '../sync/send';
 import type { Progress } from '../sync/status';
+import { writerId } from '../writer';
 import type { AccountApi, ApiError, ApiErrorCode } from './api';
 import { accountApi, accountSession } from './client';
 import { createLibraryTransport } from './library-transport';
@@ -438,18 +440,28 @@ export interface SignOutPreflight {
      */
     refusedSaves: number;
     /**
-     * Unsaved experiments this device kept for account songs.
+     * Unsaved experiments this device kept for account songs, read from the account database's
+     * `drafts` store — which since #1299 is where an account chart's unsaved text actually is.
      *
-     * **This count is the loop's half only, and the loop's half is currently always zero.** It
-     * reads the account database's `drafts` store, whose one writer (`AccountSongbook.recover`)
-     * has no caller in the app yet — account charts still retain their unsaved text in the GUEST
-     * `localStorage` namespace (`lib/repository.ts`'s `recover`, the known #1299 gap), which the
-     * loop neither owns nor can see. The SHELL completes both this number and `atRisk` from that
-     * namespace before showing them; see `withLocalDrafts` in `app/ensemble.tsx`. The store read
-     * stays because #1299 is where it starts answering, and a preflight that stopped asking would
-     * quietly stop counting on the day it does.
+     * Still the loop's half only. A draft whose storage write was REFUSED exists nowhere but the
+     * open tab's own memory, and the loop cannot see that; the shell adds it, along with any guest
+     * slot left over from before #1299, in `withLocalDrafts` (`app/ensemble.tsx`). That composition
+     * can over-count by one in the narrow case where a retained row and a failed later write both
+     * exist for the same song, and that is the safe direction: it offers an export nobody needed,
+     * where under-counting destroys work after saying it would not.
      */
     drafts: number;
+}
+
+/**
+ * One account chart's retained unsaved experiment (#1299), in the shape the shell already renders a
+ * guest recovery in (`recoveryFor` in `lib/repository.ts`) — the offer is the SAME offer, so it
+ * reuses the same menu, the same message and the same "save a copy to keep both" advice.
+ */
+export interface RetainedDraft {
+    document: ChartDocument;
+    /** The experiment was captured against a different committed revision than the one saved now. */
+    conflict: boolean;
 }
 
 /**
@@ -481,6 +493,60 @@ export interface SyncLoop {
     /** Commit locally and queue that exact version. Does NOT send; the caller triggers a pass. */
     save(document: ChartDocument, expected: number | null): Promise<SavedSong>;
     /**
+     * Retain this writer's unsaved experiment on an account chart (#1299) — the account half of
+     * `lib/repository.ts`'s guest `recover`, and emphatically NOT an upload: it writes one row to
+     * this device's own `drafts` store and sends nothing. "Automatic recovery retains a writer's
+     * unsaved experiment; it never silently uploads it" (`docs/design/ensemble-v2-sync.md`).
+     *
+     * Deliberately reachable while the SESSION has expired, which is the one thing that separates
+     * it from every other call here: expiry pauses uploads and detaches the loop, but it does not
+     * change which account this device holds locally, and a draft written nowhere is a draft lost
+     * on the next close. See `retentionScope`.
+     */
+    recover(
+        document: ChartDocument,
+        baseRevision: number | null,
+        /**
+         * The account the CHART belongs to, captured when it was opened — or null to write it
+         * under whichever account this device holds (#1299 patch review P2).
+         *
+         * Not the same question as "which owner is attached right now", and that is the whole
+         * point: a session can expire under an account chart and the musician can answer "Sign in
+         * again" with a DIFFERENT passkey. The loop then holds account B while the stand still
+         * holds A's song, and the next keystroke would retain A's chart text inside B's database.
+         * Named here, compared in `retentionScope`, and refused rather than written.
+         */
+        owner: string | null,
+    ): Promise<void>;
+    /** The newest retained experiment worth offering for one account chart, or null. */
+    retainedDraft(documentId: string): Promise<RetainedDraft | null>;
+    /**
+     * Every LIVE retained experiment for one account chart, newest first — what the song menu's
+     * "Preserved drafts" list offers (#1299 patch review P2). `retainedDraft` is the same read
+     * narrowed to the newest row; this is how a SECOND tab's experiment is reachable at all.
+     */
+    preservedDrafts(
+        documentId: string,
+    ): Promise<Array<{ document: ChartDocument; capturedAt: string }>>;
+    /**
+     * The same answer for several documents at once, as the newest local text of each.
+     *
+     * Read AHEAD of a sign-out or delete-account export rather than during it: those write one file
+     * per song inside a single user gesture, and an await between two downloads is how a browser's
+     * per-gesture cap starts dropping them.
+     */
+    retainedDrafts(documentIds: string[]): Promise<Map<string, ChartDocument>>;
+    /** Drop this writer's retained experiment, once a Save has committed what it held. */
+    discardDraft(documentId: string): Promise<void>;
+    /**
+     * Drop every writer's, once the chart on the stand is its committed version again — see
+     * `AccountSongbook.discardDrafts` for why a revert cannot be a per-writer operation.
+     */
+    discardDrafts(documentId: string): Promise<void>;
+    /** Remember/read which chart this account last had on the stand here (#1299). */
+    rememberOpened(documentId: string): Promise<void>;
+    lastOpened(): Promise<string | null>;
+    /**
      * Delete one document from the cloud (#1270): an explicit ONLINE operation with a frozen,
      * retry-safe operation id, never a side effect of removing a local copy. Sends immediately
      * rather than joining the outbox — a delete is a deliberate human act that must report its own
@@ -502,8 +568,8 @@ export interface SyncLoop {
     keepBoth(documentId: string): Promise<KeepBothResolution | null>;
     /**
      * What signing out would cost (#1269), as far as the ACCOUNT DATABASE can see. A read; it
-     * changes nothing and sends nothing. The caller completes `drafts`/`atRisk` from guest
-     * recovery storage before showing them — see `SignOutPreflight['drafts']`.
+     * changes nothing and sends nothing. The caller completes `drafts`/`atRisk` with the drafts no
+     * store holds — see `SignOutPreflight['drafts']`.
      */
     signOutPreflight(): Promise<SignOutPreflight>;
     /**
@@ -575,6 +641,80 @@ export function createSyncLoop(
             throw new Error('The account songbook is not available while signed out.');
         }
         return scope;
+    }
+
+    /**
+     * The scope a RETAINED DRAFT may be written under (#1299): the attached one, or — when the
+     * session expired underneath a chart that is still the account's — the account this device
+     * still holds locally.
+     *
+     * This is the only call that reaches past `settledScope`, and only ever for the `drafts` store.
+     * An expired session detaches the loop (`app/account/library.tsx`), which is right for anything
+     * that sends: uploads wait for reauthentication. It says nothing about local ownership, though
+     * — `meta.active` still names the owner until an explicit sign-out moves it — and the shell has
+     * a chart on the stand whose unsaved text has to go SOMEWHERE. The guest namespace is precisely
+     * where it must not go, so it goes to the account that owns it, which is also the account whose
+     * sign-out will remove it.
+     *
+     * Genuinely signed out there is no such account and this rejects, which the caller turns into
+     * the in-tab-only retention it already falls back to when storage refuses.
+     *
+     * `owner` is the caller's claim about WHICH account the chart belongs to (#1299 patch review
+     * P2). The scope resolved above says which account this device holds; those two can disagree
+     * exactly once — an expired session answered with another passkey — and the disagreement means
+     * this text belongs to neither the account now held nor the guest namespace. It is refused,
+     * and the shell's in-tab fallback keeps it where it can still be exported.
+     */
+    async function retentionScope(owner: string | null): Promise<AccountScope> {
+        const held = scope || attaching ? await settledScope() : await songbook.currentScope();
+        if (!held) {
+            throw new Error('The account songbook is not available while signed out.');
+        }
+        if (owner !== null && held.ownerId !== owner) {
+            throw new Error(
+                'This chart belongs to a different account than the one on this device.',
+            );
+        }
+        return held;
+    }
+
+    /**
+     * Every retained experiment still worth offering for one document, newest first, under the
+     * SAME rule guest recovery follows (`recoveryFor` in `lib/repository.ts`): only a draft
+     * captured at or after the committed version it sits on. An older row is not an experiment on
+     * this song any more — a Save, another tab's or a `keepBoth` has moved past it — and offering
+     * it would invite the musician to restore text they already replaced. `AccountSongbook`'s own
+     * `liveDraft` is the same rule, applied where a row decides whether a remote body may land.
+     *
+     * The saved record is read HERE rather than taken from the caller: a list the shell is holding
+     * can be a moment stale, and this comparison decides whether a person is shown their own words.
+     */
+    async function liveDrafts(
+        current: AccountScope,
+        documentId: string,
+    ): Promise<{ song: SavedSong; rows: Draft[] } | null> {
+        const song = await songbook.read(current, documentId);
+        if (!song) {
+            return null;
+        }
+        const rows = (await songbook.drafts(current, documentId))
+            .filter((draft) => draft.capturedAt >= song.document.updatedAt)
+            .sort((a, b) => b.capturedAt.localeCompare(a.capturedAt));
+        return { song, rows };
+    }
+
+    async function newestDraft(
+        current: AccountScope,
+        documentId: string,
+    ): Promise<RetainedDraft | null> {
+        const live = await liveDrafts(current, documentId);
+        const newest = live?.rows[0];
+        return newest && live
+            ? {
+                  document: newest.document,
+                  conflict: newest.baseRevision !== live.song.document.revision,
+              }
+            : null;
     }
 
     /**
@@ -959,6 +1099,42 @@ export function createSyncLoop(
             await observe();
             return song;
         },
+        async recover(document, baseRevision, owner) {
+            await songbook.recover(await retentionScope(owner), writerId, document, baseRevision);
+        },
+        async retainedDraft(documentId) {
+            return newestDraft(await settledScope(), documentId);
+        },
+        async preservedDrafts(documentId) {
+            const live = await liveDrafts(await settledScope(), documentId);
+            return (live?.rows ?? []).map((draft) => ({
+                document: draft.document,
+                capturedAt: draft.capturedAt,
+            }));
+        },
+        async retainedDrafts(documentIds) {
+            const current = await settledScope();
+            const held = new Map<string, ChartDocument>();
+            for (const documentId of documentIds) {
+                const draft = await newestDraft(current, documentId);
+                if (draft) {
+                    held.set(documentId, draft.document);
+                }
+            }
+            return held;
+        },
+        async discardDraft(documentId) {
+            await songbook.discardDraft(await settledScope(), documentId, writerId);
+        },
+        async discardDrafts(documentId) {
+            await songbook.discardDrafts(await settledScope(), documentId);
+        },
+        async rememberOpened(documentId) {
+            await songbook.rememberOpened(await settledScope(), documentId);
+        },
+        async lastOpened() {
+            return songbook.lastOpened(await settledScope());
+        },
         async deleteFromCloud(documentId) {
             const current = await settledScope();
             if (Date.now() < backoffUntil) {
@@ -1096,7 +1272,13 @@ export function createSyncLoop(
                 // are the same queries the rest of this module counts work with, and a library
                 // bounded at `MAX_REMOTE_CANDIDATES` makes this a bounded preflight, not a scan.
                 const operations = await songbook.pending(current, song.documentId);
-                const kept = (await songbook.drafts(current, song.documentId)).length;
+                // LIVE rows only (#1299 patch review P1), the same rule `retainedDraft` offers
+                // one under: a row an earlier page load's Save has moved past is not an experiment
+                // this sign-out is about to destroy, and counting it would announce unsaved work
+                // that no export could write out and no musician could point at.
+                const kept = (await songbook.drafts(current, song.documentId)).filter(
+                    (draft) => draft.capturedAt >= song.document.updatedAt,
+                ).length;
                 unsentSaves += operations.length;
                 // Counted off the same read rather than a second query: a refused Save is one of
                 // these operations, not a separate store. The WHOLE queue counts when the head is
