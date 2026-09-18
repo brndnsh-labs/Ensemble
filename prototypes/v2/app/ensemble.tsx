@@ -19,6 +19,7 @@ import { type AccountDialogMode, SignInDialog } from './account/sign-in';
 import { useAccountSession, useAccountsEnabled } from './account/use-account-session';
 import { ChartSheet } from './chart-sheet';
 import { EditPanel } from './edit-panel';
+import { FeelSheet, type FeelSnapshot } from './feel-sheet';
 import { ImportDialog } from './import-dialog';
 import type { MeasureEditorHandle } from './measure-editor';
 import { SongHeader } from './song-header';
@@ -32,6 +33,17 @@ import { useStageTheme } from './use-stage-theme';
 
 const same = (a: ChartDocument, b: ChartDocument) =>
     a.title === b.title && JSON.stringify(a.chart) === JSON.stringify(b.chart);
+
+/** Read the live engine values the Feel sheet needs but `ChartDocument` doesn't carry. */
+function feelSnapshot(): FeelSnapshot {
+    const { playback } = runtime.state();
+    return {
+        bandIntensity: playback.bandIntensity,
+        autoIntensity: playback.autoIntensity,
+        metronome: playback.metronome,
+        masterVolume: playback.masterVolume,
+    };
+}
 
 export default function Ensemble() {
     const [songs, setSongs] = useState<ChartDocument[]>([]);
@@ -70,6 +82,12 @@ export default function Ensemble() {
     const [soundsOffline, setSoundsOffline] = useState<boolean | null>(null);
     const [allSoundsOffline, setAllSoundsOffline] = useState<boolean | null>(null);
     const [soundMenu, setSoundMenu] = useState(false);
+    const [feelMenu, setFeelMenu] = useState(false);
+    // `bandIntensity`/`autoIntensity`/`metronome`/`masterVolume` are not part of
+    // `current.chart` (`STATE_OWNERSHIP_MANIFEST`: session-only or a device
+    // preference, never a document field) — this is the shell's own reactive mirror
+    // of the live engine values the Feel sheet reads, refreshed whenever it opens.
+    const [feel, setFeel] = useState<FeelSnapshot>(() => feelSnapshot());
     const [showControls, setShowControls] = useState(false);
     const [pendingSound, setPendingSound] = useState<{ lane: string; value: string } | null>(null);
     const [recoveryOptions, setRecoveryOptions] = useState<
@@ -93,6 +111,7 @@ export default function Ensemble() {
     const dialog = useRef<HTMLDialogElement>(null);
     const accountDialogRef = useRef<HTMLDialogElement>(null);
     const soundsDialog = useRef<HTMLDialogElement>(null);
+    const feelDialog = useRef<HTMLDialogElement>(null);
     const file = useRef<HTMLInputElement>(null);
     const scroll = useRef<HTMLDivElement>(null);
     const editPanel = useRef<HTMLElement>(null);
@@ -240,6 +259,17 @@ export default function Ensemble() {
             accountDialogRef.current?.close();
         }
     }, [accountDialog]);
+    useEffect(() => {
+        if (feelMenu) {
+            // Refreshed on every open: these four fields can drift from what the
+            // sheet last showed (a different song's live session values, or a
+            // conductor tick that moved band intensity while the sheet was closed).
+            setFeel(feelSnapshot());
+            feelDialog.current?.showModal();
+        } else {
+            feelDialog.current?.close();
+        }
+    }, [feelMenu]);
     useEffect(() => {
         let alive = true;
         setAllSoundsOffline(null);
@@ -840,6 +870,7 @@ export default function Ensemble() {
                                 setSoundProgress('');
                             });
                         }}
+                        onFeel={() => setFeelMenu(true)}
                         onTempo={(value) => change(() => runtime.setTempo(value))}
                         onKey={(key) =>
                             change(
@@ -900,6 +931,42 @@ export default function Ensemble() {
                         onStyle={(lane, value) => change(() => runtime.setStyle(lane, value))}
                         onDensity={(value) => change(() => runtime.setDensity(value))}
                         onSoloistMode={(mode) => change(() => runtime.setSoloistMode(mode))}
+                    />
+                    <FeelSheet
+                        dialogRef={feelDialog}
+                        current={current}
+                        busy={busy}
+                        feel={feel}
+                        onClose={() => setFeelMenu(false)}
+                        onSwing={(value) => change(() => runtime.setSwing(value))}
+                        onSwingSub={(sub) => change(() => runtime.setSwingSub(sub))}
+                        onHumanize={(value) => change(() => runtime.setHumanize(value))}
+                        onComplexity={(value) => change(() => runtime.setComplexity(value))}
+                        onBandIntensity={(value) =>
+                            change(() => {
+                                runtime.setBandIntensity(value);
+                                setFeel((f) => ({ ...f, bandIntensity: value }));
+                            })
+                        }
+                        onAutoIntensity={(auto) =>
+                            change(() => {
+                                runtime.setAutoIntensity(auto);
+                                setFeel((f) => ({ ...f, autoIntensity: auto }));
+                            })
+                        }
+                        onMetronome={(enabled) =>
+                            change(() => {
+                                runtime.setMetronome(enabled);
+                                setFeel((f) => ({ ...f, metronome: enabled }));
+                            })
+                        }
+                        onMasterVolume={(value) =>
+                            change(() => {
+                                runtime.setMasterVolume(value);
+                                setFeel((f) => ({ ...f, masterVolume: value }));
+                            })
+                        }
+                        onNotation={(notation) => change(() => runtime.setNotation(notation))}
                     />
                     <div className={`workspace-body ${editing ? 'editing' : ''}`}>
                         <div

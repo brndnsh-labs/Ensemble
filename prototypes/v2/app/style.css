@@ -2011,6 +2011,16 @@ dialog textarea {
     max-width: 125px;
     cursor: pointer;
 }
+/* Opens the Feel sheet (#1276) beside the genre select: same type, muted, no chrome. */
+.feel-button {
+    font-size: 13px;
+    font-weight: 650;
+    color: var(--muted);
+    padding: 0 0 0 6px;
+}
+.feel-button:hover {
+    color: var(--ink);
+}
 .section-text {
     width: 100%;
     resize: vertical;
@@ -2375,6 +2385,103 @@ dialog textarea {
     display: none;
 }
 
+/* Feel & mix sheet (#1276) — same dialog/heading/close-button shape as `.sound-panel`
+   above, kept as its own scoped block rather than sharing class names across the two
+   unrelated features (per-instrument sound settings vs. band-wide feel settings). */
+.feel-panel {
+    width: min(480px, calc(100vw - 24px));
+    padding: 24px;
+    max-height: calc(100dvh - 32px);
+    overflow: auto;
+}
+.feel-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+}
+.feel-heading h2 {
+    margin: 0;
+}
+.feel-heading p {
+    margin: 6px 0 16px;
+}
+.feel-groups {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+.feel-group {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+}
+.feel-group h3 {
+    font-size: 13px;
+    margin: 0;
+}
+.feel-group label {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-size: 13px;
+}
+.feel-group select {
+    width: 100%;
+    min-height: 44px;
+    font: inherit;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 8px;
+    background: var(--surface);
+    color: var(--ink);
+}
+.feel-swing-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 12px;
+    align-items: end;
+}
+.feel-group .feel-hint {
+    font-size: 11px;
+    color: var(--muted);
+    margin: 0;
+}
+.feel-range-control {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.feel-range-control input[type="range"] {
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 32px;
+    accent-color: var(--green);
+}
+.feel-range-value {
+    flex: 0 0 auto;
+    width: 2.4em;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    color: var(--muted);
+}
+.feel-group .feel-toggle {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+}
+@media (max-width: 760px) {
+    .feel-panel {
+        padding: 18px;
+    }
+    .feel-swing-row {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
 /* The open song owns the viewport. Branding and installation belong outside
    the score; errors participate in layout instead of pushing transport offscreen. */
 .app-shell.song-open {
@@ -2453,7 +2560,8 @@ dialog textarea {
 .performance-focus .mode-switch,
 .performance-focus .save-btn,
 .performance-focus .menu-btn,
-.performance-focus .sounds-button {
+.performance-focus .sounds-button,
+.performance-focus .feel-button {
     display: none;
 }
 /* One size for idle and playing: a second, larger playing-only scale used to

@@ -24,7 +24,12 @@ import {
     scoreArrangement,
 } from '@engine/songbook/score-playback';
 import type { SemanticScore } from '@engine/songbook/score-types';
-import type { ChartContent, ChartLaneMix, SoloistMode } from '@engine/songbook/types';
+import type {
+    ChartContent,
+    ChartLaneMix,
+    ChartNotation,
+    SoloistMode,
+} from '@engine/songbook/types';
 import { dispatch, getState, subscribe } from '@engine/state';
 import {
     deriveSoloistModeOnBoot,
@@ -37,10 +42,12 @@ import {
     type EnsembleState,
     type InstrumentModule,
     type InstrumentVoice,
+    type SwingSub,
 } from '@engine/types';
 import { transposeKeyName } from '@engine/utils';
 import { initWorker, syncWorker } from '@engine/worker-client';
 import { type ChartDocument, type DocumentContent, validateDocument } from './documents';
+import { masterVolumePreference, rememberMasterVolume } from './session';
 import { initializeSounds, prepareSound, prepareSounds, validateVoice } from './sounds';
 
 export type { ChartContent, ChartDocument };
@@ -258,6 +265,15 @@ export function initialize(): Promise<void> {
                     handleEffects(action, state, context);
                 }
             });
+            // #1276 — `playback.masterVolume` is `preferences`-owned (never part of a
+            // saved chart), so it's hydrated from its own device-local key here rather
+            // than from `apply()`. `initAudio()` reads `playback.masterVolume` straight
+            // off state at graph-build time (`engine.ts`), so setting it this early is
+            // enough even though guest startup defers `initAudio()` past this point.
+            const storedMasterVolume = masterVolumePreference();
+            if (storedMasterVolume !== null) {
+                param('playback', 'masterVolume', storedMasterVolume);
+            }
             rebuild();
             document.addEventListener('visibilitychange', () => {
                 const { playback } = getState();
@@ -402,6 +418,89 @@ export function setSoloistMode(mode: 'auto' | SoloistMode): void {
     } else {
         dispatch(ACTIONS.SET_SOLOIST_MODE, mode);
         dispatch(ACTIONS.SET_SOLOIST_AUTO_MODE, false);
+    }
+}
+
+// #1276 — Feel sheet. `groove.swing`/`swingSub`/`humanize` and `playback.complexity`
+// are `document`-owned (`STATE_OWNERSHIP_MANIFEST`): they ride `captureContent()`'s
+// existing `band.groove`/`performance` projection already, so no codec change is
+// needed here, only the dispatch — same shape as `setStyle` above minus the
+// worker-buffer flush, since none of these change note *selection*, only feel
+// parameters the worker already re-reads live (`SET_SWING`/`SET_SWING_SUB`/
+// `SET_COMPLEXITY` all have their own delta case in `worker-client.ts`).
+
+/** `SET_SWING`'s reducer stores the raw 0-100 shuffle amount, not a 0-1 fraction. */
+export function setSwing(value: number): void {
+    dispatch(ACTIONS.SET_SWING, value);
+}
+
+/** `SET_SWING_SUB`'s reducer ignores an unrecognized grid rather than defaulting it. */
+export function setSwingSub(sub: SwingSub): void {
+    dispatch(ACTIONS.SET_SWING_SUB, sub);
+}
+
+/** Also a raw 0-100 value, like `setSwing` — not the 0-1 scale `setVolume`/`setReverb` use. */
+export function setHumanize(value: number): void {
+    dispatch(ACTIONS.SET_HUMANIZE, value);
+}
+
+/** 0-1 document field; the conductor's own opinion lives in the sibling runtime-derived
+ * `playback.conductorDensity`/`conductorHarmonyComplexity` fields (#1064) and never
+ * writes here. */
+export function setComplexity(value: number): void {
+    dispatch(ACTIONS.SET_COMPLEXITY, value);
+}
+
+// `playback.bandIntensity`/`autoIntensity`/`metronome` are `runtime-derived` —
+// session-only by design (`docs/design/write-ownership.md` §3), never part of
+// `ChartContent` or a preferences key. A user dispatch onto them is fine (the law
+// only forbids a *runtime system* writing a document/preferences field); they
+// simply reset to their engine defaults on next boot, same as v1.
+
+/** Manual band-energy override; ignored by the engine while `autoIntensity` is on. */
+export function setBandIntensity(value: number): void {
+    dispatch(ACTIONS.SET_BAND_INTENSITY, value);
+}
+
+/** Hands band energy to the conductor's own ramp, mirroring `InstrumentRail.tsx`. */
+export function setAutoIntensity(auto: boolean): void {
+    dispatch(ACTIONS.SET_AUTO_INTENSITY, auto);
+}
+
+/** Click track on/off — session-only, like the two above. */
+export function setMetronome(enabled: boolean): void {
+    dispatch(ACTIONS.SET_METRONOME, enabled);
+}
+
+/**
+ * `preferences`-owned: persists to its own device-local key (`session.ts`)
+ * immediately, independent of the chart's own Save — mirrors v1's
+ * `debounceSaveState` persisting `masterVolume` outside the chart-dirty flow
+ * (`state/persistence.ts`). The live bus ramp itself is `state-effects.ts`'s
+ * `SET_PARAM(masterVolume)` case, run by the `handleEffects` call already wired
+ * into this module's dispatch subscriber.
+ */
+export function setMasterVolume(value: number): void {
+    dispatch(ACTIONS.SET_PARAM, { module: 'playback', param: 'masterVolume', value });
+    rememberMasterVolume(value);
+}
+
+/**
+ * Chord-notation preference — `document`-owned, but the ONE Feel-sheet field split
+ * across the dual chart schema: a schemaVersion-1 chart keeps it on `arranger.notation`
+ * directly (what `dispatch` below writes, and what `captureContent()`'s `arrangement`
+ * projection reads), while a schemaVersion-2 (score) chart's saved copy lives on the
+ * authored `currentScore.notation` instead — `captureSessionContent()` clones
+ * `currentScore` verbatim for that schema and never reads `arranger.notation` for it.
+ * Patch both so either schema's next `captureDocument()` reflects the change. No
+ * `rebuild()`/`editScore()`: notation is a pure display selector over the chord's
+ * already-precomputed `display: FormattedChordNames` (all three notations are always
+ * present), so it never touches arrangement layout, generation, or the worker.
+ */
+export function setNotation(notation: ChartNotation): void {
+    dispatch(ACTIONS.SET_NOTATION, notation);
+    if (currentScore) {
+        currentScore = { ...currentScore, notation };
     }
 }
 
