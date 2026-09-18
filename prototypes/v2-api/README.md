@@ -457,7 +457,8 @@ Design points worth knowing before changing it:
   demonstrated the consequence: a client that spent both documented read budgets got `429` on its
   next `GET /api/auth/session` **and** on Save. They are now 30 + 180 = 210, leaving 90/min for
   the session check, Save and logout a sync pass needs in the same window. **A new document route
-  has to come out of that 90, not be added on top of it.** A client must therefore treat any
+  has to come out of that 90, not be added on top of it** — which is exactly where the delete
+  route's 30/min comes from (#1260), leaving 60. A client must therefore treat any
   `429` as a **global** back-off with the response's `Retry-After`, not as "this endpoint is
   busy" — the next request to a different route is just as likely to be refused.
   Cold-start arithmetic for a full 2,000-document library: 4 manifest pages at
@@ -481,6 +482,121 @@ cross-owner tombstone case and the three malformed stored bodies) and the `listM
 case in `test/db/documents.test.ts` (tombstone interleaving, owner scoping, cursor exclusivity,
 UTF-8 `bytes`, the clamp floor). The deny-by-default pair in `test/http/auth-hardening.test.ts`
 covers both new routes automatically, since it is parameterized over `DOCUMENT_POLICIES`.
+
+## Document delete (#1260, stage 3)
+
+`POST /api/documents/delete` is the sync contract's deletion rule
+([`ensemble-v2-sync.md`](../../docs/design/ensemble-v2-sync.md), *Sharing, deletion, operations
+and privacy*): "cloud document deletion is an explicit online operation with a tombstone …, not a
+side effect of removing a local download", and "a stale Save cannot resurrect the deleted cloud
+ID". The decision table is `commitDelete` in `src/db/document-delete.ts` (one `withTransaction`,
+`BEGIN IMMEDIATE`); the request decoder is `src/http/document-delete-request.ts`; the route lives
+in `src/http/documents.ts` beside Save and the read routes.
+
+The request body is the Save envelope's field *names* minus its document, in one canonical order:
+
+```json
+{"ownerId":"…","documentId":"…","operationId":"…","expectedRevision":"…"}
+```
+
+| Situation | Reply |
+| --- | --- |
+| `expectedRevision` equals the current revision | `200 { …receipt, revision: <the revision it died at>, kind: 'deleted' }` — row gone, tombstone written, receipt recorded |
+| Same operation id, same bytes (retry after an uncertain response) | the original `200`, byte for byte; nothing deleted twice |
+| Same operation id, different bytes or a different document — including an id a **Save** committed | `409 { error: 'operation_mismatch' }` |
+| A different operation id, id already deleted | `200 … kind: 'deleted'` at the tombstone's revision, and a receipt for this operation; no second tombstone, `expectedRevision` not consulted |
+| Stale `expectedRevision`, id still live | `409 { …receipt, revision: <current>, kind: 'conflict', remote: { revision, document } }` — nothing deleted, no receipt |
+| Id absent with no tombstone, or another owner's id | `404 { error: 'not_found' }` — one status, one body, both; nothing written at all |
+| Any decoder refusal — reordered/unknown/missing keys, added whitespace, `expectedRevision: null`, an envelope `ownerId` that is not the session's account, any query string | `400 { error: 'malformed_request' }` |
+| No session, or a recovery-purpose session | `401 { error: 'unauthenticated' }` |
+| Body above `MAX_DELETE_REQUEST_BYTES` (1 KiB) | `413 { error: 'payload_too_large' }` |
+| Past the per-identity budget (30/min) | `429 { error: 'rate_limited' }` with `Retry-After` |
+
+Design points worth knowing before changing it:
+
+- **It is Save's decision order, line for line:** receipt → current state → expected revision →
+  write, all inside one `BEGIN IMMEDIATE` transaction on the session's account id. A delete writes
+  the same three tables the Save protocol owns, so it has to be idempotent the same way and refuse
+  a stale base the same way. Divergence between `commitDelete` and `commitSave` is a bug in one of
+  them, not a local style choice. One id per operation, too: one operation id is one receipt, and a
+  partially-applied bulk delete could not replay honestly. Account deletion is #1271's own story.
+- **Two things are deliberately NOT Save's.** There is no `expectedRevision: null` form — `null`
+  means "this operation creates the document" and there is nothing to create — and a conflict here
+  always carries a `remote` version, because the cases where Save answers `remote: null` (absent,
+  tombstoned) are answered by `404`/idempotent-`deleted` before the revision check.
+- **The already-deleted answer is idempotent, not a conflict, and it writes a receipt.** A
+  tombstone is terminal: there is no newer version to offer for Keep-both and nothing the caller
+  could do with a refusal except ask again, so a second device's queued delete is told the truth
+  (the tombstone's revision) rather than refused. `expectedRevision` is not consulted on that path
+  for the same reason. The receipt is what makes a retry of *that* request a single indexed read.
+  The `404` path, by contrast, writes **nothing** — nothing happened, so a retry stays free and no
+  receipt can later claim a deletion that never occurred.
+- **One operation id is one operation, across both endpoints.** Receipts are one namespace per
+  owner, so reusing a Save's operation id for a delete must be refused — and it is, by the digest
+  comparison alone, with no discriminator column: the digest covers the whole request body, and a
+  four-key delete envelope can never serialize to a six-key Save envelope's bytes. "Same id,
+  different operation" is therefore always "same id, different bytes".
+- **Deleting is exempt from the storage quota's refusal, and only from the refusal.** The
+  tombstone and the receipt a delete leaves are both **charged** by `readOwnerUsage` (new in
+  #1260 — see the next bullet), so the accounting stays honest.
+  But `commitDelete` has no quota gate: Save's "an owner over the cap may not grow" clause would
+  refuse a delete whose freed body is smaller than the 1,536 bytes it leaves behind, which is
+  exactly the owner who most needs to delete something. Deletion is the only operation that gives
+  document bytes back, so making it refusable by the cap would lock an account at the cap out of
+  its own remedy. The residual is the one rollout decision 11 / #1256 already accepted for
+  receipts: a caller holding one tombstone can re-delete that id under fresh operation ids, each
+  leaving a charged receipt the cap will not refuse — bounded by this route's 30/min budget, not by
+  the quota, and wanting the same admin-side prune the receipt residual wants. Proven at the
+  *shipped* caps in both suites (document cap and byte cap), not at an injected one, because
+  `commitDelete` takes no caps to inject.
+- **Tombstones are now charged against the byte cap**, which the stage-3 authorization review
+  asked for at exactly this point: "when stage 4/5 ships a delete route, charge tombstones the way
+  receipts are charged so the cap keeps meaning what it says" (residual risk 4). They are charged
+  at the receipt's rate and by `RECEIPT_COST_BYTES` itself, not a second constant — a tombstone
+  row is strictly smaller than a receipt row (four columns to six, one secondary index to two), so
+  that measured worst case over-charges it in the safe direction, and the "one number cannot
+  drift" rule that put the receipt size in `src/db/documents.ts` forbids a near-identical second
+  one. It closes no unbounded hole (the tombstone insert is an upsert keyed on
+  `(owner, document)`, so re-deleting adds no rows, and a fresh id costs a charged receipt to
+  create); it makes the cap mean what it says in real disk.
+- **The tombstone carries the revision the document died at**, per `deleteDocument`'s existing
+  contract — never a freshly minted one, and `commitDelete` mints nothing at all. That is what
+  makes `commitSave`'s non-resurrection reply (`revision: <tombstone>`, `remote: null`) a revision
+  a stale client can recognise.
+- **A 1 KiB body limit, applied by the route itself.** The whole `/api/documents/` prefix is
+  exempt from the parent app's 64 KB limit so a Save can carry a chart, and the sub-app's
+  catch-all then bounds the prefix at `MAX_SAVE_REQUEST_BYTES` (~1 MiB). A delete request is **653
+  bytes** at its legal maximum (three 128-character identifiers and a 200-character revision, from
+  character sets that need no JSON escaping), so it applies `MAX_DELETE_REQUEST_BYTES` nested
+  inside that one. Registered with `routes.use('/delete', …)`, not as a second handler argument:
+  `routes.post(path, limiter, handler)` registers the path **twice** in `app.routes` and breaks the
+  route-drift test's comparison, while `use` registers as `ALL`, which that test filters out.
+  Proven over a real socket (`test/http/body-limit.socket.test.ts`) on both the Content-Length and
+  the chunked branch, because `bodyLimit`'s Content-Length branch trusts a *declared* length and
+  only Node's HTTP parser enforces framing — and the same 4 KB body reaching the Save route proves
+  the small limit belongs to `/delete` alone.
+- **There is no client producer yet.** `prototypes/v2/lib/sync/protocol.ts` has no delete operation
+  type and no tombstone receipt shape (checked, not assumed), so this is the smallest **server**
+  contract for #1270 to mirror, and the decoder lives in this package rather than in the shared
+  sync module — putting a request shape in the shared bundle before the client produces it would
+  be inventing the client's half from the server side. It borrows the shared *validators*
+  (`identifier`, `remoteRevision`, `digest`) so the ids and revisions it accepts are exactly the
+  language the Save path writes. Two open choices for #1270 to settle: the reply's
+  `kind: 'deleted'` (the client's `reply()` validator currently accepts only
+  `committed`/`conflict`), and the absence of a `protocolVersion` field — the exact-key-set check
+  already makes adding any field a breaking change an old server refuses rather than misreads,
+  which is the property a version field buys.
+
+Tests: `test/db/document-delete.test.ts` (the decision table, the storage accounting, the
+transaction rollback, and non-resurrection after a *real* delete),
+`test/db/document-delete-concurrency.test.ts` (four real OS processes racing one revision, under
+different operation ids and under one duplicated id — the harness and the reason for it are
+`save-concurrency.test.ts`'s; there is no sequenced variant, deliberately, because every assertion
+here is an invariant that survives non-overlap and `commitDelete` has no `mintRevision` seam to
+pause at), and
+`test/http/documents-delete.test.ts` (the route over `app.request()` with two real passkey
+accounts and every document written by a real Save). `test/http/auth-hardening.test.ts` covers the
+new route automatically, since it is parameterized over `DOCUMENT_POLICIES`.
 
 ## Commands
 

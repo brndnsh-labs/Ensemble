@@ -142,6 +142,57 @@ describe('body-limit enforcement over a real socket', () => {
         expect(res.raw).not.toContain('malformed_request');
     });
 
+    it("honors the delete route's own 1 KiB limit, which the documents prefix would not give it", async () => {
+        await startServer();
+        // `/api/documents/` is exempt from the 64 KB `/api/*` limit so a Save can carry a chart,
+        // and the sub-app's catch-all then bounds the prefix at ~1 MiB. The delete route is 653
+        // bytes at its legal maximum, so #1260 applies its own `MAX_DELETE_REQUEST_BYTES` limiter
+        // nested inside that one — and a nested `bodyLimit` is exactly the arrangement that has to
+        // be proven over a real socket rather than argued: the outer limiter has already wrapped
+        // the request stream by the time the inner one counts it.
+        const oversized = JSON.stringify({ padding: 'x'.repeat(4 * 1024) });
+        const head =
+            'POST /api/documents/delete HTTP/1.1\r\n' +
+            'Host: ensembletest.brndn.zip\r\n' +
+            `Origin: ${CONFIG.origin}\r\n` +
+            'Content-Type: application/json\r\n';
+
+        const declared = await sendRaw(
+            port,
+            `${head}Content-Length: ${Buffer.byteLength(oversized, 'utf8')}\r\n` +
+                'Connection: close\r\n\r\n' +
+                oversized,
+        );
+        expect(declared.statusLine).toContain('413');
+        expect(declared.raw).toContain('payload_too_large');
+
+        // The chunked leg exercises the streaming byte-count branch, where the inner limiter is
+        // counting bytes off a stream the outer one already replaced.
+        const chunked = await sendRaw(
+            port,
+            `${head}Transfer-Encoding: chunked\r\n` +
+                'Connection: close\r\n\r\n' +
+                chunk(oversized) +
+                '0\r\n\r\n',
+        );
+        expect(chunked.statusLine).toContain('413');
+
+        // Not a tautology in either direction: the SAME 4 KB body is under the Save route's
+        // ceiling on the same prefix, so it reaches the application and is answered 401 for having
+        // no session — which is also what proves the small limit belongs to /delete alone.
+        const atSave = await sendRaw(
+            port,
+            'POST /api/documents/save HTTP/1.1\r\n' +
+                'Host: ensembletest.brndn.zip\r\n' +
+                `Origin: ${CONFIG.origin}\r\n` +
+                'Content-Type: application/json\r\n' +
+                `Content-Length: ${Buffer.byteLength(oversized, 'utf8')}\r\n` +
+                'Connection: close\r\n\r\n' +
+                oversized,
+        );
+        expect(atSave.statusLine).toContain('401');
+    });
+
     it('allows a well-formed, in-bounds request through to the application', async () => {
         await startServer();
         const body = JSON.stringify({

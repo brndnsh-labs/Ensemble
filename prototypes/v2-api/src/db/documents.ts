@@ -254,17 +254,33 @@ export function listManifest(
  * receipt roughly fourfold, which is the safe direction and costs a real songbook nothing: even
  * 20,000 saves is 15 MiB of a 256 MiB budget. Charging too LITTLE would be the bug, because
  * then the cap would not actually bound what lands on the disk.
+ *
+ * **A TOMBSTONE is charged at this same rate (#1260)**, and deliberately by this same constant
+ * rather than a second one of its own. A tombstone is retained for the account lifetime — that
+ * permanence is exactly what keeps a deleted id from being resurrected — so it is another
+ * permanent row the quota would otherwise be blind to, which is what the stage-3 authorization
+ * review asked for at exactly this point (`docs/design/ensemble-v2-document-authorization-review.md`,
+ * residual risk 4: "when stage 4/5 ships a delete route, charge tombstones the way receipts are
+ * charged so the cap keeps meaning what it says"). A tombstone row is strictly smaller than a
+ * receipt row (four columns to six, one secondary index to two), so this measured worst case
+ * over-charges it — the safe direction — and the same "one number cannot drift" rule that put
+ * the receipt size here forbids measuring a near-identical second one on a different day.
+ *
+ * It closes no unbounded hole either way: the tombstone insert is an upsert keyed on
+ * `(owner_id, document_id)`, so re-deleting one id adds no rows, and reaching a fresh id means
+ * creating it first, which costs a charged receipt. It makes the cap mean what it says on disk.
  */
 export const RECEIPT_COST_BYTES = 768;
 
 /**
  * The owner's current storage footprint: documents held, and the bytes their bodies plus their
- * retained receipts occupy. One statement per table, each covered by an owner index, so the Save
- * transaction can afford to ask on every write (#1234, extended by #1250).
+ * retained receipts and tombstones occupy. One statement per table, each covered by an owner
+ * index, so the Save transaction can afford to ask on every write (#1234, extended by #1250 and
+ * #1260).
  *
  * `bytes` is the TOTAL — it is what `MAX_BYTES_PER_OWNER` bounds, and the breakdown is returned
- * alongside so a caller (and a test) can see which half is which. Before #1250 this returned the
- * document half alone and called it the footprint, which is how the receipt table came to be
+ * alongside so a caller (and a test) can see which part is which. Before #1250 this returned the
+ * document part alone and called it the footprint, which is how the receipt table came to be
  * unbounded.
  *
  * `length()` on TEXT counts CHARACTERS, which would let a body of astral-plane characters occupy
@@ -280,6 +296,8 @@ export function readOwnerUsage(
     documentBytes: number;
     receipts: number;
     receiptBytes: number;
+    tombstones: number;
+    tombstoneBytes: number;
     bytes: number;
 } {
     const documentRow = db
@@ -291,13 +309,20 @@ export function readOwnerUsage(
     const receiptRow = db
         .prepare('SELECT COUNT(*) AS receipts FROM receipts WHERE owner_id = ?')
         .get(ownerId) as { receipts: number };
+    const tombstoneRow = db
+        .prepare('SELECT COUNT(*) AS tombstones FROM tombstones WHERE owner_id = ?')
+        .get(ownerId) as { tombstones: number };
     const receiptBytes = receiptRow.receipts * RECEIPT_COST_BYTES;
+    // Tombstones are charged at the receipt's rate, by the receipt's constant — see it for why.
+    const tombstoneBytes = tombstoneRow.tombstones * RECEIPT_COST_BYTES;
     return {
         documents: documentRow.documents,
         documentBytes: documentRow.bytes,
         receipts: receiptRow.receipts,
         receiptBytes,
-        bytes: documentRow.bytes + receiptBytes,
+        tombstones: tombstoneRow.tombstones,
+        tombstoneBytes,
+        bytes: documentRow.bytes + receiptBytes + tombstoneBytes,
     };
 }
 
@@ -323,7 +348,12 @@ export function writeDocument(
 /**
  * Delete the owner's document and leave its tombstone in one statement pair. Returns false when
  * there was nothing to delete (so the caller can 404 rather than mint a tombstone for an id the
- * owner never had). The caller wraps this in a transaction with its revision check.
+ * owner never had). The caller wraps this in a transaction with its revision check — that caller
+ * is `commitDelete` in `db/document-delete.ts` (#1260).
+ *
+ * The tombstone carries the revision the document DIED at (`current.revision`), not a freshly
+ * minted one: it is the last revision that ever existed for that id, which is what makes
+ * `commitSave`'s non-resurrection check answer a stale client with a revision it can recognise.
  */
 export function deleteDocument(
     db: DatabaseSync,

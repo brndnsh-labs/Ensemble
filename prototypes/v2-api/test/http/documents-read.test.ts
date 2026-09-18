@@ -191,7 +191,10 @@ describe('GET /api/documents and GET /api/documents/:id (#1259)', () => {
         await save(ctx, ctx.owner, 'doc-1', 'op-1');
         const middle = await save(ctx, ctx.owner, 'doc-2', 'op-2');
         await save(ctx, ctx.owner, 'doc-3', 'op-3');
-        // There is no delete ROUTE yet (#1271); the delete itself is the real db primitive.
+        // Straight through the db primitive rather than `POST /api/documents/delete` (#1260, which
+        // has its own suite): what is under test here is the manifest's tombstone leg, and the
+        // primitive is the shortest way to a tombstone. Nothing else about this test changes when
+        // the route is the producer.
         expect(deleteDocument(ctx.testDb.db, ctx.owner.accountId, 'doc-2', 5)).toBe(true);
 
         const page = (await get(ctx, MANIFEST)).json as ManifestReply;

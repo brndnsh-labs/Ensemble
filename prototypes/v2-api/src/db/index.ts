@@ -1,5 +1,7 @@
 export type { OpenDatabaseOptions } from './connection.js';
 export { openDatabase } from './connection.js';
+export type { DeleteCommand, DeleteOutcome } from './document-delete.js';
+export { commitDelete } from './document-delete.js';
 export type {
     DocumentRow,
     DocumentSummary,
