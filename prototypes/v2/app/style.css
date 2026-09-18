@@ -2826,3 +2826,29 @@ html[data-theme="stage"] {
     border-radius: 8px;
     padding: 9px 12px;
 }
+/* Sync status chip (#1266). Three separate facts, laid out as three separate lines rather
+   than one badge — a musician who saved offline needs to see local safety and cloud
+   confirmation disagree. Rendered only for a signed-in device, so the guest DOM is unchanged. */
+.sync-status {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    font-size: 11px;
+    line-height: 1.5;
+    color: var(--muted);
+    min-width: 0;
+}
+.sync-fact {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.sync-failure {
+    color: var(--accent);
+    /* The reason can be a full sentence; it wraps rather than being clipped like the facts. */
+    white-space: normal;
+}
+.sync-card .sync-status {
+    font-size: 12px;
+    margin-top: 12px;
+}
