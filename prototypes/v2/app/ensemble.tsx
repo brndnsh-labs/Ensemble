@@ -837,7 +837,6 @@ export default function Ensemble() {
                         onHome={goHome}
                         onToggleTheme={toggleTheme}
                         onSounds={() => setSoundMenu(true)}
-                        onFeel={() => setFeelMenu(true)}
                         onToggleControls={() => setShowControls(!showControls)}
                         onShowChart={() => setEditing(false)}
                         onEditChart={() => revealEditor()}
@@ -871,6 +870,7 @@ export default function Ensemble() {
                                 setSoundProgress('');
                             });
                         }}
+                        onFeel={() => setFeelMenu(true)}
                         onTempo={(value) => change(() => runtime.setTempo(value))}
                         onKey={(key) =>
                             change(

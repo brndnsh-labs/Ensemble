@@ -16,7 +16,6 @@ interface SongHeaderProps {
     onHome: () => void;
     onToggleTheme: () => void;
     onSounds: () => void;
-    onFeel: () => void;
     onToggleControls: () => void;
     onShowChart: () => void;
     onEditChart: () => void;
@@ -39,7 +38,6 @@ export function SongHeader({
     onHome,
     onToggleTheme,
     onSounds,
-    onFeel,
     onToggleControls,
     onShowChart,
     onEditChart,
@@ -87,9 +85,6 @@ export function SongHeader({
                 </button>
                 <button className="btn sounds-button" onClick={onSounds}>
                     Sounds
-                </button>
-                <button className="btn feel-button" onClick={onFeel}>
-                    Feel
                 </button>
                 {playbackActive && (
                     <button

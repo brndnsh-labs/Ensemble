@@ -2011,6 +2011,16 @@ dialog textarea {
     max-width: 125px;
     cursor: pointer;
 }
+/* Opens the Feel sheet (#1276) beside the genre select: same type, muted, no chrome. */
+.feel-button {
+    font-size: 13px;
+    font-weight: 650;
+    color: var(--muted);
+    padding: 0 0 0 6px;
+}
+.feel-button:hover {
+    color: var(--ink);
+}
 .section-text {
     width: 100%;
     resize: vertical;
@@ -2615,8 +2625,7 @@ dialog textarea {
         order: 2;
         padding-top: 6px;
     }
-    .sounds-button,
-    .feel-button {
+    .sounds-button {
         margin-left: auto;
         padding: 8px 10px;
     }
