@@ -69,13 +69,18 @@ export type ReconcileOutcome =
  *
  * `conflict` is which refusal was resolved, carried through rather than flattened, for the same
  * reason `CloudObservation.conflict` keeps the two apart: `'version'` had a remote version to adopt
- * under the original id and `'gone'` had none, so only one of them leaves a song there afterwards.
+ * under the original id and `'gone'` had none — or had one this device already knew was tombstoned
+ * — so only one of them leaves a song there afterwards.
  */
 export interface KeepBothResolution {
     conflict: 'version' | 'gone';
     /** The fresh identity the local line now lives under. NEVER the id that was refused. */
     documentId: string;
-    /** The committed record created under it: the newest local version, at local revision 0. */
+    /**
+     * The committed record created under it: the newest local version, at local revision 0, under
+     * the marked title. The caller re-points the chart on the stand at this — TITLE INCLUDED, or
+     * the stand reads one name while the songbook reads another and the next Save renames it back.
+     */
     document: ChartDocument;
     /** The queued create's operation id. NEVER the failed operation's — see `keepBoth`. */
     operationId: string;
@@ -613,13 +618,14 @@ export class AccountSongbook {
      * - writes the LOCAL LINE under a fresh `crypto.randomUUID()` document id, as an ordinary
      *   create (`base: { revision: null }`, local revision 0). Its content is the newest queued
      *   Save's bytes — which is also what the saved record holds, since `save()` advances both
-     *   together and a held record is never advanced by a download — falling back to the saved
-     *   record when the queue somehow holds none;
+     *   together and a held record is never advanced by a download — under a marked title, so the
+     *   two lines a `version` refusal leaves in the songbook can be told apart;
      * - retires EVERY queued Save for the failed id. Only the newest bytes matter: replaying the
      *   older ones under the new id would upload a version history nobody asked for, and leaving
      *   them would leave the queue parked exactly as it was;
      * - moves this account's drafts for that id onto the new one, so an unsaved experiment follows
-     *   the line it belongs to rather than the identity the cloud kept;
+     *   the line it belongs to rather than the identity the cloud kept. A row this build cannot
+     *   validate is left in place instead: preserved, not moved, and never a reason to abort;
      * - and then settles the ORIGINAL id. `'version'`: the preserved remote version becomes the
      *   saved record, labelled with its own `remoteRevision`, so it reads as cloud-confirmed
      *   because it is. `'gone'`: the account has no such document — tombstoned (#1270) or never
@@ -632,11 +638,17 @@ export class AccountSongbook {
      * refused again by the same revision check. The fresh pair is a request the account has never
      * seen — the same reasoning `save()` states for always minting an operation id.
      *
-     * Any preserved remote CANDIDATE for the original id goes too: it described a divergence that
-     * this call has just settled. If a download had already observed a NEWER revision than the one
-     * being adopted, dropping the candidate loses nothing — the record is labelled with the
-     * revision it actually holds, and the next download diffs the manifest against exactly that and
-     * advances it. Choosing between two opaque revision strings here would be a guess.
+     * A preserved remote CANDIDATE for the original id is read before either settlement, and it
+     * can decide it. A `'deleted'` one — a tombstone a download saw but could not apply, because
+     * this device held the record — outranks whatever version the refusal carried: that id is gone
+     * from the account, so adopting `remote` would resurrect a deleted song until the next download
+     * removed it again. A `'version'` or `'deleted'` candidate then goes with the settlement it
+     * described; if a download had already observed a NEWER revision than the one being adopted,
+     * dropping it loses nothing — the record is labelled with the revision it actually holds, and
+     * the next download diffs the manifest against exactly that and advances it. Choosing between
+     * two opaque revision strings here would be a guess. An `'unsupported'` candidate is NOT a
+     * divergence this call settles: it is the only copy this device has of a body it cannot read,
+     * so it survives untouched.
      *
      * `'none'` when the queue holds no refused Save: whoever was looking at the banner is a moment
      * stale, and reporting that is better than inventing a resolution.
@@ -650,36 +662,46 @@ export class AccountSongbook {
         const operationId = crypto.randomUUID();
         return this.database.run('readwrite', scope, (tx) => {
             tx.read(
-                tx.table('songs').get([scope.ownerId, documentId]),
-                (stored: SavedSong | undefined) => {
-                    const song = stored ? savedSong(stored, scope, documentId) : null;
-                    tx.read(
-                        tx.table('drafts').index('song').getAll([scope.ownerId, documentId]),
-                        (rows: Draft[]) => {
-                            const drafts = rows.map((row) => savedDraft(row, scope, documentId));
-                            operations(tx, scope, documentId, (queue) => {
-                                // The same read `observe()` makes: the queue is sorted by local
-                                // revision, so the first refused operation is the head the outbox
-                                // is actually stuck on.
-                                const refused = queue.find(
-                                    (operation) => operation.status === 'conflict',
-                                );
-                                if (!refused) {
-                                    return tx.finish('none');
-                                }
-                                const latest = queue.at(-1)?.snapshot ?? song?.document;
-                                if (!latest) {
-                                    throw new Error(
-                                        'This conflict has no local version left to keep.',
-                                    );
+                tx.table('drafts').index('song').getAll([scope.ownerId, documentId]),
+                (rows: Draft[]) => {
+                    operations(tx, scope, documentId, (queue) => {
+                        // The same read `observe()` makes: the queue is sorted by local revision,
+                        // so the first refused operation is the head the outbox is actually stuck
+                        // on.
+                        const refused = queue.find((operation) => operation.status === 'conflict');
+                        if (!refused) {
+                            return tx.finish('none');
+                        }
+                        // `refused` came out of this queue, so it is not empty, and `operations()`
+                        // sorted it — the last entry is the newest bytes this device committed.
+                        // That is also what the saved record holds, since `save()` advances both
+                        // together and a held record is never advanced by a download.
+                        const latest = queue[queue.length - 1].snapshot;
+                        tx.read(
+                            tx.table('meta').get(candidateKey(scope.ownerId, documentId)),
+                            (row: RemoteCandidate | undefined) => {
+                                let candidate: RemoteCandidate | null = null;
+                                try {
+                                    candidate = row ? savedCandidate(row, scope, documentId) : null;
+                                } catch {
+                                    // An unreadable observation must not be the thing that keeps
+                                    // this account in a terminal conflict — this call is the only
+                                    // way out of one. It stays exactly where it is, and is read
+                                    // below as saying nothing about the id.
                                 }
                                 const now = new Date().toISOString();
                                 // `createdAt` is carried: this is the same piece of music under a
                                 // new identity, not a song written today. `updatedAt` moves,
                                 // because this IS a new commit and the songbook orders by it.
+                                //
+                                // The title is marked, mirroring `save(copy)`'s `— copy`: after a
+                                // `version` refusal BOTH lines sit in the songbook under the name
+                                // the musician gave the song, and two rows spelled identically is
+                                // not a resolution anybody can act on.
                                 const carried = snapshot({
                                     ...latest,
                                     id: freshDocumentId,
+                                    title: `${latest.title.slice(0, 150)} — kept`,
                                     revision: 0,
                                     createdAt: latest.createdAt,
                                     updatedAt: now,
@@ -706,26 +728,56 @@ export class AccountSongbook {
                                         operation.operationId,
                                     ]);
                                 }
-                                for (const draft of drafts) {
+                                for (const row of rows) {
+                                    let moved: Draft;
+                                    try {
+                                        const draft = savedDraft(row, scope, documentId);
+                                        moved = {
+                                            ...draft,
+                                            documentId: freshDocumentId,
+                                            document: snapshot({
+                                                ...draft.document,
+                                                id: freshDocumentId,
+                                            }),
+                                            // The experiment is unchanged; what it is an
+                                            // experiment ON is the create above, so its base is
+                                            // that revision — always 0, because the create is
+                                            // always a create. A placeholder in practice until
+                                            // #1299 gives this store a writer in the app.
+                                            baseRevision: carried.revision,
+                                        };
+                                    } catch {
+                                        // One row this build cannot validate must not abort the
+                                        // only exit from a terminal conflict. It is left where it
+                                        // is rather than moved or destroyed: unreadable here is
+                                        // not the same as worthless, and nothing else has a copy.
+                                        continue;
+                                    }
                                     tx.table('drafts').delete([
                                         scope.ownerId,
                                         documentId,
-                                        draft.writerId,
+                                        moved.writerId,
                                     ]);
-                                    tx.table('drafts').put({
-                                        ...draft,
-                                        documentId: freshDocumentId,
-                                        document: snapshot({
-                                            ...draft.document,
-                                            id: freshDocumentId,
-                                        }),
-                                        // The experiment is unchanged; what it is an experiment ON
-                                        // is the create above, so its base is that revision.
-                                        baseRevision: carried.revision,
-                                    } satisfies Draft);
+                                    tx.table('drafts').put(moved);
                                 }
-                                tx.table('meta').delete(candidateKey(scope.ownerId, documentId));
-                                if (!refused.remote) {
+                                // A `version` or `deleted` observation described a divergence this
+                                // call has just settled. An `unsupported` one did not: it is this
+                                // device's only copy of a body it cannot read, and it is a fact
+                                // about the cloud's document, not about the refusal.
+                                if (
+                                    candidate?.kind === 'version' ||
+                                    candidate?.kind === 'deleted'
+                                ) {
+                                    tx.table('meta').delete(
+                                        candidateKey(scope.ownerId, documentId),
+                                    );
+                                }
+                                // A tombstone this device has already observed outranks the
+                                // version the refusal carried: the account does not hold that id
+                                // at all any more, so adopting `remote` would put a song back
+                                // that the cloud has deleted — visibly, until the next download
+                                // removed it again.
+                                if (!refused.remote || candidate?.kind === 'deleted') {
                                     // Nothing up there to mirror. The frozen delete goes with the
                                     // record for the reason `commitDeleted` states: nothing else
                                     // clears one for a song that has left the library.
@@ -756,9 +808,9 @@ export class AccountSongbook {
                                     operationId,
                                     adopted,
                                 });
-                            });
-                        },
-                    );
+                            },
+                        );
+                    });
                 },
             );
         });

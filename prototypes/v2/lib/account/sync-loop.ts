@@ -957,7 +957,16 @@ export function createSyncLoop(
         },
         async keepBoth(documentId) {
             const current = await settledScope();
+            const mine = epoch;
             const resolution = await songbook.keepBoth(current, documentId);
+            if (mine !== epoch) {
+                // Signed out, or attached to another account, while the transaction was open. The
+                // commit still happened — it is reported, because the caller has to move the chart
+                // on the stand with it — but nothing of THIS loop's state may be written from a
+                // superseded epoch: a publish, a re-pointed `watched` or a pass would all describe
+                // an account that is no longer attached. The same rule `pass()` follows.
+                return resolution === 'none' ? null : resolution;
+            }
             if (resolution === 'none') {
                 // Nothing moved, so the library is unchanged — but the observation the caller was
                 // reading may be why they asked, so it is re-read rather than left alone.

@@ -967,6 +967,39 @@ describe('a Save the cloud can no longer hold reads differently from a two-sided
         expect(api.get).toHaveBeenCalled();
     });
 
+    it('writes none of its own state back from an epoch that has been superseded', async () => {
+        const resolution = {
+            conflict: 'gone',
+            documentId: 'song-2',
+            document: { id: 'song-2' },
+            operationId: 'op-fresh',
+            adopted: null,
+        };
+        const { api } = fakeApi({ ok: true, value: { kind: 'committed' }, status: 200 });
+        let loop!: ReturnType<typeof createSyncLoop>;
+        const parts = resolvable(resolution, {
+            keepBoth: async () => {
+                // The session expires, or the musician signs out, while the transaction is open.
+                loop.detach();
+                return resolution;
+            },
+        });
+        loop = createSyncLoop(api, createAccountSession(api), parts.songbook);
+        await loop.attach(OWNER);
+        await loop.watch('song-1');
+        const before = loop.getSnapshot().libraryVersion;
+
+        // Still reported: the commit happened, and the caller has to move the chart on the stand
+        // onto the identity its line now lives under whatever this loop is attached to.
+        expect(await loop.keepBoth('song-1')).toEqual(resolution);
+
+        // ...but nothing of THIS loop's state may be written from an epoch that is gone: a library
+        // bump, a re-pointed `watched` or a pass would all describe an account that has detached.
+        expect(loop.getSnapshot().owner).toBe(null);
+        expect(loop.getSnapshot().libraryVersion).toBe(before);
+        expect(loop.getSnapshot().observation).toBe(null);
+    });
+
     it('reports nothing moved when the refusal is already gone, and touches neither list nor stand', async () => {
         const { api } = fakeApi({ ok: true, value: { kind: 'committed' }, status: 200 });
         const parts = resolvable('none', { pending: async () => [{ status: 'queued' }] });

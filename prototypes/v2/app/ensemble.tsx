@@ -1037,11 +1037,14 @@ export default function Ensemble() {
      *
      * The chart KEEPS PLAYING, and that is the whole shape of this. The local line is what is on
      * the stand; the resolution gives it a new identity in storage, and the shell's job is to point
-     * `current`/`saved`/`currentStore` at that identity without the chart's content changing by a
-     * byte. Nothing is loaded into the runtime, nothing is stopped, no section is re-selected — the
-     * only field that moves on `current` is its id, and the revision that goes with it (the create
-     * is local revision 0, so a later plain Save must name 0, not the number the failed line had
-     * reached).
+     * `current`/`saved`/`currentStore` at that identity without a bar of the music changing.
+     * Nothing is loaded into the runtime, nothing is stopped, no section is re-selected — what
+     * moves on `current` is its id, the revision that goes with it (the create is local revision 0,
+     * so a later plain Save must name 0, not the number the failed line had reached) and the marked
+     * title storage filed it under.
+     *
+     * The bar editor is committed before any of that, because `current.id` is what those editors
+     * are keyed on — see the note inside.
      *
      * The unsaved experiment follows the line rather than the identity the account kept. `current`
      * IS that experiment — the recovery slot and the in-tab map are only where it is persisted — so
@@ -1057,10 +1060,20 @@ export default function Ensemble() {
         if (!current) {
             return;
         }
-        const original = current;
-        const experiment = dirty;
         void run(async () => {
             setKeepBothFailure(null);
+            // The editor is committed FIRST, exactly as `save()` does — and for a reason that is
+            // specific to this operation. `current.id` is about to change, and `MeasureEditor` and
+            // `TempoControl` are mounted with `key={current.id}`: a remount throws away every bar
+            // typed but not applied, while `pendingMeasures` stays true and the chip goes on
+            // saying "Unsaved changes" about text that no longer exists anywhere. An unparseable
+            // bar throws out of here the way it throws out of Save — the editor reopens on the bar
+            // that needs fixing, and the resolution has not run.
+            const original = updateChart();
+            // Recomputed rather than read from the render's `dirty`: the commit above has just
+            // folded whatever was pending INTO `original`, so what is unsaved from here is exactly
+            // what that document holds over the account's own baseline.
+            const experiment = sharedDraft || !!(saved && !same(original, saved));
             let resolution: KeepBothResolution | null;
             try {
                 resolution = await accountSync.keepBoth(original.id);
@@ -1081,6 +1094,11 @@ export default function Ensemble() {
                 ...original,
                 id: resolution.documentId,
                 revision: resolution.document.revision,
+                // Storage marks the kept line's title, so the two songs a `version` refusal leaves
+                // behind can be told apart in the songbook. The stand has to read the name it is
+                // actually filed under: left on the old one, the chip would report an unsaved
+                // change nobody made and the next Save would quietly rename it back.
+                title: resolution.document.title,
             };
             accountSync.setActiveDocument(moved.id);
             setCurrent(moved);

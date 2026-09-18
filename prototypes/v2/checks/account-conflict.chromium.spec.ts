@@ -96,6 +96,36 @@ async function openSong(page: Page, title: string): Promise<void> {
     await expect(page.getByRole('button', { name: 'Song actions' })).toBeEnabled();
 }
 
+/**
+ * Open the row whose name is EXACTLY this, not the first one containing it. After keeping both,
+ * the two rows are `X` and `X — kept`, and a substring match would silently always take the
+ * first — which is the kept line, never the account's version this is asked for.
+ */
+async function openExactSong(page: Page, title: string): Promise<void> {
+    await page.locator('.song-name', { hasText: new RegExp(`^${title}$`) }).click();
+    await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Song actions' })).toBeEnabled();
+}
+
+/**
+ * Recovery slots this device holds for one document id — `lib/repository.ts`'s key shape, read
+ * from the page rather than through that module because an account chart's unsaved experiment
+ * still lives in the GUEST `localStorage` namespace (the known #1299 gap) and this spec drives a
+ * real browser, not the module.
+ */
+function recoverySlots(page: Page, documentId: string): Promise<number> {
+    return page.evaluate((id) => {
+        let count = 0;
+        for (let index = 0; index < localStorage.length; index += 1) {
+            const key = localStorage.key(index);
+            if (key?.startsWith('ensemble-v2-preview:recovery:') && key.endsWith(`:${id}`)) {
+                count += 1;
+            }
+        }
+        return count;
+    }, documentId);
+}
+
 async function revealEditor(page: Page): Promise<void> {
     await page.getByRole('button', { name: 'Edit chart' }).click();
     await editorRevealed(page);
@@ -195,11 +225,14 @@ test('two devices save the same version: the loser keeps both, and nothing is lo
         await revealEditor(second);
 
         // Device one commits the next version from that same base, and the account takes it.
-        await saveAndUpload(page, 'Take one');
+        // BOTH devices name it the same thing on purpose: two people editing one song from one
+        // base is exactly the case where the two lines end up spelled identically, and a
+        // resolution that leaves two rows a musician cannot tell apart has not resolved anything.
+        await saveAndUpload(page, 'Our take');
 
         // Device two commits ITS next version from the same base. The account refuses it — and
         // the refusal is a banner with a way out, not a dead end that parks this song forever.
-        await saveAs(second, 'Take two');
+        await saveAs(second, 'Our take');
         const banner = second.getByTestId('conflict-banner');
         await expect(banner).toHaveAttribute('data-conflict', 'version');
         await expect(second.getByTestId('conflict-title')).toHaveText('Changed on another device');
@@ -210,29 +243,36 @@ test('two devices save the same version: the loser keeps both, and nothing is lo
         // Waited on the RESPONSE, not the chip: the refused Save carried this same title, so the
         // only reading that cannot be a moment stale is the one the account accepted (`ok()`; the
         // refusal is a 409).
-        const uploaded = uploadOf(second, 'Take two');
+        const uploaded = uploadOf(second, 'Our take');
         await second.getByTestId('conflict-keep-both').click();
         await uploaded;
         await expect(banner).toHaveCount(0);
         // The chart on the stand is untouched: the local line IS what is open, and only its
-        // identity moved. It also leaves the outbox, which it could not do before.
-        await expect(second.getByRole('heading', { name: 'Take two', exact: true })).toBeVisible();
+        // identity — and the name it is filed under — moved. It also leaves the outbox, which it
+        // could not do before.
+        await expect(
+            second.getByRole('heading', { name: 'Our take — kept', exact: true }),
+        ).toBeVisible();
         await expect(second.getByTestId('sync-cloud')).toHaveText('Saved to your account');
+        // The stand reads the name the songbook filed it under, so nothing claims an edit nobody
+        // made — and the next plain Save cannot quietly rename it back.
+        await expect(second.getByTestId('sync-local')).toHaveText('Saved on this device');
 
         // The create the resolution queued is a request the account has never seen.
         expectFreshIdentity(saves());
 
         // Both charts, on the device that had the conflict: its own version as a new song, and
-        // the account's version back under the original name.
+        // the account's version under the name they both chose — told apart by the suffix, which
+        // is the only thing that makes this list actionable.
         await backToSongbook(second);
-        await expect(songTitles(second)).toHaveText(['Take two', 'Take one']);
-        await openSong(second, 'Take one');
+        await expect(songTitles(second)).toHaveText(['Our take — kept', 'Our take']);
+        await openExactSong(second, 'Our take');
         await backToSongbook(second);
 
         // ...and on the device that won, which learns about the new song the ordinary way.
         await page.reload();
         await expect(page.getByTestId('library-loading')).toHaveCount(0);
-        await expect(songTitles(page)).toHaveText(['Take two', 'Take one']);
+        await expect(songTitles(page)).toHaveText(['Our take — kept', 'Our take']);
     } finally {
         await fresh.close();
     }
@@ -292,24 +332,104 @@ test('a Save the account can no longer hold becomes a song of its own', async ({
         await uploaded;
         await expect(banner).toHaveCount(0);
         await expect(
-            second.getByRole('heading', { name: 'Set list two', exact: true }),
+            second.getByRole('heading', { name: 'Set list two — kept', exact: true }),
         ).toBeVisible();
         await expect(second.getByTestId('sync-cloud')).toHaveText('Saved to your account');
 
         expectFreshIdentity(saves());
 
         // The deleted id is gone from this device too — it never resurrected — and what is left
-        // is this device's own version, under its own name.
+        // is this device's own version, named for what it is.
         await backToSongbook(second);
-        await expect(songTitles(second)).toHaveText(['Set list two']);
+        await expect(songTitles(second)).toHaveText(['Set list two — kept']);
         await second.reload();
         await expect(second.getByTestId('library-loading')).toHaveCount(0);
-        await expect(songTitles(second)).toHaveText(['Set list two']);
+        await expect(songTitles(second)).toHaveText(['Set list two — kept']);
 
         // And the device that deleted it gets the new song the ordinary way.
         await page.reload();
         await expect(page.getByTestId('library-loading')).toHaveCount(0);
-        await expect(songTitles(page)).toHaveText(['Set list two']);
+        await expect(songTitles(page)).toHaveText(['Set list two — kept']);
+    } finally {
+        await fresh.close();
+    }
+});
+
+/**
+ * A bar typed and not yet applied when Keep both is pressed (#1267 patch review P1).
+ *
+ * The resolution changes `current.id`, and the bar editor and tempo control are mounted with
+ * `key={current.id}` — so without a commit in front of it the remount takes every unapplied bar
+ * with it, silently, while the chip goes on saying "Unsaved changes" about text that no longer
+ * exists anywhere. Save has always committed the editor first; this proves the resolution does too,
+ * through to the recovery slot that has to survive a reload under the NEW identity.
+ */
+test('a bar typed but not applied survives keeping both, and its recovery slot moves', async ({
+    page,
+    browser,
+    accountApi,
+}) => {
+    const authenticator = await addVirtualAuthenticator(page);
+    await openWithAccounts(page);
+    await signUp(page);
+
+    await newSongOnTheStand(page);
+    await saveAndUpload(page, 'Study');
+
+    const passkeys = await authenticator.credentials();
+    const fresh = await browser.newContext({ baseURL: accountApi.origin });
+    try {
+        const second = await fresh.newPage();
+        const saves = sentSaves(second);
+        const spare = await addVirtualAuthenticator(second);
+        await spare.addCredential(passkeys[0]);
+        await signInOnSecondDevice(second);
+        await openSong(second, 'Study');
+        await revealEditor(second);
+
+        // The same two-device refusal as above: device one advances the account from the base
+        // device two is holding open.
+        await saveAndUpload(page, 'Study theirs');
+        await saveAs(second, 'Study mine');
+        await expect(second.getByTestId('conflict-banner')).toHaveAttribute(
+            'data-conflict',
+            'version',
+        );
+
+        // ...and THEN the musician types a bar and reaches for the banner without applying it.
+        const bar = second.getByLabel('Chords in this bar');
+        await bar.fill('F');
+        await expect(second.getByTestId('sync-local')).toHaveText('Unsaved changes');
+
+        const uploaded = uploadOf(second, 'Study mine');
+        await second.getByTestId('conflict-keep-both').click();
+        await uploaded;
+        await expect(second.getByTestId('conflict-banner')).toHaveCount(0);
+
+        // The typed bar is in the chart that moved, not lost with the editor that unmounted —
+        // and it is still honestly unsaved, because it is: the account holds the version that was
+        // refused, not this experiment on top of it.
+        await expect(
+            second.getByRole('heading', { name: 'Study mine — kept', exact: true }),
+        ).toBeVisible();
+        await expect(bar).toHaveValue('F');
+        await expect(second.getByTestId('sync-local')).toHaveText('Unsaved changes');
+
+        const sent = saves();
+        const refusedId = sent[0].documentId;
+        const keptId = sent.find((save) => save.documentId !== refusedId)?.documentId ?? '';
+        expect(keptId).not.toBe('');
+        // The experiment follows its line: recorded under the identity it now belongs to, and
+        // dropped from the id that holds the account's own version from here on.
+        expect(await recoverySlots(second, keptId)).toBe(1);
+        expect(await recoverySlots(second, refusedId)).toBe(0);
+
+        // Which is the whole point of writing it: it is what a reload has to find.
+        await second.reload();
+        await expect(second.getByTestId('library-loading')).toHaveCount(0);
+        await openExactSong(second, 'Study mine — kept');
+        await revealEditor(second);
+        await expect(second.getByLabel('Chords in this bar')).toHaveValue('F');
     } finally {
         await fresh.close();
     }
