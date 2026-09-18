@@ -107,15 +107,20 @@ export interface DocumentRoutesOptions {
  * a policy — a new document route without an entry here fails that test, and the companion test
  * added by #1253 proves each key answers `401` to a cookie-less caller.
  *
- * **These must not add up to the transport budget.** `transportRateLimitGuard`'s 300/min is a
- * SHARED ceiling over every `/api/*` request from one identity — `/api/auth/*` included — so a
- * per-route budget is only a promise the caller can keep if the transport budget still has room
- * left when it does. The read routes shipped at 60 + 240 = exactly 300, which the #1259
- * authorization review demonstrated: a client that spent both documented read budgets got `429`
- * on its next `GET /api/auth/session` AND on Save, both of which it is entitled to. 30 + 180 =
- * 210 leaves 90/min of the shared ceiling for the session check, Save and logout that a sync
- * pass needs in the same window. Any new document route has to come out of that 90, not be
- * added on top of it.
+ * **These are ceilings, not a budget that sums to the transport limit.** `transportRateLimitGuard`'s
+ * 300/min is a SHARED ceiling over every `/api/*` request from one identity — `/api/auth/*`
+ * included — and a per-route budget is only ever a promise the caller can keep if the transport
+ * budget still has room left when it does. It is not an invariant this table maintains: the four
+ * documented budgets sum to 30 + 180 + 120 + 30 = 360/min, already past the shared 300/min ceiling
+ * before a single `/api/auth/*` request is counted — Save's own 120 is what breaks it, not
+ * delete's addition. The #1259 authorization review demonstrated the consequence directly: a
+ * client that spent both read budgets in one window got `429` on its next `GET /api/auth/session`
+ * AND on Save, both of which it is entitled to. **Treat any `429` from this service as a signal to
+ * back off across the WHOLE origin, not just the route that returned it** — a client paced to stay
+ * under one route's number can still be over the shared one. And because
+ * `transportRateLimitGuard`/`identify()` key by source address, every device sharing one NAT or
+ * carrier gateway shares these budgets too, which is one more reason a route-local 429 says
+ * nothing about how much of the shared ceiling is actually left.
  *
  * Sized against the per-owner document cap (2,000): a manifest page carries up to
  * `MAX_LIST_LIMIT` rows, so 30/min re-reads a full four-page library seven times a minute, and
@@ -123,11 +128,12 @@ export interface DocumentRoutesOptions {
  * deliberate — a full library is a one-time cost on a new device, and the alternative is
  * starving the account routes it takes to stay signed in while it happens.
  *
- * Delete (#1260) takes 30/min OUT of that 90, leaving 60. It is the smallest of the four because
- * deleting is a rare human act — a song removed, occasionally a handful in one sitting — and
- * because it is the one route whose receipt the storage quota will not refuse (step 4 of
- * `commitDelete`), which leaves this budget as the only thing bounding that residual. Giving it
- * Save's 120 would spend more of the shared ceiling than the operation can justify.
+ * Delete (#1260) is set at 30/min, the smallest of the four, because deleting is a rare human
+ * act — a song removed, occasionally a handful in one sitting — and because it is the one route
+ * whose receipt the storage quota will not refuse (step 4 of `commitDelete`), which leaves this
+ * budget as the only thing bounding that residual. It is not sized against remaining headroom
+ * under the shared ceiling, because there is none by the arithmetic above; it is sized against
+ * what the operation itself needs.
  */
 export const DOCUMENT_POLICIES: Readonly<Record<string, { max: number; windowMs: number }>> =
     Object.freeze({
@@ -415,8 +421,22 @@ export function documentRoutes({
      * second handler argument to `routes.post` — for two reasons: `use` registers with method
      * `ALL`, which the deny-by-default route-drift test in `test/http/auth-hardening.test.ts`
      * filters out, whereas `post('/delete', limiter, handler)` would register the path TWICE and
-     * break that comparison; and it keeps the limit on every method reaching `/delete`, not only
-     * the one this file handles.
+     * break that comparison; and it bounds every WRITE-method request reaching `/delete`, not only
+     * the `POST` this file handles today — a future `PUT`/`PATCH` handler added at this path would
+     * inherit the same ceiling for free.
+     *
+     * **This does NOT cover `GET /api/documents/delete`, and cannot by moving where it is
+     * registered.** That request matches `GET /:id` above (registered earlier, `id` bound to
+     * `'delete'`), so if this middleware ran first it would still hand off to that handler, which
+     * reads only the path and query — never `c.req.text()`/`.json()`/`.raw.body`. It does not
+     * matter either way, because a `GET` request cannot carry an observable body into this app at
+     * all: `@hono/node-server` never attaches a `body` stream to the Fetch `Request` it builds for
+     * `GET`/`HEAD` (mirroring the Fetch spec, which forbids a body on those methods), so
+     * `bodyLimit`'s own `if (!c.req.raw.body) return next()` short-circuits before it ever looks at
+     * `Content-Length` — verified directly against the installed `hono` middleware source and by a
+     * probe (`c.req.raw.body === null` for every `GET`, in-memory `app.request()` included). No
+     * registration order changes that, so don't "fix" this by moving the middleware above `GET
+     * /:id` — it would look like a fix and buy nothing.
      *
      * This nests inside the sub-app's `MAX_SAVE_REQUEST_BYTES` catch-all above. The outer limit
      * cannot be the only one here: the whole `/api/documents/` prefix is exempt from the parent

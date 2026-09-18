@@ -116,19 +116,18 @@ export function commitDelete(db: DatabaseSync, command: DeleteCommand): DeleteOu
                 // caller could do with a refusal except ask again. The revision answered is the
                 // tombstone's (the truth about the id), never the one the request guessed.
                 //
-                // A receipt IS written here, unlike the `not_found` path above: this answer is a
-                // statement about a durable server fact, so it must keep answering identically if
-                // this very request is retried after a lost response, and a receipt is what makes
-                // that a single indexed read instead of a re-derivation. It costs
-                // `RECEIPT_COST_BYTES` against the owner's budget (see step 4 on why that cannot
-                // refuse the delete) and is bounded by this route's own rate budget.
-                writeReceipt(db, ownerId, {
-                    operationId,
-                    documentId,
-                    requestDigest: digest,
-                    resultRevision: tombstone.revision,
-                    createdAt: now,
-                });
+                // No receipt is written here, unlike the live-delete path in step 4 below: the
+                // answer is ALREADY idempotent without one. A tombstone is terminal and its
+                // revision is immutable — `commitSave`'s non-resurrection check refuses both a
+                // create and a stale update against it — so a retry (this very request sent again,
+                // or a different operation id from a second device) re-derives the identical reply
+                // from a single indexed primary-key read of the tombstone; there is nothing a
+                // receipt would make cheaper or safer here. Writing one WOULD cost something real:
+                // an owner holding a single tombstone could otherwise mint an unbounded number of
+                // charged `RECEIPT_COST_BYTES` rows forever, one per fresh operation id, with no
+                // quota gate to stop them (step 4's comment) and only this route's per-minute rate
+                // budget standing in the way. Mirrors the `not_found` path just above for the same
+                // reason: nothing durable changed here, so nothing is recorded.
                 return {
                     kind: 'deleted',
                     revision: tombstone.revision,
@@ -160,13 +159,28 @@ export function commitDelete(db: DatabaseSync, command: DeleteCommand): DeleteOu
             // gives document bytes back, so making it refusable by the cap would lock an account
             // at the cap out of its own remedy, and the remedy is the whole point of the endpoint.
             //
-            // Exempting the refusal is not free, and the residual is the same one the stage-3
-            // review already accepted for receipts (`docs/design/ensemble-v2-rollout.md` decision
-            // 11, #1256): a caller with one tombstone can keep re-deleting that id under fresh
-            // operation ids, each leaving a charged receipt that the cap will not refuse. That is
-            // bounded by this route's per-identity rate budget (`DOCUMENT_POLICIES`), not by the
-            // quota, and it wants the same admin-side prune the receipt residual wants.
-            deleteDocument(db, ownerId, documentId, now);
+            // Exempting the refusal is not free, but the residual is NOT the one the stage-3
+            // review accepted for Save's receipts (`docs/design/ensemble-v2-rollout.md` decision
+            // 11, #1256) — that decision covered an unbounded fresh-operation-id loop against one
+            // tombstone, and step 2 above closes exactly that loop by writing no receipt on the
+            // already-tombstoned path. After that fix, the only receipt a delete can still leave
+            // is the one below, and reaching it requires a LIVE document to delete — which
+            // requires a charged, refusable `commitSave` create that already passed the quota
+            // gate. So delete-side receipt growth is bounded by how many live documents an owner
+            // is permitted to hold, not by decision 11's residual. Do not cite decision 11 as
+            // cover for this path any more.
+            // `deleteDocument` returns false only when there is nothing to delete, and step 2/3
+            // above already established that a live document at `expectedRevision` exists — so
+            // `false` here means the two reads and this write disagree about the world, which is
+            // a bug, not a race (the transaction is `BEGIN IMMEDIATE`). Fail loud rather than
+            // fall through to writing a receipt/reply for a delete that did not happen: the
+            // transaction rolls back both the `throw` and any partial write with it.
+            if (!deleteDocument(db, ownerId, documentId, now)) {
+                throw new Error(
+                    `commitDelete: deleteDocument reported no row for ${ownerId}/${documentId} ` +
+                        'immediately after reading one at the expected revision',
+                );
+            }
             writeReceipt(db, ownerId, {
                 operationId,
                 documentId,

@@ -448,19 +448,20 @@ Design points worth knowing before changing it:
 - **Guard order is Save's, unchanged:** session → syntactic refusal → this route's own budget →
   the database. The budget is spent only by an authenticated identity, so an anonymous caller
   can never exhaust one.
-- **The 300/min transport budget is SHARED, and the read budgets must fit inside it with room
-  left over** (review F1 — the P1 of the review). `transportRateLimitGuard`'s 300/min covers
-  every `/api/*` request from one identity, **`/api/auth/*` included**, and it is keyed by
-  **network identity, not by account** — two accounts behind one NAT share it, and so do two tabs
-  of one account. So a per-route budget is only a promise the caller can keep while the shared
-  ceiling still has room. The routes shipped at 60 + 240 = *exactly* 300, and the review
-  demonstrated the consequence: a client that spent both documented read budgets got `429` on its
-  next `GET /api/auth/session` **and** on Save. They are now 30 + 180 = 210, leaving 90/min for
-  the session check, Save and logout a sync pass needs in the same window. **A new document route
-  has to come out of that 90, not be added on top of it** — which is exactly where the delete
-  route's 30/min comes from (#1260), leaving 60. A client must therefore treat any
-  `429` as a **global** back-off with the response's `Retry-After`, not as "this endpoint is
-  busy" — the next request to a different route is just as likely to be refused.
+- **The 300/min transport budget is SHARED, and per-route budgets are ceilings under it, not a
+  sub-budget that sums to it** (review F1 — the P1 of the review). `transportRateLimitGuard`'s
+  300/min covers every `/api/*` request from one identity, **`/api/auth/*` included**, and it is
+  keyed by **network identity, not by account** — two accounts behind one NAT share it, and so do
+  two tabs of one account, and so does every device behind one carrier gateway or shared Wi-Fi.
+  So a per-route budget is only a promise the caller can keep while the shared ceiling still has
+  room, and this table does not keep that promise as an invariant: the four current budgets sum
+  to 30 + 180 + 120 + 30 = 360/min, already over 300 before `/api/auth/*` is counted at all —
+  Save's own 120 is what breaks it. The #1259 review demonstrated the consequence directly: a
+  client that spent both documented read budgets in one window got `429` on its next
+  `GET /api/auth/session` **and** on Save, both of which it is entitled to. **Treat any `429`
+  from this service as a signal to back off across the whole origin**, with the response's
+  `Retry-After` — the next request to a *different* route is just as likely to be refused, and a
+  client paced to stay under one route's number can still be over the shared one.
   Cold-start arithmetic for a full 2,000-document library: 4 manifest pages at
   `MAX_LIST_LIMIT`, then 2,000 downloads at 180/min ≈ **11 minutes**, paced. That is deliberate —
   a full library is a one-time cost on a new device, and the alternative is starving the account
@@ -504,7 +505,7 @@ The request body is the Save envelope's field *names* minus its document, in one
 | `expectedRevision` equals the current revision | `200 { …receipt, revision: <the revision it died at>, kind: 'deleted' }` — row gone, tombstone written, receipt recorded |
 | Same operation id, same bytes (retry after an uncertain response) | the original `200`, byte for byte; nothing deleted twice |
 | Same operation id, different bytes or a different document — including an id a **Save** committed | `409 { error: 'operation_mismatch' }` |
-| A different operation id, id already deleted | `200 … kind: 'deleted'` at the tombstone's revision, and a receipt for this operation; no second tombstone, `expectedRevision` not consulted |
+| A different operation id, id already deleted | `200 … kind: 'deleted'` at the tombstone's revision; no receipt, no second tombstone, `expectedRevision` not consulted |
 | Stale `expectedRevision`, id still live | `409 { …receipt, revision: <current>, kind: 'conflict', remote: { revision, document } }` — nothing deleted, no receipt |
 | Id absent with no tombstone, or another owner's id | `404 { error: 'not_found' }` — one status, one body, both; nothing written at all |
 | Any decoder refusal — reordered/unknown/missing keys, added whitespace, `expectedRevision: null`, an envelope `ownerId` that is not the session's account, any query string | `400 { error: 'malformed_request' }` |
@@ -524,13 +525,18 @@ Design points worth knowing before changing it:
   means "this operation creates the document" and there is nothing to create — and a conflict here
   always carries a `remote` version, because the cases where Save answers `remote: null` (absent,
   tombstoned) are answered by `404`/idempotent-`deleted` before the revision check.
-- **The already-deleted answer is idempotent, not a conflict, and it writes a receipt.** A
-  tombstone is terminal: there is no newer version to offer for Keep-both and nothing the caller
-  could do with a refusal except ask again, so a second device's queued delete is told the truth
-  (the tombstone's revision) rather than refused. `expectedRevision` is not consulted on that path
-  for the same reason. The receipt is what makes a retry of *that* request a single indexed read.
-  The `404` path, by contrast, writes **nothing** — nothing happened, so a retry stays free and no
-  receipt can later claim a deletion that never occurred.
+- **The already-deleted answer is idempotent, and it writes NO receipt.** A tombstone is
+  terminal: there is no newer version to offer for Keep-both and nothing the caller could do with
+  a refusal except ask again, so a second device's queued delete is told the truth (the
+  tombstone's revision) rather than refused. `expectedRevision` is not consulted on that path for
+  the same reason. No receipt is written because none is needed: the tombstone's revision is
+  immutable (`commitSave`'s non-resurrection check refuses both a create and a stale update
+  against it), so a retry — this exact request again, or a fresh operation id from a third caller
+  — re-derives the identical reply from one indexed primary-key read of the tombstone alone.
+  Writing a receipt here anyway would have let an owner holding a single tombstone mint an
+  unbounded number of charged rows by resending fresh operation ids forever; this path is the
+  fix for exactly that. It mirrors the `404` path, which also writes **nothing**: in both cases
+  nothing happened that a receipt needs to remember, so a retry stays free.
 - **One operation id is one operation, across both endpoints.** Receipts are one namespace per
   owner, so reusing a Save's operation id for a delete must be refused — and it is, by the digest
   comparison alone, with no discriminator column: the digest covers the whole request body, and a
@@ -543,12 +549,14 @@ Design points worth knowing before changing it:
   refuse a delete whose freed body is smaller than the 1,536 bytes it leaves behind, which is
   exactly the owner who most needs to delete something. Deletion is the only operation that gives
   document bytes back, so making it refusable by the cap would lock an account at the cap out of
-  its own remedy. The residual is the one rollout decision 11 / #1256 already accepted for
-  receipts: a caller holding one tombstone can re-delete that id under fresh operation ids, each
-  leaving a charged receipt the cap will not refuse — bounded by this route's 30/min budget, not by
-  the quota, and wanting the same admin-side prune the receipt residual wants. Proven at the
-  *shipped* caps in both suites (document cap and byte cap), not at an injected one, because
-  `commitDelete` takes no caps to inject.
+  its own remedy. This is NOT the residual rollout decision 11 / #1256 accepted for receipts —
+  that decision covered an unbounded fresh-operation-id loop against one tombstone, and the
+  already-deleted path above closes exactly that loop by writing no receipt. What remains is
+  smaller: the only receipt a delete can still leave requires a *live* document to delete, which
+  requires a charged, refusable `commitSave` create that already passed the quota gate — so
+  delete-side receipt growth is bounded by how many live documents an owner is permitted to hold,
+  not by an unbounded loop. Proven at the *shipped* caps in both suites (document cap and byte
+  cap), not at an injected one, because `commitDelete` takes no caps to inject.
 - **Tombstones are now charged against the byte cap**, which the stage-3 authorization review
   asked for at exactly this point: "when stage 4/5 ships a delete route, charge tombstones the way
   receipts are charged so the cap keeps meaning what it says" (residual risk 4). They are charged
@@ -560,9 +568,13 @@ Design points worth knowing before changing it:
   `(owner, document)`, so re-deleting adds no rows, and a fresh id costs a charged receipt to
   create); it makes the cap mean what it says in real disk.
 - **The tombstone carries the revision the document died at**, per `deleteDocument`'s existing
-  contract — never a freshly minted one, and `commitDelete` mints nothing at all. That is what
-  makes `commitSave`'s non-resurrection reply (`revision: <tombstone>`, `remote: null`) a revision
-  a stale client can recognise.
+  contract — never a freshly minted one, and `commitDelete` mints nothing at all. That is the
+  revision `commitSave`'s non-resurrection reply answers with (`revision: <tombstone>`,
+  `remote: null`) — but it is only a revision the CALLING client would recognise when that client
+  was current at the moment of deletion. A client holding rev-1 after a second device saved
+  rev-2 and then deleted the id gets back `conflict rev-2, remote: null`, and rev-2 is not a
+  revision the first client ever saw. #1270's client must not build recognition logic on this
+  value; the only safe use of it is recording it as the id's terminal revision.
 - **A 1 KiB body limit, applied by the route itself.** The whole `/api/documents/` prefix is
   exempt from the parent app's 64 KB limit so a Save can carry a chart, and the sub-app's
   catch-all then bounds the prefix at `MAX_SAVE_REQUEST_BYTES` (~1 MiB). A delete request is **653
@@ -581,11 +593,16 @@ Design points worth knowing before changing it:
   sync module — putting a request shape in the shared bundle before the client produces it would
   be inventing the client's half from the server side. It borrows the shared *validators*
   (`identifier`, `remoteRevision`, `digest`) so the ids and revisions it accepts are exactly the
-  language the Save path writes. Two open choices for #1270 to settle: the reply's
+  language the Save path writes. Open choices for #1270 to settle: the reply's
   `kind: 'deleted'` (the client's `reply()` validator currently accepts only
-  `committed`/`conflict`), and the absence of a `protocolVersion` field — the exact-key-set check
+  `committed`/`conflict`); the absence of a `protocolVersion` field — the exact-key-set check
   already makes adding any field a breaking change an old server refuses rather than misreads,
-  which is the property a version field buys.
+  which is the property a version field buys; and the contract's "recovery/export preflight"
+  (`ensemble-v2-sync.md`'s deletion paragraph) — this server enforces the tombstone and the
+  non-resurrection rule, but the preflight itself (warning the user, offering an export, before
+  the delete is even sent) is entirely client-owned and unenforced here. #1270 has to decide
+  where that lives; this route will delete on request the moment it is asked, with no server-side
+  confirmation step of its own.
 
 Tests: `test/db/document-delete.test.ts` (the decision table, the storage accounting, the
 transaction rollback, and non-resurrection after a *real* delete),

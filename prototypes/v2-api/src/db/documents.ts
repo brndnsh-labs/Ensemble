@@ -352,8 +352,13 @@ export function writeDocument(
  * is `commitDelete` in `db/document-delete.ts` (#1260).
  *
  * The tombstone carries the revision the document DIED at (`current.revision`), not a freshly
- * minted one: it is the last revision that ever existed for that id, which is what makes
- * `commitSave`'s non-resurrection check answer a stale client with a revision it can recognise.
+ * minted one: it is the last revision that ever existed for that id, which is what
+ * `commitSave`'s non-resurrection check answers a stale client with. That is a revision the
+ * client would RECOGNISE only when it was current at the moment of deletion — it is not a
+ * guarantee in general. A client holding rev-1 after a second device saved rev-2 and then
+ * deleted the id gets back `conflict rev-2, remote: null`: rev-2 is a revision the first client
+ * never saw. #1270's client must not build recognition logic on this value; the only thing it
+ * can safely do with it is record it as the id's terminal revision.
  */
 export function deleteDocument(
     db: DatabaseSync,

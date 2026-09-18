@@ -213,11 +213,15 @@ describe('delete concurrency on a real database (#1260)', () => {
             revision: 'rev-1',
             deletedAt: clocks.get(winner as string),
         });
-        // Every racer left its own receipt: the deleter's, and one per idempotent answer, so each
-        // of those four frozen requests replays as itself.
-        expect(countRows(db, 'receipts')).toBe(4);
-        for (const tag of tags) {
-            expect(readReceipt(db, 'owner-a', `op-${tag}`)?.resultRevision).toBe('rev-1');
+        // Only the DELETER's operation id leaves a receipt. `BEGIN IMMEDIATE` fully serializes
+        // these four transactions, so the three racers that lose the race always run AFTER the
+        // winner commits and see the id already tombstoned — the idempotent-from-a-tombstone path,
+        // which writes no receipt (the tombstone's own immutable revision is enough to answer any
+        // retry of any of those three requests identically, forever).
+        expect(countRows(db, 'receipts')).toBe(1);
+        expect(readReceipt(db, 'owner-a', `op-${winner}`)?.resultRevision).toBe('rev-1');
+        for (const tag of tags.filter((candidate) => candidate !== winner)) {
+            expect(readReceipt(db, 'owner-a', `op-${tag}`)).toBeUndefined();
         }
     }, 60_000);
 

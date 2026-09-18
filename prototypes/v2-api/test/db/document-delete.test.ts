@@ -188,7 +188,7 @@ describe('commitDelete (#1260)', () => {
         expect(readOwnerUsage(db, 'owner-a')).toMatchObject({ receipts: 0, tombstones: 0 });
     });
 
-    it('a delete of an already-deleted id answers idempotently from the tombstone', () => {
+    it('a delete of an already-deleted id answers idempotently from the tombstone, writing no receipt', () => {
         const db = setUp();
         seedSaved(db);
         commitDelete(db, command());
@@ -212,12 +212,21 @@ describe('commitDelete (#1260)', () => {
             ),
         ).toEqual({ kind: 'deleted', revision: 'rev-1', replayed: false, performed: false });
 
-        // The tombstone did not move, and each of those answers left its own receipt so that a
-        // retry of THAT request is a single indexed read.
+        // The tombstone did not move, and NEITHER answer left a receipt: a tombstone's revision is
+        // immutable, so a retry of either request (this exact one, or a fresh operation id from a
+        // third caller) re-derives the identical reply from the tombstone alone. Writing a receipt
+        // here would let an owner mint an unbounded number of charged rows against one tombstone.
         expect(readTombstone(db, 'owner-a', 'doc-1')).toMatchObject({ deletedAt: 2000 });
-        expect(readReceipt(db, 'owner-a', 'op-del-2')?.resultRevision).toBe('rev-1');
-        expect(readReceipt(db, 'owner-a', 'op-del-3')?.resultRevision).toBe('rev-1');
+        expect(readReceipt(db, 'owner-a', 'op-del-2')).toBeUndefined();
+        expect(readReceipt(db, 'owner-a', 'op-del-3')).toBeUndefined();
         expect(readOwnerUsage(db, 'owner-a').tombstones).toBe(1);
+
+        // A replay with a FRESH op id still answers the tombstone's revision, straight from the
+        // tombstone, every time — not just twice.
+        expect(
+            commitDelete(db, command({ operationId: 'op-del-4', digest: 'd4', now: 6000 })),
+        ).toEqual({ kind: 'deleted', revision: 'rev-1', replayed: false, performed: false });
+        expect(readReceipt(db, 'owner-a', 'op-del-4')).toBeUndefined();
     });
 
     it("owners are isolated: another owner's id is not_found and is left alone", () => {
@@ -312,10 +321,10 @@ describe('commitDelete (#1260)', () => {
             });
 
             commitDelete(db, command());
-            // The document half is gone. What remains is permanent: the Save's receipt, the
-            // delete's own receipt, and the tombstone — none of which anything frees, which is why
-            // delete is the remedy for the DOCUMENT half of the budget and not for the rest
-            // (the accepted residual in rollout decision 11 / #1256).
+            // The document half is gone. What remains is permanent: the Save's receipt, this
+            // live delete's own receipt, and the tombstone — none of which anything frees, which
+            // is why delete is the remedy for the DOCUMENT half of the budget and not for the
+            // rest.
             expect(readOwnerUsage(db, 'owner-a')).toEqual({
                 documents: 0,
                 documentBytes: 0,
@@ -326,10 +335,12 @@ describe('commitDelete (#1260)', () => {
                 // Two receipts and one tombstone, all charged at the receipt's rate.
                 bytes: 3 * RECEIPT_COST_BYTES,
             });
-            // Re-deleting the same id adds a receipt but never a second tombstone: the insert is
-            // an upsert keyed on (owner, document), so the tombstone charge cannot be multiplied.
+            // Re-deleting the same id under a fresh operation id now hits the already-tombstoned
+            // path, which writes NEITHER a receipt NOR a second tombstone: the receipt count is
+            // unchanged, bounding this residual by the number of live documents ever deleted
+            // rather than by how many times an id is re-deleted.
             commitDelete(db, command({ operationId: 'op-del-2', digest: 'd2' }));
-            expect(readOwnerUsage(db, 'owner-a')).toMatchObject({ receipts: 3, tombstones: 1 });
+            expect(readOwnerUsage(db, 'owner-a')).toMatchObject({ receipts: 2, tombstones: 1 });
         });
 
         it("one owner's tombstones do not count against another's footprint", () => {
