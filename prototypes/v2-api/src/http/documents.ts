@@ -9,8 +9,14 @@ import {
 } from '../../../v2/lib/sync/request.js';
 import { createRateLimiter } from '../auth/rate-limit.js';
 import type { SessionClaims } from '../auth/session.js';
+import { commitDelete } from '../db/document-delete.js';
 import { listManifest, MAX_LIST_LIMIT, readDocument } from '../db/documents.js';
 import { commitSave, type SaveDependencies } from '../db/save.js';
+import {
+    DeleteRequestError,
+    decodeDeleteRequest,
+    MAX_DELETE_REQUEST_BYTES,
+} from './document-delete-request.js';
 import { sendError } from './errors.js';
 
 /**
@@ -59,6 +65,19 @@ import { sendError } from './errors.js';
  *       the write path already guarantees; the download re-checks it rather than splicing an
  *       unvalidated string into its reply. See the handler for why.
  *
+ * ---
+ *
+ * `POST /api/documents/delete` — explicit cloud deletion with a tombstone (#1260, stage 3). The
+ * sync contract's deletion rule is that removing a cloud document is an explicit online operation
+ * leaving a tombstone, never a side effect of dropping a local copy, and that a stale Save cannot
+ * resurrect the deleted id. The decision table is `commitDelete` in `db/document-delete.ts` and
+ * the reply shapes are on the handler; the two properties worth stating up here are that it runs
+ * the SAME receipt/revision/transaction path as Save (so a duplicate sender is safe) and that it
+ * is exempt from the storage quota's refusal (so an account at its cap can still use the one
+ * operation that frees space).
+ *
+ * ---
+ *
  * **Why a safe method is not a cross-site read.** `sameOriginGuard` and `jsonOnlyGuard` exempt
  * `GET`/`HEAD`/`OPTIONS` (`http-safe-methods.ts`), so neither runs here. That is not a hole: the
  * session cookie is `__Host-`-prefixed and `SameSite=Strict` (`cookies.ts`), so a cross-site
@@ -88,27 +107,40 @@ export interface DocumentRoutesOptions {
  * a policy — a new document route without an entry here fails that test, and the companion test
  * added by #1253 proves each key answers `401` to a cookie-less caller.
  *
- * **These must not add up to the transport budget.** `transportRateLimitGuard`'s 300/min is a
- * SHARED ceiling over every `/api/*` request from one identity — `/api/auth/*` included — so a
- * per-route budget is only a promise the caller can keep if the transport budget still has room
- * left when it does. The read routes shipped at 60 + 240 = exactly 300, which the #1259
- * authorization review demonstrated: a client that spent both documented read budgets got `429`
- * on its next `GET /api/auth/session` AND on Save, both of which it is entitled to. 30 + 180 =
- * 210 leaves 90/min of the shared ceiling for the session check, Save and logout that a sync
- * pass needs in the same window. Any new document route has to come out of that 90, not be
- * added on top of it.
+ * **These are ceilings, not a budget that sums to the transport limit.** `transportRateLimitGuard`'s
+ * 300/min is a SHARED ceiling over every `/api/*` request from one identity — `/api/auth/*`
+ * included — and a per-route budget is only ever a promise the caller can keep if the transport
+ * budget still has room left when it does. It is not an invariant this table maintains: the four
+ * documented budgets sum to 30 + 180 + 120 + 30 = 360/min, already past the shared 300/min ceiling
+ * before a single `/api/auth/*` request is counted — Save's own 120 is what breaks it, not
+ * delete's addition. The #1259 authorization review demonstrated the consequence directly: a
+ * client that spent both read budgets in one window got `429` on its next `GET /api/auth/session`
+ * AND on Save, both of which it is entitled to. **Treat any `429` from this service as a signal to
+ * back off across the WHOLE origin, not just the route that returned it** — a client paced to stay
+ * under one route's number can still be over the shared one. And because
+ * `transportRateLimitGuard`/`identify()` key by source address, every device sharing one NAT or
+ * carrier gateway shares these budgets too, which is one more reason a route-local 429 says
+ * nothing about how much of the shared ceiling is actually left.
  *
  * Sized against the per-owner document cap (2,000): a manifest page carries up to
  * `MAX_LIST_LIMIT` rows, so 30/min re-reads a full four-page library seven times a minute, and
  * a cold start of 2,000 documents at 180/min is a paced ~11 minutes of downloads. The pacing is
  * deliberate — a full library is a one-time cost on a new device, and the alternative is
  * starving the account routes it takes to stay signed in while it happens.
+ *
+ * Delete (#1260) is set at 30/min, the smallest of the four, because deleting is a rare human
+ * act — a song removed, occasionally a handful in one sitting — and because it is the one route
+ * whose receipt the storage quota will not refuse (step 4 of `commitDelete`), which leaves this
+ * budget as the only thing bounding that residual. It is not sized against remaining headroom
+ * under the shared ceiling, because there is none by the arithmetic above; it is sized against
+ * what the operation itself needs.
  */
 export const DOCUMENT_POLICIES: Readonly<Record<string, { max: number; windowMs: number }>> =
     Object.freeze({
         'GET /api/documents': { max: 30, windowMs: 60_000 },
         'GET /api/documents/:id': { max: 180, windowMs: 60_000 },
         'POST /api/documents/save': { max: 120, windowMs: 60_000 },
+        'POST /api/documents/delete': { max: 30, windowMs: 60_000 },
     });
 
 /** Manifest page size when the caller names none. */
@@ -382,6 +414,144 @@ export function documentRoutes({
             );
         }
         return c.json({ ...receipt, revision: outcome.revision, kind: 'committed' });
+    });
+
+    /**
+     * The delete route's own body ceiling (#1260). Registered as middleware — `routes.use`, not a
+     * second handler argument to `routes.post` — for two reasons: `use` registers with method
+     * `ALL`, which the deny-by-default route-drift test in `test/http/auth-hardening.test.ts`
+     * filters out, whereas `post('/delete', limiter, handler)` would register the path TWICE and
+     * break that comparison; and it bounds every WRITE-method request reaching `/delete`, not only
+     * the `POST` this file handles today — a future `PUT`/`PATCH` handler added at this path would
+     * inherit the same ceiling for free.
+     *
+     * **This does NOT cover `GET /api/documents/delete`, and cannot by moving where it is
+     * registered.** That request matches `GET /:id` above (registered earlier, `id` bound to
+     * `'delete'`), so if this middleware ran first it would still hand off to that handler, which
+     * reads only the path and query — never `c.req.text()`/`.json()`/`.raw.body`. It does not
+     * matter either way, because a `GET` request cannot carry an observable body into this app at
+     * all: `@hono/node-server` never attaches a `body` stream to the Fetch `Request` it builds for
+     * `GET`/`HEAD` (mirroring the Fetch spec, which forbids a body on those methods), so
+     * `bodyLimit`'s own `if (!c.req.raw.body) return next()` short-circuits before it ever looks at
+     * `Content-Length` — verified directly against the installed `hono` middleware source and by a
+     * probe (`c.req.raw.body === null` for every `GET`, in-memory `app.request()` included). No
+     * registration order changes that, so don't "fix" this by moving the middleware above `GET
+     * /:id` — it would look like a fix and buy nothing.
+     *
+     * This nests inside the sub-app's `MAX_SAVE_REQUEST_BYTES` catch-all above. The outer limit
+     * cannot be the only one here: the whole `/api/documents/` prefix is exempt from the parent
+     * app's 64 KB limit (`app.ts`) so that a Save can carry a chart, and a delete request is 653
+     * bytes at its legal maximum — inheriting a ~1 MiB ceiling would let an oversized body be
+     * buffered through this process for no reason. Proven over a real socket in
+     * `test/http/body-limit.socket.test.ts`, not only over `app.request()`, because
+     * `bodyLimit`'s Content-Length branch trusts a declared length and only a real HTTP parser
+     * enforces framing — see that file's header.
+     */
+    routes.use(
+        '/delete',
+        bodyLimit({
+            maxSize: MAX_DELETE_REQUEST_BYTES,
+            onError: (c) => sendError(c, 413, 'payload_too_large'),
+        }),
+    );
+
+    /**
+     * `POST /api/documents/delete` — explicit cloud deletion with a tombstone (#1260).
+     *
+     * Guard order is the Save route's, unchanged: session, then the syntactic refusal of a request
+     * nobody legitimate sends, then this route's own budget, then the database. The decision table
+     * itself is `commitDelete` in `db/document-delete.ts`, one `BEGIN IMMEDIATE` transaction; this
+     * handler only maps its outcome onto the wire.
+     *
+     *   200 `{ ownerId, documentId, operationId, digest, revision, kind: 'deleted' }` — the id is
+     *       deleted and `revision` is the revision it died at. The SAME reply for a fresh delete,
+     *       a replay of that operation id, and a later delete of an id already deleted: a caller
+     *       learns the state of the world, never which of the three it caused.
+     *   409 `{ …, kind: 'conflict', remote: { revision, document } }` — the id is live at another
+     *       revision; nothing was deleted. The same envelope `commitSave` answers a conflict with,
+     *       so a client has one conflict shape to handle for both operations.
+     *   409 `{ error: 'operation_mismatch' }` — this operation id already committed other bytes.
+     *   404 `{ error: 'not_found' }` — the owner has no such id and no tombstone for it. Identical
+     *       to another owner's id, exactly as on the download route, and nothing is written, so a
+     *       retry costs the caller nothing but its rate budget.
+     *   400 `{ error: 'malformed_request' }` — anything the decoder refuses, INCLUDING an envelope
+     *       whose `ownerId` is not the session's account and a query string of any kind.
+     *   401 `{ error: 'unauthenticated' }` — including a recovery-purpose session.
+     *   413 `{ error: 'payload_too_large' }` — above `MAX_DELETE_REQUEST_BYTES`.
+     *
+     * There is deliberately no `quota_exceeded` on this route: a delete is never refused for
+     * storage, because it is the remedy for storage. See step 4 of `commitDelete`.
+     */
+    routes.post('/delete', async (c) => {
+        const session = requireSession(c);
+        if (!session.ok) {
+            return session.response;
+        }
+        // Deny-by-default, same as Save: the endpoint takes its whole input from the body, so any
+        // query string is an unexpected input, refused.
+        if (new URL(c.req.url).search.length !== 0) {
+            return sendError(c, 400, 'malformed_request');
+        }
+        const rejected = overBudget(c, 'POST /api/documents/delete');
+        if (rejected !== undefined) {
+            return rejected;
+        }
+
+        // The RAW bytes, never a re-parsed and re-serialized substitute: the decoder pins the
+        // canonical serialization and digests exactly what arrived.
+        const body = await c.req.text();
+        let decoded: Awaited<ReturnType<typeof decodeDeleteRequest>>;
+        try {
+            decoded = await decodeDeleteRequest(body, session.claims.accountId);
+        } catch (error) {
+            if (error instanceof DeleteRequestError) {
+                return sendError(c, 400, 'malformed_request');
+            }
+            // A missing `crypto.subtle` or similar is a broken server, not a bad request.
+            throw error;
+        }
+
+        const outcome = commitDelete(db, {
+            ownerId: session.claims.accountId,
+            documentId: decoded.documentId,
+            operationId: decoded.operationId,
+            digest: decoded.digest,
+            expectedRevision: decoded.expectedRevision,
+            now: now(),
+        });
+
+        const receipt = {
+            ownerId: session.claims.accountId,
+            documentId: decoded.documentId,
+            operationId: decoded.operationId,
+            digest: decoded.digest,
+        };
+        if (outcome.kind === 'operation_mismatch') {
+            return sendError(c, 409, 'operation_mismatch');
+        }
+        if (outcome.kind === 'not_found') {
+            return sendError(c, 404, 'not_found');
+        }
+        if (outcome.kind === 'conflict') {
+            return c.json(
+                {
+                    ...receipt,
+                    revision: outcome.revision,
+                    kind: 'conflict',
+                    // Parsed rather than spliced, exactly as the Save route's conflict reply does
+                    // it: the document is nested inside a reply built from computed values, not
+                    // handed back as the whole body (which is why the DOWNLOAD route splices).
+                    remote: {
+                        revision: outcome.remote.revision,
+                        document: JSON.parse(outcome.remote.body) as unknown,
+                    },
+                },
+                409,
+            );
+        }
+        // `replayed`/`performed` stop here: which call did the deleting is not something a caller
+        // can act on, and two callers racing must not be able to tell each other apart.
+        return c.json({ ...receipt, revision: outcome.revision, kind: 'deleted' });
     });
 
     return routes;
