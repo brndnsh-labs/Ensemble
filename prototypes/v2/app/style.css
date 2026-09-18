@@ -2733,6 +2733,38 @@ html[data-theme="stage"] {
     padding: 0;
     accent-color: var(--ink);
 }
+/* Recovery entry and code entry (#1263). */
+.recovery-link {
+    /* Not a .btn: that is `white-space: nowrap`, and this label is a sentence that has to wrap at
+       phone width. A text link is also the right weight for a way out of trouble sitting under
+       the two things most people actually came for. */
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--ink);
+    text-align: left;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    padding: 0;
+    background: none;
+    border: 0;
+}
+.recovery-link:disabled {
+    color: var(--muted);
+    text-decoration: none;
+}
+.recovery-entry {
+    display: block;
+    font-size: 13px;
+    line-height: 1.6;
+    margin-bottom: 4px;
+}
+.recovery-entry input {
+    /* The code is 43 unbroken base64url characters; a proportional face makes an l/1/I mix-up
+       impossible to spot while checking a typo. */
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 13px;
+    margin-top: 6px;
+}
 .account-notice,
 .account-error {
     font-size: 13px;

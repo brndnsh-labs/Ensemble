@@ -1,5 +1,5 @@
 /**
- * The passkey ceremonies, as five plain async functions over `lib/account/api.ts` (#1262).
+ * The passkey ceremonies, as plain async functions over `lib/account/api.ts` (#1262, #1263).
  *
  * `@simplewebauthn/browser` (14.0.0, the same major as the server's pinned `@simplewebauthn/server`
  * 14.0.1) is the ONE new client dependency rollout decision 9 S4 allows. It is used for exactly
@@ -35,6 +35,7 @@ import {
     type AccountFailure,
     type AccountOutcome,
     failureFromApi,
+    failureFromClaim,
 } from './messages';
 
 /** Every `options` route answers `{ options }`; the value is passed straight to the library. */
@@ -97,8 +98,24 @@ function accountIdOf(reply: AccountIdReply | undefined): string | null {
 
 /** Creates an account from a brand-new passkey. The session cookie is set by `register/verify`. */
 export async function createAccount(api: AccountApi): Promise<AccountOutcome<string>> {
+    return registerCredential(api, '/api/auth/register/options', '/api/auth/register/verify');
+}
+
+/**
+ * One registration ceremony over an options/verify pair — the sibling of `assertIdentity` below,
+ * and for the same reason: `register/*` and `recovery/enroll-passkey/*` are byte-identical
+ * ceremonies over different routes (a `PublicKeyCredentialCreationOptionsJSON`, one
+ * `startRegistration`, an `{ accountId }` reply), differing only in what the server does with the
+ * result. Keeping one implementation is what stops the recovery path quietly drifting away from
+ * the create path's cancellation and error handling.
+ */
+async function registerCredential(
+    api: AccountApi,
+    optionsPath: string,
+    verifyPath: string,
+): Promise<AccountOutcome<string>> {
     const started = await api.post<OptionsReply<PublicKeyCredentialCreationOptionsJSON>>(
-        '/api/auth/register/options',
+        optionsPath,
         NO_BODY,
     );
     if (!started.ok) {
@@ -114,10 +131,7 @@ export async function createAccount(api: AccountApi): Promise<AccountOutcome<str
     } catch (error) {
         return failureFromCeremony(error);
     }
-    const verified = await api.post<AccountIdReply>(
-        '/api/auth/register/verify',
-        JSON.stringify(response),
-    );
+    const verified = await api.post<AccountIdReply>(verifyPath, JSON.stringify(response));
     if (!verified.ok) {
         return fail(failureFromApi(verified.error));
     }
@@ -227,6 +241,54 @@ export async function confirmRecoveryCode(
         api.post<undefined>('/api/auth/recovery/confirm', JSON.stringify({ code })),
     );
     return result.ok ? { ok: true, value: null } : result;
+}
+
+/**
+ * Spends a recovery code for a RECOVERY-ONLY session (#1263). `204`, no body: the cookie the
+ * server sets is the entire result, and there is nothing else to disclose.
+ *
+ * Deliberately NOT `withFreshAuth`-wrapped. This is the one account route that runs with no
+ * session at all — a person here has lost their passkey, so there is nothing to step up with —
+ * and the session it mints can do exactly one thing: enroll one new passkey. It does not satisfy
+ * `isFreshlyAuthenticated`, and the library routes (`GET /api/documents`) refuse it, so nothing
+ * between this call and `enrollRecoveryPasskey` below can read or write a single chart.
+ *
+ * `failureFromClaim` rather than `failureFromApi`: the server's one collapsed
+ * `401 authentication_failed` means "that code isn't usable" here, not "try a different passkey".
+ *
+ * Claiming takes an exclusive, self-expiring lock on the code for `RECOVERY_SESSION_TTL_MS` (10
+ * minutes). So a caller whose enrolment then fails must RETRY THE CEREMONY on the session it
+ * already holds — calling this again with the same code inside that window is refused by the
+ * lock, not by the code being spent. The code itself is only consumed when
+ * `enroll-passkey/verify` commits.
+ */
+export async function claimRecoveryCode(
+    api: AccountApi,
+    code: string,
+): Promise<AccountOutcome<null>> {
+    const result = await api.post<undefined>('/api/auth/recovery/claim', JSON.stringify({ code }));
+    return result.ok ? { ok: true, value: null } : fail(failureFromClaim(result.error));
+}
+
+/**
+ * Enrolls the replacement passkey under a recovery-only session, completing the recovery (#1263).
+ *
+ * The server's commit is one transaction: consume the code, revoke every live session, delete
+ * every existing credential, insert this one — so on success the old passkeys and every other
+ * signed-in device are gone, and `verify` mints a brand-new STANDARD session bound to the new
+ * credential, immediately fresh. That freshness is why the replacement `enrollRecoveryCode` that
+ * follows needs no second prompt, exactly as it doesn't after registration.
+ *
+ * On ANY failure the whole transaction rolls back, including the consume — which is what makes an
+ * interrupted enrolment safe to retry. Retry this function, not `claimRecoveryCode`: the recovery
+ * session is still live and still holds the claim lock.
+ */
+export async function enrollRecoveryPasskey(api: AccountApi): Promise<AccountOutcome<string>> {
+    return registerCredential(
+        api,
+        '/api/auth/recovery/enroll-passkey/options',
+        '/api/auth/recovery/enroll-passkey/verify',
+    );
 }
 
 /**

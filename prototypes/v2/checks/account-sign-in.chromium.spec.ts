@@ -1,5 +1,11 @@
 import { readFile } from 'node:fs/promises';
 import type { Page } from '@playwright/test';
+import {
+    CODE_SHAPE,
+    createAccountThroughDialog,
+    openWithAccounts,
+    persistedState,
+} from './account-helpers';
 import { expect, accountTest as test } from './fixtures';
 import { addVirtualAuthenticator } from './virtual-authenticator';
 
@@ -8,82 +14,18 @@ import { addVirtualAuthenticator } from './virtual-authenticator';
  *
  * `*.chromium.spec.ts`: the CDP virtual authenticator is Chromium-only.
  *
- * **Budget note, load-bearing for stability:** `POST /api/auth/recovery/enroll` is rate limited
- * to 5 per 10 minutes, and the harness runs the API in `socket-only` identity mode, so every
- * test in a worker shares ONE bucket (the preview proxy is the socket peer). Creating an account
- * through the UI always enrols once. This file therefore spends exactly 4: one each here and in
- * the sign-out round trip, two in the abandon/resume test — the fresh-profile sign-in costs
- * nothing extra because it reuses that round trip's account. That is also why the
- * "code never leaks" assertions live inside the create test rather than in a fifth account of
- * their own — the code is on screen exactly once per enrolment, so proving it is nowhere else at
- * that moment is the same test, not a cheaper version of a separate one.
+ * **Rate-limit budget, no longer shared.** `POST /api/auth/recovery/enroll` is rate limited to 5
+ * per 10 minutes, but `fixtures.ts`'s `accountApi` fixture is TEST-scoped (patch review #1263,
+ * item 5): every test spawns its own API process against its own throwaway `node:sqlite` file,
+ * so every test gets a virgin rate limiter. There is no longer a bucket shared across tests in
+ * this file, across workers, or with `account-recovery.chromium.spec.ts` to do arithmetic
+ * against — a fifth (or fiftieth) enrolment costs nothing but its own spawn.
  *
- * The security-review follow-ups (focus-on-code, the offline sign-out disable, and a failed
- * Finish rendering its error) are folded into these same four enrolments rather than adding a
- * fifth — the budget stays at 4/10min.
+ * The shapes below (one account covering both round trips, the "code never leaks" assertions
+ * living inside the create test, the security-review follow-ups folded into these same tests) are
+ * kept as they are because they are still the right shapes — one clear scenario per test — not
+ * because of a budget that no longer exists.
  */
-
-const CODE_SHAPE = /^[A-Za-z0-9_-]{43}$/;
-
-/** Opt this device into the dark-launched account UI, then land on the songbook. */
-async function openWithAccounts(page: Page): Promise<void> {
-    await page.goto('/v2/?accounts=on');
-    await expect(page.getByRole('heading', { name: 'Let’s play something.' })).toBeVisible();
-}
-
-async function createAccountThroughDialog(page: Page): Promise<string> {
-    await page.getByTestId('account-sign-in').click();
-    await expect(page.locator('dialog.account-dialog')).toBeVisible();
-    await page.getByTestId('account-create').click();
-    const shown = page.getByTestId('recovery-code');
-    await expect(shown).toBeVisible();
-    const code = (await shown.textContent()) ?? '';
-    expect(code).toMatch(CODE_SHAPE);
-    return code;
-}
-
-/** Everything this origin can be asked for, to search for a leaked recovery code. */
-async function persistedState(page: Page) {
-    return page.evaluate(async () => {
-        const pack = (storage: Storage) => {
-            const entries: string[] = [];
-            for (let index = 0; index < storage.length; index += 1) {
-                const key = storage.key(index);
-                entries.push(`${key}=${key === null ? '' : storage.getItem(key)}`);
-            }
-            return entries.join('\n');
-        };
-        let indexed = '';
-        const databases = (await indexedDB.databases?.()) ?? [];
-        for (const { name } of databases) {
-            if (!name) {
-                continue;
-            }
-            const db = await new Promise<IDBDatabase>((resolve, reject) => {
-                const request = indexedDB.open(name);
-                request.onsuccess = () => resolve(request.result);
-                request.onerror = () => reject(request.error);
-            });
-            for (const store of Array.from(db.objectStoreNames)) {
-                indexed += await new Promise<string>((resolve) => {
-                    const request = db.transaction(store, 'readonly').objectStore(store).getAll();
-                    request.onsuccess = () => resolve(JSON.stringify(request.result));
-                    request.onerror = () => resolve('');
-                });
-            }
-            db.close();
-        }
-        return {
-            href: location.href,
-            local: pack(localStorage),
-            session: pack(sessionStorage),
-            indexed,
-            // HttpOnly, so this should be empty — but an accidental readable cookie is exactly
-            // the kind of thing worth failing on.
-            cookie: document.cookie,
-        };
-    });
-}
 
 test('creating an account shows the recovery code once, downloads it, and survives a reload', async ({
     page,
