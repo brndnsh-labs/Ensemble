@@ -9,6 +9,7 @@ import {
     enrollRecoveryCode,
     listPasskeys,
     type PasskeySummary,
+    recoveryEnrolled,
     revokeOtherSessions,
     revokePasskey,
 } from '../../lib/account/passkeys';
@@ -46,12 +47,17 @@ interface AccountPageProps {
     onAccountChanged: () => void;
 }
 
-type Section = 'main' | 'replaceCode';
+type Section = 'main' | 'replaceCode' | 'signedOut';
 
 export function AccountPage({ dialogRef, open, onClose, onAccountChanged }: AccountPageProps) {
     const [section, setSection] = useState<Section>('main');
     const [passkeys, setPasskeys] = useState<PasskeySummary[] | null>(null);
     const [listFailure, setListFailure] = useState<AccountFailure | null>(null);
+    /** Whether the account has a CONFIRMED, unconsumed recovery code — `null` while unknown, same
+     * convention as `passkeys`. Fetched alongside the passkey list (#1264 patch review P2-2): the
+     * server's `409 last_credential` rule is "one credential AND no confirmed recovery material",
+     * not "one credential" alone, so the button's courtesy disable needs this to match it. */
+    const [recoveryConfirmed, setRecoveryConfirmed] = useState<boolean | null>(null);
     // Which action is in flight, if any — every button on the page disables while ANY action is
     // busy, both because two ceremonies can't interleave on one profile (`passkeys.ts`'s doc
     // comment) and because a stale list read mid-mutation would be confusing either way.
@@ -86,18 +92,48 @@ export function AccountPage({ dialogRef, open, onClose, onAccountChanged }: Acco
         previousSectionRef.current = section;
     }, [section, open]);
 
+    /**
+     * The 'signedOut' section (#1264 patch review P2-4) replaces this dialog's own heading and
+     * the Remove button that was just pressed, so focus would otherwise fall to `<body>` — the
+     * mirror image of `mainHeadingRef` above, for the transition INTO this section instead of
+     * out of `replaceCode`.
+     */
+    const signedOutHeadingRef = useRef<HTMLHeadingElement>(null);
+    useEffect(() => {
+        if (section === 'signedOut') {
+            signedOutHeadingRef.current?.focus();
+        }
+    }, [section]);
+
+    /**
+     * Re-reads both the passkey list and the recovery-code status together (#1264 patch review
+     * P2-2) — `lastPasskey` below needs both to answer the server's actual rule, and either one
+     * can change out from under the other: a step-up rebinds `current` on the SAME list, and
+     * confirming/abandoning a recovery code flips `recoveryConfirmed` alone. One call, run from
+     * every site that currently calls this, keeps them from drifting apart.
+     */
     const refreshPasskeys = useCallback(() => {
-        void listPasskeys(accountApi).then((outcome) => {
-            if (!openRef.current) {
-                return;
-            }
-            if (outcome.ok) {
-                setPasskeys(outcome.value);
-                setListFailure(null);
-            } else if (outcome.failure.kind !== 'cancelled') {
-                setListFailure(outcome.failure);
-            }
-        });
+        void Promise.all([listPasskeys(accountApi), recoveryEnrolled(accountApi)]).then(
+            ([passkeysOutcome, recoveryOutcome]) => {
+                if (!openRef.current) {
+                    return;
+                }
+                if (passkeysOutcome.ok) {
+                    setPasskeys(passkeysOutcome.value);
+                    setListFailure(null);
+                } else if (passkeysOutcome.failure.kind !== 'cancelled') {
+                    setListFailure(passkeysOutcome.failure);
+                }
+                // A failed recovery-status read leaves `recoveryConfirmed` at its last known value
+                // (or `null`) rather than surfacing a second failure banner next to the passkey
+                // one — `lastPasskey` only trips on an explicit `false`, so the courtesy note
+                // simply stays silent here; the server's own `409 last_credential` remains the
+                // real enforcement point regardless.
+                if (recoveryOutcome.ok) {
+                    setRecoveryConfirmed(recoveryOutcome.value);
+                }
+            },
+        );
     }, []);
 
     useEffect(() => {
@@ -114,6 +150,7 @@ export function AccountPage({ dialogRef, open, onClose, onAccountChanged }: Acco
             // that was already shown, and a stale passkey list is not worth keeping around either.
             setPasskeys(null);
             setListFailure(null);
+            setRecoveryConfirmed(null);
             setBusyAction(null);
             setActionFailure(null);
             setCode('');
@@ -154,9 +191,12 @@ export function AccountPage({ dialogRef, open, onClose, onAccountChanged }: Acco
         if (outcome.value.signedOut) {
             // The revoked credential created THIS session — the server already cleared the
             // cookie, so react as a sign-out rather than refreshing a list for an account we can
-            // no longer read.
+            // no longer read. Stay open on a dedicated section instead of closing straight away
+            // (#1264 patch review P2-4): the shell's header flips to "Sign in again" behind this
+            // dialog the instant `onAccountChanged` runs, and closing immediately would leave
+            // nothing on screen saying why this device just got signed out.
             onAccountChanged();
-            onClose();
+            setSection('signedOut');
             return;
         }
         refreshPasskeys();
@@ -198,6 +238,11 @@ export function AccountPage({ dialogRef, open, onClose, onAccountChanged }: Acco
         // decision 2/3) the moment this call succeeded. Same rule `sign-in.tsx`'s `runCreate`
         // follows: tell the shell immediately rather than only on Finish.
         onAccountChanged();
+        // `withFreshAuth` inside `enrollRecoveryCode` may have just run a step-up ceremony, which
+        // rebinds THIS session to whichever credential answered it (#1264 patch review P1) — the
+        // passkey list already in state can be showing "— this device" on the wrong row by the
+        // time this section is reachable again. Re-read it now rather than leaving it stale.
+        refreshPasskeys();
         setCode(outcome.value);
         setSection('replaceCode');
     }
@@ -219,6 +264,11 @@ export function AccountPage({ dialogRef, open, onClose, onAccountChanged }: Acco
         setCode('');
         setSection('main');
         onAccountChanged();
+        // Same reason as `beginReplaceCode` above: `confirmRecoveryCode` is also
+        // `withFreshAuth`-wrapped, so this call alone can be the one that steps up and rebinds
+        // the session — and separately, `recoveryConfirmed` itself just flipped to `true` and the
+        // main section is about to render its courtesy note again.
+        refreshPasskeys();
     }
 
     function abandonReplaceCode() {
@@ -226,7 +276,11 @@ export function AccountPage({ dialogRef, open, onClose, onAccountChanged }: Acco
         setSection('main');
     }
 
-    const lastPasskey = passkeys !== null && passkeys.length <= 1;
+    // The server's rule (`revokePasskey`'s step 3, `v2-api/src/auth/passkeys.ts`): refuse only
+    // when this credential is the ONLY one AND there is no confirmed, unconsumed recovery code —
+    // `=== 1`, not `<= 1`, so an empty (still-loading-failed) list never shows the note, and
+    // `=== false`, not falsy, so `null` (not yet known) doesn't either (#1264 patch review P2-2).
+    const lastPasskey = passkeys !== null && passkeys.length === 1 && recoveryConfirmed === false;
     const busy = busyAction !== null;
 
     return (
@@ -249,6 +303,25 @@ export function AccountPage({ dialogRef, open, onClose, onAccountChanged }: Acco
                     onFinish={() => void finishReplaceCode()}
                     onClose={abandonReplaceCode}
                 />
+            ) : section === 'signedOut' ? (
+                <>
+                    <h2 id="account-page-title" ref={signedOutHeadingRef} tabIndex={-1}>
+                        You’ve been signed out.
+                    </h2>
+                    <p>
+                        That passkey was what signed this device in, so removing it ended this
+                        session too.
+                    </p>
+                    <div className="dialog-actions">
+                        <button
+                            className="btn"
+                            data-testid="account-page-signed-out-close"
+                            onClick={onClose}
+                        >
+                            Close
+                        </button>
+                    </div>
+                </>
             ) : (
                 <>
                     <h2 id="account-page-title" ref={mainHeadingRef} tabIndex={-1}>
@@ -259,7 +332,12 @@ export function AccountPage({ dialogRef, open, onClose, onAccountChanged }: Acco
                         <h3 id="account-page-passkeys-heading">Passkeys</h3>
                         <AccountFailureNotice failure={listFailure} />
                         {passkeys === null ? (
-                            <p className="status-detail">Loading…</p>
+                            // `listFailure !== null` means the fetch already answered — with an
+                            // error `AccountFailureNotice` just rendered above — so this must not
+                            // ALSO claim to be loading forever (#1264 patch review P3-5). Nothing
+                            // further to say: the failure banner already covers it, and setting
+                            // `passkeys` to `[]` here would misreport "zero passkeys" instead.
+                            listFailure === null && <p className="status-detail">Loading…</p>
                         ) : (
                             <ul className="passkey-list">
                                 {passkeys.map((passkey) => (

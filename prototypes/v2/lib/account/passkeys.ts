@@ -83,8 +83,21 @@ function failureFromCeremony(error: unknown): { ok: false; failure: AccountFailu
     if (ceremonyCancelled(error)) {
         return fail({ kind: 'cancelled' });
     }
-    // Everything else the authenticator can refuse — already-registered, no discoverable
-    // credential support, no user verification — is actionable in the same one way.
+    // `ERROR_AUTHENTICATOR_PREVIOUSLY_REGISTERED` (#1264 patch review P2-3): this device's
+    // authenticator already holds the account's credential — `attemptAddPasskey`'s
+    // `excludeCredentials` makes WebAuthn refuse with `InvalidStateError`, which
+    // `identifyRegistrationError` (verified against the installed 14.0.0) maps to this code.
+    // `identifyAuthenticationError` (the sign-in path) never produces it, so this branch only
+    // ever fires for registration ceremonies (`registerCredential`/`attemptAddPasskey`), and the
+    // dedicated message is only ever accurate there.
+    if (
+        error instanceof WebAuthnError &&
+        error.code === 'ERROR_AUTHENTICATOR_PREVIOUSLY_REGISTERED'
+    ) {
+        return fail({ kind: 'error', message: ACCOUNT_MESSAGES.passkeyOnThisDevice });
+    }
+    // Everything else the authenticator can refuse — no discoverable credential support, no
+    // user verification — is actionable in the same one way.
     return fail({ kind: 'error', message: ACCOUNT_MESSAGES.failed });
 }
 

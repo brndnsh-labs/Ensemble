@@ -42,11 +42,23 @@ export const ACCOUNT_MESSAGES = {
     badCode:
         'That code isn’t right, or it’s already been used. If you started a recovery and ' +
         'stopped, wait ten minutes and try the same code again.',
-    /** `409 last_credential` (#1264): the account page also blocks this in the UI (the Remove
-     * button is disabled on the last passkey), so a real caller only ever sees this message if
-     * the direct route is called some other way — but the server is the actual enforcement point,
-     * never the disabled button alone, so the words still have to exist. */
-    lastPasskey: 'Add another passkey before removing your last one.',
+    /** `409 last_credential` (#1264, worded per patch review P2-2): the server's real rule
+     * (`revokePasskey` in `v2-api/src/auth/passkeys.ts`) is "refuse only when this would leave
+     * the account with one credential AND zero confirmed, unconsumed recovery material" — one
+     * passkey plus a confirmed recovery code is fine and the server allows removing it. The
+     * account page's own courtesy note mirrors that exact rule (`passkeys.length === 1 &&
+     * recoveryConfirmed === false`), not a plain "down to one" count, so this sentence has to
+     * name BOTH missing pieces rather than implying passkey count alone is the reason. */
+    lastPasskey:
+        'This is your only passkey and there’s no recovery code — add one of them before ' +
+        'removing it.',
+    /** `InvalidStateError` from `startRegistration` (#1264 patch review P2-3): the platform
+     * authenticator answering "Add a passkey" already holds this account's credential (WebAuthn's
+     * `excludeCredentials` check), which the generic `failed` copy answers with "try a different
+     * passkey" — useless advice when a different passkey is exactly what this device lacks. */
+    passkeyOnThisDevice:
+        'This device already has a passkey for your account. Add one from another device, ' +
+        'a phone or a security key.',
 } as const;
 
 /**

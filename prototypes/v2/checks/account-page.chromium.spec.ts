@@ -1,5 +1,11 @@
 import type { Page } from '@playwright/test';
-import { createAccountThroughDialog, openWithAccounts } from './account-helpers';
+import { ACCOUNT_MESSAGES } from '../lib/account/messages';
+import {
+    CODE_SHAPE,
+    createAccountThroughDialog,
+    openWithAccounts,
+    persistedState,
+} from './account-helpers';
 import { expect, accountTest as test } from './fixtures';
 import { addVirtualAuthenticator } from './virtual-authenticator';
 
@@ -86,16 +92,6 @@ test('passkeys can be added and revoked (each stepping up when stale), the last 
     expect(originalCredentials).toHaveLength(1);
     const [originalCredential] = originalCredentials;
 
-    // A SECOND, independent virtual authenticator — a different transport, standing in for a
-    // different physical device — added only NOW, after the account already has its one
-    // credential. `excludeCredentials` on the add-passkey ceremony lists that existing credential,
-    // and WebAuthn's exclusion check is per-connected-authenticator: adding a second passkey on
-    // the SAME authenticator that already holds one always throws `InvalidStateError` (correct
-    // WebAuthn behavior, not a bug in `lib/account/passkeys.ts`), and attaching this one earlier
-    // would race Chrome's presence simulation across both for the FIRST registration too. A
-    // second `transport: 'internal'` authenticator is refused outright — Chrome allows one.
-    const secondDevice = await addVirtualAuthenticator(page, 'usb');
-
     // --- the page opens, is named, and closes the way every dialog in this app does ------------
     await page.getByTestId('account-open').click();
     const dialog = page.locator('dialog.account-page');
@@ -113,9 +109,33 @@ test('passkeys can be added and revoked (each stepping up when stale), the last 
     await expect(dialog).toBeHidden();
     await page.getByTestId('account-open').click();
     await expect(dialog).toBeVisible();
+    const rows = page.getByTestId('passkey-row');
+
+    // --- adding a passkey on a device that already holds the account's only credential ---------
+    // Only the platform authenticator is attached right now (the second "device" below doesn't
+    // exist yet) — `attemptAddPasskey`'s `excludeCredentials` lists the existing credential, so
+    // WebAuthn refuses with `InvalidStateError`, which `@simplewebauthn/browser` (verified against
+    // the installed 14.0.0) maps to `ERROR_AUTHENTICATOR_PREVIOUSLY_REGISTERED`. `failureFromCeremony`
+    // (#1264 patch review P2-3) must answer with the dedicated message, not the generic "try a
+    // different passkey" — nonsense advice when a different passkey is exactly what this device
+    // doesn't have.
+    await page.getByTestId('passkey-add').click();
+    await expect(page.getByTestId('account-error')).toHaveText(
+        ACCOUNT_MESSAGES.passkeyOnThisDevice,
+    );
+    await expect(rows).toHaveCount(1);
+
+    // A SECOND, independent virtual authenticator — a different transport, standing in for a
+    // different physical device — added only NOW, after the account already has its one
+    // credential. `excludeCredentials` on the add-passkey ceremony lists that existing credential,
+    // and WebAuthn's exclusion check is per-connected-authenticator: adding a second passkey on
+    // the SAME authenticator that already holds one always throws `InvalidStateError` (correct
+    // WebAuthn behavior, not a bug in `lib/account/passkeys.ts`), and attaching this one earlier
+    // would race Chrome's presence simulation across both for the FIRST registration too. A
+    // second `transport: 'internal'` authenticator is refused outright — Chrome allows one.
+    const secondDevice = await addVirtualAuthenticator(page, 'usb');
 
     // --- the last passkey cannot be removed: in the UI, and at the server ----------------------
-    const rows = page.getByTestId('passkey-row');
     await expect(rows).toHaveCount(1);
     await expect(rows.getByTestId('passkey-remove')).toBeDisabled();
     await expect(page.getByTestId('passkey-last-note')).toBeVisible();
@@ -200,7 +220,10 @@ test('passkeys can be added and revoked (each stepping up when stale), the last 
     // --- replace the recovery code, through a step-up ------------------------------------------
     await refuseOnceWithFreshAuthRequired(page, '**/api/auth/recovery/enroll');
     await page.getByTestId('replace-recovery-code').click();
-    await expect(page.getByTestId('recovery-code')).toBeVisible();
+    const shownReplacement = page.getByTestId('recovery-code');
+    await expect(shownReplacement).toBeVisible();
+    const replacementCode = (await shownReplacement.textContent()) ?? '';
+    expect(replacementCode).toMatch(CODE_SHAPE);
     await expect.poll(stepUps).toBe(3);
     await page.getByTestId('recovery-saved').check();
     await page.getByTestId('recovery-finish').click();
@@ -209,6 +232,18 @@ test('passkeys can be added and revoked (each stepping up when stale), the last 
     await expect(page.getByTestId('recovery-code')).toHaveCount(0);
     await expect(page.locator('#account-page-title')).toBeFocused();
     await expect(page.getByTestId('account-error')).toHaveCount(0);
+
+    // This is the THIRD code this test has minted (account creation's, abandoned, doesn't count
+    // since it was never confirmed and is unrelated to this sweep) — the create and recovery
+    // flows already run this exact leaked-storage sweep (#1262/#1263); the replace-code flow
+    // (#1264 patch review P3-6) must run it too, identically, or a future storage regression in
+    // ONE of the three flows could ship unnoticed.
+    const replaceState = await persistedState(page);
+    expect(replaceState.href).not.toContain(replacementCode);
+    expect(replaceState.local).not.toContain(replacementCode);
+    expect(replaceState.session).not.toContain(replacementCode);
+    expect(replaceState.indexed).not.toContain(replacementCode);
+    expect(replaceState.cookie).not.toContain(replacementCode);
 
     await page.keyboard.press('Escape');
     await expect(dialog).toBeHidden();
@@ -263,4 +298,61 @@ test('passkeys can be added and revoked (each stepping up when stale), the last 
     } finally {
         await fresh.close();
     }
+});
+
+/**
+ * Revoking the credential that created THIS session (#1264 patch review P2-4) — a separate test,
+ * and a separate account, from the narrative above: `accountApi` is TEST-scoped (its own API
+ * process and throwaway database), so there is no budget or ordering to share, and this scenario
+ * needs its OWN account left with exactly two passkeys, removing the one bound to the live
+ * session. Reusing the narrative test's account would mean either revoking its remaining passkey
+ * (leaving nothing for later assertions in that test) or adding a third, neither of which is
+ * simpler than a fresh account.
+ */
+test('revoking the passkey that signed this device in ends the session, with the dialog saying so', async ({
+    page,
+}) => {
+    await addVirtualAuthenticator(page);
+    await openWithAccounts(page);
+    await createAccountThroughDialog(page);
+    await page.getByTestId('recovery-not-now').click();
+    await expect(page.getByTestId('account-finish-protecting')).toBeVisible();
+
+    // A second passkey, purely so removing the first isn't blocked by the last-credential guard —
+    // this test is about the SIGN-OUT reaction, not that guard (covered above).
+    const secondDevice = await addVirtualAuthenticator(page, 'usb');
+    await page.getByTestId('account-open').click();
+    const dialog = page.locator('dialog.account-page');
+    await expect(dialog).toBeVisible();
+    await page.getByTestId('passkey-add').click();
+    await expect(page.getByTestId('passkey-row')).toHaveCount(2);
+    // Unplug it immediately: with both authenticators attached, a later ceremony that allows
+    // either one is Chrome's choice, not this test's (`VirtualAuthenticator.remove`'s own doc
+    // comment) — there is no later ceremony here, but removing it keeps this test's intent
+    // (revoke the ORIGINAL, session-creating credential) unambiguous either way.
+    await secondDevice.remove();
+
+    // This session was created by registration, i.e. the credential still marked `current`.
+    const currentId = await page.evaluate(async () => {
+        const reply = await fetch('/api/auth/passkeys', { cache: 'no-store' });
+        const { passkeys } = (await reply.json()) as {
+            passkeys: { id: string; current: boolean }[];
+        };
+        return passkeys.find((row) => row.current)?.id;
+    });
+    expect(currentId).toBeDefined();
+    await page.locator(`[data-credential-id="${currentId}"]`).getByTestId('passkey-remove').click();
+
+    // The dialog stays open and says why, rather than vanishing the instant the header behind it
+    // flips to signed-out.
+    await expect(page.getByTestId('account-page-signed-out-close')).toBeVisible();
+    await expect(dialog).toBeVisible();
+    await page.getByTestId('account-page-signed-out-close').click();
+    await expect(dialog).toBeHidden();
+    await expect(page.getByTestId('account-sign-in')).toBeVisible();
+    expect(
+        await page.evaluate(() =>
+            fetch('/api/auth/session', { cache: 'no-store' }).then((reply) => reply.status),
+        ),
+    ).toBe(401);
 });
