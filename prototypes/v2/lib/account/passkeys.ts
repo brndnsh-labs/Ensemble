@@ -1,5 +1,7 @@
 /**
- * The passkey ceremonies, as plain async functions over `lib/account/api.ts` (#1262, #1263).
+ * The passkey ceremonies, as plain async functions over `lib/account/api.ts` (#1262, #1263,
+ * extended by #1264's account page with
+ * `listPasskeys`/`addPasskey`/`revokePasskey`/`revokeOtherSessions`).
  *
  * `@simplewebauthn/browser` (14.0.0, the same major as the server's pinned `@simplewebauthn/server`
  * 14.0.1) is the ONE new client dependency rollout decision 9 S4 allows. It is used for exactly
@@ -81,8 +83,21 @@ function failureFromCeremony(error: unknown): { ok: false; failure: AccountFailu
     if (ceremonyCancelled(error)) {
         return fail({ kind: 'cancelled' });
     }
-    // Everything else the authenticator can refuse — already-registered, no discoverable
-    // credential support, no user verification — is actionable in the same one way.
+    // `ERROR_AUTHENTICATOR_PREVIOUSLY_REGISTERED` (#1264 patch review P2-3): this device's
+    // authenticator already holds the account's credential — `attemptAddPasskey`'s
+    // `excludeCredentials` makes WebAuthn refuse with `InvalidStateError`, which
+    // `identifyRegistrationError` (verified against the installed 14.0.0) maps to this code.
+    // `identifyAuthenticationError` (the sign-in path) never produces it, so this branch only
+    // ever fires for registration ceremonies (`registerCredential`/`attemptAddPasskey`), and the
+    // dedicated message is only ever accurate there.
+    if (
+        error instanceof WebAuthnError &&
+        error.code === 'ERROR_AUTHENTICATOR_PREVIOUSLY_REGISTERED'
+    ) {
+        return fail({ kind: 'error', message: ACCOUNT_MESSAGES.passkeyOnThisDevice });
+    }
+    // Everything else the authenticator can refuse — no discoverable credential support, no
+    // user verification — is actionable in the same one way.
     return fail({ kind: 'error', message: ACCOUNT_MESSAGES.failed });
 }
 
@@ -220,8 +235,9 @@ interface EnrollReply {
  * enrolment safe: the person gets a fresh code, and the one they walked away from stops working.
  */
 export async function enrollRecoveryCode(api: AccountApi): Promise<AccountOutcome<string>> {
-    const result = await withFreshAuth(api, () =>
-        api.post<EnrollReply>('/api/auth/recovery/enroll', NO_BODY),
+    const result = await withFreshAuth(
+        api,
+        gatedRequest(() => api.post<EnrollReply>('/api/auth/recovery/enroll', NO_BODY)),
     );
     if (!result.ok) {
         return result;
@@ -237,10 +253,179 @@ export async function confirmRecoveryCode(
     api: AccountApi,
     code: string,
 ): Promise<AccountOutcome<null>> {
-    const result = await withFreshAuth(api, () =>
-        api.post<undefined>('/api/auth/recovery/confirm', JSON.stringify({ code })),
+    const result = await withFreshAuth(
+        api,
+        gatedRequest(() =>
+            api.post<undefined>('/api/auth/recovery/confirm', JSON.stringify({ code })),
+        ),
     );
     return result.ok ? { ok: true, value: null } : result;
+}
+
+/** What `GET /api/auth/passkeys` returns — a deliberate COPY of the server's `PasskeySummary`
+ * (`prototypes/v2-api/src/auth/passkeys.ts`), same rationale as `api.ts`'s `ApiErrorCode` copy:
+ * two separate services, no shared dependency edge, kept in sync by hand. */
+export interface PasskeySummary {
+    id: string;
+    createdAt: number;
+    lastUsedAt: number | null;
+    transports: string[];
+    /** True for the credential that created the session making this request (#1264). */
+    current: boolean;
+}
+
+interface PasskeysReply {
+    passkeys?: unknown;
+}
+
+function isPasskeySummary(value: unknown): value is PasskeySummary {
+    if (value === null || typeof value !== 'object') {
+        return false;
+    }
+    const row = value as Record<string, unknown>;
+    return (
+        typeof row.id === 'string' &&
+        typeof row.createdAt === 'number' &&
+        (row.lastUsedAt === null || typeof row.lastUsedAt === 'number') &&
+        Array.isArray(row.transports) &&
+        row.transports.every((t) => typeof t === 'string') &&
+        typeof row.current === 'boolean'
+    );
+}
+
+/** Every passkey on the signed-in account, oldest first (#1264, the account page's list). */
+export async function listPasskeys(api: AccountApi): Promise<AccountOutcome<PasskeySummary[]>> {
+    const result = await api.get<PasskeysReply>('/api/auth/passkeys');
+    if (!result.ok) {
+        return fail(failureFromApi(result.error));
+    }
+    const rows = result.value?.passkeys;
+    return Array.isArray(rows) && rows.every(isPasskeySummary)
+        ? { ok: true, value: rows }
+        : genericFailure();
+}
+
+interface AddPasskeyReply {
+    credentialId?: unknown;
+    alreadyRegistered?: unknown;
+}
+
+export interface AddedPasskey {
+    credentialId: string;
+    alreadyRegistered: boolean;
+}
+
+/**
+ * One attempt at the add-passkey ceremony (options -> platform prompt -> verify), reporting
+ * whether a `fresh_auth_required` refusal was the cause of failure — `startAddPasskey` on the
+ * server checks freshness before minting options, and `verifyAddPasskey` re-checks it again at
+ * commit (the ceremony's real-world await is exactly the window a session can go stale in), so
+ * either call can be the one that reports it.
+ *
+ * A whole ceremony rather than one request is exactly why `withFreshAuth` below is written over a
+ * `GatedAttempt` instead of an `ApiResult`: the retry has to re-run the platform prompt too, and
+ * the alternative was a second copy of the step-up ceremony living here.
+ */
+async function attemptAddPasskey(api: AccountApi): Promise<GatedAttempt<AddedPasskey>> {
+    const started = await api.post<OptionsReply<PublicKeyCredentialCreationOptionsJSON>>(
+        '/api/auth/passkeys/options',
+        NO_BODY,
+    );
+    if (!started.ok) {
+        return {
+            ok: false,
+            failure: failureFromApi(started.error),
+            freshAuthRequired:
+                started.error.kind === 'code' && started.error.code === 'fresh_auth_required',
+        };
+    }
+    const optionsJSON = started.value?.options;
+    if (!optionsJSON) {
+        return { ...genericFailure(), freshAuthRequired: false };
+    }
+    let response: RegistrationResponseJSON;
+    try {
+        response = await startRegistration({ optionsJSON });
+    } catch (error) {
+        return { ...failureFromCeremony(error), freshAuthRequired: false };
+    }
+    const verified = await api.post<AddPasskeyReply>(
+        '/api/auth/passkeys/verify',
+        JSON.stringify(response),
+    );
+    if (!verified.ok) {
+        return {
+            ok: false,
+            failure: failureFromApi(verified.error),
+            freshAuthRequired:
+                verified.error.kind === 'code' && verified.error.code === 'fresh_auth_required',
+        };
+    }
+    const credentialId = verified.value?.credentialId;
+    if (typeof credentialId !== 'string' || credentialId.length === 0) {
+        return { ...genericFailure(), freshAuthRequired: false };
+    }
+    return {
+        ok: true,
+        value: { credentialId, alreadyRegistered: verified.value?.alreadyRegistered === true },
+    };
+}
+
+/**
+ * Adds a passkey to the signed-in account (#1264) — "store a second passkey before you need it"
+ * is the account page's whole reason to offer this. Freshly authenticated sessions (right after
+ * creating the account or signing in) need no extra prompt; a session that has gone stale (the
+ * 10-minute `FRESH_AUTH_WINDOW_MS`) gets exactly one step-up retry, same contract as
+ * `enrollRecoveryCode`/`confirmRecoveryCode` below — a second refusal is fixed copy, not a loop.
+ */
+export async function addPasskey(api: AccountApi): Promise<AccountOutcome<AddedPasskey>> {
+    return withFreshAuth(api, () => attemptAddPasskey(api));
+}
+
+interface RevokePasskeyReply {
+    signedOut?: unknown;
+}
+
+/**
+ * Revokes a passkey (#1264). The server refuses to leave the account with zero usable credentials
+ * AND zero confirmed recovery material (`409 last_credential`) — the account page also disables
+ * the Remove button on a sole passkey, but that is a courtesy, not the enforcement point; this
+ * call still goes to the real route and reports whatever the server actually decided.
+ *
+ * `signedOut: true` means the revoked credential was the one that created the CURRENT session —
+ * the server has already cleared its cookie, so the caller must react as a sign-out, not merely
+ * refresh the list.
+ */
+export async function revokePasskey(
+    api: AccountApi,
+    credentialId: string,
+): Promise<AccountOutcome<{ signedOut: boolean }>> {
+    const result = await withFreshAuth(
+        api,
+        gatedRequest(() =>
+            api.post<RevokePasskeyReply>(
+                '/api/auth/passkeys/revoke',
+                JSON.stringify({ credentialId }),
+            ),
+        ),
+    );
+    if (!result.ok) {
+        return result;
+    }
+    return { ok: true, value: { signedOut: result.value?.signedOut === true } };
+}
+
+/**
+ * Ends every OTHER live session on the account (#1264's "Sign out other devices") — the current
+ * session is left untouched. Verified against `prototypes/v2-api/src/http/app.ts`:
+ * `POST /api/auth/sessions/revoke-others` calls `requireSession` and nothing else — unlike
+ * add-passkey/revoke-passkey/recovery-enroll/recovery-confirm, this route has NO freshness gate,
+ * so this call is deliberately NOT wrapped in `withFreshAuth`. Wrapping it would be dead code that
+ * misdescribes the server's actual contract.
+ */
+export async function revokeOtherSessions(api: AccountApi): Promise<AccountOutcome<null>> {
+    const result = await api.post<undefined>('/api/auth/sessions/revoke-others', NO_BODY);
+    return result.ok ? { ok: true, value: null } : fail(failureFromApi(result.error));
 }
 
 /**
@@ -292,22 +477,54 @@ export async function enrollRecoveryPasskey(api: AccountApi): Promise<AccountOut
 }
 
 /**
+ * One attempt at a fresh-auth-gated operation, which knows whether the server refused it for
+ * staleness specifically. A whole ceremony (`attemptAddPasskey`) and a single request
+ * (`gatedRequest` below) both reduce to this, which is what lets ONE step-up implementation serve
+ * every mutation on the account page.
+ */
+type GatedAttempt<T> =
+    | { ok: true; value: T }
+    | { ok: false; failure: AccountFailure; freshAuthRequired: boolean };
+
+/** The single-request form of a `GatedAttempt` — a route that answers, with no ceremony inside. */
+function gatedRequest<T>(request: () => Promise<ApiResult<T>>): () => Promise<GatedAttempt<T>> {
+    return async () => {
+        const result = await request();
+        if (result.ok) {
+            return { ok: true, value: result.value };
+        }
+        return {
+            ok: false,
+            failure: failureFromApi(result.error),
+            freshAuthRequired:
+                result.error.kind === 'code' && result.error.code === 'fresh_auth_required',
+        };
+    };
+}
+
+/**
  * Runs `attempt`, and on the server's `403 fresh_auth_required` performs a step-up
- * re-authentication and retries it exactly once.
+ * re-authentication and retries it exactly once. The ONLY step-up path in this client: every
+ * gated mutation — add a passkey, revoke one, enroll or confirm a recovery code — comes through
+ * here, so there is one place where "what happens when the session went stale" is decided.
  *
- * Both recovery routes are gated on `isFreshlyAuthenticated`: the session must have been created
+ * Every gated route is guarded by `isFreshlyAuthenticated`: the session must have been created
  * by a real passkey ceremony within the last 10 minutes (`FRESH_AUTH_WINDOW_MS`). Registration
  * mints exactly such a session, so the happy path — create the account, enroll, confirm — needs
- * NO extra prompt; the retry only ever fires when someone comes back to an abandoned enrolment
- * later, which is precisely the case where re-proving possession of the passkey is the point
- * rather than friction. `reauth/verify` rotates the session, so the retry runs on a fresh one.
+ * NO extra prompt; the retry only ever fires when someone comes back later, which is precisely
+ * the case where re-proving possession of the passkey is the point rather than friction.
+ * `reauth/verify` rotates the session, so the retry runs on a fresh one.
+ *
+ * Exactly once, never a loop: a second refusal is an answer, not something to keep prompting
+ * through. A cancelled step-up (the person dismissed the platform prompt) is reported as the
+ * cancellation it is, so the UI can stay silent rather than showing an error nobody caused.
  */
 async function withFreshAuth<T>(
     api: AccountApi,
-    attempt: () => Promise<ApiResult<T>>,
+    attempt: () => Promise<GatedAttempt<T>>,
 ): Promise<AccountOutcome<T>> {
     let result = await attempt();
-    if (!result.ok && result.error.kind === 'code' && result.error.code === 'fresh_auth_required') {
+    if (!result.ok && result.freshAuthRequired) {
         const stepped = await assertIdentity(
             api,
             '/api/auth/reauth/options',
@@ -318,5 +535,5 @@ async function withFreshAuth<T>(
         }
         result = await attempt();
     }
-    return result.ok ? { ok: true, value: result.value } : fail(failureFromApi(result.error));
+    return result.ok ? { ok: true, value: result.value } : fail(result.failure);
 }

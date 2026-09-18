@@ -15,6 +15,7 @@ import { lastOpenedSong, rememberSong } from '../lib/session';
 import { allSoundsAvailableOffline, installAllSounds, soundsAvailableOffline } from '../lib/sounds';
 import { start } from '../lib/starters';
 import { AccountEntry } from './account/account-entry';
+import { AccountPage } from './account/account-page';
 import { type AccountDialogMode, SignInDialog } from './account/sign-in';
 import { useAccountSession, useAccountsEnabled } from './account/use-account-session';
 import { ChartSheet } from './chart-sheet';
@@ -108,8 +109,13 @@ export default function Ensemble() {
     const accountsOn = useAccountsEnabled();
     const account = useAccountSession(accountsOn && ready);
     const [accountDialog, setAccountDialog] = useState<AccountDialogMode | null>(null);
+    // The account page (#1264: passkeys, sessions, recovery code) is a second, independent
+    // dialog from the sign-in one above — opening it never touches `accountDialog`, and vice
+    // versa, so the two can't fight over the same `showModal()`/`close()` pair.
+    const [accountPageOpen, setAccountPageOpen] = useState(false);
     const dialog = useRef<HTMLDialogElement>(null);
     const accountDialogRef = useRef<HTMLDialogElement>(null);
+    const accountPageDialogRef = useRef<HTMLDialogElement>(null);
     const soundsDialog = useRef<HTMLDialogElement>(null);
     const feelDialog = useRef<HTMLDialogElement>(null);
     const file = useRef<HTMLInputElement>(null);
@@ -259,6 +265,13 @@ export default function Ensemble() {
             accountDialogRef.current?.close();
         }
     }, [accountDialog]);
+    useEffect(() => {
+        if (accountPageOpen) {
+            accountPageDialogRef.current?.showModal();
+        } else {
+            accountPageDialogRef.current?.close();
+        }
+    }, [accountPageOpen]);
     useEffect(() => {
         if (feelMenu) {
             // Refreshed on every open: these four fields can drift from what the
@@ -732,6 +745,7 @@ export default function Ensemble() {
                             signOutFailure={account.signOutFailure}
                             onSignIn={() => setAccountDialog('signIn')}
                             onFinishProtecting={() => setAccountDialog('recovery')}
+                            onOpenAccount={() => setAccountPageOpen(true)}
                             onSignOut={account.signOut}
                         />
                     )}
@@ -1162,6 +1176,14 @@ export default function Ensemble() {
                     mode={accountDialog ?? 'signIn'}
                     open={accountDialog !== null}
                     onClose={() => setAccountDialog(null)}
+                    onAccountChanged={account.refresh}
+                />
+            )}
+            {accountsOn && (
+                <AccountPage
+                    dialogRef={accountPageDialogRef}
+                    open={accountPageOpen}
+                    onClose={() => setAccountPageOpen(false)}
                     onAccountChanged={account.refresh}
                 />
             )}

@@ -7,11 +7,12 @@ import { AccountFailureNotice } from './account-failure';
 /**
  * "Here is your recovery code — keep it, then confirm you kept it." (#1262, extracted for #1263.)
  *
- * Both flows that mint a code end here and must end here IDENTICALLY: creating an account
- * (`sign-in.tsx`) and recovering one (`recover.tsx`). The heading and the sentence above the code
- * differ, because what just happened differs; everything that makes this step trustworthy — the
- * code is displayed and nowhere else, Copy, Download, the "I've saved it" gate on Finish, the
- * touch-reachable "Not now", and the no-email-reset warning underneath — is this component, once.
+ * Every flow that mints a code ends here and must end here IDENTICALLY: creating an account
+ * (`sign-in.tsx`), recovering one (`recover.tsx`), and replacing a live one from the account page
+ * (`account-page.tsx`, #1264). The heading and the sentence above the code differ, because what
+ * just happened differs; everything that makes this step trustworthy — the code is displayed and
+ * nowhere else, Copy, Download, the "I've saved it" gate on Finish, the touch-reachable
+ * "Not now", and the no-email-reset warning underneath — is this component, once.
  *
  * The code lives ONLY in the caller's state for the life of the dialog and in this component's
  * props. It is never written to `localStorage`, `sessionStorage` or IndexedDB, never placed in
@@ -25,7 +26,14 @@ import { AccountFailureNotice } from './account-failure';
  */
 
 interface RecoveryCodeStepProps {
-    /** Carries `id="account-dialog-title"`, so it is also the dialog's accessible name. */
+    /**
+     * The id the heading carries, so it is also the enclosing dialog's accessible name. Defaults
+     * to the sign-in/recover dialog's; the account page passes its own because BOTH dialogs are
+     * mounted at once (`ensemble.tsx`), and two elements sharing one `id` would make each
+     * `aria-labelledby` resolve to whichever came first in the document rather than its own.
+     */
+    headingId?: string;
+    /** The heading text itself. */
     heading: string;
     /** What just happened and what this code is for. One paragraph, above the code. */
     lead: ReactNode;
@@ -39,6 +47,7 @@ interface RecoveryCodeStepProps {
 }
 
 export function RecoveryCodeStep({
+    headingId = 'account-dialog-title',
     heading,
     lead,
     code,
@@ -86,7 +95,7 @@ export function RecoveryCodeStep({
 
     return (
         <>
-            <h2 id="account-dialog-title" ref={headingRef} tabIndex={-1}>
+            <h2 id={headingId} ref={headingRef} tabIndex={-1}>
                 {heading}
             </h2>
             <p>{lead}</p>

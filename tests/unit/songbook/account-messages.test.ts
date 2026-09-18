@@ -59,6 +59,15 @@ describe('failureFromApi', () => {
         });
     });
 
+    it('answers the last-passkey refusal with what to do about it (#1264)', () => {
+        // The account page disables Remove on a sole passkey, but the server is the enforcement
+        // point — `409 last_credential` has to say something better than "try again in a moment".
+        expect(failureFromApi(code('last_credential', 409))).toEqual({
+            kind: 'error',
+            message: ACCOUNT_MESSAGES.lastPasskey,
+        });
+    });
+
     it('falls back to one generic sentence for everything else', () => {
         expect(failureFromApi(code('internal_error', 500))).toEqual({
             kind: 'error',
