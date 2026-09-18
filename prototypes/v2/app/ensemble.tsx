@@ -984,6 +984,70 @@ export default function Ensemble() {
             setMessage('Signed out · your guest songbook is unchanged');
         });
     }
+    /**
+     * The newest local version of one account song (#1269's export precedence, extracted for
+     * #1271): this tab's retained draft first, then the newest recovery slot, then the committed
+     * library copy. The work an export exists to rescue is exactly the part that is NOT in the
+     * library copy, so writing that copy alone would hand back a file missing the very edit the
+     * warning was about.
+     */
+    function latestLocalVersion(song: ChartDocument): ChartDocument {
+        const retained = volatileDrafts.current.get(song.id);
+        if (retained) {
+            return retained;
+        }
+        try {
+            return repository.recoveryFor(song)?.document ?? song;
+        } catch {
+            /* Unreadable slot; the committed copy is still worth a file. */
+            return song;
+        }
+    }
+    /**
+     * Delete the account (#1271) — what this device does once the server says the account is gone.
+     *
+     * Playback stops FIRST, for the same reason sign-out stops it: the chart on the stand is about
+     * to stop existing on this device. Then the LOCAL half of #1269's sign-out runs
+     * (`forgetDeletedAccount` — fence, forget, `markSignedOut`), with no logout round trip in
+     * front of it: the delete route already removed the session row and cleared the cookie, so a
+     * logout could only answer "already gone". Everything after that is the same shell cleanup
+     * sign-out does, including the account songs' recovery slots, which live in the GUEST
+     * `localStorage` namespace today (known gap #1299) and would otherwise leave a deleted
+     * account's chart text readable on a shared device.
+     *
+     * Never `signOutPlan`'s ids here: that plan only exists while the sign-out step is open. The
+     * account library the shell is already holding is the same set of documents.
+     */
+    async function forgetDeletedAccount() {
+        const documentIds = (accountSongs ?? []).map((song) => song.id);
+        runtime.stop();
+        await account.forgetDeletedAccount();
+        setSaved(null);
+        if (currentStore.current === 'account') {
+            setCurrent(null);
+            currentStore.current = null;
+            clearBuffers();
+        }
+        setAccountSongs(null);
+        for (const id of documentIds) {
+            volatileDrafts.current.delete(id);
+            try {
+                repository.clearRecovery(id);
+            } catch {
+                /* Recovery is a convenience; a stale entry must not fail the deletion. */
+            }
+        }
+        setGuestSongs(await repository.list());
+        // Read live rather than from the `sync` snapshot this render closed over, exactly as
+        // `signOutOfAccount` does: a wipe that failed after the account was already deleted is
+        // still a deletion, but the songs really are still here and the reason has to be said.
+        const failure = accountSync.getSnapshot().failure;
+        if (failure) {
+            setError(failure.message);
+            return;
+        }
+        setMessage('Account deleted · your guest songbook is unchanged');
+    }
     function openSong(id: string) {
         void run(async () => {
             const fresh = await refreshSongs();
@@ -1671,6 +1735,19 @@ export default function Ensemble() {
                     open={accountPageOpen}
                     onClose={() => setAccountPageOpen(false)}
                     onAccountChanged={account.refresh}
+                    online={account.online}
+                    accountSongCount={accountSongs?.length ?? null}
+                    onExportAccountSongs={() =>
+                        void run(() => {
+                            // EVERY song, unlike the sign-out step's at-risk subset (#1271): the
+                            // cloud copy is about to stop existing, so "it comes back on the next
+                            // sign-in" is no longer true of any of them.
+                            for (const song of accountSongs ?? []) {
+                                exportDocument(latestLocalVersion(song));
+                            }
+                        })
+                    }
+                    onAccountDeleted={() => run(forgetDeletedAccount)}
                 />
             )}
             {accountsOn && signedIn && (
@@ -1696,20 +1773,9 @@ export default function Ensemble() {
                                 if (!song) {
                                     continue;
                                 }
-                                // The EDITED bytes, not the committed ones. The work this export
-                                // exists to rescue is exactly the part that is NOT in `song`, so
-                                // writing the library copy would hand back a file missing the very
-                                // edit the step warned about. Same precedence as `open()`: this
-                                // tab's retained draft first, then the newest recovery slot.
-                                let latest = volatileDrafts.current.get(id);
-                                if (!latest) {
-                                    try {
-                                        latest = repository.recoveryFor(song)?.document;
-                                    } catch {
-                                        /* Unreadable slot; the committed copy is still worth a file. */
-                                    }
-                                }
-                                exportDocument(latest ?? song);
+                                // The EDITED bytes, not the committed ones — same precedence as
+                                // `open()`, shared with #1271's export-everything offer.
+                                exportDocument(latestLocalVersion(song));
                             }
                         })
                     }

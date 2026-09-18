@@ -158,11 +158,13 @@ export function readSession(db: DatabaseSync, token: unknown, now: number): Sess
 
     const row = db
         .prepare(
-            // The JOIN can't currently matter: `sessions.account_id` has no `ON DELETE CASCADE`,
-            // so an account with live sessions cannot be deleted at all today (see #1188's
-            // schema). If a future story adds account deletion, it must delete/revoke that
-            // account's sessions FIRST, or this JOIN silently stops being redundant defense and
-            // starts being load-bearing without anyone having verified it. Tracked on #1190/#1192.
+            // Account deletion exists now (#1271) and honors exactly the condition this JOIN was
+            // written against: `deleteAccount` walks `ACCOUNT_DELETION_WIPED`, which deletes
+            // `sessions` BEFORE `accounts` (children before parents — `sessions.account_id` has no
+            // `ON DELETE CASCADE`, so the reverse order would fail the foreign key outright). So
+            // the JOIN remains redundant defense rather than the thing standing between a deleted
+            // account and a live session: the session row is already gone. Keep it that way — a
+            // future wipe that spared a session row would make this load-bearing silently.
             `SELECT s.id AS session_id, s.account_id AS account_id, s.expires_at AS expires_at,
                     s.credential_id AS credential_id, s.purpose AS purpose
              FROM sessions s

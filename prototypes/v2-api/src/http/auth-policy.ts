@@ -24,6 +24,10 @@ export const AUTH_POLICIES: Readonly<Record<string, Policy>> = Object.freeze({
     'GET /api/auth/session': policy('empty', 120),
     'POST /api/auth/logout': policy('empty', 30),
     'POST /api/auth/sessions/revoke-others': policy('empty', 10),
+    // #1271. The tightest budget in this table on purpose: deleting an account is a once-in-a-
+    // lifetime action, it is already gated on a fresh passkey ceremony, and three attempts per ten
+    // minutes is more retries than any honest client needs after a step-up.
+    'POST /api/auth/account/delete': policy('empty', 3, 10 * minute),
     'GET /api/auth/passkeys': policy('empty', 60),
     'POST /api/auth/passkeys/options': policy('label', 10),
     'POST /api/auth/passkeys/verify': policy('registration', 20),

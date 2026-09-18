@@ -151,6 +151,13 @@ html [hidden] {
     border-color: transparent;
     color: var(--green);
 }
+/* #1271. The one action in this app with no undo, and the only button that reads as destructive
+   on sight. Outline rather than filled: it sits beside Export and Cancel, and a solid red block
+   would pull the eye to the button nobody should reach for by accident. */
+.btn.danger {
+    border-color: var(--danger);
+    color: var(--danger);
+}
 .text-button {
     font-size: 13px;
     font-weight: 600;
@@ -2825,6 +2832,23 @@ html[data-theme="stage"] {
     border: 1px solid var(--line);
     border-radius: 8px;
     padding: 9px 12px;
+}
+/* Deleting the account (#1271): the last section on the page, set apart by a rule rather than a
+   red panel — it is a legitimate thing to want, not a hazard sign. */
+.account-page .account-danger {
+    border-top: 1px solid var(--line);
+    padding-top: 18px;
+}
+.account-page .account-danger h3 {
+    color: var(--danger);
+}
+/* The typed confirmation's label. `.modal-box input` is already a full-width field. */
+.delete-confirm {
+    display: block;
+    font-size: 13px;
+    line-height: 1.6;
+    margin-top: 18px;
+    margin-bottom: 8px;
 }
 /* Sync status chip (#1266). Three separate facts, laid out as three separate lines rather
    than one badge — a musician who saved offline needs to see local safety and cloud

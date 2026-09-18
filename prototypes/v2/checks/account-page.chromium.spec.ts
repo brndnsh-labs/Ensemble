@@ -1,10 +1,11 @@
-import type { Page } from '@playwright/test';
 import { ACCOUNT_MESSAGES } from '../lib/account/messages';
 import {
     CODE_SHAPE,
+    countStepUps,
     createAccountThroughDialog,
     openWithAccounts,
     persistedState,
+    refuseOnceWithFreshAuthRequired,
 } from './account-helpers';
 import { expect, accountTest as test } from './fixtures';
 import { addVirtualAuthenticator } from './virtual-authenticator';
@@ -21,48 +22,15 @@ import { addVirtualAuthenticator } from './virtual-authenticator';
  * budget to account for. It spends 2 enrolments — one when the account is created, one for
  * "Replace recovery code".
  *
- * **How the step-up is proven.** Faking a `403 fresh_auth_required` alone proves nothing: the
- * session really IS fresh here (registration mints one), so a client that simply retried without
- * re-authenticating would sail through. So every mutation below is checked twice — the fake
- * refusal makes the stale path run, and the `reauth/verify` counter proves a real step-up
- * ceremony actually happened before the retry. The fake response never reaches the server and
- * costs nothing against any route's budget; everything it triggers is a real round trip through
- * the real virtual authenticator.
+ * **How the step-up is proven.** Every mutation below is checked twice — the fake refusal
+ * (`refuseOnceWithFreshAuthRequired`) makes the stale path run, and the `reauth/verify` counter
+ * (`countStepUps`) proves a real step-up ceremony actually happened before the retry. Both live in
+ * `account-helpers.ts`, shared with #1271's delete-account spec, which proves the same contract
+ * for the same reason; see their doc comments for why the pair is what carries the proof.
  *
  * One account carries the whole narrative, for the same reason the sibling specs do it: a second
  * account would buy nothing but another ceremony.
  */
-
-/**
- * Intercepts exactly ONE matching request with a fake `403 fresh_auth_required`, then lets every
- * later request through untouched.
- */
-async function refuseOnceWithFreshAuthRequired(page: Page, urlGlob: string): Promise<void> {
-    let used = false;
-    await page.route(urlGlob, async (route) => {
-        if (used) {
-            await route.continue();
-            return;
-        }
-        used = true;
-        await route.fulfill({
-            status: 403,
-            contentType: 'application/json',
-            body: JSON.stringify({ error: 'fresh_auth_required' }),
-        });
-    });
-}
-
-/** Counts completed step-up ceremonies: one `reauth/verify` per successful re-authentication. */
-function countStepUps(page: Page): () => number {
-    let count = 0;
-    page.on('request', (request) => {
-        if (new URL(request.url()).pathname === '/api/auth/reauth/verify') {
-            count += 1;
-        }
-    });
-    return () => count;
-}
 
 test('passkeys can be added and revoked (each stepping up when stale), the last one cannot be removed, and signing out other devices ends a second context', async ({
     page,

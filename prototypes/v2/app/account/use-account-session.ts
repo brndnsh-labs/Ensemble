@@ -75,6 +75,19 @@ export interface AccountView {
      * belongs to a hook that knows only about the session.
      */
     signOut: () => Promise<SignOutOutcome>;
+    /**
+     * The local half of sign-out, for an account the server has ALREADY deleted (#1271).
+     *
+     * Same ordered work as `signOut` — fence first, then forget this device's account records —
+     * but with no revocation request in front of it: `POST /api/auth/account/delete` deleted the
+     * session row and cleared the cookie on its own response, so a logout round trip could only
+     * answer "already gone", and a failure of it would be indistinguishable from the account still
+     * existing. The revoke step is therefore a resolved `true`, which is the honest answer here: it
+     * means "the server has confirmed this session is gone", and it has, by deleting it.
+     *
+     * Unlike `signOut` this cannot resolve `'kept'`. There is nothing to keep.
+     */
+    forgetDeletedAccount: () => Promise<void>;
 }
 
 /**
@@ -181,6 +194,24 @@ export function useAccountSession(active: boolean): AccountView {
         }
     }, [refresh]);
 
+    const forgetDeletedAccount = useCallback(async (): Promise<void> => {
+        try {
+            await accountSync.signOut(async () => true);
+        } catch {
+            // The loop turns a failed record wipe into its own `notCleared` failure rather than a
+            // rejection; what reaches here is the fence write itself failing on unreadable storage.
+            // Either way the account is already deleted on the server, so this device still signs
+            // out: what could not be removed is unreachable — every route answers 401 — and only a
+            // fresh sign-in could reach those stores again.
+        } finally {
+            // A deletion that has already committed must reach `markSignedOut` whatever storage
+            // did. Being told to "sign in again" to an account that no longer exists is the one
+            // reading this must never produce.
+            accountSession.markSignedOut();
+            refresh();
+        }
+    }, [refresh]);
+
     return {
         session,
         recoveryEnrolled: enrolled,
@@ -190,5 +221,6 @@ export function useAccountSession(active: boolean): AccountView {
         signOutFailure,
         refresh,
         signOut: runSignOut,
+        forgetDeletedAccount,
     };
 }
