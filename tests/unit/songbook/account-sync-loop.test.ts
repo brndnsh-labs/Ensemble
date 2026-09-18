@@ -4,6 +4,7 @@ import { createAccountSession } from '../../../prototypes/v2/lib/account/session
 import {
     createSyncLoop,
     DELETE_MESSAGES,
+    SIGN_OUT_MESSAGES,
     SYNC_MESSAGES,
 } from '../../../prototypes/v2/lib/account/sync-loop.js';
 import { MAX_PENDING_SAVES, type PreparedSave } from '../../../prototypes/v2/lib/sync/protocol.js';
@@ -935,6 +936,66 @@ describe('signing out moves the fence before it asks the server for anything', (
         expect(loop.getSnapshot().owner).toBe(OWNER);
     });
 
+    it('stands by a revocation the server confirmed even when the local wipe fails', async () => {
+        const { api } = fakeApi({ ok: true, value: {}, status: 204 });
+        const { songbook } = recorded({
+            clearAccount: async () => {
+                throw new Error('storage went away');
+            },
+        });
+        const loop = createSyncLoop(api, createAccountSession(api), songbook);
+        await loop.attach(OWNER);
+
+        const outcome = await loop.signOut(async () => true);
+
+        // Revoking is the irreversible step and it already happened. Re-attaching here would put
+        // the shell back into a session the server has dropped — and show the expired banner's
+        // "everything you saved is still on this device" about an account whose records really
+        // are still here, which is the one reading this must never produce.
+        expect(outcome).toBe('signed-out');
+        expect(loop.getSnapshot().owner).toBeNull();
+        // So what is owed is the sentence: the sign-out happened, the wipe did not.
+        expect(loop.getSnapshot().failure).toEqual({
+            reason: 'server',
+            message: SIGN_OUT_MESSAGES.notCleared,
+        });
+    });
+
+    it('keeps the server’s back-off window and its sentence across a refused sign-out', async () => {
+        const { api, reads } = fakeApi({
+            ok: false,
+            error: { kind: 'code', code: 'rate_limited', status: 429 },
+        });
+        const loop = createSyncLoop(api, createAccountSession(api), withQueuedSave());
+        await loop.attach(OWNER);
+        await loop.run();
+        expect(api.post).toHaveBeenCalledTimes(1);
+
+        // A sign-out the server would not confirm re-attaches the account — and `detach`/`attach`
+        // both reset the 429 floor. A refusal is not the server withdrawing the wait it asked
+        // for, so a re-attach that cleared it would re-POST the refused Save inside the very
+        // window this origin was told to sit out.
+        expect(await loop.signOut(async () => false)).toBe('kept');
+
+        // `attach` also publishes `failure: null`, and nothing about a refused sign-out resolved
+        // the Save that is still owed — the chip must not go quiet about it.
+        expect(loop.getSnapshot().failure).toEqual({
+            reason: 'rate-limited',
+            message: SYNC_MESSAGES.rateLimited,
+        });
+        await loop.run();
+        expect(api.post).toHaveBeenCalledTimes(1);
+        expect(documentReads(reads)).toEqual([]);
+    });
+
+    /**
+     * The `drafts` half of this plan is the ACCOUNT DATABASE's, and today it is always zero: the
+     * one writer of that store (`AccountSongbook.recover`) has no caller in the app yet. The rows
+     * below are therefore a contract for the #1299 future, not a reproduction of live storage —
+     * what an account chart's unsaved text actually sits in today is a guest recovery slot, which
+     * the loop cannot see and the SHELL adds (`withLocalDrafts` in `app/ensemble.tsx`). That
+     * composition is proven end to end in `prototypes/v2/checks/account-sign-out.chromium.spec.ts`.
+     */
     it('counts unsent Saves and unsaved drafts as two separate facts', async () => {
         const { api } = fakeApi({ ok: true, value: {}, status: 204 });
         const loop = createSyncLoop(

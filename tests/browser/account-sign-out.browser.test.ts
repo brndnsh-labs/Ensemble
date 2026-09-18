@@ -22,6 +22,13 @@ import { accountChart } from '../utils/account-songbook-fixture.js';
  * 2. **Signing in as B on the same profile sees none of A's songs.** Owner isolation already holds
  *    through the key ranges, but a shared device also requires A's records to be GONE, which is
  *    what `clearAccount` is for — across all six places one account's data lives.
+ *
+ * The `recover()` calls below write `drafts` rows this file writes ITSELF, purely so `clearAccount`
+ * has something in that store to prove its key range reaches. They are not a reproduction of live
+ * storage: no production path calls `AccountSongbook.recover` yet, and an account chart's unsaved
+ * text still lands in the guest `localStorage` namespace instead (the known #1299 gap). Nothing
+ * here should be read as evidence about what the sign-out PREFLIGHT can see — that is the shell's
+ * composition, proven in `prototypes/v2/checks/account-sign-out.chromium.spec.ts`.
  */
 
 const A = 'owner-a';

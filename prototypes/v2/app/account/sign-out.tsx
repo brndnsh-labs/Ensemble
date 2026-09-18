@@ -40,6 +40,11 @@ export interface SignOutDialogProps {
     preflight: SignOutPreflight | null;
     /** The last attempt's sentence, when one was refused. Cleared by the shell on reopen. */
     failure: string | null;
+    /**
+     * False while the account library is still being read. Export writes files FROM that library,
+     * so offering the button before it exists is a click that silently writes nothing.
+     */
+    songsReady: boolean;
     /** Writes a file for every song holding work the account has not got. */
     onExport: () => void;
     onSyncNow: () => void;
@@ -53,6 +58,7 @@ export function SignOutDialog({
     busy,
     preflight,
     failure,
+    songsReady,
     onExport,
     onSyncNow,
     onConfirm,
@@ -127,9 +133,12 @@ export function SignOutDialog({
                     <button
                         className="btn"
                         data-testid="sign-out-export"
-                        // Never disabled by the network: a file written to this device's own disk
-                        // is the one thing that survives whatever happens next.
-                        disabled={busy}
+                        // Never disabled by the NETWORK: a file written to this device's own disk
+                        // is the one thing that survives whatever happens next. `songsReady` is a
+                        // different fact — the library these files are written from has not been
+                        // read yet, and a button that wrote nothing would be worse than a
+                        // disabled one.
+                        disabled={busy || !songsReady}
                         onClick={onExport}
                     >
                         {exposed === 1 ? 'Export that song' : `Export those ${exposed} songs`}

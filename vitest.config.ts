@@ -1,8 +1,17 @@
+import { fileURLToPath } from 'node:url';
 import preact from '@preact/preset-vite';
 import { configDefaults, defineConfig } from 'vitest/config';
 
 export default defineConfig({
     plugins: [preact()],
+    resolve: {
+        alias: {
+            // The same alias `prototypes/v2/tsconfig.json` and `next.config.mjs` give the preview,
+            // so a unit test can import a v2 `lib/` module whose own imports reach back into the
+            // shared engine. Inert for `public/` and `tests/`, which never spell it.
+            '@engine': fileURLToPath(new URL('./public', import.meta.url)),
+        },
+    },
     test: {
         globals: true,
         environment: 'node',

@@ -57,6 +57,49 @@ function libraryDocuments(library: SavedSong[]): ChartDocument[] {
         .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
+/**
+ * The sign-out preflight (#1269), completed with the unsaved edits the LOOP CANNOT SEE.
+ *
+ * An account chart's unsaved text does not live in the account database. `signOutPreflight` reads
+ * its `drafts` store, and the one writer of that store (`AccountSongbook.recover`) has no caller in
+ * the app today; what this shell actually writes on every edit is a GUEST recovery slot
+ * (`repository.recover`, the known #1299 namespace gap) — or, when that storage write was refused,
+ * a `volatileDrafts` entry that exists only in this tab. Sign-out removes both. Left uncounted, the
+ * step would print "Everything on this device has reached your account", hide Export, label the
+ * button a plain "Sign out", and then delete the edit it had just said nothing about.
+ *
+ * Composed HERE rather than inside the loop on purpose: the loop owns the account database, the
+ * shell owns guest storage, and neither should reach across that line. When #1299 moves account
+ * recovery into the account store, this function is what shrinks — not the loop's plan.
+ */
+function withLocalDrafts(
+    plan: SignOutPreflight,
+    volatile: Map<string, ChartDocument>,
+): SignOutPreflight {
+    let held = 0;
+    const exposed = new Set(plan.atRisk);
+    for (const id of plan.documentIds) {
+        let slots = 0;
+        try {
+            slots = repository.recoverySlotCount(id);
+        } catch {
+            /* Unreadable storage is not evidence of nothing; the in-tab map still answers. */
+        }
+        const local = slots + (volatile.has(id) ? 1 : 0);
+        if (local > 0) {
+            held += local;
+            exposed.add(id);
+        }
+    }
+    return {
+        ...plan,
+        drafts: plan.drafts + held,
+        // Re-ordered by the library rather than left in set-insertion order, so the export writes
+        // its files in the order the musician sees the songs listed.
+        atRisk: plan.documentIds.filter((id) => exposed.has(id)),
+    };
+}
+
 /** Read the live engine values the Feel sheet needs but `ChartDocument` doesn't carry. */
 function feelSnapshot(): FeelSnapshot {
     const { playback } = runtime.state();
@@ -430,7 +473,7 @@ export default function Ensemble() {
             .signOutPreflight()
             .then((plan) => {
                 if (alive) {
-                    setSignOutPlan(plan);
+                    setSignOutPlan(withLocalDrafts(plan, volatileDrafts.current));
                 }
             })
             .catch(() => {
@@ -892,8 +935,11 @@ export default function Ensemble() {
      * The recovery slots go last and by id. Account chart recovery currently lives in the GUEST
      * `localStorage` namespace (`repository.recover`, known gap #1299), so clearing the account's
      * IndexedDB stores alone would leave account chart TEXT readable on a shared device after
-     * sign-out. `clearOwnRecovery` only reaches THIS writer's slots — another tab's are #1299's to
-     * fix — but this tab's are the ones this sign-out is responsible for.
+     * sign-out. `clearRecovery` takes EVERY writer's slot for each id, not just this page load's:
+     * a slot an earlier load left behind is the same plaintext on the same shared device, and a
+     * tab still open on this account is losing its session anyway. By `documentIds` rather than
+     * `atRisk` — every one of this account's documents is being removed from this device, so every
+     * one of their slots goes with it.
      */
     function signOutOfAccount() {
         const documentIds = signOutPlan?.documentIds ?? [];
@@ -904,16 +950,21 @@ export default function Ensemble() {
             }
             setSignOutOpen(false);
             setSignOutPlan(null);
+            // Unconditional: `saved` is an account chart's committed baseline, and nothing of that
+            // account may outlive the sign-out. (The header carrying Sign out is hidden while a
+            // chart is open, so in practice `currentStore` is already null by the time this runs —
+            // which is exactly why the guard below must not be what protects `saved`.)
+            setSaved(null);
             if (currentStore.current === 'account') {
                 setCurrent(null);
-                setSaved(null);
                 currentStore.current = null;
                 clearBuffers();
             }
             setAccountSongs(null);
             for (const id of documentIds) {
+                volatileDrafts.current.delete(id);
                 try {
-                    repository.clearOwnRecovery(id);
+                    repository.clearRecovery(id);
                 } catch {
                     /* Recovery is a convenience; a stale entry must not fail the sign-out. */
                 }
@@ -921,6 +972,15 @@ export default function Ensemble() {
             // Read directly rather than through `refreshSongs`: `signedIn` is still true in this
             // closure's render, and that path would ask a loop that no longer has an account.
             setGuestSongs(await repository.list());
+            // Read live rather than from the `sync` snapshot this render closed over: the loop
+            // publishes this during the await above. A wipe that failed after a confirmed
+            // revocation is still a sign-out — but the songs really are still here, so the
+            // cheerful sentence would be a lie and the reason has to reach the musician.
+            const failure = accountSync.getSnapshot().failure;
+            if (failure) {
+                setError(failure.message);
+                return;
+            }
             setMessage('Signed out · your guest songbook is unchanged');
         });
     }
@@ -1625,6 +1685,7 @@ export default function Ensemble() {
                             ? account.signOutFailure.message
                             : null
                     }
+                    songsReady={accountSongs !== null}
                     onExport={() =>
                         void run(() => {
                             // Only the songs holding work the account has not got. The rest of the
@@ -1632,16 +1693,35 @@ export default function Ensemble() {
                             // so writing it out too would bury the files that matter.
                             for (const id of signOutPlan?.atRisk ?? []) {
                                 const song = accountSongs?.find((held) => held.id === id);
-                                if (song) {
-                                    exportDocument(song);
+                                if (!song) {
+                                    continue;
                                 }
+                                // The EDITED bytes, not the committed ones. The work this export
+                                // exists to rescue is exactly the part that is NOT in `song`, so
+                                // writing the library copy would hand back a file missing the very
+                                // edit the step warned about. Same precedence as `open()`: this
+                                // tab's retained draft first, then the newest recovery slot.
+                                let latest = volatileDrafts.current.get(id);
+                                if (!latest) {
+                                    try {
+                                        latest = repository.recoveryFor(song)?.document;
+                                    } catch {
+                                        /* Unreadable slot; the committed copy is still worth a file. */
+                                    }
+                                }
+                                exportDocument(latest ?? song);
                             }
                         })
                     }
                     onSyncNow={() =>
                         void run(async () => {
                             await accountSync.run();
-                            setSignOutPlan(await accountSync.signOutPreflight());
+                            setSignOutPlan(
+                                withLocalDrafts(
+                                    await accountSync.signOutPreflight(),
+                                    volatileDrafts.current,
+                                ),
+                            );
                         })
                     }
                     onConfirm={signOutOfAccount}

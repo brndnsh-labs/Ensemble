@@ -20,6 +20,12 @@ import { addVirtualAuthenticator } from './virtual-authenticator';
  * gets its own API process and its own bucket. This file spends 2 in the first test (the account
  * switch is the point of it) and 1 in the second. Do not add another account; fold a new claim
  * into one of these two journeys instead.
+ *
+ * This file is also the only place the preflight's UNSAVED-EDIT half can be proven. The count the
+ * sync loop returns reads the account database's `drafts` store, which no production path writes
+ * to yet; what an account chart's unsaved text really sits in is a guest recovery slot (#1299), so
+ * the honest answer is composed in the shell (`withLocalDrafts` in `app/ensemble.tsx`) and only a
+ * real browser holds both halves at once.
  */
 
 const CODE_SHAPE = /^[A-Za-z0-9_-]{43}$/;
@@ -111,9 +117,23 @@ test('sign-out names the work it would destroy, then leaves nothing of that acco
     await newSongOnTheStand(page);
     await saveAndUpload(page, 'Set list');
 
+    // The CLEAN case, asserted where it is actually true: nothing queued, nothing unsaved. This
+    // is the sentence a preflight that could not see unsaved edits would also print a moment
+    // before destroying them, so it is worth pinning to a device that really is clear — the
+    // recovery-slot count is what makes that a measurement rather than a hope.
+    await backToSongbook(page);
+    expect(await recoverySlots(page)).toBe(0);
+    await page.getByTestId('account-sign-out').click();
+    await expect(page.getByTestId('sign-out-clear')).toBeVisible();
+    await expect(page.getByTestId('sign-out-confirm')).toHaveText('Sign out');
+    await expect(page.getByTestId('sign-out-export')).toHaveCount(0);
+    await page.getByTestId('sign-out-cancel').click();
+
     // A Save the server will not take. Blocked at the route rather than by going offline,
     // because sign-out needs a connection (decision 9 S2) — the queue has to still be there when
     // the musician is online enough to leave, which is the whole case this preflight is for.
+    await openSong(page, 'Set list');
+    await revealEditor(page);
     await page.route('**/api/documents/save', (route) => route.abort('failed'));
     await saveAs(page, 'Set list two');
     await expect(page.getByTestId('sync-cloud')).toContainText('Waiting to upload');
@@ -141,21 +161,36 @@ test('sign-out names the work it would destroy, then leaves nothing of that acco
     await expect(page.getByTestId('sign-out-unsent')).toContainText(
         'hasn’t reached your account yet',
     );
+    // The unsaved retitle is NAMED, not silently included in the queue's count. The account
+    // database cannot see it — an account chart's unsaved text lives in the guest recovery
+    // namespace (#1299) — so the shell composes it in, and without that this step would print
+    // "everything on this device has reached your account" moments before deleting it.
+    await expect(page.getByTestId('sign-out-drafts')).toContainText(
+        'One unsaved experiment is kept on this device',
+    );
+    await expect(page.getByTestId('sign-out-clear')).toHaveCount(0);
+    await expect(page.getByTestId('sign-out-confirm')).toHaveText('Sign out anyway');
+
     // Export is offered beside the destructive button, never implied, and it names the songs it
     // would actually write: a file on the musician's own disk is the only thing that survives
-    // this whatever the network does. It is the one control the network never disables.
+    // this whatever the network does. It is the one control the network never disables. The
+    // filename is the load-bearing assertion — 'Set list three' is the EDITED title, so this is
+    // the retained draft being written out and not the library's committed copy, which is
+    // precisely the version that would not have been worth rescuing.
     const exportButton = page.getByTestId('sign-out-export');
     await expect(exportButton).toHaveText('Export that song');
     const download = page.waitForEvent('download');
     await exportButton.click();
-    expect((await download).suggestedFilename()).toBe('Set list two.ensemble');
+    expect((await download).suggestedFilename()).toBe('Set list three.ensemble');
 
     // "Sync now" is the other way out, and the step RE-READS rather than remembering what it
-    // found: the queue is empty afterwards, and it says so.
+    // found: the queue empties, and the sentence about it goes. The unsaved experiment is not
+    // something a sync can rescue, so that one stays — and so does "Sign out anyway".
     await page.unroute('**/api/documents/save');
     await page.getByTestId('sign-out-sync').click();
-    await expect(page.getByTestId('sign-out-clear')).toBeVisible();
-    await expect(page.getByTestId('sign-out-confirm')).toHaveText('Sign out');
+    await expect(page.getByTestId('sign-out-unsent')).toHaveCount(0);
+    await expect(page.getByTestId('sign-out-drafts')).toBeVisible();
+    await expect(page.getByTestId('sign-out-confirm')).toHaveText('Sign out anyway');
     await page.getByTestId('sign-out-confirm').click();
 
     // Signed out: the guest songbook is back, untouched, and this is NOT an expired session —
@@ -165,9 +200,11 @@ test('sign-out names the work it would destroy, then leaves nothing of that acco
     await expect(page.getByTestId('account-expired-banner')).toHaveCount(0);
     await expect(page.getByTestId('library-heading')).toHaveText('Your songbook');
     expect(await songTitles(page).allInnerTexts()).toEqual(guestSongs);
-    // The account chart's recovery slot went with it. Those live in the GUEST localStorage
-    // namespace today (known gap #1299), so clearing the account's IndexedDB alone would leave
-    // account chart text readable on a shared device after sign-out.
+    // The account chart's recovery slot went with it — every writer's, not just this page load's.
+    // Those live in the GUEST localStorage namespace today (known gap #1299), so clearing the
+    // account's IndexedDB alone would leave account chart text readable on a shared device after
+    // sign-out. (One page load can only produce its own slot, so the across-writers half of that
+    // is proven in `tests/unit/songbook/repository-recovery.test.ts`.)
     expect(await recoverySlots(page)).toBe(0);
 
     // A second account on the SAME browser profile — which is what switching accounts is

@@ -1,7 +1,15 @@
 {
     "extends": "./tsconfig.json",
     "compilerOptions": {
-        "types": ["vitest/globals", "chai", "node"]
+        "types": ["vitest/globals", "chai", "node"],
+        "paths": {
+            "*": ["./node_modules/*", "./public/*"],
+            // The alias `prototypes/v2/tsconfig.json` and `next.config.mjs` give the preview, and
+            // `vitest.config.ts` gives the runner. A test that imports a v2 `lib/` module reaches
+            // whatever that module imports, and without this those resolve to `any` — which does
+            // not fail here, it just quietly stops checking them.
+            "@engine/*": ["./public/*"]
+        }
     },
     "include": ["public/**/*.ts", "public/**/*.tsx", "env.d.ts", "tests/**/*.ts", "tests/**/*.tsx"],
     "exclude": ["node_modules", "dist"]
