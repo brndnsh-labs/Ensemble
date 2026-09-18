@@ -2557,3 +2557,75 @@ html[data-theme="stage"] {
     color: var(--on-ink);
     border-color: var(--ink);
 }
+/* Account entry point and sign-in dialog (#1262). Dark-launched: only a device
+   that opted in via `/v2/?accounts=on` renders any of this. Everything reuses
+   the existing tokens and the .btn / .modal-box / .dialog-actions vocabulary,
+   so both Day and Stage follow from light-dark() with nothing redefined. */
+.account-entry {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+}
+.account-state {
+    font-size: 12px;
+    color: var(--muted);
+    white-space: nowrap;
+}
+.account-btn.account-warn {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+.account-dialog {
+    /* .modal-box is width:100%/max-width:480px, which at phone width runs edge
+       to edge. The recovery code needs a readable gutter, so this dialog keeps
+       one (same idea as .sound-panel's min()). */
+    max-width: min(480px, calc(100vw - 32px));
+}
+.recovery-code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 15px;
+    line-height: 1.7;
+    /* .modal-box p is --muted; the code itself is the content, not commentary. */
+    color: var(--ink);
+    background: var(--paper-raised);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 14px;
+    margin-bottom: 14px;
+    overflow-wrap: anywhere;
+    /* One click selects the whole code: it is 43 unbroken base64url characters,
+       and a partial selection is a silently unusable code. */
+    user-select: all;
+}
+.recovery-confirm {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    font-size: 13px;
+    line-height: 1.6;
+    margin-top: 18px;
+}
+.recovery-confirm input {
+    /* .modal-box input is a full-width text field; a checkbox is not. */
+    width: auto;
+    flex-shrink: 0;
+    margin: 2px 0 0;
+    padding: 0;
+    accent-color: var(--ink);
+}
+.account-notice,
+.account-error {
+    font-size: 13px;
+    line-height: 1.6;
+    border-radius: 10px;
+    padding: 11px 13px;
+    margin-top: 16px;
+}
+.account-notice {
+    background: var(--green-light);
+    color: var(--green);
+}
+.account-error {
+    background: var(--danger-bg);
+    color: var(--danger);
+}

@@ -87,6 +87,19 @@ describe('createAccountApi', () => {
         expect(JSON.stringify(result)).not.toContain('html');
     });
 
+    it('treats an empty 204 as success, not as an unparseable body (#1262)', async () => {
+        // `POST /api/auth/logout` and `POST /api/auth/recovery/confirm` both answer
+        // `c.body(null, 204)`; parsing that as JSON rejects, which would report a completed
+        // sign-out or recovery confirmation as a failure.
+        const fetchImpl = (async () => new Response(null, { status: 204 })) as typeof fetch;
+        const api = createAccountApi(fetchImpl);
+        expect(await api.post('/api/auth/logout', '{}')).toEqual({
+            ok: true,
+            value: undefined,
+            status: 204,
+        });
+    });
+
     it('sends a GET with no body, same-origin credentials and no-store caching', async () => {
         const { fetchImpl, calls } = fakeFetch(() => jsonResponse({ accountId: 'a' }));
         const api = createAccountApi(fetchImpl);

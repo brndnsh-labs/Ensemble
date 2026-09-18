@@ -1,4 +1,5 @@
 import { expect, accountTest as test } from './fixtures';
+import { addVirtualAuthenticator } from './virtual-authenticator';
 
 // `*.chromium.spec.ts`: the CDP virtual authenticator is Chromium-only, so playwright.config.ts
 // keeps these out of the WebKit project rather than starting an API there just to skip.
@@ -6,18 +7,9 @@ import { expect, accountTest as test } from './fixtures';
 test('a passkey registers against the real API on the app origin, and the session reads back', async ({
     page,
 }) => {
-    const cdp = await page.context().newCDPSession(page);
-    await cdp.send('WebAuthn.enable');
-    await cdp.send('WebAuthn.addVirtualAuthenticator', {
-        options: {
-            protocol: 'ctap2',
-            transport: 'internal',
-            hasResidentKey: true,
-            hasUserVerification: true,
-            isUserVerified: true,
-            automaticPresenceSimulation: true,
-        },
-    });
+    // The authenticator setup this spec introduced now lives in ./virtual-authenticator, shared
+    // with the sign-in specs (#1262); the options it sends are unchanged.
+    await addVirtualAuthenticator(page);
     await page.goto('/v2/');
 
     const outcome = await page.evaluate(async () => {

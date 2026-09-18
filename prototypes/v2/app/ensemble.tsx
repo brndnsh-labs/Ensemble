@@ -14,6 +14,9 @@ import * as runtime from '../lib/runtime';
 import { lastOpenedSong, rememberSong } from '../lib/session';
 import { allSoundsAvailableOffline, installAllSounds, soundsAvailableOffline } from '../lib/sounds';
 import { start } from '../lib/starters';
+import { AccountEntry } from './account/account-entry';
+import { type AccountDialogMode, SignInDialog } from './account/sign-in';
+import { useAccountSession, useAccountsEnabled } from './account/use-account-session';
 import { ChartSheet } from './chart-sheet';
 import { EditPanel } from './edit-panel';
 import { ImportDialog } from './import-dialog';
@@ -80,7 +83,15 @@ export default function Ensemble() {
     // permission) — the visible fallback the acceptance criteria calls for.
     const [shareLinkFallback, setShareLinkFallback] = useState<string | null>(null);
     const sharedLinkHandled = useRef(false);
+    // Accounts are dark-launched (#1262): every merge publishes this app to the public `/v2/`
+    // beta, so the entry point, the dialog and every `/api/*` request stay behind a per-device
+    // opt-in (`/v2/?accounts=on`) until the account work is finished. `ready` gates the session
+    // read so it lands after the songbook is up; nothing here is ever awaited by startup.
+    const accountsOn = useAccountsEnabled();
+    const account = useAccountSession(accountsOn && ready);
+    const [accountDialog, setAccountDialog] = useState<AccountDialogMode | null>(null);
     const dialog = useRef<HTMLDialogElement>(null);
+    const accountDialogRef = useRef<HTMLDialogElement>(null);
     const soundsDialog = useRef<HTMLDialogElement>(null);
     const file = useRef<HTMLInputElement>(null);
     const scroll = useRef<HTMLDivElement>(null);
@@ -222,6 +233,13 @@ export default function Ensemble() {
             soundsDialog.current?.close();
         }
     }, [soundMenu]);
+    useEffect(() => {
+        if (accountDialog) {
+            accountDialogRef.current?.showModal();
+        } else {
+            accountDialogRef.current?.close();
+        }
+    }, [accountDialog]);
     useEffect(() => {
         let alive = true;
         setAllSoundsOffline(null);
@@ -675,6 +693,16 @@ export default function Ensemble() {
                 <div className="header-right">
                     <span className="local-status">{offline}</span>
                     <span className="concept-tag">Music stand · beta</span>
+                    {accountsOn && (
+                        <AccountEntry
+                            session={account.session}
+                            unprotected={account.recoveryEnrolled === false}
+                            busy={account.signingOut}
+                            onSignIn={() => setAccountDialog('signIn')}
+                            onFinishProtecting={() => setAccountDialog('recovery')}
+                            onSignOut={account.signOut}
+                        />
+                    )}
                 </div>
             </header>
             {error && !soundMenu && (
@@ -1059,6 +1087,15 @@ export default function Ensemble() {
                     })
                 }
             />
+            {accountsOn && (
+                <SignInDialog
+                    dialogRef={accountDialogRef}
+                    mode={accountDialog ?? 'signIn'}
+                    open={accountDialog !== null}
+                    onClose={() => setAccountDialog(null)}
+                    onAccountChanged={account.refresh}
+                />
+            )}
         </div>
     );
 }

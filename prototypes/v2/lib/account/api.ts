@@ -102,12 +102,20 @@ async function call<T>(
     } catch {
         return { ok: false, error: { kind: 'network' } };
     }
+    // `204 No Content` is a SUCCESS in this contract with nothing to parse — `POST
+    // /api/auth/logout` and `POST /api/auth/recovery/confirm` both answer `c.body(null, 204)`,
+    // and `response.json()` on an empty body rejects, which would misreport a completed sign-out
+    // or recovery confirmation as `{ kind: 'unknown' }`. The server never sends a 204 carrying a
+    // body, so there is no case where skipping the parse loses information (#1262).
+    if (response.status === 204) {
+        return { ok: true, value: undefined as T, status: 204 };
+    }
     let body: unknown;
     try {
         body = await response.json();
     } catch {
         // Never surface the parse failure or any raw body text — it can carry arbitrary
-        // upstream content (an HTML error page from a proxy, an empty 204, etc).
+        // upstream content (an HTML error page from a proxy, a truncated response, etc).
         return { ok: false, error: { kind: 'unknown', status: response.status } };
     }
     if (isErrorBody(body)) {
