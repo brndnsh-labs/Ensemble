@@ -6,24 +6,27 @@
  * guest store — `lib/repository.ts` is read here through `list()` only, never `save()` — and the
  * guest songbook is untouched no matter how a copy attempt ends, including mid-copy.
  *
- * **Retry-safe by construction.** Both the account document id and the Save operation id are
- * derived deterministically from `(ownerId, guestId)` alone — never from the guest song's content,
- * revision or timestamps, via the same SHA-256 `digest()` the Save wire protocol already uses
- * (`lib/sync/protocol.ts`). The document id is what does the real work: `computeAdoptCandidates`
- * filters out any guest song whose deterministic account document id is already present, so a
- * rerun after an interruption only offers what is genuinely still missing — that is what makes
- * "interrupt mid-copy, rerun" land on exactly N account songs, not more.
+ * **The account DOCUMENT id is deterministic; the Save OPERATION id is not.** The document id is
+ * derived from `(ownerId, guestId)` alone — never from the guest song's content, revision or
+ * timestamps — via the same SHA-256 `digest()` the Save wire protocol already uses
+ * (`lib/sync/protocol.ts`). That is the dedup key, and it does all the real work:
+ * `computeAdoptCandidates` filters out any guest song whose deterministic account document id is
+ * already present, so a rerun after an interruption only offers what is genuinely still missing —
+ * that is what makes "interrupt mid-copy, rerun" land on exactly N account songs, not more. The
+ * local store refuses the rest: `AccountSongbook.save` will not recreate a document id it already
+ * holds (`LocalRevisionError`, treated here as success — the interrupted copy already got that
+ * song in).
  *
- * The operation id is the same story's belt to that document id's suspenders: if the filter above
- * were ever bypassed (a stale candidate list read a moment before an interruption, say),
- * `AccountSongbook.save` still refuses to recreate a document id it already holds locally
- * (`LocalRevisionError`, treated here as success — the interrupted copy already got that song in).
- * It is deliberately NOT relied on for a server-side replay across a genuinely lost local record:
- * `save()` stamps `updatedAt` with `Date.now()` on every call regardless of the candidate's own
- * timestamps, so two calls for the same id on two different days would not send byte-identical
- * wire bodies even under the same operation id, and the server's idempotent receipt only replays
- * an EXACT byte match. The one guarantee this file makes is the one the acceptance test asks for:
- * the local document-id check, not a server-side replay across data loss.
+ * The operation id is deliberately a FRESH one per attempt (`AccountSongbook.save`'s own
+ * `crypto.randomUUID()`), which is the #1268 patch-review P0 fix. A deterministic operation id
+ * beside a deterministic document id poisoned the outbox: the server's receipts never expire and
+ * only replay an EXACT byte match, while `save()` restamps `updatedAt` with `Date.now()` on every
+ * call, so a second device adopting the same guest starter (`starter-blues` is a literal id on
+ * every device) sent the same operation id with different bytes and earned a permanent
+ * `operation_mismatch` — a `'retry'` to the outbox, which ended every pass at that document
+ * forever. With a fresh id, a create for a document the account already holds answers `conflict`
+ * (the handled path: the operation is marked `conflict`, the chip says so, and Keep-both #1267
+ * owns resolving it) and a tombstoned one answers `'gone'`. Neither wedges the queue.
  *
  * A guest starter (`id.startsWith('starter-')`, the same test `songbook.tsx`'s Quick Jam section
  * uses) is not filtered out. A starter a musician has actually been playing from is a real song to
@@ -35,18 +38,31 @@
 import * as repository from '../repository';
 import type { ChartDocument } from '../runtime';
 import { digest, LocalRevisionError } from '../sync/protocol';
+import { MAX_REMOTE_CANDIDATES } from '../sync/repository';
+import type { Progress } from '../sync/status';
 import { accountSync } from './sync-loop';
 
 export interface AdoptCandidate {
     guestId: string;
     accountDocumentId: string;
-    operationId: string;
     document: ChartDocument;
 }
 
 export interface AdoptFailure {
     guestId: string;
     message: string;
+}
+
+export interface AdoptOffer {
+    /** What this account has room for, in guest-songbook order. */
+    candidates: AdoptCandidate[];
+    /**
+     * Guest songs this account has no room left for, so the offer leaves them out rather than
+     * queueing Saves the server is bound to refuse with `quota_exceeded`.
+     */
+    omitted: number;
+    /** How many more songs this account could hold when the offer was computed. */
+    room: number;
 }
 
 export interface AdoptResult {
@@ -64,35 +80,61 @@ function stableId(...parts: string[]): Promise<string> {
 }
 
 /**
+ * Has this device finished downloading the signed-in account's library at least once?
+ *
+ * The offer is computed by diffing the guest songbook against the ACCOUNT library, so it is only
+ * meaningful once that library has actually been fetched — `attach()` publishes `UNOBSERVED`
+ * (`{ required: null, verified: null }`) and only a download that paged the whole manifest replaces
+ * it, which also makes this inherently per-owner. Offering before then computes the diff against an
+ * empty local library and re-offers every song the account already has, which on a second device
+ * (or after a cloud delete) is how #1268's P0 reproduced. Both halves of the pair have to be
+ * observed: a partially paged manifest is not a library this can be trusted against.
+ */
+export function libraryDownloaded(documents: Progress): boolean {
+    return documents.required !== null && documents.verified !== null;
+}
+
+/**
  * Every guest song this owner does not already hold in their account, paired with the
- * deterministic account document id and Save operation id it will use if adopted.
+ * deterministic account document id it will use if adopted — bounded by what the account can
+ * still hold.
  *
  * Reads the guest songbook (`repository.list()`) and the account library (`accountSync.listLibrary()`)
  * fresh on every call rather than trusting a caller's cached lists — this is what makes "rerun
  * after an interruption" mean something: a candidate here is one this device can currently prove
- * is missing, not one that was missing the last time somebody asked.
+ * is missing, not one that was missing the last time somebody asked. Call it only once
+ * `libraryDownloaded` is true, or "missing" means "not downloaded yet".
  */
-export async function computeAdoptCandidates(ownerId: string): Promise<AdoptCandidate[]> {
+export async function computeAdoptCandidates(ownerId: string): Promise<AdoptOffer> {
     const [guestSongs, accountSongs] = await Promise.all([
         repository.list(),
         accountSync.listLibrary(),
     ]);
     const known = new Set(accountSongs.map((song) => song.documentId));
+    // The server refuses a CREATE past `MAX_DOCUMENTS_PER_OWNER` (2,000 — the same number
+    // `MAX_REMOTE_CANDIDATES` bounds local paging by) with `quota_exceeded`, which is an
+    // ACCOUNT-WIDE refusal: it ends the whole outbox pass, so every song queued behind the
+    // overflow waits on it too. Offering only what fits keeps a generous guest songbook from
+    // turning one opt-in gesture into a stalled queue.
+    const room = Math.max(0, MAX_REMOTE_CANDIDATES - known.size);
     const candidates: AdoptCandidate[] = [];
+    let omitted = 0;
     for (const guest of guestSongs) {
         const accountDocumentId = `guest-${await stableId('adopt-doc', ownerId, guest.id)}`;
         if (known.has(accountDocumentId)) {
             continue;
         }
-        const operationId = await stableId('adopt-op', ownerId, guest.id);
+        if (candidates.length >= room) {
+            omitted += 1;
+            continue;
+        }
         candidates.push({
             guestId: guest.id,
             accountDocumentId,
-            operationId,
             document: { ...guest, id: accountDocumentId },
         });
     }
-    return candidates;
+    return { candidates, omitted, room };
 }
 
 /**
@@ -102,18 +144,20 @@ export async function computeAdoptCandidates(ownerId: string): Promise<AdoptCand
  * is fire-and-forget: offline or mid-flight, the outbox already owns retrying it safely, and the
  * per-song sync status the songbook already renders (`SyncStatus`) is what reports the outcome
  * from here on — this function's job ends at "committed locally and queued".
+ *
+ * `onProgress` reports songs actually COPIED so far, after each write rather than before it: a
+ * count published in front of the `await` claims a Save that has not happened yet, and a write
+ * that then fails would have been counted.
  */
 export async function adoptGuestSongs(
     candidates: AdoptCandidate[],
-    onProgress?: (current: number, total: number) => void,
+    onProgress?: (copied: number, total: number) => void,
 ): Promise<AdoptResult> {
     let adopted = 0;
     const failures: AdoptFailure[] = [];
-    for (let index = 0; index < candidates.length; index += 1) {
-        const candidate = candidates[index];
-        onProgress?.(index + 1, candidates.length);
+    for (const candidate of candidates) {
         try {
-            await accountSync.save(candidate.document, null, candidate.operationId);
+            await accountSync.save(candidate.document, null);
             adopted += 1;
         } catch (error) {
             if (error instanceof LocalRevisionError) {
@@ -127,6 +171,7 @@ export async function adoptGuestSongs(
                 });
             }
         }
+        onProgress?.(adopted, candidates.length);
     }
     if (adopted > 0) {
         void accountSync.run();

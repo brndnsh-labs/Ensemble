@@ -60,9 +60,16 @@ import {
  *
  * `too-large` is deliberately its own reason rather than a second spelling of `quota`: a full
  * library is fixed by deleting a song in the cloud and a chart the server will not accept is not
- * fixed by anything the musician can do to their account, so the two must not be one word. It is
- * also the one reason that is a fact about ONE document — `drain()` steps over that song and keeps
- * sending the rest, which no other reason permits.
+ * fixed by anything the musician can do to their account, so the two must not be one word.
+ *
+ * `refused` is the third of that family (#1268 patch review P1): the account read the request,
+ * answered definitively about THESE bytes, and will answer the same way forever — an operation id
+ * already spent on something else (`operation_mismatch`), or an id it has no row and no tombstone
+ * for (`not_found`). Every other reason here is a wait; this one is not, and saying "we'll try
+ * again" about it is the one sentence this surface must not produce.
+ *
+ * `too-large` and `refused` are also the only reasons that are facts about ONE document —
+ * `drain()` steps over that song and keeps sending the rest, which no other reason permits.
  */
 export type SyncFailureReason =
     | 'expired'
@@ -70,6 +77,7 @@ export type SyncFailureReason =
     | 'rate-limited'
     | 'quota'
     | 'too-large'
+    | 'refused'
     | 'server';
 
 export interface SyncFailure {
@@ -116,6 +124,14 @@ export const SYNC_MESSAGES = {
     rateLimited: 'Saved on this device · the server asked us to wait. We’ll try again shortly.',
     quota: 'Saved on this device · your account library is full. Delete a song in the cloud to make room.',
     tooLarge: 'Saved on this device · this chart is too large to upload.',
+    /**
+     * The one sentence here that does NOT promise a retry, because a retry cannot change the
+     * answer: the account has already decided about these exact bytes. "Save it as a copy" is the
+     * step that actually works — a new document id and a new operation id are a request the
+     * account has never seen.
+     */
+    refused:
+        'Saved on this device · your account refused this upload and retrying won’t change that. Save it as a copy to upload it.',
     expired: 'Saved on this device · sign in again to upload it.',
     server: 'Saved on this device · we couldn’t reach your account library. We’ll try again.',
 } as const;
@@ -179,6 +195,22 @@ const UNOBSERVED: Progress = { required: null, verified: null };
 /** One page per 25 documents (`OUTBOX_PAGE_LIMIT`) over the server's 2,000-document cap. */
 const OUTBOX_PAGE_CEILING = Math.ceil(MAX_REMOTE_CANDIDATES / OUTBOX_PAGE_LIMIT);
 
+/**
+ * The Save refusals that are a verdict on ONE document rather than on the server, the network or
+ * the account as a whole — so `drain()` steps over that song and keeps sending the rest instead of
+ * parking the whole outbox behind it. See `drain`'s doc comment for why that distinction has to be
+ * made here: `sendNext` reports all three as the same `'retry'`.
+ *
+ * `quota_exceeded` is deliberately NOT in this set. A full library refuses the NEXT create for the
+ * same reason, so continuing would spend requests that are all bound to fail; ending the pass is
+ * the honest answer there.
+ */
+const STEP_OVER_CODES: ReadonlySet<ApiErrorCode> = new Set<ApiErrorCode>([
+    'payload_too_large',
+    'operation_mismatch',
+    'not_found',
+]);
+
 function failureFromApi(error: ApiError): SyncFailure {
     if (error.kind === 'network') {
         return { reason: 'offline', message: SYNC_MESSAGES.offline };
@@ -195,6 +227,12 @@ function failureFromApi(error: ApiError): SyncFailure {
             return { reason: 'quota', message: SYNC_MESSAGES.quota };
         case 'payload_too_large':
             return { reason: 'too-large', message: SYNC_MESSAGES.tooLarge };
+        case 'operation_mismatch':
+        case 'not_found':
+            // A verdict about these exact bytes, not a wait: the account has spent this operation
+            // id on something else, or holds neither the id nor a tombstone for it. The default
+            // below would promise a retry that can only be refused again — see `SYNC_MESSAGES.refused`.
+            return { reason: 'refused', message: SYNC_MESSAGES.refused };
         case 'rate_limited':
             return { reason: 'rate-limited', message: SYNC_MESSAGES.rateLimited };
         default:
@@ -385,17 +423,8 @@ export interface SyncLoop {
     watch(documentId: string | null): Promise<void>;
     /** Every saved song for this account, paged to the end. */
     listLibrary(): Promise<SavedSong[]>;
-    /**
-     * Commit locally and queue that exact version. Does NOT send; the caller triggers a pass.
-     *
-     * `operationId` is optional and passed straight through to `AccountSongbook.save` — see its
-     * doc comment. Guest-to-account adoption (#1268) is the one caller that supplies it.
-     */
-    save(
-        document: ChartDocument,
-        expected: number | null,
-        operationId?: string,
-    ): Promise<SavedSong>;
+    /** Commit locally and queue that exact version. Does NOT send; the caller triggers a pass. */
+    save(document: ChartDocument, expected: number | null): Promise<SavedSong>;
     /**
      * Delete one document from the cloud (#1270): an explicit ONLINE operation with a frozen,
      * retry-safe operation id, never a side effect of removing a local copy. Sends immediately
@@ -537,18 +566,20 @@ export function createSyncLoop(
      * cannot spin; `MAX_PENDING_SAVES` is the deepest one song's queue can be, which makes it
      * the most sweeps a full drain can ever need.
      *
-     * `refusedTooLarge` is the one rejection that does NOT end the pass. `sendNext` reports every
+     * `refusedDocument` names the rejections that do NOT end the pass. `sendNext` reports every
      * transport failure as `'retry'`, which is right for the outbox but wrong as a stop rule: a
-     * 413 is a verdict on one chart's bytes, not on the server or the network, so ending the sweep
-     * there would park every song behind it behind a document no retry will ever fix. So that one
-     * song is stepped over — the cursor moves PAST it, its queued Save stays queued, and the
-     * reason is still reported at the end of the pass. Every other reason keeps the early return,
-     * because a 401, a 429 or a dead network would refuse the next song for the same reason.
+     * 413, an `operation_mismatch` and a `not_found` are verdicts on ONE document, not on the
+     * server or the network, so ending the sweep there would park every song behind it behind a
+     * document no retry will ever fix — and with no timer here, "the next trigger" can be days
+     * away. So that one song is stepped over — the cursor moves PAST it, its queued Save stays
+     * queued, and the reason is still reported at the end of the pass. Every other reason keeps
+     * the early return, because a 401, a 429 or a dead network would refuse the next song for the
+     * same reason.
      */
     async function drain(
         current: AccountScope,
         transport: SaveTransport,
-        refusedTooLarge: () => string | null,
+        refusedDocument: () => string | null,
     ): Promise<boolean> {
         let changed = false;
         for (let sweep = 0; sweep < MAX_PENDING_SAVES; sweep += 1) {
@@ -564,7 +595,7 @@ export function createSyncLoop(
                     // A transport failure ends the drain outright: another sweep would only
                     // fail again on the same song, and the reason is already captured.
                     if (result.kind === 'retry' || result.kind === 'aborted') {
-                        const refused = result.kind === 'retry' ? refusedTooLarge() : null;
+                        const refused = result.kind === 'retry' ? refusedDocument() : null;
                         if (refused === null) {
                             return changed;
                         }
@@ -619,7 +650,7 @@ export function createSyncLoop(
                     changed = await drain(current, transport, () => {
                         const captured = lastRefusal();
                         return captured?.error.kind === 'code' &&
-                            captured.error.code === 'payload_too_large'
+                            STEP_OVER_CODES.has(captured.error.code)
                             ? captured.documentId
                             : null;
                     });
@@ -810,9 +841,9 @@ export function createSyncLoop(
             }
             throw new Error('Account library paging did not terminate.');
         },
-        async save(document, expected, operationId) {
+        async save(document, expected) {
             const current = await settledScope();
-            const song = await songbook.save(current, document, expected, operationId);
+            const song = await songbook.save(current, document, expected);
             publish({ libraryVersion: state.libraryVersion + 1 });
             await observe();
             return song;

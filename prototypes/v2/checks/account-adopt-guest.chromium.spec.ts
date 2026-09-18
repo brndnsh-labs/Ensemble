@@ -18,6 +18,20 @@ import { addVirtualAuthenticator } from './virtual-authenticator';
 
 const songTitles = (page: Page) => page.locator('.song-name');
 
+/** Every Save this page actually sent. Zero is the honest proof that nothing was re-queued. */
+function countSaveRequests(page: Page): () => number {
+    let count = 0;
+    page.on('request', (request) => {
+        if (
+            request.method() === 'POST' &&
+            new URL(request.url()).pathname === '/api/documents/save'
+        ) {
+            count += 1;
+        }
+    });
+    return () => count;
+}
+
 test('signing in offers to add this device’s songs; adopting reaches the account list, the guest songbook is untouched, and running it again adds nothing new', async ({
     page,
 }) => {
@@ -33,17 +47,21 @@ test('signing in offers to add this device’s songs; adopting reaches the accou
     await page.getByTestId('recovery-not-now').click();
     await expect(page.getByTestId('account-finish-protecting')).toBeVisible();
 
-    // The auto-prompt, right after this device's first sign-in.
+    // The auto-prompt, right after this device's first sign-in — and with it the preview the
+    // contract asks for: exactly the titles that are about to be copied, by name.
     await expect(page.locator('#adopt-guest-title')).toHaveText(
         `Add your ${guestTitles.length} songs on this device to your account?`,
     );
+    await expect(page.getByTestId('adopt-guest-preview').locator('li')).toHaveText(guestTitles);
     // The 'copying' phase (`adopt-guest-progress`) is genuinely transient for three local-only
     // IDB writes — not asserted on directly, since polling for it would either race past it or
     // wait out a timeout on a step that legitimately never gets observed. `toHaveText` below
     // polls straight through it to the final state, which is the one this spec needs to prove.
     await page.getByTestId('adopt-guest-confirm').click();
+    // Says what actually happened: the copies are committed HERE, and the per-song chip is what
+    // reports the cloud half (#1268 patch review P2-4).
     await expect(page.locator('#adopt-guest-title')).toHaveText(
-        `Added ${guestTitles.length} songs to your account`,
+        `Copied ${guestTitles.length} songs into this device’s account songbook`,
     );
     await page.getByTestId('adopt-guest-done').click();
     await expect(page.locator('dialog[aria-labelledby="adopt-guest-title"]')).toBeHidden();
@@ -107,4 +125,94 @@ test('declining is remembered — reloading and signing back in does not reopen 
     await expect(page.locator('#adopt-guest-title')).toHaveText(
         `Add your ${guestTitles.length} songs on this device to your account?`,
     );
+});
+
+/**
+ * The #1268 patch-review P0, on two real devices: guest starters carry the SAME literal ids
+ * (`starter-blues`…) on every device, so a second device signing into the same account derives the
+ * same deterministic account document ids for songs the first device has already adopted. Offering
+ * them again is what re-queued a Save for a document the account already holds — and under the
+ * deterministic OPERATION id this story shipped with, the server answered `operation_mismatch`
+ * (receipts never expire, and `save()` restamps `updatedAt`, so the bytes never match the
+ * receipt), which the outbox reads as `'retry'` and which therefore ended every pass at that
+ * document forever. Both halves of the fix are asserted here: the offer is computed only after the
+ * first download has landed (so the account library is actually known), and this device sends no
+ * Save at all.
+ */
+test('a second device signing into the same account is offered nothing, and queues no upload for songs the account already holds', async ({
+    page,
+    browser,
+    accountApi,
+}) => {
+    const authenticator = await addVirtualAuthenticator(page);
+    await openWithAccounts(page);
+    await expect(page.getByTestId('library-loading')).toHaveCount(0);
+    const guestTitles = await songTitles(page).allInnerTexts();
+    expect(guestTitles.length).toBeGreaterThan(0);
+
+    await createAccountThroughDialog(page);
+    await page.getByTestId('recovery-not-now').click();
+    await expect(page.locator('#adopt-guest-title')).toHaveText(
+        `Add your ${guestTitles.length} songs on this device to your account?`,
+    );
+    await page.getByTestId('adopt-guest-confirm').click();
+    await expect(page.locator('#adopt-guest-title')).toHaveText(
+        `Copied ${guestTitles.length} songs into this device’s account songbook`,
+    );
+    await page.getByTestId('adopt-guest-done').click();
+
+    // The cloud really took them — read from one adopted song's own chip, not from the copy
+    // dialog, which only ever claimed the local half.
+    await expect(page.getByTestId('library-loading')).toHaveCount(0);
+    await page.locator('.song-link', { hasText: guestTitles[0] }).first().click();
+    await expect(page.getByTestId('sync-cloud')).toHaveText('Saved to your account');
+
+    // Device two: its own cookie jar, its own IndexedDB, its own guest songbook — and the same
+    // three starters, under the same ids. Only the passkey is carried over.
+    const [passkey] = await authenticator.credentials();
+    const fresh = await browser.newContext({ baseURL: accountApi.origin });
+    try {
+        const second = await fresh.newPage();
+        const saves = countSaveRequests(second);
+        const spare = await addVirtualAuthenticator(second);
+        await spare.addCredential(passkey);
+        await openWithAccounts(second);
+        await expect(second.getByTestId('library-loading')).toHaveCount(0);
+        // The precondition that made this a P0: the same titles, from the same starter ids.
+        expect((await songTitles(second).allInnerTexts()).slice().sort()).toEqual(
+            guestTitles.slice().sort(),
+        );
+
+        await second.getByTestId('account-sign-in').click();
+        await second.getByTestId('account-do-sign-in').click();
+        await expect(second.getByTestId('account-sign-out')).toBeVisible();
+
+        // The download lands, and with it every song the first device adopted.
+        await expect(second.getByTestId('library-heading')).toHaveText('Your account songbook');
+        await expect(second.getByTestId('library-loading')).toHaveCount(0);
+        await expect
+            .poll(async () => (await songTitles(second).allInnerTexts()).slice().sort())
+            .toEqual(guestTitles.slice().sort());
+
+        // No auto-prompt here: there is nothing missing from the account to offer. Asking again
+        // is exactly what would have re-queued the whole library.
+        await expect(second.locator('dialog[aria-labelledby="adopt-guest-title"]')).toBeHidden();
+
+        // And asked explicitly, it says so — computed against the DOWNLOADED library, which is
+        // why the account-page button waits for that download before it enables.
+        await second.getByTestId('account-open').click();
+        await second.getByTestId('account-page-adopt-guest').click();
+        await expect(second.locator('#adopt-guest-title')).toHaveText('Nothing new to add');
+        await second.getByTestId('adopt-guest-close').click();
+
+        // The proof that no poisoned operation exists: this device never sent a Save at all, so
+        // there is no `operation_mismatch` to be stuck behind and nothing was duplicated.
+        expect(saves()).toBe(0);
+        await expect(second.getByTestId('library-loading')).toHaveCount(0);
+        expect((await songTitles(second).allInnerTexts()).slice().sort()).toEqual(
+            guestTitles.slice().sort(),
+        );
+    } finally {
+        await fresh.close();
+    }
 });

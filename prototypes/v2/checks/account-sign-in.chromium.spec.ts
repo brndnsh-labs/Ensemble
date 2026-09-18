@@ -3,6 +3,7 @@ import type { Page } from '@playwright/test';
 import {
     CODE_SHAPE,
     createAccountThroughDialog,
+    dismissAdoptGuestPrompt,
     openWithAccounts,
     persistedState,
 } from './account-helpers';
@@ -93,6 +94,10 @@ test('abandoning the recovery step leaves the account unprotected until it is fi
     await page.getByTestId('recovery-not-now').click();
     await expect(page.locator('dialog.account-dialog')).toBeHidden();
     await expect(page.getByTestId('account-finish-protecting')).toBeVisible();
+    // #1268's adoption prompt auto-opens once the account library has downloaded (this device's
+    // guest starters are not in the account). Unrelated to this spec, but it is a modal: every
+    // click below would be intercepted by it.
+    await dismissAdoptGuestPrompt(page);
 
     // The unprotected state is the SERVER's answer (`recovery/status`), not a device flag, so a
     // reload — or another browser — still knows.
@@ -154,6 +159,10 @@ test('signing out and back in, then in again on a fresh profile, reaches the sam
     await createAccountThroughDialog(page);
     await page.keyboard.press('Escape');
     await expect(page.getByTestId('account-finish-protecting')).toBeVisible();
+    // #1268's adoption prompt auto-opens once the account library has downloaded (this device's
+    // guest starters are not in the account). Unrelated to this spec, but it is a modal: every
+    // click below would be intercepted by it.
+    await dismissAdoptGuestPrompt(page);
 
     // P1-3: offline, sign-out must be disabled with a visible, honest reason rather than shipping
     // enabled and failing silently against a server it cannot reach (rollout decision 9 S2).

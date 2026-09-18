@@ -1,4 +1,5 @@
 import type { Page } from '@playwright/test';
+import { dismissAdoptGuestPrompt } from './account-helpers';
 import { editorRevealed, expect, accountTest as test } from './fixtures';
 import { addVirtualAuthenticator } from './virtual-authenticator';
 
@@ -43,6 +44,10 @@ async function signUp(page: Page): Promise<void> {
     await expect(page.getByTestId('recovery-code')).toHaveText(CODE_SHAPE);
     await page.keyboard.press('Escape');
     await expect(page.getByTestId('account-finish-protecting')).toBeVisible();
+    // #1268's adoption prompt auto-opens once the account library has downloaded, and this
+    // device's guest starters are not in the account — it is unrelated to this spec, but it is a
+    // modal, so every click below would be intercepted by it.
+    await dismissAdoptGuestPrompt(page);
 }
 
 async function newSongOnTheStand(page: Page): Promise<void> {

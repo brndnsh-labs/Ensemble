@@ -449,21 +449,12 @@ describe('account songbook on real IndexedDB', () => {
         expect(await book.read(scope, 'study')).toBeNull();
     });
 
-    it('accepts a caller-supplied operation id, rejects an invalid one, and defaults to a fresh one', async () => {
-        // #1268: guest-to-account adoption derives its operation id deterministically, so the
-        // queue must actually carry the id the caller passed, not a fresh random one alongside it.
-        await book.save(scope, accountChart('adopted', 'guest-song'), null, 'fixed-adopt-op');
-        const [queued] = await book.pending(scope, 'guest-song');
-        expect(queued.operationId).toBe('fixed-adopt-op');
-
-        // The same `identifier()` shape every other id in this store is held to.
-        await expect(
-            book.save(scope, accountChart('bad id', 'other-song'), null, 'has spaces'),
-        ).rejects.toThrow('Invalid sync identifier');
-        expect(await book.pending(scope, 'other-song')).toEqual([]);
-
-        // Omitted, as every non-adoption caller (the editor's own Save button) does: a fresh id
-        // every call, exactly the prior behavior.
+    it('mints a fresh operation id for every Save, which no caller can override', async () => {
+        // #1268 patch review P0: a caller-supplied operation id was briefly part of this signature,
+        // for adoption's deterministic ids. It is gone, and this is what holds it gone — a
+        // deterministic operation id is unsafe, not retry-safe: the server's receipts never expire
+        // and replay only an EXACT byte match, while `updatedAt` below moves on every call, so the
+        // same id sent twice earns a permanent `operation_mismatch`.
         const a = await book.save(scope, accountChart('C', 'study'), null);
         const b = await book.save(scope, { ...a.document, title: 'D' }, a.document.revision);
         const [firstQueued, secondQueued] = await book.pending(scope, 'study');
@@ -472,12 +463,13 @@ describe('account songbook on real IndexedDB', () => {
     });
 
     it('rejects recreating a document under its own deterministic id, so a retried adoption cannot duplicate it', async () => {
-        // The retry-safety #1268 relies on: the SAME (documentId, operationId) pair, re-submitted
-        // as a create (`expected = null`) exactly as a rerun after an interrupted copy would,
-        // finds the song already there and refuses rather than creating a second one.
-        await book.save(scope, accountChart('adopted', 'guest-song'), null, 'fixed-adopt-op');
+        // The retry-safety #1268 relies on, and it is the DOCUMENT id that carries it: the same
+        // deterministic id re-submitted as a create (`expected = null`), exactly as a rerun after
+        // an interrupted copy would, finds the song already there and refuses rather than creating
+        // a second one.
+        await book.save(scope, accountChart('adopted', 'guest-song'), null);
         await expect(
-            book.save(scope, accountChart('adopted', 'guest-song'), null, 'fixed-adopt-op'),
+            book.save(scope, accountChart('adopted', 'guest-song'), null),
         ).rejects.toBeInstanceOf(LocalRevisionError);
         expect(await book.pending(scope, 'guest-song')).toHaveLength(1);
     });

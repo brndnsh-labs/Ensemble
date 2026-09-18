@@ -81,6 +81,12 @@ interface AccountPageProps {
      * nesting one modal inside another.
      */
     onOpenAdopt: () => void;
+    /**
+     * Whether the offer can be computed yet: it is a diff against the account library, and this
+     * device has to have downloaded that library once for "missing from your account" to mean
+     * anything (#1268 patch review P0 — see `libraryDownloaded` in `lib/account/adopt-guest.ts`).
+     */
+    adoptReady: boolean;
 }
 
 type Section = 'main' | 'replaceCode' | 'signedOut' | 'deleteAccount' | 'deleted';
@@ -95,6 +101,7 @@ export function AccountPage({
     onExportAccountSongs,
     onAccountDeleted,
     onOpenAdopt,
+    adoptReady,
 }: AccountPageProps) {
     const [section, setSection] = useState<Section>('main');
     const [passkeys, setPasskeys] = useState<PasskeySummary[] | null>(null);
@@ -451,11 +458,17 @@ export function AccountPage({
                         <button
                             className="btn"
                             data-testid="account-page-adopt-guest"
-                            disabled={busy}
+                            disabled={busy || !adoptReady}
                             onClick={onOpenAdopt}
                         >
                             Add this device’s songs
                         </button>
+                        {!adoptReady && (
+                            <p className="status-detail" data-testid="account-page-adopt-waiting">
+                                Available once your account songbook has finished downloading, so
+                                this offers only the songs your account doesn’t already have.
+                            </p>
+                        )}
                     </section>
 
                     <section aria-labelledby="account-page-passkeys-heading">

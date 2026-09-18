@@ -180,6 +180,29 @@ describe('the sync loop surfaces the reason a Save could not be sent', () => {
         expect(documentReads(reads)).toEqual([]);
     });
 
+    it('says a refusal is permanent rather than promising a retry that cannot work', async () => {
+        // #1268 patch review P1: `operation_mismatch` fell through to the generic server sentence,
+        // which ends "We’ll try again" — and the retry is refused for exactly the same reason
+        // every time, because the account has already answered about these bytes. Same for a
+        // `not_found`: an id the account holds neither a row nor a tombstone for.
+        for (const code of ['operation_mismatch', 'not_found'] as const) {
+            const { snapshot } = await passWith({
+                ok: false,
+                error: { kind: 'code', code, status: code === 'not_found' ? 404 : 409 },
+            });
+
+            expect(snapshot.failure).toEqual({
+                reason: 'refused',
+                message: SYNC_MESSAGES.refused,
+            });
+            // Still leads with the local truth, still names no server vocabulary — and, unlike
+            // every other sentence here, makes no promise about trying again.
+            expect(snapshot.failure?.message).toContain('Saved on this device');
+            expect(snapshot.failure?.message).not.toContain(code);
+            expect(snapshot.failure?.message).not.toContain('try again');
+        }
+    });
+
     it('names no code at all for a verdict this client has no specific answer to', async () => {
         const { snapshot } = await passWith({
             ok: false,
@@ -325,6 +348,58 @@ describe('the sync loop empties the queue rather than leaving it one version sho
         expect(loop.getSnapshot().failure).toEqual({
             reason: 'too-large',
             message: SYNC_MESSAGES.tooLarge,
+        });
+    });
+
+    it('steps over a song the account has permanently refused, and keeps sending the rest', async () => {
+        // The same rule as the 413 above, for the refusal #1268's adoption could actually produce
+        // (patch review P1): an `operation_mismatch` is a verdict on ONE document's frozen bytes,
+        // so ending the sweep there parks every song behind it behind a document no retry can fix.
+        const posts: string[] = [];
+        let queued = 1;
+        const api: AccountApi = {
+            get: vi.fn(async () => EMPTY_MANIFEST),
+            post: vi.fn(async (_path: string, body: string) => {
+                const documentId = (JSON.parse(body) as { song: string }).song;
+                posts.push(documentId);
+                return documentId === 'song-1'
+                    ? {
+                          ok: false,
+                          error: { kind: 'code', code: 'operation_mismatch', status: 409 },
+                      }
+                    : { ok: true, value: { kind: 'committed' }, status: 200 };
+            }),
+        } as unknown as AccountApi;
+        const queuedFor = (documentId: string) => ({
+            ...PREPARED,
+            documentId,
+            body: JSON.stringify({ song: documentId }),
+        });
+        const songbook = stubSongbook({
+            list: async (_scope: unknown, options: { afterDocumentId?: string } = {}) => ({
+                songs: [
+                    { documentId: 'song-1', remoteRevision: null },
+                    { documentId: 'song-2', remoteRevision: null },
+                ].filter((song) => song.documentId > (options.afterDocumentId ?? '')),
+                nextAfterDocumentId: null,
+            }),
+            prepare: async (_scope: unknown, documentId: string) =>
+                documentId === 'song-1' || queued > 0 ? queuedFor(documentId) : 'idle',
+            acknowledge: async () => {
+                queued -= 1;
+                return 'committed';
+            },
+        });
+        const loop = createSyncLoop(api, createAccountSession(api), songbook);
+        await loop.attach(OWNER);
+
+        await loop.run();
+
+        expect(posts).toEqual(['song-1', 'song-2', 'song-1']);
+        expect(queued).toBe(0);
+        expect(loop.getSnapshot().failure).toEqual({
+            reason: 'refused',
+            message: SYNC_MESSAGES.refused,
         });
     });
 

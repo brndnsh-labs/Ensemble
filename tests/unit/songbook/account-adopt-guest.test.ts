@@ -4,17 +4,20 @@ import {
     adoptGuestSongs,
     computeAdoptCandidates,
     hasDecidedAdoption,
+    libraryDownloaded,
     rememberAdoptionDecision,
 } from '../../../prototypes/v2/lib/account/adopt-guest.js';
 import { LocalRevisionError } from '../../../prototypes/v2/lib/sync/protocol.js';
+import { MAX_REMOTE_CANDIDATES } from '../../../prototypes/v2/lib/sync/repository.js';
 
 /**
  * Copying guest songs into the account (#1268), tested at the level this file can reach without
  * a browser: WHICH ids get derived, WHICH candidates get offered, and how many Saves/passes a
- * copy issues. Real IDB compare-and-put behavior (what `AccountSongbook.save`'s caller-supplied
- * `operationId` actually does inside a transaction) is proven against real IndexedDB in
- * `tests/browser/account-songbook.browser.test.ts` — a mocked `accountSync` here would agree
- * with a wrong implementation as readily as a right one, so nothing here asserts about storage.
+ * copy issues. Real IDB compare-and-put behavior (the local refusal to recreate a document id the
+ * store already holds, which is what makes a rerun land on exactly N songs) is proven against real
+ * IndexedDB in `tests/browser/account-songbook.browser.test.ts` — a mocked `accountSync` here
+ * would agree with a wrong implementation as readily as a right one, so nothing here asserts
+ * about storage.
  */
 
 const { listLibrary, save, run, list } = vi.hoisted(() => ({
@@ -43,34 +46,38 @@ function guestSong(id: string) {
 }
 
 beforeEach(() => {
-    vi.clearAllMocks();
+    // `reset`, not `clear`: one test below installs a `mockImplementation` on `save` to log write
+    // ORDER, and `clearAllMocks` leaves an implementation in place for every later test.
+    vi.resetAllMocks();
 });
 
 describe('computeAdoptCandidates', () => {
-    it('derives a deterministic account document id and operation id per guest song', async () => {
+    it('derives a deterministic account document id per guest song, and no operation id at all', async () => {
         list.mockResolvedValue([guestSong('a'), guestSong('b')]);
         listLibrary.mockResolvedValue([]);
-        const first = await computeAdoptCandidates('owner-1');
+        const { candidates: first } = await computeAdoptCandidates('owner-1');
         expect(first.map((c) => c.guestId)).toEqual(['a', 'b']);
         for (const candidate of first) {
-            // The exact shape `identifier()` (`lib/sync/protocol.ts`) requires of both fields.
+            // The exact shape `identifier()` (`lib/sync/protocol.ts`) requires of a document id.
             expect(candidate.accountDocumentId).toMatch(/^guest-[a-f0-9]{64}$/);
-            expect(candidate.operationId).toMatch(/^[a-f0-9]{64}$/);
             expect(candidate.document.id).toBe(candidate.accountDocumentId);
+            // The operation id is NOT derived here (patch review P0): a deterministic operation id
+            // beside a deterministic document id earns a permanent `operation_mismatch` from a
+            // second device, because `save()` restamps `updatedAt` and receipts replay only an
+            // exact byte match. `AccountSongbook.save` mints a fresh one per attempt instead.
+            expect(candidate).not.toHaveProperty('operationId');
         }
         expect(first[0].accountDocumentId).not.toBe(first[1].accountDocumentId);
-        expect(first[0].operationId).not.toBe(first[1].operationId);
 
         // Same owner, same guest songs, called again: identical ids — the whole point of
         // deriving them from identity alone rather than content or timestamps.
-        const second = await computeAdoptCandidates('owner-1');
+        const { candidates: second } = await computeAdoptCandidates('owner-1');
         expect(second.map((c) => c.accountDocumentId)).toEqual(
             first.map((c) => c.accountDocumentId),
         );
-        expect(second.map((c) => c.operationId)).toEqual(first.map((c) => c.operationId));
 
         // A different owner on the same device gets different ids for the same guest song.
-        const other = await computeAdoptCandidates('owner-2');
+        const { candidates: other } = await computeAdoptCandidates('owner-2');
         expect(other[0].accountDocumentId).not.toBe(first[0].accountDocumentId);
     });
 
@@ -78,19 +85,61 @@ describe('computeAdoptCandidates', () => {
         list.mockResolvedValue([guestSong('a'), guestSong('b')]);
         listLibrary.mockResolvedValue([]);
         const initial = await computeAdoptCandidates('owner-1');
-        const alreadyAdopted = initial.find((c) => c.guestId === 'a')!;
+        const alreadyAdopted = initial.candidates.find((c) => c.guestId === 'a')!;
 
         listLibrary.mockResolvedValue([{ documentId: alreadyAdopted.accountDocumentId }]);
         const remaining = await computeAdoptCandidates('owner-1');
-        expect(remaining.map((c) => c.guestId)).toEqual(['b']);
+        expect(remaining.candidates.map((c) => c.guestId)).toEqual(['b']);
+        expect(remaining.omitted).toBe(0);
     });
 
     it('offers a guest starter the same as any other guest song', async () => {
         list.mockResolvedValue([guestSong('starter-blues')]);
         listLibrary.mockResolvedValue([]);
-        const candidates = await computeAdoptCandidates('owner-1');
+        const { candidates } = await computeAdoptCandidates('owner-1');
         expect(candidates).toHaveLength(1);
         expect(candidates[0].guestId).toBe('starter-blues');
+    });
+
+    it('offers only what the account has room for, rather than queueing Saves the cap will refuse', async () => {
+        // One slot left under the server's per-owner document cap, three guest songs wanting it.
+        // A `quota_exceeded` refusal is ACCOUNT-WIDE: it ends the whole outbox pass, so the two
+        // that do not fit would stall every song queued behind them too.
+        list.mockResolvedValue([guestSong('a'), guestSong('b'), guestSong('c')]);
+        listLibrary.mockResolvedValue(
+            Array.from({ length: MAX_REMOTE_CANDIDATES - 1 }, (_, index) => ({
+                documentId: `held-${index}`,
+            })),
+        );
+        const offer = await computeAdoptCandidates('owner-1');
+        expect(offer.room).toBe(1);
+        expect(offer.candidates.map((c) => c.guestId)).toEqual(['a']);
+        expect(offer.omitted).toBe(2);
+    });
+
+    it('offers nothing at all, and says how many it left out, when the account is already full', async () => {
+        list.mockResolvedValue([guestSong('a')]);
+        listLibrary.mockResolvedValue(
+            Array.from({ length: MAX_REMOTE_CANDIDATES }, (_, index) => ({
+                documentId: `held-${index}`,
+            })),
+        );
+        const offer = await computeAdoptCandidates('owner-1');
+        // Not the same as "nothing new to add": the dialog has its own sentence for a full
+        // account, and `omitted` is what tells it apart from an already-adopted library.
+        expect(offer).toMatchObject({ candidates: [], omitted: 1, room: 0 });
+    });
+});
+
+describe('libraryDownloaded', () => {
+    it('is false until both halves of the manifest progress are observed', () => {
+        // `attach()` publishes `UNOBSERVED`, and a partially paged manifest leaves one half null.
+        expect(libraryDownloaded({ required: null, verified: null })).toBe(false);
+        expect(libraryDownloaded({ required: 3, verified: null })).toBe(false);
+        expect(libraryDownloaded({ required: null, verified: 3 })).toBe(false);
+        // A genuinely empty account library is still an ANSWER, so the offer may be computed.
+        expect(libraryDownloaded({ required: 0, verified: 0 })).toBe(true);
+        expect(libraryDownloaded({ required: 3, verified: 3 })).toBe(true);
     });
 });
 
@@ -98,35 +147,46 @@ function candidate(guestId: string): AdoptCandidate {
     return {
         guestId,
         accountDocumentId: `guest-${guestId}`,
-        operationId: `op-${guestId}`,
         document: guestSong(`guest-${guestId}`),
     };
 }
 
 describe('adoptGuestSongs', () => {
-    it('commits every candidate as its own Save with its own operation id, then runs exactly one pass', async () => {
-        save.mockResolvedValue({});
-        const progress: Array<[number, number]> = [];
+    it('commits every candidate as a create, reports progress after each write, then runs exactly one pass', async () => {
+        // One log for both, so the ORDER is what is asserted: a count published before the write
+        // claims a Save that has not happened yet (patch review P3-6b).
+        const log: string[] = [];
+        save.mockImplementation(async (document: { id: string }) => {
+            log.push(`save:${document.id}`);
+            return {};
+        });
         const result = await adoptGuestSongs(
             [candidate('a'), candidate('b'), candidate('c')],
-            (current, total) => progress.push([current, total]),
+            (copied, total) => log.push(`copied:${copied}/${total}`),
         );
         expect(result).toEqual({ adopted: 3, failures: [] });
-        expect(save).toHaveBeenCalledTimes(3);
-        // Every call is a create (`expected = null`) using that candidate's own operation id —
-        // never a shared one, and never the loop's default random id.
-        expect(save.mock.calls.map((call) => [call[1], call[2]])).toEqual([
-            [null, 'op-a'],
-            [null, 'op-b'],
-            [null, 'op-c'],
+        expect(log).toEqual([
+            'save:guest-a',
+            'copied:1/3',
+            'save:guest-b',
+            'copied:2/3',
+            'save:guest-c',
+            'copied:3/3',
         ]);
-        expect(progress).toEqual([
-            [1, 3],
-            [2, 3],
-            [3, 3],
-        ]);
+        // Every call is a create (`expected = null`) and passes NO operation id: the store mints a
+        // fresh one per attempt, which is the patch review's P0 fix.
+        expect(save.mock.calls.map((call) => call.slice(1))).toEqual([[null], [null], [null]]);
         // ONE pass for the whole batch, never one per song (#1268's explicit design constraint).
         expect(run).toHaveBeenCalledTimes(1);
+    });
+
+    it('counts only songs actually copied, so a failure does not inflate the progress line', async () => {
+        save.mockRejectedValueOnce(new Error('storage exploded')).mockResolvedValueOnce({});
+        const progress: string[] = [];
+        await adoptGuestSongs([candidate('a'), candidate('b')], (copied, total) =>
+            progress.push(`${copied}/${total}`),
+        );
+        expect(progress).toEqual(['0/2', '1/2']);
     });
 
     it('treats a LocalRevisionError as already adopted, not a failure — the retry-safety case', async () => {

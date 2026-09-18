@@ -1,6 +1,11 @@
 import type { Download, Page } from '@playwright/test';
 import { DELETE_CONFIRMATION } from '../app/account/delete-account';
-import { countStepUps, openWithAccounts, refuseOnceWithFreshAuthRequired } from './account-helpers';
+import {
+    countStepUps,
+    dismissAdoptGuestPrompt,
+    openWithAccounts,
+    refuseOnceWithFreshAuthRequired,
+} from './account-helpers';
 import { editorRevealed, expect, accountTest as test } from './fixtures';
 import { addVirtualAuthenticator } from './virtual-authenticator';
 
@@ -32,6 +37,10 @@ async function signUp(page: Page): Promise<void> {
     await expect(page.getByTestId('recovery-code')).toHaveText(CODE_SHAPE);
     await page.keyboard.press('Escape');
     await expect(page.getByTestId('account-finish-protecting')).toBeVisible();
+    // #1268's adoption prompt auto-opens once the account library has downloaded, and this
+    // device's guest starters are not in the account — it is unrelated to this spec, but it is a
+    // modal, so every click below would be intercepted by it.
+    await dismissAdoptGuestPrompt(page);
 }
 
 async function newSongOnTheStand(page: Page): Promise<void> {
@@ -199,6 +208,9 @@ test('a second device is refused after the deletion, and keeps its own work expo
         await second.getByTestId('account-sign-in').click();
         await second.getByTestId('account-do-sign-in').click();
         await expect(second.getByTestId('account-sign-out')).toBeVisible();
+        // A fresh profile: its own guest starters, none of them in the account, so #1268's
+        // prompt opens here too once the download lands (`account-helpers.ts`).
+        await dismissAdoptGuestPrompt(second);
         await expect(songTitles(second)).toHaveText(['Road take']);
 
         // Device two commits a version the account has not got, offline. This is the work the
