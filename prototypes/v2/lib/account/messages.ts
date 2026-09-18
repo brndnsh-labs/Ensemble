@@ -31,7 +31,7 @@ export type AccountOutcome<T> = { ok: true; value: T } | { ok: false; failure: A
 export const ACCOUNT_MESSAGES = {
     closed: 'New accounts aren’t open yet.',
     failed: 'That didn’t work. Try again, or use a different passkey.',
-    rateLimited: 'Too many attempts — wait a minute.',
+    rateLimited: 'Too many attempts — try again later.',
     network: 'Can’t reach the server. You can keep playing as a guest.',
     generic: 'Something went wrong. Try again in a moment.',
 } as const;

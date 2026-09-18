@@ -62,6 +62,18 @@ export function SignInDialog({
     }, []);
 
     /**
+     * The recovery-code step replaces whatever was focused (usually the Create-account button,
+     * which unmounts), so focus would otherwise fall back to `<body>` — outside the dialog and
+     * silent for a screen reader. Move it to the step's own heading the moment the code appears.
+     */
+    const codeHeadingRef = useRef<HTMLHeadingElement>(null);
+    useEffect(() => {
+        if (code !== '') {
+            codeHeadingRef.current?.focus();
+        }
+    }, [code]);
+
+    /**
      * Every await below outlives a possible close — a passkey prompt is a human pressing a
      * fingerprint reader — so each one re-checks this before writing state. Without it, a code
      * that arrived after the dialog closed would sit in state past the reset below and be shown
@@ -98,12 +110,13 @@ export function SignInDialog({
             setBusy(false);
             setFailure(null);
             setCopyHint('');
-            return;
         }
-        if (mode === 'recovery') {
-            void beginRecovery();
-        }
-    }, [open, mode, beginRecovery]);
+        // Opening in recovery mode used to fire `beginRecovery()` automatically here. That DELETEs
+        // the live recovery row server-side and spends one of the 5 `recovery/enroll` calls per 10
+        // minutes on every open — five open/close cycles (a curious click, a slow double-tap) locks
+        // the account out of getting a code for 10 minutes with nothing to show for it. The
+        // "Get a code" button below is the only thing allowed to spend that budget now.
+    }, [open]);
 
     async function runCreate() {
         setFailure(null);
@@ -222,7 +235,9 @@ export function SignInDialog({
                 </>
             ) : code !== '' ? (
                 <>
-                    <h2 id="account-dialog-title">Save your recovery code.</h2>
+                    <h2 id="account-dialog-title" ref={codeHeadingRef} tabIndex={-1}>
+                        Save your recovery code.
+                    </h2>
                     <p>
                         You’re signed in. This code is shown once and never again — it’s the only
                         way back into your account if you lose your passkey. Copy it or download it,
@@ -240,6 +255,7 @@ export function SignInDialog({
                         </button>
                     </div>
                     {copyHint !== '' && <p className="status-detail">{copyHint}</p>}
+                    {renderFailure(failure)}
                     <label className="recovery-confirm">
                         <input
                             type="checkbox"
@@ -257,6 +273,14 @@ export function SignInDialog({
                             onClick={() => void finish()}
                         >
                             Finish
+                        </button>
+                        <button
+                            className="btn"
+                            data-testid="recovery-not-now"
+                            disabled={busy}
+                            onClick={onClose}
+                        >
+                            Not now
                         </button>
                     </div>
                     <p className="status-detail">

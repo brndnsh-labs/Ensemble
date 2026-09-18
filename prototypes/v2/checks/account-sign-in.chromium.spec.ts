@@ -17,6 +17,10 @@ import { addVirtualAuthenticator } from './virtual-authenticator';
  * "code never leaks" assertions live inside the create test rather than in a fifth account of
  * their own — the code is on screen exactly once per enrolment, so proving it is nowhere else at
  * that moment is the same test, not a cheaper version of a separate one.
+ *
+ * The security-review follow-ups (focus-on-code, the offline sign-out disable, and a failed
+ * Finish rendering its error) are folded into these same four enrolments rather than adding a
+ * fifth — the budget stays at 4/10min.
  */
 
 const CODE_SHAPE = /^[A-Za-z0-9_-]{43}$/;
@@ -93,6 +97,10 @@ test('creating an account shows the recovery code once, downloads it, and surviv
 
     const code = await createAccountThroughDialog(page);
 
+    // P2-2: the focused Create button unmounts the instant the recovery-code step replaces it;
+    // focus must land inside the dialog (the step's own heading), never fall through to <body>.
+    expect(await focusIsInDialog(page)).toBe(true);
+
     // Nothing is protected until the code is confirmed kept, so Finish waits for the checkbox.
     await expect(page.getByTestId('recovery-finish')).toBeDisabled();
 
@@ -138,8 +146,9 @@ test('abandoning the recovery step leaves the account unprotected until it is fi
     await openWithAccounts(page);
     const abandoned = await createAccountThroughDialog(page);
 
-    // Walk away from the code. The account is real and signed in, just unprotected.
-    await page.keyboard.press('Escape');
+    // P1-2: the recovery-code step has a touch-reachable exit now, not just Escape — abandon by
+    // clicking it, proving that path rather than only the keyboard one.
+    await page.getByTestId('recovery-not-now').click();
     await expect(page.locator('dialog.account-dialog')).toBeHidden();
     await expect(page.getByTestId('account-finish-protecting')).toBeVisible();
 
@@ -149,6 +158,15 @@ test('abandoning the recovery step leaves the account unprotected until it is fi
     await expect(page.getByTestId('account-finish-protecting')).toBeVisible();
 
     await page.getByTestId('account-finish-protecting').click();
+    // P2-3: opening in recovery mode no longer auto-fires the enrolment — that DELETEs the live
+    // recovery row and spends one of the 5 `recovery/enroll` calls per 10 minutes on every open,
+    // which would lock the account out of getting a code for 10 minutes after a few open/closes.
+    // An explicit press of "Get a code" is required now.
+    await expect(
+        page.getByRole('heading', { name: 'Finish protecting your account.' }),
+    ).toBeVisible();
+    await expect(page.getByTestId('recovery-code')).toHaveCount(0);
+    await page.getByTestId('recovery-retry').click();
     const replacement = page.getByTestId('recovery-code');
     await expect(replacement).toBeVisible();
     const second = (await replacement.textContent()) ?? '';
@@ -158,7 +176,26 @@ test('abandoning the recovery step leaves the account unprotected until it is fi
     // Re-showing the first code would be a lie about what opens the account.
     expect(second).not.toBe(abandoned);
 
+    // P1-1: a failed Finish (here, the server refusing a rate-limited confirm) must render the
+    // failure copy in the dialog and leave the account reading unprotected. Reusing this flow
+    // instead of a dedicated account keeps the `recovery/enroll` budget where it was.
+    await page.route('**/api/auth/recovery/confirm', (route) =>
+        route.fulfill({
+            status: 429,
+            contentType: 'application/json',
+            // The server's collapsed error shape is `{ error: <code> }` (`lib/account/api.ts`),
+            // not `{ code }`.
+            body: JSON.stringify({ error: 'rate_limited' }),
+        }),
+    );
     await page.getByTestId('recovery-saved').check();
+    await page.getByTestId('recovery-finish').click();
+    await expect(page.getByTestId('account-error')).toHaveText(
+        'Too many attempts — try again later.',
+    );
+    await expect(page.getByTestId('account-finish-protecting')).toBeVisible();
+    await page.unroute('**/api/auth/recovery/confirm');
+
     await page.getByTestId('recovery-finish').click();
     await expect(page.getByTestId('account-state')).toHaveText('Signed in');
 });
@@ -176,7 +213,19 @@ test('signing out and back in, then in again on a fresh profile, reaches the sam
     await page.keyboard.press('Escape');
     await expect(page.getByTestId('account-finish-protecting')).toBeVisible();
 
-    await page.getByRole('button', { name: 'Sign out' }).click();
+    // P1-3: offline, sign-out must be disabled with a visible, honest reason rather than shipping
+    // enabled and failing silently against a server it cannot reach (rollout decision 9 S2).
+    const signOutButton = page.getByTestId('account-sign-out');
+    await page.context().setOffline(true);
+    await expect(signOutButton).toBeDisabled();
+    await expect(page.getByTestId('account-offline-note')).toHaveText(
+        'Sign out needs a connection',
+    );
+    await page.context().setOffline(false);
+    await expect(signOutButton).toBeEnabled();
+    await expect(page.getByTestId('account-offline-note')).toHaveCount(0);
+
+    await signOutButton.click();
     // A session that WAS signed in and is now refused reads as `expired`, not `guest` — the
     // header says so.
     await expect(page.getByTestId('account-sign-in')).toHaveText('Sign in again');

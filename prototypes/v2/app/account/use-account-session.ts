@@ -15,6 +15,7 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { accountApi, accountSession } from '../../lib/account/client';
 import { syncAccountsFlag } from '../../lib/account/feature';
+import type { AccountFailure } from '../../lib/account/messages';
 import { recoveryEnrolled, signOut } from '../../lib/account/passkeys';
 import type { SessionState } from '../../lib/account/session';
 
@@ -46,6 +47,14 @@ export interface AccountView {
      */
     recoveryEnrolled: boolean | null;
     signingOut: boolean;
+    /**
+     * `navigator.onLine`, kept live. Rollout decision 9 S2: offline, sign-out is disabled with a
+     * reason rather than left to fail silently against a server it cannot reach — export stays
+     * available either way, since it never leaves the device.
+     */
+    online: boolean;
+    /** Set only when the last sign-out attempt reached the server and was refused. */
+    signOutFailure: AccountFailure | null;
     /** Re-reads the session and, when signed in, the recovery status. */
     refresh: () => void;
     signOut: () => void;
@@ -62,11 +71,30 @@ export function useAccountSession(active: boolean): AccountView {
     const session = useSyncExternalStore(subscribe, snapshot, snapshot);
     const [enrolled, setEnrolled] = useState<boolean | null>(null);
     const [signingOut, setSigningOut] = useState(false);
+    const [signOutFailure, setSignOutFailure] = useState<AccountFailure | null>(null);
+    // `true` until the effect below resolves the real value — `navigator` is unavailable during
+    // the static export's prerender, and a device is assumed reachable until proven otherwise.
+    const [online, setOnline] = useState(true);
     const mounted = useRef(true);
     useEffect(() => {
         mounted.current = true;
         return () => {
             mounted.current = false;
+        };
+    }, []);
+
+    useEffect(() => {
+        if (typeof navigator === 'undefined' || typeof window === 'undefined') {
+            return;
+        }
+        setOnline(navigator.onLine);
+        const goOnline = () => setOnline(true);
+        const goOffline = () => setOnline(false);
+        window.addEventListener('online', goOnline);
+        window.addEventListener('offline', goOffline);
+        return () => {
+            window.removeEventListener('online', goOnline);
+            window.removeEventListener('offline', goOffline);
         };
     }, []);
 
@@ -98,11 +126,15 @@ export function useAccountSession(active: boolean): AccountView {
 
     const runSignOut = useCallback(() => {
         setSigningOut(true);
-        void signOut(accountApi).then(() => {
+        setSignOutFailure(null);
+        void signOut(accountApi).then((outcome) => {
             if (!mounted.current) {
                 return;
             }
             setSigningOut(false);
+            if (!outcome.ok) {
+                setSignOutFailure(outcome.failure);
+            }
             // Refresh either way: on success the server has revoked the session, and on failure
             // the only honest thing to do is re-read who the server still thinks we are.
             refresh();
@@ -113,6 +145,8 @@ export function useAccountSession(active: boolean): AccountView {
         session,
         recoveryEnrolled: enrolled,
         signingOut,
+        online,
+        signOutFailure,
         refresh,
         signOut: runSignOut,
     };

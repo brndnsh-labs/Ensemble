@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
     accountsEnabled,
     accountsFlagFromSearch,
+    accountsFlagRequest,
     setAccountsEnabled,
 } from '../../../prototypes/v2/lib/account/feature.js';
 
@@ -59,6 +60,19 @@ describe('accountsFlagFromSearch', () => {
 
     it('finds the parameter among others', () => {
         expect(accountsFlagFromSearch('?chart=abc&accounts=on&x=1')).toBe('on');
+    });
+});
+
+describe('accountsFlagRequest', () => {
+    it('reads the param when there is no share hash', () => {
+        expect(accountsFlagRequest('?accounts=on', '')).toBe('on');
+        expect(accountsFlagRequest('?accounts=off', '')).toBe('off');
+    });
+
+    it('ignores the param entirely when a share payload is riding in the hash (P2-1)', () => {
+        // /v2/?accounts=on#<share> must not opt a stranger's device in just for opening a link.
+        expect(accountsFlagRequest('?accounts=on', '#abc123')).toBeNull();
+        expect(accountsFlagRequest('?accounts=off', '#abc123')).toBeNull();
     });
 });
 

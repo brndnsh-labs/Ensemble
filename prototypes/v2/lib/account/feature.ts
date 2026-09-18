@@ -54,6 +54,22 @@ export function setAccountsEnabled(enabled: boolean): void {
 }
 
 /**
+ * What `syncAccountsFlag` should do with a `?accounts=` request, given the URL's hash too.
+ *
+ * Share payloads live in the hash (`ensemble.tsx`'s `decodeChartLink`), so `/v2/?accounts=on#
+ * <share>` is link-injectable: a stranger who only meant to open a shared song would otherwise
+ * have this device's account UI flipped on permanently. A share link must never carry a
+ * feature-flag side effect, so the request is ignored outright — not merely left unpersisted —
+ * whenever the hash is non-empty, whatever it asked for.
+ */
+export function accountsFlagRequest(search: string, hash: string): AccountsFlagRequest {
+    if (hash !== '') {
+        return null;
+    }
+    return accountsFlagFromSearch(search);
+}
+
+/**
  * Applies any `?accounts=on|off` request, strips the parameter from the address bar, and reports
  * whether the account UI is enabled for this device. Safe to call only after mount — it touches
  * `location`, `history` and `localStorage`, none of which exist during the static export's
@@ -61,10 +77,11 @@ export function setAccountsEnabled(enabled: boolean): void {
  *
  * The parameter is removed with `replaceState` so it never survives into a shared or bookmarked
  * URL: the opt-in belongs to the device, and a link carrying it would silently enable unfinished
- * account UI for whoever opened it.
+ * account UI for whoever opened it. A request riding alongside a share hash is never applied at
+ * all (see `accountsFlagRequest`), so the flag setter below is never reached for one.
  */
 export function syncAccountsFlag(): boolean {
-    const requested = accountsFlagFromSearch(window.location.search);
+    const requested = accountsFlagRequest(window.location.search, window.location.hash);
     if (requested !== null) {
         setAccountsEnabled(requested === 'on');
         try {

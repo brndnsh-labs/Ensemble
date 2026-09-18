@@ -698,6 +698,8 @@ export default function Ensemble() {
                             session={account.session}
                             unprotected={account.recoveryEnrolled === false}
                             busy={account.signingOut}
+                            online={account.online}
+                            signOutFailure={account.signOutFailure}
                             onSignIn={() => setAccountDialog('signIn')}
                             onFinishProtecting={() => setAccountDialog('recovery')}
                             onSignOut={account.signOut}
