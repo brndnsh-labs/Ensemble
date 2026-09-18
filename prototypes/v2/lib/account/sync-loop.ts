@@ -443,12 +443,18 @@ export function createSyncLoop(
                 if (failure.reason === 'rate-limited') {
                     backoffUntil = Math.max(backoffUntil, Date.now() + BACKOFF_FALLBACK_MS);
                 }
-                if (failure.reason === 'expired') {
+                if (
+                    failure.reason === 'expired' &&
+                    (scope === null || scope.ownerId === current.ownerId)
+                ) {
                     // Published BEFORE the epoch check below, and deliberately: a 401 is a fact
                     // about the ACCOUNT, not about the scope this pass was attached to. The app's
                     // own order is `markExpired()` -> re-render -> `detach()`, so by the time this
                     // pass unwinds the epoch has usually moved — and dropping the publish there
                     // would silently delete the one sentence that explains why nothing uploaded.
+                    // The owner check is the one thing the epoch was protecting that still
+                    // matters here: if a DIFFERENT account attached in the meantime, this sentence
+                    // is about the old one and must not land on the new one's chip.
                     publish({ failure });
                 }
             }
