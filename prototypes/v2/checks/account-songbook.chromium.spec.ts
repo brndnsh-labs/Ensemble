@@ -129,7 +129,17 @@ test('a song saved on one device opens on another, and the guest songbook is unt
 
     // Nothing above went anywhere near the guest songbook.
     await page.getByRole('button', { name: 'Back to songbook' }).click();
+    // Sign-out goes through its preflight (#1269). Take D is exactly the case it exists for: an
+    // edit this device kept and the account never got, about to be removed. So the step NAMES it
+    // and the destructive button says "anyway" — "everything has reached your account" here would
+    // be the preflight lying about the retained draft the two assertions above just proved.
     await page.getByTestId('account-sign-out').click();
+    await expect(page.getByTestId('sign-out-drafts')).toContainText(
+        'One unsaved experiment is kept on this device',
+    );
+    await expect(page.getByTestId('sign-out-clear')).toHaveCount(0);
+    await expect(page.getByTestId('sign-out-confirm')).toHaveText('Sign out anyway');
+    await page.getByTestId('sign-out-confirm').click();
     await expect(page.getByTestId('account-sign-in')).toBeVisible();
     await expect(page.getByTestId('library-heading')).toHaveText('Your songbook');
     expect(await songTitles(page).allInnerTexts()).toEqual(guestSongs);

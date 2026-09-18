@@ -109,6 +109,26 @@ describe('createAccountSession', () => {
         expect(guest.getSnapshot()).toEqual({ status: 'guest' });
     });
 
+    it('a deliberate sign-out lands on guest, and the refresh after it cannot undo that (#1269)', async () => {
+        const session = createAccountSession(
+            apiReturning(
+                { ok: true, value: { accountId: 'acct-1' }, status: 200 },
+                // The 401 the sign-out's own logout just created. For every other caller that
+                // means `expired`; for this one it must not, or the header would answer somebody
+                // who just signed out with "Sign in again".
+                { ok: false, error: { kind: 'code', code: 'unauthenticated', status: 401 } },
+            ),
+        );
+        await session.refresh();
+        expect(session.getSnapshot()).toEqual({ status: 'signedIn', owner: 'acct-1' });
+
+        session.markSignedOut();
+        expect(session.getSnapshot()).toEqual({ status: 'guest' });
+
+        await session.refresh();
+        expect(session.getSnapshot()).toEqual({ status: 'guest' });
+    });
+
     it('unsubscribe stops further notifications', async () => {
         // Signed in first, so `markExpired()` is a REAL state change: from `unknown` it is a
         // no-op, and this would then pass without unsubscribe doing anything at all.

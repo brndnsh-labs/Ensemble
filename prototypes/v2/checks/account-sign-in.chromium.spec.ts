@@ -168,9 +168,13 @@ test('signing out and back in, then in again on a fresh profile, reaches the sam
     await expect(page.getByTestId('account-offline-note')).toHaveCount(0);
 
     await signOutButton.click();
-    // A session that WAS signed in and is now refused reads as `expired`, not `guest` — the
-    // header says so.
-    await expect(page.getByTestId('account-sign-in')).toHaveText('Sign in again');
+    // #1269 — sign-out goes through its preflight. This account has nothing unsent, which the
+    // step says rather than leaving blank.
+    await expect(page.getByTestId('sign-out-clear')).toBeVisible();
+    await page.getByTestId('sign-out-confirm').click();
+    // A DELIBERATE sign-out is not an expiry: the header offers a plain "Sign in", not the "Sign
+    // in again" that belongs to a session which went away underneath somebody (#1269).
+    await expect(page.getByTestId('account-sign-in')).toHaveText('Sign in');
 
     await page.getByTestId('account-sign-in').click();
     await page.getByTestId('account-do-sign-in').click();

@@ -6,7 +6,11 @@ import { prepareScorePlayback } from '@engine/songbook/score-playback';
 import type { SemanticScore } from '@engine/songbook/score-types';
 import type { InstrumentVoice } from '@engine/types';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { accountSync, type CloudDeleteResult } from '../lib/account/sync-loop';
+import {
+    accountSync,
+    type CloudDeleteResult,
+    type SignOutPreflight,
+} from '../lib/account/sync-loop';
 import { arrangementOf, blankSong, convertedCopy, extendedScore } from '../lib/documents';
 import { validateEditorText } from '../lib/editor';
 import * as repository from '../lib/repository';
@@ -22,6 +26,7 @@ import { AccountPage } from './account/account-page';
 import { DeleteSongDialog } from './account/delete-song';
 import { SyncStatus, useAccountLibrary } from './account/library';
 import { type AccountDialogMode, SignInDialog } from './account/sign-in';
+import { SignOutDialog } from './account/sign-out';
 import { useAccountSession, useAccountsEnabled } from './account/use-account-session';
 import { ChartSheet } from './chart-sheet';
 import { EditPanel } from './edit-panel';
@@ -50,6 +55,49 @@ function libraryDocuments(library: SavedSong[]): ChartDocument[] {
     return library
         .map((song) => song.document)
         .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+}
+
+/**
+ * The sign-out preflight (#1269), completed with the unsaved edits the LOOP CANNOT SEE.
+ *
+ * An account chart's unsaved text does not live in the account database. `signOutPreflight` reads
+ * its `drafts` store, and the one writer of that store (`AccountSongbook.recover`) has no caller in
+ * the app today; what this shell actually writes on every edit is a GUEST recovery slot
+ * (`repository.recover`, the known #1299 namespace gap) — or, when that storage write was refused,
+ * a `volatileDrafts` entry that exists only in this tab. Sign-out removes both. Left uncounted, the
+ * step would print "Everything on this device has reached your account", hide Export, label the
+ * button a plain "Sign out", and then delete the edit it had just said nothing about.
+ *
+ * Composed HERE rather than inside the loop on purpose: the loop owns the account database, the
+ * shell owns guest storage, and neither should reach across that line. When #1299 moves account
+ * recovery into the account store, this function is what shrinks — not the loop's plan.
+ */
+function withLocalDrafts(
+    plan: SignOutPreflight,
+    volatile: Map<string, ChartDocument>,
+): SignOutPreflight {
+    let held = 0;
+    const exposed = new Set(plan.atRisk);
+    for (const id of plan.documentIds) {
+        let slots = 0;
+        try {
+            slots = repository.recoverySlotCount(id);
+        } catch {
+            /* Unreadable storage is not evidence of nothing; the in-tab map still answers. */
+        }
+        const local = slots + (volatile.has(id) ? 1 : 0);
+        if (local > 0) {
+            held += local;
+            exposed.add(id);
+        }
+    }
+    return {
+        ...plan,
+        drafts: plan.drafts + held,
+        // Re-ordered by the library rather than left in set-insertion order, so the export writes
+        // its files in the order the musician sees the songs listed.
+        atRisk: plan.documentIds.filter((id) => exposed.has(id)),
+    };
 }
 
 /** Read the live engine values the Feel sheet needs but `ChartDocument` doesn't carry. */
@@ -154,6 +202,10 @@ export default function Ensemble() {
     // Both are the shell's, because the shell owns every `<dialog>` in this app.
     const [deleteOpen, setDeleteOpen] = useState(false);
     const [deleteFailure, setDeleteFailure] = useState<string | null>(null);
+    // #1269 — the sign-out preflight, and what it found. `null` while the read is still out: the
+    // step says "checking" rather than "nothing at stake", which would be a claim.
+    const [signOutOpen, setSignOutOpen] = useState(false);
+    const [signOutPlan, setSignOutPlan] = useState<SignOutPreflight | null>(null);
     // #1266 — signed in, the songbook IS the account library. `current?.id` is the chart on the
     // stand: the loop hands it to the download's `isActive` so a remote update can never be
     // swapped in underneath whoever is playing.
@@ -191,6 +243,7 @@ export default function Ensemble() {
     const accountDialogRef = useRef<HTMLDialogElement>(null);
     const accountPageDialogRef = useRef<HTMLDialogElement>(null);
     const deleteDialogRef = useRef<HTMLDialogElement>(null);
+    const signOutDialogRef = useRef<HTMLDialogElement>(null);
     const soundsDialog = useRef<HTMLDialogElement>(null);
     const feelDialog = useRef<HTMLDialogElement>(null);
     const file = useRef<HTMLInputElement>(null);
@@ -393,6 +446,44 @@ export default function Ensemble() {
             deleteDialogRef.current?.close();
         }
     }, [deleteOpen, inAccount]);
+    // #1269 — the sign-out preflight. `signedIn` is a dependency, not just a guard: a session that
+    // expires underneath this step makes its own question moot (there is no session left to
+    // revoke), and a flag left true would spring the step open again on the next sign-in.
+    useEffect(() => {
+        if (!signedIn) {
+            setSignOutOpen(false);
+            return;
+        }
+        if (!signOutOpen) {
+            signOutDialogRef.current?.close();
+            return;
+        }
+        signOutDialogRef.current?.showModal();
+    }, [signOutOpen, signedIn]);
+    // The preflight read is its own effect, keyed on `sync.owner` rather than `signedIn`: the loop
+    // publishes an owner only once it actually has a scope, so this cannot race the attach and be
+    // left permanently on "checking" for a step opened the moment after signing in. Re-read on
+    // every open rather than cached — a Save queued since the last time is the work it names.
+    useEffect(() => {
+        if (!signOutOpen || sync.owner === null) {
+            return;
+        }
+        let alive = true;
+        accountSync
+            .signOutPreflight()
+            .then((plan) => {
+                if (alive) {
+                    setSignOutPlan(withLocalDrafts(plan, volatileDrafts.current));
+                }
+            })
+            .catch(() => {
+                // An unreadable store is not evidence that nothing is at stake, so the step stays
+                // on "checking" — which leaves the destructive button disabled.
+            });
+        return () => {
+            alive = false;
+        };
+    }, [signOutOpen, sync.owner]);
     useEffect(() => {
         if (feelMenu) {
             // Refreshed on every open: these four fields can drift from what the
@@ -828,6 +919,71 @@ export default function Ensemble() {
             setMessage(result.message);
         });
     }
+    /**
+     * Sign out of the account (#1269) — the other destructive account operation, and the one where
+     * unsent work gets destroyed if nothing stands in front of it.
+     *
+     * Playback stops FIRST, through the runtime's own entrypoint: the chart on the stand is about
+     * to stop existing on this device, and a band playing a song out of a songbook that has been
+     * removed is the kind of half-state the fence exists to make impossible everywhere else.
+     *
+     * Then `accountSync.signOut` does the ordered part — fence, revoke, forget — and this puts the
+     * shell back to a guest device around it. A `'kept'` outcome changes nothing at all: the server
+     * never confirmed, so the account is still attached, the step stays open, and the sentence the
+     * hook captured is what the musician reads.
+     *
+     * The recovery slots go last and by id. Account chart recovery currently lives in the GUEST
+     * `localStorage` namespace (`repository.recover`, known gap #1299), so clearing the account's
+     * IndexedDB stores alone would leave account chart TEXT readable on a shared device after
+     * sign-out. `clearRecovery` takes EVERY writer's slot for each id, not just this page load's:
+     * a slot an earlier load left behind is the same plaintext on the same shared device, and a
+     * tab still open on this account is losing its session anyway. By `documentIds` rather than
+     * `atRisk` — every one of this account's documents is being removed from this device, so every
+     * one of their slots goes with it.
+     */
+    function signOutOfAccount() {
+        const documentIds = signOutPlan?.documentIds ?? [];
+        void run(async () => {
+            runtime.stop();
+            if ((await account.signOut()) === 'kept') {
+                return;
+            }
+            setSignOutOpen(false);
+            setSignOutPlan(null);
+            // Unconditional: `saved` is an account chart's committed baseline, and nothing of that
+            // account may outlive the sign-out. (The header carrying Sign out is hidden while a
+            // chart is open, so in practice `currentStore` is already null by the time this runs —
+            // which is exactly why the guard below must not be what protects `saved`.)
+            setSaved(null);
+            if (currentStore.current === 'account') {
+                setCurrent(null);
+                currentStore.current = null;
+                clearBuffers();
+            }
+            setAccountSongs(null);
+            for (const id of documentIds) {
+                volatileDrafts.current.delete(id);
+                try {
+                    repository.clearRecovery(id);
+                } catch {
+                    /* Recovery is a convenience; a stale entry must not fail the sign-out. */
+                }
+            }
+            // Read directly rather than through `refreshSongs`: `signedIn` is still true in this
+            // closure's render, and that path would ask a loop that no longer has an account.
+            setGuestSongs(await repository.list());
+            // Read live rather than from the `sync` snapshot this render closed over: the loop
+            // publishes this during the await above. A wipe that failed after a confirmed
+            // revocation is still a sign-out — but the songs really are still here, so the
+            // cheerful sentence would be a lie and the reason has to reach the musician.
+            const failure = accountSync.getSnapshot().failure;
+            if (failure) {
+                setError(failure.message);
+                return;
+            }
+            setMessage('Signed out · your guest songbook is unchanged');
+        });
+    }
     function openSong(id: string) {
         void run(async () => {
             const fresh = await refreshSongs();
@@ -910,11 +1066,13 @@ export default function Ensemble() {
             setSectionId(extended.sectionId);
         });
     }
-    function exportSong() {
-        if (!current) {
-            return;
-        }
-        const candidate = updateChart();
+    /**
+     * Write one chart to a file on this device. Extracted from `exportSong` for #1269's sign-out
+     * preflight, which exports songs from the LIBRARY rather than the stand — the header (and its
+     * Sign out button) is hidden while a chart is open, so at that moment there is no chart on the
+     * stand to export and the work at risk is named by document id.
+     */
+    function exportDocument(candidate: ChartDocument) {
         const url = URL.createObjectURL(
             new Blob([JSON.stringify(repository.validated(candidate), null, 2)], {
                 type: 'application/json',
@@ -922,9 +1080,15 @@ export default function Ensemble() {
         );
         const anchor = document.createElement('a');
         anchor.href = url;
-        anchor.download = `${current.title.replace(/[^\p{L}\p{N} -]/gu, '').slice(0, 80) || 'chart'}.ensemble`;
+        anchor.download = `${candidate.title.replace(/[^\p{L}\p{N} -]/gu, '').slice(0, 80) || 'chart'}.ensemble`;
         anchor.click();
         window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+    function exportSong() {
+        if (!current) {
+            return;
+        }
+        exportDocument(updateChart());
     }
     // #1277 — reuse the shared `.mid` exporter (runs in its own detached worker
     // realm, so it never touches the live scheduler/audio and is safe to call
@@ -1040,7 +1204,10 @@ export default function Ensemble() {
                             onSignIn={() => setAccountDialog('signIn')}
                             onFinishProtecting={() => setAccountDialog('recovery')}
                             onOpenAccount={() => setAccountPageOpen(true)}
-                            onSignOut={account.signOut}
+                            onSignOut={() => {
+                                setSignOutPlan(null);
+                                setSignOutOpen(true);
+                            }}
                         />
                     )}
                 </div>
@@ -1049,6 +1216,22 @@ export default function Ensemble() {
                 <div className="error-banner" role="alert">
                     <span>{error}</span>
                     <button onClick={() => setError('')}>Dismiss</button>
+                </div>
+            )}
+            {/*
+             * #1269 — an expired session, said once, everywhere. The stand's sync chip already
+             * carries the queue's half of this ("sign in again to upload it"), but the chip only
+             * exists with a chart open: a musician who signs out of nothing, closes the song and
+             * goes back to the songbook would otherwise see their library silently fall back to
+             * the guest one with no explanation anywhere. `role="status"`, not `alert`: nothing
+             * was lost, and the sentence says so.
+             */}
+            {accountsOn && account.session.status === 'expired' && (
+                <div className="error-banner" role="status" data-testid="account-expired-banner">
+                    <span>
+                        Sign in again to keep syncing. Everything you saved is still on this device.
+                    </span>
+                    <button onClick={() => setAccountDialog('signIn')}>Sign in again</button>
                 </div>
             )}
             {volatileDrafts.current.size > 0 && (
@@ -1488,6 +1671,61 @@ export default function Ensemble() {
                     open={accountPageOpen}
                     onClose={() => setAccountPageOpen(false)}
                     onAccountChanged={account.refresh}
+                />
+            )}
+            {accountsOn && signedIn && (
+                <SignOutDialog
+                    dialogRef={signOutDialogRef}
+                    online={account.online}
+                    busy={busy || account.signingOut}
+                    preflight={signOutPlan}
+                    failure={
+                        account.signOutFailure !== null &&
+                        account.signOutFailure.kind !== 'cancelled'
+                            ? account.signOutFailure.message
+                            : null
+                    }
+                    songsReady={accountSongs !== null}
+                    onExport={() =>
+                        void run(() => {
+                            // Only the songs holding work the account has not got. The rest of the
+                            // library is already in the cloud and comes back on the next sign-in,
+                            // so writing it out too would bury the files that matter.
+                            for (const id of signOutPlan?.atRisk ?? []) {
+                                const song = accountSongs?.find((held) => held.id === id);
+                                if (!song) {
+                                    continue;
+                                }
+                                // The EDITED bytes, not the committed ones. The work this export
+                                // exists to rescue is exactly the part that is NOT in `song`, so
+                                // writing the library copy would hand back a file missing the very
+                                // edit the step warned about. Same precedence as `open()`: this
+                                // tab's retained draft first, then the newest recovery slot.
+                                let latest = volatileDrafts.current.get(id);
+                                if (!latest) {
+                                    try {
+                                        latest = repository.recoveryFor(song)?.document;
+                                    } catch {
+                                        /* Unreadable slot; the committed copy is still worth a file. */
+                                    }
+                                }
+                                exportDocument(latest ?? song);
+                            }
+                        })
+                    }
+                    onSyncNow={() =>
+                        void run(async () => {
+                            await accountSync.run();
+                            setSignOutPlan(
+                                withLocalDrafts(
+                                    await accountSync.signOutPreflight(),
+                                    volatileDrafts.current,
+                                ),
+                            );
+                        })
+                    }
+                    onConfirm={signOutOfAccount}
+                    onClose={() => setSignOutOpen(false)}
                 />
             )}
             {inAccount && current && (

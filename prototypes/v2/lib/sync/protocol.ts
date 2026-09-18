@@ -100,10 +100,14 @@ export function candidateKey(ownerId: string, documentId: string): string {
  * from its receipt rather than a second delete — so the id has to outlive a reload, which a
  * module-level variable would not.
  */
-export function deletionKey(ownerId: string, documentId: string): string {
+export function deletionPrefix(ownerId: string): string {
     identifier(ownerId);
+    return `delete:${ownerId}:`;
+}
+
+export function deletionKey(ownerId: string, documentId: string): string {
     identifier(documentId);
-    return `delete:${ownerId}:${documentId}`;
+    return `${deletionPrefix(ownerId)}${documentId}`;
 }
 
 /** The stored frozen delete. Four scalars: everything the canonical request bytes are made of. */

@@ -4,6 +4,7 @@ import { createAccountSession } from '../../../prototypes/v2/lib/account/session
 import {
     createSyncLoop,
     DELETE_MESSAGES,
+    SIGN_OUT_MESSAGES,
     SYNC_MESSAGES,
 } from '../../../prototypes/v2/lib/account/sync-loop.js';
 import { MAX_PENDING_SAVES, type PreparedSave } from '../../../prototypes/v2/lib/sync/protocol.js';
@@ -852,6 +853,183 @@ describe('a Save the cloud can no longer hold reads differently from a two-sided
         expect(loop.getSnapshot().observation).toMatchObject({
             conflict: 'none',
             pendingCount: 1,
+        });
+    });
+});
+
+/**
+ * Signing out (#1269). What is proven here is the ORDER, which is the whole safety property: the
+ * generation fence moves before the logout request, so a Save reply for this account that arrives
+ * after the musician asked to leave meets a generation that no longer matches. That a mismatched
+ * generation actually refuses the write is proven against real IndexedDB in
+ * `tests/browser/account-sign-out.browser.test.ts`; a stub store would agree either way.
+ */
+describe('signing out moves the fence before it asks the server for anything', () => {
+    /** Records every ordered step a sign-out takes, through one stub. */
+    function recorded(overrides: Record<string, unknown> = {}) {
+        const steps: string[] = [];
+        const songbook = stubSongbook({
+            switchAccount: async (ownerId: string | null) => {
+                steps.push(`switchAccount:${ownerId}`);
+                return ownerId === null ? null : SCOPE;
+            },
+            clearAccount: async (ownerId: string) => {
+                steps.push(`clearAccount:${ownerId}`);
+            },
+            ...overrides,
+        });
+        return { steps, songbook };
+    }
+
+    it('bumps the generation, then revokes, then forgets the account', async () => {
+        const { api } = fakeApi({ ok: true, value: {}, status: 204 });
+        const { steps, songbook } = recorded();
+        const loop = createSyncLoop(api, createAccountSession(api), songbook);
+        await loop.attach(OWNER);
+        steps.length = 0;
+
+        const outcome = await loop.signOut(async () => {
+            steps.push('revoke');
+            return true;
+        });
+
+        expect(outcome).toBe('signed-out');
+        // The fence is the FIRST step and the revocation the second: a late reply for this
+        // account can no longer commit anything, whatever the server says next.
+        expect(steps).toEqual(['switchAccount:null', 'revoke', `clearAccount:${OWNER}`]);
+        expect(loop.getSnapshot().owner).toBeNull();
+    });
+
+    it('removes nothing and gives the account back when the server never confirmed', async () => {
+        const { api } = fakeApi({ ok: false, error: { kind: 'network' } });
+        const { steps, songbook } = recorded();
+        const loop = createSyncLoop(api, createAccountSession(api), songbook);
+        await loop.attach(OWNER);
+        steps.length = 0;
+
+        const outcome = await loop.signOut(async () => {
+            steps.push('revoke');
+            return false;
+        });
+
+        expect(outcome).toBe('kept');
+        // No `clearAccount` at any point: an unanswered logout is a sign-out that did not happen,
+        // and a device that emptied itself on one would destroy the queue for a live session.
+        expect(steps).not.toContain(`clearAccount:${OWNER}`);
+        // And the account is attached again, so the outbox is not stranded behind a stale scope.
+        expect(loop.getSnapshot().owner).toBe(OWNER);
+    });
+
+    it('gives the account back when the revocation throws rather than answering', async () => {
+        const { api } = fakeApi({ ok: true, value: {}, status: 204 });
+        const { steps, songbook } = recorded();
+        const loop = createSyncLoop(api, createAccountSession(api), songbook);
+        await loop.attach(OWNER);
+
+        await expect(
+            loop.signOut(async () => {
+                throw new Error('logout blew up');
+            }),
+        ).rejects.toThrow('logout blew up');
+
+        expect(steps).not.toContain(`clearAccount:${OWNER}`);
+        expect(loop.getSnapshot().owner).toBe(OWNER);
+    });
+
+    it('stands by a revocation the server confirmed even when the local wipe fails', async () => {
+        const { api } = fakeApi({ ok: true, value: {}, status: 204 });
+        const { songbook } = recorded({
+            clearAccount: async () => {
+                throw new Error('storage went away');
+            },
+        });
+        const loop = createSyncLoop(api, createAccountSession(api), songbook);
+        await loop.attach(OWNER);
+
+        const outcome = await loop.signOut(async () => true);
+
+        // Revoking is the irreversible step and it already happened. Re-attaching here would put
+        // the shell back into a session the server has dropped — and show the expired banner's
+        // "everything you saved is still on this device" about an account whose records really
+        // are still here, which is the one reading this must never produce.
+        expect(outcome).toBe('signed-out');
+        expect(loop.getSnapshot().owner).toBeNull();
+        // So what is owed is the sentence: the sign-out happened, the wipe did not.
+        expect(loop.getSnapshot().failure).toEqual({
+            reason: 'server',
+            message: SIGN_OUT_MESSAGES.notCleared,
+        });
+    });
+
+    it('keeps the server’s back-off window and its sentence across a refused sign-out', async () => {
+        const { api, reads } = fakeApi({
+            ok: false,
+            error: { kind: 'code', code: 'rate_limited', status: 429 },
+        });
+        const loop = createSyncLoop(api, createAccountSession(api), withQueuedSave());
+        await loop.attach(OWNER);
+        await loop.run();
+        expect(api.post).toHaveBeenCalledTimes(1);
+
+        // A sign-out the server would not confirm re-attaches the account — and `detach`/`attach`
+        // both reset the 429 floor. A refusal is not the server withdrawing the wait it asked
+        // for, so a re-attach that cleared it would re-POST the refused Save inside the very
+        // window this origin was told to sit out.
+        expect(await loop.signOut(async () => false)).toBe('kept');
+
+        // `attach` also publishes `failure: null`, and nothing about a refused sign-out resolved
+        // the Save that is still owed — the chip must not go quiet about it.
+        expect(loop.getSnapshot().failure).toEqual({
+            reason: 'rate-limited',
+            message: SYNC_MESSAGES.rateLimited,
+        });
+        await loop.run();
+        expect(api.post).toHaveBeenCalledTimes(1);
+        expect(documentReads(reads)).toEqual([]);
+    });
+
+    /**
+     * The `drafts` half of this plan is the ACCOUNT DATABASE's, and today it is always zero: the
+     * one writer of that store (`AccountSongbook.recover`) has no caller in the app yet. The rows
+     * below are therefore a contract for the #1299 future, not a reproduction of live storage —
+     * what an account chart's unsaved text actually sits in today is a guest recovery slot, which
+     * the loop cannot see and the SHELL adds (`withLocalDrafts` in `app/ensemble.tsx`). That
+     * composition is proven end to end in `prototypes/v2/checks/account-sign-out.chromium.spec.ts`.
+     */
+    it('counts unsent Saves and unsaved drafts as two separate facts', async () => {
+        const { api } = fakeApi({ ok: true, value: {}, status: 204 });
+        const loop = createSyncLoop(
+            api,
+            createAccountSession(api),
+            stubSongbook({
+                list: async () => ({
+                    // `song-3` holds neither: it is already safely in the account, so an export
+                    // that wrote it out too would bury the files that actually matter.
+                    songs: [
+                        { documentId: 'song-1' },
+                        { documentId: 'song-2' },
+                        { documentId: 'song-3' },
+                    ],
+                    nextAfterDocumentId: null,
+                }),
+                pending: async (_scope: unknown, documentId: string) =>
+                    documentId === 'song-1' ? [{ status: 'queued' }, { status: 'queued' }] : [],
+                drafts: async (_scope: unknown, documentId: string) =>
+                    documentId === 'song-2' ? [{ writerId: 'w' }] : [],
+            }),
+        );
+        await loop.attach(OWNER);
+
+        // Two counts, never one total: a committed version the cloud has not taken and an
+        // experiment that was never committed are protected differently, so the preflight has to
+        // be able to say which is at stake.
+        expect(await loop.signOutPreflight()).toEqual({
+            documentIds: ['song-1', 'song-2', 'song-3'],
+            // Both songs hold work the account has not got, by two different routes: one a queued
+            // Save, the other an unsaved experiment. Export has to reach both.
+            atRisk: ['song-1', 'song-2'],
+            unsentSaves: 2,
+            drafts: 1,
         });
     });
 });

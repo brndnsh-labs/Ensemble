@@ -160,6 +160,20 @@ export const DELETE_MESSAGES = {
     deleted: 'Deleted from your account.',
 } as const;
 
+/**
+ * The one sentence signing out can need beyond the preflight's own counts (#1269).
+ *
+ * Revoking the session is the irreversible half and it goes first, so by the time the local wipe
+ * can fail the sign-out has already happened — there is no honest way to take it back, and
+ * re-attaching a revoked account would strand the shell signed in to a session the server has
+ * dropped. What is left is to say what did NOT happen, in the same posture as the tables above:
+ * lead with the fact, never print a storage error, and name the step that finishes the job.
+ */
+export const SIGN_OUT_MESSAGES = {
+    notCleared:
+        'Signed out — but your account’s songs could not be removed from this device. Sign in again and sign out to clear them.',
+} as const;
+
 const UNOBSERVED: Progress = { required: null, verified: null };
 
 /** One page per 25 documents (`OUTBOX_PAGE_LIMIT`) over the server's 2,000-document cap. */
@@ -311,6 +325,47 @@ function deleteFailure(error: ApiError): { retry: boolean; message: string } {
     }
 }
 
+/**
+ * What signing out would cost this device (#1269), read from storage rather than inferred.
+ *
+ * Two counts, never one total: a queued Save is work the musician committed and the cloud has not
+ * taken yet, an unsaved draft is an experiment they never committed at all. They are protected the
+ * same way — export, or send what can still be sent — but they are not the same sentence, and a
+ * combined number would make the preflight unable to say which one is at stake.
+ */
+export interface SignOutPreflight {
+    /** Every document this account holds here — what sign-out removes, and whose recovery slots go. */
+    documentIds: string[];
+    /**
+     * The songs that hold work the account has not got: a queued Save, an unsaved draft, or both.
+     * A subset of `documentIds`, and the exact set a preflight export needs to write out — the
+     * rest of the library is already safe in the cloud and comes back on the next sign-in.
+     */
+    atRisk: string[];
+    /** Committed versions still in the outbox, across the whole library. */
+    unsentSaves: number;
+    /**
+     * Unsaved experiments this device kept for account songs.
+     *
+     * **This count is the loop's half only, and the loop's half is currently always zero.** It
+     * reads the account database's `drafts` store, whose one writer (`AccountSongbook.recover`)
+     * has no caller in the app yet — account charts still retain their unsaved text in the GUEST
+     * `localStorage` namespace (`lib/repository.ts`'s `recover`, the known #1299 gap), which the
+     * loop neither owns nor can see. The SHELL completes both this number and `atRisk` from that
+     * namespace before showing them; see `withLocalDrafts` in `app/ensemble.tsx`. The store read
+     * stays because #1299 is where it starts answering, and a preflight that stopped asking would
+     * quietly stop counting on the day it does.
+     */
+    drafts: number;
+}
+
+/**
+ * `kept` is a sign-out that did NOT happen: the server never confirmed the revocation, so nothing
+ * local was removed and the account is attached again exactly as it was. A device that cleared
+ * itself on an unanswered logout would destroy the queue for a session that is still live.
+ */
+export type SignOutOutcome = 'signed-out' | 'kept';
+
 export interface SyncLoop {
     getSnapshot(): SyncSnapshot;
     /** `useSyncExternalStore`'s contract: returns the unsubscribe function. */
@@ -339,6 +394,22 @@ export interface SyncLoop {
      * outcome, not a queued intention the musician walks away from.
      */
     deleteFromCloud(documentId: string): Promise<CloudDeleteResult>;
+    /**
+     * What signing out would cost (#1269), as far as the ACCOUNT DATABASE can see. A read; it
+     * changes nothing and sends nothing. The caller completes `drafts`/`atRisk` from guest
+     * recovery storage before showing them — see `SignOutPreflight['drafts']`.
+     */
+    signOutPreflight(): Promise<SignOutPreflight>;
+    /**
+     * Sign this device out of the account (#1269), in the one order that cannot lose work.
+     *
+     * The FENCE MOVES FIRST — before `revoke` is even called — so a Save reply for this account
+     * that arrives after the musician asked to leave finds a generation that no longer matches and
+     * commits nothing. Everything else follows from what `revoke` answers: `true` means the server
+     * confirmed the session is gone and this device may forget the account; anything else means the
+     * sign-out did not happen, and the account is re-attached with everything it had.
+     */
+    signOut(revoke: () => Promise<boolean>): Promise<SignOutOutcome>;
     /** One outbox + download pass, coalesced: a request during a pass re-runs once after it. */
     run(): Promise<void>;
 }
@@ -825,6 +896,101 @@ export function createSyncLoop(
                 retained,
                 message: retained ? DELETE_MESSAGES.retained : DELETE_MESSAGES.deleted,
             };
+        },
+        async signOutPreflight() {
+            const current = await settledScope();
+            const songs = await loop.listLibrary();
+            let unsentSaves = 0;
+            let drafts = 0;
+            const documentIds: string[] = [];
+            const atRisk: string[] = [];
+            for (const song of songs) {
+                documentIds.push(song.documentId);
+                // Two reads per song rather than one sweep of the outbox: `pending` and `drafts`
+                // are the same queries the rest of this module counts work with, and a library
+                // bounded at `MAX_REMOTE_CANDIDATES` makes this a bounded preflight, not a scan.
+                const queued = (await songbook.pending(current, song.documentId)).length;
+                const kept = (await songbook.drafts(current, song.documentId)).length;
+                unsentSaves += queued;
+                drafts += kept;
+                if (queued > 0 || kept > 0) {
+                    atRisk.push(song.documentId);
+                }
+            }
+            return { documentIds, atRisk, unsentSaves, drafts };
+        },
+        async signOut(revoke) {
+            const current = await settledScope();
+            const owner = current.ownerId;
+            // Held across the round trip because `detach()` and `attach()` both clear them, and a
+            // sign-out the server REFUSED must leave this device exactly as it found it. The 429
+            // floor is the load-bearing one: a refusal is not the server withdrawing the wait it
+            // asked for, and a re-attach that reset it would re-POST the refused request inside
+            // the very window it was told to sit out. The sentence is the same argument in words —
+            // a Save is still owed, and the chip must not go quiet about it.
+            const heldBackoff = backoffUntil;
+            const heldFailure = state.failure;
+            /** Puts back what `detach`/`attach` cleared, for a sign-out that did not happen. */
+            const restore = () => {
+                backoffUntil = Math.max(backoffUntil, heldBackoff);
+                if (heldFailure) {
+                    publish({ failure: heldFailure });
+                }
+            };
+            // Detach before the fence moves, not after: the loop's own scope is now stale, and a
+            // pass that started against it would spend requests for an account this device is in
+            // the middle of leaving. It also makes `attach(owner)` below a real re-attach rather
+            // than the idempotent no-op it is for an owner already held.
+            loop.detach();
+            // THE FENCE, and it moves before the request. From here a late reply for `owner` —
+            // a Save committed seconds ago, a download that was already in flight — meets a
+            // generation that does not match and writes nothing, whatever the server says next.
+            let revoked: boolean;
+            try {
+                await songbook.switchAccount(null);
+                revoked = await revoke();
+            } catch (error) {
+                // Storage that would not commit the fence, or a `revoke` that threw instead of
+                // answering. Either way the sign-out did not happen, and leaving the loop detached
+                // would strand the outbox behind a scope nothing re-attaches — the session state
+                // has not changed, so no effect is coming to do it.
+                await loop.attach(owner).catch(() => {});
+                restore();
+                throw error;
+            }
+            if (!revoked) {
+                // The sign-out did not happen. Giving the account back is the whole point: the
+                // outbox, the drafts and the library are untouched, and the musician can retry.
+                // `attach` mints a fresh generation, which is what un-strands the stale scope.
+                await loop.attach(owner);
+                restore();
+                if (Date.now() >= backoffUntil) {
+                    void loop.run().catch(() => {});
+                }
+                return 'kept';
+            }
+            let cleared = true;
+            try {
+                await songbook.clearAccount(owner);
+            } catch {
+                // The revocation already happened and cannot be undone, so this is still a
+                // sign-out: the session is gone, and claiming otherwise would put the shell back
+                // into an account the server has stopped honouring — and show the "sign in again,
+                // everything you saved is still on this device" banner about an account whose
+                // records really ARE still here, which is the one reading this must never produce.
+                // What is owed is the sentence below, and only a fresh sign-in can reach these
+                // stores to try again.
+                cleared = false;
+            }
+            // The queue this sentence was about is gone with the account. `detach` deliberately
+            // preserves a failure — a session that expired still owes an explanation — but a
+            // completed sign-out has nothing left to owe, unless the wipe is what failed.
+            publish({
+                failure: cleared
+                    ? null
+                    : { reason: 'server', message: SIGN_OUT_MESSAGES.notCleared },
+            });
+            return 'signed-out';
         },
         run() {
             if (!scope) {
