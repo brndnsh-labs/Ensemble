@@ -619,6 +619,88 @@ describe('the sync loop deletes from the cloud as one explicit, retry-safe opera
         expect(discarded).toEqual([]);
     });
 
+    it('asks for a pass after a conflict, so the stale local revision is not a dead end', async () => {
+        const { api, reads } = fakeApi({ ok: true, value: { outcome: 'conflict' }, status: 409 });
+        const parts = deletable();
+        const loop = createSyncLoop(api, createAccountSession(api), parts.songbook);
+        await loop.attach(OWNER);
+        expect(documentReads(reads)).toEqual([]);
+
+        expect((await loop.deleteFromCloud('song-1')).kind).toBe('refused');
+
+        // Kicked detached — nothing awaits it inside the delete — so this waits for the pass the
+        // refusal asked for rather than starting one of its own, which would prove nothing.
+        await vi.waitFor(() => {
+            expect(documentReads(reads).length).toBeGreaterThan(0);
+        });
+    });
+
+    it('cleans up a mirror the account has never held, through the download’s own rule', async () => {
+        const reconciled: unknown[] = [];
+        const parts = deletable({
+            reconcile: async (_scope: unknown, outcome: unknown, options: unknown) => {
+                reconciled.push({ outcome, options });
+                return 'removed';
+            },
+        });
+        const { loop, result, discarded } = await deleting(
+            { ok: false, error: { kind: 'code', code: 'not_found', status: 404 } },
+            parts,
+        );
+
+        expect(result).toEqual({ kind: 'refused', retry: false, message: DELETE_MESSAGES.absent });
+        expect(discarded).toEqual(['song-1']);
+        // A 404 is the account saying it holds neither the id nor a tombstone for it, so the local
+        // record's confirmed revision is a claim about a cloud copy that does not exist. It is
+        // retired by the same rule a downloaded tombstone runs, aimed at the revision this device
+        // last confirmed — the only one a 404 leaves it holding.
+        expect(reconciled).toEqual([
+            {
+                outcome: { kind: 'deleted', documentId: 'song-1', revision: 'cloud-1' },
+                options: { active: false, expectedRemoteRevision: 'cloud-1' },
+            },
+        ]);
+        // The library moved on disk, so the shell's list is asked to re-read.
+        expect(loop.getSnapshot().libraryVersion).toBeGreaterThan(0);
+    });
+
+    it('refuses a delete inside the back-off window rather than sending it', async () => {
+        const { api } = fakeApi({
+            ok: false,
+            error: { kind: 'code', code: 'rate_limited', status: 429 },
+        });
+        let prepared = 0;
+        const parts = deletable({
+            prepareDelete: async () => {
+                prepared += 1;
+                return PREPARED_DELETE;
+            },
+        });
+        const loop = createSyncLoop(api, createAccountSession(api), parts.songbook);
+        await loop.attach(OWNER);
+
+        const first = await loop.deleteFromCloud('song-1');
+        expect(first).toEqual({
+            kind: 'refused',
+            retry: true,
+            message: DELETE_MESSAGES.rateLimited,
+        });
+        expect(api.post).toHaveBeenCalledTimes(1);
+        expect(prepared).toBe(1);
+
+        // The 429 answers for the whole ORIGIN, so the next attempt is refused here: a destructive
+        // POST inside the window is what the server just asked this device not to send, and
+        // nothing is frozen for a request that never left.
+        const second = await loop.deleteFromCloud('song-1');
+        expect(second).toEqual({
+            kind: 'refused',
+            retry: true,
+            message: DELETE_MESSAGES.rateLimited,
+        });
+        expect(api.post).toHaveBeenCalledTimes(1);
+        expect(prepared).toBe(1);
+    });
+
     it('keeps the frozen id after an uncertain outcome, so a retry is a replay', async () => {
         const uncertain: ApiResult<unknown>[] = [
             { ok: false, error: { kind: 'network' } },
@@ -648,7 +730,6 @@ describe('the sync loop deletes from the cloud as one explicit, retry-safe opera
 
     it('turns each refusal into a sentence, never a server code', async () => {
         const cases: Array<[ApiResult<unknown>, string]> = [
-            [{ ok: false, error: { kind: 'network' } }, DELETE_MESSAGES.offline],
             [
                 { ok: false, error: { kind: 'code', code: 'unauthenticated', status: 401 } },
                 DELETE_MESSAGES.expired,
@@ -662,14 +743,52 @@ describe('the sync loop deletes from the cloud as one explicit, retry-safe opera
                 DELETE_MESSAGES.absent,
             ],
             [
-                { ok: false, error: { kind: 'code', code: 'internal_error', status: 500 } },
-                DELETE_MESSAGES.server,
+                { ok: false, error: { kind: 'code', code: 'malformed_request', status: 400 } },
+                DELETE_MESSAGES.refused,
+            ],
+            [
+                { ok: false, error: { kind: 'code', code: 'operation_mismatch', status: 409 } },
+                DELETE_MESSAGES.refused,
             ],
         ];
         for (const [post, message] of cases) {
             const { result } = await deleting(post);
             expect(result).toMatchObject({ kind: 'refused', message });
-            expect(message).not.toMatch(/rate_limited|not_found|internal_error|unauthenticated/);
+            expect(message).not.toMatch(
+                /rate_limited|not_found|malformed_request|operation_mismatch|unauthenticated/,
+            );
+        }
+    });
+
+    /**
+     * The half of the vocabulary that is about what this device can KNOW. Each of these outcomes
+     * is compatible with the server having committed the delete and the reply going missing — the
+     * lost-response case `checks/account-delete.chromium.spec.ts` stages end to end — so a sentence
+     * claiming nothing was deleted would be a guess this device cannot make.
+     */
+    it('never claims nothing was deleted when it cannot know', async () => {
+        const unknowable: ApiResult<unknown>[] = [
+            { ok: false, error: { kind: 'network' } },
+            { ok: false, error: { kind: 'unknown', status: 502 } },
+            { ok: false, error: { kind: 'code', code: 'internal_error', status: 500 } },
+        ];
+        for (const post of unknowable) {
+            const { result } = await deleting(post);
+            expect(result).toEqual({
+                kind: 'refused',
+                retry: true,
+                message: DELETE_MESSAGES.uncertain,
+            });
+            expect(result.message).not.toMatch(/Nothing was deleted/);
+        }
+        // And the sentences that DO make that claim are only the ones the account answered.
+        for (const message of [
+            DELETE_MESSAGES.expired,
+            DELETE_MESSAGES.rateLimited,
+            DELETE_MESSAGES.refused,
+            DELETE_MESSAGES.changed,
+        ]) {
+            expect(message).toMatch(/Nothing was deleted/);
         }
     });
 

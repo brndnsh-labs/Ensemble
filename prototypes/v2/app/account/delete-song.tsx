@@ -9,7 +9,7 @@ import type { RefObject } from 'react';
  * ref and drives `showModal()`/`close()`, which is what gives this the browser's own focus trap,
  * Escape handling and focus restore for free. Nothing is added on top of that.
  *
- * Three rules this component exists to hold:
+ * Four rules this component exists to hold:
  *
  * 1. **The export preflight is offered, not implied.** `docs/design/ensemble-v2-sync.md`:
  *    "Cloud document deletion is an explicit online operation with a tombstone and
@@ -21,6 +21,10 @@ import type { RefObject } from 'react';
  *    the device.
  * 3. **Local work is named before it is risked, not after.** Unsaved edits and Saves still waiting
  *    to upload are two different facts with two different consequences, so they are two sentences.
+ * 4. **Nothing dismisses this step while the request is in flight** — not Cancel, not Escape. The
+ *    answer to a destructive request is written here, and a step that vanished mid-flight would
+ *    take that answer with it. The Escape default is the one browser behaviour above that is
+ *    overridden, and only while `busy`.
  */
 
 export interface DeleteSongDialogProps {
@@ -57,14 +61,24 @@ export function DeleteSongDialog({
             ref={dialogRef}
             className="modal-box"
             aria-labelledby="delete-song-title"
-            onCancel={onClose}
+            onCancel={(event) => {
+                // Escape while the request is in flight would close the step its own answer is
+                // written to. The shell has a fallback for a refusal that arrives at a closed
+                // dialog, but the musician would still have lost the place they were standing.
+                if (busy) {
+                    event.preventDefault();
+                    return;
+                }
+                onClose();
+            }}
             onClose={onClose}
         >
             <h2 id="delete-song-title">Delete “{title}” from your account?</h2>
             <p>
-                This removes it from your account and from every device signed in to it. It can’t be
-                undone, and it isn’t a backup you can restore from — export a file first if you want
-                to keep this song.
+                This removes it from your account. Other devices drop their copy on their next sync
+                — except any that still hold unsent work, which keep it. It can’t be undone, and it
+                isn’t a backup you can restore from — export a file first if you want to keep this
+                song.
             </p>
             {unsavedEdits && (
                 <p className="status-detail" data-testid="delete-song-unsaved">
@@ -109,7 +123,12 @@ export function DeleteSongDialog({
                 >
                     Delete from my account
                 </button>
-                <button className="btn" data-testid="delete-song-cancel" onClick={onClose}>
+                <button
+                    className="btn"
+                    data-testid="delete-song-cancel"
+                    disabled={busy}
+                    onClick={onClose}
+                >
                     Cancel
                 </button>
             </div>

@@ -6,7 +6,7 @@ import { prepareScorePlayback } from '@engine/songbook/score-playback';
 import type { SemanticScore } from '@engine/songbook/score-types';
 import type { InstrumentVoice } from '@engine/types';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { accountSync } from '../lib/account/sync-loop';
+import { accountSync, type CloudDeleteResult } from '../lib/account/sync-loop';
 import { arrangementOf, blankSong, convertedCopy, extendedScore } from '../lib/documents';
 import { validateEditorText } from '../lib/editor';
 import * as repository from '../lib/repository';
@@ -768,6 +768,12 @@ export default function Ensemble() {
      * than left to the `useAccountLibrary` effect that normally mirrors `current?.id`: effects run
      * after the render that follows a state change, and the loop reads `activeDocumentId` at the
      * moment it commits.
+     *
+     * Every path that leaves the record in place gives the claim back, THROWN paths included. A
+     * delete can fail by exception as well as by refusal — a session that went away mid-request, a
+     * reply this build could not read, storage that would not commit — and none of those is
+     * evidence the cloud copy is gone. An unprotected chart on the stand is exactly what the next
+     * download pass is allowed to adopt a remote body or a tombstone over.
      */
     function deleteFromAccount() {
         if (!current) {
@@ -776,13 +782,30 @@ export default function Ensemble() {
         const documentId = current.id;
         void run(async () => {
             accountSync.setActiveDocument(null);
-            const result = await accountSync.deleteFromCloud(documentId);
+            let result: CloudDeleteResult;
+            try {
+                result = await accountSync.deleteFromCloud(documentId);
+            } catch (failure) {
+                accountSync.setActiveDocument(documentId);
+                // Written to the confirm step as well, because that step is modal: everything
+                // behind it is inert, so a reason rendered only in the shell's error line is one
+                // the musician cannot read until they dismiss the thing they were answering.
+                setDeleteFailure(failure instanceof Error ? failure.message : String(failure));
+                // Rethrown, not swallowed: `run()` is what turns it into that error line, which
+                // is what carries the reason if the step was dismissed while this was in flight.
+                throw failure;
+            }
             if (result.kind === 'refused') {
                 // Nothing was deleted, so nothing about this session changes: the chart keeps its
                 // claim and the dialog stays open carrying the reason. Closing it and dropping a
                 // toast would leave the musician guessing whether it worked.
                 accountSync.setActiveDocument(documentId);
                 setDeleteFailure(result.message);
+                if (!deleteDialogRef.current?.open) {
+                    // The confirm step was dismissed while the request was in flight, so the line
+                    // above has nowhere to render. The reason still has to reach the musician.
+                    setError(result.message);
+                }
                 return;
             }
             runtime.stop();
@@ -791,6 +814,16 @@ export default function Ensemble() {
             setSaved(null);
             currentStore.current = null;
             clearBuffers();
+            if (!result.retained) {
+                // The account copy is gone and this device kept nothing, so the unsaved-experiment
+                // recovery `draft()` writes for account charts too must go with it — otherwise the
+                // deleted song reappears as a recovery offer on the next visit.
+                try {
+                    repository.clearOwnRecovery(documentId);
+                } catch {
+                    /* Recovery is a convenience; a stale entry is not worth failing the delete. */
+                }
+            }
             await refreshSongs();
             setMessage(result.message);
         });

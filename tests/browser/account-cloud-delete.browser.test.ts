@@ -257,6 +257,30 @@ describe('the frozen delete shares the meta store without colliding with its nei
         expect(request.expectedRevision).toBe('cloud-1');
     });
 
+    it('clears a frozen delete that a downloaded tombstone overtook', async () => {
+        await saveAndConfirm('Set list', 'cloud-1', null);
+        const frozen = (await book.prepareDelete(scope, DOC)) as PreparedDelete;
+
+        // The download pass wins the race: the account's tombstone arrives as a manifest row while
+        // this device's own request for the same id is still unanswered.
+        expect(
+            await book.reconcile(
+                scope,
+                { kind: 'deleted', documentId: DOC, revision: 'cloud-2' },
+                { expectedRemoteRevision: 'cloud-1' },
+            ),
+        ).toBe('removed');
+        expect(await savedIds()).toEqual([]);
+
+        // Nothing is left in `meta` for a NEW song at this id to inherit. The check is made only
+        // AFTER that song exists, because asking `prepareDelete` with no record would clear the
+        // row itself and hide the very leak this proves.
+        await saveAndConfirm('Set list again', 'cloud-3', null);
+        const next = (await book.prepareDelete(scope, DOC)) as PreparedDelete;
+        expect(next.operationId).not.toBe(frozen.operationId);
+        expect(next.expectedRevision).toBe('cloud-3');
+    });
+
     it('discards a frozen delete on request, so a fresh attempt mints a fresh id', async () => {
         await saveAndConfirm('Set list', 'cloud-1', null);
         const request = (await book.prepareDelete(scope, DOC)) as PreparedDelete;

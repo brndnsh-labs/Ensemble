@@ -187,10 +187,14 @@ test('offline the delete is disabled with a reason; a lost response retries the 
     // cannot tell that from a delete that never happened, which is the whole reason the operation
     // id is frozen on disk before the request goes out.
     const sent: string[] = [];
+    // Collected, never asserted inside the handler: an `expect` that fails in a route callback
+    // rejects out of band, where the failure is a stray unhandled rejection rather than this
+    // test's own result.
+    const answered: number[] = [];
     await page.route('**/api/documents/delete', async (route) => {
         sent.push(route.request().postData() ?? '');
         const response = await route.fetch();
-        expect(response.status()).toBe(200);
+        answered.push(response.status());
         if (sent.length === 1) {
             await route.abort('failed');
             return;
@@ -200,9 +204,10 @@ test('offline the delete is disabled with a reason; a lost response retries the 
 
     await openDeleteConfirm(page);
     await page.getByTestId('delete-song-confirm').click();
-    // Nothing was deleted as far as this device knows, so it says so and stays put rather than
-    // closing on a claim it cannot make.
-    await expect(page.getByTestId('delete-song-failure')).toContainText('needs a connection');
+    // This device cannot tell a committed delete from one that never happened, so it says exactly
+    // that and stays put rather than closing on either claim.
+    await expect(page.getByTestId('delete-song-failure')).toContainText('couldn’t confirm');
+    await expect(page.getByTestId('delete-song-failure')).not.toContainText('Nothing was deleted');
     await expect(page.getByRole('heading', { name: 'One take', exact: true })).toBeVisible();
 
     // The retry is a REPLAY: byte-identical bytes, so the same operation id, so the server answers
@@ -213,10 +218,45 @@ test('offline the delete is disabled with a reason; a lost response retries the 
     expect(sent).toHaveLength(2);
     expect(sent[1]).toBe(sent[0]);
     expect(JSON.parse(sent[0]).operationId).toEqual(expect.any(String));
+    // Both times the account did the work; only the first reply was thrown away.
+    expect(answered).toEqual([200, 200]);
     await page.unroute('**/api/documents/delete');
 
     // It stays gone across a reload: the tombstone is the account's answer, not this tab's.
     await page.reload();
     await expect(page.getByTestId('library-loading')).toHaveCount(0);
     await expect(page.locator('.song-row')).toHaveCount(0);
+
+    // A reply this build cannot READ is the other half of a lost answer: the account committed,
+    // and what came back was not a delete reply at all. That path throws rather than returning a
+    // refusal, and the chart must still get its active claim back — an unprotected chart on the
+    // stand is exactly what the next download pass is allowed to drop the local copy of.
+    await newSongOnTheStand(page);
+    await saveAs(page, 'Second take');
+    await expect(page.getByTestId('sync-cloud')).toHaveText('Saved to your account');
+    await expect(page.getByTestId('sync-offline')).toContainText('Songs 1/1');
+
+    await page.route('**/api/documents/delete', async (route) => {
+        await route.fetch();
+        await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: '{"status":"ok"}',
+        });
+    });
+    await openDeleteConfirm(page);
+    await page.getByTestId('delete-song-confirm').click();
+    await expect(page.getByTestId('delete-song-failure')).toContainText('does not match');
+    await page.unroute('**/api/documents/delete');
+    await page.getByTestId('delete-song-cancel').click();
+
+    // Reconnecting runs a pass, and the manifest now carries the account's tombstone for the song
+    // still on the stand. With the claim restored, the shared rule RETAINS this device's copy —
+    // the chart is still open, still readable, still exportable. Without it, the same pass would
+    // drop the record from under the musician and the chip would fall to "not in your account".
+    await page.context().setOffline(true);
+    await page.context().setOffline(false);
+    await expect(page.getByTestId('sync-offline')).toContainText('Songs 0/0');
+    await expect(page.getByTestId('sync-cloud')).toHaveText('Saved to your account');
+    await expect(page.getByRole('heading', { name: 'Second take', exact: true })).toBeVisible();
 });

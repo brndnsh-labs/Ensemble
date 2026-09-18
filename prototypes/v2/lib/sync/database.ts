@@ -44,9 +44,10 @@ export class AccountDatabase {
                         keyPath: ['ownerId', 'documentId', 'writerId'],
                     });
                     drafts.createIndex('song', ['ownerId', 'documentId']);
-                    // Generic keyed store: the `'active'` account pointer, plus the
-                    // `remote:<owner>:<document>` candidates a library download preserves
-                    // (see `candidateKey` in `protocol.ts` for why they live here).
+                    // Generic keyed store, three namespaces: the `'active'` account pointer, the
+                    // `remote:<owner>:<document>` candidates a library download preserves, and the
+                    // `delete:<owner>:<document>` frozen deletions (#1270). See `candidateKey` and
+                    // `deletionKey` in `protocol.ts` for why they all live here.
                     db.createObjectStore('meta', { keyPath: 'key' });
                 };
                 request.onblocked = () => {

@@ -125,8 +125,15 @@ function commitDeleted(
     // A clean mirror of a document the cloud no longer has. Receipts stay: they are the idempotency
     // record of Saves already acknowledged, and this document has no queued Save left that could
     // resurrect the cloud ID.
+    //
+    // The frozen delete goes too, and it is the download path that needs this: a tombstone arriving
+    // while this device held a prepared delete of its own would otherwise leave a permanent
+    // `delete:` row. `prepareDelete` is the only other thing that clears one, and it cannot run for
+    // a song that is no longer in the library. The delete path has already forgotten its own row in
+    // this same transaction, so there it is a no-op.
     tx.table('songs').delete([scope.ownerId, documentId]);
     tx.table('meta').delete(key);
+    tx.table('meta').delete(deletionKey(scope.ownerId, documentId));
     return 'removed';
 }
 

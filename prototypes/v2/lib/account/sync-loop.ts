@@ -30,13 +30,15 @@ import {
  * `runOutboxPass` and `runLibraryDownload` run, and the one place that turns their outcomes into
  * facts a musician can read.
  *
- * **Event-driven, never scheduled.** A pass runs on exactly four things, all of them moments the
- * musician or the device created: an explicit Save, signing in, the `online` event, and a
- * `visibilitychange` back to visible. There is no timer, no poll and no background sync
- * registration — the rollout's decision 9 keeps this deliberately small, and a loop that runs
- * while nobody is looking is both a battery cost and a class of bug (a pass firing against a
- * half-torn-down session) that nothing in this product needs. The browser events are registered
- * by the React wrapper (`app/account/library.tsx`); this module only knows `run()`.
+ * **Event-driven, never scheduled.** A pass runs on exactly five things, all of them moments the
+ * musician or the device created: an explicit Save, signing in, the `online` event, a
+ * `visibilitychange` back to visible, and a cloud delete the account refused as a conflict (#1270)
+ * — that last one because the refusal is otherwise a dead end, not because time passed. There is
+ * no timer, no poll and no background sync registration — the rollout's decision 9 keeps this
+ * deliberately small, and a loop that runs while nobody is looking is both a battery cost and a
+ * class of bug (a pass firing against a half-torn-down session) that nothing in this product
+ * needs. The browser events are registered by the React wrapper (`app/account/library.tsx`); this
+ * module only knows `run()`.
  *
  * **It closes #1261's known gap.** `sendNext` (`lib/sync/send.ts`) collapses every transport
  * rejection to `'retry'` — correct for the outbox, whose whole job is to keep the operation
@@ -121,7 +123,12 @@ export const SYNC_MESSAGES = {
 /**
  * The same posture as `SYNC_MESSAGES` for the one operation that is not a Save (#1270): lead with
  * what is true of this device, never print the server's vocabulary, and never claim something was
- * removed that was not.
+ * removed that was not — nor that nothing was, when this device cannot know.
+ *
+ * That last half is why there is no "nothing was deleted" sentence for a dead network or a 5xx.
+ * The request may have reached the account and committed there; the reply is what went missing.
+ * Saying "Nothing was deleted" would be a guess dressed as a fact, and the one guess this surface
+ * must never make — so those outcomes get `uncertain`, which is exactly as much as is known.
  *
  * Deliberately a separate table rather than more `SYNC_MESSAGES` entries: every sentence there
  * begins "Saved on this device", because every one of them is about a Save that is safe here and
@@ -130,13 +137,20 @@ export const SYNC_MESSAGES = {
  * an honest sentence.
  */
 export const DELETE_MESSAGES = {
-    offline: 'Deleting from your account needs a connection. Nothing was deleted.',
     rateLimited: 'Your account asked us to wait. Nothing was deleted — try again shortly.',
     expired: 'Sign in again to delete this from your account. Nothing was deleted.',
-    server: 'We couldn’t reach your account. Nothing was deleted.',
+    /**
+     * The outcome this device cannot see: a dead network, a 5xx, a reply it could not read. The
+     * retry is safe to offer because the frozen operation id makes the next attempt a REPLAY —
+     * the server answers it from its receipt rather than deleting a second time.
+     */
+    uncertain:
+        'We couldn’t confirm this with your account. It may or may not have been deleted — try again and we’ll finish it safely.',
+    /** The account read the request and would not act on it, so nothing in it changed. */
+    refused: 'Your account refused this request. Nothing was deleted.',
     /** 409 conflict: the id is live at a revision this request did not expect. */
     changed:
-        'This song changed in your account since you opened it. Nothing was deleted — reopen it and try again.',
+        'This song changed in your account since you opened it. Nothing was deleted — close it, let your account sync, then reopen and try again.',
     /** 404: the owner has no such id and no tombstone for it. */
     absent: 'That song isn’t in your account.',
     /** Local: a record the cloud has never confirmed. There is nothing up there to delete. */
@@ -271,12 +285,16 @@ const FORGET_FROZEN_ID: ReadonlySet<ApiErrorCode> = new Set<ApiErrorCode>([
     'malformed_request',
 ]);
 
+/**
+ * One refusal, one sentence. The split that matters is not which code arrived but whether the
+ * ACCOUNT answered about this request: a 401, a 429, a 404 and a `malformed_request` are verdicts
+ * the server reached before touching the library, so they can honestly say nothing was deleted.
+ * A dead network, an unrecognized body and a 5xx are not verdicts at all — the server may have
+ * committed and only the reply was lost — so they get `uncertain` and the replay it promises.
+ */
 function deleteFailure(error: ApiError): { retry: boolean; message: string } {
-    if (error.kind === 'network') {
-        return { retry: true, message: DELETE_MESSAGES.offline };
-    }
-    if (error.kind === 'unknown') {
-        return { retry: true, message: DELETE_MESSAGES.server };
+    if (error.kind === 'network' || error.kind === 'unknown') {
+        return { retry: true, message: DELETE_MESSAGES.uncertain };
     }
     switch (error.code) {
         case 'unauthenticated':
@@ -285,8 +303,11 @@ function deleteFailure(error: ApiError): { retry: boolean; message: string } {
             return { retry: true, message: DELETE_MESSAGES.rateLimited };
         case 'not_found':
             return { retry: false, message: DELETE_MESSAGES.absent };
+        case 'malformed_request':
+        case 'operation_mismatch':
+            return { retry: false, message: DELETE_MESSAGES.refused };
         default:
-            return { retry: true, message: DELETE_MESSAGES.server };
+            return { retry: true, message: DELETE_MESSAGES.uncertain };
     }
 }
 
@@ -718,6 +739,13 @@ export function createSyncLoop(
         },
         async deleteFromCloud(documentId) {
             const current = await settledScope();
+            if (Date.now() < backoffUntil) {
+                // The 429 the Save path already met answers for the whole ORIGIN, and a
+                // destructive POST inside that window is precisely what the server asked this
+                // device not to send. Refused before `prepareDelete`, so nothing is frozen for a
+                // request that never left — there are no bytes to replay.
+                return { kind: 'refused', retry: true, message: DELETE_MESSAGES.rateLimited };
+            }
             const request = await songbook.prepareDelete(current, documentId);
             if (request === 'missing') {
                 // Nothing here mirrors that id, so there is no confirmed revision to name and no
@@ -745,6 +773,32 @@ export function createSyncLoop(
                     // A 429 answers for the whole origin, exactly as on the Save path.
                     backoffUntil = Math.max(backoffUntil, Date.now() + BACKOFF_FALLBACK_MS);
                 }
+                if (error.reason.kind === 'code' && error.reason.code === 'not_found') {
+                    // The account holds neither this id nor a tombstone for it, so the local
+                    // mirror is claiming a cloud confirmation that does not exist — and left alone
+                    // it would keep reading "Saved to your account" forever. That is the same fact
+                    // a downloaded tombstone carries, so it goes through the same rule rather than
+                    // a second spelling of it: a clean mirror is dropped, a held one is retained
+                    // and flagged. The revision named is the last one this device confirmed, since
+                    // a 404 carries none; it is only ever read back as the candidate's own label.
+                    const cleaned = await songbook
+                        .reconcile(
+                            current,
+                            { kind: 'deleted', documentId, revision: request.expectedRevision },
+                            {
+                                active: documentId === activeDocumentId,
+                                expectedRemoteRevision: request.expectedRevision,
+                            },
+                        )
+                        .then(
+                            () => true,
+                            () => false,
+                        );
+                    if (cleaned) {
+                        publish({ libraryVersion: state.libraryVersion + 1 });
+                        await observe();
+                    }
+                }
                 const failure = deleteFailure(error.reason);
                 return { kind: 'refused', ...failure };
             }
@@ -754,8 +808,13 @@ export function createSyncLoop(
                 active: documentId === activeDocumentId,
             });
             if (outcome === 'conflict') {
-                // Nothing was deleted and nothing local changed; the next download brings the
-                // version the server is holding, under the ordinary preservation rules.
+                // Nothing was deleted and nothing local changed. Left there this is a dead end:
+                // the record still names the revision the server refused, and while the chart is
+                // on the stand a download pass can only preserve a candidate, never advance the
+                // record past it. So a pass is asked for here — the musician's own act is the
+                // trigger, as there is no timer — and the sentence names the step that actually
+                // finishes the job: close the chart, let the account sync, reopen.
+                void loop.run().catch(() => {});
                 return { kind: 'refused', retry: false, message: DELETE_MESSAGES.changed };
             }
             const retained = outcome === 'retained-deleted';
