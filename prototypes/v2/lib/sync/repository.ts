@@ -387,11 +387,23 @@ export class AccountSongbook {
                         // account has answered about THESE bytes and will answer the same way
                         // forever, so a fresh Save of this same document is a request it has never
                         // seen and deserves to be sent, not parked behind a head `prepare()` will
-                        // never advance past. Only the head is ever dropped — anything queued
-                        // behind it is an ordinary unacknowledged Save that still gets its turn —
-                        // so the queue becomes `[new]`, not `[refused, new]`.
+                        // never advance past.
+                        //
+                        // The WHOLE queue retires with it, `keepBoth`'s precedent exactly (#1267):
+                        // every operation behind a refused head is chained to it by
+                        // `base: { operationId }`, and that predecessor is about to stop existing.
+                        // Dropping only the head would leave the next operation basing itself on a
+                        // deleted one, and `prepare()` would then throw "The preceding Save has no
+                        // confirmed receipt." forever — one rejected pass bricking the entire
+                        // account's outbox, since `runOutboxPass` rejects rather than stepping over
+                        // a storage failure. None of the retired operations was ever committed
+                        // (`acknowledge` deletes an operation the moment it is), so the record's
+                        // own `remoteRevision` is still the honest base for the new Save, and this
+                        // snapshot already carries the newest bytes — the older queued versions
+                        // were never anything the account or the musician asked to keep.
                         const refusedHead = queue[0]?.status === 'refused' ? queue[0] : null;
-                        const active = refusedHead ? queue.slice(1) : queue;
+                        const retired = refusedHead ? queue : [];
+                        const active = refusedHead ? [] : queue;
                         if (active.length >= MAX_PENDING_SAVES) {
                             throw new Error(
                                 'Too many pending Saves for this song. Sync or export before saving again.',
@@ -423,8 +435,8 @@ export class AccountSongbook {
                             wireBody: null,
                             status: 'queued',
                         };
-                        if (refusedHead) {
-                            tx.table('operations').delete([scope.ownerId, refusedHead.operationId]);
+                        for (const operation of retired) {
+                            tx.table('operations').delete([scope.ownerId, operation.operationId]);
                         }
                         tx.table('songs').put(song);
                         tx.table('operations').add(operation);
@@ -630,30 +642,35 @@ export class AccountSongbook {
      * Same posture as `acknowledge`'s conflict write: the row is never removed, so `prepare()`
      * answers `'refused'` for this document from here on and sends nothing further for it, while
      * every OTHER document's queue keeps moving (`drain`'s step-over in `sync-loop.ts`). The one
-     * way out is a fresh Save of this same document — `save()` deletes a refused head the moment
-     * a new op is enqueued for its id — or `save(copy)`'s fresh identity.
+     * way out is a fresh Save of this same document — `save()` retires a refused head, and the
+     * whole queue chained behind it, the moment a new op is enqueued for its id — or
+     * `save(copy)`'s fresh identity.
      *
-     * Marks whatever is CURRENTLY the head rather than matching a frozen request: the caller
-     * (`drain`) knows only which DOCUMENT the transport refused, from a `SaveTransportError` it
-     * captured on the way past a generic `'retry'` — the frozen request itself is not carried
-     * that far. Nothing else advances a queue between a refused send and this call in the same
-     * pass, so marking the current head is safe.
+     * Marks the operation the transport actually refused — `operationId`, not merely "whatever is
+     * the head now". The two are usually the same row, but not always: this account's outbox is
+     * shared by every open tab, so another tab can commit the head and the musician can queue a
+     * fresh Save behind it while this tab's rejected request is still unwinding. Marking by
+     * position would then permanently refuse an operation that was NEVER SENT, and the only way
+     * out of that is a Save the musician has no reason to know they need to make.
      *
-     * `'none'` when the head is no longer a plain queued Save — already resolved a different way,
-     * or the queue emptied — under this call. The caller's own capture is then a moment stale, and
-     * stepping over the document by its already-known id is still correct either way.
+     * `'none'` when that operation is no longer a plain queued Save at the head — already
+     * committed, already resolved a different way, or overtaken. The caller's own capture is then
+     * a moment stale, and stepping over the document by its already-known id is still correct
+     * either way.
      */
     async refuse(
         scope: AccountScope,
         documentId: string,
+        operationId: string,
         reason: SaveRefusalReason,
     ): Promise<'refused' | 'none'> {
         scope = copyScope(scope);
         identifier(documentId);
+        identifier(operationId);
         return this.database.run('readwrite', scope, (tx) => {
             operations(tx, scope, documentId, (queue) => {
                 const head = queue[0];
-                if (head?.status !== 'queued') {
+                if (head?.status !== 'queued' || head.operationId !== operationId) {
                     return tx.finish('none');
                 }
                 const refused: SaveOperation = { ...head, status: 'refused', reason };

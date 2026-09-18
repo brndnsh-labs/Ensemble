@@ -220,11 +220,19 @@ const OUTBOX_PAGE_CEILING = Math.ceil(MAX_REMOTE_CANDIDATES / OUTBOX_PAGE_LIMIT)
  * `quota_exceeded` is deliberately NOT in this set. A full library refuses the NEXT create for the
  * same reason, so continuing would spend requests that are all bound to fail; ending the pass is
  * the honest answer there.
+ *
+ * Neither is `not_found`, and for exactly that reason (#1298 patch review). The Save route never
+ * answers 404 about a document: `commitSave` resolves an unknown or tombstoned id as a `conflict`
+ * with `remote: null`, and the deletion route owns its own codes. The one thing on this origin that
+ * emits 404 for `POST /api/documents/save` is the server's catch-all `app.notFound` — the route is
+ * not mounted, an older image is serving, or a proxy rewrote the path. That is an account-wide
+ * outage, not a verdict on one chart, so the next song would 404 for the same reason; stepping over
+ * it would spend a request per song and — since a step-over is now DURABLE — permanently refuse an
+ * entire library over a deployment mistake. It ends the pass, like `quota_exceeded`.
  */
 const STEP_OVER_CODES: ReadonlySet<ApiErrorCode> = new Set<ApiErrorCode>([
     'payload_too_large',
     'operation_mismatch',
-    'not_found',
 ]);
 
 function failureFromApi(error: ApiError): SyncFailure {
@@ -244,10 +252,16 @@ function failureFromApi(error: ApiError): SyncFailure {
         case 'payload_too_large':
             return { reason: 'too-large', message: SYNC_MESSAGES.tooLarge };
         case 'operation_mismatch':
-        case 'not_found':
             // A verdict about these exact bytes, not a wait: the account has spent this operation
-            // id on something else, or holds neither the id nor a tombstone for it. The default
-            // below would promise a retry that can only be refused again — see `SYNC_MESSAGES.refused`.
+            // id on something else. The default below would promise a retry that can only be
+            // refused again — see `SYNC_MESSAGES.refused`.
+            //
+            // `not_found` is deliberately NOT folded in here any more (#1298 patch review). It is
+            // never a per-document answer on this route — see `STEP_OVER_CODES` — so it falls to
+            // the `server` default below, which is the truthful reading of an unmounted route: the
+            // library could not be reached, and the retry it promises is the thing that works once
+            // the deployment is fixed. "Save it as a copy" would send the musician to make copies
+            // that 404 for the same reason.
             return { reason: 'refused', message: SYNC_MESSAGES.refused };
         case 'rate_limited':
             return { reason: 'rate-limited', message: SYNC_MESSAGES.rateLimited };
@@ -274,10 +288,18 @@ function failureFromDownload(result: LibraryDownloadResult): SyncFailure | null 
     }
 }
 
-/** The last rejection this pass's transport saw, and the song it was about. */
+/** The last rejection this pass's transport saw, and the exact Save it was about. */
 interface Refusal {
     error: ApiError;
     documentId: string;
+    /**
+     * The operation the refused request actually carried, so `AccountSongbook.refuse` marks THAT
+     * row rather than whatever happens to be the head by the time it runs. Another tab sharing
+     * this account's outbox can commit the head and the musician can queue a fresh Save behind it
+     * while this rejection is still unwinding; marking by position would permanently refuse a Save
+     * that was never sent.
+     */
+    operationId: string;
 }
 
 /**
@@ -293,7 +315,11 @@ function capturing(inner: SaveTransport, onRefusal: (refusal: Refusal) => void):
             return await inner(request);
         } catch (error) {
             if (error instanceof SaveTransportError) {
-                onRefusal({ error: error.reason, documentId: request.documentId });
+                onRefusal({
+                    error: error.reason,
+                    documentId: request.documentId,
+                    operationId: request.operationId,
+                });
             }
             throw error;
         }
@@ -399,6 +425,18 @@ export interface SignOutPreflight {
     atRisk: string[];
     /** Committed versions still in the outbox, across the whole library. */
     unsentSaves: number;
+    /**
+     * How many of `unsentSaves` a permanent refusal (#1298) has stranded — a subset, never a
+     * separate pile, and it counts a refused head's whole queue rather than only the marked row,
+     * because `prepare()` never advances past that head.
+     *
+     * The preflight has to tell these apart because its two protective offers are not equally true
+     * of both: "Sync now" is the move that can empty an ordinary queue before it is discarded, and
+     * against a refused head it is a button that provably cannot do anything, since `prepare()`
+     * answers `'refused'` for it without sending. Export is the only thing that saves those bytes,
+     * and the step has to say so rather than offering a retry that will not run.
+     */
+    refusedSaves: number;
     /**
      * Unsaved experiments this device kept for account songs.
      *
@@ -609,16 +647,22 @@ export function createSyncLoop(
      * `refusedDocument` names the rejections that do NOT end the pass, and — since #1298 —
      * PERSISTS them: `sendNext` reports every transport failure as `'retry'`, which is right for
      * the outbox but wrong as a stop rule, and the durable record is what stops next pass from
-     * re-discovering (and re-POSTing) the same rejection. A 413, an `operation_mismatch` and a
-     * `not_found` are verdicts on ONE document, not on the server or the network, so ending the
-     * sweep there would park every song behind it behind a document no retry will ever fix — and
-     * with no timer here, "the next trigger" can be days away. So that one song is stepped over —
-     * `refusedDocument` marks its head `status: 'refused'` (`AccountSongbook.refuse`, the same
-     * transaction shape `acknowledge` uses for `'conflict'`) so `prepare()` answers `'refused'`
-     * for it from here on without spending a request, the cursor moves PAST it, its queued Save
-     * stays queued, and the reason is still reported at the end of the pass. Every other reason
-     * keeps the early return, because a 401, a 429 or a dead network would refuse the next song
-     * for the same reason.
+     * re-discovering (and re-POSTing) the same rejection. A 413 and an `operation_mismatch` are
+     * verdicts on ONE document, not on the server or the network, so ending the sweep there would
+     * park every song behind it behind a document no retry will ever fix — and with no timer here,
+     * "the next trigger" can be days away. So that one song is stepped over — `refusedDocument`
+     * marks its head `status: 'refused'` (`AccountSongbook.refuse`, the same transaction shape
+     * `acknowledge` uses for `'conflict'`) so `prepare()` answers `'refused'` for it from here on
+     * without spending a request, the cursor moves PAST it, its queued Save stays queued, and the
+     * reason is still reported at the end of the pass. Every other reason keeps the early return,
+     * because a 401, a 429, a dead network or an unmounted route would refuse the next song for
+     * the same reason.
+     *
+     * `counts.refused` is deliberately NOT part of `changed`. That count is every ALREADY-refused
+     * head this pass walked past, which is a standing fact, not news — folding it in would bump
+     * `libraryVersion` on every pass for as long as one refused head exists, re-rendering the
+     * songbook forever. The TRANSITION is what changed something, and only `refuse()`'s own
+     * `'refused'` answer reports it (see `pass()`).
      */
     async function drain(
         current: AccountScope,
@@ -634,10 +678,7 @@ export function createSyncLoop(
                     ...(cursor === undefined ? {} : { afterDocumentId: cursor }),
                 });
                 committed += result.counts.committed;
-                changed ||=
-                    result.counts.committed > 0 ||
-                    result.counts.conflict > 0 ||
-                    result.counts.refused > 0;
+                changed ||= result.counts.committed > 0 || result.counts.conflict > 0;
                 if (result.kind !== 'more' || result.resumeAfterDocumentId === null) {
                     // A transport failure ends the drain outright: another sweep would only
                     // fail again on the same song, and the reason is already captured.
@@ -691,6 +732,9 @@ export function createSyncLoop(
         let failure: SyncFailure | null = backedOff
             ? { reason: 'rate-limited', message: SYNC_MESSAGES.rateLimited }
             : null;
+        // The TRANSITION into `'refused'`, and only the transition: a head that was already
+        // refused before this pass began is a standing fact the songbook is already rendering.
+        let newlyRefused = false;
         try {
             if (!backedOff) {
                 try {
@@ -704,10 +748,18 @@ export function createSyncLoop(
                         }
                         // #1298: persisted BEFORE the cursor steps over it, so the durable record
                         // — not this pass's transient capture — is what stops the next pass from
-                        // re-discovering (and re-POSTing) the exact same rejection.
+                        // re-discovering (and re-POSTing) the exact same rejection. Marked by
+                        // OPERATION id, so a head another tab committed underneath this rejection
+                        // is not refused in its place.
                         const reason: SaveRefusalReason =
                             captured.error.code === 'payload_too_large' ? 'too-large' : 'refused';
-                        await songbook.refuse(current, captured.documentId, reason);
+                        const marked = await songbook.refuse(
+                            current,
+                            captured.documentId,
+                            captured.operationId,
+                            reason,
+                        );
+                        newlyRefused ||= marked === 'refused';
                         return captured.documentId;
                     });
                 } catch (error) {
@@ -718,6 +770,9 @@ export function createSyncLoop(
                     // a reason the queue did not move — and the Save is still on this device.
                     failure = { reason: 'server', message: SYNC_MESSAGES.server };
                 }
+                // Outside the catch: a mark that landed before a later storage failure is still a
+                // change the songbook has to re-read, whether or not the rest of the drain held.
+                changed ||= newlyRefused;
             }
             // The captured transport reason outranks the generic storage one: it names what the
             // server actually said, which is the whole point of the wrapper.
@@ -1031,6 +1086,7 @@ export function createSyncLoop(
             const current = await settledScope();
             const songs = await loop.listLibrary();
             let unsentSaves = 0;
+            let refusedSaves = 0;
             let drafts = 0;
             const documentIds: string[] = [];
             const atRisk: string[] = [];
@@ -1039,15 +1095,24 @@ export function createSyncLoop(
                 // Two reads per song rather than one sweep of the outbox: `pending` and `drafts`
                 // are the same queries the rest of this module counts work with, and a library
                 // bounded at `MAX_REMOTE_CANDIDATES` makes this a bounded preflight, not a scan.
-                const queued = (await songbook.pending(current, song.documentId)).length;
+                const operations = await songbook.pending(current, song.documentId);
                 const kept = (await songbook.drafts(current, song.documentId)).length;
-                unsentSaves += queued;
+                unsentSaves += operations.length;
+                // Counted off the same read rather than a second query: a refused Save is one of
+                // these operations, not a separate store. The WHOLE queue counts when the head is
+                // refused, not just the marked row — `prepare()` never advances past that head, so
+                // an ordinary Save sitting behind it is exactly as unsendable as the refusal
+                // itself, and calling it syncable would put a Sync now button in front of work
+                // that cannot move.
+                if (operations[0]?.status === 'refused') {
+                    refusedSaves += operations.length;
+                }
                 drafts += kept;
-                if (queued > 0 || kept > 0) {
+                if (operations.length > 0 || kept > 0) {
                     atRisk.push(song.documentId);
                 }
             }
-            return { documentIds, atRisk, unsentSaves, drafts };
+            return { documentIds, atRisk, unsentSaves, refusedSaves, drafts };
         },
         async signOut(revoke) {
             const current = await settledScope();

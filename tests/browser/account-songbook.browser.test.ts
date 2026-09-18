@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { runOutboxPass } from '../../prototypes/v2/lib/sync/drain.js';
 import {
     ACCOUNT_DATABASE,
     AccountChangedError,
@@ -382,9 +383,11 @@ describe('account songbook on real IndexedDB', () => {
     describe('a permanent transport-level refusal (#1298)', () => {
         it('stops preparing a refused head, and a fresh Save of the same document replaces it', async () => {
             await book.save(scope, accountChart(), null);
-            await prepared();
+            const first = await prepared();
 
-            expect(await book.refuse(scope, 'study', 'too-large')).toBe('refused');
+            expect(await book.refuse(scope, 'study', first.operationId, 'too-large')).toBe(
+                'refused',
+            );
             expect(await book.prepare(scope, 'study')).toBe('refused');
             const refusedOps = await book.pending(scope, 'study');
             expect(refusedOps).toHaveLength(1);
@@ -414,12 +417,34 @@ describe('account songbook on real IndexedDB', () => {
             });
 
             // The queue's head is already 'conflict', not the plain 'queued' this call expects.
-            expect(await book.refuse(scope, 'study', 'refused')).toBe('none');
+            expect(await book.refuse(scope, 'study', request.operationId, 'refused')).toBe('none');
             expect(await book.prepare(scope, 'study')).toBe('conflict');
         });
 
         it('reports none against an empty queue rather than inventing a refusal', async () => {
-            expect(await book.refuse(scope, 'never-saved', 'refused')).toBe('none');
+            expect(await book.refuse(scope, 'never-saved', crypto.randomUUID(), 'refused')).toBe(
+                'none',
+            );
+        });
+
+        it('refuses the operation the transport named, never whichever Save is the head now', async () => {
+            // #1298 patch review P1: this account's outbox is shared by every open tab, so a
+            // second tab can commit the head and the musician can queue a fresh Save behind it
+            // while a late 413 for the FIRST operation is still unwinding. Marking by position
+            // would then permanently refuse a Save that was never sent — and the only way out is a
+            // re-Save the musician has no reason to know they owe.
+            const a = await book.save(scope, accountChart(), null);
+            const first = await prepared();
+            await book.acknowledge(scope, first, committed(first, 'cloud-1'));
+            // The Save the musician makes next; the account has never seen these bytes.
+            await book.save(scope, { ...a.document, title: 'B' }, 0);
+
+            expect(await book.refuse(scope, 'study', first.operationId, 'too-large')).toBe('none');
+
+            const ops = await book.pending(scope, 'study');
+            expect(ops.map((op) => op.status)).toEqual(['queued']);
+            // Still sendable, which is the whole point: a stale capture cannot condemn it.
+            expect(JSON.parse((await prepared()).body).document.title).toBe('B');
         });
 
         it('does not strip a CONFLICTED head — only a refused one — so Keep-both still has both bytes', async () => {
@@ -439,6 +464,50 @@ describe('account songbook on real IndexedDB', () => {
             const ops = await book.pending(scope, 'study');
             expect(ops.map((op) => op.status)).toEqual(['conflict', 'queued']);
             expect(await book.prepare(scope, 'study')).toBe('conflict');
+        });
+
+        it('retires the whole queue with a refused head, so nothing is left based on a deleted Save', async () => {
+            // #1298 patch review P0. Every operation behind the head is chained to it by
+            // `base: { operationId }`. Dropping ONLY the refused head left the next one basing
+            // itself on a row that no longer existed, and `prepare()` answers that with a THROW —
+            // which `runOutboxPass` does not step over, so every later pass for the whole account
+            // rejected on this one song. There was no way back out of it from inside the app.
+            const a = await book.save(scope, accountChart(), null);
+            const first = await prepared();
+            // Queued behind the frozen head, so its base is that operation id, not a revision.
+            const b = await book.save(scope, { ...a.document, title: 'B' }, 0);
+            expect((await book.pending(scope, 'study'))[1].base).toEqual({
+                operationId: first.operationId,
+            });
+
+            expect(await book.refuse(scope, 'study', first.operationId, 'too-large')).toBe(
+                'refused',
+            );
+            await book.save(scope, { ...b.document, title: 'C' }, 1);
+
+            // One operation, not two: the orphan retired with the head that was its base.
+            const ops = await book.pending(scope, 'study');
+            expect(ops).toHaveLength(1);
+            expect(ops[0]).toMatchObject({ status: 'queued', localRevision: 2 });
+            // Resolves rather than throwing, and is based on what the account actually confirmed
+            // for this record — nothing in that queue was ever committed.
+            const next = await prepared();
+            expect(JSON.parse(next.body).expectedRevision).toBe(
+                (await book.read(scope, 'study'))?.remoteRevision ?? null,
+            );
+            expect(JSON.parse(next.body).document.title).toBe('C');
+
+            // And the account's outbox as a whole still moves: the pass that used to reject on
+            // this song now walks past it and sends the next one.
+            await book.save(scope, accountChart('other', 'etude'), null);
+            const titles: string[] = [];
+            const result = await runOutboxPass(book, scope, async (request) => {
+                titles.push(JSON.parse(request.body).document.title);
+                return committed(request, `cloud-${titles.length}`);
+            });
+            expect(result.kind).toBe('complete');
+            // Ordered by document id, so `etude` before `study`; both sent, neither rejected.
+            expect(titles).toEqual(['other', 'C']);
         });
     });
 
