@@ -35,6 +35,55 @@ export interface RemoteVersion {
     document: ChartDocument;
 }
 
+export type UnsupportedReason = 'needs-app-update' | 'invalid';
+
+/**
+ * What a library download learned about one document and was NOT allowed to apply to the saved
+ * record. Exactly one record per (owner, document), because the three kinds are mutually
+ * exclusive outcomes of the same question — "the cloud moved, can this device adopt it?":
+ *
+ * - `version`: the remote body is valid but local work would be lost by adopting it (a draft, a
+ *   queued Save, or the chart currently on the stand). Kept beside the untouched saved record
+ *   so a later Keep-both/adopt decision has both sides to show.
+ * - `deleted`: the cloud tombstoned a document this device still has divergent local work for.
+ *   The local work stays; this is the flag that explains why the cloud copy is gone.
+ * - `unsupported`: the body could not be validated — a newer `schemaVersion` this build has no
+ *   decoder for, or a corrupt record. `body` is the observed value, preserved and NEVER passed
+ *   through `snapshot()`, migrated or coerced; it is untrusted data for display and export only.
+ */
+export type RemoteOutcome = {
+    documentId: string;
+    revision: string;
+} & (
+    | ({ kind: 'version' } & Pick<RemoteVersion, 'document'>)
+    | { kind: 'deleted' }
+    | { kind: 'unsupported'; body: unknown; reason: UnsupportedReason }
+);
+
+/** The stored form: the same observation, bound to an owner and its `meta` key. */
+export type RemoteCandidate = RemoteOutcome & { key: string; ownerId: string };
+
+/**
+ * Remote candidates live in the `meta` store rather than a store of their own: adding one would
+ * need an IndexedDB version bump on a database that already exists wherever this app has run,
+ * and a schema upgrade is a destructive-data decision that a download feature does not get to
+ * make on its own. `meta` is a generic keyed store (keyPath `'key'`), is already inside every
+ * transaction's scope in `AccountDatabase.run` — so a candidate and a saved record still commit
+ * together — and its only other key is `'active'`.
+ *
+ * The identifier grammar excludes `':'`, so this composition is unambiguous: no owner or
+ * document ID can be spelled to collide with another's key or with `'active'`.
+ */
+export function candidatePrefix(ownerId: string): string {
+    identifier(ownerId);
+    return `remote:${ownerId}:`;
+}
+
+export function candidateKey(ownerId: string, documentId: string): string {
+    identifier(documentId);
+    return `${candidatePrefix(ownerId)}${documentId}`;
+}
+
 export interface SaveOperation {
     ownerId: string;
     documentId: string;

@@ -1,12 +1,16 @@
 import {
     type AccountScope,
+    candidateKey,
     type Draft,
     identifier,
     localRevision,
+    type RemoteCandidate,
+    type RemoteOutcome,
     remoteRevision,
     type SavedSong,
     type SaveOperation,
     snapshot,
+    type UnsupportedReason,
 } from './protocol';
 
 export function copyScope(scope: AccountScope): AccountScope {
@@ -55,6 +59,63 @@ export function savedDraft(value: Draft, scope: AccountScope, id: string): Draft
         throw new Error('Invalid stored draft. Source is unchanged.');
     }
     return { ...value, document };
+}
+
+const UNSUPPORTED_REASONS: readonly UnsupportedReason[] = ['needs-app-update', 'invalid'];
+
+/**
+ * Validate one remote observation BEFORE a transaction opens, and rebuild it from the validated
+ * fields only — a transport object never reaches storage with stray members, the same posture
+ * `reply()` takes for a Save response.
+ *
+ * `body` on an unsupported observation is the one thing deliberately left unvalidated: it is
+ * preserved exactly as observed, because refusing it here would discard the only copy this
+ * device has of a document it cannot yet read. Nothing downstream may treat it as a chart.
+ */
+export function remoteOutcome(value: RemoteOutcome): RemoteOutcome {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        throw new Error('Invalid remote observation.');
+    }
+    identifier(value.documentId);
+    remoteRevision(value.revision);
+    const documentId = value.documentId;
+    const revision = value.revision;
+    if (value.kind === 'version') {
+        const document = snapshot(value.document);
+        if (document.id !== documentId) {
+            throw new Error('Remote version identity does not match its document.');
+        }
+        return { kind: 'version', documentId, revision, document };
+    }
+    if (value.kind === 'deleted') {
+        return { kind: 'deleted', documentId, revision };
+    }
+    if (value.kind === 'unsupported') {
+        if (!UNSUPPORTED_REASONS.includes(value.reason)) {
+            throw new Error('Invalid unsupported-body reason.');
+        }
+        return {
+            kind: 'unsupported',
+            documentId,
+            revision,
+            body: value.body,
+            reason: value.reason,
+        };
+    }
+    throw new Error('Unknown remote observation kind.');
+}
+
+/** Reading a candidate re-proves its ownership and its key, never only the record it sits at. */
+export function savedCandidate(
+    value: RemoteCandidate,
+    scope: AccountScope,
+    id: string,
+): RemoteCandidate {
+    owned(value, scope, id);
+    if (value.key !== candidateKey(scope.ownerId, id)) {
+        throw new Error('Stored remote candidate does not match its key.');
+    }
+    return Object.assign({ key: value.key, ownerId: scope.ownerId }, remoteOutcome(value));
 }
 
 export function savedOperation(
