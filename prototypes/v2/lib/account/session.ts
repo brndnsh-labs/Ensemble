@@ -2,9 +2,10 @@ import type { AccountApi } from './api';
 
 /**
  * The account session state machine (#1261). Framework-free on purpose: `subscribe`/
- * `getSnapshot` is the exact shape `useSyncExternalStore` wants, so a future React hook is a
- * thin wrapper, not a rewrite — but that hook, and any call to `refresh()` from app startup,
- * is out of scope here (#1262/#1266). Nothing in this file is wired into `app/ensemble.tsx`.
+ * `getSnapshot` is the exact shape `useSyncExternalStore` wants, which is how #1262 wired it into
+ * the app — `app/account/use-account-session.ts` is that thin wrapper, over the single instance
+ * `lib/account/client.ts` owns. This module still knows nothing about React or about when the
+ * app chooses to `refresh()`.
  *
  * `unknown` is the only state before the first `refresh()` resolves. `guest` and `expired` are
  * both "not signed in", but they mean different things to the UI this eventually feeds: `guest`
