@@ -57,9 +57,24 @@ export type ReconcileOutcome =
 export interface ReconcileOptions {
     /**
      * True when this document is the chart on the stand right now. The caller owns that fact —
-     * storage must never reach into UI state to guess which song is playing.
+     * storage must never reach into UI state to guess which song is playing — and must answer it
+     * as this call is made, not from a list captured when its plan was drawn.
      */
     active?: boolean;
+    /**
+     * The `remoteRevision` the caller's plan was computed against: `undefined` for "there was no
+     * saved record", `null` for "a record the cloud had never confirmed", a string for a
+     * confirmed one. This is a compare-and-swap base, and it is the ONLY thing that can catch the
+     * one dangerous interleaving the re-reads below cannot — a Save queued AND acknowledged while
+     * the remote body was in flight, which leaves a record that is clean, unheld, and NEWER than
+     * the observation about to be written over it. When it does not match, the record moved under
+     * the plan and the observation is preserved as a candidate instead of applied.
+     *
+     * Omitting it therefore ASSERTS that no saved record existed. That default fails closed — it
+     * can only turn an adoption into a preserved candidate, never the reverse — so a caller that
+     * holds a record must pass its revision or it will simply be told the record moved.
+     */
+    expectedRemoteRevision?: string | null;
 }
 
 function operations<T>(
@@ -519,13 +534,21 @@ export class AccountSongbook {
      * a body arrives the musician may have started editing, queued a Save, or opened the chart.
      * Re-reading the record, the draft count and the queue here is what makes a download safe to
      * interleave with live use — and what makes an interrupted run safe to simply run again,
-     * since a document already at this revision costs nothing and changes nothing.
+     * since a document already at this revision costs nothing and changes nothing. The chart on
+     * the stand is the one fact storage cannot re-read, so the caller supplies it per call.
      *
      * `held` is the single preservation predicate: a draft, a queued Save, or the chart on the
      * stand each mean adopting the remote body would destroy something that exists only on this
      * device. A held document keeps everything it has and gets a separate candidate instead.
      * `remoteRevision === null` counts as divergent for the same reason: the local record has
      * never been confirmed by the cloud, so it cannot be treated as a clean mirror of it.
+     *
+     * `held` alone is not enough, because a Save can be queued AND drained inside the same
+     * window: `acknowledge` writes the new `remoteRevision` and deletes the operation in ONE
+     * transaction, so the record is never observably "clean but mid-flight" — it is simply clean
+     * and newer, and nothing readable here would distinguish it from the record the plan saw.
+     * `expectedRemoteRevision` is what does: a write only proceeds against the exact revision the
+     * caller diffed against.
      */
     async reconcile(
         scope: AccountScope,
@@ -539,6 +562,10 @@ export class AccountSongbook {
         // Captured synchronously, before IDB awaits: a caller mutating its observation or its
         // options object mid-flight cannot retarget the commit that is already decided.
         const active = options.active === true;
+        const expected = options.expectedRemoteRevision;
+        if (expected !== undefined && expected !== null) {
+            remoteRevision(expected);
+        }
         const observed = remoteOutcome(outcome);
         const documentId = observed.documentId;
         return this.database.run('readwrite', scope, (tx) => {
@@ -566,6 +593,14 @@ export class AccountSongbook {
                                         tx.table('meta').put(candidate());
                                         return tx.finish('retained-deleted');
                                     }
+                                    if (song && song.remoteRevision !== expected) {
+                                        // The record moved under the plan that asked for this
+                                        // removal. Removing it would delete a revision nobody
+                                        // ever diffed — so it stays, flagged like any other
+                                        // divergence from a cloud deletion.
+                                        tx.table('meta').put(candidate());
+                                        return tx.finish('retained-deleted');
+                                    }
                                     if (!song) {
                                         // Nothing was ever mirrored here, so there is nothing to
                                         // remove and nothing to explain. Any candidate left from
@@ -589,6 +624,14 @@ export class AccountSongbook {
                                     return tx.finish('unchanged');
                                 }
                                 if (held || song?.remoteRevision === null) {
+                                    tx.table('meta').put(candidate());
+                                    return tx.finish('candidate');
+                                }
+                                if (song?.remoteRevision !== expected) {
+                                    // Clean, unheld — and NOT the record the caller diffed. It
+                                    // moved between the plan and this transaction, so this body
+                                    // is an observation about a state that no longer exists here
+                                    // and may not be written over the one that does.
                                     tx.table('meta').put(candidate());
                                     return tx.finish('candidate');
                                 }

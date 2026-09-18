@@ -1,5 +1,6 @@
 import { validateChartDocument } from '../../../../public/songbook/codec.js';
 import {
+    AccountChangedError,
     type AccountScope,
     type ChartDocument,
     identifier,
@@ -22,11 +23,13 @@ import type { Progress } from './status';
  *
  * Three passes, in this order and for these reasons:
  *
- * 1. Page the whole manifest into memory (bounded by the server's 2,000-document per-owner cap).
- *    A malformed row rejects the ENTIRE pass: a diff is a plan to remove and overwrite records,
- *    and it may only be computed from rows that were all validated.
+ * 1. Page the whole manifest into memory, bounded only by a runaway-server page fuse. A malformed
+ *    row rejects the ENTIRE pass: a diff is a plan to remove and overwrite records, and it may
+ *    only be computed from rows that were all validated.
  * 2. Diff it against local records — pure, in `planLibraryDownload`, so the rule that decides
- *    what to fetch and what to remove is testable without a browser or a transport.
+ *    what to fetch and what to remove is testable without a browser or a transport. Each planned
+ *    row carries the local revision it was diffed against, which is the commit's compare-and-swap
+ *    base: a plan is a statement about a moment, and the moment can pass before the body lands.
  * 3. Fetch the changed bodies with bounded concurrency and a paced request rate, validating each
  *    one through the same `snapshot()` the Save path uses before it can reach the store.
  *
@@ -39,8 +42,18 @@ import type { Progress } from './status';
 
 /** The server's `MAX_LIST_LIMIT`: a 2,000-document library is four manifest pages. */
 export const MANIFEST_PAGE_LIMIT = 500;
-/** The per-owner document cap. A manifest longer than this is a broken server, not a library. */
-export const MANIFEST_ROW_LIMIT = 2_000;
+/**
+ * A runaway-server fuse, NOT a library ceiling — the difference matters, because a client-side
+ * refusal here is permanent: the same library would fail every pass, forever, and no user action
+ * could clear it.
+ *
+ * The manifest is `documents UNION ALL tombstones` (#1259) and tombstones are never pruned, so
+ * the server's per-owner DOCUMENT cap bounds only half of it: a full library plus one delete is
+ * already over that cap, and deletes only accumulate. Nothing about the row count is therefore a
+ * client-side error at all. What is still worth stopping is a server that never ends its pages,
+ * and that is all this counts. At the page limit it is a million rows.
+ */
+export const MANIFEST_PAGE_BUDGET = 2_000;
 export const DOWNLOAD_CONCURRENCY = 4;
 /**
  * 400ms between requests is 150/min: under the download route's own 180/min budget and inside
@@ -112,6 +125,14 @@ export interface LocalMirror {
 export interface PlannedDocument {
     documentId: string;
     revision: string;
+    /**
+     * The saved record's `remoteRevision` this row was diffed against — the compare-and-swap base
+     * the commit must still find. `undefined` when no saved record existed; `null` when one
+     * existed that the cloud had never confirmed. The two are different states and neither may be
+     * collapsed into the other, because "no record" and "an unconfirmed record" have opposite
+     * consequences for whether a remote body may become the local song.
+     */
+    expectedRemoteRevision?: string | null;
 }
 
 export interface LibraryPlan {
@@ -137,7 +158,9 @@ export type LibraryFailureReason =
     | 'expired'
     | 'rate-limited'
     | 'malformed-manifest'
-    | 'malformed-body';
+    | 'malformed-body'
+    /** This device could not read its own library, so there was nothing sound to diff against. */
+    | 'malformed-local';
 
 export interface LibraryDownloadFailure {
     /** Null when the manifest pass itself failed rather than one document. */
@@ -185,8 +208,17 @@ export interface LibraryDownloadResult {
 }
 
 export interface LibraryDownloadOptions {
-    /** The document(s) on the stand right now. The caller owns this; storage never guesses it. */
-    activeDocumentIds?: readonly string[];
+    /**
+     * Is this document on the stand RIGHT NOW? The caller owns that fact; storage never guesses
+     * it. Asked again for every single commit, because a full library is ~11 paced minutes and a
+     * chart opened at minute two would otherwise be swapped under the performer by a list
+     * captured at minute zero.
+     *
+     * Required, and deliberately so: an empty default is the unsafe direction — it silently
+     * answers "nothing is open" for a caller that simply forgot, and the cost of that answer is
+     * the one thing this pass must never do.
+     */
+    isActive: (documentId: string) => boolean;
     concurrency?: number;
     manifestLimit?: number;
     minimumIntervalMs?: number;
@@ -309,6 +341,10 @@ function unsupportedReason(document: unknown): UnsupportedReason {
  * A deleted row is planned only when a saved record exists, because that is the only local thing
  * a tombstone can act on. A draft or a candidate with no saved record is left exactly as it is:
  * losing nothing outranks flagging everything.
+ *
+ * Every planned row also carries the saved record's revision AT PLAN TIME, so the commit can
+ * refuse to act on a record that has moved since. The plan is not the authority on what to write;
+ * it is the authority on what it was looking at when it decided.
  */
 export function planLibraryDownload(
     rows: readonly ManifestRow[],
@@ -326,9 +362,16 @@ export function planLibraryDownload(
     for (const row of rows) {
         listed.add(row.documentId);
         const mirror = mirrors.get(row.documentId);
+        // Undefined rather than null when there is no SAVED record: a mirror that exists only to
+        // carry a quarantined revision has no record for a commit to compare against.
+        const expectedRemoteRevision = mirror?.saved ? mirror.remoteRevision : undefined;
         if (row.deleted) {
             if (mirror?.saved) {
-                plan.tombstone.push({ documentId: row.documentId, revision: row.revision });
+                plan.tombstone.push({
+                    documentId: row.documentId,
+                    revision: row.revision,
+                    expectedRemoteRevision,
+                });
             } else {
                 plan.unchanged.push(row.documentId);
             }
@@ -344,7 +387,11 @@ export function planLibraryDownload(
             plan.unchanged.push(row.documentId);
             continue;
         }
-        plan.fetch.push({ documentId: row.documentId, revision: row.revision });
+        plan.fetch.push({
+            documentId: row.documentId,
+            revision: row.revision,
+            expectedRemoteRevision,
+        });
     }
     for (const mirror of local) {
         if (mirror.saved && !listed.has(mirror.documentId)) {
@@ -358,11 +405,53 @@ function detailOf(error: unknown): string {
     return error instanceof Error ? error.message : 'Unrecognized failure.';
 }
 
+/**
+ * The passes running right now, per store and per owner. A pass is a long (~11 paced minutes),
+ * stateful walk that both reads and writes the same records; two of them over one library would
+ * double every request against a shared rate budget and race each other's commits, each holding a
+ * plan the other has already invalidated. One at a time, per account.
+ *
+ * Keyed weakly by the store instance, so a closed songbook takes its entry with it. Two DIFFERENT
+ * accounts may run at once — they share no records — and so may two different stores.
+ */
+const passesInFlight = new WeakMap<AccountSongbook, Set<string>>();
+
+/**
+ * Run one library-download pass. Rejects rather than coalescing when a pass for the same account
+ * is already running on this store: the second caller asked with its own transport, its own
+ * pacing and its own `isActive`, and quietly handing back the first pass's result would answer a
+ * question nobody asked. A caller that wants to know when the library is current awaits its own
+ * call; a caller that fired twice has a bug, and is told so.
+ */
 export async function runLibraryDownload(
     songbook: AccountSongbook,
     scope: AccountScope,
     transport: LibraryTransport,
-    options: LibraryDownloadOptions = {},
+    options: LibraryDownloadOptions,
+): Promise<LibraryDownloadResult> {
+    if (!songbook || typeof songbook.reconcile !== 'function') {
+        throw new Error('Invalid account songbook.');
+    }
+    // Validated here so the fence's own verdict — not a WeakMap lookup — is what a bad scope hits.
+    const owner = copyScope(scope).ownerId;
+    const running = passesInFlight.get(songbook) ?? new Set<string>();
+    passesInFlight.set(songbook, running);
+    if (running.has(owner)) {
+        throw new Error('A library download is already running for this account.');
+    }
+    running.add(owner);
+    try {
+        return await libraryDownloadPass(songbook, scope, transport, options);
+    } finally {
+        running.delete(owner);
+    }
+}
+
+async function libraryDownloadPass(
+    songbook: AccountSongbook,
+    scope: AccountScope,
+    transport: LibraryTransport,
+    options: LibraryDownloadOptions,
 ): Promise<LibraryDownloadResult> {
     if (!options || typeof options !== 'object' || Array.isArray(options)) {
         throw new Error('Invalid library download options.');
@@ -375,10 +464,11 @@ export async function runLibraryDownload(
         throw new Error('Invalid library transport.');
     }
     // Captured synchronously, before any await: a caller mutating its scope or options while the
-    // pass is in flight cannot retarget the account, the open chart, or the request rate.
+    // pass is in flight cannot retarget the account or the request rate. `isActive` is the one
+    // deliberate exception — it is a live question, asked again at every commit.
     scope = copyScope(scope);
     const {
-        activeDocumentIds = [],
+        isActive,
         concurrency = DOWNLOAD_CONCURRENCY,
         manifestLimit = MANIFEST_PAGE_LIMIT,
         minimumIntervalMs = DOWNLOAD_INTERVAL_MS,
@@ -391,13 +481,8 @@ export async function runLibraryDownload(
     if (typeof now !== 'function' || typeof sleep !== 'function') {
         throw new Error('Invalid injected clock.');
     }
-    if (!Array.isArray(activeDocumentIds)) {
-        throw new Error('Invalid active document list.');
-    }
-    const active = new Set<string>();
-    for (const id of activeDocumentIds) {
-        identifier(id);
-        active.add(id);
+    if (typeof isActive !== 'function') {
+        throw new Error('Invalid active-document predicate.');
     }
 
     const failures: LibraryDownloadFailure[] = [];
@@ -464,8 +549,7 @@ export async function runLibraryDownload(
     const rows: ManifestRow[] = [];
     let after: string | null = null;
     let paged = false;
-    const maxPages = Math.ceil(MANIFEST_ROW_LIMIT / manifestLimit) + 1;
-    for (let page = 0; page < maxPages && !paged; page++) {
+    for (let page = 0; page < MANIFEST_PAGE_BUDGET && !paged; page++) {
         await pace();
         const outcome = await transport.manifest(after, manifestLimit);
         if (outcome.kind === 'expired') {
@@ -500,10 +584,6 @@ export async function runLibraryDownload(
             }
             rows.push(row);
         }
-        if (rows.length > MANIFEST_ROW_LIMIT) {
-            fail(null, 'malformed-manifest', 'Manifest exceeds the per-owner cap.');
-            return abandoned();
-        }
         if (current.nextAfterDocumentId === null) {
             paged = true;
             break;
@@ -520,56 +600,79 @@ export async function runLibraryDownload(
         return abandoned();
     }
 
-    // Pass 2: the local side of the diff. A storage failure here rejects rather than resolving —
-    // a library this device could not read is not one it may remove records from.
-    const quarantined = new Map(
-        (await songbook.remoteCandidates(scope))
-            .filter((candidate) => candidate.kind === 'unsupported')
-            .map((candidate) => [candidate.documentId, candidate.revision]),
-    );
+    // Pass 2: the local side of the diff. A library this device could not read is not one it may
+    // remove records from, so the whole pass is abandoned before a single record is touched — but
+    // it is REPORTED, not thrown. One corrupt row (a candidate or a saved song a validator
+    // refuses) would otherwise make every future pass reject at the same row, with no result to
+    // show and nothing in `failures` a musician could act on. The fence is the one exception: an
+    // owner switch is not a fact about the library, and a pass that no longer knows whose records
+    // it is holding must not resolve at all.
     const local: LocalMirror[] = [];
-    const saved = new Set<string>();
-    let cursor: string | undefined;
-    for (let page = 0; ; page++) {
-        if (page >= LOCAL_PAGE_CEILING) {
-            throw new Error('Local library paging did not terminate.');
-        }
-        const listing = await songbook.list(scope, {
-            limit: MAX_LIST_LIMIT,
-            ...(cursor === undefined ? {} : { afterDocumentId: cursor }),
-        });
-        for (const song of listing.songs) {
-            saved.add(song.documentId);
-            local.push({
-                documentId: song.documentId,
-                saved: true,
-                remoteRevision: song.remoteRevision,
-                quarantinedRevision: quarantined.get(song.documentId) ?? null,
+    try {
+        const quarantined = new Map(
+            (await songbook.remoteCandidates(scope))
+                .filter((candidate) => candidate.kind === 'unsupported')
+                .map((candidate) => [candidate.documentId, candidate.revision]),
+        );
+        const saved = new Set<string>();
+        let cursor: string | undefined;
+        for (let page = 0; ; page++) {
+            if (page >= LOCAL_PAGE_CEILING) {
+                throw new Error('Local library paging did not terminate.');
+            }
+            const listing = await songbook.list(scope, {
+                limit: MAX_LIST_LIMIT,
+                ...(cursor === undefined ? {} : { afterDocumentId: cursor }),
             });
+            for (const song of listing.songs) {
+                saved.add(song.documentId);
+                local.push({
+                    documentId: song.documentId,
+                    saved: true,
+                    remoteRevision: song.remoteRevision,
+                    quarantinedRevision: quarantined.get(song.documentId) ?? null,
+                });
+            }
+            if (listing.nextAfterDocumentId === null) {
+                break;
+            }
+            cursor = listing.nextAfterDocumentId;
         }
-        if (listing.nextAfterDocumentId === null) {
-            break;
+        // A quarantine and a saved record CAN coexist — advance to r1, then meet r2 on a schema
+        // this build has no decoder for — and the loop above already merged those onto one mirror.
+        // This loop is for the other case: a quarantine whose document has no saved record at
+        // all. Without it every pass would re-download the revision this build already preserved
+        // and still cannot read.
+        for (const [documentId, revision] of quarantined) {
+            if (!saved.has(documentId)) {
+                local.push({
+                    documentId,
+                    saved: false,
+                    remoteRevision: null,
+                    quarantinedRevision: revision,
+                });
+            }
         }
-        cursor = listing.nextAfterDocumentId;
-    }
-    // A quarantined body has no saved record by construction — nothing unusable ever becomes
-    // one — so it must join the local side on its own, or every pass would re-download the
-    // revision this build already preserved and still cannot read.
-    for (const [documentId, revision] of quarantined) {
-        if (!saved.has(documentId)) {
-            local.push({
-                documentId,
-                saved: false,
-                remoteRevision: null,
-                quarantinedRevision: revision,
-            });
+    } catch (error) {
+        if (error instanceof AccountChangedError) {
+            throw error;
         }
+        fail(null, 'malformed-local', detailOf(error));
+        return abandoned();
     }
 
     const plan = planLibraryDownload(rows, local);
-    const commit = async (outcome: RemoteOutcome): Promise<void> => {
+    /**
+     * Both facts the commit needs are supplied HERE, at the moment its transaction opens, never
+     * from when the plan was drawn: `isActive` is asked again (the performer may have opened this
+     * chart since), and the plan's compare-and-swap base is handed over so `reconcile` can refuse
+     * a record that moved under it (a Save may have been queued AND acknowledged since, leaving a
+     * record that is clean and NEWER — which no re-read of drafts or queue can detect).
+     */
+    const commit = async (planned: PlannedDocument, outcome: RemoteOutcome): Promise<void> => {
         const result = await songbook.reconcile(scope, outcome, {
-            active: active.has(outcome.documentId),
+            active: isActive(outcome.documentId) === true,
+            expectedRemoteRevision: planned.expectedRemoteRevision,
         });
         buckets[result].push(outcome.documentId);
     };
@@ -578,7 +681,11 @@ export async function runLibraryDownload(
     // removals it had already proved from explicit tombstone rows.
     let tombstoned = 0;
     for (const row of plan.tombstone) {
-        await commit({ kind: 'deleted', documentId: row.documentId, revision: row.revision });
+        await commit(row, {
+            kind: 'deleted',
+            documentId: row.documentId,
+            revision: row.revision,
+        });
         tombstoned += 1;
     }
 
@@ -647,6 +754,7 @@ export async function runLibraryDownload(
             // Committed OUTSIDE any catch: a storage or fence failure must reject the run, not
             // be mistaken for an unusable document and quarantined under a stale owner.
             await commit(
+                planned,
                 document
                     ? {
                           kind: 'version',

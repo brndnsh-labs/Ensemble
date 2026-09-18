@@ -12,6 +12,7 @@ import {
     type ChartDocument,
 } from '../../prototypes/v2/lib/sync/protocol.js';
 import { AccountSongbook } from '../../prototypes/v2/lib/sync/repository.js';
+import { type SaveTransport, sendNext } from '../../prototypes/v2/lib/sync/send.js';
 import { accountChart } from '../utils/account-songbook-fixture.js';
 
 /**
@@ -110,11 +111,37 @@ function songId(index: number): string {
     return `song-${String(index).padStart(2, '0')}`;
 }
 
-/** Zero pacing: the request budget is the server's concern, and `sync-download` proves it. */
+/**
+ * Zero pacing: the request budget is the server's concern, and `sync-download` proves it.
+ * Nothing is on the stand unless a test says so — but `isActive` is required, so saying "nothing"
+ * is an explicit answer here rather than a default nobody chose.
+ */
 function run(target: Cloud, options: Record<string, unknown> = {}, active = scope) {
     return runLibraryDownload(book, active, target.transport, {
+        isActive: () => false,
         minimumIntervalMs: 0,
         ...options,
+    } as Parameters<typeof runLibraryDownload>[3]);
+}
+
+/** A deferred gate, so a test can hold one request open and act while it is in flight. */
+function gate(): { wait: Promise<void>; open: () => void } {
+    let open!: () => void;
+    const wait = new Promise<void>((resolve) => {
+        open = resolve;
+    });
+    return { wait, open };
+}
+
+/** A cloud that commits every Save it is handed, at the revision the test names. */
+function committing(revision: string): SaveTransport {
+    return async (request) => ({
+        ownerId: request.ownerId,
+        documentId: request.documentId,
+        operationId: request.operationId,
+        digest: request.digest,
+        kind: 'committed',
+        revision,
     });
 }
 
@@ -338,7 +365,10 @@ describe('library download and reconcile on real IndexedDB', () => {
                     return {};
                 },
             ],
-            ['the chart on the stand', async (id) => ({ activeDocumentIds: [id] })],
+            [
+                'the chart on the stand',
+                async (id) => ({ isActive: (candidate: string) => candidate === id }),
+            ],
         ];
 
         for (const [label, dirty] of holds) {
@@ -372,6 +402,112 @@ describe('library download and reconcile on real IndexedDB', () => {
             // Fresh account for the next hold, so each one is proved from a clean library.
             scope = (await book.switchAccount(`owner-${label.length}`))!;
         }
+    });
+
+    it('never overwrites a Save that was acknowledged while the body was in flight', async () => {
+        const id = songId(1);
+        const sky = cloud({ [id]: { revision: 'r1', document: remoteChart('head', id, 0) } });
+        await run(sky);
+
+        // The plan is drawn against r1 and asks for r2. Everything below happens in the window
+        // between that decision and the body landing.
+        sky.docs.set(id, { revision: 'r2', document: remoteChart('theirs', id, 9) });
+        const inFlight = gate();
+        const held = gate();
+        sky.interceptDownload = async () => {
+            inFlight.open();
+            await held.wait;
+            return undefined;
+        };
+
+        const pass = run(sky);
+        await inFlight.wait;
+        // The musician Saves, and the outbox drains it: `acknowledge` writes the new
+        // remoteRevision and deletes the operation in ONE transaction, so the record is never
+        // observably "clean but mid-flight" — it is clean, unheld, and NEWER than r2.
+        const local = (await book.read(scope, id))!;
+        await book.save(scope, { ...local.document, title: 'mine' }, local.document.revision);
+        expect(await sendNext(book, scope, id, committing('r3'))).toBe('committed');
+        held.open();
+        const result = await pass;
+
+        // Nothing readable inside the commit distinguishes that record from the one the plan
+        // saw. Only the revision the plan diffed against does.
+        expect(result.candidates).toEqual([id]);
+        expect(result.advanced).toEqual([]);
+        const after = (await book.read(scope, id))!;
+        expect(after.document.title).toBe('mine');
+        expect(after.remoteRevision).toBe('r3');
+        const candidate = await book.remoteCandidate(scope, id);
+        expect(candidate?.kind).toBe('version');
+        expect(candidate?.revision).toBe('r2');
+        // Resolved, so the run is complete — but this device does not hold the cloud's revision.
+        expect(result.complete).toBe(true);
+        expect(result.documents).toEqual({ required: 1, verified: 0 });
+    });
+
+    it('refuses either write when the record moved under the caller’s plan', async () => {
+        const id = songId(1);
+        const sky = cloud({ [id]: { revision: 'r1', document: remoteChart('head', id, 0) } });
+        await run(sky);
+        const moved = { expectedRemoteRevision: 'r0' };
+
+        // A body whose plan was drawn against a revision this record no longer holds.
+        expect(
+            await book.reconcile(
+                scope,
+                {
+                    kind: 'version',
+                    documentId: id,
+                    revision: 'r2',
+                    document: remoteChart('theirs', id, 9),
+                },
+                moved,
+            ),
+        ).toBe('candidate');
+        expect((await book.read(scope, id))?.document.title).toBe('head');
+
+        // And a tombstone, because a removal is a write too — deleting a revision nobody ever
+        // diffed is the worst version of this bug, not an exception to it.
+        expect(
+            await book.reconcile(scope, { kind: 'deleted', documentId: id, revision: 'r2' }, moved),
+        ).toBe('retained-deleted');
+        expect((await book.read(scope, id))?.document.title).toBe('head');
+
+        // Against the revision it actually holds, the same tombstone removes it.
+        expect(
+            await book.reconcile(
+                scope,
+                { kind: 'deleted', documentId: id, revision: 'r2' },
+                { expectedRemoteRevision: 'r1' },
+            ),
+        ).toBe('removed');
+        expect(await book.read(scope, id)).toBeNull();
+    });
+
+    it('asks again whether the chart is on the stand, at the moment each commit opens', async () => {
+        const id = songId(1);
+        const sky = cloud({ [id]: { revision: 'r1', document: remoteChart('head', id, 0) } });
+        await run(sky);
+        sky.docs.set(id, { revision: 'r2', document: remoteChart('theirs', id, 9) });
+
+        // A full library is ~11 paced minutes: the stand at minute zero is not the stand now.
+        let onTheStand = false;
+        sky.interceptDownload = async () => {
+            onTheStand = true;
+            return undefined;
+        };
+        const result = await run(sky, {
+            isActive: (candidate: string) => onTheStand && candidate === id,
+        });
+
+        expect(result.candidates).toEqual([id]);
+        expect(result.advanced).toEqual([]);
+        // The performer's chart did not change under them mid-song.
+        const after = (await book.read(scope, id))!;
+        expect(after.document.title).toBe('head');
+        expect(after.remoteRevision).toBe('r1');
+        expect((await book.remoteCandidate(scope, id))?.revision).toBe('r2');
     });
 
     it('preserves and flags a body from a newer schema, and never asks for it twice', async () => {
@@ -581,14 +717,40 @@ describe('library download and reconcile on real IndexedDB', () => {
             { concurrency: 1.5 },
             { manifestLimit: 10_000 },
             { minimumIntervalMs: -1 },
-            { activeDocumentIds: ['not a valid id'] },
+            { isActive: undefined },
+            { isActive: ['song-01'] },
         ]) {
             await expect(run(sky, options)).rejects.toThrow();
         }
         await expect(
-            runLibraryDownload(book, scope, {} as unknown as LibraryTransport),
+            runLibraryDownload(book, scope, {} as unknown as LibraryTransport, {
+                isActive: () => false,
+            }),
         ).rejects.toThrow('Invalid library transport');
         expect(sky.manifests).toBe(0);
+    });
+
+    it('refuses a second pass over the same account while one is still running', async () => {
+        const sky = cloud({
+            [songId(1)]: { revision: 'r1', document: remoteChart('One', songId(1), 0) },
+        });
+        const held = gate();
+        sky.interceptManifest = async () => {
+            await held.wait;
+            return undefined;
+        };
+
+        const first = run(sky);
+        // Two passes over one library would double every request against a shared rate budget
+        // and race each other's commits, each holding a plan the other had already invalidated.
+        await expect(run(sky)).rejects.toThrow('already running for this account');
+        held.open();
+        expect((await first).complete).toBe(true);
+
+        // The guard is released when the pass ends, however it ended — a one-shot lock that
+        // outlived its run would leave the library permanently un-downloadable.
+        sky.interceptManifest = undefined;
+        expect((await run(sky)).complete).toBe(true);
     });
 });
 
