@@ -12,36 +12,25 @@ import { addVirtualAuthenticator } from './virtual-authenticator';
  *
  * `*.chromium.spec.ts`: the CDP virtual authenticator is Chromium-only.
  *
- * **Budget note, load-bearing for stability.** `POST /api/auth/recovery/enroll` is 5 per 10
- * minutes and the harness runs the API in `socket-only` identity mode, so every test sharing a
- * WORKER shares one bucket (the preview proxy is the socket peer). Measured 2026-09-17 with
- * `--reporter=json`: under `fullyParallel` Playwright hands out one TEST at a time, so tests from
- * one file land on different workers AND tests from different files land on the same one —
- * `account-sign-in.chromium.spec.ts`'s 4 enrolments and this file's are drawn from the same
- * bucket whenever two of them meet on a worker. A recovery costs two enrolments that nothing can
- * remove (one to mint the code being recovered with, one for the replacement the server issues
- * afterwards), so this file spends exactly 2: the whole flow is ONE test, and the wrong-code and
- * rate-limit test needs no account at all.
+ * **Rate-limit budget, no longer shared.** `POST /api/auth/recovery/enroll` is 5 per 10 minutes,
+ * but `fixtures.ts`'s `accountApi` fixture is TEST-scoped (patch review #1263, item 5): every
+ * test spawns its own API process against its own throwaway `node:sqlite` file, so every test
+ * gets a virgin rate limiter and there is no cross-test or cross-file bucket to do arithmetic
+ * against any more. The whole recovery flow still lives in ONE test below, and the wrong-code/
+ * rate-limit test still needs no account at all — that shape is kept because it is the right
+ * shape, not because of a shared budget.
  *
- * That is also why the abandon → unprotected → re-prompt tail below stops at the re-prompt rather
- * than pressing "Get a code" again. The surface it re-prompts into is `sign-in.tsx`'s own
- * `mode === 'recovery'` step, unchanged by this story, and the sibling spec already drives that
- * button through to a confirmed code. Spending a third enrolment to retest it would buy a
- * duplicate assertion and cost the bucket headroom these two files share.
- *
- * Even at 2, the account suite's total is 6 against a budget of 5, so **the account specs need at
- * least two Playwright workers.** Measured 2026-09-17: green at 2, 3 and the default (cores/2),
- * and `npx playwright test account --workers=1` exhausts the bucket — the sibling's third
- * enrolling test is the one that reports it. The gate and CI both run 3, and the only config that
- * forces one worker (`V2_LIVE_TEST=1`) refuses account specs outright, so nothing the project runs
- * hits this. The durable fix is to make `fixtures.ts`'s `accountApi` test-scoped instead of
- * worker-scoped, which would hand every test a virgin rate limiter and retire this arithmetic
- * altogether; that is a change to shared harness infrastructure and a decision of its own, not a
- * side effect of this story.
+ * The abandon → unprotected → re-prompt tail below still stops at the re-prompt rather than
+ * pressing "Get a code" again, for an unrelated reason: the surface it re-prompts into is
+ * `sign-in.tsx`'s own `mode === 'recovery'` step, unchanged by this story, and the sibling spec
+ * (`account-sign-in.chromium.spec.ts`) already drives that button through to a confirmed code.
+ * Retesting it here would just be a duplicate assertion.
  */
 
 const BAD_PASSKEY = 'That didn’t work. Try again, or use a different passkey.';
-const BAD_CODE = 'That code isn’t right, or it has already been used. Check it and try again.';
+const BAD_CODE =
+    'That code isn’t right, or it’s already been used. If you started a recovery and ' +
+    'stopped, wait ten minutes and try the same code again.';
 
 test('recovering with the code replaces the passkey, and an interrupted enrolment never spends it', async ({
     page,
@@ -119,9 +108,12 @@ test('recovering with the code replaces the passkey, and an interrupted enrolmen
 
     // (2) Now a refusal the SERVER issues: `isBadUV` clears the user-verification flag in the
     // authenticator data, so the ceremony completes in the browser and
-    // `verifyRecoveryEnrollPasskey` — which requires user verification — rejects it. This is the
-    // interruption that matters, because it is the one where the server ran the enrolment and
-    // said no; the code must come back out of that unspent.
+    // `verifyRegistrationResponse` — which requires user verification — rejects it inside
+    // `verifyRecoveryEnrollPasskey`, still BEFORE that function opens its commit transaction.
+    // Like (1), this aborts ahead of the transaction that would consume the code, so it proves
+    // the same "never spent" property from the server's side rather than a deeper one: the
+    // post-consume rollback (an abort AFTER the code is marked consumed, inside the transaction)
+    // is covered by `v2-api/test/auth/recovery.test.ts`, not by either interruption here.
     await authenticator.setUserVerified(true);
     await authenticator.session.send('WebAuthn.setResponseOverrideBits', {
         authenticatorId: authenticator.authenticatorId,
@@ -247,4 +239,10 @@ test('a wrong code and a rate-limited one both answer in words, never in server 
     // Still on the entry step with the code intact, so a retry is one press away.
     await expect(page.getByTestId('recovery-code-input')).toHaveValue(wrong);
     await expect(page.getByTestId('recovery-claim')).toBeEnabled();
+
+    // Patch review #1263, item 4: Back unmounts this step's own heading, and the sign-in
+    // dialog's entry heading is the thing focus must land on next — not `<body>`, which would be
+    // both outside the dialog and silent for a screen reader.
+    await page.getByTestId('recovery-back').click();
+    await expect(page.getByRole('heading', { name: 'Take your songbook with you.' })).toBeFocused();
 });

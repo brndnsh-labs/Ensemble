@@ -2,7 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { accountApi } from '../../lib/account/client';
-import type { AccountFailure } from '../../lib/account/messages';
+import {
+    ACCOUNT_MESSAGES,
+    type AccountFailure,
+    RECOVERY_CODE_SHAPE,
+} from '../../lib/account/messages';
 import {
     claimRecoveryCode,
     confirmRecoveryCode,
@@ -114,12 +118,21 @@ export function RecoverFlow({ onBack, onClose, onAccountChanged }: RecoverFlowPr
     }, []);
 
     async function claim() {
-        if (typedCode.trim() === '' || busy) {
+        const trimmed = typedCode.trim();
+        if (trimmed === '' || busy) {
+            return;
+        }
+        // #1263 patch review P3: the downloaded `.txt` holds the code PLUS explanatory text, so
+        // pasting the whole file is one keystroke away — catch that shape here, with no request,
+        // instead of letting it round-trip to a `400 malformed_request` that reads as the same
+        // generic failure a real network problem would.
+        if (!RECOVERY_CODE_SHAPE.test(trimmed)) {
+            setFailure({ kind: 'error', message: ACCOUNT_MESSAGES.badCode });
             return;
         }
         setFailure(null);
         setBusy(true);
-        const claimed = await claimRecoveryCode(accountApi, typedCode.trim());
+        const claimed = await claimRecoveryCode(accountApi, trimmed);
         if (!alive.current) {
             return;
         }
@@ -148,6 +161,11 @@ export function RecoverFlow({ onBack, onClose, onAccountChanged }: RecoverFlowPr
             }
             return;
         }
+        // #1263 patch review P2: move off this step's "nothing has changed yet" copy the instant
+        // the ceremony actually commits — staying here while `getReplacementCode()` awaits would
+        // keep showing a now-false claim. `protect`'s own busy copy ("Getting a new recovery
+        // code…") is exactly the honest transitional state.
+        setStep('protect');
         // The account is recovered and signed in NOW, even if the replacement code below fails or
         // is abandoned; the header must not claim otherwise. Told BEFORE the liveness check on
         // purpose: a dialog dismissed while the platform prompt was open would otherwise leave a
@@ -249,14 +267,31 @@ export function RecoverFlow({ onBack, onClose, onAccountChanged }: RecoverFlowPr
                     >
                         Create passkey
                     </button>
+                    {/* #1263 patch review P2: once the recovery session's 10-minute claim lock
+                        expires, retrying the ceremony above fails with no way back — this is the
+                        only exit that returns to step 1 instead of a dead end. */}
+                    {failure !== null && (
+                        <button
+                            className="btn"
+                            data-testid="recovery-start-over"
+                            disabled={busy}
+                            onClick={() => {
+                                setFailure(null);
+                                setStep('code');
+                            }}
+                        >
+                            Start again with your code
+                        </button>
+                    )}
                     <button className="btn" disabled={busy} onClick={onClose}>
                         Not now
                     </button>
                 </div>
                 <p className="status-detail">
                     If the passkey prompt is dismissed or refused, press Create passkey again — your
-                    recovery code is still good and is only spent once a new passkey is saved. It
-                    stays claimed for ten minutes; after that, start again with the same code.
+                    recovery code is still good and is only spent once a new passkey is saved. If
+                    you stop here instead, the code locks for ten minutes before it can be used
+                    again, including by you with this same code.
                 </p>
             </>
         );

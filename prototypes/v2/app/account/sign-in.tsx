@@ -78,6 +78,26 @@ export function SignInDialog({
     const openRef = useRef(false);
 
     /**
+     * #1263 patch review P2-4: the entry stage's own heading, focused when Back returns to it
+     * from `RecoverFlow`. Every OTHER step change in this dialog (create/sign-in errors aside)
+     * replaces the control that navigated here, which is exactly the shape `recover.tsx`'s
+     * `headingRef` effect exists for — this is that same fix for the one transition living in
+     * this file instead: `RecoverFlow` unmounting back into the entry choice.
+     */
+    const entryHeadingRef = useRef<HTMLHeadingElement>(null);
+    const previousStageRef = useRef<'entry' | 'recover'>('entry');
+    useEffect(() => {
+        // Only a genuine 'recover' -> 'entry' transition steals focus. The first open already
+        // gets it for free from the dialog's own `showModal()`, and a close-triggered reset
+        // (stage snaps to 'entry' while `open` is already false) must not move focus in a
+        // dialog nobody can see.
+        if (stage === 'entry' && open && previousStageRef.current === 'recover') {
+            entryHeadingRef.current?.focus();
+        }
+        previousStageRef.current = stage;
+    }, [stage, open]);
+
+    /**
      * Ask the server for a recovery code. Also the retry path: the enrolment may need a step-up
      * passkey prompt (the original session stops being "fresh" after 10 minutes), which someone
      * can dismiss, and a dead end with no way to try again would leave the account unprotected.
@@ -167,16 +187,19 @@ export function SignInDialog({
         setFailure(null);
         setBusy(true);
         const result = await confirmRecoveryCode(accountApi, code);
-        if (!openRef.current) {
-            return;
-        }
-        setBusy(false);
         if (!result.ok) {
-            if (result.failure.kind !== 'cancelled') {
-                setFailure(result.failure);
+            if (openRef.current) {
+                setBusy(false);
+                if (result.failure.kind !== 'cancelled') {
+                    setFailure(result.failure);
+                }
             }
             return;
         }
+        // #1263 patch review P3: confirmed on the server now, even if this dialog closed before
+        // the reply landed — the header must not claim otherwise. Told unconditionally, ahead of
+        // the liveness check, matching `recover.tsx`'s `finish()` and `runCreate`'s
+        // account-exists case above.
         setCode('');
         onAccountChanged();
         onClose();
@@ -246,7 +269,9 @@ export function SignInDialog({
                 </>
             ) : (
                 <>
-                    <h2 id="account-dialog-title">Take your songbook with you.</h2>
+                    <h2 id="account-dialog-title" ref={entryHeadingRef} tabIndex={-1}>
+                        Take your songbook with you.
+                    </h2>
                     <p>
                         An account is a passkey — your device’s fingerprint, face or PIN. There’s no
                         password and no email address, which also means there’s nothing to reset:

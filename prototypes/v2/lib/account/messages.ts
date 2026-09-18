@@ -34,8 +34,24 @@ export const ACCOUNT_MESSAGES = {
     rateLimited: 'Too many attempts — try again later.',
     network: 'Can’t reach the server. You can keep playing as a guest.',
     generic: 'Something went wrong. Try again in a moment.',
-    badCode: 'That code isn’t right, or it has already been used. Check it and try again.',
+    // #1263 patch review P1: a code re-typed while its own claim lock is still held (up to ten
+    // minutes after starting recovery, per `RECOVERY_SESSION_TTL_MS`) reads through this exact
+    // same server code, which used to say only "already been used" — indistinguishable from a
+    // truly spent code. Naming the lock, without naming the server's vocabulary for it, is the
+    // fix: it tells someone who stopped mid-recovery that the SAME code will work again shortly.
+    badCode:
+        'That code isn’t right, or it’s already been used. If you started a recovery and ' +
+        'stopped, wait ten minutes and try the same code again.',
 } as const;
+
+/**
+ * `randomBytes(32).toString('base64url')` — the shape the server mints for every recovery code
+ * (`RECOVERY_CODE_BYTES` in `v2-api/src/auth/recovery.ts`). Shared with the Playwright harness
+ * (`checks/account-helpers.ts`) so both stay in lockstep, and used client-side (#1263 patch
+ * review P3) to reject an obviously-wrong paste — e.g. the whole downloaded `.txt`, code plus
+ * explanatory text — before it ever reaches the network as a doomed `recovery/claim` call.
+ */
+export const RECOVERY_CODE_SHAPE = /^[A-Za-z0-9_-]{43}$/;
 
 export function failureFromApi(error: ApiError): AccountFailure {
     if (error.kind === 'network') {

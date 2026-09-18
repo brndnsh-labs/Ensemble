@@ -1,4 +1,5 @@
 import type { Page } from '@playwright/test';
+import { RECOVERY_CODE_SHAPE } from '../lib/account/messages';
 import { expect } from './fixtures';
 
 /**
@@ -10,8 +11,14 @@ import { expect } from './fixtures';
  * recovery flow (#1263) mint a code, so both run the same sweep.
  */
 
-/** `randomBytes(32).toString('base64url')` — what the server mints, and nothing else. */
-export const CODE_SHAPE = /^[A-Za-z0-9_-]{43}$/;
+/**
+ * `randomBytes(32).toString('base64url')` — what the server mints, and nothing else. Re-exported
+ * under this file's established name; the single source of truth is `lib/account/messages.ts`'s
+ * `RECOVERY_CODE_SHAPE`, which `recover.tsx` also validates a typed code against (#1263 patch
+ * review P3) — keeping one constant is what stops the client-side guard and this harness drifting
+ * apart on what a real code looks like.
+ */
+export const CODE_SHAPE = RECOVERY_CODE_SHAPE;
 
 /** Opt this device into the dark-launched account UI, then land on the songbook. */
 export async function openWithAccounts(page: Page): Promise<void> {

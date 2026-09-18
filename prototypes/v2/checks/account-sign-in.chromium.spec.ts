@@ -14,25 +14,17 @@ import { addVirtualAuthenticator } from './virtual-authenticator';
  *
  * `*.chromium.spec.ts`: the CDP virtual authenticator is Chromium-only.
  *
- * **Budget note, load-bearing for stability:** `POST /api/auth/recovery/enroll` is rate limited
- * to 5 per 10 minutes, and the harness runs the API in `socket-only` identity mode, so every
- * test in a worker shares ONE bucket (the preview proxy is the socket peer). Creating an account
- * through the UI always enrols once. This file therefore spends exactly 4: one each here and in
- * the sign-out round trip, two in the abandon/resume test — the fresh-profile sign-in costs
- * nothing extra because it reuses that round trip's account. That is also why the
- * "code never leaks" assertions live inside the create test rather than in a fifth account of
- * their own — the code is on screen exactly once per enrolment, so proving it is nowhere else at
- * that moment is the same test, not a cheaper version of a separate one.
+ * **Rate-limit budget, no longer shared.** `POST /api/auth/recovery/enroll` is rate limited to 5
+ * per 10 minutes, but `fixtures.ts`'s `accountApi` fixture is TEST-scoped (patch review #1263,
+ * item 5): every test spawns its own API process against its own throwaway `node:sqlite` file,
+ * so every test gets a virgin rate limiter. There is no longer a bucket shared across tests in
+ * this file, across workers, or with `account-recovery.chromium.spec.ts` to do arithmetic
+ * against — a fifth (or fiftieth) enrolment costs nothing but its own spawn.
  *
- * The security-review follow-ups (focus-on-code, the offline sign-out disable, and a failed
- * Finish rendering its error) are folded into these same four enrolments rather than adding a
- * fifth — the budget stays at 4/10min.
- *
- * Measured 2026-09-17 (#1263) and worth knowing before adding a fifth: "a worker" is not "a
- * file". Under `fullyParallel` Playwright hands out one TEST at a time, so these five spread
- * across workers AND share a worker with tests from other files — including
- * `account-recovery.chromium.spec.ts`'s two enrolments, which are drawn from the same bucket
- * whenever they meet. Four here plus two there is the whole account suite's spend; keep it there.
+ * The shapes below (one account covering both round trips, the "code never leaks" assertions
+ * living inside the create test, the security-review follow-ups folded into these same tests) are
+ * kept as they are because they are still the right shapes — one clear scenario per test — not
+ * because of a budget that no longer exists.
  */
 
 test('creating an account shows the recovery code once, downloads it, and survives a reload', async ({
