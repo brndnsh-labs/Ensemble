@@ -1,6 +1,18 @@
 import type { Page } from '@playwright/test';
-import { dismissAdoptGuestPrompt } from './account-helpers';
-import { editorRevealed, expect, accountTest as test } from './fixtures';
+import {
+    backToSongbook,
+    dismissAdoptGuestPrompt,
+    newSongOnTheStand,
+    openSong,
+    openWithAccounts,
+    revealEditor,
+    saveAndUpload,
+    saveAs,
+    signUp,
+    songTitles,
+    uploadOf,
+} from './account-helpers';
+import { expect, accountTest as test } from './fixtures';
 import { addVirtualAuthenticator } from './virtual-authenticator';
 
 /**
@@ -24,77 +36,6 @@ import { addVirtualAuthenticator } from './virtual-authenticator';
  * gets its own API process and its own bucket. Each test here spends exactly 1 — one account,
  * shared by its two devices, which is what makes them two devices rather than two accounts.
  */
-
-const CODE_SHAPE = /^[A-Za-z0-9_-]{43}$/;
-
-async function openWithAccounts(page: Page): Promise<void> {
-    await page.goto('/v2/?accounts=on');
-    await expect(page.getByRole('heading', { name: 'Let’s play something.' })).toBeVisible();
-}
-
-/** Creates an account and walks away from the recovery step, which costs no second enrolment. */
-async function signUp(page: Page): Promise<void> {
-    await page.getByTestId('account-sign-in').click();
-    await page.getByTestId('account-create').click();
-    await expect(page.getByTestId('recovery-code')).toHaveText(CODE_SHAPE);
-    await page.keyboard.press('Escape');
-    await expect(page.getByTestId('account-finish-protecting')).toBeVisible();
-    // #1268's prompt auto-opens once the library downloads, and it is modal: every click below
-    // would be intercepted by it. Unrelated to this spec.
-    await dismissAdoptGuestPrompt(page);
-}
-
-async function newSongOnTheStand(page: Page): Promise<void> {
-    await page.getByRole('button', { name: '＋ New song', exact: true }).click();
-    await expect(page.getByLabel('Chords in this bar')).toHaveValue('C');
-    await editorRevealed(page);
-    await expect(page.getByRole('button', { name: 'Song actions' })).toBeEnabled();
-}
-
-/** Retitle and commit. The Save button going disabled is the shell's own "committed" signal. */
-async function saveAs(page: Page, title: string): Promise<void> {
-    const save = page.getByRole('button', { name: 'Save', exact: true });
-    await page.getByLabel('Song title').fill(title);
-    await expect(save).toBeEnabled();
-    await save.click();
-    await expect(save).toBeDisabled();
-}
-
-/**
- * Save, and wait for THIS version's upload to come back (shared with
- * `account-sign-out.chromium.spec.ts`). `sync-cloud` alone is not enough: a new song's blank first
- * version is confirmed a moment earlier, so the chip already reads "Saved to your account" while
- * this Save is still queued.
- */
-async function saveAndUpload(page: Page, title: string): Promise<void> {
-    const uploaded = uploadOf(page, title);
-    await saveAs(page, title);
-    await uploaded;
-    await expect(page.getByTestId('sync-cloud')).toHaveText('Saved to your account');
-}
-
-/** The Save of `title` the account ACCEPTED. A refusal carries the same bytes and a 409. */
-function uploadOf(page: Page, title: string) {
-    return page.waitForResponse(
-        (response) =>
-            response.url().includes('/api/documents/save') &&
-            (response.request().postData() ?? '').includes(title) &&
-            response.ok(),
-    );
-}
-
-const songTitles = (page: Page) => page.locator('.song-name');
-
-async function backToSongbook(page: Page): Promise<void> {
-    await page.getByRole('button', { name: 'Back to songbook' }).click();
-    await expect(page.getByTestId('library-loading')).toHaveCount(0);
-}
-
-async function openSong(page: Page, title: string): Promise<void> {
-    await page.locator('.song-link', { hasText: title }).first().click();
-    await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Song actions' })).toBeEnabled();
-}
 
 /**
  * Open the row whose name is EXACTLY this, not the first one containing it. After keeping both,
@@ -124,11 +65,6 @@ function recoverySlots(page: Page, documentId: string): Promise<number> {
         }
         return count;
     }, documentId);
-}
-
-async function revealEditor(page: Page): Promise<void> {
-    await page.getByRole('button', { name: 'Edit chart' }).click();
-    await editorRevealed(page);
 }
 
 /** Sign this device in with a passkey minted on another one, and settle its first download. */

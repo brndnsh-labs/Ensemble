@@ -94,14 +94,23 @@ export async function saveAs(page: Page, title: string): Promise<void> {
  * body carries this title is the only reading that cannot be a moment stale.
  */
 export async function saveAndUpload(page: Page, title: string): Promise<void> {
-    const uploaded = page.waitForResponse(
-        (response) =>
-            response.url().includes('/api/documents/save') &&
-            (response.request().postData() ?? '').includes(title),
-    );
+    const uploaded = uploadOf(page, title);
     await saveAs(page, title);
     await uploaded;
     await expect(page.getByTestId('sync-cloud')).toHaveText('Saved to your account');
+}
+
+/**
+ * The Save of `title` the account ACCEPTED. `response.ok()` matters: a refused Save (#1267's
+ * conflict, a 409) carries the same bytes, and resolving on it would call a rejection an upload.
+ */
+export function uploadOf(page: Page, title: string) {
+    return page.waitForResponse(
+        (response) =>
+            response.url().includes('/api/documents/save') &&
+            (response.request().postData() ?? '').includes(title) &&
+            response.ok(),
+    );
 }
 
 /** The songbook list's visible titles, in the order rendered. */
