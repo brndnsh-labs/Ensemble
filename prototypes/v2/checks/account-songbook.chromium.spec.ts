@@ -63,7 +63,10 @@ test('a song saved on one device opens on another, and the guest songbook is unt
 }) => {
     const authenticator = await addVirtualAuthenticator(page);
     await openWithAccounts(page);
-    // The guest songbook as it stands before any account exists on this device.
+    // The guest songbook as it stands before any account exists on this device. With accounts on,
+    // the list is held back until the first session read answers — the shell will not show one
+    // songbook and then swap in another — so wait for that answer before reading the rows.
+    await expect(page.getByTestId('library-loading')).toHaveCount(0);
     const guestSongs = await songTitles(page).allInnerTexts();
     expect(guestSongs.length).toBeGreaterThan(0);
 
@@ -104,7 +107,11 @@ test('a song saved on one device opens on another, and the guest songbook is unt
         await expect(page.getByTestId('sync-cloud')).toHaveText('Saved to your account');
 
         // A then C, and never the unsaved B: an experiment nobody committed never uploads.
+        // On reload the list stays hidden until the session read answers "signed in" and the
+        // account library is read — never the guest starters for a moment first.
         await second.reload();
+        await expect(second.getByTestId('library-heading')).toHaveText('Your account songbook');
+        await expect(second.getByTestId('library-loading')).toHaveCount(0);
         await expect(songTitles(second)).toHaveText('Take C');
         await expect(songTitles(second)).toHaveCount(1);
     } finally {

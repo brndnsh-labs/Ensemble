@@ -157,6 +157,12 @@ export default function Ensemble() {
     // `?? []` is the LIST, not the claim: "we haven't read the account library yet" is carried
     // separately to the songbook as `loading`, so an unread library never renders as an empty one.
     const songs = signedIn ? (accountSongs ?? []) : guestSongs;
+    // Two things the songbook cannot yet claim: WHICH library this is (the first session read is
+    // still out — rendering the guest list and then swapping it for the account library is a
+    // wrong answer, not a loading state), and, once signed in, what the account library holds.
+    // `settled` flips on any answer, so an offline cold start still shows the guest songbook.
+    const songbookLoading =
+        (accountsOn && ready && !account.settled) || (signedIn && accountSongs === null);
     // The band/sound defaults a brand-new or imported song is built from. It falls back to the
     // guest starters because a fresh account's library is legitimately empty, and "New song" and
     // "Import" must still work on the very first visit after signing in.
@@ -1000,13 +1006,13 @@ export default function Ensemble() {
                 </main>
             ) : !current ? (
                 <Songbook
-                    songs={songs}
+                    songs={songbookLoading ? [] : songs}
                     featured={featured}
                     continued={!!continuedSave}
                     busy={busy}
                     offline={offline.label}
                     accountLibrary={signedIn}
-                    loading={signedIn && accountSongs === null}
+                    loading={songbookLoading}
                     search={search}
                     onSearch={setSearch}
                     onImport={() => setImporting(true)}

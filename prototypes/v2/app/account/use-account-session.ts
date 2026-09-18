@@ -46,6 +46,14 @@ export interface AccountView {
      * would nag a perfectly protected account).
      */
     recoveryEnrolled: boolean | null;
+    /**
+     * `true` once the FIRST session read has answered — signed in, guest, or "couldn't tell"
+     * (offline). Until then the shell does not know WHICH songbook it is showing, and rendering
+     * the guest list only to swap it for the account library a moment later is a wrong claim,
+     * not a loading state (#1266). It settles on any answer, so an offline cold start still
+     * reaches the guest songbook without a server — accounts must never gate guest startup.
+     */
+    settled: boolean;
     signingOut: boolean;
     /**
      * `navigator.onLine`, kept live. Rollout decision 9 S2: offline, sign-out is disabled with a
@@ -70,6 +78,7 @@ export function useAccountSession(active: boolean): AccountView {
     // refresh, which is precisely what the prerendered HTML should reflect.
     const session = useSyncExternalStore(subscribe, snapshot, snapshot);
     const [enrolled, setEnrolled] = useState<boolean | null>(null);
+    const [settled, setSettled] = useState(false);
     const [signingOut, setSigningOut] = useState(false);
     const [signOutFailure, setSignOutFailure] = useState<AccountFailure | null>(null);
     // `true` until the effect below resolves the real value — `navigator` is unavailable during
@@ -105,6 +114,11 @@ export function useAccountSession(active: boolean): AccountView {
      */
     const refresh = useCallback(() => {
         void accountSession.refresh().then(async () => {
+            // Any answer settles it, including "still unknown" after a network failure: the
+            // device has now asked, and the guest songbook is the honest fallback.
+            if (mounted.current) {
+                setSettled(true);
+            }
             if (accountSession.getSnapshot().status !== 'signedIn') {
                 if (mounted.current) {
                     setEnrolled(null);
@@ -144,6 +158,7 @@ export function useAccountSession(active: boolean): AccountView {
     return {
         session,
         recoveryEnrolled: enrolled,
+        settled,
         signingOut,
         online,
         signOutFailure,

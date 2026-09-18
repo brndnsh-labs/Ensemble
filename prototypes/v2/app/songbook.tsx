@@ -112,7 +112,9 @@ export function Songbook({
                     </div>
                     {loading && (
                         <p className="library-loading" role="status" data-testid="library-loading">
-                            Loading your account songbook…
+                            {accountLibrary
+                                ? 'Loading your account songbook…'
+                                : 'Loading your songbook…'}
                         </p>
                     )}
                     <table className="song-table" hidden={loading}>

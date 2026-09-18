@@ -439,7 +439,10 @@ describe('the sync loop never lets a download swap the chart on the stand', () =
     }
 
     it('answers `isActive` from the chart open RIGHT NOW, not from when the pass started', async () => {
-        const reconcile = vi.fn(async () => 'retained-deleted');
+        // Typed against the real signature so `mock.calls[0]?.[2]` below is a known tuple slot —
+        // an untyped `vi.fn(async () => …)` infers `[]` parameters and `typecheck:tests` rejects
+        // the index.
+        const reconcile = vi.fn<AccountSongbook['reconcile']>(async () => 'retained-deleted');
         const songbook = stubSongbook({
             reconcile,
             list: async () => ({
