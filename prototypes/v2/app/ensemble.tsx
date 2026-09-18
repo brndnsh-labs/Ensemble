@@ -169,6 +169,25 @@ export default function Ensemble() {
      * leaves this device.
      */
     const accountDrafts = useRef(new Map<string, ChartDocument>());
+    /**
+     * The account the chart on the stand belongs to, captured when it was opened (#1299 patch
+     * review P2) — not "whoever is attached right now", which is a different question the moment a
+     * session expires.
+     *
+     * It travels with every retention write, and `retentionScope` refuses one whose owner is not
+     * the account this device holds. The case it exists for: expire as A with A's chart on the
+     * stand, answer "Sign in again" with B's passkey, type one character. Without this the
+     * keystroke retains A's chart text inside B's database, where B's sign-out is what removes it
+     * and B's library download is what it protects.
+     */
+    const standOwner = useRef<string | null>(null);
+    /**
+     * The last account this loop actually attached to, null only before the first one. Deliberately
+     * NOT cleared on detach: an expiry publishes `owner: null` on its way past, so a ref that
+     * followed it could never tell "signed back in as the same account" from "signed in as another
+     * one" — which is the only transition the effect below acts on.
+     */
+    const attachedOwner = useRef<string | null>(null);
     const [recoveryHealthy, setRecoveryHealthy] = useState(true);
     // #1266 — whether the LAST explicit Save failed locally. `status.ts` ranks that above an
     // older successful revision, so it cannot be inferred from `saved` and needs its own fact.
@@ -500,12 +519,39 @@ export default function Ensemble() {
      *
      * Keyed on `sync.owner` for the same reason the reads above are: it is published only once the
      * loop has a scope, so this cannot race the attach.
+     *
+     * It is also where a change of ACCOUNT clears the stand (#1299 patch review P2). A session can
+     * expire under an account chart and "Sign in again" can be answered with a different passkey;
+     * the loop then attaches B while the stand still holds A's song, `currentStore` still says
+     * `'account'`, and the next keystroke would try to retain A's chart under B. `standOwner`
+     * refuses that write; this is the other half — the musician is put back where a sign-out puts
+     * them, rather than left typing into a chart no Save of theirs can reach.
      */
     useEffect(() => {
         if (sync.owner === null) {
             accountDrafts.current = new Map();
             setLastOpened(lastOpenedSong());
             return;
+        }
+        const previous = attachedOwner.current;
+        attachedOwner.current = sync.owner;
+        if (previous !== null && previous !== sync.owner) {
+            accountDrafts.current = new Map();
+            standOwner.current = null;
+            if (currentStore.current === 'account') {
+                // The same shape signing out has, and for the same reason: the songbook this
+                // chart came from is no longer the one this device is reading. (`clearBuffers`
+                // is inlined because a plain function declaration is a new reference every
+                // render, which useExhaustiveDependencies rightly rejects as a dependency.)
+                runtime.stop();
+                setCurrent(null);
+                setSaved(null);
+                currentStore.current = null;
+                pendingText.current = false;
+                setBuffers(new Map());
+                setPendingMeasures(false);
+                measureEditor.current?.reset();
+            }
         }
         let alive = true;
         accountSync
@@ -569,7 +615,12 @@ export default function Ensemble() {
         readSignOutPlan(volatileDrafts.current)
             .then(({ plan, drafts }) => {
                 if (alive) {
-                    accountDrafts.current = drafts;
+                    // Folded in, never assigned over (#1299 patch review P3): this read covers
+                    // only the ids it asked about, and replacing the map would drop what this tab
+                    // knows about every other song — including the chart it has open.
+                    for (const [id, held] of drafts) {
+                        accountDrafts.current.set(id, held);
+                    }
                     setSignOutPlan(plan);
                 }
             })
@@ -756,6 +807,36 @@ export default function Ensemble() {
         setMessage('Draft recovered on this device');
     }
     /**
+     * Retain nothing for one chart, in the songbook it came from — the account's `drafts` rows or
+     * the guest slots, never both (#1299 patch review P1).
+     *
+     * EVERY writer's, deliberately, unlike the `discardDraft`/`clearOwnRecovery` pair a Save uses.
+     * This runs when the chart on the stand has come back to its committed version, and that is a
+     * statement about the song rather than about this page load: a writer id is minted per page
+     * load, so the row an open RECOVERED FROM usually belongs to an earlier one. Dropping only
+     * this writer's would leave that row to be recovered again on the next open — the musician
+     * reverts, reloads, and the edit they threw away is back on the stand.
+     *
+     * A concurrent tab's live experiment goes with it. That is the same trade `clearRecovery`
+     * makes at sign-out, and the tab in question still holds its text and retains it again on its
+     * next keystroke.
+     */
+    function retainNothingFor(id: string) {
+        volatileDrafts.current.delete(id);
+        if (currentStore.current === 'account') {
+            accountDrafts.current.delete(id);
+            accountSync.discardDrafts(id).catch(() => {
+                /* Recovery is a convenience; a row that will not clear is not worth an error. */
+            });
+            return;
+        }
+        try {
+            repository.clearRecovery(id);
+        } catch {
+            /* Recovery is a convenience; a slot that will not clear is not worth an error. */
+        }
+    }
+    /**
      * Retain the unsaved experiment, in the songbook the chart on the stand came from (#1299).
      *
      * An account chart's goes to that account's own database, never the guest `localStorage`
@@ -772,17 +853,31 @@ export default function Ensemble() {
      * no account chart on the stand to be asking.
      *
      * Fire-and-forget, unlike the synchronous guest write: an IndexedDB write cannot be finished
-     * inside an edit handler, so the experiment is reported retained and the in-tab fallback is
-     * what a rejection falls back to, exactly as a refused `localStorage` write does today.
+     * inside an edit handler. The in-tab fallback is what a rejection falls back to, exactly as a
+     * refused `localStorage` write does today — but "recovered on this device" is only said once
+     * the store has actually answered (#1299 patch review P3), because it is a claim about a write
+     * that may still fail. The `accountDrafts` entry goes in immediately either way: the export
+     * paths read it synchronously and this tab does hold that text.
+     *
+     * Nothing is retained for a chart that matches its committed version (#1299 patch review P1).
+     * "Revert to saved" is exactly that, and so is any change that lands back on the saved text: a
+     * retained row identical to the commit is a draft of nothing, and it would hold this record
+     * against every later remote advance, tell the sign-out step an experiment is at stake, and
+     * answer a cloud delete `retained` — forever, because nothing but a Save ever clears it.
      */
     function draft(next: ChartDocument) {
         setCurrent(next);
+        if (saved && same(next, saved)) {
+            retainNothingFor(next.id);
+            setRecoveryHealthy(true);
+            return;
+        }
         if (currentStore.current === 'account') {
             accountDrafts.current.set(next.id, next);
-            retained(next);
-            accountSync.recover(next, next.revision).catch((failure: unknown) => {
-                retainInTab(next, failure);
-            });
+            accountSync.recover(next, next.revision, standOwner.current).then(
+                () => retained(next),
+                (failure: unknown) => retainInTab(next, failure),
+            );
             return;
         }
         try {
@@ -945,24 +1040,62 @@ export default function Ensemble() {
      * musician's own work. Offering it once through the same menu is how it comes back; the next
      * successful Save of that song is what finally clears it. Nothing ever writes there for an
      * account chart again.
+     *
+     * `unreadable` keeps "this song has no retained draft" apart from "this device could not ask"
+     * (#1299 patch review P2). Collapsing the two opened the committed copy as if it were the
+     * whole truth, and the first keystroke then retained an experiment over a draft nobody had
+     * seen. It still opens the chart — refusing to open a song because a draft read failed helps
+     * nobody — but it says so, and it leaves this tab's `accountDrafts` entry alone rather than
+     * replacing it with an answer it never got.
      */
-    async function retainedDraftFor(document: ChartDocument) {
+    async function retainedDraftFor(document: ChartDocument): Promise<{
+        recovery: { document: ChartDocument; conflict: boolean } | null;
+        unreadable: boolean;
+    }> {
+        let unreadable = false;
         if (signedIn) {
             try {
                 const held = await accountSync.retainedDraft(document.id);
                 if (held) {
-                    return held;
+                    return { recovery: held, unreadable: false };
                 }
             } catch {
-                /* An unreadable account store is not evidence of nothing; try the legacy slot. */
+                unreadable = true;
             }
         }
-        return repository.recoveryFor(document);
+        return { recovery: repository.recoveryFor(document), unreadable };
+    }
+    /**
+     * Every preserved draft the song menu can offer for the chart on the stand (#1299 patch
+     * review P2) — newest first, from BOTH namespaces.
+     *
+     * Since #1299 an account chart's experiments live in the account database, so a guest-only
+     * list made a second tab's experiment on this song unreachable: nothing in the product could
+     * open it, and the only thing that mentioned it was a sign-out warning. The account rows are
+     * the live ones (`preservedDrafts`), which is also why this list can never offer text a Save
+     * has already moved past. The guest slots stay merged in because a build from before #1299
+     * may have left one under an account id, and that is the musician's own work too.
+     *
+     * An unreadable account store answers with the guest half rather than an error: the menu is
+     * an offer, and a missing offer is not a claim about anything.
+     */
+    async function recoveryOptionsFor(document: ChartDocument) {
+        const slots = repository.recoveriesFor(document);
+        if (currentStore.current !== 'account') {
+            return slots;
+        }
+        let held: Array<{ document: ChartDocument; capturedAt: string }> = [];
+        try {
+            held = await accountSync.preservedDrafts(document.id);
+        } catch {
+            /* Unreadable account store; the legacy slots below are still worth offering. */
+        }
+        return [...held, ...slots].sort((a, b) => b.capturedAt.localeCompare(a.capturedAt));
     }
     async function open(document: ChartDocument) {
-        const recovery = await retainedDraftFor(document);
+        const { recovery, unreadable } = await retainedDraftFor(document);
         const next = volatileDrafts.current.get(document.id) || recovery?.document || document;
-        if (signedIn) {
+        if (signedIn && !unreadable) {
             // What the store just answered, replacing whatever this tab believed about that song —
             // including nothing, on the first open after a reload.
             accountDrafts.current.delete(document.id);
@@ -974,10 +1107,19 @@ export default function Ensemble() {
         setSaved(document);
         setCurrent(next);
         currentStore.current = signedIn ? 'account' : 'guest';
+        // The account this chart belongs to, for as long as it is on the stand. Null for a guest
+        // chart, and for a signed-in device whose loop has not published an owner yet — which
+        // leaves the retention write unfenced, exactly as it was before (#1299 patch review P2).
+        standOwner.current = signedIn ? sync.owner : null;
         setSharedDraft(false);
         clearBuffers();
         rememberOpened(next.id);
-        setRecoveryHealthy(!volatileDrafts.current.has(document.id));
+        setRecoveryHealthy(!unreadable && !volatileDrafts.current.has(document.id));
+        if (unreadable) {
+            setError(
+                'Couldn’t read your retained draft for this song — this is the last saved version. Export before editing.',
+            );
+        }
         // `lastSave` is a fact about the chart on the stand, and this is a different chart:
         // carrying a previous song's failed Save into it would rank "Save failed on this device"
         // above a local status that is, for this document, simply true (#1266).
@@ -1243,16 +1385,21 @@ export default function Ensemble() {
             setCurrent(moved);
             setSaved(resolution.document);
             currentStore.current = 'account';
+            standOwner.current = sync.owner;
             rememberOpened(moved.id);
             if (experiment) {
                 // Storage has already re-keyed the rows a PREVIOUS edit captured onto the new id;
                 // this is the one live in the editor right now, which no store has seen (#1299).
                 volatileDrafts.current.delete(moved.id);
                 accountDrafts.current.set(moved.id, moved);
-                setRecoveryHealthy(true);
-                accountSync.recover(moved, moved.revision).catch((failure: unknown) => {
-                    retainInTab(moved, failure);
-                });
+                // Reported only once the store has answered, like `draft()` (#1299 patch review
+                // P3): the flag is a claim about a write that can still fail. The success arm sets
+                // no message — this resolution has its own sentence below, and a later "Draft
+                // recovered on this device" would land on top of it.
+                accountSync.recover(moved, moved.revision, standOwner.current).then(
+                    () => setRecoveryHealthy(true),
+                    (failure: unknown) => retainInTab(moved, failure),
+                );
             }
             volatileDrafts.current.delete(original.id);
             accountDrafts.current.delete(original.id);
@@ -1446,6 +1593,12 @@ export default function Ensemble() {
                 // content in the guest namespace, which is the thing this story removes. It was
                 // offered once by `retainedDraftFor`, and the commit it was offered against has
                 // now happened.
+                //
+                // Load-bearing invariant, and the reason this is safe to do by id alone: the two
+                // id spaces never overlap. A guest document id is minted by `crypto.randomUUID`
+                // in this app and an account one by the same call inside the account database —
+                // so a slot found under an account chart's id can only ever be that same chart's,
+                // written by a build that routed account recovery through the guest namespace.
                 repository.clearRecovery(current.id);
             } catch {
                 /* Recovery is a convenience; a stale slot must not fail the Save. */
@@ -1560,7 +1713,10 @@ export default function Ensemble() {
             return current;
         }
         // `accountDrafts` is what makes the card preview an ACCOUNT chart's unsaved edit (#1299):
-        // the guest slot below no longer holds one, and a store read cannot happen in a memo.
+        // the guest slot below no longer holds one, and a store read cannot happen in a memo. It
+        // only answers for a song this TAB has opened or prefetched, though — on a cold load the
+        // map is empty and the card previews the committed copy, which is the honest answer here
+        // rather than a claim about a draft nobody has read (#1299 patch review P3).
         const held =
             volatileDrafts.current.get(featuredSave.id) ??
             accountDrafts.current.get(featuredSave.id);
@@ -1796,8 +1952,8 @@ export default function Ensemble() {
                         onEditChart={() => revealEditor()}
                         onSave={() => void run(() => (sharedDraft ? keepSharedCopy() : save()))}
                         onMenu={() =>
-                            void run(() => {
-                                setRecoveryOptions(repository.recoveriesFor(current));
+                            void run(async () => {
+                                setRecoveryOptions(await recoveryOptionsFor(current));
                                 setMenu(true);
                             })
                         }
@@ -2142,10 +2298,13 @@ export default function Ensemble() {
                             const library = accountSongs ?? [];
                             // Read once, before the first file: the retained drafts are what makes
                             // these the newest versions, and awaiting between two downloads is
-                            // what loses the later ones (#1299).
-                            accountDrafts.current = await accountSync.retainedDrafts(
+                            // what loses the later ones (#1299). Folded in rather than assigned
+                            // over, for the reason the sign-out read states.
+                            for (const [id, held] of await accountSync.retainedDrafts(
                                 library.map((song) => song.id),
-                            );
+                            )) {
+                                accountDrafts.current.set(id, held);
+                            }
                             for (const song of library) {
                                 exportDocument(latestLocalVersion(song));
                             }
@@ -2216,7 +2375,10 @@ export default function Ensemble() {
                         void run(async () => {
                             await accountSync.run();
                             const { plan, drafts } = await readSignOutPlan(volatileDrafts.current);
-                            accountDrafts.current = drafts;
+                            // Folded in, for the reason the sign-out read states.
+                            for (const [id, held] of drafts) {
+                                accountDrafts.current.set(id, held);
+                            }
                             setSignOutPlan(plan);
                         })
                     }
