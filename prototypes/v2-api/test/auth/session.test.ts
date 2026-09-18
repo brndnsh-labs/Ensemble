@@ -314,4 +314,25 @@ describe('revokeOtherSessions', () => {
 
         expect(revokeOtherSessions(testDb.db, 'acc-1', keep.sessionId, now)).toBe(0);
     });
+
+    it('leaves a live recovery session alone, but still revokes a standard one (#1296)', () => {
+        testDb = createTestDatabase();
+        insertAccount(testDb, 'acc-1');
+        const now = 1_000_000;
+        const keep = issueSession(testDb.db, 'acc-1', now);
+        // `recoveryCodeId` is left `null` here (rather than a real `recovery_codes` row) since
+        // it plays no part in `revokeOtherSessions`'s `purpose` predicate under test.
+        const recovery = issueSession(testDb.db, 'acc-1', now, SESSION_TTL_MS, null, 'recovery');
+        const standard = issueSession(testDb.db, 'acc-1', now);
+
+        const revokedCount = revokeOtherSessions(testDb.db, 'acc-1', keep.sessionId, now);
+
+        // Only the other STANDARD session counts — the recovery session is excluded outright,
+        // not merely left alive by coincidence.
+        expect(revokedCount).toBe(1);
+        expect(readSession(testDb.db, keep.token, now)).not.toBeNull();
+        expect(readSession(testDb.db, recovery.token, now)).not.toBeNull();
+        expect(rawSessionRow(testDb, recovery.sessionId).revoked_at).toBeNull();
+        expect(readSession(testDb.db, standard.token, now)).toBeNull();
+    });
 });

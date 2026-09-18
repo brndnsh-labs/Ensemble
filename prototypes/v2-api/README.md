@@ -102,7 +102,9 @@ server. The service is reachable over a real socket for the first time here.
 - `readSession` performs **zero writes** — one `SELECT`, requiring `revoked_at IS NULL`,
   `expires_at > now`, and that the owning account row still exists (via a `JOIN`).
 - `revokeSession` is owner-scoped: presenting a foreign `accountId` is a silent no-op, never a
-  throw. `revokeOtherSessions` returns the count revoked.
+  throw. `revokeOtherSessions` returns the count revoked, and only ever revokes `'standard'`
+  sessions — a live `'recovery'` session on another device survives "sign out other devices"
+  (#1296), since it already can't read anything and expires on its own.
 
 **HTTP layer** (`src/http/`, `src/server.ts`), built on Hono `4.13.7` + `@hono/node-server`
 `2.1.1` — zero additional runtime dependencies:

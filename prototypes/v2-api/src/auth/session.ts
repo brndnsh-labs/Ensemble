@@ -211,9 +211,21 @@ export function revokeSession(
 }
 
 /**
- * Revokes every other live session on `accountId`, leaving `keepSessionId` untouched. Returns
- * the number of sessions revoked so callers (e.g. a "signed out N other devices" response) don't
- * need a second query.
+ * Revokes every other live, **standard** session on `accountId`, leaving `keepSessionId`
+ * untouched. Returns the number of sessions revoked so callers (e.g. a "signed out N other
+ * devices" response) don't need a second query.
+ *
+ * `AND purpose = 'standard'` (#1296) deliberately excludes a live `'recovery'` session from this
+ * sweep. The caller here always holds a `'standard'` session — `requireSession` refuses a
+ * `'recovery'` one outright (see `src/http/app.ts`) — so `keepSessionId` itself is never the
+ * recovery session; without this predicate, "sign out other devices" would also end an
+ * in-flight recovery ceremony on a different device. A `'recovery'` session already can't read
+ * anything but the recovery-enroll-passkey routes and expires on its own
+ * (`RECOVERY_SESSION_TTL_MS`), so it needs no revoke-others exposure at all — but a stolen
+ * `'standard'` session repeatedly hitting this route could otherwise abort the real owner's
+ * in-progress recovery over and over: `claimRecoveryCode` (`recovery.ts`) won't let the code be
+ * re-claimed until `RECOVERY_SESSION_TTL_MS` has passed since the ORIGINAL claim, so each forced
+ * abort-and-reclaim cycle re-starts that same 10-minute lock rather than shortening it.
  */
 export function revokeOtherSessions(
     db: DatabaseSync,
@@ -224,7 +236,7 @@ export function revokeOtherSessions(
     const info = db
         .prepare(
             `UPDATE sessions SET revoked_at = ?
-             WHERE account_id = ? AND id != ? AND revoked_at IS NULL`,
+             WHERE account_id = ? AND id != ? AND revoked_at IS NULL AND purpose = 'standard'`,
         )
         .run(now, accountId, keepSessionId);
     return Number(info.changes);
