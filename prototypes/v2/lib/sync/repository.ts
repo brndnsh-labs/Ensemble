@@ -1,6 +1,7 @@
 import { AccountDatabase, type Transaction } from './database';
 import {
     type AccountScope,
+    type ChartDocument,
     candidateKey,
     candidatePrefix,
     type Draft,
@@ -60,6 +61,27 @@ export type ReconcileOutcome =
     | 'removed'
     | 'retained-deleted'
     | 'unsupported';
+
+/**
+ * What `keepBoth` moved (#1267). Returned rather than inferred, because the SHELL has to finish the
+ * move: an account chart's unsaved experiment does not live in this database yet (#1299), and the
+ * chart on the stand has to follow its line to the new identity without its content changing.
+ *
+ * `conflict` is which refusal was resolved, carried through rather than flattened, for the same
+ * reason `CloudObservation.conflict` keeps the two apart: `'version'` had a remote version to adopt
+ * under the original id and `'gone'` had none, so only one of them leaves a song there afterwards.
+ */
+export interface KeepBothResolution {
+    conflict: 'version' | 'gone';
+    /** The fresh identity the local line now lives under. NEVER the id that was refused. */
+    documentId: string;
+    /** The committed record created under it: the newest local version, at local revision 0. */
+    document: ChartDocument;
+    /** The queued create's operation id. NEVER the failed operation's — see `keepBoth`. */
+    operationId: string;
+    /** The remote version now saved under the original id, or null when the cloud has none. */
+    adopted: ChartDocument | null;
+}
 
 export interface ReconcileOptions {
     /**
@@ -571,6 +593,170 @@ export class AccountSongbook {
                             } satisfies SaveReceipt);
                             tx.table('operations').delete([scope.ownerId, request.operationId]);
                             tx.finish('committed');
+                        },
+                    );
+                },
+            );
+        });
+    }
+
+    /**
+     * Resolve a refused Save by KEEPING BOTH (#1267) — the one way out of a conflicted outbox head,
+     * and the only resolution this product offers. No merge, no "overwrite theirs".
+     *
+     * `acknowledge` parks a refused Save as `status: 'conflict'` with the remote version beside it,
+     * and `prepare()` answers `'conflict'` for that document forever after: the row is never
+     * removed, so every later Save of that song queues behind it. Nothing else clears that state.
+     *
+     * One transaction, because the two halves are one decision. It:
+     *
+     * - writes the LOCAL LINE under a fresh `crypto.randomUUID()` document id, as an ordinary
+     *   create (`base: { revision: null }`, local revision 0). Its content is the newest queued
+     *   Save's bytes — which is also what the saved record holds, since `save()` advances both
+     *   together and a held record is never advanced by a download — falling back to the saved
+     *   record when the queue somehow holds none;
+     * - retires EVERY queued Save for the failed id. Only the newest bytes matter: replaying the
+     *   older ones under the new id would upload a version history nobody asked for, and leaving
+     *   them would leave the queue parked exactly as it was;
+     * - moves this account's drafts for that id onto the new one, so an unsaved experiment follows
+     *   the line it belongs to rather than the identity the cloud kept;
+     * - and then settles the ORIGINAL id. `'version'`: the preserved remote version becomes the
+     *   saved record, labelled with its own `remoteRevision`, so it reads as cloud-confirmed
+     *   because it is. `'gone'`: the account has no such document — tombstoned (#1270) or never
+     *   there (#1268's adoption after a delete) — so the local record is dropped along with its
+     *   frozen delete, because there is nothing up there for that id to be a mirror of.
+     *
+     * **The failed operation id is never reused**, and neither is the failed document id. Both are
+     * spent: the server's receipts never expire and replay only an EXACT byte match, so the id is
+     * bound to the request it was refused for, and a create under the old document id would be
+     * refused again by the same revision check. The fresh pair is a request the account has never
+     * seen — the same reasoning `save()` states for always minting an operation id.
+     *
+     * Any preserved remote CANDIDATE for the original id goes too: it described a divergence that
+     * this call has just settled. If a download had already observed a NEWER revision than the one
+     * being adopted, dropping the candidate loses nothing — the record is labelled with the
+     * revision it actually holds, and the next download diffs the manifest against exactly that and
+     * advances it. Choosing between two opaque revision strings here would be a guess.
+     *
+     * `'none'` when the queue holds no refused Save: whoever was looking at the banner is a moment
+     * stale, and reporting that is better than inventing a resolution.
+     */
+    async keepBoth(scope: AccountScope, documentId: string): Promise<KeepBothResolution | 'none'> {
+        scope = copyScope(scope);
+        identifier(documentId);
+        // Minted before the transaction opens, like `save()`'s: `crypto.randomUUID` is not
+        // something to reach for from inside an IDB callback, and neither value depends on a read.
+        const freshDocumentId = crypto.randomUUID();
+        const operationId = crypto.randomUUID();
+        return this.database.run('readwrite', scope, (tx) => {
+            tx.read(
+                tx.table('songs').get([scope.ownerId, documentId]),
+                (stored: SavedSong | undefined) => {
+                    const song = stored ? savedSong(stored, scope, documentId) : null;
+                    tx.read(
+                        tx.table('drafts').index('song').getAll([scope.ownerId, documentId]),
+                        (rows: Draft[]) => {
+                            const drafts = rows.map((row) => savedDraft(row, scope, documentId));
+                            operations(tx, scope, documentId, (queue) => {
+                                // The same read `observe()` makes: the queue is sorted by local
+                                // revision, so the first refused operation is the head the outbox
+                                // is actually stuck on.
+                                const refused = queue.find(
+                                    (operation) => operation.status === 'conflict',
+                                );
+                                if (!refused) {
+                                    return tx.finish('none');
+                                }
+                                const latest = queue.at(-1)?.snapshot ?? song?.document;
+                                if (!latest) {
+                                    throw new Error(
+                                        'This conflict has no local version left to keep.',
+                                    );
+                                }
+                                const now = new Date().toISOString();
+                                // `createdAt` is carried: this is the same piece of music under a
+                                // new identity, not a song written today. `updatedAt` moves,
+                                // because this IS a new commit and the songbook orders by it.
+                                const carried = snapshot({
+                                    ...latest,
+                                    id: freshDocumentId,
+                                    revision: 0,
+                                    createdAt: latest.createdAt,
+                                    updatedAt: now,
+                                });
+                                tx.table('songs').put({
+                                    ownerId: scope.ownerId,
+                                    documentId: freshDocumentId,
+                                    document: carried,
+                                    remoteRevision: null,
+                                } satisfies SavedSong);
+                                tx.table('operations').add({
+                                    ownerId: scope.ownerId,
+                                    documentId: freshDocumentId,
+                                    operationId,
+                                    localRevision: carried.revision,
+                                    snapshot: carried,
+                                    base: { revision: null },
+                                    wireBody: null,
+                                    status: 'queued',
+                                } satisfies SaveOperation);
+                                for (const operation of queue) {
+                                    tx.table('operations').delete([
+                                        scope.ownerId,
+                                        operation.operationId,
+                                    ]);
+                                }
+                                for (const draft of drafts) {
+                                    tx.table('drafts').delete([
+                                        scope.ownerId,
+                                        documentId,
+                                        draft.writerId,
+                                    ]);
+                                    tx.table('drafts').put({
+                                        ...draft,
+                                        documentId: freshDocumentId,
+                                        document: snapshot({
+                                            ...draft.document,
+                                            id: freshDocumentId,
+                                        }),
+                                        // The experiment is unchanged; what it is an experiment ON
+                                        // is the create above, so its base is that revision.
+                                        baseRevision: carried.revision,
+                                    } satisfies Draft);
+                                }
+                                tx.table('meta').delete(candidateKey(scope.ownerId, documentId));
+                                if (!refused.remote) {
+                                    // Nothing up there to mirror. The frozen delete goes with the
+                                    // record for the reason `commitDeleted` states: nothing else
+                                    // clears one for a song that has left the library.
+                                    tx.table('songs').delete([scope.ownerId, documentId]);
+                                    tx.table('meta').delete(deletionKey(scope.ownerId, documentId));
+                                    return tx.finish({
+                                        conflict: 'gone',
+                                        documentId: freshDocumentId,
+                                        document: carried,
+                                        operationId,
+                                        adopted: null,
+                                    });
+                                }
+                                // Re-decoded rather than taken from the stored record: `savedOperation`
+                                // proves a conflict's remote body validates and matches its id, but
+                                // hands back the raw value it was given.
+                                const adopted = snapshot(refused.remote.document);
+                                tx.table('songs').put({
+                                    ownerId: scope.ownerId,
+                                    documentId,
+                                    document: adopted,
+                                    remoteRevision: refused.remote.revision,
+                                } satisfies SavedSong);
+                                tx.finish({
+                                    conflict: 'version',
+                                    documentId: freshDocumentId,
+                                    document: carried,
+                                    operationId,
+                                    adopted,
+                                });
+                            });
                         },
                     );
                 },

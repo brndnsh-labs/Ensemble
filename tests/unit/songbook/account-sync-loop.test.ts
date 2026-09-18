@@ -913,6 +913,83 @@ describe('a Save the cloud can no longer hold reads differently from a two-sided
         }
     });
 
+    /**
+     * Keeping both (#1267). What is proven here is the loop's half — that the resolution is
+     * reported, the library is republished, the observation is re-read and a pass follows, which is
+     * what actually unblocks the queue. The transaction itself is proven against real IndexedDB in
+     * `tests/browser/account-keep-both.browser.test.ts`; a stub store would agree with a wrong one.
+     */
+    function resolvable(resolution: unknown, overrides: Record<string, unknown> = {}) {
+        const asked: string[] = [];
+        let queue: unknown[] = [{ status: 'conflict', remote: null }];
+        const songbook = stubSongbook({
+            read: async () => ({ remoteRevision: 'cloud-1' }),
+            pending: async () => queue,
+            keepBoth: async (_scope: unknown, documentId: string) => {
+                asked.push(documentId);
+                if (resolution !== 'none') {
+                    queue = [];
+                }
+                return resolution;
+            },
+            ...overrides,
+        });
+        return { songbook, asked };
+    }
+
+    it('resolves the refused Save, republishes the library and sends what it queued', async () => {
+        const resolution = {
+            conflict: 'gone',
+            documentId: 'song-2',
+            document: { id: 'song-2' },
+            operationId: 'op-fresh',
+            adopted: null,
+        };
+        const { api } = fakeApi({ ok: true, value: { kind: 'committed' }, status: 200 });
+        const parts = resolvable(resolution);
+        const loop = createSyncLoop(api, createAccountSession(api), parts.songbook);
+        await loop.attach(OWNER);
+        await loop.watch('song-1');
+        expect(loop.getSnapshot().observation?.conflict).toBe('gone');
+        const before = loop.getSnapshot().libraryVersion;
+
+        expect(await loop.keepBoth('song-1')).toEqual(resolution);
+
+        expect(parts.asked).toEqual(['song-1']);
+        // The library moved on disk — a song left it and another arrived — so the shell re-reads.
+        expect(loop.getSnapshot().libraryVersion).toBeGreaterThan(before);
+        // And the banner's own fact is re-read rather than left describing a conflict that is
+        // no longer there.
+        expect(loop.getSnapshot().observation?.conflict).toBe('none');
+        // The pass is detached, so give it a turn: the queue is unblocked and holds a create
+        // nobody has sent, and there is no timer here to notice that.
+        await loop.run();
+        expect(api.get).toHaveBeenCalled();
+    });
+
+    it('reports nothing moved when the refusal is already gone, and touches neither list nor stand', async () => {
+        const { api } = fakeApi({ ok: true, value: { kind: 'committed' }, status: 200 });
+        const parts = resolvable('none', { pending: async () => [{ status: 'queued' }] });
+        const loop = createSyncLoop(api, createAccountSession(api), parts.songbook);
+        await loop.attach(OWNER);
+        await loop.watch('song-1');
+        const before = loop.getSnapshot().libraryVersion;
+
+        expect(await loop.keepBoth('song-1')).toBe(null);
+
+        expect(parts.asked).toEqual(['song-1']);
+        expect(loop.getSnapshot().libraryVersion).toBe(before);
+        expect(loop.getSnapshot().observation).toMatchObject({ conflict: 'none', pendingCount: 1 });
+    });
+
+    it('refuses to resolve anything while signed out', async () => {
+        const { api } = fakeApi({ ok: true, value: { kind: 'committed' }, status: 200 });
+        const parts = resolvable('none');
+        const loop = createSyncLoop(api, createAccountSession(api), parts.songbook);
+        await expect(loop.keepBoth('song-1')).rejects.toThrow('signed out');
+        expect(parts.asked).toEqual([]);
+    });
+
     it('reports no conflict at all for an ordinary queued Save', async () => {
         const { api } = fakeApi({ ok: true, value: { kind: 'committed' }, status: 200 });
         const loop = createSyncLoop(

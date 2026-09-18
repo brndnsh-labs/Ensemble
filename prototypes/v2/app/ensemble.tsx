@@ -25,10 +25,12 @@ import { lastOpenedSong, rememberSong } from '../lib/session';
 import { allSoundsAvailableOffline, installAllSounds, soundsAvailableOffline } from '../lib/sounds';
 import { start } from '../lib/starters';
 import type { SavedSong } from '../lib/sync/protocol';
+import type { KeepBothResolution } from '../lib/sync/repository';
 import type { Progress } from '../lib/sync/status';
 import { AccountEntry } from './account/account-entry';
 import { AccountPage } from './account/account-page';
 import { AdoptGuestDialog } from './account/adopt-guest';
+import { ConflictBanner } from './account/conflict';
 import { DeleteSongDialog } from './account/delete-song';
 import { SyncStatus, useAccountLibrary } from './account/library';
 import { type AccountDialogMode, SignInDialog } from './account/sign-in';
@@ -208,6 +210,10 @@ export default function Ensemble() {
     // Both are the shell's, because the shell owns every `<dialog>` in this app.
     const [deleteOpen, setDeleteOpen] = useState(false);
     const [deleteFailure, setDeleteFailure] = useState<string | null>(null);
+    // #1267 — the sentence a refused Keep-both produced, rendered inside the banner it was asked
+    // from. The banner is not modal, so the shell's own error line is readable too — but the
+    // reason belongs beside the button that earned it.
+    const [keepBothFailure, setKeepBothFailure] = useState<string | null>(null);
     // #1269 — the sign-out preflight, and what it found. `null` while the read is still out: the
     // step says "checking" rather than "nothing at stake", which would be a claim.
     const [signOutOpen, setSignOutOpen] = useState(false);
@@ -244,6 +250,23 @@ export default function Ensemble() {
         signedIn &&
         currentStore.current === 'account' &&
         sync.observation?.remoteRevision != null;
+    /**
+     * Is the Save at the head of this song's outbox refused, and which way (#1267)?
+     *
+     * Deliberately NOT `inAccount`: that answer also requires a confirmed `remoteRevision`, and a
+     * `gone` conflict is precisely the case where there is none — an adoption refused by a
+     * tombstone (#1268) never had one. The three clauses that are shared are the ones that decide
+     * whether this chart is the account's at all: a guest chart, and an account chart whose session
+     * lapsed underneath it, have no account queue to be stuck in.
+     *
+     * The observation is the watched document's own cloud fact, read from storage by the loop —
+     * `useAccountLibrary` keeps it pointed at `current?.id` — so this is never inferred from a
+     * request result.
+     */
+    const conflict: 'none' | 'version' | 'gone' =
+        accountsOn && signedIn && currentStore.current === 'account' && current !== null
+            ? (sync.observation?.conflict ?? 'none')
+            : 'none';
     // `?? []` is the LIST, not the claim: "we haven't read the account library yet" is carried
     // separately to the songbook as `loading`, so an unread library never renders as an empty one.
     const songs = signedIn ? (accountSongs ?? []) : guestSongs;
@@ -821,6 +844,9 @@ export default function Ensemble() {
         // carrying a previous song's failed Save into it would rank "Save failed on this device"
         // above a local status that is, for this document, simply true (#1266).
         setSaveFailed(false);
+        // Same reasoning (#1267): a Keep-both that failed is a fact about the song it was asked
+        // for, and carrying its sentence into the next chart's banner would explain nothing.
+        setKeepBothFailure(null);
         setEditing(false);
         setFollowing(true);
         setMessage(
@@ -1002,6 +1028,88 @@ export default function Ensemble() {
             }
             await refreshSongs();
             setMessage(result.message);
+        });
+    }
+    /**
+     * Resolve the refused Save on the stand by keeping both (#1267) — the one way out of a
+     * conflicted outbox head, which is otherwise terminal and parks every later Save of this song
+     * behind it.
+     *
+     * The chart KEEPS PLAYING, and that is the whole shape of this. The local line is what is on
+     * the stand; the resolution gives it a new identity in storage, and the shell's job is to point
+     * `current`/`saved`/`currentStore` at that identity without the chart's content changing by a
+     * byte. Nothing is loaded into the runtime, nothing is stopped, no section is re-selected — the
+     * only field that moves on `current` is its id, and the revision that goes with it (the create
+     * is local revision 0, so a later plain Save must name 0, not the number the failed line had
+     * reached).
+     *
+     * The unsaved experiment follows the line rather than the identity the account kept. `current`
+     * IS that experiment — the recovery slot and the in-tab map are only where it is persisted — so
+     * the carry is to write it under the new id and then drop EVERY writer's slot for the old one,
+     * as sign-out does: the old id now holds the account's version, and a slot left under it is
+     * this device's chart text sitting beneath a song it is not a draft of.
+     *
+     * The active claim moves through `setActiveDocument` explicitly rather than being left to the
+     * effect that mirrors `current?.id`: effects run after the render that follows a state change,
+     * and the pass this resolution triggers reads that id at the moment it commits.
+     */
+    function keepBothVersions() {
+        if (!current) {
+            return;
+        }
+        const original = current;
+        const experiment = dirty;
+        void run(async () => {
+            setKeepBothFailure(null);
+            let resolution: KeepBothResolution | null;
+            try {
+                resolution = await accountSync.keepBoth(original.id);
+            } catch (failure) {
+                // Written to the banner as well as the shell's error line: the banner is where the
+                // button was, and it is the thing the musician is looking at.
+                setKeepBothFailure(failure instanceof Error ? failure.message : String(failure));
+                throw failure;
+            }
+            if (resolution === null) {
+                // The refusal is already gone — resolved in another tab, or overtaken by a pass.
+                // Nothing moved, so nothing here may move either; the list is re-read in case it
+                // did elsewhere.
+                await refreshSongs();
+                return;
+            }
+            const moved = {
+                ...original,
+                id: resolution.documentId,
+                revision: resolution.document.revision,
+            };
+            accountSync.setActiveDocument(moved.id);
+            setCurrent(moved);
+            setSaved(resolution.document);
+            currentStore.current = 'account';
+            rememberSong(moved.id);
+            setLastOpened(moved.id);
+            if (experiment) {
+                try {
+                    repository.recover(moved);
+                    volatileDrafts.current.delete(moved.id);
+                    setRecoveryHealthy(true);
+                } catch {
+                    volatileDrafts.current.set(moved.id, moved);
+                    setRecoveryHealthy(false);
+                }
+            }
+            volatileDrafts.current.delete(original.id);
+            try {
+                repository.clearRecovery(original.id);
+            } catch {
+                /* Recovery is a convenience; a stale slot must not fail the resolution. */
+            }
+            await refreshSongs();
+            setMessage(
+                resolution.conflict === 'version'
+                    ? 'Kept both · yours is a new song, and your account’s version is back in your songbook'
+                    : 'Kept yours as a new song · your account no longer has the original',
+            );
         });
     }
     /**
@@ -1390,6 +1498,20 @@ export default function Ensemble() {
                     </span>
                     <button onClick={() => setAccountDialog('signIn')}>Sign in again</button>
                 </div>
+            )}
+            {/*
+             * #1267 — the refused Save, and the one move that resolves it. Above the stand rather
+             * than inside it because it is a fact about the SONG, not about the chart view, and
+             * next to the other banners because that is where this app says things that are true
+             * regardless of which surface is open. `role="status"`, not `alert`: nothing was lost.
+             */}
+            {conflict !== 'none' && (
+                <ConflictBanner
+                    conflict={conflict}
+                    busy={busy}
+                    failure={keepBothFailure}
+                    onKeepBoth={keepBothVersions}
+                />
             )}
             {volatileDrafts.current.size > 0 && (
                 <div className="error-banner" role="status">

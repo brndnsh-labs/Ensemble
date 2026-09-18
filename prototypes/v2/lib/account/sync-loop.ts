@@ -11,7 +11,12 @@ import {
     MAX_PENDING_SAVES,
     type SavedSong,
 } from '../sync/protocol';
-import { AccountSongbook, MAX_LIST_LIMIT, MAX_REMOTE_CANDIDATES } from '../sync/repository';
+import {
+    AccountSongbook,
+    type KeepBothResolution,
+    MAX_LIST_LIMIT,
+    MAX_REMOTE_CANDIDATES,
+} from '../sync/repository';
 import type { SaveTransport } from '../sync/send';
 import type { Progress } from '../sync/status';
 import type { AccountApi, ApiError, ApiErrorCode } from './api';
@@ -432,6 +437,19 @@ export interface SyncLoop {
      * outcome, not a queued intention the musician walks away from.
      */
     deleteFromCloud(documentId: string): Promise<CloudDeleteResult>;
+    /**
+     * Resolve this document's refused Save by keeping both (#1267) — the one way out of a
+     * conflicted outbox head, which is otherwise terminal and parks every later Save of that song
+     * behind it.
+     *
+     * Purely local: `AccountSongbook.keepBoth` is one transaction and sends nothing. What follows
+     * is the pass it has just made possible — the queue is unblocked and holds a create nobody has
+     * sent, and the musician's own act is the trigger, because there is no timer here.
+     *
+     * `null` when the queue no longer holds a refused Save. The caller is then a moment stale, not
+     * wrong, and the fresh observation published below is the answer.
+     */
+    keepBoth(documentId: string): Promise<KeepBothResolution | null>;
     /**
      * What signing out would cost (#1269), as far as the ACCOUNT DATABASE can see. A read; it
      * changes nothing and sends nothing. The caller completes `drafts`/`atRisk` from guest
@@ -936,6 +954,31 @@ export function createSyncLoop(
                 retained,
                 message: retained ? DELETE_MESSAGES.retained : DELETE_MESSAGES.deleted,
             };
+        },
+        async keepBoth(documentId) {
+            const current = await settledScope();
+            const resolution = await songbook.keepBoth(current, documentId);
+            if (resolution === 'none') {
+                // Nothing moved, so the library is unchanged — but the observation the caller was
+                // reading may be why they asked, so it is re-read rather than left alone.
+                await observe();
+                return null;
+            }
+            publish({ libraryVersion: state.libraryVersion + 1 });
+            if (watched === documentId) {
+                // The line this caller was watching has MOVED, and the observation has to move
+                // with it. Left pointed at the original id, the very next publish would describe
+                // the version the account kept — an empty queue and a confirmed revision, so
+                // "Saved to your account" — about a chart whose local line has not been uploaded
+                // at all. The shell re-points this a render later anyway; the point is that there
+                // is no render in between where the chip says something untrue of what is open.
+                watched = resolution.documentId;
+            }
+            await observe();
+            // Detached, exactly as `deleteFromCloud`'s own follow-up pass is: the resolution is
+            // already committed here, and the upload is the loop's problem from this point.
+            void loop.run().catch(() => {});
+            return resolution;
         },
         async signOutPreflight() {
             const current = await settledScope();
