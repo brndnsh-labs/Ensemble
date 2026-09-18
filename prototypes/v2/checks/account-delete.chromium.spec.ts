@@ -1,6 +1,17 @@
 import type { Page } from '@playwright/test';
-import { dismissAdoptGuestPrompt } from './account-helpers';
-import { editorRevealed, expect, accountTest as test } from './fixtures';
+import {
+    backToSongbook,
+    dismissAdoptGuestPrompt,
+    newSongOnTheStand,
+    openSong,
+    openWithAccounts,
+    revealEditor,
+    saveAndUpload,
+    saveAs,
+    signUp,
+    songTitles,
+} from './account-helpers';
+import { expect, accountTest as test } from './fixtures';
 import { addVirtualAuthenticator } from './virtual-authenticator';
 
 /**
@@ -21,65 +32,6 @@ import { addVirtualAuthenticator } from './virtual-authenticator';
  * not add a second account to either test — fold a new claim into an existing journey instead.
  */
 
-const CODE_SHAPE = /^[A-Za-z0-9_-]{43}$/;
-
-async function openWithAccounts(page: Page): Promise<void> {
-    await page.goto('/v2/?accounts=on');
-    await expect(page.getByRole('heading', { name: 'Let’s play something.' })).toBeVisible();
-}
-
-/** Creates an account and walks away from the recovery step, which costs no second enrolment. */
-async function signUp(page: Page): Promise<void> {
-    await page.getByTestId('account-sign-in').click();
-    await page.getByTestId('account-create').click();
-    await expect(page.getByTestId('recovery-code')).toHaveText(CODE_SHAPE);
-    await page.keyboard.press('Escape');
-    await expect(page.getByTestId('account-finish-protecting')).toBeVisible();
-    // #1268's adoption prompt auto-opens once the account library has downloaded, and this
-    // device's guest starters are not in the account — it is unrelated to this spec, but it is a
-    // modal, so every click below would be intercepted by it.
-    await dismissAdoptGuestPrompt(page);
-}
-
-async function newSongOnTheStand(page: Page): Promise<void> {
-    await page.getByRole('button', { name: '＋ New song', exact: true }).click();
-    await expect(page.getByLabel('Chords in this bar')).toHaveValue('C');
-    await editorRevealed(page);
-    await expect(page.getByRole('button', { name: 'Song actions' })).toBeEnabled();
-}
-
-/** Retitle and commit. The Save button going disabled is the shell's own "committed" signal. */
-async function saveAs(page: Page, title: string): Promise<void> {
-    const save = page.getByRole('button', { name: 'Save', exact: true });
-    await page.getByLabel('Song title').fill(title);
-    await expect(save).toBeEnabled();
-    await save.click();
-    await expect(save).toBeDisabled();
-}
-
-const songTitles = (page: Page) => page.locator('.song-name');
-
-async function backToSongbook(page: Page): Promise<void> {
-    await page.getByRole('button', { name: 'Back to songbook' }).click();
-    await expect(page.getByTestId('library-loading')).toHaveCount(0);
-}
-
-/** Open a song by its title from the songbook list. */
-async function openSong(page: Page, title: string): Promise<void> {
-    await page.locator('.song-link', { hasText: title }).first().click();
-    await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Song actions' })).toBeEnabled();
-}
-
-/**
- * Reveal the edit panel. Opening an existing song leaves the chart showing rather than the editor
- * (`open()` sets `editing` false), so the title field only exists after this.
- */
-async function revealEditor(page: Page): Promise<void> {
-    await page.getByRole('button', { name: 'Edit chart' }).click();
-    await editorRevealed(page);
-}
-
 /** Song menu → "Delete from my account", stopping on the confirm step. */
 async function openDeleteConfirm(page: Page): Promise<void> {
     await page.getByRole('button', { name: 'Song actions' }).click();
@@ -98,12 +50,10 @@ test('a cloud delete reaches the other device: clean mirror dropped, divergent w
 
     // Two songs in the account, both confirmed by the cloud.
     await newSongOnTheStand(page);
-    await saveAs(page, 'Set list');
-    await expect(page.getByTestId('sync-cloud')).toHaveText('Saved to your account');
+    await saveAndUpload(page, 'Set list');
     await backToSongbook(page);
     await newSongOnTheStand(page);
-    await saveAs(page, 'Scratch take');
-    await expect(page.getByTestId('sync-cloud')).toHaveText('Saved to your account');
+    await saveAndUpload(page, 'Scratch take');
     await backToSongbook(page);
 
     // Device two: its own cookie jar, storage and authenticator. Only the passkey is carried over.
@@ -178,8 +128,7 @@ test('offline the delete is disabled with a reason; a lost response retries the 
     await openWithAccounts(page);
     await signUp(page);
     await newSongOnTheStand(page);
-    await saveAs(page, 'One take');
-    await expect(page.getByTestId('sync-cloud')).toHaveText('Saved to your account');
+    await saveAndUpload(page, 'One take');
 
     // Offline, deleting is refused BEFORE it is attempted — a control that looks live and then
     // fails teaches nothing. Export stays available, because it never leaves the device.
@@ -240,8 +189,7 @@ test('offline the delete is disabled with a reason; a lost response retries the 
     // refusal, and the chart must still get its active claim back — an unprotected chart on the
     // stand is exactly what the next download pass is allowed to drop the local copy of.
     await newSongOnTheStand(page);
-    await saveAs(page, 'Second take');
-    await expect(page.getByTestId('sync-cloud')).toHaveText('Saved to your account');
+    await saveAndUpload(page, 'Second take');
     await expect(page.getByTestId('sync-offline')).toContainText('Songs 1/1');
 
     await page.route('**/api/documents/delete', async (route) => {

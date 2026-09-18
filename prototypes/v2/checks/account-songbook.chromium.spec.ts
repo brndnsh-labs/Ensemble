@@ -1,6 +1,12 @@
-import type { Page } from '@playwright/test';
-import { dismissAdoptGuestPrompt } from './account-helpers';
-import { editorRevealed, expect, accountTest as test } from './fixtures';
+import {
+    newSongOnTheStand,
+    openWithAccounts,
+    saveAndUpload,
+    saveAs,
+    signUp,
+    songTitles,
+} from './account-helpers';
+import { expect, accountTest as test } from './fixtures';
 import { addVirtualAuthenticator } from './virtual-authenticator';
 
 /**
@@ -16,48 +22,6 @@ import { addVirtualAuthenticator } from './virtual-authenticator';
  * account rather than minting a second. Do not add a third account here; fold a new claim into
  * one of these two journeys instead.
  */
-
-const CODE_SHAPE = /^[A-Za-z0-9_-]{43}$/;
-
-/** Opt this device into the dark-launched account UI, then land on the songbook. */
-async function openWithAccounts(page: Page): Promise<void> {
-    await page.goto('/v2/?accounts=on');
-    await expect(page.getByRole('heading', { name: 'Let’s play something.' })).toBeVisible();
-}
-
-/**
- * Creates an account and walks away from the recovery step. Abandoning it deliberately: this
- * file is about the songbook, the unprotected-account path is #1262's own spec, and dismissing
- * costs no second `recovery/enroll`.
- */
-async function signUp(page: Page): Promise<void> {
-    await page.getByTestId('account-sign-in').click();
-    await page.getByTestId('account-create').click();
-    await expect(page.getByTestId('recovery-code')).toHaveText(CODE_SHAPE);
-    await page.keyboard.press('Escape');
-    await expect(page.getByTestId('account-finish-protecting')).toBeVisible();
-    // Unrelated to this spec (#1268 owns it) but blocks every click below until it's answered.
-    await dismissAdoptGuestPrompt(page);
-}
-
-/** A new song on the stand, with its editor revealed and the shell no longer working. */
-async function newSongOnTheStand(page: Page): Promise<void> {
-    await page.getByRole('button', { name: '＋ New song', exact: true }).click();
-    await expect(page.getByLabel('Chords in this bar')).toHaveValue('C');
-    await editorRevealed(page);
-    await expect(page.getByRole('button', { name: 'Song actions' })).toBeEnabled();
-}
-
-/** Retitle and commit. The Save button going disabled is the shell's own "committed" signal. */
-async function saveAs(page: Page, title: string): Promise<void> {
-    const save = page.getByRole('button', { name: 'Save', exact: true });
-    await page.getByLabel('Song title').fill(title);
-    await expect(save).toBeEnabled();
-    await save.click();
-    await expect(save).toBeDisabled();
-}
-
-const songTitles = (page: Page) => page.locator('.song-name');
 
 test('a song saved on one device opens on another, and the guest songbook is untouched', async ({
     page,
@@ -84,8 +48,7 @@ test('a song saved on one device opens on another, and the guest songbook is unt
     await expect(page.locator('.song-row')).toHaveCount(0);
 
     await newSongOnTheStand(page);
-    await saveAs(page, 'Take A');
-    await expect(page.getByTestId('sync-cloud')).toHaveText('Saved to your account');
+    await saveAndUpload(page, 'Take A');
 
     // Device two: its own cookie jar, its own localStorage, its own IndexedDB and its own
     // authenticator. The ONLY thing carried across is the passkey, which is the whole claim.
@@ -106,8 +69,7 @@ test('a song saved on one device opens on another, and the guest songbook is unt
 
         // B is an edit that is never saved; C is the next committed version.
         await page.getByLabel('Song title').fill('Take B');
-        await saveAs(page, 'Take C');
-        await expect(page.getByTestId('sync-cloud')).toHaveText('Saved to your account');
+        await saveAndUpload(page, 'Take C');
 
         // A then C, and never the unsaved B: an experiment nobody committed never uploads.
         // On reload the list stays hidden until the session read answers "signed in" and the
@@ -155,8 +117,7 @@ test('an offline Save is safe here and confirms on reconnect; a refusal arrives 
     await openWithAccounts(page);
     await signUp(page);
     await newSongOnTheStand(page);
-    await saveAs(page, 'Road take');
-    await expect(page.getByTestId('sync-cloud')).toHaveText('Saved to your account');
+    await saveAndUpload(page, 'Road take');
 
     // Offline, Save is still a successful Save. It commits here and says so; it does not fail,
     // and it does not pretend the cloud has it.
