@@ -129,7 +129,11 @@ test('a song saved on one device opens on another, and the guest songbook is unt
 
     // Nothing above went anywhere near the guest songbook.
     await page.getByRole('button', { name: 'Back to songbook' }).click();
+    // Sign-out goes through its preflight (#1269). Everything here has reached the account, so
+    // the step says exactly that and the button is a plain "Sign out".
     await page.getByTestId('account-sign-out').click();
+    await expect(page.getByTestId('sign-out-clear')).toBeVisible();
+    await page.getByTestId('sign-out-confirm').click();
     await expect(page.getByTestId('account-sign-in')).toBeVisible();
     await expect(page.getByTestId('library-heading')).toHaveText('Your songbook');
     expect(await songTitles(page).allInnerTexts()).toEqual(guestSongs);

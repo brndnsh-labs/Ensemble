@@ -18,6 +18,7 @@ import { syncAccountsFlag } from '../../lib/account/feature';
 import type { AccountFailure } from '../../lib/account/messages';
 import { recoveryEnrolled, signOut } from '../../lib/account/passkeys';
 import type { SessionState } from '../../lib/account/session';
+import { accountSync, type SignOutOutcome } from '../../lib/account/sync-loop';
 
 // Module scope keeps both references stable across renders, which is what `useSyncExternalStore`
 // requires to avoid resubscribing (and, for the snapshot, re-rendering) on every pass.
@@ -65,7 +66,15 @@ export interface AccountView {
     signOutFailure: AccountFailure | null;
     /** Re-reads the session and, when signed in, the recovery status. */
     refresh: () => void;
-    signOut: () => void;
+    /**
+     * Runs the whole sign-out (#1269): fence, revoke, forget. Resolves `'kept'` when the server
+     * never confirmed the revocation — nothing was removed, and the caller must leave the chart on
+     * the stand and the songbook exactly where they are.
+     *
+     * The caller stops playback and clears the account's recovery slots around this; neither
+     * belongs to a hook that knows only about the session.
+     */
+    signOut: () => Promise<SignOutOutcome>;
 }
 
 /**
@@ -138,21 +147,38 @@ export function useAccountSession(active: boolean): AccountView {
         }
     }, [active, refresh]);
 
-    const runSignOut = useCallback(() => {
+    const runSignOut = useCallback(async (): Promise<SignOutOutcome> => {
         setSigningOut(true);
         setSignOutFailure(null);
-        void signOut(accountApi).then((outcome) => {
-            if (!mounted.current) {
-                return;
+        let refusal: AccountFailure | null = null;
+        // Read through a call: control-flow analysis does not follow the assignment made inside
+        // the callback below, so a direct read narrows to the `null` it was initialized with.
+        const refused = () => refusal;
+        try {
+            const outcome = await accountSync.signOut(async () => {
+                const result = await signOut(accountApi);
+                if (!result.ok) {
+                    refusal = result.failure;
+                }
+                // `POST /api/auth/logout` is idempotent and answers 204 even with no session
+                // cookie at all, so `ok` is the server having confirmed there is no session left.
+                return result.ok;
+            });
+            if (outcome === 'signed-out') {
+                // Before the refresh below, which would otherwise read this deliberate sign-out's
+                // own 401 as an expiry and offer "Sign in again" to somebody who just left.
+                accountSession.markSignedOut();
             }
-            setSigningOut(false);
-            if (!outcome.ok) {
-                setSignOutFailure(outcome.failure);
+            return outcome;
+        } finally {
+            if (mounted.current) {
+                setSigningOut(false);
+                setSignOutFailure(refused());
             }
-            // Refresh either way: on success the server has revoked the session, and on failure
-            // the only honest thing to do is re-read who the server still thinks we are.
+            // Either way: on success the server has revoked the session, and on failure the only
+            // honest thing to do is re-read who the server still thinks we are.
             refresh();
-        });
+        }
     }, [refresh]);
 
     return {

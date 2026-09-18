@@ -7,6 +7,7 @@ import {
     deleteBody,
     deleteReply,
     deletionKey,
+    deletionPrefix,
     digest,
     identifier,
     LocalRevisionError,
@@ -191,6 +192,45 @@ export class AccountSongbook {
                 tx.table('meta').put({ key: 'active', ownerId, generation });
                 tx.finish(ownerId === null ? null : { ownerId, generation });
             });
+        });
+    }
+
+    /**
+     * Remove every record this device holds for one account (#1269) — songs, the outbox and its
+     * receipts, drafts, preserved remote candidates and frozen deletions. Nothing else is touched:
+     * the guest songbook lives in a different database entirely, and another owner's records are
+     * outside every range below.
+     *
+     * **Run deliberately WITHOUT the owner fence, and only ever after it has moved.** The sign-out
+     * sequence is `switchAccount(null)` — which bumps the generation, so a late reply for this
+     * account can no longer commit anything — and then this. Passing the old scope here would fail
+     * that very fence, and passing the new one would not describe these records at all. The owner
+     * is instead the explicit bound on all six ranges, so this can only ever reach the account it
+     * was named with.
+     *
+     * One transaction: a sign-out that removed the songs and left the outbox behind would leave
+     * queued Saves for an account this device no longer holds, and the next sign-in as that same
+     * owner would pick them back up.
+     */
+    async clearAccount(ownerId: string): Promise<void> {
+        identifier(ownerId);
+        return this.database.run('readwrite', null, (tx) => {
+            // The same bound `list` pages with: an array sorts after every string in IndexedDB key
+            // order, so `[ownerId, []]` stops at this owner's last record and cannot reach the next
+            // owner's. It holds for the two- and three-element key paths alike.
+            const owned = IDBKeyRange.bound([ownerId], [ownerId, []], false, true);
+            tx.table('songs').delete(owned);
+            tx.table('operations').delete(owned);
+            tx.table('receipts').delete(owned);
+            tx.table('drafts').delete(owned);
+            // `meta` is one generic keyed store, so these are prefix ranges rather than key paths
+            // — the same windows `remoteCandidates` reads through. The `'active'` pointer sorts
+            // below both prefixes and is never in range: this must not delete the fence it is
+            // being run underneath.
+            for (const prefix of [candidatePrefix(ownerId), deletionPrefix(ownerId)]) {
+                tx.table('meta').delete(IDBKeyRange.bound(prefix, `${prefix}￿`, false, true));
+            }
+            tx.finish(undefined);
         });
     }
 

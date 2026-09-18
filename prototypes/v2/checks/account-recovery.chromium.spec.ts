@@ -54,7 +54,10 @@ test('recovering with the code replaces the passkey, and an interrupted enrolmen
     const [lost] = await authenticator.credentials();
 
     await page.getByTestId('account-sign-out').click();
-    await expect(page.getByTestId('account-sign-in')).toHaveText('Sign in again');
+    await page.getByTestId('sign-out-confirm').click();
+    // A deliberate sign-out reads as `guest`, not `expired` (#1269) — "Sign in again" belongs to
+    // a session that went away underneath somebody, which is not what just happened.
+    await expect(page.getByTestId('account-sign-in')).toHaveText('Sign in');
 
     // --- the way back in is one line under the two things people came for --------------------
     await page.getByTestId('account-sign-in').click();
