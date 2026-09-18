@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test';
 import { RECOVERY_CODE_SHAPE } from '../lib/account/messages';
-import { expect } from './fixtures';
+import { editorRevealed, expect } from './fixtures';
 
 /**
  * The account specs' shared page driving (#1262, extracted for #1263).
@@ -53,6 +53,80 @@ export async function dismissAdoptGuestPrompt(page: Page): Promise<void> {
     await expect(dialog).toBeVisible();
     await page.getByTestId('adopt-guest-decline').click();
     await expect(dialog).toBeHidden();
+}
+
+/** Creates an account and walks away from the recovery step, which costs no second enrolment. */
+export async function signUp(page: Page): Promise<void> {
+    await page.getByTestId('account-sign-in').click();
+    await page.getByTestId('account-create').click();
+    await expect(page.getByTestId('recovery-code')).toHaveText(CODE_SHAPE);
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('account-finish-protecting')).toBeVisible();
+    // #1268's adoption prompt auto-opens once the account library has downloaded, and this
+    // device's guest starters are not in the account — it is unrelated to this spec, but it is a
+    // modal, so every click below would be intercepted by it.
+    await dismissAdoptGuestPrompt(page);
+}
+
+/** A new song on the stand, with its editor revealed and the shell no longer working. */
+export async function newSongOnTheStand(page: Page): Promise<void> {
+    await page.getByRole('button', { name: '＋ New song', exact: true }).click();
+    await expect(page.getByLabel('Chords in this bar')).toHaveValue('C');
+    await editorRevealed(page);
+    await expect(page.getByRole('button', { name: 'Song actions' })).toBeEnabled();
+}
+
+/** Retitle and commit. The Save button going disabled is the shell's own "committed" signal. */
+export async function saveAs(page: Page, title: string): Promise<void> {
+    const save = page.getByRole('button', { name: 'Save', exact: true });
+    await page.getByLabel('Song title').fill(title);
+    await expect(save).toBeEnabled();
+    await save.click();
+    await expect(save).toBeDisabled();
+}
+
+/**
+ * Save, and wait for THIS version's upload to come back before going on (#1303).
+ *
+ * `sync-cloud` reading "Saved to your account" is not enough on its own: a brand-new song's
+ * blank first version is confirmed a moment earlier, so the chip is already showing that sentence
+ * when this Save is queued and an assertion can match the old state. Waiting on the response whose
+ * body carries this title is the only reading that cannot be a moment stale.
+ */
+export async function saveAndUpload(page: Page, title: string): Promise<void> {
+    const uploaded = page.waitForResponse(
+        (response) =>
+            response.url().includes('/api/documents/save') &&
+            (response.request().postData() ?? '').includes(title),
+    );
+    await saveAs(page, title);
+    await uploaded;
+    await expect(page.getByTestId('sync-cloud')).toHaveText('Saved to your account');
+}
+
+/** The songbook list's visible titles, in the order rendered. */
+export const songTitles = (page: Page) => page.locator('.song-name');
+
+/** Back to the songbook, past the loading gate so a "0 rows" read isn't a still-running query. */
+export async function backToSongbook(page: Page): Promise<void> {
+    await page.getByRole('button', { name: 'Back to songbook' }).click();
+    await expect(page.getByTestId('library-loading')).toHaveCount(0);
+}
+
+/** Open a song by its title from the songbook list. */
+export async function openSong(page: Page, title: string): Promise<void> {
+    await page.locator('.song-link', { hasText: title }).first().click();
+    await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Song actions' })).toBeEnabled();
+}
+
+/**
+ * Reveal the edit panel. Opening an existing song leaves the chart showing rather than the editor
+ * (`open()` sets `editing` false), so the title field only exists after this.
+ */
+export async function revealEditor(page: Page): Promise<void> {
+    await page.getByRole('button', { name: 'Edit chart' }).click();
+    await editorRevealed(page);
 }
 
 /**
