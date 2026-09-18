@@ -97,6 +97,16 @@ export type SaveOutcome =
     /** Written now (`replayed: false`) or the original result of this same request again. */
     | { kind: 'committed'; revision: string; replayed: boolean }
     /**
+     * The session's owner no longer has an account row — the request raced #1271's account
+     * deletion. Checked FIRST, inside the transaction, precisely so this and the wipe cannot
+     * interleave: without it, a Save against a mid-flight or just-committed deletion hits the
+     * `documents.owner_id` foreign key and this transaction rolls back with an unhandled
+     * exception, which `src/http/app.ts`'s `onError` turns into `500 internal_error` — a session
+     * whose account is gone is a `401`, not a server fault. `src/http/documents.ts` maps this to
+     * `401 unauthenticated`, matching every other route's answer for a deleted account's cookie.
+     */
+    | { kind: 'owner_gone' }
+    /**
      * Nothing written. `revision` is the server revision this decision was made against:
      * the current document's (or the tombstone's last revision, or, when the owner never had
      * the document at all, the caller's own `expectedRevision` — the only revision in play).
@@ -134,6 +144,15 @@ export function commitSave(
     return withTransaction(
         db,
         () => {
+            // 0. The owner must still exist. Checked before the receipt read, not after: a
+            // deleted account's replayed receipt is exactly as unreachable as a fresh write, and
+            // reading it first would answer `committed` for an owner this request can no longer
+            // prove is authenticated. `readSession` already refuses the cookie for a deleted
+            // account on the NEXT request; this is what keeps the request already in flight from
+            // hitting the FK constraint below instead.
+            if (db.prepare('SELECT 1 FROM accounts WHERE id = ?').get(ownerId) === undefined) {
+                return { kind: 'owner_gone' };
+            }
             // 1. Operation receipt: replay or reject before anything else is even read.
             const receipt = readReceipt(db, ownerId, operationId);
             if (receipt !== undefined) {

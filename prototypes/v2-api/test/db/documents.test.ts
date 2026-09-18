@@ -221,4 +221,14 @@ describe('owner-scoped documents, receipts and tombstones (#1201)', () => {
         db.exec('CREATE TABLE stray (owner_id TEXT)');
         expect(() => assertAccountDeletionCoverage(db)).toThrow('exactly once');
     });
+
+    it('the drift guard also bites when a registered column is renamed out from under it', () => {
+        const db = seed();
+        expect(() => assertAccountDeletionCoverage(db)).not.toThrow();
+        // A migration renaming `documents.owner_id` without updating the registry: the table
+        // check alone cannot see this, because `documents` is still classified — only the
+        // column axis catches it.
+        db.exec('ALTER TABLE documents RENAME COLUMN owner_id TO owner_id_renamed');
+        expect(() => assertAccountDeletionCoverage(db)).toThrow('documents.owner_id');
+    });
 });

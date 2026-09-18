@@ -100,6 +100,11 @@ export function DeleteAccountStep({
                     copy that survives.
                 </p>
             )}
+            {songCount === null && (
+                <p className="status-detail" data-testid="delete-account-counting">
+                    Checking what’s in your account songbook…
+                </p>
+            )}
             {!online && (
                 <p className="status-detail" data-testid="delete-account-offline">
                     {OFFLINE_REASON}
@@ -120,22 +125,32 @@ export function DeleteAccountStep({
                 onChange={(event) => setTyped(event.currentTarget.value)}
             />
             <div className="dialog-actions">
-                {songCount !== null && songCount > 0 && (
+                {(songCount === null || songCount > 0) && (
                     <button
                         className="btn"
                         data-testid="delete-account-export"
                         // Never disabled by the NETWORK: a file written to this device's own disk
-                        // is the one thing that survives whatever happens next.
-                        disabled={busy}
+                        // is the one thing that survives whatever happens next. `songCount ===
+                        // null` is a different fact — the library these files are written from
+                        // has not been read yet, and a button that wrote nothing would be worse
+                        // than a disabled one (same rule as the sign-out step's `songsReady`).
+                        disabled={busy || songCount === null}
                         onClick={onExport}
                     >
-                        {songCount === 1 ? 'Export that song' : `Export those ${songCount} songs`}
+                        {songCount === null
+                            ? 'Export your songs'
+                            : songCount === 1
+                              ? 'Export that song'
+                              : `Export those ${songCount} songs`}
                     </button>
                 )}
                 <button
                     className="btn danger"
                     data-testid="delete-account-confirm"
-                    disabled={busy || !online || !confirmed}
+                    // Never while the library is unread: deleting before `songCount` resolves
+                    // means the Export button above may still be disabled, and Delete must not
+                    // outrun the one safeguard standing between the musician and losing songs.
+                    disabled={busy || !online || songCount === null || !confirmed}
                     title={online ? undefined : OFFLINE_REASON}
                     onClick={onConfirm}
                 >

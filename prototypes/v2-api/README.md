@@ -649,8 +649,11 @@ ship (DECISION 2026-09-17). One route, one transaction, no body, `204` on succes
   login ceremony with the old passkey fails `credential_not_found`. There is deliberately NO
   credential-level blocklist: the same authenticator must be able to register a brand-new account
   afterwards, and it can, because the row holding its credential id is gone.
-- **Rate limit**: `policy('empty', 3, 10 * minute)` — the tightest budget in `auth-policy.ts`,
-  because this is a once-in-a-lifetime action already behind a passkey ceremony.
+- **Rate limit**: `policy('empty', 10, 10 * minute)` — well below the ceremony routes, because
+  this is a once-in-a-lifetime action already behind a passkey ceremony, but not tighter than
+  `10`: the client's own step-up retry (`withFreshAuth`) spends two requests per stale-session
+  attempt (`403 fresh_auth_required` then the re-proved retry), so two dismissed platform
+  prompts plus one real deletion already spends 6.
 - **Backups are out of scope, and the client says so.** Nightly snapshots age out on their own
   schedule; the account page's copy discloses that rather than promising an erasure this route
   cannot deliver.

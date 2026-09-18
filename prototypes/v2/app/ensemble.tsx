@@ -1135,6 +1135,14 @@ export default function Ensemble() {
      * preflight, which exports songs from the LIBRARY rather than the stand — the header (and its
      * Sign out button) is hidden while a chart is open, so at that moment there is no chart on the
      * stand to export and the work at risk is named by document id.
+     *
+     * `onExportAccountSongs`'s export-everything offer (#1271) and the sign-out preflight's own
+     * export both call this once per song in a plain loop, one user gesture triggering several
+     * downloads. Chromium allows a handful of same-gesture downloads through without prompting,
+     * which is what the checks assert (`*.chromium.spec.ts`); Safari and Firefox are known to
+     * prompt before the second download or drop later ones silently past their own per-gesture
+     * cap. There is no E2E coverage for either engine here — WebKit/Firefox-specific handling
+     * (batching into one archive, or a click-through per file) is unverified and out of scope.
      */
     function exportDocument(candidate: ChartDocument) {
         const url = URL.createObjectURL(
@@ -1747,7 +1755,20 @@ export default function Ensemble() {
                             }
                         })
                     }
-                    onAccountDeleted={() => run(forgetDeletedAccount)}
+                    // NOT `run(forgetDeletedAccount)`: `run()` silently no-ops when another task
+                    // is already `working` (e.g. an in-flight autosave), and `runDelete` in
+                    // `account-page.tsx` calls this only AFTER the server has already deleted the
+                    // account — a no-op here would leave `runDelete` reporting "deleted" while
+                    // this device's local half never ran. Called directly, with its own
+                    // try/catch, so it always runs and still reports a failure the same way
+                    // `run()` does.
+                    onAccountDeleted={async () => {
+                        try {
+                            await forgetDeletedAccount();
+                        } catch (e) {
+                            setError(e instanceof Error ? e.message : String(e));
+                        }
+                    }}
                 />
             )}
             {accountsOn && signedIn && (
