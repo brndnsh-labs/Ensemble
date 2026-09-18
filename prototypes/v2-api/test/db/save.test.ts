@@ -172,6 +172,10 @@ describe('commitSave (#1202)', () => {
     });
 
     it('creating over an existing document conflicts with that document', () => {
+        // Also the server half of #1268's guest adoption: a second device adopting the same guest
+        // song sends the SAME deterministic document id under a FRESH operation id, and this is
+        // the answer that makes that safe — `conflict`, which the client's outbox handles, rather
+        // than the `operation_mismatch` a deterministic operation id would have earned.
         const db = setUp();
         commitSave(db, command(), deps);
         expect(

@@ -1976,6 +1976,20 @@ dialog textarea {
     font-size: 13px;
     margin-bottom: 12px;
 }
+/* #1268's offer preview: every title that is about to be copied, scrollable rather than
+   pushing the Add/Not now buttons off a phone screen on a generous guest songbook. */
+.adopt-guest-preview {
+    list-style: none;
+    margin-bottom: 17px;
+    max-height: 30dvh;
+    overflow-y: auto;
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--muted);
+}
+.adopt-guest-preview li {
+    overflow-wrap: anywhere;
+}
 .error-banner {
     background: var(--danger-bg);
     color: var(--danger);

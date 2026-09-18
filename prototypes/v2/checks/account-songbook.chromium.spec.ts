@@ -1,4 +1,5 @@
 import type { Page } from '@playwright/test';
+import { dismissAdoptGuestPrompt } from './account-helpers';
 import { editorRevealed, expect, accountTest as test } from './fixtures';
 import { addVirtualAuthenticator } from './virtual-authenticator';
 
@@ -35,6 +36,8 @@ async function signUp(page: Page): Promise<void> {
     await expect(page.getByTestId('recovery-code')).toHaveText(CODE_SHAPE);
     await page.keyboard.press('Escape');
     await expect(page.getByTestId('account-finish-protecting')).toBeVisible();
+    // Unrelated to this spec (#1268 owns it) but blocks every click below until it's answered.
+    await dismissAdoptGuestPrompt(page);
 }
 
 /** A new song on the stand, with its editor revealed and the shell no longer working. */

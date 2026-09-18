@@ -1,6 +1,7 @@
 import {
     CODE_SHAPE,
     createAccountThroughDialog,
+    dismissAdoptGuestPrompt,
     openWithAccounts,
     persistedState,
 } from './account-helpers';
@@ -48,6 +49,10 @@ test('recovering with the code replaces the passkey, and an interrupted enrolmen
     await page.getByTestId('recovery-saved').check();
     await page.getByTestId('recovery-finish').click();
     await expect(page.getByTestId('account-state')).toHaveText('Signed in');
+    // #1268's adoption prompt auto-opens once the account library has downloaded (this device's
+    // guest starters are not in the account). Unrelated to this spec, but it is a modal: every
+    // click below would be intercepted by it.
+    await dismissAdoptGuestPrompt(page);
 
     // The passkey this account is about to lose — kept to prove, at the end, that it really is
     // lost rather than merely joined by a second one.

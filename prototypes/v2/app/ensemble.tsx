@@ -7,6 +7,11 @@ import type { SemanticScore } from '@engine/songbook/score-types';
 import type { InstrumentVoice } from '@engine/types';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+    computeAdoptCandidates,
+    hasDecidedAdoption,
+    libraryDownloaded,
+} from '../lib/account/adopt-guest';
+import {
     accountSync,
     type CloudDeleteResult,
     type SignOutPreflight,
@@ -23,6 +28,7 @@ import type { SavedSong } from '../lib/sync/protocol';
 import type { Progress } from '../lib/sync/status';
 import { AccountEntry } from './account/account-entry';
 import { AccountPage } from './account/account-page';
+import { AdoptGuestDialog } from './account/adopt-guest';
 import { DeleteSongDialog } from './account/delete-song';
 import { SyncStatus, useAccountLibrary } from './account/library';
 import { type AccountDialogMode, SignInDialog } from './account/sign-in';
@@ -206,6 +212,18 @@ export default function Ensemble() {
     // step says "checking" rather than "nothing at stake", which would be a claim.
     const [signOutOpen, setSignOutOpen] = useState(false);
     const [signOutPlan, setSignOutPlan] = useState<SignOutPreflight | null>(null);
+    // #1268 — copy this device's guest songs into the account: opened automatically once per
+    // (device, owner) after a sign-in that finds candidates and has not been answered yet, and
+    // manually from the account page's "Add this device's songs" button at any later time.
+    const [adoptOpen, setAdoptOpen] = useState(false);
+    /**
+     * The owner this device has already been OFFERED the copy for during this attach (#1268 patch
+     * review P3-6a). `hasDecidedAdoption` only remembers an ANSWER, so an escaped prompt — Escape
+     * or the backdrop, deliberately not a decision — was re-opened by the very next `accountDialog`
+     * transition. A ref rather than state: nothing renders from it, and it must not re-trigger the
+     * effect that writes it. Cleared when the owner goes null, so the next sign-in asks again.
+     */
+    const adoptOffered = useRef<string | null>(null);
     // #1266 — signed in, the songbook IS the account library. `current?.id` is the chart on the
     // stand: the loop hands it to the download's `isActive` so a remote update can never be
     // swapped in underneath whoever is playing.
@@ -244,6 +262,7 @@ export default function Ensemble() {
     const accountPageDialogRef = useRef<HTMLDialogElement>(null);
     const deleteDialogRef = useRef<HTMLDialogElement>(null);
     const signOutDialogRef = useRef<HTMLDialogElement>(null);
+    const adoptDialogRef = useRef<HTMLDialogElement>(null);
     const soundsDialog = useRef<HTMLDialogElement>(null);
     const feelDialog = useRef<HTMLDialogElement>(null);
     const file = useRef<HTMLInputElement>(null);
@@ -484,6 +503,72 @@ export default function Ensemble() {
             alive = false;
         };
     }, [signOutOpen, sync.owner]);
+    useEffect(() => {
+        if (adoptOpen) {
+            adoptDialogRef.current?.showModal();
+        } else {
+            adoptDialogRef.current?.close();
+        }
+    }, [adoptOpen]);
+    /**
+     * #1268 — offer the copy once per sign-in, once this device can actually tell what the account
+     * already holds. `sync.owner` is the right dependency for the same reason the preflight effect
+     * above uses it rather than `signedIn`: it is published only once `attach` actually has a
+     * scope, so this cannot race it and open on a scope that isn't ready to be read from yet.
+     *
+     * `libraryDownloaded(sync.documents)` is the P0 gate (#1268 patch review): the offer is a DIFF
+     * against the account library, and `attach` publishes `UNOBSERVED` until a download has paged
+     * the whole manifest. Computing it before then diffs against an empty library and re-offers
+     * every song the account already has — which on a second device, or after a cloud delete, is a
+     * create for a document id the server already holds. `sync.documents` is therefore a
+     * dependency: the download lands well after the owner does.
+     *
+     * `accountDialog !== null` holds this off while the sign-in dialog — including its OWN
+     * recovery-code step, which keeps that dialog open well after the account already exists and
+     * `sync.owner` is already set — is still showing. Without it this raced a second `showModal()`
+     * on top of the first, blocking "Not now"/"Finish" underneath it. `accountDialog` is in the
+     * dependency array so this re-evaluates the moment that dialog actually closes, not only when
+     * the owner changes.
+     *
+     * `hasDecidedAdoption` guards a decline (or a completed Add) from ever reopening this on a
+     * later sign-in to the same account on this device, and `adoptOffered` guards an ESCAPED
+     * prompt — which is deliberately not a decision — from reopening on the next `accountDialog`
+     * or download transition within this attach. Finding zero candidates does NOT count as either:
+     * nothing was asked, so a guest song created later in this session, or on the next sign-in,
+     * still gets offered.
+     */
+    useEffect(() => {
+        const owner = sync.owner;
+        if (owner === null) {
+            // Signed out: this attach is over, and the next one — same account or not — is a
+            // fresh offer rather than one this device has already made.
+            adoptOffered.current = null;
+            return;
+        }
+        if (
+            accountDialog !== null ||
+            adoptOffered.current === owner ||
+            hasDecidedAdoption(owner) ||
+            !libraryDownloaded(sync.documents)
+        ) {
+            return;
+        }
+        let alive = true;
+        void computeAdoptCandidates(owner)
+            .then((offer) => {
+                if (alive && offer.candidates.length > 0) {
+                    adoptOffered.current = owner;
+                    setAdoptOpen(true);
+                }
+            })
+            .catch(() => {
+                // An unreadable store is not evidence there is nothing to offer; simply don't
+                // auto-prompt this time. The account page's own button still reaches this.
+            });
+        return () => {
+            alive = false;
+        };
+    }, [sync.owner, sync.documents, accountDialog]);
     useEffect(() => {
         if (feelMenu) {
             // Refreshed on every open: these four fields can drift from what the
@@ -1769,6 +1854,22 @@ export default function Ensemble() {
                             setError(e instanceof Error ? e.message : String(e));
                         }
                     }}
+                    onOpenAdopt={() => {
+                        setAccountPageOpen(false);
+                        setAdoptOpen(true);
+                    }}
+                    // Same P0 gate as the auto-prompt above: until this device has downloaded the
+                    // account library once, "which songs are missing?" has no honest answer here.
+                    adoptReady={libraryDownloaded(sync.documents)}
+                />
+            )}
+            {accountsOn && signedIn && (
+                <AdoptGuestDialog
+                    dialogRef={adoptDialogRef}
+                    open={adoptOpen}
+                    ownerId={sync.owner}
+                    online={account.online}
+                    onClose={() => setAdoptOpen(false)}
                 />
             )}
             {accountsOn && signedIn && (

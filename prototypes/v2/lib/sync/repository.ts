@@ -336,6 +336,13 @@ export class AccountSongbook {
         scope = copyScope(scope);
         const document = snapshot(candidate);
         localRevision(expected);
+        // ALWAYS fresh, and never caller-supplied (#1268 patch review P0). A deterministic
+        // operation id looks retry-safe and is the opposite: the server's receipts never expire
+        // and replay only an EXACT byte match, while the `updatedAt` stamped below moves every
+        // call, so the same id re-sent with different bytes earns a permanent
+        // `operation_mismatch`. Guest adoption deduplicates on its deterministic DOCUMENT id
+        // (`lib/account/adopt-guest.ts`), which the compare-and-put below enforces locally and a
+        // server-side `conflict` enforces remotely.
         const operationId = crypto.randomUUID();
         return this.database.run('readwrite', scope, (tx) => {
             tx.read(

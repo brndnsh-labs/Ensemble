@@ -3,6 +3,7 @@ import {
     CODE_SHAPE,
     countStepUps,
     createAccountThroughDialog,
+    dismissAdoptGuestPrompt,
     openWithAccounts,
     persistedState,
     refuseOnceWithFreshAuthRequired,
@@ -53,6 +54,8 @@ test('passkeys can be added and revoked (each stepping up when stale), the last 
     await page.getByTestId('recovery-not-now').click();
     await expect(page.locator('dialog.account-dialog')).toBeHidden();
     await expect(page.getByTestId('account-finish-protecting')).toBeVisible();
+    // Unrelated to this spec (#1268 owns it) but blocks every click below until it's answered.
+    await dismissAdoptGuestPrompt(page);
 
     // Captured now, while it is the only credential on the authenticator — reused at the very end
     // to sign the SAME (surviving) passkey in on a genuinely fresh browser profile.
@@ -238,6 +241,11 @@ test('passkeys can be added and revoked (each stepping up when stale), the last 
         await second.getByTestId('account-sign-in').click();
         await second.getByTestId('account-do-sign-in').click();
         await expect(second.getByTestId('account-sign-out')).toBeVisible();
+        // This fresh profile has its own guest songbook (three starters) and its own
+        // `localStorage`, so signing the same owner in here surfaces #1268's prompt again — and
+        // declining it is also what proves this context never queues a second adoption of songs
+        // the first context already adopted, which is the P0 this spec must not reintroduce.
+        await dismissAdoptGuestPrompt(second);
         // That context genuinely holds a live session before anything revokes it.
         expect(
             await second.evaluate(() =>
@@ -285,6 +293,7 @@ test('revoking the passkey that signed this device in ends the session, with the
     await createAccountThroughDialog(page);
     await page.getByTestId('recovery-not-now').click();
     await expect(page.getByTestId('account-finish-protecting')).toBeVisible();
+    await dismissAdoptGuestPrompt(page);
 
     // A second passkey, purely so removing the first isn't blocked by the last-credential guard —
     // this test is about the SIGN-OUT reaction, not that guard (covered above).
