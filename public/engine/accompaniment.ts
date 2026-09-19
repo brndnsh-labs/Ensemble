@@ -2098,17 +2098,38 @@ export function getAccompanimentNotes(
             const isMinorQuality =
                 (clavQuality.startsWith('m') && !clavQuality.startsWith('maj')) ||
                 clavQuality.includes('dim');
-            const clavThird = pickClavDegree([3, 4], isMinorQuality ? 3 : 4);
+            // #1316 — a suspended chord's identity voice is the suspension itself, not
+            // a 3rd: `pickClavDegree`'s fallback SYNTHESIZES the degree it can't find,
+            // so a sus chord came out with an invented major 3rd (G7sus4 -> F-A-B, a
+            // plain G9 — the suspension gone). Take the 4th (or the 2nd) instead, the
+            // note the chart actually wrote.
+            const isSuspendedChord = ['sus4', '7sus4', 'sus2'].includes(clavQuality);
+            const clavThird = isSuspendedChord
+                ? pickClavDegree(clavQuality === 'sus2' ? [2] : [5], clavQuality === 'sus2' ? 2 : 5)
+                : pickClavDegree([3, 4], isMinorQuality ? 3 : 4);
             // #1313 — a 6th chord's colour voice is its 6th. Synthesizing a b7 here
             // swapped the written 6th for an unwritten 7th (Am6 -> C-G-B), the same
             // defect the parse layer had; b3-6-9 is the Dorian clav cell instead.
             const isSixthChord = ['6', 'm6', '6/9'].includes(clavQuality);
+            // #1316 — "add" in a chart symbol means "this colour tone INSTEAD of a
+            // 7th" (Cadd9 exists precisely to not be C9), so the synthesized b7 turned
+            // every added-tone chord into a dominant: Cadd9 -> E-Bb-D. Voice the 5th in
+            // that slot — a real chord tone — and the cell states Cadd9. A plain triad
+            // still gets the funk b7: it says nothing about its 7th, and the dominant-7
+            // default is the idiom the clav lane is built on.
+            const isAddedToneChord = ['add9', 'add2'].includes(clavQuality);
             const clavSeventh = isSixthChord
                 ? pickClavDegree([9], 9)
-                : pickClavDegree([10, 11], 10);
+                : isAddedToneChord
+                  ? pickClavDegree([7], 7)
+                  : pickClavDegree([10, 11], 10);
             // the 9 is rarely a literal chord tone — default to a synthesized
             // major 9th so the gapped cell is guaranteed its color voice.
-            const clavNinth = pickClavDegree([2], 14);
+            // why (#1316): on a sus2 the identity voice above IS the 9th's pitch class,
+            // which would collapse the cell to two pitch classes and octave-double one
+            // of them. Fall back to the 5th so the cell keeps three distinct voices.
+            const clavNinth =
+                pcFromRoot(clavThird) === 2 ? pickClavDegree([7], 7) : pickClavDegree([2], 14);
             // why: the gapped cell's three pitch classes are fixed, but its
             // ABSOLUTE register has to voice-lead from the prior cell. Building
             // it as raw `root + interval` pins the cell to `chord.rootMidi`,

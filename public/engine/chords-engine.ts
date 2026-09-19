@@ -959,6 +959,14 @@ function parseProgressionPart(
                             quality = 'm11';
                         } else if (quality === '13') {
                             quality = 'm13';
+                        } else if (quality === '6') {
+                            // why (#1317): a lowercase numeral means minor, and `i6`/`iv6` are
+                            // everyday minor-key chords (Minor Swing is `i6 | iv6 | V7`). Without
+                            // this branch `iv6` parsed as the MAJOR 6th quality — F6 in C, with an
+                            // A natural over the F minor triad. `m6` keeps `is7th === false`
+                            // (#1313): a 6th chord has no 7th. '6/9' has no minor counterpart
+                            // quality yet, so `iv6/9` still reads major — filed, not fixed here.
+                            quality = 'm6';
                         }
                     }
 

@@ -45,6 +45,34 @@ const GROUNDING_QUALITIES = new Set([
     'augmaj7',
 ]);
 
+/**
+ * Qualities that must never take the rootless DOMINANT shell (#1316). The dominant
+ * bucket in `shouldUseRootlessVoicing`/`getRootlessVoicing` is keyed on `is7th`,
+ * which `getChordDetails` derives from a string heuristic (`symbol.includes('7' |
+ * '9' | '11' | '13')`) — so a suspension, an added tone or a 6th lands in it and
+ * gets voiced [3, 5, b7]: the whole point of `G7sus4` is that the 4th REPLACES the
+ * 3rd (it came out B-D-F, a plain G7), and `Cadd9` is written precisely to say
+ * "9th, no 7th" (it came out Bb-E-G, a C9 shell). They keep their rooted
+ * `getIntervals` stack instead, above `COMP_REGISTER_FLOOR`.
+ *
+ * Every entry is reachable, not defensive: the ones `getChordDetails` pins to
+ * `is7th = false` on their own ('sus4', 'sus2', 'add2', '6', '6/9') still arrive
+ * with `is7th = true` from a compound symbol whose leftmost suffix match is the
+ * suspension/6th — a written `G` + `sus4add9`, `C` + `sus2add9` or `C` + `6add9`
+ * all trip the heuristic.
+ * A rootless 7sus4 shell (4, b7, 9) is a separate by-ear call, deliberately not
+ * taken here.
+ */
+export const NEVER_ROOTLESS_DOMINANT_QUALITIES = new Set([
+    'sus4',
+    'sus2',
+    '7sus4',
+    'add9',
+    'add2',
+    '6',
+    '6/9',
+]);
+
 const TENSION_CHORD_QUALITIES = new Set([
     'halfdim',
     'm7b5',
@@ -126,6 +154,8 @@ export function shouldUseRootlessVoicing(
     const isDominant =
         !isMinorFamily &&
         !['dim', 'halfdim'].includes(quality) &&
+        // #1316 — a suspension / added tone / 6th is not a 3-b7 dominant shell.
+        !NEVER_ROOTLESS_DOMINANT_QUALITIES.has(quality) &&
         (is7th ||
             ['9', '11', '13', '7alt', '7b9', '7#9', '7#11', '7b13'].includes(quality) ||
             quality.startsWith('7'));
@@ -579,6 +609,49 @@ function getAlteredVoicingCandidates(
     }
 }
 
+/**
+ * The "Hendrix" 7#9 spacing (#1318): major 3rd below, #9 on top, a major 7th or more
+ * apart (G7#9 = B-F-A#). That width is what makes the #9 read as a blue note; folded
+ * to a semitone UNDER the 3rd (Bb3-B3-F4) it reads as a chromatic smear instead, and
+ * the 3+#9 clash-penalty exemption below is exactly what let that placement win.
+ * `placeIntervalsNearTarget` seats each voice independently at its own nearest octave
+ * to the register center, so the #9 (15 semitones up) routinely lands below the 3rd.
+ */
+const SHARP_NINE_MIN_SPACING = 11;
+
+/**
+ * Lift the #9 (root-relative degree 3) by whole octaves until it sits at least
+ * `SHARP_NINE_MIN_SPACING` above the major 3rd (degree 4). Returns the input
+ * unchanged when the candidate doesn't carry both voices, and `null` when the lift
+ * can't stay inside the comp register — so the caller can prefer a sibling candidate
+ * that fits rather than emitting the smear.
+ */
+function spaceSharpNineAboveThird(
+    midis: number[],
+    rootMidi: number,
+    maxMidi: number,
+): number[] | null {
+    const degreeOf = (midi: number) => (((Math.round(midi) - rootMidi) % 12) + 12) % 12;
+    const thirdIndex = midis.findIndex((midi) => degreeOf(midi) === 4);
+    const ninthIndex = midis.findIndex((midi) => degreeOf(midi) === 3);
+    if (thirdIndex === -1 || ninthIndex === -1) {
+        return midis;
+    }
+
+    let ninth = midis[ninthIndex];
+    const lowestAllowed = midis[thirdIndex] + SHARP_NINE_MIN_SPACING;
+    while (ninth < lowestAllowed) {
+        ninth += 12;
+    }
+    if (ninth > maxMidi) {
+        return null;
+    }
+
+    const spaced = [...midis];
+    spaced[ninthIndex] = ninth;
+    return [...new Set(spaced)].sort((a, b) => a - b);
+}
+
 export function buildResolvingAlteredVoicing(
     chord: { rootMidi?: number; freqs?: number[]; quality?: string } | null,
     previousMidis: number[] = [],
@@ -604,28 +677,44 @@ export function buildResolvingAlteredVoicing(
 
     const candidateIntervals = getAlteredVoicingCandidates(chord?.quality, intensity, complexity);
 
-    let bestMidis = placeIntervalsNearTarget(
-        resolvedRootMidi,
-        candidateIntervals[0],
-        targetCenter,
-        minMidi,
-        maxMidi,
-    );
-    let bestScore = Number.POSITIVE_INFINITY;
-
-    candidateIntervals.forEach((intervals) => {
-        const candidateMidis = placeIntervalsNearTarget(
+    // why (#1318): 7#9 is the one quality whose charted alteration sits a semitone
+    // from a voice the shell must also carry, so its placement needs an ORDERING
+    // constraint the generic scorer has no term for. Repair each candidate before
+    // scoring — a penalty alone can't help, since every candidate for this quality is
+    // placed by the same center-seeking rule and they'd all be penalised equally.
+    const needsSharpNineSpacing = chord?.quality === '7#9';
+    const placeCandidate = (intervals: number[]): { midis: number[]; penalty: number } => {
+        const placed = placeIntervalsNearTarget(
             resolvedRootMidi,
             intervals,
             targetCenter,
             minMidi,
             maxMidi,
         );
+        if (!needsSharpNineSpacing) {
+            return { midis: placed, penalty: 0 };
+        }
+        const spaced = spaceSharpNineAboveThird(placed, resolvedRootMidi, maxMidi);
+        // why: a placement whose #9 cannot clear the 3rd inside the comp register is
+        // the smear this repair exists to remove, but it stays a LAST-RESORT
+        // candidate rather than being dropped — a chord jammed against the 84
+        // ceiling still has to voice something. +40 dwarfs every other term here
+        // (voice-leading + spread + clash together stay well under it), so any
+        // sibling candidate that CAN be spaced wins outright.
+        return spaced ? { midis: spaced, penalty: 0 } : { midis: placed, penalty: 40 };
+    };
+
+    let bestMidis = placeCandidate(candidateIntervals[0]).midis;
+    let bestScore = Number.POSITIVE_INFINITY;
+
+    candidateIntervals.forEach((intervals) => {
+        const { midis: candidateMidis, penalty: spacingPenalty } = placeCandidate(intervals);
         if (candidateMidis.length === 0) {
             return;
         }
 
         let score =
+            spacingPenalty +
             Math.abs(averageMidi(candidateMidis) - targetCenter) * 0.5 +
             getNearestVoiceLeadingCost(candidateMidis, previousMidis) * 0.8 +
             getNearestVoiceLeadingCost(candidateMidis, nextMidis) * 0.6 +
