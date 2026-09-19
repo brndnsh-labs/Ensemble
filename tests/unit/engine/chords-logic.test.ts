@@ -180,6 +180,56 @@ describe('Chords & Voicing Logic', () => {
             expect(intervals).toContain(6); // b5
             expect(intervals).not.toContain(7); // No natural 5
         });
+
+        // #1315 — the test above only ran at the default intensity. 'dim' and 'halfdim'
+        // are the canonical diminished qualities (getChordDetails never emits
+        // 'dim7'/'m7b5'), and the `isAltered5` predicate that guards the intensity-based
+        // extension blocks only matched name SHAPES ('alt'/'b5'/'#5'/'aug') — so a loud
+        // band stacked a perfect 5th right next to the chord's own b5.
+        describe('#1315 — a diminished 5th is an altered 5th at every intensity', () => {
+            it.each([
+                ['Jazz', true], // a bass-space feel, bass sounding
+                ['Acoustic', false], // a rooted, non-bass-space feel
+            ])('%s never backfills a natural 5th over the b5 when loud', (feel, bassActive) => {
+                groove.genreFeel = feel;
+                for (const intensity of [0.8, 1.0]) {
+                    playback.bandIntensity = intensity;
+                    for (const [quality, is7th] of [
+                        ['dim', false],
+                        ['dim', true],
+                        ['halfdim', true],
+                    ]) {
+                        const pcs = getIntervals(
+                            getState(),
+                            quality,
+                            is7th,
+                            'standard',
+                            feel,
+                            bassActive,
+                        ).map((i) => ((i % 12) + 12) % 12);
+                        const where = `${quality} is7th=${is7th} @${intensity} in ${feel}`;
+                        expect(pcs, `${where} lost its b5`).toContain(6);
+                        expect(pcs, `${where} stacked a natural 5th on its b5`).not.toContain(7);
+                    }
+                }
+            });
+
+            it('no longer slams a b7 onto a plain diminished triad at the 0.6 colour tier', () => {
+                groove.genreFeel = 'Acoustic';
+                playback.bandIntensity = 0.65;
+                // A written dim triad is 1-b3-b5; the b7 silently made it half-diminished.
+                const pcs = getIntervals(
+                    getState(),
+                    'dim',
+                    false,
+                    'standard',
+                    'Acoustic',
+                    true,
+                ).map((i) => ((i % 12) + 12) % 12);
+                expect(pcs).toEqual(expect.arrayContaining([0, 3, 6]));
+                expect(pcs).not.toContain(10);
+            });
+        });
     });
 
     describe('Inversion & Voice Leading (getBestInversion)', () => {
@@ -460,6 +510,18 @@ describe('Chords & Voicing Logic', () => {
             const intervals = getIntervals(getState(), 'add9', false, 'standard', 'Rock', false);
             expect(intervals).toEqual([0, 4, 7, 14]);
         });
+
+        // #1316 — the case above passes is7th=false, but production never does:
+        // `getChordDetails('add9')` reports is7th=TRUE (its "9" trips the string
+        // heuristic), which sent the "ENSURE 7th" backfill in to add a b7 the chart
+        // explicitly didn't write — Cadd9 sounded as a C9. Same exclusion, same
+        // reason, as the one `getFormattedChordNames` already had for the display name.
+        it('Cadd9 gains no b7 even though getChordDetails reports is7th (#1316)', () => {
+            expect(getChordDetails('add9').is7th).toBe(true);
+            const intervals = getIntervals(getState(), 'add9', true, 'standard', 'Rock', false);
+            expect(intervals).toEqual([0, 4, 7, 14]);
+            expect(intervals.map((i) => i % 12)).not.toContain(10);
+        });
     });
 
     describe('#780 — 6/9, 7sus4, add2 qualities (no silent-major fallback)', () => {
@@ -528,6 +590,51 @@ describe('Chords & Voicing Logic', () => {
             chords.density = 'standard';
             validateProgression(getState());
             expect(arranger.progression[0].intervals).toEqual([0, 7, 16, 19]);
+        });
+    });
+
+    // #1317 — in roman-numeral notation a lowercase numeral means minor, and
+    // `parseProgressionPart` remaps the quality accordingly — but its remap had no
+    // entry for a 6th, so `iv6` (an everyday minor-key chord: the Minor Swing changes
+    // are `i6 | iv6 | V7`) parsed as the MAJOR 6th quality, sounding an A natural over
+    // an F minor triad.
+    describe('#1317 — a lowercase numeral makes a 6th chord minor', () => {
+        const pcOf = (freq) => ((getMidi(freq) % 12) + 12) % 12;
+
+        it('parses iv6 as Fm6 in C and leaves IV6 major', () => {
+            arranger.sections = [{ id: 's1', label: 'Main', value: 'iv6 | IV6', repeat: 1 }];
+            arranger.key = 'C';
+            arranger.isMinor = false;
+            validateProgression(getState());
+
+            const [minorSix, majorSix] = arranger.progression;
+            expect(minorSix.quality).toBe('m6');
+            expect(minorSix.absName).toBe('Fm6');
+            // #1313 — an m6 has no 7th; a true is7th here re-adds the b7 it must never carry.
+            expect(minorSix.is7th).toBe(false);
+            expect(minorSix.intervals).toEqual([0, 3, 7, 9]);
+            const voicedPcs = minorSix.freqs.map(pcOf);
+            expect(voicedPcs, 'Ab, the minor 3rd').toContain(8);
+            expect(voicedPcs, 'D, the 6th').toContain(2);
+            expect(voicedPcs, 'A natural would make it F6').not.toContain(9);
+
+            expect(majorSix.quality).toBe('6');
+            expect(majorSix.absName).toBe('F6');
+            expect(majorSix.freqs.map(pcOf)).toContain(9); // A natural: IV6 is still major
+        });
+
+        it('parses the Minor Swing changes in A minor as Am6 | Dm6 | E7', () => {
+            arranger.sections = [{ id: 's1', label: 'Main', value: 'i6 | iv6 | V7', repeat: 1 }];
+            arranger.key = 'A';
+            arranger.isMinor = true;
+            validateProgression(getState());
+
+            expect(arranger.progression.map((chord) => chord.absName)).toEqual([
+                'Am6',
+                'Dm6',
+                'E7',
+            ]);
+            expect(arranger.progression.map((chord) => chord.quality)).toEqual(['m6', 'm6', '7']);
         });
     });
 });

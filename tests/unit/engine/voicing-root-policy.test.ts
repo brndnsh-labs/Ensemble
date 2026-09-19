@@ -1,4 +1,5 @@
 // @ts-nocheck
+// cspell:ignore Bdim Gsus
 // #1313 — "leave room for the bass" (a register floor) and "rootless voicing" (drop
 // the root for shell tones) are different things. Rootless is only for chords the
 // chart WRITES as 7ths/extensions, and only while a bass line is actually sounding;
@@ -47,10 +48,48 @@ function voice(feel, bassOn, progression, key = 'C', practiceMode = true, intens
         const midis = chord.freqs.map(toMidi);
         return {
             name: chord.absName,
+            quality: chord.quality,
             midis,
             // pitch classes measured from the chord root: 0 = root, 9 = 6th, 10 = b7
             degrees: new Set(midis.map((m) => degreeOf(m, chord))),
         };
+    });
+}
+
+// Every voicing the comp actually emits for each chord over 8 laps, as raw sorted midi
+// arrays. `sound()` below keys its hits by root-relative degree set, which collapses two
+// different REGISTERS of the same pitch classes into one entry — fine for "which tones
+// sound", useless for a spacing/ordering claim (#1318). This keeps every emission.
+function voicings(feel, bassOn, progression, intensity) {
+    voice(feel, bassOn, progression, 'C', true, intensity);
+    const state = getState();
+    resetCompingState(compingState);
+    const ts = TIME_SIGNATURES['4/4'];
+    const lapSteps = state.arranger.progression.length * 16;
+    return state.arranger.progression.map((chord, chordIndex) => {
+        const emitted = [];
+        for (let lap = 0; lap < 8; lap++) {
+            for (let mStep = 0; mStep < 16; mStep++) {
+                const step = lap * lapSteps + chordIndex * 16 + mStep;
+                state.playback.step = step;
+                const midis = getAccompanimentNotes(
+                    state,
+                    chord,
+                    step,
+                    mStep,
+                    mStep,
+                    getStepInfo(step, ts),
+                    { bassEffectiveEnabled: bassOn },
+                )
+                    .filter((note) => note.midi > 0 && !note.muted)
+                    .map((note) => note.midi)
+                    .sort((a, b) => a - b);
+                if (midis.length > 0) {
+                    emitted.push(midis);
+                }
+            }
+        }
+        return { name: chord.absName, chord, emitted };
     });
 }
 
@@ -171,6 +210,40 @@ describe('Voicing root policy (#1313)', () => {
             expect(muted.degrees.has(0), `${symbol} is rooted with the bass muted`).toBe(true);
         });
 
+        // #1316 — the rootless DOMINANT bucket is "non-minor, non-dim, and is7th", and
+        // `is7th` comes from a string heuristic over the chart symbol, so a suspension
+        // or an added tone fell into the 3-5-b7 shell whenever a bass line was sounding:
+        // the 4th that IS G7sus4 was replaced by a major 3rd (a plain G7), and Cadd9 —
+        // written precisely to mean "9th, no 7th" — gained a b7 (a C9 shell). These keep
+        // their rooted getIntervals stack instead.
+        it.each([
+            // symbol, quality, defining degrees, degrees that would rename the chord
+            ['G7sus4', '7sus4', [5, 10], [4]],
+            ['Cadd9', 'add9', [2, 4], [10]],
+            ['Gsus4', 'sus4', [5], [4, 10]],
+            ['Csus2', 'sus2', [2], [4, 10]],
+            ['Cadd2', 'add2', [2, 4], [10]],
+            ['C6', '6', [4, 9], [10]],
+        ])('%s keeps its own tones in both bass states', (symbol, quality, defining, misnaming) => {
+            for (const bassOn of [true, false]) {
+                const [chord] = voice(feel, bassOn, symbol);
+                const where = `${symbol} in ${feel}, bass on: ${bassOn}`;
+                expect(chord.quality, where).toBe(quality);
+                for (const degree of defining) {
+                    expect(chord.degrees.has(degree), `${where} needs degree ${degree}`).toBe(true);
+                }
+                for (const degree of misnaming) {
+                    expect(chord.degrees.has(degree), `${where} must not sound ${degree}`).toBe(
+                        false,
+                    );
+                }
+                // A suspension/added tone is rooted, not a rootless shell — but it still
+                // voices inside the comp register, never down in the bass's octave.
+                expect(chord.degrees.has(0), `${where} states its root`).toBe(true);
+                expect(Math.min(...chord.midis), where).toBeGreaterThanOrEqual(COMP_REGISTER_FLOOR);
+            }
+        });
+
         it('dim and half-dim stay rooted in both bass states', () => {
             // shouldUseRootlessVoicing never routes them rootless at the parse layer.
             for (const symbol of ['Bm7b5', 'Bdim7']) {
@@ -239,6 +312,118 @@ describe('Voicing root policy (#1313)', () => {
                 }
             },
         );
+
+        // #1316 — the parse fix is only half the claim: every lane re-reduces the
+        // voicing, and Funk's clav cell BUILDS its own by pitch class with a
+        // synthesized fallback, so it invented the exact tones the parse layer stopped
+        // inventing (G7sus4 -> F-A-B, a G9; Cadd9 -> E-Bb-D, a C9).
+        it.each([0.35, 0.65])(
+            'a suspension is never voiced as a 3rd and an added tone never as a b7 (intensity %s)',
+            (intensity) => {
+                const cases = [
+                    { symbol: 'G7sus4', defining: 5, misnaming: 4, renamed: 'a plain G7/G9' },
+                    { symbol: 'Cadd9', defining: 2, misnaming: 10, renamed: 'a C9 shell' },
+                ];
+                for (const bassOn of [true, false]) {
+                    const heard = sound(feel, bassOn, 'G7sus4 | Cadd9', intensity);
+                    cases.forEach(({ symbol, misnaming, renamed }, index) => {
+                        const { sets } = heard[index];
+                        expect(sets.length, `${symbol} in ${feel} never sounds`).toBeGreaterThan(0);
+                        for (const degrees of sets) {
+                            expect(
+                                degrees,
+                                `${symbol} in ${feel} (bass on: ${bassOn}) sounds as ${renamed}`,
+                            ).not.toContain(misnaming);
+                        }
+                    });
+                    // The suspension itself has to reach the ear in every lane. (The
+                    // add9's 9th is NOT asserted here: the 3-note cluster lanes
+                    // (Neo-Soul/Hip Hop/Reggae) window it out and sound a plain C
+                    // major triad — a subset of Cadd9, not a different chord, unlike
+                    // the C9 shell above.)
+                    expect(
+                        heard[0].sets.some((degrees) => degrees.includes(cases[0].defining)),
+                        `G7sus4 in ${feel} (bass on: ${bassOn}) never sounds its 4th`,
+                    ).toBe(true);
+                }
+            },
+        );
+    });
+
+    // #1318 — Jazz voices altered dominants through `buildResolvingAlteredVoicing`,
+    // which seats each voice independently at its own nearest octave to the register
+    // center. For 7#9 that folded the #9 to a semitone UNDER the major 3rd (G7#9 ->
+    // Bb3-B3-F4) — a chromatic smear, not the "Hendrix" shell — and the 3+#9
+    // clash-penalty exemption is what let that placement win the scoring. The
+    // idiomatic voicing is the 3rd below and the #9 on top, a major 7th apart
+    // (B3-F4-Bb4), which is the spacing that makes the #9 read as a blue note.
+    describe('#1318 — Jazz 7#9 voices the #9 above the 3rd, not under it', () => {
+        it.each([0.35, 0.65, 0.9])(
+            'every G7#9 that sounds both tones spaces them a major 7th apart (intensity %s)',
+            (intensity) => {
+                for (const bassOn of [true, false]) {
+                    // A ii-V-i so the voicing has a real previous/next chord to lead from.
+                    const [, dominant] = voicings('Jazz', bassOn, 'Dm7 | G7#9 | Cmaj7', intensity);
+                    expect(dominant.emitted.length).toBeGreaterThan(0);
+                    let sawBoth = 0;
+                    for (const midis of dominant.emitted) {
+                        const where = `G7#9 bass on: ${bassOn} @${intensity}: ${midis.join(',')}`;
+                        for (const midi of midis) {
+                            expect(midi, `${where} left the comp register`).toBeGreaterThanOrEqual(
+                                COMP_REGISTER_FLOOR,
+                            );
+                            expect(midi, `${where} left the comp register`).toBeLessThanOrEqual(84);
+                        }
+                        const thirds = midis.filter((m) => degreeOf(m, dominant.chord) === 4);
+                        const sharpNines = midis.filter((m) => degreeOf(m, dominant.chord) === 3);
+                        if (thirds.length === 0 || sharpNines.length === 0) {
+                            continue; // a 2-voice reduction dropped one of them
+                        }
+                        sawBoth++;
+                        for (const third of thirds) {
+                            for (const sharpNine of sharpNines) {
+                                expect(
+                                    sharpNine - third,
+                                    `${where} smears the #9`,
+                                ).toBeGreaterThanOrEqual(11);
+                            }
+                        }
+                    }
+                    // Guard the guard: a reduction that always dropped one of the two
+                    // tones would make every assertion above vacuous.
+                    expect(
+                        sawBoth,
+                        'no G7#9 voicing carried both the 3rd and the #9',
+                    ).toBeGreaterThan(0);
+                }
+            },
+        );
+
+        // G alone proves one register; the repair lifts the #9 by octaves against a
+        // fixed 84 ceiling, so a root whose 3rd seats high is where it would give up.
+        it('holds for every root, not just G', () => {
+            const roots = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
+            for (const root of roots) {
+                for (const bassOn of [true, false]) {
+                    const [, dominant] = voicings('Jazz', bassOn, `Dm7 | ${root}7#9 | Cmaj7`, 0.65);
+                    let sawBoth = 0;
+                    for (const midis of dominant.emitted) {
+                        const third = midis.find((m) => degreeOf(m, dominant.chord) === 4);
+                        const sharpNine = midis.find((m) => degreeOf(m, dominant.chord) === 3);
+                        if (third === undefined || sharpNine === undefined) {
+                            continue;
+                        }
+                        sawBoth++;
+                        expect(
+                            sharpNine - third,
+                            `${root}7#9 bass on: ${bassOn}: ${midis.join(',')}`,
+                        ).toBeGreaterThanOrEqual(11);
+                        expect(Math.max(...midis)).toBeLessThanOrEqual(84);
+                    }
+                    expect(sawBoth, `${root}7#9 never carried both tones`).toBeGreaterThan(0);
+                }
+            }
+        });
     });
 
     it('getChordDetails never marks an m6 as a 7th chord (Am6/9\'s "9" is not a 7th)', () => {

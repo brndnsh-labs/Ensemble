@@ -1,5 +1,5 @@
 import type { EnsembleState } from '../types.js';
-import { shouldUseRootlessVoicing } from './voicing-policy.js';
+import { NEVER_ROOTLESS_DOMINANT_QUALITIES, shouldUseRootlessVoicing } from './voicing-policy.js';
 
 export function getRootlessVoicing(
     state: EnsembleState,
@@ -32,6 +32,16 @@ export function getRootlessVoicing(
     // major triad). `shouldUseRootlessVoicing` no longer routes m6 here; this keeps
     // the function honest for any direct caller: null = use the rooted [0,3,7,9].
     if (quality === 'm6') {
+        return null;
+    }
+
+    // #1316 — same class as the m6 refusal above: a suspension, an added tone or a
+    // 6th has no 3rd-plus-b7 shell to state, so the `is7th` string heuristic routing
+    // one here produced a different chord (G7sus4 -> B-D-F, a plain G7; Cadd9 ->
+    // Bb-E-G, a C9). null = use the rooted `getIntervals` stack. Kept in lockstep
+    // with the same guard in `shouldUseRootlessVoicing` so a direct caller of this
+    // function can't reach the shell either.
+    if (NEVER_ROOTLESS_DOMINANT_QUALITIES.has(quality)) {
         return null;
     }
 
@@ -181,7 +191,17 @@ export function getIntervals(
     const isRich = density === 'rich';
     const intensity = playback.bandIntensity;
 
+    // why (#1315): a diminished chord's 5th IS altered — 'dim' and 'halfdim' are the
+    // canonical names for it (`getChordDetails` never emits 'dim7'/'m7b5'), so the
+    // name-shape tests below could never match them. That let the intensity >= 0.8
+    // "Wall of Sound" backfill stack a PERFECT 5th a semitone above the chord's own
+    // b5 (Bm7b5 -> B3 F4 F#4 A4 D5) in every genre whenever the band got loud, and
+    // let the >= 0.6 extension block slam a b7 onto a plain diminished triad (a
+    // written B dim came out B D F A, a Bm7b5). Both now read the flat 5 as the
+    // alteration it is.
     const isAltered5 =
+        quality === 'dim' ||
+        quality === 'halfdim' ||
         quality.includes('alt') ||
         quality.includes('b5') ||
         quality.includes('#5') ||
@@ -441,6 +461,13 @@ export function getIntervals(
             '7alt',
             '9',
             'dim',
+            // why (#1316): `add9` is the one quality whose NAME says "9th but no
+            // 7th" — that distinction from `C9` is the reason the symbol exists —
+            // yet its "9" makes `getChordDetails` report `is7th`, so this backfill
+            // handed every rooted Cadd9 an unwritten b7 (C-E-G-D-Bb, a C9). Same
+            // exclusion, same reason, as the one in `getFormattedChordNames`, which
+            // is why "Cadd9" displayed correctly while sounding as a C9.
+            'add9',
         ].includes(quality)
     ) {
         if (!intervals.includes(10)) {
