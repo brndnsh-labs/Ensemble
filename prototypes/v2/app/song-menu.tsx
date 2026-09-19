@@ -29,6 +29,13 @@ interface SongMenuProps {
     onImport: () => void;
     onRevert: () => void;
     onOpenRecovery: (record: Recovery) => void;
+    /** #1278 — audio export is a distinct busy state from `busy` so its Cancel
+     * button stays clickable while the render is in flight; see `onCancelExportAudio`. */
+    exportingAudio: boolean;
+    exportAudioProgress: string;
+    onExportAudioMix: () => void;
+    onExportAudioStems: () => void;
+    onCancelExportAudio: () => void;
     onDeleteFromAccount: () => void;
 }
 
@@ -49,6 +56,11 @@ export function SongMenu({
     onImport,
     onRevert,
     onOpenRecovery,
+    exportingAudio,
+    exportAudioProgress,
+    onExportAudioMix,
+    onExportAudioStems,
+    onCancelExportAudio,
     onDeleteFromAccount,
 }: SongMenuProps) {
     return (
@@ -70,6 +82,12 @@ export function SongMenu({
                 </button>
                 <button className="btn" disabled={busy} onClick={onExportMidi}>
                     Export MIDI
+                </button>
+                <button className="btn" disabled={busy} onClick={onExportAudioMix}>
+                    Export audio (mix)
+                </button>
+                <button className="btn" disabled={busy} onClick={onExportAudioStems}>
+                    Export audio (stems)
                 </button>
                 {current?.schemaVersion === 2 && current.importSource && (
                     <button
@@ -103,6 +121,14 @@ export function SongMenu({
                     Close
                 </button>
             </div>
+            {exportingAudio && (
+                <p className="sound-progress" role="status">
+                    {exportAudioProgress || 'Preparing sounds…'}
+                    <button className="btn" onClick={onCancelExportAudio}>
+                        Cancel
+                    </button>
+                </p>
+            )}
             {shareLinkFallback && (
                 <p className="share-link-fallback">
                     <label htmlFor="share-link-url">
