@@ -106,6 +106,14 @@ const QUALITIES = new Set([
     'm7b5',
     'm7',
     'm6',
+    // #1336 — the `m…` spellings of the minor-♯5 triad. iReal's own `-#5` is already above;
+    // these are Ensemble's, and they now parse to the real `m#5` quality instead of a plain
+    // minor triad, so the codec must accept them as whole tokens too.
+    'm#5',
+    'm+5',
+    'min#5',
+    'min+5',
+    '-+5',
     'min',
     'm',
     'dim7',

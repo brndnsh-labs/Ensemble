@@ -182,6 +182,23 @@ const SUFFIX_QUALITIES = new Map<string, string>([
     ['mmaj7', 'mMaj7!'],
     ['mmaj', 'mMaj7!'],
 
+    // --- minor with a RAISED fifth (#1336). A real quality for the same reason `maj7b5` is:
+    // no other quality voices a minor 3rd without a natural 5, so every spelling of this
+    // chord matched the bare `m`/`min`/`-` row and came out a plain minor triad — the
+    // natural 5 the chart had sharpened. `-#5` is the iReal spelling and was already in
+    // `songbook/score-text.ts`'s accepted vocabulary while parsing as a plain minor. The
+    // `+5` spellings are the same chord ("minor, raised 5"); bare `m+` is deliberately NOT
+    // a row, because it would also capture `m+7`/`m+9`, whose reading is genuinely
+    // contested (minor-MAJOR 7 by the "+ raises the 7th" convention, m7#5 by this table's
+    // own `+7` -> aug7 analogy) — picking a side there is a separate decision.
+    // Rows are 3+ characters so the longest-first matcher puts them ahead of `m`/`min`/`-`.
+    ['m#5', 'm#5'],
+    ['min#5', 'm#5'],
+    ['-#5', 'm#5'],
+    ['m+5', 'm#5'],
+    ['min+5', 'm#5'],
+    ['-+5', 'm#5'],
+
     // --- minor family. `minor` + is7th true IS m7 (the canonical pair, not a shortcut).
     ['m7b5', 'halfdim!'],
     ['min7b5', 'halfdim!'],
@@ -876,6 +893,13 @@ export function getFormattedChordNames(
         absSuffix = 'mMaj7';
         nnsSuffix = '-Maj7';
         romSuffix = 'Maj7';
+    } else if (quality === 'm#5') {
+        // why (#1336): without a branch this collapsed to the default empty suffix, so a
+        // written `Cm#5` displayed as a bare `C` — the major chord it is furthest from.
+        // `-#5` is the iReal/NNS spelling of the same chord.
+        absSuffix = 'm#5';
+        nnsSuffix = '-#5';
+        romSuffix = '#5';
     } else if (quality === 'madd9') {
         absSuffix = 'madd9';
         nnsSuffix = '-add9';
@@ -1039,7 +1063,9 @@ export function getFormattedChordNames(
         // is lowercase like every other minor quality's. Without these a chart in roman
         // notation displayed `IMaj7` for what it plays as a minor tonic.
         quality === 'mMaj7' ||
-        quality === 'madd9'
+        quality === 'madd9' ||
+        // #1336 — a raised fifth does not make the chord major; its b3 does the naming.
+        quality === 'm#5'
     ) {
         romanName = rootRomanBase.toLowerCase();
     } else {

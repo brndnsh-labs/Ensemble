@@ -31,6 +31,7 @@ const QUALITIES: Readonly<Record<string, readonly number[]>> = {
     // would hand the guitar/piano voicers a major 3rd over a minor chord.
     mMaj7: [0, 3, 7, 11],
     madd9: [0, 3, 7, 14],
+    'm#5': [0, 3, 8], // #1336 — no natural 5; a missing row falls back to MAJOR
     '9sus4': [0, 5, 7, 10, 14],
     '13sus4': [0, 5, 7, 10, 14, 21],
     '6/9': [0, 4, 7, 9, 14],

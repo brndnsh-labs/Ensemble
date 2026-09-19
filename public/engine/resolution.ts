@@ -123,6 +123,9 @@ const MINOR_QUALITIES = new Set([
     'm13',
     'mMaj7',
     'madd9',
+    // #1336 — a raised fifth is a colour on a MINOR triad, so a chart cadencing on `Cm#5`
+    // lands on a minor tonic. Absent this the ending resolution voiced it major.
+    'm#5',
     'halfdim',
     'dim',
 ]);

@@ -35,6 +35,16 @@ export function getRootlessVoicing(
         return null;
     }
 
+    // #1336 — same class as the m6 refusal above, one alteration over: `m#5` is a TRIAD, so
+    // it has no 3rd-plus-7th shell to state. It is in the minor family (`startsWith('m')`
+    // and not 'maj'), so without this it fell through to the minor-7 shell and came back
+    // [3, 7, 10] — a natural 5 over a chord written with a sharp one, plus an unwritten b7.
+    // `shouldUseRootlessVoicing` already says no (its minor bucket requires `is7th`); this
+    // keeps the function honest for any direct caller. null = use the rooted [0, 3, 8].
+    if (quality === 'm#5') {
+        return null;
+    }
+
     // #1316 — same class as the m6 refusal above: a suspension, an added tone or a
     // 6th has no 3rd-plus-b7 shell to state, so the `is7th` string heuristic routing
     // one here produced a different chord (G7sus4 -> B-D-F, a plain G7; Cadd9 ->
@@ -311,6 +321,13 @@ export function getIntervals(
             intervals = [0, 4, 7, 9];
         } else if (quality === 'm6') {
             intervals = [0, 3, 7, 9];
+        } else if (quality === 'm#5') {
+            // 1 b3 #5 (#1336). No natural 5 — the sharpened fifth IS the spelling, and
+            // `isAltered5` (which matches '#5') keeps the >= 0.8 "Wall of Sound" backfill and
+            // the rich-density tier from adding one back. No `is7th` arm: no row in
+            // `SUFFIX_QUALITIES` encodes this quality with a seventh, so it never arrives with
+            // one (unlike `aug`, whose `aug7`/`+7`/`7#5` rows do).
+            intervals = [0, 3, 8];
         } else if (quality === 'mMaj7') {
             intervals = [0, 3, 7, 11]; // 1 b3 5 maj7 — the melodic-minor tonic (#1321)
         } else if (quality === 'madd9') {
@@ -483,6 +500,11 @@ export function getIntervals(
             m7: [14, 17], // 9, 11
             7: [14, 21], // 9, 13
             halfdim: [17], // 11
+            // why (#1336): without its own row `m#5` fell to the `isAltered5 ? [14, 18]`
+            // default below, and 18 is the #11 — a FLAT fifth stacked onto a chord written
+            // with a sharp one, two different fifths in one voicing. The minor family's own
+            // colours (9, 11) are the honest rich extension here, so this mirrors `minor`.
+            'm#5': [14, 17], // 9, 11
             aug: [14, 22], // 9, #11
             augmaj7: [14, 18], // 9, #11
             '7alt': [13, 15, 20], // b9, #9, b13
