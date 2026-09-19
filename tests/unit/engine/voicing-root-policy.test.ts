@@ -198,6 +198,39 @@ describe('Voicing root policy (#1313)', () => {
             },
         );
 
+        // #1348 — the altered-fifth family the #1313->#1344 series finished
+        // (`maj7b5`, `m#5`, `m7#5`) joining `GROUNDING_QUALITIES`. Two halves, and the
+        // identity matrix's live layer (c) covers neither for all seven feels: it runs
+        // Jazz/Funk/Neo-Soul only, and it asserts misnaming degrees are ABSENT, never
+        // that the root is PRESENT.
+        //   * root present — rootless, these three lose their name outright: an `m7#5`
+        //     shell is Eb-Ab-Bb, which IS an Eb sus4, and a `maj7b5` without its root
+        //     is E-Gb-B. With the bass muted nothing else states it.
+        //   * no natural 5 — the tone the chart altered. Degree 7 over any of the three
+        //     is a semitone grind against the written #5/b5, not a colour.
+        // Measured honestly: this is COVERAGE, not the mutation-sensitive pin for the
+        // #1348 change. Both halves already hold here without the `GROUNDING_QUALITIES`
+        // entries, because with the bass muted `shouldUseRootlessVoicing` is off outright
+        // and #1313's `selectRootedDyad`/`ensureRootVoice` keep the root for every
+        // quality. The assertion that DOES go red when the grounding half is dropped is
+        // the harmony pad's, in tests/standards/harmony-lane-written-fifth-critique.ts —
+        // the pad is the one lane whose tension density cap can strip the root.
+        it.each([0.35, 0.9])(
+            'the altered-fifth family states its root and never a natural 5, bass muted (intensity %s)',
+            (intensity) => {
+                const chart = 'Cmaj7b5 | Cm#5 | Cm7#5';
+                for (const heard of sound(feel, false, chart, intensity, 4)) {
+                    const where = `${heard.name} in ${feel} @${intensity}`;
+                    expect(heard.sets.length, `${where} never sounds`).toBeGreaterThan(0);
+                    // The fullest hit is the statement; sparser answers echo under it.
+                    expect(heard.sets[0], `${where} has no root under a muted bass`).toContain(0);
+                    for (const degrees of heard.sets) {
+                        expect(degrees, `${where} sounds the 5 it altered`).not.toContain(7);
+                    }
+                }
+            },
+        );
+
         // #1316 — the parse fix is only half the claim: every lane re-reduces the
         // voicing, and Funk's clav cell BUILDS its own by pitch class with a
         // synthesized fallback, so it invented the exact tones the parse layer stopped
@@ -309,6 +342,54 @@ describe('Voicing root policy (#1313)', () => {
                 }
             }
         });
+    });
+
+    // #1348 (tests only, no behaviour change) — `mb6` is the one member of the family
+    // the #1313->#1344 series added whose fifth is WRITTEN: [0, 3, 7, 8] states the
+    // natural 5 AND the b6 a semitone above it, so the two have to be SPACED, not just
+    // both present. The textbook answer, and what the generic minor-2nd spread produces
+    // today, is the b6 UNDER the 5 a major 7th apart (Ab3-G4 = 11 semitones); an
+    // adjacent semitone (Ab-G in one octave) is the other acceptable reading. The one
+    // inversion that is not is the 5 below the b6 at a MINOR NINTH (G3-Ab4 = 13) — the
+    // harshest interval in tonal voicing, and exactly what an octave-shift change to
+    // `spreadMinorSeconds` could flip this into. This pin is the guard against that.
+    // Measured when written: all 336 cells carry both tones and every one of them spaces
+    // them at -11 (the b6 a major 7th below the 5), so the pin has the whole 24-semitone
+    // gap to the forbidden +13 as headroom — it can only go red on a real inversion.
+    it('never places an mb6 fifth a minor 9th below its b6', () => {
+        const roots = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
+        const offenders = [];
+        let sawBoth = 0;
+        for (const feel of FEELS) {
+            for (const root of roots) {
+                for (const bassOn of [true, false]) {
+                    for (const intensity of [0.35, 0.9]) {
+                        const [parsed] = voice(feel, bassOn, `${root}mb6`, root, intensity);
+                        expect(parsed.quality, `${root}mb6 in ${feel}`).toBe('mb6');
+                        const [chord] = getState().arranger.progression;
+                        const fifths = parsed.midis.filter((m) => degreeOf(m, chord) === 7);
+                        const flatSixes = parsed.midis.filter((m) => degreeOf(m, chord) === 8);
+                        if (fifths.length === 0 || flatSixes.length === 0) {
+                            continue;
+                        }
+                        sawBoth++;
+                        for (const fifth of fifths) {
+                            for (const flatSix of flatSixes) {
+                                if (flatSix - fifth === 13) {
+                                    offenders.push(
+                                        `${root}mb6 in ${feel}, bass on: ${bassOn} @${intensity}: ${parsed.midis.join(',')}`,
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        // Guard the guard: a voicing that dropped one of the two tones everywhere would
+        // make every check above vacuous.
+        expect(sawBoth, 'no mb6 voicing carried both the 5 and the b6').toBeGreaterThan(0);
+        expect(offenders, 'an mb6 5th sits a minor 9th below its b6').toEqual([]);
     });
 
     it('getChordDetails never marks an m6 as a 7th chord (Am6/9\'s "9" is not a 7th)', () => {

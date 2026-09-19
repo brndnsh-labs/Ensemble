@@ -43,6 +43,17 @@ const GROUNDING_QUALITIES = new Set([
     '7b5',
     'aug',
     'augmaj7',
+    // why (#1348): the altered-5th family finished by the #1313->#1344 chord series —
+    // same rule this set already applies to `aug`/`augmaj7`/`7b5`, just written after
+    // the set was. Rootless, these three lose their name outright: an `m7#5` shell is
+    // Eb-Ab-Bb, which IS an Eb sus4, and a `maj7b5` without its root is E-Gb-B. So with
+    // the bass MUTED the comp reducers (Neo-Soul window, Funk cell, low-intensity
+    // two-voice thinning, the harmony pad) keep the root under them.
+    // `mb6` is deliberately absent: its perfect 5th is WRITTEN, and the set's own
+    // precedent excludes the 6th-chord family (`6`, `m6`).
+    'maj7b5',
+    'm#5',
+    'm7#5',
 ]);
 
 /**
@@ -90,6 +101,18 @@ const TENSION_CHORD_QUALITIES = new Set([
     'aug',
     'augmented',
     'augmaj7',
+    // why (#1348): the same altered-5th family, and the same rule the entries above
+    // already encode — a chord whose 5th is altered is an unstable colour sonority, so
+    // the harmony lane stays a slim guide-tone layer over it and never states a 5th.
+    // This flag is what gates the four per-genre voicing overrides in `harmonies.ts`
+    // (`applyGenreVoicingOverride`), every one of which FABRICATES a perfect 5th:
+    // the Blues horn stab returns [3, 7, 0] / [4, 7, 0], the Metal power chord
+    // root+5+octave, the Rock harmonized line [3rd, 7] / [0, 7] / [0, 7, 12]. Without
+    // these three listed, the horns punched G natural over a written Cmaj7b5's Gb and
+    // over a Cm#5's Ab. `mb6` stays out for the same reason as above — its 5th is written.
+    'maj7b5',
+    'm#5',
+    'm7#5',
 ]);
 
 function isBassSpaceFeel(feel: string | undefined | null): boolean {
