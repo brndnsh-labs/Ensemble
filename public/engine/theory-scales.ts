@@ -136,9 +136,10 @@ export function getScaleForChord(
     }
 
     // --- WRITTEN-ALTERATION SPECIALISTS (outrank every genre branch) ---
-    // A written ♭5/♯5 (or a minor chord's written maj7) is harmonic FACT, not colour, so no
-    // genre may pick a pool that contradicts it. These branches therefore sit ABOVE the genre
-    // switches rather than in SPECIAL QUALITY HANDLING below: `maj7b5` previously fell through to
+    // A written ♭5/♯5 (or a minor chord's written maj7, or its written ♭6 — #1340) is harmonic
+    // FACT, not colour, so no genre may pick a pool that contradicts it. These branches therefore
+    // sit ABOVE the genre switches rather than in SPECIAL QUALITY HANDLING below: `maj7b5`
+    // previously fell through to
     // LYDIAN (#1336), whose natural 5 sat a semitone under the ♯4/♭5 the comp voices —
     // and country's MINOR/MAJOR_PENTATONIC early returns below, funk/blues' MAJOR_BLUES,
     // the minor family's DORIAN flavour override and the jazz/bossa non-diatonic LYDIAN
@@ -149,6 +150,26 @@ export function getScaleForChord(
     }
     if (alteredFifthQuality === 'm#5') {
         return SCALE_INTERVALS.AEOLIAN_NO_FIFTH;
+    }
+    // #1340 — `m7#5` takes the SAME pool, with no new scale needed: its tones are 0/3/8/10 and
+    // the fifth-less Aeolian states every one of them (b3, ♯5/♭6, b7) while omitting the 5 the
+    // chart sharpened. The only 7-note members of this table that state all four tones without a
+    // natural 5 are LOCRIAN, LOCRIAN_NATURAL_2 and ALTERED, and every one of them carries a ♭5
+    // (degree 6) beside this chord's written sharp fifth — two different fifths in one pool, the
+    // reason `LYDIAN_NO_FIFTH` rejects Lydian-augmented. Without the branch the minor family
+    // below answered DORIAN (Jazz/Neo-Soul/funk/bossa) or NATURAL_MINOR, both with a natural 7.
+    if (alteredFifthQuality === 'm7#5') {
+        return SCALE_INTERVALS.AEOLIAN_NO_FIFTH;
+    }
+    // #1340 — `mb6` belongs in this block for the mirror-image reason: its written tone is the
+    // ♭6 (interval 8) and the minor family's genre flavour override picks DORIAN in Jazz,
+    // Neo-Soul, funk and bossa, whose NATURAL 6 (interval 9) sits a semitone above it — the
+    // soloist running the one note the chart flattened. Plain Aeolian already contains 3, 5 and
+    // ♭6, so the honest pool needs no omission at all; only the genre override had to be
+    // outranked. (Country's MINOR_PENTATONIC early return has no 6 of either kind, so it would
+    // not have contradicted the chord — but it would have left the written colour unreachable.)
+    if (alteredFifthQuality === 'mb6') {
+        return SCALE_INTERVALS.NATURAL_MINOR;
     }
     // Minor-major 7th: the melodic-minor tonic (#1321). Same "written fact outranks genre"
     // rule, one degree over: left beside the other specialists below, country's early return

@@ -1,5 +1,5 @@
 // @ts-nocheck
-// cspell:ignore Bdim Gsus
+// cspell:ignore Bdim Gsus madd
 // #1313 — "leave room for the bass" (a register floor) and "rootless voicing" (drop
 // the root for shell tones) are different things. Rootless is only for chords the
 // chart WRITES as 7ths/extensions, and only while a bass line is actually sounding;
@@ -358,6 +358,111 @@ describe('Voicing root policy (#1313)', () => {
             ).toEqual([0, 2, 3, 5, 8]);
             expect(degrees.has(6), `${genre} sounds a b5 beside the #5`).toBe(false);
             expect(degrees.has(7), `${genre} sounds a natural 5`).toBe(false);
+        }
+    });
+
+    // #1340 — `m7#5` is the one member of this family that DOES reach the rootless shell in
+    // production: `shouldUseRootlessVoicing`'s minor bucket is `minor-family && is7th`, which
+    // is shape-based, not a name list, so the new quality qualified the moment it existed.
+    // Without its own branch in `getRootlessVoicing` it fell through to the standard minor-7
+    // shell [3, 7, 10] — the natural 5 the chart sharpened, over a sounding bass.
+    it('getRootlessVoicing gives m7#5 a b3-#5-b7 shell, never the minor-7 one', () => {
+        expect(getRootlessVoicing(getState(), 'm7#5', true, false)).toEqual([3, 8, 10]);
+        expect(getRootlessVoicing(getState(), 'm7#5', true, true)).toEqual([3, 8, 10, 14]);
+        for (const shell of [
+            getRootlessVoicing(getState(), 'm7#5', true, false),
+            getRootlessVoicing(getState(), 'm7#5', true, true),
+        ]) {
+            expect(shell.map((i) => i % 12)).not.toContain(7);
+        }
+    });
+
+    // #1340 — the rooted rich tier for `m7#5`. The musical claim is the output, not the table
+    // row: four written tones plus the 9, and NO fifth of either kind — not the natural 5 the
+    // chart sharpened, and not the #11 (a b5) the generic `isAltered5` rich default would reach
+    // for. (The `safeExtensions` row's second entry is unreachable today; see its comment.)
+    it('a rich m7#5 adds the 9 and no fifth of either kind', () => {
+        const state = getState();
+        state.playback.bandIntensity = 0.35; // below every intensity-driven backfill tier
+        const intervals = getIntervals(state, 'm7#5', true, 'rich', 'Acoustic', false);
+        expect(intervals).toEqual([0, 3, 8, 10, 14]);
+        const degrees = new Set(intervals.map((i) => ((i % 12) + 12) % 12));
+        expect(degrees.has(7), 'sounds a natural 5').toBe(false);
+        expect(degrees.has(6), 'sounds a b5 beside the #5').toBe(false);
+    });
+
+    // #1340 — and `mb6` is the m6 case exactly: a triad plus a colour tone, so there is no
+    // 3rd-plus-7th shell to state. Production never routes here (the bucket above needs
+    // `is7th`), so this is the direct-caller contract; the fallthrough would answer [3, 7, 10],
+    // swapping the written ♭6 for an unwritten b7.
+    it('getRootlessVoicing refuses mb6 rather than answering with a minor-7 shell', () => {
+        expect(getRootlessVoicing(getState(), 'mb6', false, false)).toBeNull();
+        expect(getRootlessVoicing(getState(), 'mb6', false, true)).toBeNull();
+    });
+
+    // #1340 — `mb6` is NOT `isAltered5` (its name carries no 'b5'/'#5', and its natural 5 is
+    // real), so the intensity tier that hands a plain triad a seventh had nothing stopping it:
+    // a written Cm(b6) came out C-Eb-G-Ab-Bb, the `min7b6` iReal spells with a different token.
+    // `NO_SEVENTH_QUALITIES` is the guard, the same one `m6`/`madd9` use. 0.65 is the lowest
+    // intensity that reaches the tier; Jazz/Funk/Rock are excluded from it by genre, which is
+    // why the probe genres are Acoustic and Neo-Soul.
+    it('a loud mb6 keeps its b6 and never gains a b7', () => {
+        for (const genre of ['Acoustic', 'Neo-Soul']) {
+            for (const intensity of [0.65, 0.9]) {
+                const state = getState();
+                state.playback.bandIntensity = intensity;
+                const intervals = getIntervals(state, 'mb6', false, 'standard', genre, true);
+                const degrees = new Set(intervals.map((i) => ((i % 12) + 12) % 12));
+                const where = `${genre} @${intensity}`;
+                expect(degrees.has(10), `${where} gained an unwritten b7`).toBe(false);
+                expect(degrees.has(9), `${where} sounds the natural 6 it flattens`).toBe(false);
+                expect(degrees.has(8), `${where} lost its b6`).toBe(true);
+                expect(degrees.has(7), `${where} lost its natural 5`).toBe(true);
+                expect(degrees.has(3), `${where} lost its b3`).toBe(true);
+            }
+        }
+    });
+
+    // #1340 — the rich tier: 9 only. The generic default would be [14] anyway for a quality
+    // that is not `isAltered5`, so the row's real job is to be explicit that the 11 is NOT
+    // wanted here (the 5 and ♭6 are already a semitone pair; an 11 under them crowds it).
+    it('a rich mb6 takes the 9 alone', () => {
+        const state = getState();
+        state.playback.bandIntensity = 0.35; // below every intensity-driven backfill tier
+        const intervals = getIntervals(state, 'mb6', false, 'rich', 'Acoustic', true);
+        expect(intervals).toEqual([0, 3, 7, 8, 14]);
+    });
+
+    // #1341 — the `aug` rich row held 22 (a b7) under a "#11" comment, so a plain C+ became
+    // C+7 at rich density: dominant function the chart never wrote.
+    it('a rich aug TRIAD never gains a b7; aug7 keeps the one it was written with', () => {
+        for (const genre of ['Jazz', 'Acoustic', 'Rock']) {
+            const state = getState();
+            state.playback.bandIntensity = 0.35;
+            const triad = getIntervals(state, 'aug', false, 'rich', genre, true);
+            const triadDegrees = new Set(triad.map((i) => ((i % 12) + 12) % 12));
+            expect(triadDegrees.has(10), `${genre} C+ sounds a b7`).toBe(false);
+            expect(triadDegrees.has(7), `${genre} C+ sounds a natural 5`).toBe(false);
+            expect(
+                [...triadDegrees].sort((a, b) => a - b),
+                genre,
+            ).toEqual([0, 2, 4, 6, 8]);
+
+            const seventh = getIntervals(state, 'aug', true, 'rich', genre, true);
+            expect(
+                seventh.some((i) => ((i % 12) + 12) % 12 === 10),
+                `${genre} C+7 lost its b7`,
+            ).toBe(true);
+        }
+    });
+
+    // #1341 — `quality` derives from chart text; an inherited Object.prototype key must not be
+    // read out of the extension table as a truthy "row".
+    it('an inherited-property quality name takes the fallback instead of throwing', () => {
+        const state = getState();
+        state.playback.bandIntensity = 0.35;
+        for (const hostile of ['constructor', 'toString', '__proto__', 'hasOwnProperty']) {
+            expect(() => getIntervals(state, hostile, false, 'rich', 'Jazz', true)).not.toThrow();
         }
     });
 });

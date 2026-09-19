@@ -55,4 +55,23 @@ describe('Chord Formatting Verification', () => {
             expect(formatted.roman.suffix).toBe(expectedSuffix);
         });
     });
+
+    // #1340 — a raised fifth and an added ♭6 are both colours on a MINOR triad, so the numeral
+    // is LOWERCASE like every other minor quality's (without the entry a chart in roman notation
+    // showed `I7#5` for what it plays as a minor tonic). `m7#5` additionally spells its own
+    // seventh, so the `is7th` append must skip it — `i7#57` is the failure mode #1323 is named
+    // for. The NNS suffixes are iReal's own spellings of the two chords.
+    it('formats the minor 7#5 and the minor b6 as minor chords', () => {
+        const m7sharp5 = getFormattedChordNames('C', '1', 'I', 'm7#5', true);
+        expect(m7sharp5.roman.root).toBe('i');
+        expect(m7sharp5.roman.suffix).toBe('7#5');
+        expect(m7sharp5.nns.suffix).toBe('-7#5');
+        expect(m7sharp5.name.suffix).toBe('m7#5');
+
+        const mb6 = getFormattedChordNames('C', '1', 'I', 'mb6', false);
+        expect(mb6.roman.root).toBe('i');
+        expect(mb6.roman.suffix).toBe('b6');
+        expect(mb6.nns.suffix).toBe('-b6');
+        expect(mb6.name.suffix).toBe('mb6');
+    });
 });

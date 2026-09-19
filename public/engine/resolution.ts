@@ -126,6 +126,10 @@ const MINOR_QUALITIES = new Set([
     // #1336 — a raised fifth is a colour on a MINOR triad, so a chart cadencing on `Cm#5`
     // lands on a minor tonic. Absent this the ending resolution voiced it major.
     'm#5',
+    // #1340 — same rule for the ♯5's 7th-chord sibling and for the added ♭6: both are minor
+    // triads with one extra tone, so a chart cadencing on either lands on a minor tonic.
+    'm7#5',
+    'mb6',
     'halfdim',
     'dim',
 ]);

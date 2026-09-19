@@ -2,6 +2,8 @@ import { addScoreDurations, scoreDuration, scoreMeter } from './score-duration.j
 import type { ScoreDuration, ScoreEvent } from './score-types.js';
 import type { CodecDecodeResult } from './types.js';
 
+// cspell:ignore minb susadd
+
 // Spelling vocabulary, not voicings. The official iReal grammar and Ensemble's existing
 // spellings belong here independently of octave, genre, instrument or generated intervals.
 // https://www.irealpro.com/ireal-pro-custom-chord-chart-protocol/
@@ -114,6 +116,19 @@ const QUALITIES = new Set([
     'min#5',
     'min+5',
     '-+5',
+    // #1340 — the minor-♯5 SEVENTH and the minor triad with an added ♭6. iReal's `-b6` is
+    // already above and `-7#5` follows its `-7b5` pattern; the `m…`/`min…` spellings are
+    // Ensemble's. All of them now parse to a real quality instead of a plain minor chord, so
+    // the codec must accept them as whole tokens. Longer spellings come first for readability;
+    // `isScoreChord` matches the whole tail, so set order is not load-bearing.
+    'm7#5',
+    'm7+5',
+    'min7#5',
+    'min7+5',
+    '-7#5',
+    '-7+5',
+    'mb6',
+    'minb6',
     'min',
     'm',
     'dim7',
