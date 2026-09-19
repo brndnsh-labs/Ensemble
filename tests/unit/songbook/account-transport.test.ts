@@ -40,6 +40,16 @@ function fakeApi(...posts: Array<ApiResult<unknown>>): { api: AccountApi; calls:
     return { api, calls };
 }
 
+/** A session-read-only API, so a test can reach `signedIn` before exercising the transport. */
+function signedInApi(): AccountApi {
+    return {
+        get: vi.fn(async () => ({ ok: true, value: { accountId: 'acct-1' }, status: 200 })),
+        post: vi.fn(async () => {
+            throw new Error('not used by the session');
+        }),
+    } as unknown as AccountApi;
+}
+
 describe('createSaveTransport', () => {
     it('resolves a committed reply untouched, so `reply()` can validate it', async () => {
         const committed = {
@@ -83,7 +93,12 @@ describe('createSaveTransport', () => {
             ok: false,
             error: { kind: 'code', code: 'unauthenticated', status: 401 },
         });
-        const session = createAccountSession(api);
+        // Signed in first, because that is the only session `markExpired()` acts on: it refuses
+        // to move a `guest` or never-refreshed device to `expired` (`lib/account/session.ts`),
+        // and a transport test that skipped this would be asserting against a no-op.
+        const session = createAccountSession(signedInApi());
+        await session.refresh();
+        expect(session.getSnapshot()).toEqual({ status: 'signedIn', owner: 'acct-1' });
         const markExpired = vi.spyOn(session, 'markExpired');
         const transport = createSaveTransport(api, session);
         await expect(transport(REQUEST)).rejects.toBeInstanceOf(SaveTransportError);

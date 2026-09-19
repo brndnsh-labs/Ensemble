@@ -1,10 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { runOutboxPass } from '../../prototypes/v2/lib/sync/drain.js';
 import {
     ACCOUNT_DATABASE,
     AccountChangedError,
     type AccountScope,
     type ChartDocument,
     LocalRevisionError,
+    lastOpenedKey,
     MAX_PENDING_SAVES,
     type PreparedSave,
 } from '../../prototypes/v2/lib/sync/protocol.js';
@@ -177,6 +179,18 @@ function semantic(document: ChartDocument): ChartDocumentV2 {
     return document;
 }
 
+/**
+ * Let the wall clock move on before the next write.
+ *
+ * `capturedAt` against `updatedAt` is the entire vocabulary of the live-draft rule (#1299), and
+ * both are `new Date().toISOString()` at millisecond resolution — so a recovery and a Save issued
+ * in the same tick carry the SAME stamp, and a test that means "captured before this commit" would
+ * otherwise assert it only some of the time.
+ */
+function tick(): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, 5));
+}
+
 /** Direct database access, to plant records no public API can produce. */
 async function rawDatabase(): Promise<IDBDatabase> {
     return new Promise<IDBDatabase>((resolve, reject) => {
@@ -308,7 +322,7 @@ describe('account songbook on real IndexedDB', () => {
         expect(await book.pending(scope, 'study')).toEqual([]);
     });
 
-    it('two independent connections serialize local compare-and-save and keep both writer drafts', async () => {
+    it('two independent connections serialize local compare-and-save, and the loser re-retains', async () => {
         const a = await book.save(scope, accountChart(), null);
         const other = connection();
         const otherScope = (await other.currentScope())!;
@@ -316,6 +330,7 @@ describe('account songbook on real IndexedDB', () => {
             book.recover(scope, 'writer-1', { ...a.document, title: 'tab-one' }, 0),
             other.recover(otherScope, 'writer-2', { ...a.document, title: 'tab-two' }, 0),
         ]);
+        await tick();
         const results = await Promise.allSettled([
             book.save(scope, { ...a.document, title: 'tab-one' }, 0),
             other.save(otherScope, { ...a.document, title: 'tab-two' }, 0),
@@ -326,9 +341,24 @@ describe('account songbook on real IndexedDB', () => {
             LocalRevisionError,
         );
         expect(await book.pending(scope, 'study')).toHaveLength(2);
-        expect(
-            (await book.drafts(scope, 'study')).map((draft) => draft.document.title).sort(),
-        ).toEqual(['tab-one', 'tab-two']);
+        // Both rows were captured against revision 0, and the Save that won has moved past it, so
+        // neither is an experiment on the committed version any longer and `save()` retires both
+        // (#1299 patch review P1). Nothing readable is lost: `retainedDraft` already refused to
+        // offer a row older than the version it sits on, so these were unreachable either way.
+        expect(await book.drafts(scope, 'study')).toEqual([]);
+        // And the tab whose Save was refused has not been robbed — its text is still live in that
+        // tab, and its next keystroke retains it against the version that won. That row IS an
+        // experiment on the committed version, and it stays.
+        const won = (await book.read(scope, 'study'))!;
+        await other.recover(
+            otherScope,
+            'writer-2',
+            { ...won.document, title: 'tab-two' },
+            won.document.revision,
+        );
+        expect((await book.drafts(scope, 'study')).map((draft) => draft.document.title)).toEqual([
+            'tab-two',
+        ]);
     });
 
     it('duplicate senders reuse one frozen head and late duplicate acknowledgements cannot regress metadata', async () => {
@@ -377,6 +407,137 @@ describe('account songbook on real IndexedDB', () => {
         });
         expect((await book.pending(scope, 'study'))[0].remote).toBeNull();
         expect(await book.prepare(scope, 'study')).toBe('conflict');
+    });
+
+    describe('a permanent transport-level refusal (#1298)', () => {
+        it('stops preparing a refused head, and a fresh Save of the same document replaces it', async () => {
+            await book.save(scope, accountChart(), null);
+            const first = await prepared();
+
+            expect(await book.refuse(scope, 'study', first.operationId, 'too-large')).toBe(
+                'refused',
+            );
+            expect(await book.prepare(scope, 'study')).toBe('refused');
+            const refusedOps = await book.pending(scope, 'study');
+            expect(refusedOps).toHaveLength(1);
+            expect(refusedOps[0]).toMatchObject({ status: 'refused', reason: 'too-large' });
+
+            // A smaller re-Save of the SAME document: the queue becomes [new], not
+            // [refused, new] — the refused head is deleted, not queued behind.
+            const smaller = await book.save(scope, { ...refusedOps[0].snapshot, title: 'B' }, 0);
+            const ops = await book.pending(scope, 'study');
+            expect(ops).toHaveLength(1);
+            expect(ops[0]).toMatchObject({ status: 'queued', documentId: 'study' });
+            expect(ops[0].reason).toBeUndefined();
+            expect(smaller.document.title).toBe('B');
+
+            // Prepares cleanly and can now actually send — no `'refused'` verdict blocking it.
+            const next = await prepared();
+            expect(JSON.parse(next.body).document.title).toBe('B');
+        });
+
+        it('is a no-op once the head has already resolved a different way', async () => {
+            await book.save(scope, accountChart(), null);
+            const request = await prepared();
+            await book.acknowledge(scope, request, {
+                ...committed(request, 'remote-1'),
+                kind: 'conflict',
+                remote: { revision: 'remote-1', document: accountChart('remote') },
+            });
+
+            // The queue's head is already 'conflict', not the plain 'queued' this call expects.
+            expect(await book.refuse(scope, 'study', request.operationId, 'refused')).toBe('none');
+            expect(await book.prepare(scope, 'study')).toBe('conflict');
+        });
+
+        it('reports none against an empty queue rather than inventing a refusal', async () => {
+            expect(await book.refuse(scope, 'never-saved', crypto.randomUUID(), 'refused')).toBe(
+                'none',
+            );
+        });
+
+        it('refuses the operation the transport named, never whichever Save is the head now', async () => {
+            // #1298 patch review P1: this account's outbox is shared by every open tab, so a
+            // second tab can commit the head and the musician can queue a fresh Save behind it
+            // while a late 413 for the FIRST operation is still unwinding. Marking by position
+            // would then permanently refuse a Save that was never sent — and the only way out is a
+            // re-Save the musician has no reason to know they owe.
+            const a = await book.save(scope, accountChart(), null);
+            const first = await prepared();
+            await book.acknowledge(scope, first, committed(first, 'cloud-1'));
+            // The Save the musician makes next; the account has never seen these bytes.
+            await book.save(scope, { ...a.document, title: 'B' }, 0);
+
+            expect(await book.refuse(scope, 'study', first.operationId, 'too-large')).toBe('none');
+
+            const ops = await book.pending(scope, 'study');
+            expect(ops.map((op) => op.status)).toEqual(['queued']);
+            // Still sendable, which is the whole point: a stale capture cannot condemn it.
+            expect(JSON.parse((await prepared()).body).document.title).toBe('B');
+        });
+
+        it('does not strip a CONFLICTED head — only a refused one — so Keep-both still has both bytes', async () => {
+            // #1298 patch scope: `save()`'s new stripping logic checks `status === 'refused'`
+            // specifically. A conflicted head (#1267's Keep-both target) must keep queuing
+            // ordinary Saves behind it exactly as before, since Keep-both reads the newest
+            // queued snapshot to carry forward.
+            const a = await book.save(scope, accountChart(), null);
+            const request = await prepared();
+            await book.acknowledge(scope, request, {
+                ...committed(request, 'remote-1'),
+                kind: 'conflict',
+                remote: { revision: 'remote-1', document: accountChart('remote') },
+            });
+            await book.save(scope, { ...a.document, title: 'C' }, 0);
+
+            const ops = await book.pending(scope, 'study');
+            expect(ops.map((op) => op.status)).toEqual(['conflict', 'queued']);
+            expect(await book.prepare(scope, 'study')).toBe('conflict');
+        });
+
+        it('retires the whole queue with a refused head, so nothing is left based on a deleted Save', async () => {
+            // #1298 patch review P0. Every operation behind the head is chained to it by
+            // `base: { operationId }`. Dropping ONLY the refused head left the next one basing
+            // itself on a row that no longer existed, and `prepare()` answers that with a THROW —
+            // which `runOutboxPass` does not step over, so every later pass for the whole account
+            // rejected on this one song. There was no way back out of it from inside the app.
+            const a = await book.save(scope, accountChart(), null);
+            const first = await prepared();
+            // Queued behind the frozen head, so its base is that operation id, not a revision.
+            const b = await book.save(scope, { ...a.document, title: 'B' }, 0);
+            expect((await book.pending(scope, 'study'))[1].base).toEqual({
+                operationId: first.operationId,
+            });
+
+            expect(await book.refuse(scope, 'study', first.operationId, 'too-large')).toBe(
+                'refused',
+            );
+            await book.save(scope, { ...b.document, title: 'C' }, 1);
+
+            // One operation, not two: the orphan retired with the head that was its base.
+            const ops = await book.pending(scope, 'study');
+            expect(ops).toHaveLength(1);
+            expect(ops[0]).toMatchObject({ status: 'queued', localRevision: 2 });
+            // Resolves rather than throwing, and is based on what the account actually confirmed
+            // for this record — nothing in that queue was ever committed.
+            const next = await prepared();
+            expect(JSON.parse(next.body).expectedRevision).toBe(
+                (await book.read(scope, 'study'))?.remoteRevision ?? null,
+            );
+            expect(JSON.parse(next.body).document.title).toBe('C');
+
+            // And the account's outbox as a whole still moves: the pass that used to reject on
+            // this song now walks past it and sends the next one.
+            await book.save(scope, accountChart('other', 'etude'), null);
+            const titles: string[] = [];
+            const result = await runOutboxPass(book, scope, async (request) => {
+                titles.push(JSON.parse(request.body).document.title);
+                return committed(request, `cloud-${titles.length}`);
+            });
+            expect(result.kind).toBe('complete');
+            // Ordered by document id, so `etude` before `study`; both sent, neither rejected.
+            expect(titles).toEqual(['other', 'C']);
+        });
     });
 
     it('account switching fences late responses, reads, saves and recoveries without relabeling work', async () => {
@@ -447,6 +608,31 @@ describe('account songbook on real IndexedDB', () => {
         await expect(book.save(scope, accountChart(), Number.NaN)).rejects.toThrow('revision');
         expect(await book.pending(scope, 'study')).toEqual([]);
         expect(await book.read(scope, 'study')).toBeNull();
+    });
+
+    it('mints a fresh operation id for every Save, which no caller can override', async () => {
+        // #1268 patch review P0: a caller-supplied operation id was briefly part of this signature,
+        // for adoption's deterministic ids. It is gone, and this is what holds it gone — a
+        // deterministic operation id is unsafe, not retry-safe: the server's receipts never expire
+        // and replay only an EXACT byte match, while `updatedAt` below moves on every call, so the
+        // same id sent twice earns a permanent `operation_mismatch`.
+        const a = await book.save(scope, accountChart('C', 'study'), null);
+        const b = await book.save(scope, { ...a.document, title: 'D' }, a.document.revision);
+        const [firstQueued, secondQueued] = await book.pending(scope, 'study');
+        expect(firstQueued.operationId).not.toBe(secondQueued.operationId);
+        expect(b.document.title).toBe('D');
+    });
+
+    it('rejects recreating a document under its own deterministic id, so a retried adoption cannot duplicate it', async () => {
+        // The retry-safety #1268 relies on, and it is the DOCUMENT id that carries it: the same
+        // deterministic id re-submitted as a create (`expected = null`), exactly as a rerun after
+        // an interrupted copy would, finds the song already there and refuses rather than creating
+        // a second one.
+        await book.save(scope, accountChart('adopted', 'guest-song'), null);
+        await expect(
+            book.save(scope, accountChart('adopted', 'guest-song'), null),
+        ).rejects.toBeInstanceOf(LocalRevisionError);
+        expect(await book.pending(scope, 'guest-song')).toHaveLength(1);
     });
 
     it('retries opening after storage was unavailable instead of memoizing a rejected promise', async () => {
@@ -815,5 +1001,207 @@ describe('account songbook on real IndexedDB', () => {
                 'does not match the authenticated account',
             );
         }
+    });
+});
+
+/**
+ * The two stores an account chart's unsaved experiment needs beside `recover`/`drafts` (#1299):
+ * dropping THIS writer's row after a Save, and remembering which chart was on the stand.
+ *
+ * Both are proven here rather than against a fake store because both are key-shape claims — a
+ * three-part `drafts` key path, and one `meta` key in a store shared by four namespaces.
+ */
+describe('retention beside the account songbook', () => {
+    it('drops only this writer’s draft, leaving another tab’s live experiment alone', async () => {
+        await book.save(scope, accountChart('Set list'), null);
+        await book.recover(scope, 'writer-1', accountChart('mine'), 0);
+        await book.recover(scope, 'writer-2', accountChart('theirs'), 0);
+
+        await book.discardDraft(scope, 'study', 'writer-1');
+
+        const left = await book.drafts(scope, 'study');
+        expect(left.map((draft) => draft.writerId)).toEqual(['writer-2']);
+        expect(left[0].document.title).toBe('theirs');
+        // A writer with nothing stored is not an error: a Save with no experiment behind it is
+        // the ordinary case, and it must not fail the thing that just committed.
+        await expect(book.discardDraft(scope, 'study', 'writer-3')).resolves.toBeUndefined();
+
+        // A revert takes the LOT (#1299 patch review P1): the row an open recovered from belongs
+        // to an earlier page load, so dropping only this writer's would leave the edit the
+        // musician just reverted away from to be recovered again on the next open. Bounded to
+        // this document — the writer id is the third key element, and the next song's rows are
+        // outside the range.
+        await book.recover(scope, 'writer-1', accountChart('mine again'), 0);
+        await book.save(scope, accountChart('other', 'other-song'), null);
+        await book.recover(scope, 'writer-1', accountChart('elsewhere', 'other-song'), 0);
+
+        await book.discardDrafts(scope, 'study');
+
+        expect(await book.drafts(scope, 'study')).toEqual([]);
+        expect((await book.drafts(scope, 'other-song'))[0].document.title).toBe('elsewhere');
+    });
+
+    it('a Save retires every writer’s superseded draft, and a dead row stops holding the record', async () => {
+        // #1299 patch review P1. A writer id is per PAGE LOAD and a Save only ever dropped the
+        // writer that saved, so edit → reload → edit → Save left the first page load's row behind
+        // for good. Nothing read it again, but everything COUNTED it: every later remote advance
+        // was preserved as a candidate instead of adopted, the sign-out step announced an unsaved
+        // experiment, and a cloud delete answered `retained` — for the life of the account.
+        const first = await book.save(scope, accountChart('take one'), null);
+        await book.recover(
+            scope,
+            'writer-1',
+            { ...first.document, title: 'W1 idea' },
+            first.document.revision,
+        );
+        await book.recover(
+            scope,
+            'writer-2',
+            { ...first.document, title: 'W2 idea' },
+            first.document.revision,
+        );
+        expect(await book.drafts(scope, 'study')).toHaveLength(2);
+
+        await tick();
+        const second = await book.save(
+            scope,
+            { ...first.document, title: 'take two' },
+            first.document.revision,
+        );
+        // Both rows, not just the saving writer's: each was captured against the version this
+        // Save has now moved past, so neither would ever be offered to anybody again.
+        expect(await book.drafts(scope, 'study')).toEqual([]);
+        expect(second.document.title).toBe('take two');
+
+        // A row this build did not write — an older build's, or one whose own Save happened in
+        // another tab — is never pruned, so the PREDICATE has to be what stops it holding the
+        // record. Planted directly, since nothing public can produce one any more.
+        const raw = await rawDatabase();
+        try {
+            await rawWrite(raw, 'drafts', (table) =>
+                table.put({
+                    ownerId: 'owner-a',
+                    documentId: 'study',
+                    writerId: 'writer-0',
+                    document: accountChart('from a page load long gone'),
+                    baseRevision: 0,
+                    capturedAt: '2020-01-01T00:00:00.000Z',
+                }),
+            );
+        } finally {
+            raw.close();
+        }
+
+        // Drain the outbox, so the queue is not what holds this record instead.
+        const a = await prepared();
+        await book.acknowledge(scope, a, committed(a, 'cloud-1'));
+        const b = await prepared();
+        await book.acknowledge(scope, b, committed(b, 'cloud-2'));
+        expect(await book.pending(scope, 'study')).toEqual([]);
+
+        expect(
+            await book.reconcile(
+                scope,
+                {
+                    kind: 'version',
+                    documentId: 'study',
+                    revision: 'cloud-3',
+                    document: accountChart('from the cloud'),
+                },
+                { expectedRemoteRevision: 'cloud-2' },
+            ),
+        ).toBe('advanced');
+        expect((await book.read(scope, 'study'))?.document.title).toBe('from the cloud');
+        // Preserved where it lies, though: it is not counted, and it is not destroyed either.
+        expect((await book.drafts(scope, 'study')).map((draft) => draft.writerId)).toEqual([
+            'writer-0',
+        ]);
+
+        // And the direction that must NOT be lost — the story's own acceptance. A LIVE experiment
+        // on a chart nobody has open still holds it: the cloud's next version is preserved as a
+        // candidate rather than written over an edit that exists only here.
+        const current = (await book.read(scope, 'study'))!;
+        await book.recover(
+            scope,
+            'writer-3',
+            { ...current.document, title: 'still editing' },
+            current.document.revision,
+        );
+        expect(
+            await book.reconcile(
+                scope,
+                {
+                    kind: 'version',
+                    documentId: 'study',
+                    revision: 'cloud-4',
+                    document: accountChart('newer still'),
+                },
+                { expectedRemoteRevision: 'cloud-3' },
+            ),
+        ).toBe('candidate');
+        expect((await book.read(scope, 'study'))?.document.title).toBe('from the cloud');
+        expect((await book.remoteCandidate(scope, 'study'))?.revision).toBe('cloud-4');
+    });
+
+    it('refuses to discard a draft for an account that is no longer the active one', async () => {
+        await book.recover(scope, 'writer-1', accountChart('mine'), 0);
+        await book.switchAccount('owner-b');
+
+        await expect(book.discardDraft(scope, 'study', 'writer-1')).rejects.toBeInstanceOf(
+            AccountChangedError,
+        );
+        const back = (await book.switchAccount('owner-a'))!;
+        expect(await book.drafts(back, 'study')).toHaveLength(1);
+    });
+
+    it('remembers the chart on the stand per account, and answers null before anything opened', async () => {
+        expect(await book.lastOpened(scope)).toBeNull();
+
+        await book.rememberOpened(scope, 'study');
+        expect(await book.lastOpened(scope)).toBe('study');
+        // Replaced, never appended: it is one fact per account.
+        await book.rememberOpened(scope, 'take');
+        expect(await book.lastOpened(scope)).toBe('take');
+
+        // Another account on the same device has its own, and cannot read this one.
+        const other = (await book.switchAccount('owner-b'))!;
+        expect(await book.lastOpened(other)).toBeNull();
+        await book.rememberOpened(other, 'b-song');
+        const mine = (await book.switchAccount('owner-a'))!;
+        expect(await book.lastOpened(mine)).toBe('take');
+    });
+
+    it('reads a corrupt preference as no preference rather than failing the songbook', async () => {
+        // Unlike every other read in the repository: nothing downstream treats this as content,
+        // and failing a library read over a cosmetic Continue card is the worse answer.
+        await book.rememberOpened(scope, 'study');
+        const raw = await rawDatabase();
+        try {
+            await rawWrite(raw, 'meta', (table) =>
+                table.put({
+                    key: lastOpenedKey('owner-a'),
+                    ownerId: 'owner-a',
+                    documentId: { not: 'an id' },
+                }),
+            );
+        } finally {
+            raw.close();
+        }
+
+        expect(await book.lastOpened(scope)).toBeNull();
+        // And a record belonging to another owner is never read through this owner's key.
+        const planted = await rawDatabase();
+        try {
+            await rawWrite(planted, 'meta', (table) =>
+                table.put({
+                    key: lastOpenedKey('owner-a'),
+                    ownerId: 'owner-b',
+                    documentId: 'study',
+                }),
+            );
+        } finally {
+            planted.close();
+        }
+        expect(await book.lastOpened(scope)).toBeNull();
     });
 });

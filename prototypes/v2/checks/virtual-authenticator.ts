@@ -47,15 +47,39 @@ export interface VirtualAuthenticator {
     credentials(): Promise<VirtualCredential[]>;
     /** Install a passkey exported from another authenticator. */
     addCredential(credential: VirtualCredential): Promise<void>;
+    /**
+     * Unplug this authenticator, leaving whatever it registered alive on the server.
+     *
+     * The deterministic way to say "that device isn't here right now" (#1264). With two
+     * authenticators attached and both auto-simulating presence, WHICH one answers a ceremony
+     * that allows either — a step-up reauth lists every credential on the account in
+     * `allowCredentials` — is Chrome's choice, not the test's, and it does not always land the
+     * same way twice. Detaching the one that must not answer removes the coin flip instead of
+     * asserting around it.
+     */
+    remove(): Promise<void>;
 }
 
-export async function addVirtualAuthenticator(page: Page): Promise<VirtualAuthenticator> {
+/**
+ * `transport` defaults to `'internal'` (a platform authenticator, matching every existing
+ * caller). Chrome allows only ONE `'internal'` authenticator per page/environment ("Chrome only
+ * supports one internal authenticator per environment") — so a test that needs a SECOND,
+ * independent authenticator on the SAME page (#1264: "add a passkey" on a different device,
+ * proven by `excludeCredentials` genuinely refusing the account's existing authenticator) must
+ * pass a cross-platform transport such as `'usb'` for the second call. The server's
+ * `authenticatorSelection` never sets `authenticatorAttachment`, so either kind is an eligible
+ * target.
+ */
+export async function addVirtualAuthenticator(
+    page: Page,
+    transport: 'internal' | 'usb' | 'nfc' | 'ble' = 'internal',
+): Promise<VirtualAuthenticator> {
     const session = await page.context().newCDPSession(page);
     await session.send('WebAuthn.enable');
     const { authenticatorId } = await session.send('WebAuthn.addVirtualAuthenticator', {
         options: {
             protocol: 'ctap2',
-            transport: 'internal',
+            transport,
             hasResidentKey: true,
             hasUserVerification: true,
             isUserVerified: true,
@@ -88,6 +112,9 @@ export async function addVirtualAuthenticator(page: Page): Promise<VirtualAuthen
         },
         addCredential: async (credential: VirtualCredential) => {
             await session.send('WebAuthn.addCredential', { authenticatorId, credential });
+        },
+        remove: async () => {
+            await session.send('WebAuthn.removeVirtualAuthenticator', { authenticatorId });
         },
     };
 }

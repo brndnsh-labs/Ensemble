@@ -2,13 +2,16 @@ import {
     type AccountScope,
     candidateKey,
     type Draft,
+    deletionKey,
     identifier,
     localRevision,
+    type PendingDeletion,
     type RemoteCandidate,
     type RemoteOutcome,
     remoteRevision,
     type SavedSong,
     type SaveOperation,
+    type SaveRefusalReason,
     snapshot,
     type UnsupportedReason,
 } from './protocol';
@@ -62,6 +65,7 @@ export function savedDraft(value: Draft, scope: AccountScope, id: string): Draft
 }
 
 const UNSUPPORTED_REASONS: readonly UnsupportedReason[] = ['needs-app-update', 'invalid'];
+const REFUSAL_REASONS: readonly SaveRefusalReason[] = ['too-large', 'refused'];
 
 /**
  * Validate one remote observation BEFORE a transaction opens, and rebuild it from the validated
@@ -118,6 +122,31 @@ export function savedCandidate(
     return Object.assign({ key: value.key, ownerId: scope.ownerId }, remoteOutcome(value));
 }
 
+/**
+ * Re-prove a stored frozen delete (#1270) against the scope AND its own key, never only the record
+ * it was found at — the same posture `savedCandidate` takes, and for the same reason: `meta` is one
+ * generic keyed store shared by three namespaces, so the key is part of the record's identity.
+ */
+export function savedDeletion(
+    value: PendingDeletion,
+    scope: AccountScope,
+    id: string,
+): PendingDeletion {
+    owned(value, scope, id);
+    if (value.key !== deletionKey(scope.ownerId, id)) {
+        throw new Error('Stored pending deletion does not match its key.');
+    }
+    identifier(value.operationId);
+    remoteRevision(value.expectedRevision);
+    return {
+        key: value.key,
+        ownerId: scope.ownerId,
+        documentId: id,
+        operationId: value.operationId,
+        expectedRevision: value.expectedRevision,
+    };
+}
+
 export function savedOperation(
     value: SaveOperation,
     scope: AccountScope,
@@ -130,7 +159,7 @@ export function savedOperation(
     if (
         document.id !== id ||
         document.revision !== value.localRevision ||
-        !['queued', 'conflict'].includes(value.status)
+        !['queued', 'conflict', 'refused'].includes(value.status)
     ) {
         throw new Error('Invalid queued Save. Source is unchanged.');
     }
@@ -183,6 +212,17 @@ export function savedOperation(
                 throw new Error('Invalid remote conflict identity.');
             }
         }
+    }
+    // Both directions, like the `'conflict'`/`remote` pair above: a refusal without a reason has
+    // no sentence for the chip to render, and a reason on a `'queued'` or `'conflict'` row is a
+    // record this build did not write — the status is what every reader branches on, so a stray
+    // reason beside it means the two halves disagree about what happened to this Save.
+    if (value.status === 'refused') {
+        if (!REFUSAL_REASONS.includes(value.reason as SaveRefusalReason)) {
+            throw new Error('Refused Save has no valid reason.');
+        }
+    } else if (value.reason !== undefined) {
+        throw new Error('Only a refused Save carries a reason.');
     }
     return { ...value, snapshot: document };
 }

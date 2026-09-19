@@ -7,6 +7,7 @@ import {
     confirmRecoveryCode,
     countAccounts,
     DEFAULT_REGISTRATION_CAP,
+    deleteAccount,
     enrollRecoveryCode,
     hasEnrolledRecoveryMaterial,
     issueSession,
@@ -424,6 +425,35 @@ export function createApp({
                 );
             }
         }
+        clearSessionCookie(c, config);
+        return c.body(null, 204);
+    });
+
+    /**
+     * Delete this account (#1271) — DECISION 2026-09-17, "accounts do not ship without a way out".
+     *
+     * `requireSession` first (so a recovery-purpose session is refused like any other route), then
+     * one transaction in `deleteAccount` that re-checks freshness and wipes every table the
+     * deletion registry classifies. `403 fresh_auth_required` is the only refusal it can return,
+     * and the client answers it with the same one step-up retry every other gated mutation uses.
+     *
+     * The session this request arrived on was deleted by that transaction, so the cookie is
+     * cleared here for the same reason `passkeys/revoke` clears it when it revokes the current
+     * session: the browser must stop presenting an identifier the server has already forgotten.
+     * `204`, no body — there is no account left to describe.
+     */
+    app.post('/api/auth/account/delete', (c) => {
+        const session = requireSession(c);
+        if (!session.ok) {
+            return session.response;
+        }
+        const result = deleteAccount(db, session.claims.accountId, session.claims.sessionId, now());
+        if (!result.ok) {
+            return sendError(c, 403, 'fresh_auth_required');
+        }
+        // The `account_deleted` security event is recorded INSIDE the transaction (see
+        // `deleteAccount`), not here: recording it out here would leave a claim that an account
+        // was deleted behind a wipe that rolled back.
         clearSessionCookie(c, config);
         return c.body(null, 204);
     });

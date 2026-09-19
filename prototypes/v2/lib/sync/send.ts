@@ -10,7 +10,7 @@ export async function sendNext(
     scope: AccountScope,
     documentId: string,
     transport: SaveTransport,
-): Promise<'idle' | 'conflict' | 'committed' | 'retry'> {
+): Promise<'idle' | 'conflict' | 'committed' | 'retry' | 'refused'> {
     scope = copyScope(scope);
     const request = await songbook.prepare(scope, documentId);
     if (typeof request === 'string') {

@@ -34,7 +34,41 @@ export const ACCOUNT_MESSAGES = {
     rateLimited: 'Too many attempts — try again later.',
     network: 'Can’t reach the server. You can keep playing as a guest.',
     generic: 'Something went wrong. Try again in a moment.',
+    // #1263 patch review P1: a code re-typed while its own claim lock is still held (up to ten
+    // minutes after starting recovery, per `RECOVERY_SESSION_TTL_MS`) reads through this exact
+    // same server code, which used to say only "already been used" — indistinguishable from a
+    // truly spent code. Naming the lock, without naming the server's vocabulary for it, is the
+    // fix: it tells someone who stopped mid-recovery that the SAME code will work again shortly.
+    badCode:
+        'That code isn’t right, or it’s already been used. If you started a recovery and ' +
+        'stopped, wait ten minutes and try the same code again.',
+    /** `409 last_credential` (#1264, worded per patch review P2-2): the server's real rule
+     * (`revokePasskey` in `v2-api/src/auth/passkeys.ts`) is "refuse only when this would leave
+     * the account with one credential AND zero confirmed, unconsumed recovery material" — one
+     * passkey plus a confirmed recovery code is fine and the server allows removing it. The
+     * account page's own courtesy note mirrors that exact rule (`passkeys.length === 1 &&
+     * recoveryConfirmed === false`), not a plain "down to one" count, so this sentence has to
+     * name BOTH missing pieces rather than implying passkey count alone is the reason. */
+    lastPasskey:
+        'This is your only passkey and there’s no recovery code — add one of them before ' +
+        'removing it.',
+    /** `InvalidStateError` from `startRegistration` (#1264 patch review P2-3): the platform
+     * authenticator answering "Add a passkey" already holds this account's credential (WebAuthn's
+     * `excludeCredentials` check), which the generic `failed` copy answers with "try a different
+     * passkey" — useless advice when a different passkey is exactly what this device lacks. */
+    passkeyOnThisDevice:
+        'This device already has a passkey for your account. Add one from another device, ' +
+        'a phone or a security key.',
 } as const;
+
+/**
+ * `randomBytes(32).toString('base64url')` — the shape the server mints for every recovery code
+ * (`RECOVERY_CODE_BYTES` in `v2-api/src/auth/recovery.ts`). Shared with the Playwright harness
+ * (`checks/account-helpers.ts`) so both stay in lockstep, and used client-side (#1263 patch
+ * review P3) to reject an obviously-wrong paste — e.g. the whole downloaded `.txt`, code plus
+ * explanatory text — before it ever reaches the network as a doomed `recovery/claim` call.
+ */
+export const RECOVERY_CODE_SHAPE = /^[A-Za-z0-9_-]{43}$/;
 
 export function failureFromApi(error: ApiError): AccountFailure {
     if (error.kind === 'network') {
@@ -50,6 +84,8 @@ export function failureFromApi(error: ApiError): AccountFailure {
             return { kind: 'error', message: ACCOUNT_MESSAGES.failed };
         case 'rate_limited':
             return { kind: 'error', message: ACCOUNT_MESSAGES.rateLimited };
+        case 'last_credential':
+            return { kind: 'error', message: ACCOUNT_MESSAGES.lastPasskey };
         default:
             // `unauthenticated`, `malformed_request`, `fresh_auth_required` (only ever reached
             // here after a step-up retry already failed), `not_found`, `internal_error` and every
@@ -57,4 +93,27 @@ export function failureFromApi(error: ApiError): AccountFailure {
             // try again. Naming the code would leak service vocabulary for no user benefit.
             return { kind: 'error', message: ACCOUNT_MESSAGES.generic };
     }
+}
+
+/**
+ * The same mapping, for `POST /api/auth/recovery/claim` alone (#1263).
+ *
+ * That route collapses every way a claim can fail — the code doesn't exist, the hash doesn't
+ * match, it was never confirmed, it was already spent, another attempt holds the claim lock — to
+ * one `401 authentication_failed`, deliberately, so a caller learns nothing about which. The
+ * generic `failed` copy for that code ("use a different passkey") would be nonsense here: there
+ * is no passkey in this ceremony, only a typed code. So the one place the code IS the credential
+ * gets the one sentence that fits, and the mapping stays in this module rather than becoming an
+ * `if` in the dialog — the whole point of `messages.ts` is that copy lives in exactly one file.
+ *
+ * Everything else — rate limiting, an unreachable server, a code this client has never seen —
+ * falls through to `failureFromApi` unchanged. It is deliberately NOT a "wrong code" answer for
+ * any other status: a 429 must read as a 429, or someone retyping a perfectly good code would be
+ * told it is wrong.
+ */
+export function failureFromClaim(error: ApiError): AccountFailure {
+    if (error.kind === 'code' && error.code === 'authentication_failed') {
+        return { kind: 'error', message: ACCOUNT_MESSAGES.badCode };
+    }
+    return failureFromApi(error);
 }

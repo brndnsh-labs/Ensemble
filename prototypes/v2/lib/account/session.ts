@@ -35,6 +35,16 @@ export interface AccountSession {
     refresh(): Promise<void>;
     /** The Save transport calls this on a 401 mid-session; nothing else should need to. */
     markExpired(): void;
+    /**
+     * A deliberate, completed sign-out (#1269) — the one move to `guest` from a signed-in state.
+     *
+     * Without it the sign-out flow's own `refresh()` lands on the 401 its logout just created and
+     * `expired` is what that means for every OTHER caller, so the header would answer a person who
+     * just signed out with "Sign in again" and the "sign in again to keep syncing" banner. Those
+     * sentences are for a session that went away underneath somebody; this one went away because
+     * they asked.
+     */
+    markSignedOut(): void;
 }
 
 interface SessionResponse {
@@ -92,7 +102,18 @@ export function createAccountSession(api: AccountApi): AccountSession {
             // it was. A transient blip must never flip a live signed-in session to guest.
         },
         markExpired() {
-            set(EXPIRED);
+            // Enforces this module's own rule rather than trusting the caller: only a session
+            // that WAS signed in can expire. A `guest` or `unknown` device that meets a 401 has
+            // learned nothing new, and moving it to `expired` would put "sign in again" in front
+            // of somebody who never signed in — the exact distinction `refresh()` preserves above.
+            if (state.status === 'signedIn') {
+                set(EXPIRED);
+            }
+        },
+        markSignedOut() {
+            // Unconditional, unlike `markExpired`: the caller has watched the server revoke the
+            // session, which is better evidence than any state this store is holding.
+            set(GUEST);
         },
     };
 }

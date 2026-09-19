@@ -172,6 +172,10 @@ describe('commitSave (#1202)', () => {
     });
 
     it('creating over an existing document conflicts with that document', () => {
+        // Also the server half of #1268's guest adoption: a second device adopting the same guest
+        // song sends the SAME deterministic document id under a FRESH operation id, and this is
+        // the answer that makes that safe — `conflict`, which the client's outbox handles, rather
+        // than the `operation_mismatch` a deterministic operation id would have earned.
         const db = setUp();
         commitSave(db, command(), deps);
         expect(
@@ -262,6 +266,20 @@ describe('commitSave (#1202)', () => {
         for (let i = 0; i < 20; i += 1) {
             expect(mintRevision()).toMatch(/^[A-Za-z0-9._:-]{1,200}$/);
         }
+    });
+
+    it('a Save racing #1271 account deletion answers owner_gone, not a foreign-key crash', () => {
+        const db = setUp();
+        // Simulates the interleaving directly: the account row is gone (as #1271's transaction
+        // leaves it) by the time this Save's transaction runs, without needing two real
+        // transactions racing each other.
+        db.exec("DELETE FROM accounts WHERE id = 'owner-a'");
+        expect(commitSave(db, command(), deps)).toEqual({ kind: 'owner_gone' });
+        // Nothing was written, and the connection is usable again: no leaked open transaction.
+        expect(readDocument(db, 'owner-a', 'doc-1')).toBeUndefined();
+        expect(readReceipt(db, 'owner-a', 'op-1')).toBeUndefined();
+        db.exec("INSERT INTO accounts (id, created_at) VALUES ('owner-a', 1)");
+        expect(commitSave(db, command(), deps)).toMatchObject({ kind: 'committed' });
     });
 
     /**

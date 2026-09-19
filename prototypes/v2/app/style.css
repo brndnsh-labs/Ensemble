@@ -151,6 +151,13 @@ html [hidden] {
     border-color: transparent;
     color: var(--green);
 }
+/* #1271. The one action in this app with no undo, and the only button that reads as destructive
+   on sight. Outline rather than filled: it sits beside Export and Cancel, and a solid red block
+   would pull the eye to the button nobody should reach for by accident. */
+.btn.danger {
+    border-color: var(--danger);
+    color: var(--danger);
+}
 .text-button {
     font-size: 13px;
     font-weight: 600;
@@ -1969,6 +1976,20 @@ dialog textarea {
     font-size: 13px;
     margin-bottom: 12px;
 }
+/* #1268's offer preview: every title that is about to be copied, scrollable rather than
+   pushing the Add/Not now buttons off a phone screen on a generous guest songbook. */
+.adopt-guest-preview {
+    list-style: none;
+    margin-bottom: 17px;
+    max-height: 30dvh;
+    overflow-y: auto;
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--muted);
+}
+.adopt-guest-preview li {
+    overflow-wrap: anywhere;
+}
 .error-banner {
     background: var(--danger-bg);
     color: var(--danger);
@@ -2676,9 +2697,21 @@ html[data-theme="stage"] {
     gap: 9px;
 }
 .account-state {
+    /* Opens the account page (#1264) — reset to look like the plain status text it always was,
+       not a bordered .account-btn. */
+    font: inherit;
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
     font-size: 12px;
     color: var(--muted);
     white-space: nowrap;
+}
+.account-state:hover,
+.account-state:focus-visible {
+    color: var(--ink);
+    text-decoration: underline;
 }
 /* Sign-out offline reason / failure (#1262 P1-3): small status text next to the header entry
    rather than a dialog, to keep the fix minimal — the reason is inline, not something the person
@@ -2695,10 +2728,14 @@ html[data-theme="stage"] {
     border-color: var(--accent);
     color: var(--accent);
 }
-.account-dialog {
+.account-dialog,
+.account-page {
     /* .modal-box is width:100%/max-width:480px, which at phone width runs edge
        to edge. The recovery code needs a readable gutter, so this dialog keeps
-       one (same idea as .sound-panel's min()). */
+       one (same idea as .sound-panel's min()). Two distinct dialogs (#1262's
+       sign-in, #1264's account page) share this rule but NOT a class, since
+       both are mounted at once and `dialog.account-dialog` must resolve to
+       exactly one element for a Playwright strict-mode locator to work. */
     max-width: min(480px, calc(100vw - 32px));
 }
 .recovery-code {
@@ -2733,6 +2770,38 @@ html[data-theme="stage"] {
     padding: 0;
     accent-color: var(--ink);
 }
+/* Recovery entry and code entry (#1263). */
+.recovery-link {
+    /* Not a .btn: that is `white-space: nowrap`, and this label is a sentence that has to wrap at
+       phone width. A text link is also the right weight for a way out of trouble sitting under
+       the two things most people actually came for. */
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--ink);
+    text-align: left;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    padding: 0;
+    background: none;
+    border: 0;
+}
+.recovery-link:disabled {
+    color: var(--muted);
+    text-decoration: none;
+}
+.recovery-entry {
+    display: block;
+    font-size: 13px;
+    line-height: 1.6;
+    margin-bottom: 4px;
+}
+.recovery-entry input {
+    /* The code is 43 unbroken base64url characters; a proportional face makes an l/1/I mix-up
+       impossible to spot while checking a typo. */
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 13px;
+    margin-top: 6px;
+}
 .account-notice,
 .account-error {
     font-size: 13px;
@@ -2748,4 +2817,109 @@ html[data-theme="stage"] {
 .account-error {
     background: var(--danger-bg);
     color: var(--danger);
+}
+/* The account page (#1264): passkeys, sessions, recovery code. Reuses .account-dialog's width
+   and the .btn/.dialog-actions vocabulary; only the passkey list and section rhythm are new. */
+.account-page section {
+    margin-bottom: 22px;
+}
+.account-page h3 {
+    font-size: 14px;
+    font-weight: 650;
+    margin-bottom: 10px;
+}
+.passkey-list {
+    list-style: none;
+    margin: 0 0 12px;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.passkey-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 13px;
+    color: var(--muted);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 9px 12px;
+}
+/* Deleting the account (#1271): the last section on the page, set apart by a rule rather than a
+   red panel — it is a legitimate thing to want, not a hazard sign. */
+.account-page .account-danger {
+    border-top: 1px solid var(--line);
+    padding-top: 18px;
+}
+.account-page .account-danger h3 {
+    color: var(--danger);
+}
+/* The typed confirmation's label. `.modal-box input` is already a full-width field. */
+.delete-confirm {
+    display: block;
+    font-size: 13px;
+    line-height: 1.6;
+    margin-top: 18px;
+    margin-bottom: 8px;
+}
+/* Sync status chip (#1266). Three separate facts, laid out as three separate lines rather
+   than one badge — a musician who saved offline needs to see local safety and cloud
+   confirmation disagree. Rendered only on the music stand, and only for a device with an
+   account, so the guest DOM and the songbook page are both unchanged. */
+.sync-status {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    font-size: 11px;
+    line-height: 1.5;
+    color: var(--muted);
+    min-width: 0;
+}
+.sync-fact {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.sync-failure {
+    color: var(--accent);
+    /* The reason can be a full sentence; it wraps rather than being clipped like the facts. */
+    white-space: normal;
+}
+/* Conflict banner (#1267). Accent rather than danger: a refused Save is a decision waiting to be
+   made, not a fault — nothing was lost, and the danger palette is spent on things that were. Every
+   colour is a light-dark() token, so the dark stage gets this for free. */
+.conflict-banner {
+    background: var(--accent-light);
+    color: var(--accent);
+    padding: 12px 20px;
+    font-size: 13px;
+    line-height: 1.6;
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    justify-content: space-between;
+}
+.conflict-banner-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+.conflict-banner .btn {
+    flex-shrink: 0;
+}
+@media (max-width: 640px) {
+    .conflict-banner {
+        flex-direction: column;
+        align-items: stretch;
+        padding: 12px 16px;
+    }
+}
+/* "We haven't read your account library yet" — never the empty-library table (#1266). */
+.library-loading {
+    color: var(--muted);
+    font-size: 13px;
+    padding: 14px 0;
 }

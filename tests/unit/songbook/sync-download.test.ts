@@ -338,10 +338,13 @@ describe('createLibraryTransport — the #1259 routes in the pass’s vocabulary
             (t: ReturnType<typeof transportFor>) => t.transport.download('song-1'),
         ]) {
             const fixture = transportFor(code('unauthenticated'));
-            // A session that was never signed in reads `guest`; `markExpired` is the stronger
-            // claim, so asserting it directly is what proves this path ran.
+            const markExpired = vi.spyOn(fixture.session, 'markExpired');
+            // Asserted as the CALL, not as the resulting state: this transport's contract is to
+            // report the 401 to the session, and what that does is the session's own rule —
+            // `lib/account/session.ts` only ever moves a `signedIn` session to `expired`, so a
+            // device that was never signed in (this fixture) stays exactly where it was.
             expect(await call(fixture)).toEqual({ kind: 'expired' });
-            expect(fixture.session.getSnapshot()).toEqual({ status: 'expired' });
+            expect(markExpired).toHaveBeenCalledTimes(1);
         }
     });
 

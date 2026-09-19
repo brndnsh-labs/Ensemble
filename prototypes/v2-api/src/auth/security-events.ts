@@ -8,6 +8,10 @@ const EVENTS = [
     'session_revoked',
     'other_sessions_revoked',
     'account_recovered',
+    // #1271. Written INSIDE the deletion transaction, after that transaction has wiped this
+    // account's every other row (this table's included): it is the registration of the deleted
+    // identity — an account id and a timestamp — and the only trace deletion leaves behind.
+    'account_deleted',
 ] as const;
 type Event = (typeof EVENTS)[number];
 const CODES = [

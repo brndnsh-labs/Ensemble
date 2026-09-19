@@ -44,7 +44,8 @@ route/socket identity is not built or verified. See the explicit receipt in that
 | `src/http/auth-policy.ts` | Exhaustive route registry: allowlisted bounded request shapes and independent rate limits; unknown endpoints/fields/query input fail closed. |
 | `src/http/client-identity.ts` | Domain-separated HMAC-SHA256 caller keys, canonical IPs, and an explicitly configured header trusted only from exact immediate proxy peers. Upstream sanitization must be verified separately. |
 | `src/auth/security-events.ts` | Best-effort metadata-only event recording, fixed error descriptions, 30-day/10,000-row retention bounds. |
-| `src/db/account-deletion-registry.ts` | Explicit future wipe order and retained/global classification; drift guard covers every table, including no-FK challenges. No deletion endpoint yet. |
+| `src/db/account-deletion-registry.ts` | The wipe order as `{ table, column }` pairs plus the retained/global classification; drift guard covers every table, including no-FK challenges. `deleteAccount` walks this list — nothing else may restate it. |
+| `src/auth/account-deletion.ts` | `deleteAccount` (#1271) — one `BEGIN IMMEDIATE` transaction: fresh-auth check, the registry's wipe, then one metadata-only `account_deleted` event registering the deleted identity. See "Account deletion (#1271, stage 7)" below. |
 | `src/auth/recovery.ts` | `enrollRecoveryCode` / `confirmRecoveryCode` / `claimRecoveryCode` / `readLiveRecoverySession` / `startRecoveryEnrollPasskey` / `verifyRecoveryEnrollPasskey` (#1191) — see "Recovery codes and the recovery-only session (#1191)" below. |
 | `src/auth/reauth.ts` | `startReauth` / `verifyReauth` (#1190) — step-up re-authentication. `allowCredentials` is the account's own credentials (unlike login's empty/usernameless list); the challenge binds `account_id` AND `session_id`; verify shares `assertion-commit.ts`'s core with login. Success does not itself rotate the session — the caller (the HTTP route) does that via `finishAuthentication`. |
 | `src/auth/passkeys.ts` | `startAddPasskey` / `verifyAddPasskey` / `revokePasskey` / `listPasskeys` (#1190). Add-passkey requires a FRESH session (checked at options AND re-checked inside the verify commit transaction) and binds `account_id` + `session_id` into the challenge; an already-registered credential on the same account is a no-op (`alreadyRegistered: true`), on another account it's `credential_exists`. `revokePasskey` is one synchronous transaction: fresh check, owner-scoped lookup, last-credential guard (owner-scoped SELECT/DELETE and account-scoped session revocation — never trust `id`/`credential_id` alone), revoke every session the credential created, delete. `listPasskeys` never returns the public key or counter. |
@@ -102,7 +103,9 @@ server. The service is reachable over a real socket for the first time here.
 - `readSession` performs **zero writes** — one `SELECT`, requiring `revoked_at IS NULL`,
   `expires_at > now`, and that the owning account row still exists (via a `JOIN`).
 - `revokeSession` is owner-scoped: presenting a foreign `accountId` is a silent no-op, never a
-  throw. `revokeOtherSessions` returns the count revoked.
+  throw. `revokeOtherSessions` returns the count revoked, and only ever revokes `'standard'`
+  sessions — a live `'recovery'` session on another device survives "sign out other devices"
+  (#1296), since it already can't read anything and expires on its own.
 
 **HTTP layer** (`src/http/`, `src/server.ts`), built on Hono `4.13.7` + `@hono/node-server`
 `2.1.1` — zero additional runtime dependencies:
@@ -614,6 +617,54 @@ pause at), and
 `test/http/documents-delete.test.ts` (the route over `app.request()` with two real passkey
 accounts and every document written by a real Save). `test/http/auth-hardening.test.ts` covers the
 new route automatically, since it is parameterized over `DOCUMENT_POLICIES`.
+
+## Account deletion (#1271, stage 7)
+
+`POST /api/auth/account/delete` is the way out the accounts contract requires before accounts
+ship (DECISION 2026-09-17). One route, one transaction, no body, `204` on success.
+
+- **Gated on the SAME fresh-authentication predicate as add/revoke passkey and recovery enroll**,
+  checked inside the deletion transaction (`src/auth/account-deletion.ts`) rather than only at the
+  HTTP boundary — the write and the read that authorizes it see one database state. A valid but
+  stale session gets `403 fresh_auth_required`, which the client answers with its one step-up
+  retry (`withFreshAuth`). No new error code: the taxonomy is unchanged, so the client's
+  `ApiErrorCode` copy needed no edit. `requireSession` refuses a recovery-purpose session here
+  like everywhere else — a recovery code authorizes enrolling one passkey, never deleting.
+- **The wipe consumes the registry, it does not restate it.**
+  `src/db/account-deletion-registry.ts`'s `ACCOUNT_DELETION_WIPED` is now an ordered list of
+  `{ table, column }` pairs, and `deleteAccount` walks exactly that list — the only interpolated
+  identifiers in this service's SQL, and deliberately so, because a hand-written statement list
+  can drift from `assertAccountDeletionCoverage`, which still fails on any table nobody
+  classifies. Order is children-before-parents (`foreign_keys=ON`), `accounts` last.
+- **The deleted identity is registered as one metadata-only `account_deleted` security event** —
+  account id and timestamp, no credential, no chart, no request data — written INSIDE the same
+  transaction, after the wipe has emptied this account's audit history. A rolled-back deletion
+  therefore leaves no record claiming it happened, and that single row is the only trace the
+  service keeps. It ages out under `recordSecurityEvent`'s existing 30-day/10,000-row bounds like
+  every other event.
+- **What refuses a disconnected device is absence, not a flag.** No session row, no credential
+  row, no account row: every authenticated route answers `401 unauthenticated` for the old cookie
+  (`readSession` finds nothing, and its `JOIN accounts` is a second reason it would find nothing),
+  a late queued Save from another context is refused rather than recreating a document, and a
+  login ceremony with the old passkey fails `credential_not_found`. There is deliberately NO
+  credential-level blocklist: the same authenticator must be able to register a brand-new account
+  afterwards, and it can, because the row holding its credential id is gone.
+- **Rate limit**: `policy('empty', 10, 10 * minute)` — well below the ceremony routes, because
+  this is a once-in-a-lifetime action already behind a passkey ceremony, but not tighter than
+  `10`: the client's own step-up retry (`withFreshAuth`) spends two requests per stale-session
+  attempt (`403 fresh_auth_required` then the re-proved retry), so two dismissed platform
+  prompts plus one real deletion already spends 6.
+- **Backups are out of scope, and the client says so.** Nightly snapshots age out on their own
+  schedule; the account page's copy discloses that rather than promising an erasure this route
+  cannot deliver.
+
+Tests: `test/http/account-delete.test.ts` (real migrated database, real ceremonies, injected
+clock) — the unauthenticated and stale-session refusals with a row-count proof that nothing
+changed, the full wipe with a second account untouched beside it, every route answering
+signed-out for the old cookie including a late Save, and the same passkey registering a brand-new
+account afterwards. `test/http/auth-hardening.test.ts` covers the route automatically, since it
+is parameterized over `AUTH_POLICIES` (route/policy parity, unknown-field refusal, rate
+threshold).
 
 ## Commands
 
