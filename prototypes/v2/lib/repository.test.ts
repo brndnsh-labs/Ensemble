@@ -2,16 +2,15 @@
  * `repository.save()`'s `createdAt` provenance (#1274 P2-2), through the real
  * read-modify-write path — not just `convertV1`'s own candidate-building.
  *
- * Node/happy-dom ship no IndexedDB. Rather than pull in a new dependency, this installs
- * the smallest fake that `open()`/`save()` actually drive: one object store keyed by
- * `id`, `get`/`put`, and real (microtask-scheduled) transaction completion — the same
- * spirit as this repo's existing manual `Storage` mock for the v1 writers
- * (`tests/unit/songbook/v1-import.test.ts`), applied to the one browser API this file
- * needs instead of an entire package.
+ * Node/happy-dom ship no IndexedDB, so this runs against `tests/utils/fake-indexeddb.ts` —
+ * the smallest fake that `open()`/`save()` actually drive, shared with the v1 import's own
+ * through-the-repository tests (`tests/unit/songbook/v1-import.test.ts`) rather than copied
+ * into each of them.
  */
 
 import type { ChartContent } from '@engine/songbook/types';
-import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
+import { installFakeIndexedDB } from '../../../tests/utils/fake-indexeddb';
 import { save } from './repository';
 
 function chart(): ChartContent {
@@ -87,110 +86,6 @@ function chart(): ChartContent {
             },
         },
     };
-}
-
-/**
- * A fake IndexedDB restricted to what `repository.ts` actually calls: one database, one
- * object store keyed by `id`, `get`/`put`, and transaction completion that fires only
- * once every request it dispatched (including one queued synchronously from inside
- * another request's `onsuccess`, exactly what `save()` does) has settled.
- */
-function installFakeIndexedDB() {
-    const store = new Map<string, unknown>();
-
-    function makeRequest<T>() {
-        return {
-            result: undefined as T | undefined,
-            onsuccess: null as (() => void) | null,
-            onerror: null as (() => void) | null,
-        };
-    }
-
-    function transaction() {
-        const tx = {
-            pending: 0,
-            aborted: false,
-            oncomplete: null as (() => void) | null,
-            onerror: null as (() => void) | null,
-            onabort: null as (() => void) | null,
-            objectStore: () => ({
-                get(key: string) {
-                    const request = makeRequest<unknown>();
-                    tx.pending++;
-                    queueMicrotask(() => {
-                        request.result = store.get(key);
-                        request.onsuccess?.();
-                        settle();
-                    });
-                    return request;
-                },
-                put(value: { id: string }) {
-                    const request = makeRequest<void>();
-                    tx.pending++;
-                    queueMicrotask(() => {
-                        store.set(value.id, value);
-                        request.onsuccess?.();
-                        settle();
-                    });
-                    return request;
-                },
-                getAll() {
-                    const request = makeRequest<unknown[]>();
-                    tx.pending++;
-                    queueMicrotask(() => {
-                        request.result = [...store.values()];
-                        request.onsuccess?.();
-                        settle();
-                    });
-                    return request;
-                },
-            }),
-            abort() {
-                tx.aborted = true;
-                queueMicrotask(() => tx.onabort?.());
-            },
-        };
-        function settle() {
-            tx.pending--;
-            if (tx.pending === 0 && !tx.aborted) {
-                queueMicrotask(() => {
-                    if (tx.pending === 0 && !tx.aborted) {
-                        tx.oncomplete?.();
-                    }
-                });
-            }
-        }
-        return tx;
-    }
-
-    vi.stubGlobal('indexedDB', {
-        open() {
-            const request: {
-                result: unknown;
-                onupgradeneeded: (() => void) | null;
-                onsuccess: (() => void) | null;
-                onerror: (() => void) | null;
-                onblocked: (() => void) | null;
-            } = {
-                result: undefined,
-                onupgradeneeded: null,
-                onsuccess: null,
-                onerror: null,
-                onblocked: null,
-            };
-            queueMicrotask(() => {
-                request.result = {
-                    createObjectStore: () => {},
-                    transaction,
-                    close() {},
-                    onversionchange: null,
-                };
-                request.onupgradeneeded?.();
-                request.onsuccess?.();
-            });
-            return request;
-        },
-    });
 }
 
 beforeAll(() => {

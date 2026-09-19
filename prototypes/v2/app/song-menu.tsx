@@ -21,6 +21,15 @@ interface SongMenuProps {
      * draft. Deleting from the cloud is only offered for a song that is actually in the cloud.
      */
     inAccount: boolean;
+    /**
+     * Does this device hold an old-Ensemble (v1) profile (#1274)? The entry below is the
+     * permanent way back into the import (DECISION 2026-09-19): it is shown for as long as
+     * there is v1 data on this origin, including after a "Not now" and after everything has
+     * already been brought over — which is the point, since the automatic offer never
+     * returns once declined.
+     */
+    v1Available: boolean;
+    onBringOverV1: () => void;
     onClose: () => void;
     onShare: () => void;
     onSaveCopy: () => void;
@@ -48,6 +57,8 @@ export function SongMenu({
     shareLinkFallback,
     recoveryOptions,
     inAccount,
+    v1Available,
+    onBringOverV1,
     onClose,
     onShare,
     onSaveCopy,
@@ -101,6 +112,16 @@ export function SongMenu({
                 <button className="btn" disabled={busy} onClick={onImport}>
                     Import chart
                 </button>
+                {v1Available && (
+                    <button
+                        className="btn"
+                        data-testid="bring-over-v1"
+                        disabled={busy}
+                        onClick={onBringOverV1}
+                    >
+                        Bring over old Ensemble songs
+                    </button>
+                )}
                 <button className="btn" disabled={busy || !dirty || !saved} onClick={onRevert}>
                     Revert to saved
                 </button>

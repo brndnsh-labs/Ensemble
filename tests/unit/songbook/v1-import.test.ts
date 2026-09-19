@@ -9,20 +9,36 @@
  * hand-written fixture would drift the moment the persisted payload changes. The only
  * hand-built payloads here are the deliberately corrupt ones, which no writer produces.
  */
-import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ChartDocument } from '../../../prototypes/v2/lib/documents.js';
 import {
     convertV1,
     describeV1Outcome,
     findV1Data,
+    hasV1Data,
     importV1,
+    planV1Import,
     V1_PRESETS_KEY,
+    V1_SESSION_ID,
     V1_STATE_KEY,
     type V1Finding,
     type V1ImportContext,
     type V1Source,
     v1ImportContext,
     v1ImportOffer,
+    v1OfferDeclines,
 } from '../../../prototypes/v2/lib/import-v1.js';
+import {
+    ConflictError,
+    list as repositoryList,
+    save as repositorySave,
+} from '../../../prototypes/v2/lib/repository.js';
+import {
+    rememberV1Import,
+    rememberV1SessionMark,
+    v1ImportLedger,
+    v1SessionMark,
+} from '../../../prototypes/v2/lib/session.js';
 import { saveProgression } from '../../../public/controllers/arranger-controller.js';
 import { saveCurrentState } from '../../../public/state/persistence.js';
 import {
@@ -35,6 +51,15 @@ import {
 } from '../../../public/state/state-hydration.js';
 import { dispatch, getState } from '../../../public/state.js';
 import { ACTIONS } from '../../../public/types.js';
+import { installFakeIndexedDB } from '../../utils/fake-indexeddb.js';
+
+/**
+ * The two v2-side keys the import keeps its per-device memory under, spelled out rather
+ * than imported: they are a storage contract with every browser that has already run this
+ * build, and a test that renamed itself along with the constant would notice nothing.
+ */
+const V1_IMPORT_LEDGER_KEY = 'ensemble-v2-preview:v1-import';
+const V1_SESSION_MARK_KEY = 'ensemble-v2-preview:v1-session-import';
 
 // happy-dom in this repo ships no Storage implementation, so the v1 writers get the same
 // manual mock the existing arranger-controller suite installs.
@@ -264,6 +289,68 @@ function convert(session?: string, presets?: unknown[]) {
     return result.document;
 }
 
+/**
+ * Which dismiss gesture records the permanent device-wide decline (#1274 patch N1). The
+ * rule the card's label and its handler BOTH read, so they cannot say one thing and do
+ * another — which is exactly what went wrong: "Done" was declining.
+ */
+describe('the dismiss gesture', () => {
+    const offer = (over: Partial<Parameters<typeof v1OfferDeclines>[0]> = {}) =>
+        v1OfferDeclines({ result: null, songs: 2, asked: false, ...over });
+
+    it('declines only when there is something on offer to turn down', () => {
+        expect(offer()).toBe(true);
+        // "Everything is already here" and "nothing readable" both read Done, and both
+        // used to decline anyway — the bug this rule exists to close.
+        expect(offer({ songs: 0 })).toBe(false);
+    });
+
+    it('never declines after a run — the musician engaged with it', () => {
+        expect(offer({ result: 'Imported 2' })).toBe(false);
+        expect(offer({ result: 'Imported 0', songs: 0 })).toBe(false);
+    });
+
+    it('never declines an offer the musician went looking for', () => {
+        expect(offer({ asked: true })).toBe(false);
+        expect(offer({ asked: true, songs: 0 })).toBe(false);
+    });
+});
+
+/**
+ * The cheap probe behind the song menu's permanent entry (#1274 patch R3/N5): it decides
+ * whether there is an old Ensemble here at all, without parsing a thing.
+ */
+describe('probing for a v1 profile', () => {
+    it('is false for a browser that never ran v1', () => {
+        expect(hasV1Data(storageOf({}))).toBe(false);
+    });
+
+    it('is false for the empty library v1 leaves behind, without parsing it', () => {
+        expect(hasV1Data(storageOf({ [V1_PRESETS_KEY]: '[]' }))).toBe(false);
+        expect(hasV1Data(storageOf({ [V1_PRESETS_KEY]: '  []  ' }))).toBe(false);
+        expect(hasV1Data(storageOf({ [V1_STATE_KEY]: '{}' }))).toBe(false);
+    });
+
+    it('is true for real v1 data, and for data that cannot be read', () => {
+        expect(hasV1Data(storageOf({ [V1_STATE_KEY]: multiSection }))).toBe(true);
+        expect(hasV1Data(storageOf({ [V1_PRESETS_KEY]: JSON.stringify([presetMajor]) }))).toBe(
+            true,
+        );
+        // Unreadable is the whole reason this feature reports rather than shrugging.
+        expect(hasV1Data(storageOf({ [V1_STATE_KEY]: CORRUPT_SESSION }))).toBe(true);
+    });
+
+    it('is false when storage refuses to be read at all', () => {
+        expect(
+            hasV1Data({
+                getItem: () => {
+                    throw new Error('site data blocked');
+                },
+            }),
+        ).toBe(false);
+    });
+});
+
 describe('finding v1 data', () => {
     it('reports nothing for a profile that has never run v1', () => {
         expect(findV1Data(storageOf({}))).toEqual({ sources: [], problems: [] });
@@ -314,11 +401,24 @@ describe('finding v1 data', () => {
         ]);
     });
 
-    it('gives changed v1 data a new identity so it is offered again', () => {
+    it('gives a changed v1 session a new digest, under the one document id it always has', () => {
         const first = findV1Data(storageOf({ [V1_STATE_KEY]: multiSection })).sources[0];
         const second = findV1Data(storageOf({ [V1_STATE_KEY]: minorKey })).sources[0];
+        // The digest is what makes it offered again; the id is what makes the offer an
+        // UPDATE of the song already here rather than a second copy of it (DECISION
+        // 2026-09-19).
         expect(first.digest).not.toBe(second.digest);
-        expect(first.id).toBe(`v1-session-${first.digest}`);
+        expect(first.id).toBe(V1_SESSION_ID);
+        expect(second.id).toBe(V1_SESSION_ID);
+    });
+
+    it('gives a changed saved progression its own document id — a different song, not a version', () => {
+        const first = findV1Data(storageOf({ [V1_PRESETS_KEY]: JSON.stringify([presetMajor]) }))
+            .sources[0];
+        const second = findV1Data(storageOf({ [V1_PRESETS_KEY]: JSON.stringify([presetMinor]) }))
+            .sources[0];
+        expect(first.id).toBe(`v1-preset-${first.digest}`);
+        expect(second.id).not.toBe(first.id);
     });
 
     it('keeps a preset’s identity stable across an earlier deletion (#1274 P1-a)', () => {
@@ -676,18 +776,35 @@ describe('importing', () => {
                 const outcome = await importV1({
                     offer: v1ImportOffer(finding, ledger),
                     context,
-                    existingIds: new Set(options.existing ?? []),
+                    existing: new Map(
+                        (options.existing ?? []).map((id) => [
+                            id,
+                            { document: placeholder(id), drafts: 0 },
+                        ]),
+                    ),
+                    sessionMark: null,
                     save: async (document) => {
                         if (options.fail && document.title === options.fail) {
                             throw new Error('Storage is full.');
                         }
                         saved.push(document.id);
+                        return { revision: 0 };
                     },
                     remember: (digest) => ledger.set(digest, 'imported'),
+                    markSession: () => {},
                 });
                 return outcome;
             },
         };
+    }
+
+    /**
+     * A row that is present but holds something else — enough for the "already here" guard,
+     * which for a progression is answered by the id alone. The session's own rerun rules are
+     * exercised against the REAL repository in the describe below, never against this.
+     */
+    function placeholder(id: string) {
+        return { schemaVersion: 1, title: id, revision: 0, chart: {} };
     }
 
     const profile = () =>
@@ -712,23 +829,27 @@ describe('importing', () => {
         expect(rerun.failures).toEqual([]);
     });
 
-    it('never duplicates a song the songbook already holds, even with the ledger lost', async () => {
-        const finding = profile();
+    it('never duplicates a saved progression the songbook already holds, even with the ledger lost', async () => {
+        const finding = findV1Data(
+            storageOf({ [V1_PRESETS_KEY]: JSON.stringify([presetMajor, presetMinor]) }),
+        );
         const ids = finding.sources.map((source) => source.id);
         const fresh = runner(finding, new Map());
         const outcome = await fresh.run({ existing: ids });
         expect(fresh.saved).toEqual([]);
-        expect(outcome.alreadyPresent).toBe(3);
+        expect(outcome.alreadyPresent).toBe(2);
         expect(outcome.failures).toEqual([]);
     });
 
     it('imports nothing new after an earlier preset is deleted from v1 and the run repeats (#1274 P1-a)', async () => {
         const ledger = new Map<string, 'imported' | 'declined'>();
-        const existingIds = new Set<string>();
+        const existing = new Map<string, { document: ReturnType<typeof placeholder>; drafts: 0 }>();
         const save = async (document: { id: string }) => {
-            existingIds.add(document.id);
+            existing.set(document.id, { document: placeholder(document.id), drafts: 0 });
+            return { revision: 0 };
         };
         const remember = (digest: string) => ledger.set(digest, 'imported');
+        const markSession = () => {};
 
         const before = findV1Data(
             storageOf({ [V1_PRESETS_KEY]: JSON.stringify([presetMajor, presetMinor]) }),
@@ -736,9 +857,11 @@ describe('importing', () => {
         const first = await importV1({
             offer: v1ImportOffer(before, ledger),
             context: v1ImportContext(before, BASE),
-            existingIds,
+            existing,
+            sessionMark: null,
             save,
             remember,
+            markSession,
         });
         expect(first.imported.map((document) => document.title)).toEqual([
             'My Tune',
@@ -753,9 +876,11 @@ describe('importing', () => {
         const second = await importV1({
             offer: v1ImportOffer(after, ledger),
             context: v1ImportContext(after, BASE),
-            existingIds,
+            existing,
+            sessionMark: null,
             save,
             remember,
+            markSession,
         });
         expect(second.imported).toEqual([]);
         expect(second.failures).toEqual([]);
@@ -795,7 +920,7 @@ describe('importing', () => {
             'Saved progression “Broken tune”',
         ]);
         expect(describeV1Outcome(outcome)).toBe(
-            "Imported 1 · 2 couldn't be converted: Your last session in the old Ensemble — its saved data is not readable. · Saved progression “Broken tune” — its chords could not be read.",
+            "Imported 1 · 2 couldn't be brought over: Your last session in the old Ensemble — its saved data is not readable. · Saved progression “Broken tune” — its chords could not be read.",
         );
     });
 
@@ -945,13 +1070,471 @@ describe('the v1 keys', () => {
         await importV1({
             offer: finding,
             context: v1ImportContext(finding, BASE),
-            existingIds: new Set(),
-            save: async () => {},
+            existing: new Map(),
+            sessionMark: null,
+            save: async () => ({ revision: 0 }),
             remember: () => {},
+            markSession: () => {},
         });
 
         expect(window.localStorage.getItem(V1_STATE_KEY)).toBe(before.state);
         expect(window.localStorage.getItem(V1_PRESETS_KEY)).toBe(before.presets);
         expect([...store.keys()]).toEqual(before.keys);
+    });
+});
+
+/**
+ * The session's identity and rerun rules (DECISION 2026-09-19), driven through the REAL
+ * guest repository and the REAL per-device ledger — the same four collaborators
+ * `app/ensemble.tsx`'s `importV1Songs` wires together, so a rule that only holds against a
+ * stand-in for the songbook is not one this suite can report as passing.
+ */
+describe('re-running the import', () => {
+    const database = installFakeIndexedDB();
+    /** Unsaved drafts this "device" is holding, by document id — the shell reads these from
+     * `repository.recoverySlotCount`, which needs no IndexedDB and is not what is under test. */
+    const drafts = new Map<string, number>();
+
+    beforeEach(() => {
+        database.reset();
+        drafts.clear();
+        store.delete(V1_IMPORT_LEDGER_KEY);
+        store.delete(V1_SESSION_MARK_KEY);
+    });
+
+    /**
+     * Exactly the wiring in `importV1Songs`, minus the React state it writes afterwards.
+     *
+     * `options.save` replaces the store call for the crash tests: the seam this import is
+     * built to survive is "the page went away part way through a write", and the only honest
+     * way to test it is to make the write end that way.
+     */
+    async function runImport(
+        session?: string,
+        presets?: unknown[],
+        options: {
+            save?: (document: ChartDocument, expected: number | null) => Promise<unknown>;
+            wholeFinding?: boolean;
+        } = {},
+    ) {
+        const finding = findV1Data(
+            storageOf({
+                [V1_STATE_KEY]: session,
+                [V1_PRESETS_KEY]: presets ? JSON.stringify(presets) : undefined,
+            }),
+        );
+        const library = await repositoryList();
+        const outcome = await importV1({
+            // `wholeFinding` is the song-menu path, which offers everything regardless of the
+            // ledger; the default is the automatic offer, which the ledger filters.
+            offer: options.wholeFinding ? finding : v1ImportOffer(finding, v1ImportLedger()),
+            context: v1ImportContext(finding, BASE),
+            existing: new Map(
+                library.map((song) => [
+                    song.id,
+                    { document: song, drafts: drafts.get(song.id) ?? 0 },
+                ]),
+            ),
+            sessionMark: v1SessionMark(),
+            save: options.save ?? ((document, expected) => repositorySave(document, expected)),
+            remember: (digest) => rememberV1Import([digest], 'imported'),
+            markSession: rememberV1SessionMark,
+        });
+        // The shell's own last two steps, which the ledger rules depend on (patch R1/R6).
+        rememberV1Import(outcome.acknowledged, 'shown');
+        return outcome;
+    }
+
+    /** The same session bytes with a different tempo: changed v1 data, same song. */
+    function atTempo(session: string, bpm: number): string {
+        return JSON.stringify({ ...JSON.parse(session), bpm });
+    }
+
+    async function sessionDocument() {
+        return (await repositoryList()).find((song) => song.id === V1_SESSION_ID);
+    }
+
+    it('lands the v1 session as one document with the stable id', async () => {
+        const outcome = await runImport(multiSection, [presetMajor]);
+        expect(outcome.imported.map((document) => document.id)).toContain(V1_SESSION_ID);
+        const landed = await sessionDocument();
+        expect(landed?.title).toBe('Last session from the old Ensemble');
+        expect(landed?.revision).toBe(0);
+    });
+
+    it('imports nothing at all when the same profile is run again', async () => {
+        await runImport(multiSection, [presetMajor]);
+        const rerun = await runImport(multiSection, [presetMajor]);
+        expect(rerun.imported).toEqual([]);
+        expect(rerun.updated).toEqual([]);
+        expect(rerun.failures).toEqual([]);
+        expect((await sessionDocument())?.revision).toBe(0);
+        expect(await repositoryList()).toHaveLength(2);
+    });
+
+    it('still writes nothing on a rerun whose ledger has been lost', async () => {
+        await runImport(multiSection);
+        // The whole per-device memory gone (cleared site data, a different profile copy):
+        // the offer comes back, and the songbook's own copy is what stops a second write.
+        store.delete(V1_IMPORT_LEDGER_KEY);
+        store.delete(V1_SESSION_MARK_KEY);
+        const rerun = await runImport(multiSection);
+        expect(rerun.imported).toEqual([]);
+        expect(rerun.updated).toEqual([]);
+        expect(rerun.alreadyPresent).toBe(1);
+        expect((await sessionDocument())?.revision).toBe(0);
+    });
+
+    it('updates the one document when the old app has moved on, never adding a second', async () => {
+        await runImport(multiSection);
+        const changed = atTempo(multiSection, 88);
+        const rerun = await runImport(changed);
+
+        expect(rerun.imported).toEqual([]);
+        expect(rerun.updated.map((document) => document.id)).toEqual([V1_SESSION_ID]);
+        const library = await repositoryList();
+        expect(library.map((song) => song.id)).toEqual([V1_SESSION_ID]);
+        expect(library[0].chart.performance.bpm).toBe(88);
+        expect(library[0].revision).toBe(1);
+        // And the update itself is not mistaken for a musician's edit next time round.
+        const third = await runImport(atTempo(multiSection, 76));
+        expect(third.failures).toEqual([]);
+        expect((await sessionDocument())?.chart.performance.bpm).toBe(76);
+    });
+
+    it('leaves a copy that was edited here alone, and says so', async () => {
+        await runImport(multiSection);
+        const landed = (await sessionDocument())!;
+        // A Save in v2: the musician has made this song theirs.
+        await repositorySave({ ...landed, title: 'My arrangement' }, landed.revision);
+
+        const rerun = await runImport(atTempo(multiSection, 88));
+        expect(rerun.updated).toEqual([]);
+        expect(rerun.failures).toEqual([
+            {
+                title: 'Last session from the old Ensemble',
+                reason: 'it has changed in the old Ensemble, but you have edited this copy here — nothing was overwritten.',
+            },
+        ]);
+        const kept = (await sessionDocument())!;
+        expect(kept.title).toBe('My arrangement');
+        expect(kept.chart.performance.bpm).toBe(JSON.parse(multiSection).bpm);
+    });
+
+    it('leaves it alone for an unsaved draft too, which no revision can see', async () => {
+        await runImport(multiSection);
+        drafts.set(V1_SESSION_ID, 1);
+
+        const rerun = await runImport(atTempo(multiSection, 88));
+        expect(rerun.updated).toEqual([]);
+        expect(rerun.failures.map((failure) => failure.title)).toEqual([
+            'Last session from the old Ensemble',
+        ]);
+        expect((await sessionDocument())?.chart.performance.bpm).toBe(JSON.parse(multiSection).bpm);
+    });
+
+    it('stops the automatic offer from re-opening for data it has already reported (patch R1)', async () => {
+        const outcome = await runImport(CORRUPT_SESSION, [CORRUPT_PRESET, presetMajor]);
+        expect(outcome.problems).toHaveLength(2);
+        expect(outcome.acknowledged).toHaveLength(2);
+        expect(outcome.imported.map((document) => document.title)).toEqual(['My Tune']);
+
+        // The next load asks the ledger the same question the shell does, and there is
+        // nothing left to open the card for.
+        const rerun = await runImport(CORRUPT_SESSION, [CORRUPT_PRESET, presetMajor]);
+        expect(rerun.problems).toEqual([]);
+        expect(rerun.imported).toEqual([]);
+        expect(rerun.alreadyPresent).toBe(0);
+
+        // But the menu path — which ignores the ledger — still has the item and its reason.
+        const asked = await runImport(CORRUPT_SESSION, [CORRUPT_PRESET, presetMajor], {
+            wholeFinding: true,
+        });
+        expect(asked.problems.map((problem) => problem.reason)).toEqual([
+            'its saved data is not readable.',
+            'its chords could not be read.',
+        ]);
+    });
+
+    it('does NOT acknowledge a failure the store produced — that one is retryable (patch R1)', async () => {
+        const full = await runImport(multiSection, undefined, {
+            save: async () => {
+                throw new Error('Storage is full.');
+            },
+        });
+        expect(full.failures).toEqual([
+            { title: 'Last session from the old Ensemble', reason: 'Storage is full.' },
+        ]);
+        expect(full.acknowledged).toEqual([]);
+
+        // Storage frees up: the same bytes are still on offer, and land.
+        const retry = await runImport(multiSection);
+        expect(retry.imported.map((document) => document.id)).toEqual([V1_SESSION_ID]);
+    });
+
+    it('says a collision is a collision, in its own words, and keeps it retryable (patch R7)', async () => {
+        const clash = await runImport(multiSection, undefined, {
+            save: async () => {
+                throw new ConflictError();
+            },
+        });
+        expect(clash.failures[0].reason).toBe(
+            'another tab was bringing this over at the same time. Nothing was lost — try again and it will be here.',
+        );
+        // Never the store's own editing advice, which is about a chart on a stand.
+        expect(clash.failures[0].reason).not.toContain('save a copy');
+        expect(clash.acknowledged).toEqual([]);
+    });
+
+    it('calls an unchanged old app with an edited copy here "already here", not a failure (patch R4)', async () => {
+        await runImport(multiSection);
+        const landed = (await sessionDocument())!;
+        await repositorySave({ ...landed, title: 'My arrangement' }, landed.revision);
+
+        // Same v1 bytes, asked for again from the menu: there is no newer old-Ensemble
+        // version of this song, so there is nothing to bring over and nothing to report.
+        const asked = await runImport(multiSection, undefined, { wholeFinding: true });
+        expect(asked.failures).toEqual([]);
+        expect(asked.updated).toEqual([]);
+        expect(asked.alreadyPresent).toBe(1);
+        expect((await sessionDocument())?.title).toBe('My arrangement');
+    });
+
+    it('still refuses, and says why, when the old app HAS moved on (patch R4)', async () => {
+        await runImport(multiSection);
+        const landed = (await sessionDocument())!;
+        await repositorySave({ ...landed, title: 'My arrangement' }, landed.revision);
+
+        const rerun = await runImport(atTempo(multiSection, 88), undefined, {
+            wholeFinding: true,
+        });
+        expect(rerun.failures[0].reason).toContain('it has changed in the old Ensemble');
+        // A standing refusal, not a transient one: acknowledged, so the automatic offer
+        // stops re-opening for these exact v1 bytes.
+        expect(rerun.acknowledged).toHaveLength(1);
+        expect((await sessionDocument())?.title).toBe('My arrangement');
+    });
+
+    it('heals when the page dies AFTER the store committed the update (patch R5)', async () => {
+        await runImport(multiSection);
+        // The write lands; the tab goes away before anything else in the run does.
+        await runImport(atTempo(multiSection, 88), undefined, {
+            save: async (document, expected) => {
+                await repositorySave(document, expected);
+                throw new Error('the tab went away');
+            },
+        });
+        expect((await sessionDocument())?.chart.performance.bpm).toBe(88);
+
+        // A third version must still be recognised as the import's own work.
+        const third = await runImport(atTempo(multiSection, 76), undefined, {
+            wholeFinding: true,
+        });
+        expect(third.failures).toEqual([]);
+        expect(third.updated).toHaveLength(1);
+        expect((await sessionDocument())?.chart.performance.bpm).toBe(76);
+    });
+
+    it('heals when the page dies BEFORE the store committed the update (patch R5)', async () => {
+        await runImport(multiSection);
+        await runImport(atTempo(multiSection, 88), undefined, {
+            save: async () => {
+                throw new Error('the tab went away');
+            },
+        });
+        // Nothing was written, so the copy here is still the first import's.
+        expect((await sessionDocument())?.chart.performance.bpm).toBe(JSON.parse(multiSection).bpm);
+
+        const third = await runImport(atTempo(multiSection, 76), undefined, {
+            wholeFinding: true,
+        });
+        expect(third.failures).toEqual([]);
+        expect(third.updated).toHaveLength(1);
+        expect((await sessionDocument())?.chart.performance.bpm).toBe(76);
+    });
+
+    it('never heals in the unsafe direction: a real edit after a lost write is still refused (patch R5)', async () => {
+        await runImport(multiSection);
+        await runImport(atTempo(multiSection, 88), undefined, {
+            save: async () => {
+                throw new Error('the tab went away');
+            },
+        });
+        // The musician now saves their own version over the copy that is here. Its revision
+        // is exactly the one the lost write would have produced — which is why the mark
+        // records CONTENT and not a revision number.
+        const landed = (await sessionDocument())!;
+        await repositorySave({ ...landed, title: 'My arrangement' }, landed.revision);
+
+        const third = await runImport(atTempo(multiSection, 76), undefined, {
+            wholeFinding: true,
+        });
+        expect(third.updated).toEqual([]);
+        expect(third.failures[0].reason).toContain('you have edited this copy here');
+        expect((await sessionDocument())?.title).toBe('My arrangement');
+    });
+
+    /**
+     * The card's promise and the run's behaviour, over every state the session can be in
+     * (#1274 patch N2). They used to be two rules and disagreed after an interrupted
+     * update — the card said "everything is already here" while the run would have finished
+     * the job, with no button to press. `planV1Import` and `importV1` now reach the same
+     * verdict through `decideV1Item`, and this is what holds them to it.
+     */
+    describe('the card and the run agree', () => {
+        /** Puts the songbook and the device memory into one named state. */
+        const states: Array<{ name: string; setUp: () => Promise<string> }> = [
+            {
+                name: 'nothing here yet',
+                setUp: async () => multiSection,
+            },
+            {
+                name: 'already here, unchanged',
+                setUp: async () => {
+                    await runImport(multiSection);
+                    return multiSection;
+                },
+            },
+            {
+                name: 'the old app has moved on',
+                setUp: async () => {
+                    await runImport(multiSection);
+                    return atTempo(multiSection, 88);
+                },
+            },
+            {
+                name: 'moved on AND edited here',
+                setUp: async () => {
+                    await runImport(multiSection);
+                    const landed = (await sessionDocument())!;
+                    await repositorySave({ ...landed, title: 'Mine now' }, landed.revision);
+                    return atTempo(multiSection, 88);
+                },
+            },
+            {
+                name: 'edited here, old app unchanged (localOnly)',
+                setUp: async () => {
+                    await runImport(multiSection);
+                    const landed = (await sessionDocument())!;
+                    await repositorySave({ ...landed, title: 'Mine now' }, landed.revision);
+                    return multiSection;
+                },
+            },
+            {
+                name: 'an update interrupted before it committed',
+                setUp: async () => {
+                    await runImport(multiSection);
+                    await runImport(atTempo(multiSection, 88), undefined, {
+                        save: async () => {
+                            throw new Error('the tab went away');
+                        },
+                    });
+                    return atTempo(multiSection, 88);
+                },
+            },
+            {
+                name: 'an update interrupted after it committed',
+                setUp: async () => {
+                    await runImport(multiSection);
+                    await runImport(atTempo(multiSection, 88), undefined, {
+                        save: async (document, expected) => {
+                            await repositorySave(document, expected);
+                            throw new Error('the tab went away');
+                        },
+                    });
+                    return atTempo(multiSection, 76);
+                },
+            },
+            {
+                name: 'the mark is gone and the copy is identical',
+                setUp: async () => {
+                    await runImport(multiSection);
+                    store.delete(V1_SESSION_MARK_KEY);
+                    return multiSection;
+                },
+            },
+            {
+                name: 'the mark is gone and the old app has moved on',
+                setUp: async () => {
+                    await runImport(multiSection);
+                    store.delete(V1_SESSION_MARK_KEY);
+                    return atTempo(multiSection, 88);
+                },
+            },
+            {
+                name: 'an unsaved draft is being held here',
+                setUp: async () => {
+                    await runImport(multiSection);
+                    drafts.set(V1_SESSION_ID, 1);
+                    return atTempo(multiSection, 88);
+                },
+            },
+        ];
+
+        for (const state of states) {
+            it(`promises what it delivers — ${state.name}`, async () => {
+                const session = await state.setUp();
+                // The menu path: everything on offer, so the plan has to answer for the
+                // whole profile rather than whatever the ledger happens to have filtered.
+                const finding = findV1Data(storageOf({ [V1_STATE_KEY]: session }));
+                const library = await repositoryList();
+                const existing = new Map(
+                    library.map((song) => [
+                        song.id,
+                        { document: song, drafts: drafts.get(song.id) ?? 0 },
+                    ]),
+                );
+                const plan = planV1Import(
+                    finding,
+                    v1ImportContext(finding, BASE),
+                    existing,
+                    v1SessionMark(),
+                );
+                const outcome = await runImport(session, undefined, { wholeFinding: true });
+
+                expect(plan.fresh).toBe(outcome.imported.length + outcome.updated.length);
+                expect(plan.alreadyHere).toBe(outcome.alreadyPresent);
+                expect(plan.blocked.map((item) => item.reason)).toEqual(
+                    outcome.failures.map((failure) => failure.reason),
+                );
+                // A dismissal without a run acknowledges `plan.blocked`'s digests, so they must
+                // be exactly what the run itself would have acknowledged (no unreadable data in
+                // these profiles, so `acknowledged` holds refused sources only).
+                expect(plan.blocked.map((item) => item.digest)).toEqual(outcome.acknowledged);
+            });
+        }
+    });
+
+    it('retires the content it replaced once that write is finished (patch N3)', async () => {
+        await runImport(multiSection);
+        const first = (await sessionDocument())!;
+        await runImport(atTempo(multiSection, 88));
+        expect(v1SessionMark()?.replaced).toBeNull();
+
+        // The musician reverts to what the copy held BEFORE that update and saves it. Its
+        // content is the mark's old `replaced` witness — which must no longer authorise
+        // anything, or their revert reads as the import's own work.
+        const updated = (await sessionDocument())!;
+        if (first.schemaVersion !== 1 || updated.schemaVersion !== 1) {
+            throw new Error('an imported v1 session lands at schemaVersion 1');
+        }
+        await repositorySave(
+            { ...updated, title: first.title, chart: first.chart },
+            updated.revision,
+        );
+
+        const later = await runImport(atTempo(multiSection, 76), undefined, {
+            wholeFinding: true,
+        });
+        expect(later.updated).toEqual([]);
+        expect(later.failures[0].reason).toContain('you have edited this copy here');
+    });
+
+    it('writes nothing whatsoever when the v1 profile cannot be read', async () => {
+        const outcome = await runImport(CORRUPT_SESSION, [CORRUPT_PRESET]);
+        expect(outcome.imported).toEqual([]);
+        expect(outcome.updated).toEqual([]);
+        expect(outcome.problems).toHaveLength(2);
+        expect(await repositoryList()).toEqual([]);
     });
 });

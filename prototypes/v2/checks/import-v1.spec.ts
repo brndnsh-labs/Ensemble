@@ -107,6 +107,11 @@ function v1KeysUnchanged(page: import('@playwright/test').Page) {
     });
 }
 
+/** How many songbook rows carry the one stable v1-session document id. */
+function v1SessionRows(page: import('@playwright/test').Page) {
+    return page.getByRole('button', { name: 'Last session from the old Ensemble' }).count();
+}
+
 test('brings v1 songs into the songbook, plays one, and leaves v1 untouched', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
@@ -135,11 +140,60 @@ test('brings v1 songs into the songbook, plays one, and leaves v1 untouched', as
     await page.reload();
     await expect(page.getByRole('heading', { name: 'Let’s play something.' })).toBeVisible();
     await expect(page.getByTestId('v1-import')).toHaveCount(0);
-    await expect(
-        page.getByRole('button', { name: 'Last session from the old Ensemble' }),
-    ).toBeVisible();
+    expect(await v1SessionRows(page)).toBe(1);
     expect(await v1KeysUnchanged(page)).toEqual({ state: true, presets: true });
     expect(errors).toEqual([]);
+});
+
+/**
+ * "Not now" is permanent on this device, and the song menu is the way back (DECISION
+ * 2026-09-19) — including running the import a second time, which must leave exactly one
+ * `v1-session` document rather than a second copy of the same old session.
+ */
+test('declining is permanent, and the song menu brings the import back', async ({ page }) => {
+    await seedV1Profile(page);
+    await page.goto('/v2/');
+    // The button that declines is the one that SAYS so (patch N1).
+    await expect(page.getByTestId('v1-import').getByRole('button', { name: 'Done' })).toHaveCount(
+        0,
+    );
+    await page.getByTestId('v1-import').getByRole('button', { name: 'Not now' }).click();
+    await expect(page.getByTestId('v1-import')).toHaveCount(0);
+
+    // Never again by itself, whatever this device has or hasn't imported.
+    await page.reload();
+    await expect(page.getByRole('heading', { name: 'Let’s play something.' })).toBeVisible();
+    await expect(page.getByTestId('v1-import')).toHaveCount(0);
+
+    async function openImportFromTheMenu() {
+        await page.getByRole('button', { name: 'Song actions' }).click();
+        await page.getByTestId('bring-over-v1').click();
+        await expect(page.getByTestId('v1-import')).toBeVisible();
+    }
+
+    // The way back: open any song, then the permanent menu entry.
+    // A starter is listed twice (the library table and the Quick Jam tiles); either opens it.
+    await page.getByRole('button', { name: 'Blue pocket' }).first().click();
+    await openImportFromTheMenu();
+    await page.getByTestId('v1-import').getByRole('button', { name: 'Import' }).click();
+    await expect(page.getByTestId('v1-import-result')).toHaveText('Imported 3');
+    expect(await v1SessionRows(page)).toBe(1);
+    await page.getByTestId('v1-import').getByRole('button', { name: 'Done' }).click();
+
+    // And again. The heading is a promise, so with everything already here it does not
+    // offer to bring three songs over — and there is nothing to press but Done.
+    await page.getByRole('button', { name: 'My Tune' }).click();
+    await openImportFromTheMenu();
+    const second = page.getByTestId('v1-import');
+    await expect(
+        second.getByRole('heading', { name: 'Everything from the old Ensemble is already here' }),
+    ).toBeVisible();
+    await expect(second).toContainText('3 songs from the old app are already in this songbook');
+    await expect(second.getByRole('button', { name: 'Import' })).toHaveCount(0);
+    await second.getByRole('button', { name: 'Done' }).click();
+    expect(await v1SessionRows(page)).toBe(1);
+    await expect(page.getByRole('button', { name: 'My Tune' })).toHaveCount(1);
+    expect(await v1KeysUnchanged(page)).toEqual({ state: true, presets: true });
 });
 
 test('offers nothing on a profile that never ran v1', async ({ page }) => {
@@ -164,7 +218,13 @@ test('lists v1 data it cannot read instead of quietly importing nothing', async 
     await expect(
         card.getByRole('heading', { name: 'Bring over 1 song from the old Ensemble?' }),
     ).toBeVisible();
-    await expect(card).toContainText('2 items could not be read');
+    // Reasons are readable BEFORE anything is pressed: a profile with nothing but
+    // unreadable items has no Import button to click, so a reason that only exists in a
+    // run's result would be unreachable (patch R1).
+    await expect(card.getByTestId('v1-import-problems').locator('li')).toHaveText([
+        'Your last session in the old Ensemble — its saved data is not readable.',
+        'Saved progression “Broken tune” — its chords could not be read.',
+    ]);
 
     await card.getByRole('button', { name: 'Import' }).click();
     const result = page.getByTestId('v1-import-result');
@@ -178,4 +238,107 @@ test('lists v1 data it cannot read instead of quietly importing nothing', async 
     expect(await page.evaluate(() => localStorage.getItem('ensemble_currentState'))).toBe(
         '{"sections":[{"label":"Verse"',
     );
+
+    // Shown once is enough: unreadable v1 data reads the same way on every load, so the
+    // card does not re-open by itself for it (patch R1) …
+    await page.getByTestId('v1-import').getByRole('button', { name: 'Done' }).click();
+    await page.reload();
+    await expect(page.getByRole('heading', { name: 'Let’s play something.' })).toBeVisible();
+    await expect(page.getByTestId('v1-import')).toHaveCount(0);
+
+    // … and the way back still lists it, with its reason, for anyone who goes looking.
+    await page.getByRole('button', { name: 'Good tune' }).click();
+    await page.getByRole('button', { name: 'Song actions' }).click();
+    await page.getByTestId('bring-over-v1').click();
+    await expect(page.getByTestId('v1-import').getByTestId('v1-import-problems')).toContainText(
+        'its saved data is not readable.',
+    );
+});
+
+/** Whether this device has recorded the permanent "stop offering" answer. */
+function declined(page: import('@playwright/test').Page) {
+    return page.evaluate(
+        () => localStorage.getItem('ensemble-v2-preview:v1-import-declined') !== null,
+    );
+}
+
+/**
+ * "Done" is not "Not now" (#1274 patch N1). A card with nothing left to offer still has a
+ * button, and pressing it must not quietly mean "never tell me about the old Ensemble
+ * again" — the musician who tidies up after importing is exactly the one who would then
+ * never hear about next week's songs.
+ */
+test('Done never records the permanent decline', async ({ page }) => {
+    await seedV1Profile(page);
+    await page.goto('/v2/');
+    await page.getByTestId('v1-import').getByRole('button', { name: 'Import' }).click();
+    await expect(page.getByTestId('v1-import-result')).toHaveText('Imported 3');
+    await page.getByTestId('v1-import').getByRole('button', { name: 'Done' }).click();
+    expect(await declined(page)).toBe(false);
+
+    // Everything is here now, so the menu path offers nothing — and its Done is still Done.
+    await page.getByRole('button', { name: 'My Tune' }).click();
+    await page.getByRole('button', { name: 'Song actions' }).click();
+    await page.getByTestId('bring-over-v1').click();
+    const card = page.getByTestId('v1-import');
+    await expect(
+        card.getByRole('heading', { name: 'Everything from the old Ensemble is already here' }),
+    ).toBeVisible();
+    await expect(card.getByRole('button', { name: 'Not now' })).toHaveCount(0);
+    await card.getByRole('button', { name: 'Done' }).click();
+    expect(await declined(page)).toBe(false);
+
+    // So next week's saved progression is still offered, by itself, on the next load.
+    await page.evaluate(() => {
+        const presets = JSON.parse(localStorage.getItem('ensemble_userPresets')!);
+        presets.push({
+            name: 'Next week',
+            sections: btoa(JSON.stringify([{ l: 'A', v: 'I | V' }])),
+            isMinor: false,
+            timestamp: 1750000001000,
+        });
+        localStorage.setItem('ensemble_userPresets', JSON.stringify(presets));
+    });
+    await page.reload();
+    await expect(
+        page
+            .getByTestId('v1-import')
+            .getByRole('heading', { name: 'Bring over 1 song from the old Ensemble?' }),
+    ).toBeVisible();
+});
+
+/**
+ * A card with no Import button still has to be able to finish (#1274 patch N1c): dismissing
+ * it records the unreadable items it displayed, or the automatic offer re-opens on every
+ * load for data that will never read any differently.
+ */
+test('dismissing an unreadable-only card settles it without declining', async ({ page }) => {
+    await page.addInitScript(() => {
+        localStorage.setItem('ensemble_currentState', '{"sections":[{"label":"Verse"');
+    });
+    await page.goto('/v2/');
+    const card = page.getByTestId('v1-import');
+    await expect(
+        card.getByRole('heading', { name: 'Some music in the old Ensemble could not be read' }),
+    ).toBeVisible();
+    await expect(card.getByRole('button', { name: 'Import' })).toHaveCount(0);
+    await expect(card.getByTestId('v1-import-problems')).toContainText(
+        'its saved data is not readable.',
+    );
+    await card.getByRole('button', { name: 'Done' }).click();
+
+    await page.reload();
+    await expect(page.getByRole('heading', { name: 'Let’s play something.' })).toBeVisible();
+    await expect(page.getByTestId('v1-import')).toHaveCount(0);
+    expect(await declined(page)).toBe(false);
+
+    // And the way back still says what is wrong with it.
+    await page.getByRole('button', { name: 'Blue pocket' }).first().click();
+    await page.getByRole('button', { name: 'Song actions' }).click();
+    await page.getByTestId('bring-over-v1').click();
+    await expect(page.getByTestId('v1-import').getByTestId('v1-import-problems')).toContainText(
+        'its saved data is not readable.',
+    );
+    // Reading it again is not agreeing to anything, so it still has not declined.
+    expect(await declined(page)).toBe(false);
 });

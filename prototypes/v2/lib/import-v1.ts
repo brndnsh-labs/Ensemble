@@ -28,6 +28,21 @@
  * one unconvertible progression is reported with a reason, never dropped silently and
  * never fatal to the rest of the import.
  *
+ * Two identity rules, because the two kinds of v1 item are different things (DECISION
+ * 2026-09-19 on #1274):
+ *
+ * - The v1 SESSION is one document with the fixed id `v1-session`. There is only ever one
+ *   "last session in the old Ensemble", so re-running the import UPDATES that document
+ *   rather than landing a second copy of it. What stops a rerun from overwriting work: an
+ *   unchanged v1 session is never offered at all (the ledger holds its digest), a changed
+ *   one whose conversion is byte-identical to the document already there is counted as
+ *   already present and not written, and a changed one whose v2 copy has been EDITED here
+ *   is reported in the result list, not written — see `sessionUpdate`.
+ * - A saved PROGRESSION keeps its content-derived id (`v1-preset-<digest>`), because the v1
+ *   library is a list of independent songs and an edit there makes a different song, not a
+ *   new version of one. That id is also the second guard against a duplicate copy when the
+ *   ledger is lost.
+ *
  * Deliberately NOT `public/songbook/legacy-score.ts`'s `proposeLegacyScoreConversion`:
  * that conversion blocks the WHOLE song on one unparseable bar, which is the wrong
  * failure mode for an import whose only other option is losing the song outright. Every
@@ -78,10 +93,49 @@ import {
     isChordDensity,
 } from '../../../public/types.js';
 import { normalizeKey } from '../../../public/utils.js';
+// The one v2-store import here, and only for its TYPE at runtime: a refused write has to be
+// recognised as a collision rather than reported in the store's own editing vocabulary (R7).
+import { ConflictError } from './repository';
 
 /** The two v1 keys this module reads. Never written, renamed or removed. */
 export const V1_STATE_KEY = 'ensemble_currentState';
 export const V1_PRESETS_KEY = 'ensemble_userPresets';
+
+/**
+ * Is there an old-Ensemble profile on this origin at all?
+ *
+ * Two `getItem`s and a length check — deliberately NOT `findV1Data`, which parses the
+ * session, Base64-decodes up to 500 saved progressions and validates each one. That answer
+ * is only needed when something is actually going to be offered; this one is needed on every
+ * load, to decide whether the song menu shows its permanent way back (#1274 patch R3).
+ */
+export function hasV1Data(storage: V1ReadOnlyStorage): boolean {
+    for (const key of [V1_STATE_KEY, V1_PRESETS_KEY]) {
+        try {
+            const raw = storage.getItem(key);
+            // `[]` is what v1 leaves behind for a musician who opened its preset library and
+            // never saved one, and it is not something to offer — a string compare rather
+            // than a parse keeps this the cheap probe it exists to be (#1274 patch N5). Any
+            // other content, including a corrupt blob, still counts: unreadable v1 data is
+            // exactly the thing this import must be able to tell somebody about.
+            const value = raw === null ? '' : raw.trim();
+            if (value !== '' && value !== '[]' && value !== '{}' && value !== 'null') {
+                return true;
+            }
+        } catch {
+            // Blocked site data: nothing readable, so nothing to offer.
+            return false;
+        }
+    }
+    return false;
+}
+
+/**
+ * The one document the v1 session imports as, on every run (DECISION 2026-09-19). Fixed
+ * rather than content-derived: a musician has exactly one last session in the old app, so a
+ * changed one is a new version of that song and not a second song.
+ */
+export const V1_SESSION_ID = 'v1-session';
 
 /** The only storage capability this module is given: reads. */
 export interface V1ReadOnlyStorage {
@@ -99,11 +153,23 @@ export interface V1Source {
      * LATER is offered again instead of being silently skipped.
      */
     digest: string;
-    /** Deterministic v2 document id — also where this song's v1 provenance lives. */
+    /**
+     * The v2 document id this item lands as — also where this song's v1 provenance lives,
+     * since a v1 document has no sanctioned `importSource` slot. `v1-session` for the
+     * session, `v1-preset-<digest>` for a saved progression; see the module header for why
+     * one is fixed and the other content-derived.
+     */
     id: string;
     title: string;
     /** The parsed v1 record. Held for conversion only; never written back. */
     record: Record<string, unknown>;
+    /**
+     * A saved progression's decoded sections, kept from the pass that proved them readable.
+     * `findV1Data` has to decode them to decide whether this is an offerable item at all, and
+     * `content()` would otherwise Base64-decode and re-parse every one of them a second time
+     * (#1274 patch R3). Absent for a session, whose sections are already plain objects.
+     */
+    sections?: Array<Record<string, unknown>>;
 }
 
 /** v1 data that exists but cannot be read. Reported, never treated as "nothing there". */
@@ -118,8 +184,13 @@ export interface V1Finding {
     problems: V1Problem[];
 }
 
-/** Ledger of what this device has already imported or declined, keyed by digest. */
-export type V1ImportLedger = ReadonlyMap<string, 'imported' | 'declined'>;
+/**
+ * Ledger of what this device has already imported, or been shown and can do nothing more
+ * about, keyed by the digest of the v1 bytes. The states themselves are `lib/session.ts`'s
+ * (`V1ImportState`); every one of them means the same thing to the automatic offer, so this
+ * only ever asks whether a digest is in it.
+ */
+export type V1ImportLedger = ReadonlyMap<string, string>;
 
 /**
  * Defaults for the fields a v1 save does not carry: `soloist.tradeMode` and
@@ -154,11 +225,35 @@ export type V1Conversion =
 
 export interface V1ImportOutcome {
     imported: ChartDocument[];
-    /** Items that could not be converted or saved, each with a reason to show. */
+    /**
+     * The v1 session document a rerun brought up to date with changed v1 bytes — at most
+     * one, since it is the only item with a fixed id.
+     */
+    updated: ChartDocument[];
+    /**
+     * Items that could not be converted or saved, or that this run deliberately did not
+     * write over, each with a reason to show. Nothing here is lost: the v1 bytes are
+     * untouched and the v2 copy, where there is one, is exactly as the musician left it.
+     */
     failures: Array<{ title: string; reason: string }>;
     /** Items already in the songbook from an earlier run; not re-saved, not failures. */
     alreadyPresent: number;
     problems: V1Problem[];
+    /**
+     * Digests of everything this run SHOWED the musician and will not do anything more
+     * about: v1 data that could not be read, an item that could not be converted, and the
+     * deliberate refusal to write over a copy edited here (#1274 patch R1).
+     *
+     * The caller records these so the AUTOMATIC offer stops re-opening for them on every
+     * load — they are acknowledged, not pending. A changed digest is a different item and is
+     * offered again, and the song-menu path ignores the ledger entirely, so nothing here is
+     * hidden from someone who goes looking.
+     *
+     * A failure the STORE produced (quota, an interrupted transaction, another tab writing
+     * the same id) is deliberately NOT here: nothing about it says the item was dealt with,
+     * and the next run should try it again.
+     */
+    acknowledged: string[];
     /**
      * How many landed songs play at least one lane through the synth because v1 named a
      * sound pack this build doesn't offer (#1274 P2-3) — never a failure, since the song
@@ -185,6 +280,13 @@ const NOTATIONS = ['roman', 'name', 'nns'];
 const PATTERN_LANE_NAMES: ReadonlySet<string> = new Set(CHART_GROOVE_PATTERN_LANE_NAMES);
 
 /**
+ * The bytes a digest is taken over differ by item kind, and deliberately stay that way: the
+ * SESSION is digested from the raw `localStorage` string exactly as v1 wrote it, a saved
+ * PROGRESSION from `JSON.stringify` of its parsed entry (the array element, which has no raw
+ * substring of its own to point at). Re-basing either one would hand every already-imported
+ * item a new identity and offer the whole profile again, so this is a documented convention
+ * rather than something to unify (#1274 patch R11).
+ *
  * Content identity for a v1 record: two independent djb2 folds of its exact bytes,
  * concatenated as hex. Not a security boundary — it decides "have I seen this
  * already?", and the deterministic document id it feeds gives the repository a second,
@@ -250,7 +352,7 @@ export function findV1Data(storage: V1ReadOnlyStorage): V1Finding {
             sources.push({
                 kind: 'session',
                 digest: digestOf(session.raw),
-                id: `v1-session-${digestOf(session.raw)}`,
+                id: V1_SESSION_ID,
                 title: SESSION_TITLE,
                 record: session.value,
             });
@@ -296,7 +398,11 @@ export function findV1Data(storage: V1ReadOnlyStorage): V1Finding {
                 const digest = occurrence === 0 ? base : `${base}-${occurrence}`;
                 const name =
                     isPlainRecord(entry) && typeof entry.name === 'string' ? entry.name : '';
-                if (!isPlainRecord(entry) || !name || !presetSections(entry)) {
+                // Decoded ONCE, here, and carried on the source: this pass has to decode to
+                // know whether the item is offerable at all, and `content()` would otherwise
+                // Base64-decode and re-parse every progression a second time (patch R3).
+                const sections = isPlainRecord(entry) ? presetSections(entry) : null;
+                if (!isPlainRecord(entry) || !name || !sections) {
                     problems.push({
                         digest,
                         label: name
@@ -312,13 +418,15 @@ export function findV1Data(storage: V1ReadOnlyStorage): V1Finding {
                     id: `v1-preset-${digest}`,
                     title: sanitizeDisplayString(name, 'Untitled progression', 200),
                     record: entry,
+                    sections,
                 });
             }
             const overflow = presets.value.length - MAX_PRESETS;
             if (overflow > 0) {
                 problems.push({
-                    // Stable across reruns of an unchanged profile so "Not now" sticks;
-                    // it moves only when the overflow count itself changes.
+                    // Stable across reruns of an unchanged profile, so once this has been
+                    // shown the automatic offer stops re-opening for it; it moves only when
+                    // the overflow count itself changes, which IS news worth showing again.
                     digest: digestOf(`v1-presets-overflow:${presets.value.length}`),
                     label: 'Your saved progressions',
                     reason: `this run reads at most ${MAX_PRESETS} at a time; ${overflow} more progression${overflow === 1 ? '' : 's'} could not be read this time.`,
@@ -347,9 +455,37 @@ function presetSections(preset: Record<string, unknown>): Array<Record<string, u
 }
 
 /**
- * The import ledger's view of a finding: what is still on offer. Anything already
- * imported (or declined for these exact bytes) is filtered out, so a rerun resumes
- * where the last one stopped and a dismissal does not hide a later, different set.
+ * Does the card's dismiss button record the permanent per-device decline (#1274 patch N1)?
+ *
+ * The ONE answer behind both the button's label and what pressing it does. They were worked
+ * out separately once, and drifted: a card reading "Everything from the old Ensemble is
+ * already here" with a button marked "Done" was quietly recording "never offer this again",
+ * so a musician who tidied up after importing never saw next week's new songs.
+ *
+ * Only a real "Not now" declines: there has to be something on offer to turn down, the run
+ * must not already have happened, and an offer the musician went looking for from the song
+ * menu never declines — coming to find it is the opposite of asking to be left alone.
+ *
+ * Lives here rather than in the card so it can be tested as the rule it is.
+ */
+export function v1OfferDeclines(offer: {
+    result: string | null;
+    songs: number;
+    asked: boolean;
+}): boolean {
+    return !offer.result && offer.songs > 0 && !offer.asked;
+}
+
+/**
+ * The import ledger's view of a finding: what the AUTOMATIC offer still has to say.
+ *
+ * Anything this device has already imported, or has already been shown and can do nothing
+ * more about (`'shown'` — unreadable v1 data, an unconvertible item, the refusal to write
+ * over a copy edited here), is filtered out. Identity is the DIGEST, so the same v1 item
+ * re-saved in the old app is a new item and is offered again.
+ *
+ * The song-menu path deliberately does not call this: asking is asking, and everything v1
+ * holds is on the table there (#1274 patch R1).
  */
 export function v1ImportOffer(finding: V1Finding, ledger: V1ImportLedger): V1Finding {
     return {
@@ -715,7 +851,9 @@ function content(source: V1Source, context: V1ImportContext): ChartContent | str
             band: sessionBand(saved, context),
         };
     }
-    const raw = presetSections(source.record);
+    // `source.sections` is the decode `findV1Data` already did (patch R3); the fallback is
+    // for a source built by hand in a test, never for the live path.
+    const raw = source.sections ?? presetSections(source.record);
     const sections = raw ? codecSafeSections(raw) : [];
     if (!playable(sections)) {
         return 'its chords could not be read.';
@@ -798,57 +936,393 @@ function createdAt(source: V1Source, now: string): string {
     return now;
 }
 
+/**
+ * A document already in the songbook, and whether this device holds unsaved edits to it.
+ *
+ * The document is typed structurally rather than as a `ChartDocument`, because the v2
+ * shell's own document type is a union that also carries the score-editor schema — and an
+ * imported v1 song the musician has since turned into an editable copy is exactly one of
+ * the cases this has to be able to look at.
+ */
+export interface V1ExistingDocument {
+    document: { schemaVersion: number; title: string; revision: number; chart: unknown };
+    /**
+     * Retained (unsaved) drafts for this document on this device. Non-zero is a v2 edit the
+     * document's own `revision` cannot see — `lib/repository.ts` writes a recovery slot only
+     * when the live chart differs from what was last saved — so it counts as "edited here".
+     */
+    drafts: number;
+}
+
+/**
+ * What the last import of the v1 session WROTE, or set out to write, on this device.
+ *
+ * This is what makes "has the musician edited this song here?" answerable at all. The
+ * document's own revision cannot answer it: the import's update bumps it, so a second
+ * changed-source rerun would read its own write as somebody's edit and refuse forever.
+ *
+ * Recorded as CONTENT rather than as a revision number (#1274 patch R5), and recorded
+ * BEFORE the save rather than after it, so a tab that dies mid-write heals either way:
+ *
+ * - died after the store committed → the document holds `document`, which this run wrote;
+ * - died before it committed → the document still holds `replaced`, which the previous run
+ *   wrote and this one had already established as untouched.
+ *
+ * Both are contents the import itself produced, so neither can be confused with an edit: a
+ * musician's Save moves the content away from both, and the next run refuses, which is the
+ * safe direction. A revision pair could not tell those apart — the revision a failed write
+ * would have produced is exactly the revision a musician's own next Save does produce.
+ */
+export interface V1SessionMark {
+    /**
+     * The v1 bytes that write was made from. Read back to tell "the old app has moved on"
+     * from "v1 is unchanged and you edited the copy here" (#1274 patch R4/R9), which are
+     * the same `!sameContent` to every other test in this file but are not the same event.
+     */
+    digest: string;
+    /** Content digest of the document the import wrote (or was about to write). */
+    document: string;
+    /** Content digest it was replacing, or null for a create. */
+    replaced: string | null;
+}
+
+/** Content identity of a songbook document — the three fields `sameContent` compares. */
+function documentDigest(document: {
+    schemaVersion: number;
+    title: string;
+    chart: unknown;
+}): string {
+    return digestOf(
+        JSON.stringify({
+            schemaVersion: document.schemaVersion,
+            title: document.title,
+            chart: document.chart,
+        }),
+    );
+}
+
 export interface V1ImportRun {
     offer: V1Finding;
     context: V1ImportContext;
-    /** Document ids already in the songbook — the second guard against duplicates. */
-    existingIds: ReadonlySet<string>;
-    save: (document: ChartDocument) => Promise<void>;
+    /**
+     * The songbook's documents by id — the second guard against duplicates, and, for the
+     * fixed `v1-session` id, what a rerun compares against before it writes anything.
+     */
+    existing: ReadonlyMap<string, V1ExistingDocument>;
+    /** What the last import of the v1 session committed on this device, if any. */
+    sessionMark: V1SessionMark | null;
+    /**
+     * Commits one document. `expected` is null for a create, the row's revision for an
+     * update.
+     */
+    save: (document: ChartDocument, expected: number | null) => Promise<unknown>;
     /** Called per item as it lands, so a run interrupted halfway is still remembered. */
     remember: (digest: string) => void;
+    /**
+     * Records what the session write is about to do. Called BEFORE the save, never after:
+     * the whole point is that it survives a tab that dies during the write — see
+     * `V1SessionMark`.
+     */
+    markSession: (mark: V1SessionMark) => void;
     now?: string;
 }
+
+/** Does the songbook's copy still hold exactly what an import put there? */
+function sameContent(candidate: ChartDocument, existing: V1ExistingDocument['document']): boolean {
+    return (
+        candidate.title === existing.title &&
+        candidate.schemaVersion === existing.schemaVersion &&
+        JSON.stringify(candidate.chart) === JSON.stringify(existing.chart)
+    );
+}
+
+/**
+ * What to do about a `v1-session` document that is already in the songbook, given a
+ * conversion of v1's current bytes (DECISION 2026-09-19).
+ *
+ * `'present'` — the two are identical, so there is nothing to write. This is what keeps a
+ * rerun honest after the per-device ledger is lost: the offer comes back, and the import
+ * still lands nothing.
+ *
+ * `'localOnly'` — v1 holds exactly the bytes this device already brought over, and the
+ * difference is the musician's own editing here (#1274 patch R4). Nothing to bring over and
+ * nothing wrong: there is no newer old-Ensemble version of this song, so this is reported as
+ * already here, not as a failure. Only reachable from the song-menu path, which offers
+ * everything regardless of the ledger.
+ *
+ * `'edited'` — the old app HAS moved on and this device's copy is no longer what the import
+ * left there, either because a Save committed different content or because an unsaved draft
+ * is being held. Overwriting would destroy work done HERE, so the run reports the item.
+ *
+ * `'update'` — the v1 bytes changed and the v2 copy is untouched since the import, so the
+ * song is brought up to date in place. With no mark at all (an import by a build before the
+ * mark existed, or a cleared ledger) revision 0 is the equivalent evidence: nothing in v2 has
+ * ever committed a version over it.
+ */
+function sessionUpdate(
+    candidate: ChartDocument,
+    sourceDigest: string,
+    existing: V1ExistingDocument,
+    mark: V1SessionMark | null,
+): 'present' | 'localOnly' | 'edited' | 'update' {
+    if (sameContent(candidate, existing.document)) {
+        return 'present';
+    }
+    const current = documentDigest(existing.document);
+    const ours = mark
+        ? current === mark.document || current === mark.replaced
+        : existing.document.revision === 0;
+    if (ours && existing.drafts === 0) {
+        return 'update';
+    }
+    return mark?.digest === sourceDigest ? 'localOnly' : 'edited';
+}
+
+const SESSION_EDITED_REASON =
+    'it has changed in the old Ensemble, but you have edited this copy here — nothing was overwritten.';
+
+/**
+ * What an import would do about ONE offered item — the single verdict both the card's
+ * preview and the run itself read (#1274 patch N2).
+ *
+ * They used to answer this separately, and disagreed in exactly the case that matters: after
+ * an interrupted update the run would happily finish the job while the card said "everything
+ * is already here" and offered no button to press. A verdict computed once, from the same
+ * inputs, cannot drift — so the plan below and `importV1` both call this and nothing else.
+ *
+ * `retire` rides along on a verdict rather than being a fifth kind: it is bookkeeping the RUN
+ * should do (see `V1SessionMark.replaced`, patch N3), and the plan simply ignores it.
+ */
+export type V1ItemVerdict =
+    | { kind: 'new'; document: ChartDocument; soundFallback: boolean }
+    | { kind: 'update'; document: ChartDocument; soundFallback: boolean; expected: number }
+    | { kind: 'present'; mark: V1SessionMark | null }
+    | { kind: 'localOnly' }
+    | { kind: 'edited'; reason: string }
+    | { kind: 'unconvertible'; reason: string };
+
+export function decideV1Item(
+    source: V1Source,
+    context: V1ImportContext,
+    existing: V1ExistingDocument | undefined,
+    mark: V1SessionMark | null,
+    now: string,
+): V1ItemVerdict {
+    // A saved progression's id IS its content, so an id that is already here is the same
+    // song — there is nothing to update and nothing to compare.
+    if (existing && source.kind !== 'session') {
+        return { kind: 'present', mark: null };
+    }
+    const conversion = convertV1(source, context, now);
+    if (conversion.kind === 'failed') {
+        return { kind: 'unconvertible', reason: conversion.reason };
+    }
+    if (!existing) {
+        return {
+            kind: 'new',
+            document: conversion.document,
+            soundFallback: conversion.soundFallback,
+        };
+    }
+    switch (sessionUpdate(conversion.document, source.digest, existing, mark)) {
+        case 'present':
+            return {
+                kind: 'present',
+                // Re-anchor on the content that IS the import's work. Without this, a rerun
+                // after a lost ledger could only fall back to "revision 0", which an earlier
+                // in-place update has already moved past. It also retires a stale `replaced`
+                // (patch N3): the write it was insurance against is long finished.
+                mark: {
+                    digest: source.digest,
+                    document: documentDigest(existing.document),
+                    replaced: null,
+                },
+            };
+        case 'localOnly':
+            // The musician's own editing, over v1 bytes this device already brought across.
+            // Deliberately no mark: marking their document as ours would authorise
+            // overwriting it later.
+            return { kind: 'localOnly' };
+        case 'edited':
+            return { kind: 'edited', reason: SESSION_EDITED_REASON };
+        default:
+            return {
+                kind: 'update',
+                document: conversion.document,
+                soundFallback: conversion.soundFallback,
+                expected: existing.document.revision,
+            };
+    }
+}
+
+/**
+ * What the card may promise, from the same verdicts the run will reach (#1274 patch R12/N2).
+ *
+ * `fresh` is exactly what an Import would land — created or updated — so the heading is a
+ * promise the run keeps. `alreadyHere` is everything that is genuinely here already. An item
+ * the run would refuse is neither: it is listed, with the reason the run would give, beside
+ * the v1 data that could not be read at all, because "we will not overwrite your edit" is
+ * something to say before the button is pressed, not only afterwards.
+ */
+export interface V1ImportPlan {
+    fresh: number;
+    alreadyHere: number;
+    /**
+     * `digest` is what a dismissal acknowledges: a card whose only item is blocked has no Import
+     * button, so no run will ever record it as `'shown'` — the dismiss has to, or the automatic
+     * offer re-opens on every load. These are exactly the verdicts `importV1` acknowledges itself.
+     */
+    blocked: Array<{ label: string; reason: string; digest: string }>;
+}
+
+export function planV1Import(
+    offer: V1Finding,
+    context: V1ImportContext,
+    existing: ReadonlyMap<string, V1ExistingDocument>,
+    mark: V1SessionMark | null,
+    now = new Date().toISOString(),
+): V1ImportPlan {
+    const plan: V1ImportPlan = { fresh: 0, alreadyHere: 0, blocked: [] };
+    for (const source of offer.sources) {
+        const verdict = decideV1Item(source, context, existing.get(source.id), mark, now);
+        if (verdict.kind === 'new' || verdict.kind === 'update') {
+            plan.fresh++;
+        } else if (verdict.kind === 'present' || verdict.kind === 'localOnly') {
+            plan.alreadyHere++;
+        } else {
+            plan.blocked.push({
+                label: source.title,
+                reason: verdict.reason,
+                digest: source.digest,
+            });
+        }
+    }
+    return plan;
+}
+
+/**
+ * What a musician sees instead of the store's own words when two tabs import at once
+ * (#1274 patch R7). `repository.ts`'s `ConflictError` says "save a copy or reopen the newer
+ * version", which is advice for someone editing a chart — there is no chart on a stand here,
+ * and the other tab is writing the very same thing this one is.
+ */
+const CONFLICT_REASON =
+    'another tab was bringing this over at the same time. Nothing was lost — try again and it will be here.';
 
 /**
  * Import the offered items one at a time.
  *
- * Deliberately sequential and item-atomic: item k's failure leaves items 1..k-1 saved
- * and remembered, reports k with a reason, and carries on. Nothing is rolled back —
- * a partial import is real music the musician keeps — and a rerun only touches what is
- * still missing, because each landed item is remembered (and its document id is derived
- * from its v1 bytes, so the repository would reject a second copy anyway).
+ * **Item-atomic and resumable by design, not transactional.** "Zero partial writes" holds
+ * where it can: unreadable or unconvertible v1 data writes nothing at all, because every
+ * item is parsed and converted before it is saved. A save that fails halfway through a run
+ * is the other case, and rolling back the songs that already landed would be the wrong
+ * answer — they are real music the musician keeps. So item k's failure leaves items 1..k-1
+ * saved and remembered, reports k with a reason, and carries on; a rerun then touches only
+ * what is still missing, because each landed item is remembered (and a progression's
+ * document id is derived from its v1 bytes, so the repository would reject a second copy
+ * anyway).
  */
 export async function importV1(run: V1ImportRun): Promise<V1ImportOutcome> {
     const now = run.now ?? new Date().toISOString();
     const outcome: V1ImportOutcome = {
         imported: [],
+        updated: [],
         failures: [],
         alreadyPresent: 0,
         problems: run.offer.problems,
         soundFallbacks: 0,
+        // Reported v1 data is acknowledged the moment it is shown: it will read the same way
+        // on every future run, so re-opening the offer for it forever is nagging, not safety.
+        acknowledged: run.offer.problems.map((problem) => problem.digest),
+    };
+    // One live copy of the mark through the run: a session write re-anchors it, and a second
+    // session item (impossible today, but the loop does not assume that) would otherwise
+    // decide against a record two writes out of date.
+    let mark = run.sessionMark;
+    const remark = (next: V1SessionMark) => {
+        mark = next;
+        run.markSession(next);
     };
     for (const source of run.offer.sources) {
-        if (run.existingIds.has(source.id)) {
+        const existing = run.existing.get(source.id);
+        const verdict = decideV1Item(source, run.context, existing, mark, now);
+        if (verdict.kind === 'unconvertible') {
+            outcome.failures.push({ title: source.title, reason: verdict.reason });
+            // These bytes cannot be converted by this build, and will not convert on the
+            // next load either. Shown once is enough for the automatic offer.
+            outcome.acknowledged.push(source.digest);
+            continue;
+        }
+        if (verdict.kind === 'present' || verdict.kind === 'localOnly') {
             outcome.alreadyPresent++;
             run.remember(source.digest);
+            // Written only when it actually says something new, so an unchanged profile
+            // opened from the menu does not rewrite this key on every look (patch N3).
+            if (
+                verdict.kind === 'present' &&
+                verdict.mark &&
+                (verdict.mark.digest !== mark?.digest ||
+                    verdict.mark.document !== mark?.document ||
+                    mark?.replaced !== null)
+            ) {
+                remark(verdict.mark);
+            }
             continue;
         }
-        const conversion = convertV1(source, run.context, now);
-        if (conversion.kind === 'failed') {
-            outcome.failures.push({ title: source.title, reason: conversion.reason });
+        if (verdict.kind === 'edited') {
+            outcome.failures.push({ title: source.title, reason: verdict.reason });
+            // A standing situation, not a transient one: it resolves when v1 changes
+            // again (new digest, offered again) or when the musician asks from the menu.
+            outcome.acknowledged.push(source.digest);
             continue;
+        }
+        const expected = verdict.kind === 'update' ? verdict.expected : null;
+        if (source.kind === 'session') {
+            // BEFORE the save (patch R5): this is the record that survives a tab dying
+            // mid-write, and it names both the content the write produces and the content it
+            // replaces, so the next run recognises its own work whichever side of the commit
+            // the page was lost on.
+            remark({
+                digest: source.digest,
+                document: documentDigest(verdict.document),
+                replaced: existing ? documentDigest(existing.document) : null,
+            });
         }
         try {
-            await run.save(conversion.document);
+            await run.save(verdict.document, expected);
         } catch (error) {
             outcome.failures.push({
                 title: source.title,
-                reason: error instanceof Error ? error.message : String(error),
+                reason:
+                    error instanceof ConflictError
+                        ? CONFLICT_REASON
+                        : error instanceof Error
+                          ? error.message
+                          : String(error),
             });
+            // NOT acknowledged: the store failed, the item did not. Quota frees up, the other
+            // tab finishes, the transaction is retried — the next run should offer it again.
             continue;
         }
-        outcome.imported.push(conversion.document);
-        if (conversion.soundFallback) {
+        if (source.kind === 'session' && mark?.replaced !== null) {
+            // The write landed, so the content it replaced is no longer evidence of anything
+            // (patch N3): leaving it as a standing witness would let a musician's later
+            // revert-and-Save back to that exact content read as the import's own work.
+            remark({
+                digest: source.digest,
+                document: documentDigest(verdict.document),
+                replaced: null,
+            });
+        }
+        // The candidate as converted. The repository's committed copy differs only in the
+        // two fields it owns (`revision`, `updatedAt`), and nothing downstream of here
+        // stores this list — it is counted and its titles are shown.
+        if (expected === null) {
+            outcome.imported.push(verdict.document);
+        } else {
+            outcome.updated.push(verdict.document);
+        }
+        if (verdict.soundFallback) {
             outcome.soundFallbacks++;
         }
         run.remember(source.digest);
@@ -859,6 +1333,9 @@ export async function importV1(run: V1ImportRun): Promise<V1ImportOutcome> {
 /** The one-line result the songbook shows after a run. */
 export function describeV1Outcome(outcome: V1ImportOutcome): string {
     const parts = [`Imported ${outcome.imported.length}`];
+    if (outcome.updated.length) {
+        parts.push(`${outcome.updated.length} updated`);
+    }
     if (outcome.alreadyPresent) {
         parts.push(`${outcome.alreadyPresent} already here`);
     }
@@ -873,7 +1350,10 @@ export function describeV1Outcome(outcome: V1ImportOutcome): string {
         ...outcome.problems.map((problem) => `${problem.label} — ${problem.reason}`),
     ];
     if (trouble.length) {
-        parts.push(`${trouble.length} couldn't be converted: ${trouble.join(' · ')}`);
+        // "Couldn't be brought over", not "couldn't be converted": the list also carries the
+        // item this run deliberately declined to write over (a v1 session whose v2 copy has
+        // been edited here), which converted perfectly well.
+        parts.push(`${trouble.length} couldn't be brought over: ${trouble.join(' · ')}`);
     }
     return parts.join(' · ');
 }

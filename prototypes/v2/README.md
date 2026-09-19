@@ -77,10 +77,24 @@ local browser projects and never deploys.
   The v1 import (#1274, `lib/import-v1.ts`) is a **copy**, not a migration: it is handed a
   read-only `getItem` view of those keys, reuses v1's own hydration normalizers plus the
   canonical songbook codec, and reports v1 data it cannot read instead of showing an empty
-  library. The offer is remembered per v1 item (digest, not a boolean) under v2's own
-  `ensemble-v2-preview:v1-import` key, so changed or newly-saved v1 data is offered again;
-  imported documents carry deterministic `v1-session-…`/`v1-preset-…` ids, which is both
-  their provenance and a second guard against a duplicate copy.
+  library. What this device has already imported — or been shown and can do nothing more
+  about (unreadable, unconvertible, or a copy edited here) — is remembered per v1 item
+  (digest, not a boolean) under v2's own `ensemble-v2-preview:v1-import` key, so the
+  automatic offer never re-opens for the same bytes while newly-saved v1 data still is
+  offered. A failure the STORE produced (quota, a collision with another tab) is deliberately
+  not remembered: it is retried on the next run. The old session lands as ONE document with
+  the fixed id `v1-session`: a rerun updates it in place, and refuses to when this device has
+  edited that copy, reporting it instead. "Edited" is decided by CONTENT —
+  `ensemble-v2-preview:v1-session-import` records the digests of the document the import
+  wrote and the one it replaced, written before the save, so a tab that dies mid-write heals
+  on either side of the commit while a real edit is still refused — plus any retained draft.
+  A saved progression keeps a content-derived `v1-preset-…` id, which is both its provenance
+  and a second guard against a duplicate copy. "Not now" is one per-device answer
+  (`ensemble-v2-preview:v1-import-declined`) that stops the automatic offer for good; "Bring
+  over old Ensemble songs" in Song actions is the way back, shown whenever this origin has v1
+  data at all, signed in or not. The import is guest-only: signed in, it still writes this
+  device's songbook and says so, and #1268's "Add this device's songs" is how those songs
+  reach an account.
 - IndexedDB `ensemble-v2-preview` holds explicit saves with atomic revision comparison. Local
   recovery keys are writer-scoped; older competing drafts remain accessible in Song actions.
   Quota errors retain the current draft in memory and warn before leaving the page where the
