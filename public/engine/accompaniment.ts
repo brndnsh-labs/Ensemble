@@ -25,10 +25,11 @@ import { getPianoNotes } from './piano-player.js';
 import { isInstrumentActiveAtStep, isSoloistBusyAtStep } from './section-overrides.js';
 import {
     averageMidi,
-    getBassSpaceFloor,
+    COMP_REGISTER_FLOOR,
+    ensureRootVoice,
     recenterVoicing,
     selectCompactCluster,
-    shouldPreferGroundedPracticeVoicing,
+    shouldPreferGroundedVoicing,
     shouldReserveBassSpace,
 } from './voicing-policy.js';
 
@@ -1868,10 +1869,10 @@ export function getAccompanimentNotes(
 
         if (isHit || isGhost) {
             const reserveBassSpace = shouldReserveBassSpace(state, bassEffectiveEnabled);
-            const groundingRequired = shouldPreferGroundedPracticeVoicing(
-                state,
+            const groundingRequired = shouldPreferGroundedVoicing(
                 chord.quality,
                 genre,
+                bassEffectiveEnabled,
             );
             const bassMidi = coordination.bassMidi || getMidi(bass.lastFreq || 0) || 0;
             let voicing: number[] = chord.freqs
@@ -1885,15 +1886,18 @@ export function getAccompanimentNotes(
                 voicing,
                 compingState.lastVoicingMidis,
                 groundingRequired ? Math.min(4, voicing.length) : Math.min(3, voicing.length),
-                reserveBassSpace && bassMidi
-                    ? bassMidi + 13
-                    : getBassSpaceFloor(state, bassEffectiveEnabled),
+                reserveBassSpace && bassMidi ? bassMidi + 13 : COMP_REGISTER_FLOOR,
             );
 
             if (reserveBassSpace && bassMidi) {
                 while (voicing.length > 0 && voicing[0] <= bassMidi + 12) {
                     voicing = voicing.map((midi: number) => midi + 12);
                 }
+            }
+            if (!reserveBassSpace) {
+                // #1313 — the 3-note window is a rootless-cluster idiom that leans on
+                // the bass for the root; with the bass muted the comp supplies it.
+                voicing = ensureRootVoice(voicing, chord.rootMidi, COMP_REGISTER_FLOOR, 84);
             }
             // why: apply Imperfect-Symmetry rotation BEFORE caching to
             // `compingState.lastVoicingMidis`, so the next bar's
@@ -2062,10 +2066,10 @@ export function getAccompanimentNotes(
 
         if (isHit || isGhost || funkSharedCatchActive) {
             const reserveBassSpace = shouldReserveBassSpace(state, bassEffectiveEnabled);
-            const groundingRequired = shouldPreferGroundedPracticeVoicing(
-                state,
+            const groundingRequired = shouldPreferGroundedVoicing(
                 chord.quality,
                 genre,
+                bassEffectiveEnabled,
             );
             const bassMidi = coordination.bassMidi || getMidi(bass.lastFreq || 0) || 0;
 
@@ -2095,7 +2099,13 @@ export function getAccompanimentNotes(
                 (clavQuality.startsWith('m') && !clavQuality.startsWith('maj')) ||
                 clavQuality.includes('dim');
             const clavThird = pickClavDegree([3, 4], isMinorQuality ? 3 : 4);
-            const clavSeventh = pickClavDegree([10, 11], 10);
+            // #1313 — a 6th chord's colour voice is its 6th. Synthesizing a b7 here
+            // swapped the written 6th for an unwritten 7th (Am6 -> C-G-B), the same
+            // defect the parse layer had; b3-6-9 is the Dorian clav cell instead.
+            const isSixthChord = ['6', 'm6', '6/9'].includes(clavQuality);
+            const clavSeventh = isSixthChord
+                ? pickClavDegree([9], 9)
+                : pickClavDegree([10, 11], 10);
             // the 9 is rarely a literal chord tone — default to a synthesized
             // major 9th so the gapped cell is guaranteed its color voice.
             const clavNinth = pickClavDegree([2], 14);
@@ -2114,10 +2124,7 @@ export function getAccompanimentNotes(
             // inversion nearest a target center. The 5th never enters the
             // pool, so the gapped {3,b7,9} identity is preserved (any 3-window
             // of three distinct cycling pitch classes is a cell inversion).
-            const clavFloor =
-                reserveBassSpace && bassMidi
-                    ? bassMidi + 13
-                    : getBassSpaceFloor(state, bassEffectiveEnabled);
+            const clavFloor = reserveBassSpace && bassMidi ? bassMidi + 13 : COMP_REGISTER_FLOOR;
             const cellPcs = [clavThird, clavSeventh, clavNinth].map((m) => ((m % 12) + 12) % 12);
             const cellPool: number[] = [];
             for (let octave = 48; octave <= 84; octave += 12) {
@@ -2146,9 +2153,12 @@ export function getAccompanimentNotes(
                 3,
                 clavFloor,
             );
-            if (groundingRequired) {
-                // grounded practice voicing keeps a low root anchor an octave
-                // under the 3-note cell (4 voices total) for harmonic stability.
+            if (groundingRequired || !reserveBassSpace) {
+                // A low root anchor under the 3-note cell (4 voices total). The
+                // gapped cell is rootless by construction, which is only an idiom
+                // while a bass line supplies the root: with the bass muted (#1313)
+                // Am's C-G-B alone reads as a Cmaj7 shell, so every quality gets
+                // the anchor then, not just the identity-losing ones.
                 const cellLow = Math.min(...voicing);
                 let rootAnchor = ((chord.rootMidi % 12) + 12) % 12;
                 while (rootAnchor + 12 < cellLow) {

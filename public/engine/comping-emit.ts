@@ -15,8 +15,9 @@ import {
     getMidiVoicing,
     nearestOtherChordTone,
     recenterVoicing,
+    selectRootedDyad,
     selectSupportiveVoicing,
-    shouldPreferGroundedPracticeVoicing,
+    shouldPreferGroundedVoicing,
     shouldReserveBassSpace,
 } from './voicing-policy.js';
 
@@ -202,6 +203,9 @@ function applyPerHitEconomy(
     // #1040: the singleton arrives threaded from emitCompNotes (the same object
     // accompaniment.ts re-exports) instead of via a module import — one explicit path.
     compingState: CompingState,
+    // #1313 — true when no bass line is sounding: the answer must then keep the root
+    // it was given instead of trading it away for inner-voice motion.
+    bassMuted = false,
 ): number[] {
     const chordKey = `${chord.rootMidi}:${chord.quality}`;
     const isFreshHarmony = chordKey !== compingState.statementChordKey;
@@ -221,7 +225,10 @@ function applyPerHitEconomy(
         compingState.statementVoicingMidis.length > 0
             ? compingState.statementVoicingMidis
             : voicingMidis;
-    let answer = selectSupportiveVoicing(statement, chord, 2);
+    // Guide tones over a bass line; root + 3rd when nothing else states the root.
+    let answer =
+        (bassMuted ? selectRootedDyad(statement, chord) : null) ??
+        selectSupportiveVoicing(statement, chord, 2);
     if (answer.length < 2) {
         // Triad / already-sparse voicing: keep the top two so the answer still
         // thins relative to the statement.
@@ -252,7 +259,15 @@ function applyPerHitEconomy(
     // guide tone so consecutive answers move instead of stamping an identical
     // shape — the "living" part. The destination rules in nearestOtherChordTone
     // keep this from octave-doubling or collapsing to a rooty fragment.
-    if (!forcedDiminishedCore && answer.length > 1 && draw(361) < 0.55) {
+    // Over a bass line the root is the wrong voice for an answer to hold (a rooty
+    // fragment under a 3-and-7 shell). With the bass muted it is the only thing
+    // naming the chord: nudging Am's top A down to E leaves C-E, a bare C major third.
+    const rootPc = ((chord.rootMidi % 12) + 12) % 12;
+    const topIsOnlyRoot =
+        bassMuted &&
+        answer.filter((m) => ((m % 12) + 12) % 12 === rootPc).length === 1 &&
+        ((answer[answer.length - 1] % 12) + 12) % 12 === rootPc;
+    if (!forcedDiminishedCore && !topIsOnlyRoot && answer.length > 1 && draw(361) < 0.55) {
         const top = answer[answer.length - 1];
         const rest = answer.slice(0, -1);
         const forbidPCs = new Set(rest.map((m) => ((m % 12) + 12) % 12));
@@ -703,7 +718,11 @@ export function emitCompNotes(args: CompEmitArgs): any[] {
             chordIndex >= 0 && arranger.progression
                 ? arranger.progression[chordIndex + 1] || null
                 : null;
-        const groundingRequired = shouldPreferGroundedPracticeVoicing(state, chord.quality, genre);
+        const groundingRequired = shouldPreferGroundedVoicing(
+            chord.quality,
+            genre,
+            reserveBassSpace,
+        );
         const shouldPreferGuideToneReduction =
             chords.style === 'smart' &&
             reserveBassSpace &&
@@ -902,7 +921,16 @@ export function emitCompNotes(args: CompEmitArgs): any[] {
                             voicing = voicing.slice(0, 2);
                         }
                     } else {
-                        voicing = voicing.slice(0, 2);
+                        // Bottom two voices — fine over a bass line, which states the
+                        // root. With the bass muted the dyad must say what the chord
+                        // is on its own (#1313): root + 3rd, not whatever the
+                        // inversion left at the bottom.
+                        const rootedDyad = reserveBassSpace
+                            ? null
+                            : selectRootedDyad(getMidiVoicing(voicing), chord);
+                        voicing = rootedDyad
+                            ? rootedDyad.map((midi) => getFrequency(midi))
+                            : voicing.slice(0, 2);
                     }
                 }
             }
@@ -1077,6 +1105,7 @@ export function emitCompNotes(args: CompEmitArgs): any[] {
                 isStructural,
                 compDraw,
                 compingState,
+                !reserveBassSpace,
             );
             if (emitMidis.length > 0) {
                 voicing = emitMidis.map((midi) => getFrequency(midi));

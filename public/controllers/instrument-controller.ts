@@ -1,3 +1,4 @@
+import { validateProgression } from '../engine/chords-engine.js';
 import {
     killAllPianoNotes,
     killBassBus,
@@ -137,9 +138,10 @@ export function flushBuffers(): void {
     restoreGains(stateMap);
 }
 
-function flushBuffer(type: string): void {
+function flushBuffer(...types: string[]): void {
     const { playback, chords, bass, soloist, harmony } = getState();
-    if (type === 'bass' || type === 'all') {
+    const has = (lane: string) => types.includes(lane) || types.includes('all');
+    if (has('bass')) {
         if (bass.lastPlayedFreq !== null) {
             (bass as Mutable<typeof bass>).lastFreq = bass.lastPlayedFreq; // @direct-mutation
         }
@@ -147,7 +149,7 @@ function flushBuffer(type: string): void {
         killBassNote(stateMap);
         killBassBus(stateMap);
     }
-    if (type === 'soloist' || type === 'all') {
+    if (has('soloist')) {
         if (soloist.audio.lastPlayedFreq !== null) {
             (soloist.audio as Mutable<typeof soloist.audio>).lastFreq =
                 soloist.audio.lastPlayedFreq; // @direct-mutation
@@ -156,23 +158,23 @@ function flushBuffer(type: string): void {
         killSoloistNote(stateMap);
         killSoloistBus(stateMap);
     }
-    if (type === 'chord' || type === 'all') {
+    if (has('chord')) {
         chords.buffer.clear();
         killAllPianoNotes(stateMap);
         killChordBus(stateMap);
     }
-    if (type === 'harmony' || type === 'all') {
+    if (has('harmony')) {
         harmony.buffer.clear();
         killHarmonyNote(stateMap);
         killHarmonyBus(stateMap);
     }
-    if (type === 'groove' || type === 'all') {
+    if (has('groove')) {
         killDrumNote(stateMap);
         killDrumBus(stateMap);
     }
 
     // Solo flush (usually from UI toggles)
-    if (type !== 'none') {
+    if (!types.includes('none')) {
         flushWorker(playback.step, null);
     }
     restoreGains(stateMap);
@@ -231,9 +233,24 @@ export function togglePower(type: string): void {
 
     // Viz cleanup is now handled by the component's unmount/disable effect
 
+    // #1313 — chord voicings are baked at parse time and depend on whether a bass
+    // line is sounding (rootless shells + a higher floor with it, rooted voicings
+    // without). Muting the bass is "I'm playing that part", so the comp has to be
+    // re-voiced NOW or it keeps the rootless shapes with nothing stating the root.
+    // Same load-bearing order as refreshArrangerUI(): mutate -> validate ->
+    // syncWorker -> flush. Flush every lane that reads the re-voiced progression
+    // (chords + harmony, not just the bass buffer) — but NOT the drums or the
+    // soloist: a player muting the bass mid-groove must not hear the time hiccup.
+    const bassToggled = normalizedType === 'bass';
+    if (bassToggled) {
+        validateProgression(stateMap, dispatch);
+    }
+
     syncWorker();
 
-    if (['chord', 'bass', 'soloist', 'harmony'].includes(normalizedType)) {
+    if (bassToggled) {
+        flushBuffer('bass', 'chord', 'harmony');
+    } else if (['chord', 'soloist', 'harmony'].includes(normalizedType)) {
         flushBuffer(normalizedType);
     } else {
         restoreGains(getState());

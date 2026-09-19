@@ -5,6 +5,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as InstrumentController from '../../../public/controllers/instrument-controller.js';
 import { DRUM_PRESETS } from '../../../public/data/drum-presets.js';
+import * as ChordsEngine from '../../../public/engine/chords-engine.js';
 import * as Engine from '../../../public/engine/engine.js';
 import { dispatch, getState } from '../../../public/state.js';
 import { ACTIONS } from '../../../public/types.js';
@@ -32,6 +33,10 @@ vi.mock('../../../public/engine/engine.js', () => ({
     killSoloistBus: vi.fn(),
     killSoloistNote: vi.fn(),
     restoreGains: vi.fn(),
+}));
+
+vi.mock('../../../public/engine/chords-engine.js', () => ({
+    validateProgression: vi.fn(),
 }));
 
 vi.mock('../../../public/engine/synth-drums.js', () => ({
@@ -301,6 +306,34 @@ describe('Instrument Controller', () => {
                     value: true,
                 }),
             );
+        });
+
+        // #1313 — chord voicings are baked at parse time and depend on whether a bass
+        // line is sounding, so a bass toggle must re-voice BEFORE the worker sync, and
+        // the flush must come last and cover every re-voiced lane (refreshArrangerUI's order).
+        it('re-voices the progression on a bass toggle: validate -> sync -> flush re-voiced lanes', () => {
+            InstrumentController.togglePower('bass');
+
+            const order = (fn) => fn.mock.invocationCallOrder[0];
+            expect(ChordsEngine.validateProgression).toHaveBeenCalledTimes(1);
+            expect(order(dispatch)).toBeLessThan(order(ChordsEngine.validateProgression));
+            expect(order(ChordsEngine.validateProgression)).toBeLessThan(
+                order(WorkerClient.syncWorker),
+            );
+            expect(order(WorkerClient.syncWorker)).toBeLessThan(order(WorkerClient.flushWorker));
+            expect(WorkerClient.flushWorker).toHaveBeenCalledTimes(1);
+            // The comp and pads read the re-voiced progression too...
+            expect(Engine.killAllPianoNotes).toHaveBeenCalled();
+            expect(Engine.killHarmonyNote).toHaveBeenCalled();
+            expect(Engine.killBassNote).toHaveBeenCalled();
+            // ...but the time must not hiccup: drums and soloist ring through.
+            expect(Engine.killDrumNote).not.toHaveBeenCalled();
+            expect(Engine.killSoloistNote).not.toHaveBeenCalled();
+        });
+
+        it('does not re-voice the progression for a non-bass lane', () => {
+            InstrumentController.togglePower('chords');
+            expect(ChordsEngine.validateProgression).not.toHaveBeenCalled();
         });
 
         it('should toggle viz state', () => {

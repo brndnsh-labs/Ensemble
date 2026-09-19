@@ -201,7 +201,16 @@ describe('Harmony Engine Logic', () => {
 
             const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.9);
 
-            const chord = { rootMidi: 60, intervals: [0, 4, 7, 14, 18], sectionId: 's1', beats: 4 }; // 9, #11
+            // Production-shaped: a parsed chord always carries quality + is7th, and the
+            // rootless rule (#1313) reads them — only a WRITTEN 7th/extension drops its root.
+            const chord = {
+                rootMidi: 60,
+                quality: '7#11',
+                is7th: true,
+                intervals: [0, 4, 7, 14, 18], // 9, #11
+                sectionId: 's1',
+                beats: 4,
+            };
 
             // Soloist-busy signal arrives via the coordination contract (S4) — drive it
             // explicitly rather than relying on engine-internal session state.
@@ -214,8 +223,8 @@ describe('Harmony Engine Logic', () => {
             expect(requested).not.toContain(14); // 9th
             expect(requested).not.toContain(18); // #11
 
-            // In Funk with bass enabled, the root is now removed to preserve space
-            if (_playback.practiceMode || _bass.enabled) {
+            // In Funk with the bass sounding, a written 7th drops its root to leave space
+            if (_bass.enabled) {
                 expect(requested).not.toContain(0);
             } else {
                 expect(requested).toContain(0);
@@ -576,7 +585,7 @@ describe('Harmony Engine Logic', () => {
     });
 
     describe('Practice Mode', () => {
-        it('should reserve bass register (stay above 52) when practiceMode is ON', () => {
+        it('keeps the harmony lane above 52 even with the bass muted (register slot)', () => {
             _playback.practiceMode = true;
             _bass.enabled = false;
             _groove.genreFeel = 'Rock';
@@ -590,16 +599,44 @@ describe('Harmony Engine Logic', () => {
             });
         });
 
-        it('should perform rootless reduction in Funk when practiceMode is ON even if bass is disabled', () => {
-            _playback.practiceMode = true;
-            _bass.enabled = false;
+        // #1313 — muting the bass IS practicing the bass part: nothing else states the
+        // root, so the pads must. `practiceMode` no longer forces bass space on.
+        it('keeps the root in Funk when the bass is muted, regardless of practiceMode', () => {
             _groove.genreFeel = 'Funk';
+            const chord = {
+                rootMidi: 60,
+                quality: '7',
+                is7th: true,
+                intervals: [0, 4, 7, 10],
+                sectionId: 'p2',
+                beats: 4,
+            };
 
-            const chord = { rootMidi: 60, intervals: [0, 4, 7, 10], sectionId: 'p2', beats: 4 };
+            for (const practiceMode of [true, false]) {
+                _playback.practiceMode = practiceMode;
+                _bass.enabled = false;
+                getHarmonyNotes(getState(), chord, null, 0, 60, 'smart', 0);
+                expect(getLastRequestedIntervals()).toContain(0);
+
+                _bass.enabled = true;
+                getHarmonyNotes(getState(), chord, null, 0, 60, 'smart', 0);
+                expect(getLastRequestedIntervals()).not.toContain(0);
+            }
+        });
+
+        it('never strips the root from a plain triad, even with the bass sounding', () => {
+            _groove.genreFeel = 'Funk';
+            _bass.enabled = true;
+            const chord = {
+                rootMidi: 57,
+                quality: 'minor',
+                is7th: false,
+                intervals: [0, 3, 7],
+                sectionId: 'p3',
+                beats: 4,
+            };
             getHarmonyNotes(getState(), chord, null, 0, 60, 'smart', 0);
-
-            const requested = getLastRequestedIntervals();
-            expect(requested).not.toContain(0);
+            expect(getLastRequestedIntervals()).toContain(0);
         });
 
         it('reserves or releases bass space from the effective section lane gate', () => {
@@ -649,12 +686,13 @@ describe('Harmony Engine Logic', () => {
         });
 
         // why: epic-harmony-polish S3 (review P0). selectGroundedIntervals fires
-        // here (Jazz + practiceMode + tension quality satisfies
-        // shouldPreferGroundedPracticeVoicing). For 7b9 the characteristic
+        // here (Jazz + bass MUTED + tension quality satisfies
+        // shouldPreferGroundedVoicing — #1313 moved the trigger from
+        // `practiceMode` to the bass lane). For 7b9 the characteristic
         // alteration (b9 = interval 13) IS the chord identity; if a reorder
         // ever evicted it in favor of the perfect 5th, the chord would emit a
         // plain dominant 7 instead. This test guards bucket-order regressions.
-        it('should preserve the b9 in 7b9 voicings in Jazz practice mode', () => {
+        it('should preserve the b9 in grounded 7b9 voicings (Jazz, bass muted)', () => {
             _playback.practiceMode = true;
             _bass.enabled = false;
             _groove.genreFeel = 'Jazz';

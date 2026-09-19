@@ -27,6 +27,14 @@ export function getRootlessVoicing(
         }
     }
 
+    // #1313 — a 6th chord has no 7th to build a shell from. Falling through to the
+    // minor-7 shell below swapped the 6th for an unwritten b7 (Dm6 -> F-A-C, an F
+    // major triad). `shouldUseRootlessVoicing` no longer routes m6 here; this keeps
+    // the function honest for any direct caller: null = use the rooted [0,3,7,9].
+    if (quality === 'm6') {
+        return null;
+    }
+
     // Basic types
     const isMinor = quality.startsWith('m') && !quality.startsWith('maj');
     const isDominant =
@@ -35,7 +43,11 @@ export function getRootlessVoicing(
         (is7th ||
             ['9', '11', '13', '7alt', '7b9', '7#9', '7#11', '7b13'].includes(quality) ||
             quality.startsWith('7'));
-    const isMajor7 = ['maj7', 'maj9', 'maj11', 'maj13', 'maj7#11'].includes(quality);
+    // 'augmaj7' belongs here (its shell is the first branch below). It was missing,
+    // which stayed invisible while the old default grounded the quality; reachable
+    // over a sounding bass (#1313) it fell through to the DOMINANT shell — Cmaj7#5
+    // voiced as E-G-Bb, a C7.
+    const isMajor7 = ['maj7', 'maj9', 'maj11', 'maj13', 'maj7#11', 'augmaj7'].includes(quality);
 
     if (isMajor7) {
         if (quality === 'augmaj7') {
@@ -97,10 +109,16 @@ export function getRootlessVoicing(
             return isRich ? [4, 10, 13, 15, 18, 20] : [...base, ...altExtensions.slice(0, 2)];
         }
         if (quality === '7b9') {
-            return isRich ? [4, 10, 13, 16, 20] : [4, 10, 13, 16]; // 3, b7, b9, (5 or b13)
+            // 3, b7, b9 + the 5th, or the b13 in its place when rich. (The old top
+            // voice was 16 = the 3rd again an octave up, not the "5 or b13" its
+            // comment claimed — a doubled 3rd a half-step over the b9.)
+            return isRich ? [4, 10, 13, 20] : [4, 10, 13, 19];
         }
         if (quality === '7#9') {
-            return isRich ? [4, 10, 15, 16, 20] : [4, 10, 15, 16]; // 3, b7, #9, (5 or b13)
+            // 3, b7, #9 — the "Hendrix" shell, 3rd below and #9 on top a major 7th
+            // apart; rich adds the b13. The old 16 doubled the major 3rd directly
+            // above the #9, cancelling the blue note into a half-step smear.
+            return isRich ? [4, 10, 15, 20] : [4, 10, 15];
         }
         if (quality === '7b13') {
             return isRich ? [4, 10, 14, 20, 26] : [4, 10, 14, 20]; // 3, b7, 9, b13
@@ -192,12 +210,12 @@ export function getIntervals(
 
     if (!intervals) {
         // Standard Triad Fallback for others
-        const isMinorQuality =
-            (quality.startsWith('m') && !quality.startsWith('maj')) || quality === 'minor';
-
+        // #1313 — match the plain minor triad by NAME. A `startsWith('m')` family
+        // test here sat above the explicit m6/m9/m11/m13 branches below and
+        // shadowed all four, so a written Am6 sounded as a bare Am (no 6th).
         if (quality === 'halfdim') {
             intervals = [0, 3, 6, 10];
-        } else if (isMinorQuality) {
+        } else if (quality === 'minor') {
             intervals = [0, 3, 7];
         } else if (quality === 'dim') {
             intervals = [0, 3, 6];

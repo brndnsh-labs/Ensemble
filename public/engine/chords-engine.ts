@@ -12,7 +12,7 @@ import { ACTIONS } from '../types.js';
 import { getFrequency, normalizeKey } from '../utils.js';
 import { spellPitchClass } from './note-spelling.js';
 import { transposeChordText } from './transpose.js';
-import { getBassSpaceFloor, getNearestVoiceLeadingCost } from './voicing-policy.js';
+import { COMP_REGISTER_FLOOR, getNearestVoiceLeadingCost } from './voicing-policy.js';
 
 // `FormattedChordNames` stays: it's the return type of the exported
 // `getFormattedChordNames`, so consumers need to be able to name it from here.
@@ -150,6 +150,9 @@ export function getChordDetails(symbol: string): ChordDetails {
         quality = '7b5';
     } else if (suffix === 'm6') {
         quality = 'm6';
+        // #1313 — `Am6/9` trips the includes('9') heuristic above; a 6th chord has no
+        // 7th, and a true `is7th` here re-adds the b7 this quality must never carry.
+        is7th = false;
     } else if (suffix === 'm7' || suffix === 'min' || suffix === 'm' || suffix === '-') {
         quality = 'minor';
     } else if (
@@ -979,8 +982,8 @@ function parseProgressionPart(
                     groove.genreFeel,
                     bassActive,
                 );
-                // Reduce mud: keep the comping pocket above the bass lane when that lane is active.
-                const pianoMin = getBassSpaceFloor(state, bassActive);
+                // Reduce mud: keep the comping pocket above the bass register.
+                const pianoMin = COMP_REGISTER_FLOOR;
                 const isPivot = startsSection && parsed.length === 0;
                 // why: chords.md P1 #6 / Epic 11 S6(a) — functional comping genres
                 // (Jazz, Bossa, Blues) are built on guide-tone lines and common-tone
