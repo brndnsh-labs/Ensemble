@@ -113,7 +113,10 @@ describe('Chords & Voicing Logic', () => {
             expect(getChordDetails('m7').is7th).toBe(true);
             expect(getChordDetails('maj7').quality).toBe('maj7');
             expect(getChordDetails('7alt').quality).toBe('7alt');
-            expect(getChordDetails('13(#11b9)').quality).toBe('13');
+            // #1329 — this pin used to assert '13', which sounds a NATURAL 9 against the
+            // written b9. The bare `13b9` spelling already moved to the altered dominant in
+            // #1324; this compound one was left behind only because this line pinned it.
+            expect(getChordDetails('13(#11b9)').quality).toBe('7b9');
             expect(getChordDetails('m7/G').quality).toBe('minor');
         });
     });

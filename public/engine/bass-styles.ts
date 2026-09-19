@@ -2,6 +2,7 @@ import { REGGAE_RIDDIMS } from '../config.js';
 import type { EnsembleState, StepInfo } from '../types.js';
 import { getFrequency } from '../utils.js';
 import { scrambleHash } from './hash-utils.js';
+import { chordTargetTones } from './soloist-pitch-engine.js';
 
 type ChordChangeShape = {
     rootMidi: number;
@@ -1837,17 +1838,41 @@ export function getBassNoteStyle(
                 // and pick the best. If no chord tones in the scale, fall back to a
                 // scale neighbor of the root. This is the mid-bar "approach"
                 // gesture — chord tone, not chromatic.
-                const hasFlat5 = chord.quality === 'dim' || chord.quality === 'halfdim';
-                const hasSharp5 = chord.quality === 'aug' || chord.quality === 'augmaj7';
-                const has_m3 =
-                    chord.quality.startsWith('m') ||
-                    chord.quality === 'dim' ||
-                    chord.quality === 'halfdim';
-                const thirdInterval = has_m3 ? 3 : 4;
-                const fifthInterval = hasFlat5 ? 6 : hasSharp5 ? 8 : 7;
+                // why (#1333): this slot used to hand-roll the 3rd as
+                // `quality.startsWith('m')` with no `&& !startsWith('maj')` guard, so
+                // 'major', 'maj7', 'maj9', 'maj11', 'maj13' and 'maj7#11' all read as MINOR
+                // and the line targeted an Eb under a Cmaj7 — in the very slot whose comment
+                // below picks the 3rd *because* it carries the major/minor identity. It also
+                // assumed a 3rd exists: a suspension got a major 3rd (the one tone it
+                // replaces) and a power chord got one out of nowhere.
+                // `chordTargetTones` is the single place that knows a written quality's
+                // functional tones — it already feeds the soloist, the comp's echo voice and
+                // `bass-walking-route.ts` — so ask it instead of adding a third hand-rolled
+                // quality test to this file.
+                const { guides, pillars } = chordTargetTones(baseRoot, chord.quality);
+                const rootPc = ((baseRoot % 12) + 12) % 12;
+                const chordDegrees = new Set(
+                    [...guides, ...pillars].map(
+                        (pitchClass) => (((pitchClass - rootPc) % 12) + 12) % 12,
+                    ),
+                );
+                // The identity voice: the 3rd, or the suspension standing in for it (sus4's
+                // 4th, sus2's 2nd), or nothing at all on a power chord.
+                const thirdInterval = [3, 4, 5, 2].find((degree) => chordDegrees.has(degree));
+                // The 5th as the chord spells it. Absent on altered-5 qualities, where the
+                // pillars deliberately don't target an ambiguous b5/#5 — there the slot just
+                // plays the identity voice rather than inventing a natural 5 (which is what
+                // `chordHasPerfectFifth` in utils.ts says the bass must not do).
+                const fifthInterval = [7, 6, 8].find((degree) => chordDegrees.has(degree));
 
-                const thirdMidi = normalizeToRange(baseRoot + thirdInterval);
-                const fifthMidi = normalizeToRange(baseRoot + fifthInterval);
+                const thirdMidi =
+                    thirdInterval === undefined
+                        ? undefined
+                        : normalizeToRange(baseRoot + thirdInterval);
+                const fifthMidi =
+                    fifthInterval === undefined
+                        ? undefined
+                        : normalizeToRange(baseRoot + fifthInterval);
 
                 // why: §C.84 — score by stepwise distance to prevMidi (voice
                 // leading) but tilt toward the 3rd. The 3rd carries the chord's
@@ -1859,9 +1884,16 @@ export function getBassNoteStyle(
                 // move, while keeping bar-to-bar variety.
                 const prev = prevMidi ?? baseRoot;
                 const thirdBias = scrambleHash((compoundPitchSeed + 21) | 0) < 0.7 ? 1.5 : 0;
-                const dThird = Math.abs(thirdMidi - prev) - thirdBias;
-                const dFifth = Math.abs(fifthMidi - prev);
-                const approachChordTone = dThird <= dFifth ? thirdMidi : fifthMidi;
+                const dThird =
+                    thirdMidi === undefined
+                        ? Number.POSITIVE_INFINITY
+                        : Math.abs(thirdMidi - prev) - thirdBias;
+                const dFifth =
+                    fifthMidi === undefined ? Number.POSITIVE_INFINITY : Math.abs(fifthMidi - prev);
+                // Root only if the quality somehow offers neither — the slot's contract is
+                // to sound a chord tone, never a guessed one.
+                const approachChordTone =
+                    dThird <= dFifth ? (thirdMidi ?? baseRoot) : (fifthMidi ?? baseRoot);
                 return result(
                     getFrequency(clampAndNormalize(approachChordTone)),
                     ts.stepsPerBeat * 0.6,

@@ -44,6 +44,7 @@ const QUALITIES: Readonly<Record<string, readonly number[]>> = {
     maj13: [0, 4, 7, 11, 14, 21],
     m13: [0, 3, 7, 10, 14, 21],
     'maj7#11': [0, 4, 7, 11, 18],
+    maj7b5: [0, 4, 6, 11], // #1329 — no natural 5; a missing row falls back to MAJOR
     '7#11': [0, 4, 7, 10, 18],
     '7b9': [0, 4, 7, 10, 13],
     '7#9': [0, 4, 7, 10, 15],

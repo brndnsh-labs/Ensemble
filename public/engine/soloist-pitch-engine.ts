@@ -22,6 +22,7 @@ type ChordQualityClass =
     | 'sus2' // sus2 — same, but the characteristic tone is the 2nd, not the 4th
     | 'domsus' // 7sus4, 9sus4, 13sus4 — dominant function, the 4th in place of the 3rd
     | 'power' // 5 — root and 5th only
+    | 'majb5' // maj7b5 — lydian; the 3rd and maj7 are the guides, the 5 is FLAT
     | 'aug'; // aug, augmaj7 — whole-tone / lydian-aug, no perfect 5
 
 export function classifyChordQuality(quality: string | undefined): ChordQualityClass {
@@ -54,7 +55,11 @@ export function classifyChordQuality(quality: string | undefined): ChordQualityC
     // major 3rd + b7 — so the soloist landed on, the bass walked to, and the comp's echo
     // built a support voice from, the one tone the suspension replaces, a semitone under
     // the comper's 4th.
-    if (q === '7sus4' || q === '9sus4' || q === '13sus4') {
+    // '11' belongs here too (#1326): a dominant 11th features the 4th and omits the 3rd —
+    // its rooted stack is [0,5,7,10,14,17], no 3rd anywhere — so the 'dom' guides would aim
+    // the soloist, the walking bass and the comp's echo voice at a major 3rd the chord
+    // deliberately leaves out, a semitone under the 11th the comper is sounding.
+    if (q === '7sus4' || q === '9sus4' || q === '13sus4' || q === '11') {
         return 'domsus';
     }
     // A power chord has no 3rd or 7th to target; it used to fall through to 'dom'.
@@ -63,6 +68,12 @@ export function classifyChordQuality(quality: string | undefined): ChordQualityC
     }
     if (q === 'aug' || q === 'augmaj7' || q === 'augmented') {
         return 'aug';
+    }
+    // why (#1329): 'maj7b5' starts with 'maj', and the 'maj' pillars are (1, 3, 5) — the
+    // NATURAL 5 this chord flattens. Its own class keeps the b5 out of the target set
+    // without inventing one (the b5 is a colour the comper states, not a landing tone).
+    if (q === 'maj7b5') {
+        return 'majb5';
     }
     if (q === 'm6') {
         return 'min6';
@@ -123,6 +134,7 @@ const FUNCTIONAL_PILLARS_BY_QUALITY: Record<ChordQualityClass, number> = {
     sus2: pcMask(0, 2, 7), // no 3rd — root / 2 / 5
     domsus: pcMask(0, 5, 7, 10), // suspended dominant: the 4th stands where the 3rd would
     power: pcMask(0, 7),
+    majb5: pcMask(0, 4, 6),
     aug: pcMask(0, 4, 8),
 };
 
@@ -148,6 +160,7 @@ const GUIDE_INTERVALS_BY_QUALITY: Record<ChordQualityClass, number[]> = {
     sus2: [2],
     domsus: [5, 10], // 4, b7 — the suspension and the dominant 7th, never the 3rd
     power: [7],
+    majb5: [4, 11], // 3, maj7 — the pair that names it; never the natural 5
     aug: [4], // major 3rd
 };
 

@@ -57,7 +57,17 @@ export function getRootlessVoicing(
     // which stayed invisible while the old default grounded the quality; reachable
     // over a sounding bass (#1313) it fell through to the DOMINANT shell — Cmaj7#5
     // voiced as E-G-Bb, a C7.
-    const isMajor7 = ['maj7', 'maj9', 'maj11', 'maj13', 'maj7#11', 'augmaj7'].includes(quality);
+    const isMajor7 = [
+        'maj7',
+        'maj9',
+        'maj11',
+        'maj13',
+        'maj7#11',
+        // #1329 — without this the dominant branch answered [4, 7, 10]: a C7 shell, natural
+        // 5th and b7, for a chord written with a FLAT 5 and a major 7th.
+        'maj7b5',
+        'augmaj7',
+    ].includes(quality);
 
     if (isMajor7) {
         if (quality === 'augmaj7') {
@@ -68,6 +78,9 @@ export function getRootlessVoicing(
         }
         if (quality === 'maj7#11') {
             return isRich ? [4, 11, 14, 18] : [4, 11, 18]; // 3, 7, (9), #11
+        }
+        if (quality === 'maj7b5') {
+            return isRich ? [4, 6, 11, 14] : [4, 6, 11]; // 3, b5, 7, (9) — never the 5th
         }
         if (quality === 'maj9') {
             return isRich ? [4, 11, 14, 21] : [4, 11, 14];
@@ -153,12 +166,19 @@ export function getRootlessVoicing(
             return isRich ? [4, 6, 10, 14] : [4, 6, 10]; // 3, b5, b7, (9)
         }
 
+        // #1326 — a dominant 11th's shell must be evaluated BEFORE the `isRich` shortcut
+        // below. Underneath it, a written C11 at rich density (or intensity > 0.6, which
+        // sets isRich for this call) came back as the 13 shell: it stated the major 3rd the
+        // chord conventionally omits and lost the 4th/11th it exists to feature — E against
+        // F, the textbook avoid-note rub. 4-b7-9 is the shell; rich adds the 13 on top.
+        // `m11` is unaffected and stays in the minor branch above (b3 + 11 is consonant).
+        if (quality === '11') {
+            return isRich ? [5, 10, 14, 21] : [5, 10, 14]; // 4, b7, 9, (13)
+        }
+
         // Characteristic dominant extensions
         if (quality === '13' || isRich) {
             return [4, 10, 14, 21]; // 3, b7, 9, 13
-        }
-        if (quality === '11') {
-            return [5, 7, 10, 14]; // 11, 5, b7, 9
         }
         if (quality === '9') {
             return [4, 10, 14]; // 3, b7, 9
@@ -313,6 +333,10 @@ export function getIntervals(
             intervals = [0, 4, 7, 11, 14, 17];
         } else if (quality === 'maj7#11') {
             intervals = [0, 4, 7, 11, 14, 18];
+        } else if (quality === 'maj7b5') {
+            // 1 3 b5 maj7 (#1329). No natural 5 — that is the whole point of the spelling,
+            // and `isAltered5` (which matches 'b5') keeps every later tier from adding one.
+            intervals = [0, 4, 6, 11];
         } else if (quality === '13') {
             intervals = [0, 4, 7, 10, 14, 21];
         } else if (quality === 'm13') {
@@ -493,6 +517,7 @@ export function getIntervals(
             'maj11',
             'maj13',
             'maj7#11',
+            'maj7b5',
             'aug',
             'augmaj7',
             'halfdim',

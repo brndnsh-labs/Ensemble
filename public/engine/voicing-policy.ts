@@ -163,7 +163,11 @@ export function shouldUseRootlessVoicing(
         (is7th ||
             ['9', '11', '13', '7alt', '7b9', '7#9', '7#11', '7b13'].includes(quality) ||
             quality.startsWith('7'));
-    const isMajor7 = ['maj7', 'maj9', 'maj11', 'maj13', 'maj7#11', 'augmaj7'].includes(quality);
+    // Kept in step with the same list in `getRootlessVoicing` (#1329 added 'maj7b5'); here
+    // it only decides WHETHER to voice rootless, which `isDominant` would also say yes to.
+    const isMajor7 = ['maj7', 'maj9', 'maj11', 'maj13', 'maj7#11', 'maj7b5', 'augmaj7'].includes(
+        quality,
+    );
 
     return isMinor || isDominant || isMajor7;
 }

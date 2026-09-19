@@ -119,6 +119,14 @@ flake (measure its fail-rate, classify it, and append an entry here).
 - **Note:** the same test also had a second, independent race fixed in this pass — clicking `.chord-card` immediately after "Start from here" could beat the batched re-render that detaches `onPick` (`ChordVisualizer.tsx`, gated on `playback.isPlaying`). Fixed by waiting for `.measure-box[role="button"]` to hit count 0 (same re-render, same `isPlaying` read) before that click. Not registered as its own entry — same test, same investigation, same commit.
 - **Last seen:** 2026-07-14 (measured during #1101; 20/20 clean after both fixes).
 
+### 🟢 `prototypes/v2/checks/account-sign-out.chromium.spec.ts` — "sign-out names the work it would destroy, then leaves nothing of that account behind"
+
+- **Class:** e2e-timing
+- **Symptom:** the required `v2-suite (rest)` context failed on PR #1325 — a chord-voicing diff that touches nothing in v2 — and passed on rerun. The closing `expect(await songTitles(page).allInnerTexts()).toEqual(guestSongs)` reported `- Array [] / + Array [ "After hours", "Minor swing sketch", "Blue pocket" ]`: the three real starter songs measured against an empty expectation.
+- **Root cause:** `guestSongs` was captured by a **non-waiting** `allInnerTexts()` immediately after `openWithAccounts(page)`, which only waits for the hero heading. With accounts on, the library list is deliberately held back until the first session read answers (so the shell never shows one songbook and swaps in another), so on a slow runner the capture read zero rows. The failure direction is the lucky one — it can also pass **vacuously** with both reads empty, which is why the sibling `account-songbook` spec had already been written with a `library-loading` guard and a non-empty assertion.
+- **Fix (2026-09-19, #1330):** wait for the rows before capturing (`await expect(page.getByTestId('library-loading')).toHaveCount(0)` + `await expect(songTitles(page)).not.toHaveCount(0)`), assert `guestSongs.length > 0` so an empty capture can never be the baseline, and make the closing comparison web-first (`await expect(songTitles(page)).toHaveText(guestSongs)`) so it retries while the guest library re-renders. The same bare capture in `account-delete-account.chromium.spec.ts` got the same treatment, and the non-retrying closing comparisons in `account-delete-account` (×2) and `account-songbook` were converted with it; `account-adopt-guest` was already guarded.
+- **Last seen:** 2026-09-18 (`v2-suite (rest)` on PR #1325; 10/10 clean after the fix).
+
 ### 🟢 Playwright run-wide crash (CJS import)
 
 - **Class:** e2e-timing (import)
