@@ -38,6 +38,36 @@ export function rememberTheme(choice: ThemeChoice): void {
     }
 }
 
+const MASTER_VOLUME = 'ensemble-v2-preview:master-volume';
+
+/**
+ * Device-local mixer preference (#1276) — `playback.masterVolume` is classified
+ * `preferences` in `STATE_OWNERSHIP_MANIFEST` (`../../public/songbook/state-ownership.ts`),
+ * so it never belongs on a `ChartContent`/saved chart or a share link, the same way
+ * `themePreference` above never does. `null` means "no preference recorded yet" —
+ * callers fall back to the engine's own default.
+ */
+export function masterVolumePreference(): number | null {
+    try {
+        const stored = localStorage.getItem(MASTER_VOLUME);
+        if (stored === null) {
+            return null;
+        }
+        const value = Number(stored);
+        return Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : null;
+    } catch {
+        return null;
+    }
+}
+
+export function rememberMasterVolume(value: number): void {
+    try {
+        localStorage.setItem(MASTER_VOLUME, String(value));
+    } catch {
+        // Live volume still applies for this session; only the memory is lost.
+    }
+}
+
 const V1_IMPORT = 'ensemble-v2-preview:v1-import';
 export type V1ImportState = 'imported' | 'declined';
 /**

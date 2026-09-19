@@ -22,18 +22,19 @@ export const BASS_SPACE_FEELS = new Set([
     //      harmony channel). Doubling roots down there is the mud this set
     //      exists to prevent. Same class as the entries above; it was an
     //      omission rather than a decision — the set had never been pinned.
-    //      Audible consequence: minor skanks now voice rootless and pick up a b7
-    //      (Am -> Am7, per getRootlessVoicing); plain major skanks are unchanged
-    //      because shouldUseRootlessVoicing only fires on minor/dominant/maj7.
-    //      Two knock-ons, both already accepted for the six feels above: in
-    //      practice mode `shouldPreferGroundedPracticeVoicing` now re-admits the
+    //      Audible consequence: WRITTEN minor-7th skanks voice rootless; plain
+    //      triads (major or minor) keep their root. (#1216 originally also sent
+    //      plain minor triads rootless with an invented b7, Am -> "Am7" = C-E-G;
+    //      #1313 reversed that for every feel here — see shouldUseRootlessVoicing.)
+    //      Two knock-ons, both already accepted for the six feels above:
+    //      `shouldPreferGroundedVoicing` re-admits the
     //      root on identity-losing qualities (halfdim/dim/alt) for Reggae, and
     //      the soloist's voicing-derived `chordMask` treats the root as a
     //      non-chord-tone on 7th-family chords — see engine/CLAUDE.md #6; bend
     //      and slide targets already derive from `quality`, not the mask.
     'Reggae',
 ]);
-const PRACTICE_GROUNDING_QUALITIES = new Set([
+const GROUNDING_QUALITIES = new Set([
     'halfdim',
     'dim',
     '7alt',
@@ -42,6 +43,49 @@ const PRACTICE_GROUNDING_QUALITIES = new Set([
     '7b5',
     'aug',
     'augmaj7',
+    // why (#1348): the altered-5th family finished by the #1313->#1344 chord series —
+    // same rule this set already applies to `aug`/`augmaj7`/`7b5`, just written after
+    // the set was. Rootless, these three lose their name outright: an `m7#5` shell is
+    // Eb-Ab-Bb, which IS an Eb sus4, and a `maj7b5` without its root is E-Gb-B. So with
+    // the bass MUTED the comp reducers (Neo-Soul window, Funk cell, low-intensity
+    // two-voice thinning, the harmony pad) keep the root under them.
+    // `mb6` is deliberately absent: its perfect 5th is WRITTEN, and the set's own
+    // precedent excludes the 6th-chord family (`6`, `m6`).
+    'maj7b5',
+    'm#5',
+    'm7#5',
+]);
+
+/**
+ * Qualities that must never take the rootless DOMINANT shell (#1316). The dominant
+ * bucket in `shouldUseRootlessVoicing`/`getRootlessVoicing` is keyed on `is7th`,
+ * which `getChordDetails` derives from a string heuristic (`symbol.includes('7' |
+ * '9' | '11' | '13')`) — so a suspension, an added tone or a 6th lands in it and
+ * gets voiced [3, 5, b7]: the whole point of `G7sus4` is that the 4th REPLACES the
+ * 3rd (it came out B-D-F, a plain G7), and `Cadd9` is written precisely to say
+ * "9th, no 7th" (it came out Bb-E-G, a C9 shell). They keep their rooted
+ * `getIntervals` stack instead, above `COMP_REGISTER_FLOOR`.
+ *
+ * Every entry is reachable, not defensive: the ones `getChordDetails` pins to
+ * `is7th = false` on their own ('sus4', 'sus2', 'add2', '6', '6/9') still arrive
+ * with `is7th = true` from a compound symbol whose leftmost suffix match is the
+ * suspension/6th — a written `G` + `sus4add9`, `C` + `sus2add9` or `C` + `6add9`
+ * all trip the heuristic.
+ * A rootless 7sus4 shell (4, b7, 9) is a separate by-ear call, deliberately not
+ * taken here.
+ */
+export const NEVER_ROOTLESS_DOMINANT_QUALITIES = new Set([
+    'sus4',
+    'sus2',
+    '7sus4',
+    // #1323 — the extended suspended dominants are the same case as '7sus4': the rootless
+    // dominant shell states a major 3rd, which is the one tone a suspension replaces.
+    '9sus4',
+    '13sus4',
+    'add9',
+    'add2',
+    '6',
+    '6/9',
 ]);
 
 const TENSION_CHORD_QUALITIES = new Set([
@@ -57,33 +101,57 @@ const TENSION_CHORD_QUALITIES = new Set([
     'aug',
     'augmented',
     'augmaj7',
+    // why (#1348): the same altered-5th family, and the same rule the entries above
+    // already encode — a chord whose 5th is altered is an unstable colour sonority, so
+    // the harmony lane stays a slim guide-tone layer over it and never states a 5th.
+    // This flag is what gates the four per-genre voicing overrides in `harmonies.ts`
+    // (`applyGenreVoicingOverride`), every one of which FABRICATES a perfect 5th:
+    // the Blues horn stab returns [3, 7, 0] / [4, 7, 0], the Metal power chord
+    // root+5+octave, the Rock harmonized line [3rd, 7] / [0, 7] / [0, 7, 12]. Without
+    // these three listed, the horns punched G natural over a written Cmaj7b5's Gb and
+    // over a Cm#5's Ab. `mb6` stays out for the same reason as above — its 5th is written.
+    'maj7b5',
+    'm#5',
+    'm7#5',
 ]);
 
 function isBassSpaceFeel(feel: string | undefined | null): boolean {
     return BASS_SPACE_FEELS.has(feel || '');
 }
 
+/**
+ * True when a bass line is actually sounding under the comp. This is the ONLY
+ * input to "leave room for the bass" (#1313): muting the bass means the player
+ * is practicing that part, so the remaining lanes must state the harmony
+ * themselves — the register floor drops and rootless voicings switch off. It
+ * used to also be forced true by a default-on "practice mode" preference, which
+ * made `bassActive` dead and left a muted-bass band with no root anywhere. That
+ * preference had no other reader left and was retired in #1314.
+ */
 export function shouldReserveBassSpace(
     state: EnsembleState,
     bassActive = Boolean(state.bass?.enabled),
 ): boolean {
-    return Boolean(state.playback.practiceMode || bassActive);
+    return bassActive;
 }
 
 /**
- * In practice mode we still want pro-style voicings, but some chords lose too much
- * identity if they are forced rootless. Let these chords re-admit the root while
- * still keeping the voicing above the bass lane.
+ * Some chords lose too much identity without a root under them (the root is what
+ * disambiguates a dim/ø/altered/augmented shape). Over a sounding bass the bass
+ * supplies it and the comp plays the idiomatic rootless shell; with the bass
+ * MUTED — the player covering that part, which the retired practice-mode
+ * preference used to stand in for (#1313) — the smart-comp, Neo-Soul, Funk and pad reducers keep
+ * these chords grounded (root retained, fuller voice count) instead of thinning
+ * them to bare shells. Jazz's resolving altered-dominant voicing is the one
+ * exception: it stays a 3-b7 tritone shell either way, which still states the
+ * dominant function on its own.
  */
-export function shouldPreferGroundedPracticeVoicing(
-    state: EnsembleState,
+export function shouldPreferGroundedVoicing(
     quality: string | undefined | null,
     feel: string | undefined | null,
+    bassActive: boolean,
 ): boolean {
-    if (!state.playback.practiceMode || !isBassSpaceFeel(feel)) {
-        return false;
-    }
-    return PRACTICE_GROUNDING_QUALITIES.has(quality || '');
+    return !bassActive && isBassSpaceFeel(feel) && GROUNDING_QUALITIES.has(quality || '');
 }
 
 export function isTensionChordQuality(quality: string | undefined | null): boolean {
@@ -100,28 +168,43 @@ export function shouldUseRootlessVoicing(
     if (!shouldReserveBassSpace(state, bassActive) || !isBassSpaceFeel(feel)) {
         return false;
     }
-    if (shouldPreferGroundedPracticeVoicing(state, quality, feel)) {
-        return false;
-    }
-
-    const isMinor = quality.startsWith('m') && !quality.startsWith('maj');
+    // why (#1313): rootless is an idiom for chords the chart WRITES as 7ths or
+    // extensions — the shell (3rd + 7th) carries the identity and the bass owns
+    // the root. A plain minor triad has no 7th to build a shell from: voicing it
+    // rootless meant inventing a b7 and dropping the root, which is literally
+    // the relative major triad (Am -> C-E-G). An m6 likewise lost its 6th to an
+    // unwritten b7 (Dm6 -> F-A-C). Plain major triads never went rootless at
+    // this (parse) layer, so this also removes a major/minor asymmetry there.
+    // m9/m11/m13 always carry `is7th`, so the single `is7th` test covers every
+    // written minor extension; `getChordDetails` pins m6 to `is7th = false`.
+    const isMinorFamily = quality.startsWith('m') && !quality.startsWith('maj');
+    const isMinor = isMinorFamily && is7th;
     const isDominant =
-        !isMinor &&
+        !isMinorFamily &&
         !['dim', 'halfdim'].includes(quality) &&
+        // #1316 — a suspension / added tone / 6th is not a 3-b7 dominant shell.
+        !NEVER_ROOTLESS_DOMINANT_QUALITIES.has(quality) &&
         (is7th ||
             ['9', '11', '13', '7alt', '7b9', '7#9', '7#11', '7b13'].includes(quality) ||
             quality.startsWith('7'));
-    const isMajor7 = ['maj7', 'maj9', 'maj11', 'maj13', 'maj7#11', 'augmaj7'].includes(quality);
+    // Kept in step with the same list in `getRootlessVoicing` (#1329 added 'maj7b5'); here
+    // it only decides WHETHER to voice rootless, which `isDominant` would also say yes to.
+    const isMajor7 = ['maj7', 'maj9', 'maj11', 'maj13', 'maj7#11', 'maj7b5', 'augmaj7'].includes(
+        quality,
+    );
 
     return isMinor || isDominant || isMajor7;
 }
 
-export function getBassSpaceFloor(
-    state: EnsembleState,
-    bassActive = Boolean(state.bass?.enabled),
-): number {
-    return shouldReserveBassSpace(state, bassActive) ? 52 : 43;
-}
+/**
+ * Lowest MIDI the comp voices to. Deliberately NOT bass-aware (#1313): tick-logic's
+ * `enforceRegisterSlotting` clamps every chords/harmony note to 52-84 one note at
+ * a time, so a lower parse floor (the old bass-off 43) only ever produced voicings
+ * whose bottom notes were then folded up INDIVIDUALLY — re-inverting the chord
+ * (Dm9 from D3 became F-A-C-D-E, an F6/9) and clustering it. "The comp states the
+ * root when the bass is muted" is delivered by pitch-class presence, not register.
+ */
+export const COMP_REGISTER_FLOOR = 52;
 
 /**
  * Sum of per-voice nearest-neighbor semitone distances from `fromMidis` to `toMidis`.
@@ -321,6 +404,53 @@ export function selectSupportiveVoicing(
 }
 
 /**
+ * Guarantee the chord root is sounding, for a comp with NO bass under it (#1313).
+ * The compact-cluster lanes pick a contiguous window of the voicing, which can
+ * window the root out (Am9 -> C-E-G, a C major triad once nothing supplies the A).
+ * Adds the root in the octave nearest below the lowest voice, inside the comp
+ * register, or nearest above it when there is no room underneath. No-op when the
+ * root already sounds.
+ */
+export function ensureRootVoice(midis: number[], rootMidi: number, min = 52, max = 84): number[] {
+    const rootPc = ((rootMidi % 12) + 12) % 12;
+    if (midis.length === 0 || midis.some((midi) => ((midi % 12) + 12) % 12 === rootPc)) {
+        return midis;
+    }
+    const lowest = Math.min(...midis);
+    const candidates: number[] = [];
+    for (let midi = rootPc; midi <= max; midi += 12) {
+        if (midi >= min) {
+            candidates.push(midi);
+        }
+    }
+    const below = candidates.filter((midi) => midi < lowest);
+    const root = below.length > 0 ? below[below.length - 1] : candidates[0];
+    return root === undefined ? midis : [...midis, root].sort((a, b) => a - b);
+}
+
+/**
+ * The two-voice thinning for a comp with NO bass under it (#1313). The blind
+ * "bottom two voices" reduction is only safe while a bass line states the root: an
+ * inverted Am (C-E-A) thins to C-E, which alone is a C major third. With the bass
+ * muted the dyad has to carry the identity itself — root + 3rd (or the sus
+ * 2nd/4th standing in for a 3rd). Returns null when the voicing has no root or no
+ * 3rd to pick, so the caller keeps its existing reduction.
+ */
+export function selectRootedDyad(
+    midis: number[],
+    chord: { rootMidi?: number } | null,
+): number[] | null {
+    const pick = (classes: number[]) =>
+        midis.find((midi) => classes.includes(getChordIntervalClass(midi, chord) ?? -1));
+    const root = pick([0]);
+    const third = pick([3, 4]) ?? pick([2, 5]);
+    if (root === undefined || third === undefined) {
+        return null;
+    }
+    return [root, third].sort((a, b) => a - b);
+}
+
+/**
  * Move a single voice to the nearest NEIGHBORING chord tone (a small melodic step
  * to a different pitch-class still in the chord), to give the top of an "answer"
  * voicing a little inner-voice motion so consecutive answers aren't identical.
@@ -511,6 +641,49 @@ function getAlteredVoicingCandidates(
     }
 }
 
+/**
+ * The "Hendrix" 7#9 spacing (#1318): major 3rd below, #9 on top, a major 7th or more
+ * apart (G7#9 = B-F-A#). That width is what makes the #9 read as a blue note; folded
+ * to a semitone UNDER the 3rd (Bb3-B3-F4) it reads as a chromatic smear instead, and
+ * the 3+#9 clash-penalty exemption below is exactly what let that placement win.
+ * `placeIntervalsNearTarget` seats each voice independently at its own nearest octave
+ * to the register center, so the #9 (15 semitones up) routinely lands below the 3rd.
+ */
+const SHARP_NINE_MIN_SPACING = 11;
+
+/**
+ * Lift the #9 (root-relative degree 3) by whole octaves until it sits at least
+ * `SHARP_NINE_MIN_SPACING` above the major 3rd (degree 4). Returns the input
+ * unchanged when the candidate doesn't carry both voices, and `null` when the lift
+ * can't stay inside the comp register — so the caller can prefer a sibling candidate
+ * that fits rather than emitting the smear.
+ */
+function spaceSharpNineAboveThird(
+    midis: number[],
+    rootMidi: number,
+    maxMidi: number,
+): number[] | null {
+    const degreeOf = (midi: number) => (((Math.round(midi) - rootMidi) % 12) + 12) % 12;
+    const thirdIndex = midis.findIndex((midi) => degreeOf(midi) === 4);
+    const ninthIndex = midis.findIndex((midi) => degreeOf(midi) === 3);
+    if (thirdIndex === -1 || ninthIndex === -1) {
+        return midis;
+    }
+
+    let ninth = midis[ninthIndex];
+    const lowestAllowed = midis[thirdIndex] + SHARP_NINE_MIN_SPACING;
+    while (ninth < lowestAllowed) {
+        ninth += 12;
+    }
+    if (ninth > maxMidi) {
+        return null;
+    }
+
+    const spaced = [...midis];
+    spaced[ninthIndex] = ninth;
+    return [...new Set(spaced)].sort((a, b) => a - b);
+}
+
 export function buildResolvingAlteredVoicing(
     chord: { rootMidi?: number; freqs?: number[]; quality?: string } | null,
     previousMidis: number[] = [],
@@ -536,28 +709,44 @@ export function buildResolvingAlteredVoicing(
 
     const candidateIntervals = getAlteredVoicingCandidates(chord?.quality, intensity, complexity);
 
-    let bestMidis = placeIntervalsNearTarget(
-        resolvedRootMidi,
-        candidateIntervals[0],
-        targetCenter,
-        minMidi,
-        maxMidi,
-    );
-    let bestScore = Number.POSITIVE_INFINITY;
-
-    candidateIntervals.forEach((intervals) => {
-        const candidateMidis = placeIntervalsNearTarget(
+    // why (#1318): 7#9 is the one quality whose charted alteration sits a semitone
+    // from a voice the shell must also carry, so its placement needs an ORDERING
+    // constraint the generic scorer has no term for. Repair each candidate before
+    // scoring — a penalty alone can't help, since every candidate for this quality is
+    // placed by the same center-seeking rule and they'd all be penalised equally.
+    const needsSharpNineSpacing = chord?.quality === '7#9';
+    const placeCandidate = (intervals: number[]): { midis: number[]; penalty: number } => {
+        const placed = placeIntervalsNearTarget(
             resolvedRootMidi,
             intervals,
             targetCenter,
             minMidi,
             maxMidi,
         );
+        if (!needsSharpNineSpacing) {
+            return { midis: placed, penalty: 0 };
+        }
+        const spaced = spaceSharpNineAboveThird(placed, resolvedRootMidi, maxMidi);
+        // why: a placement whose #9 cannot clear the 3rd inside the comp register is
+        // the smear this repair exists to remove, but it stays a LAST-RESORT
+        // candidate rather than being dropped — a chord jammed against the 84
+        // ceiling still has to voice something. +40 dwarfs every other term here
+        // (voice-leading + spread + clash together stay well under it), so any
+        // sibling candidate that CAN be spaced wins outright.
+        return spaced ? { midis: spaced, penalty: 0 } : { midis: placed, penalty: 40 };
+    };
+
+    let bestMidis = placeCandidate(candidateIntervals[0]).midis;
+    let bestScore = Number.POSITIVE_INFINITY;
+
+    candidateIntervals.forEach((intervals) => {
+        const { midis: candidateMidis, penalty: spacingPenalty } = placeCandidate(intervals);
         if (candidateMidis.length === 0) {
             return;
         }
 
         let score =
+            spacingPenalty +
             Math.abs(averageMidi(candidateMidis) - targetCenter) * 0.5 +
             getNearestVoiceLeadingCost(candidateMidis, previousMidis) * 0.8 +
             getNearestVoiceLeadingCost(candidateMidis, nextMidis) * 0.6 +

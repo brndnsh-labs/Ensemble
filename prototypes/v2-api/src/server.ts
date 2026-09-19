@@ -1,6 +1,7 @@
 import { fileURLToPath } from 'node:url';
 import { serve } from '@hono/node-server';
 import { createWebAuthnConfig } from './auth/config.js';
+import { DEFAULT_REGISTRATION_CAP } from './auth/registration.js';
 import { openDatabase } from './db/connection.js';
 import { runMigrations } from './db/migrate.js';
 import { createApp } from './http/app.js';
@@ -152,6 +153,38 @@ function readRegistrationOpen(): boolean {
     );
 }
 const registrationOpen = readRegistrationOpen();
+/**
+ * Service-wide registration ceiling (#1272 — DECISION 2026-09-17 on #1256): the per-owner
+ * storage caps (`MAX_BYTES_PER_OWNER` in db/save.ts) bound one account's footprint, but nothing
+ * bounded how many accounts could exist — an unbounded account count has no disk ceiling at all.
+ * Same fail-loud digits-only validation as `readPort` above, and the same reasoning: an
+ * unrecognized value must refuse to start, not silently resolve to some other cap nobody chose.
+ * `DEFAULT_REGISTRATION_CAP` (`auth/registration.ts`) is 25, worst case 6.4 GiB against the
+ * 256 MiB per-owner cap.
+ */
+function readRegistrationCap(): number {
+    const raw = process.env.ENSEMBLE_REGISTRATION_CAP;
+    if (raw === undefined) {
+        return DEFAULT_REGISTRATION_CAP;
+    }
+    if (!/^\d+$/.test(raw)) {
+        throw new Error(
+            `ENSEMBLE_REGISTRATION_CAP must consist only of decimal digits (no sign, decimal ` +
+                `point, exponent, hex prefix, or surrounding whitespace), got ${JSON.stringify(raw)}`,
+        );
+    }
+    const cap = Number(raw);
+    // Bounded above as well as below, like `readPort`. A long enough digit string passes the
+    // regex and becomes `Infinity` (`Number('9'.repeat(400))`), and `count >= Infinity` is never
+    // true — a fat-fingered value would silently REMOVE the cap this variable exists to set.
+    if (cap < 1 || !Number.isSafeInteger(cap)) {
+        throw new Error(
+            `ENSEMBLE_REGISTRATION_CAP must be a positive safe integer, got ${JSON.stringify(raw)}`,
+        );
+    }
+    return cap;
+}
+const registrationCap = readRegistrationCap();
 const clientIdentity: ClientIdentityOptions = {
     secret: readRequiredEnv('ENSEMBLE_AUTH_IP_SECRET'),
     header: process.env.ENSEMBLE_AUTH_IP_HEADER,
@@ -184,14 +217,14 @@ const db = openDatabase(dbPath);
 // (`%20`), which readdirSync/readFileSync would then try to open literally rather than decoding.
 runMigrations(db, fileURLToPath(new URL('../migrations', import.meta.url)));
 
-const app = createApp({ db, config, clientIdentity, registrationOpen });
+const app = createApp({ db, config, clientIdentity, registrationOpen, registrationCap });
 registerHealthCheck(app, db, revision);
 
 // This service's one intended startup log line. `noConsole` (biome.json) is scoped to
 // `public/**` only, so it does not apply here.
 const server = serve({ fetch: app.fetch, port, hostname: host }, (info) => {
     console.log(
-        `ensemble-v2-api listening on http://${host}:${info.port} (origin: ${config.origin}, registration: ${registrationOpen ? 'open' : 'closed'})`,
+        `ensemble-v2-api listening on http://${host}:${info.port} (origin: ${config.origin}, registration: ${registrationOpen ? 'open' : 'closed'}, cap: ${registrationCap})`,
     );
 });
 

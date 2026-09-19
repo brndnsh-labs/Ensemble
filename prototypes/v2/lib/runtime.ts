@@ -18,12 +18,25 @@ import { scheduler } from '@engine/engine/scheduler-core';
 import { isSoloistMonophonicMode } from '@engine/engine/soloist-mode-policy';
 import { transposeChordText } from '@engine/engine/transpose';
 import {
+    downloadExportResult,
+    renderCurrentSessionToWav,
+    renderStemsToWav,
+    STEM_INSTRUMENTS,
+    type StemInstrument,
+} from '@engine/export/audio-export';
+import { exportToMidi } from '@engine/export/midi-export';
+import {
     prepareScorePlayback,
     renderScorePlayback,
     scoreArrangement,
 } from '@engine/songbook/score-playback';
 import type { SemanticScore } from '@engine/songbook/score-types';
-import type { ChartContent, ChartLaneMix } from '@engine/songbook/types';
+import type {
+    ChartContent,
+    ChartLaneMix,
+    ChartNotation,
+    SoloistMode,
+} from '@engine/songbook/types';
 import { dispatch, getState, subscribe } from '@engine/state';
 import {
     deriveSoloistModeOnBoot,
@@ -32,21 +45,36 @@ import {
 } from '@engine/state/state-effects';
 import {
     ACTIONS,
+    type ChordDensity,
     type EnsembleState,
     type InstrumentModule,
     type InstrumentVoice,
+    type SwingSub,
 } from '@engine/types';
 import { transposeKeyName } from '@engine/utils';
 import { initWorker, syncWorker } from '@engine/worker-client';
 import { type ChartDocument, type DocumentContent, validateDocument } from './documents';
+import { masterVolumePreference, rememberMasterVolume } from './session';
 import { initializeSounds, prepareSound, prepareSounds, validateVoice } from './sounds';
 
-export type { ChartContent, ChartDocument };
+export type { ChartContent, ChartDocument, StemInstrument };
 export { GENRE_NAMES };
 
 let boot: Promise<void> | undefined;
 let loading = false;
 let playIntent = 0;
+/**
+ * Bumped by {@link cancelExportAudio}; an in-flight {@link exportAudio} call
+ * checks this after every await and discards its work (no download) once its
+ * own captured value falls behind. Same superseded-intent shape as
+ * `playIntent` above — the one difference is a cancelled export is expected
+ * (a user action), not a race to quietly lose, so callers must not surface it
+ * as an error.
+ */
+let exportIntent = 0;
+
+/** Thrown from inside {@link exportAudio}'s stem-progress hook to unwind `renderStemsToWav`'s loop the moment a cancel lands, rather than waiting for it to finish every remaining stem. Never escapes {@link exportAudio}. */
+class ExportCancelled extends Error {}
 /** Lanes whose voice follows the feel while they are left on Auto (#675). */
 const AUTO_LANES = ['groove', 'bass', 'chords', 'harmony', 'soloist'] as const;
 /**
@@ -256,6 +284,15 @@ export function initialize(): Promise<void> {
                     handleEffects(action, state, context);
                 }
             });
+            // #1276 — `playback.masterVolume` is `preferences`-owned (never part of a
+            // saved chart), so it's hydrated from its own device-local key here rather
+            // than from `apply()`. `initAudio()` reads `playback.masterVolume` straight
+            // off state at graph-build time (`engine.ts`), so setting it this early is
+            // enough even though guest startup defers `initAudio()` past this point.
+            const storedMasterVolume = masterVolumePreference();
+            if (storedMasterVolume !== null) {
+                param('playback', 'masterVolume', storedMasterVolume);
+            }
             rebuild();
             document.addEventListener('visibilitychange', () => {
                 const { playback } = getState();
@@ -362,6 +399,128 @@ export async function setVoice(
         deriveSoloistModeOnBoot(getState(), dispatch);
     }
     rebuild();
+}
+
+/** Live bus gain — mirrors `InstrumentSettings.tsx`'s `updateInstrumentAudio`. */
+export function setVolume(module: InstrumentModule, value: number): void {
+    dispatch(ACTIONS.SET_VOLUME, { module, value });
+}
+
+/** Live reverb send — the `SET_REVERB` sibling of `setVolume`. */
+export function setReverb(module: InstrumentModule, value: number): void {
+    dispatch(ACTIONS.SET_REVERB, { module, value });
+}
+
+/**
+ * Bass/chords/harmony/soloist all read `<lane>.style` live at note-generation
+ * time (see `instrument-styles.ts`); this is the one manual style picker each
+ * of those four lanes has ever had in either app. Flush the worker's
+ * lookahead buffer afterward so the new style is audible at the next
+ * scheduled note rather than waiting for the pre-generated buffer to drain —
+ * `InstrumentSettings.tsx`'s chords-style handler does the same
+ * (`refreshArrangerUI`) for the one style picker v1 exposes.
+ */
+export function setStyle(module: InstrumentModule, style: string): void {
+    dispatch(ACTIONS.SET_STYLE, { module, style });
+    rebuild();
+}
+
+/** Chords-only: `SET_DENSITY`'s reducer writes `chords.density` unconditionally. */
+export function setDensity(density: ChordDensity): void {
+    dispatch(ACTIONS.SET_DENSITY, density);
+}
+
+/** Soloist phrasing mode — mirrors `InstrumentSettings.tsx`'s Auto/Monophonic/Guitar group. */
+export function setSoloistMode(mode: 'auto' | SoloistMode): void {
+    if (mode === 'auto') {
+        dispatch(ACTIONS.SET_SOLOIST_AUTO_MODE, true);
+    } else {
+        dispatch(ACTIONS.SET_SOLOIST_MODE, mode);
+        dispatch(ACTIONS.SET_SOLOIST_AUTO_MODE, false);
+    }
+}
+
+// #1276 — Feel sheet. `groove.swing`/`swingSub`/`humanize` and `playback.complexity`
+// are `document`-owned (`STATE_OWNERSHIP_MANIFEST`): they ride `captureContent()`'s
+// existing `band.groove`/`performance` projection already, so no codec change is
+// needed here, only the dispatch — same shape as `setStyle` above minus the
+// worker-buffer flush, since none of these change note *selection*, only feel
+// parameters the worker already re-reads live (`SET_SWING`/`SET_SWING_SUB`/
+// `SET_COMPLEXITY` all have their own delta case in `worker-client.ts`).
+
+/** `SET_SWING`'s reducer stores the raw 0-100 shuffle amount, not a 0-1 fraction. */
+export function setSwing(value: number): void {
+    dispatch(ACTIONS.SET_SWING, value);
+}
+
+/** `SET_SWING_SUB`'s reducer ignores an unrecognized grid rather than defaulting it. */
+export function setSwingSub(sub: SwingSub): void {
+    dispatch(ACTIONS.SET_SWING_SUB, sub);
+}
+
+/** Also a raw 0-100 value, like `setSwing` — not the 0-1 scale `setVolume`/`setReverb` use. */
+export function setHumanize(value: number): void {
+    dispatch(ACTIONS.SET_HUMANIZE, value);
+}
+
+/** 0-1 document field; the conductor's own opinion lives in the sibling runtime-derived
+ * `playback.conductorDensity`/`conductorHarmonyComplexity` fields (#1064) and never
+ * writes here. */
+export function setComplexity(value: number): void {
+    dispatch(ACTIONS.SET_COMPLEXITY, value);
+}
+
+// `playback.bandIntensity`/`autoIntensity`/`metronome` are `runtime-derived` —
+// session-only by design (`docs/design/write-ownership.md` §3), never part of
+// `ChartContent` or a preferences key. A user dispatch onto them is fine (the law
+// only forbids a *runtime system* writing a document/preferences field); they
+// simply reset to their engine defaults on next boot, same as v1.
+
+/** Manual band-energy override; ignored by the engine while `autoIntensity` is on. */
+export function setBandIntensity(value: number): void {
+    dispatch(ACTIONS.SET_BAND_INTENSITY, value);
+}
+
+/** Hands band energy to the conductor's own ramp, mirroring `InstrumentRail.tsx`. */
+export function setAutoIntensity(auto: boolean): void {
+    dispatch(ACTIONS.SET_AUTO_INTENSITY, auto);
+}
+
+/** Click track on/off — session-only, like the two above. */
+export function setMetronome(enabled: boolean): void {
+    dispatch(ACTIONS.SET_METRONOME, enabled);
+}
+
+/**
+ * `preferences`-owned: persists to its own device-local key (`session.ts`)
+ * immediately, independent of the chart's own Save — mirrors v1's
+ * `debounceSaveState` persisting `masterVolume` outside the chart-dirty flow
+ * (`state/persistence.ts`). The live bus ramp itself is `state-effects.ts`'s
+ * `SET_PARAM(masterVolume)` case, run by the `handleEffects` call already wired
+ * into this module's dispatch subscriber.
+ */
+export function setMasterVolume(value: number): void {
+    dispatch(ACTIONS.SET_PARAM, { module: 'playback', param: 'masterVolume', value });
+    rememberMasterVolume(value);
+}
+
+/**
+ * Chord-notation preference — `document`-owned, but the ONE Feel-sheet field split
+ * across the dual chart schema: a schemaVersion-1 chart keeps it on `arranger.notation`
+ * directly (what `dispatch` below writes, and what `captureContent()`'s `arrangement`
+ * projection reads), while a schemaVersion-2 (score) chart's saved copy lives on the
+ * authored `currentScore.notation` instead — `captureSessionContent()` clones
+ * `currentScore` verbatim for that schema and never reads `arranger.notation` for it.
+ * Patch both so either schema's next `captureDocument()` reflects the change. No
+ * `rebuild()`/`editScore()`: notation is a pure display selector over the chord's
+ * already-precomputed `display: FormattedChordNames` (all three notations are always
+ * present), so it never touches arrangement layout, generation, or the worker.
+ */
+export function setNotation(notation: ChartNotation): void {
+    dispatch(ACTIONS.SET_NOTATION, notation);
+    if (currentScore) {
+        currentScore = { ...currentScore, notation };
+    }
 }
 
 /**
@@ -697,6 +856,93 @@ export function audition(index: number): void {
         });
     }
 }
+/**
+ * Downloads a multi-track `.mid` of the current arrangement (#1277). Delegates
+ * to the shared `exportToMidi` entry point — the same detached-worker realm v1's
+ * ShareModal uses, so there is no second MIDI code path (root CLAUDE.md's "MIDI
+ * has three interpretation paths" rule: live, MIDI-out, `.mid` — never a fourth).
+ * The export clones state via `cloneStateForDetachedGeneration` and generates in
+ * a fresh Worker, so it never touches the live scheduler/audio graph — safe to
+ * call while the band is playing.
+ */
+export function exportMidi(filename: string): Promise<void> {
+    return exportToMidi({ filename });
+}
+
+/** Cancels the in-flight {@link exportAudio} call, if any (#1278). Cooperative,
+ * not a true mid-render abort — see {@link exportAudio}'s doc comment. */
+export function cancelExportAudio(): void {
+    exportIntent++;
+}
+
+/**
+ * Downloads a WAV mix, or one WAV per stem, of the current arrangement
+ * (#1278). Delegates to the shared `renderCurrentSessionToWav`/
+ * `renderStemsToWav` (public/export/audio-export.ts) — the same detached-clone
+ * offline render v1's `ShareModal` uses (`cloneStateForRender`), so the live
+ * scheduler/state tree is never written during the render; nothing here
+ * dispatches.
+ *
+ * Sampled voices must be installed before the render can use them —
+ * `resolveInstrumentSource` (instrument-registry.ts) silently resolves an
+ * uninstalled `pack:<id>` voice to the built-in synth, which would export
+ * audio that doesn't match what the Sounds picker shows as selected for this
+ * chart. Reuse the exact install path `toggle()` (Play) already runs before
+ * playback — `prepareSounds` with the same progress callback shape — so a
+ * missing pack visibly downloads first instead of the render silently
+ * proceeding on a synth stand-in; a failed/declined install throws here and
+ * the caller surfaces that as an error rather than exporting anyway.
+ *
+ * Cancellation is cooperative: `OfflineAudioContext` has no cancel primitive,
+ * so a mix export (one render) can only be discarded after it finishes
+ * (checked once more before the download fires). A stems export can stop
+ * between stems — `onStemProgress` fires synchronously before each one starts,
+ * so throwing {@link ExportCancelled} there unwinds `renderStemsToWav`'s loop
+ * before any further stem renders — but a stem already in flight still
+ * finishes. Either way, a cancelled call never reaches `downloadExportResult`.
+ */
+export async function exportAudio(
+    kind: 'mix' | 'stems',
+    filename: string,
+    progress: (text: string) => void,
+    instruments: StemInstrument[] = STEM_INSTRUMENTS,
+): Promise<void> {
+    const intent = ++exportIntent;
+    await prepareSounds(captureContent(), progress);
+    if (intent !== exportIntent) {
+        return;
+    }
+    if (kind === 'mix') {
+        progress('Rendering mix…');
+        const result = await renderCurrentSessionToWav({ filename });
+        if (intent !== exportIntent) {
+            return;
+        }
+        downloadExportResult(result);
+        return;
+    }
+    try {
+        const results = await renderStemsToWav(instruments, {
+            filename,
+            onStemProgress: ({ instrument, index, total }) => {
+                if (intent !== exportIntent) {
+                    throw new ExportCancelled();
+                }
+                progress(`Rendering ${instrument} (${index + 1}/${total})…`);
+            },
+        });
+        if (intent === exportIntent) {
+            for (const result of results) {
+                downloadExportResult(result);
+            }
+        }
+    } catch (error) {
+        if (!(error instanceof ExportCancelled)) {
+            throw error;
+        }
+    }
+}
+
 export function state(): EnsembleState {
     return getState();
 }

@@ -23,8 +23,14 @@ export default [
         name: 'Main Entry',
     },
     {
+        // Raised 125 -> 126 kB for the chord-spelling table (#1320-#1324). The parser now
+        // carries one row per accepted spelling instead of a regex alternation plus an
+        // if/else chain, which is +350 B brotlied against 230 B of remaining headroom. The
+        // budget is a baseline, not a ceiling to defend by deleting rows: the alternative
+        // was dropping ~20 real chord spellings (or obfuscating the table a reviewer has to
+        // audit musically) to buy back 121 B.
         path: initialJavaScriptPaths,
-        limit: '125 kB',
+        limit: '126 kB',
         name: 'Initial JavaScript Graph',
     },
     {

@@ -248,12 +248,12 @@ describe('genreFeel routing canon (#1130)', () => {
     //         Blast radius, since this is an audible change and not just a
     //         bookkeeping one: `shouldUseRootlessVoicing` fires on minor,
     //         dominant and maj7 qualities only, so plain MAJOR skanks are
-    //         untouched. Minor ones become rootless and pick up a b7 —
-    //         getRootlessVoicing returns [b3, 5, b7] (or [b3, b7, 9] when rich),
-    //         i.e. an Am skank now voices as Am7. That is idiomatic (roots
-    //         reggae comps minor chords as m7 far more often than as a bare
-    //         triad) and it is the same treatment the six genres above already
-    //         get, but it IS a harmonic change, not only a register one.
+    //         untouched. WRITTEN minor 7ths become rootless —
+    //         getRootlessVoicing returns [b3, 5, b7] (or [b3, b7, 9] when rich).
+    //         (As first shipped this also caught plain minor TRIADS, inventing
+    //         a b7 and dropping the root: an Am skank voiced C-E-G, literally a
+    //         C major triad. #1313 reversed that for all seven feels — a skank
+    //         is overwhelmingly a triad, and the chart wrote one.)
     //   OUT — Rock/Metal: the voicing IS the root — a power chord is root+5th,
     //         and rootless would delete the gesture rather than thin it.
     //   OUT — Country/Acoustic: strummed open-position guitar shapes sound the

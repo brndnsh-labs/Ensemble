@@ -126,4 +126,53 @@ describe('Ending-cadence tonic critique (#830)', () => {
             once.map((r) => `${r.bassPC}|${r.soloPC}|${r.pickupInterval}`),
         );
     });
+
+    /**
+     * #1336 — the MODE half of the inference, driven by a hand-written chart rather than a
+     * preset because the new quality has no preset. `inferResolutionTonic`'s guard (a) reads
+     * the final chord's own quality through `MINOR_QUALITIES`; a raised fifth does not make
+     * the chord major, so a chart ending on `Cm#5` must resolve into a MINOR tonic. Before
+     * this the quality was absent from that set and the band ended bright on a written minor
+     * chord — the same class as the minor-major-7 and minor-add9 rows (#1321/#1322). The
+     * plain-C control is what proves the assertion isn't vacuous.
+     */
+    it.each([
+        ['Cm#5', 3, 'minor'],
+        // #1340 — the same rule for the ♯5's 7th-chord sibling and for the added ♭6. Both are
+        // minor triads with one extra tone, so both were absent from `MINOR_QUALITIES` and both
+        // ended the song bright over a written minor chord.
+        ['Cm7#5', 3, 'minor'],
+        ['Cmb6', 3, 'minor'],
+        ['Cm', 3, 'minor'],
+        ['C', 4, 'major'],
+    ])('a chart ending on %s resolves into a %s tonic', (finalChord, pickup) => {
+        dispatch(ACTIONS.RESET_STATE);
+        dispatch(ACTIONS.SET_TIME_SIGNATURE, '4/4');
+        dispatch(ACTIONS.SET_KEY, 'C');
+        const state = getState();
+        state.arranger.key = 'C';
+        state.arranger.isMinor = false;
+        state.arranger.sections = [
+            { id: 's0', label: 'A', value: `${finalChord} | Fm | G7 | ${finalChord}`, repeat: 1 },
+        ];
+        validateProgression(state);
+        expect(state.arranger.progression.at(-1).absName, finalChord).toBe(finalChord);
+
+        const notes = generateResolutionNotes(
+            state,
+            0,
+            state.arranger,
+            { chords: true, bass: true, soloist: true, groove: false, harmony: false },
+            120,
+            { genreFeel: 'Acoustic' },
+            { octave: 72 },
+        );
+        const solo = notes.filter((n: any) => n.module === 'soloist' && typeof n.midi === 'number');
+        const landing = solo.find((n: any) => n.vibrato);
+        const pickups = solo
+            .filter((n: any) => n.durationSteps === 2)
+            .sort((a: any, b: any) => a.timingOffset - b.timingOffset);
+        expect(((landing.midi % 12) + 12) % 12, `${finalChord} landing PC`).toBe(0);
+        expect(pickups[0].midi - landing.midi, `${finalChord} pickup interval`).toBe(pickup);
+    });
 });

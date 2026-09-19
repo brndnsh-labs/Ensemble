@@ -1,3 +1,5 @@
+export type { DeleteAccountFailureReason, DeleteAccountResult } from './account-deletion.js';
+export { deleteAccount } from './account-deletion.js';
 export type { WebAuthnConfig, WebAuthnConfigInput } from './config.js';
 export { createWebAuthnConfig } from './config.js';
 export { FRESH_AUTH_WINDOW_MS, isFreshlyAuthenticated } from './fresh-auth.js';
@@ -59,8 +61,14 @@ export type {
     StartRegistrationInput,
     StartRegistrationResult,
     VerifyRegistrationInput,
+    VerifyRegistrationOptions,
 } from './registration.js';
-export { startRegistration, verifyRegistration } from './registration.js';
+export {
+    countAccounts,
+    DEFAULT_REGISTRATION_CAP,
+    startRegistration,
+    verifyRegistration,
+} from './registration.js';
 export type { IssuedSession, SessionClaims } from './session.js';
 export {
     issueSession,

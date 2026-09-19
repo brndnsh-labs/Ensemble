@@ -1,13 +1,12 @@
 import type { InstrumentModule } from '@engine/types';
 import { type ChartDocument, validateDocument } from './documents';
 import { validateVoice } from './sounds';
+// Each page load is a separate writer; the account `drafts` store keys on the same id (#1299).
+import { writerId as writer } from './writer';
 
 const DATABASE = 'ensemble-v2-preview';
 const STORE = 'documents';
 const RECOVERY = 'ensemble-v2-preview:recovery:';
-// Each page load is a separate writer. Recoveries are discoverable across reloads;
-// a duplicated tab cannot inherit a live writer identity.
-const writer = typeof crypto !== 'undefined' ? crypto.randomUUID() : 'unavailable';
 let database: Promise<IDBDatabase> | undefined;
 
 export class ConflictError extends Error {
@@ -123,7 +122,13 @@ export async function save(
     });
 }
 
-/** Synchronous, per-writer recovery protects the final edit on close. */
+/**
+ * Synchronous, per-writer recovery protects the final edit on close.
+ *
+ * A GUEST chart's, and only a guest chart's (#1299): an account chart's unsaved experiment is
+ * retained in that account's own database (`AccountSongbook.recover`), so it is cleared by
+ * signing out and never leaves account content in this shared `localStorage` namespace.
+ */
 export function recover(document: ChartDocument): void {
     validated(document);
     const key = `${RECOVERY}${writer}:${document.id}`;
@@ -139,15 +144,40 @@ export function recover(document: ChartDocument): void {
     }
 }
 
+/**
+ * Every writer's recovery key for one document id — the one place the key shape is interpreted.
+ *
+ * Collected into an array rather than acted on during the scan: `localStorage.removeItem` inside a
+ * `localStorage.key(i)` loop renumbers every index behind it, which silently skips entries.
+ */
+function recoveryKeysFor(id: string): string[] {
+    const keys: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key?.startsWith(RECOVERY) && key.endsWith(`:${id}`)) {
+            keys.push(key);
+        }
+    }
+    return keys;
+}
+
+/**
+ * How many recovery slots this device holds for one document, whoever wrote them (#1269).
+ *
+ * A key count, not a parse: a slot whose JSON no longer validates still holds that chart's text on
+ * this device, and a reader that dropped it could report "nothing is at stake" about bytes it is
+ * about to delete. Over-reporting is the safe direction here — it offers an export nobody needed;
+ * under-reporting destroys work after saying it would not.
+ */
+export function recoverySlotCount(id: string): number {
+    return recoveryKeysFor(id).length;
+}
+
 export function recoveriesFor(
     document: ChartDocument,
 ): Array<{ document: ChartDocument; capturedAt: string }> {
     const records: Array<{ document: ChartDocument; capturedAt: string }> = [];
-    for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (!key?.startsWith(RECOVERY) || !key.endsWith(`:${document.id}`)) {
-            continue;
-        }
+    for (const key of recoveryKeysFor(document.id)) {
         const raw = localStorage.getItem(key);
         if (!raw || raw.length > 1_100_000) {
             continue;
@@ -183,4 +213,19 @@ export function recoveryFor(
 
 export function clearOwnRecovery(id: string): void {
     localStorage.removeItem(`${RECOVERY}${writer}:${id}`);
+}
+
+/**
+ * Remove EVERY writer's recovery slot for one document (#1269), not just this page load's.
+ *
+ * `clearOwnRecovery` is the right tool after a Save: another tab editing the same song is holding
+ * its own live experiment, and this writer has no business discarding it. Signing out is the
+ * opposite case — the account's local data is being removed from a possibly shared device, a slot
+ * an earlier page load left behind holds that chart's text in plaintext, and a tab still open on
+ * the same account is losing its session too. So the whole id goes.
+ */
+export function clearRecovery(id: string): void {
+    for (const key of recoveryKeysFor(id)) {
+        localStorage.removeItem(key);
+    }
 }

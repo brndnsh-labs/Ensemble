@@ -24,8 +24,9 @@ import {
 import { isInstrumentActiveAtStep } from './section-overrides.js';
 import {
     isTensionChordQuality,
-    shouldPreferGroundedPracticeVoicing,
+    shouldPreferGroundedVoicing,
     shouldReserveBassSpace,
+    shouldUseRootlessVoicing,
 } from './voicing-policy.js';
 import { getWorkerState } from './worker-orchestrator.js';
 
@@ -264,8 +265,8 @@ function selectGroundedIntervals(intervals: number[], targetCount = 4): number[]
     });
 
     // why: order is [roots, guides, colors, fifths, others] — NOT R-3-5-7.
-    // This function is reached only when `shouldPreferGroundedPracticeVoicing`
-    // gates the call (see voicing-policy.ts `PRACTICE_GROUNDING_QUALITIES`:
+    // This function is reached only when `shouldPreferGroundedVoicing`
+    // gates the call (see voicing-policy.ts `GROUNDING_QUALITIES`:
     // halfdim, dim, 7b5, aug, augmaj7, 7alt, 7#9, 7b9). Plain 7/maj7/m7 never
     // reach here. For tension/altered qualities the characteristic alteration
     // (e.g. b9 in 7b9 = interval 13, color-class) IS the chord identity — a
@@ -884,11 +885,25 @@ function finalizeHarmonyNotes(
         coordination.bassEffectiveEnabled ?? isInstrumentActiveAtStep(activeState, 'bass', step),
     );
     const isCompingGenre = ['Jazz', 'Funk', 'Neo-Soul', 'Blues'].includes(feel);
-    const groundingRequired = shouldPreferGroundedPracticeVoicing(activeState, chord.quality, feel);
+    const groundingRequired = shouldPreferGroundedVoicing(chord.quality, feel, reserveBassSpace);
     const isTensionChord = isTensionChordQuality(chord.quality);
-    const rootlessComping = reserveBassSpace && isCompingGenre && !groundingRequired;
+    // #1313 — same rule as the comp's parse-time voicing: only a chord the chart
+    // writes as a 7th/extension has its root STRIPPED here. (The guide-tone
+    // reductions further down can still thin a pad line to a single 3rd; that is
+    // a one-voice line under the comp, not a rootless chord voicing.)
+    const rootlessComping =
+        reserveBassSpace &&
+        isCompingGenre &&
+        !groundingRequired &&
+        shouldUseRootlessVoicing(
+            activeState,
+            chord.quality || 'major',
+            Boolean(chord.is7th),
+            feel,
+            reserveBassSpace,
+        );
 
-    // Apply rootless reduction if practice mode is on or bass is enabled
+    // Apply rootless reduction when a bass line is sounding under the pads
     if (rootlessComping) {
         intervals = getSafeVoicings(intervals, true);
     } else if (groundingRequired) {

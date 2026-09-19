@@ -26,7 +26,6 @@ export function Settings() {
     const {
         countIn,
         metronome,
-        practiceMode,
         visualFlash,
         qualityColors,
         sessionTimer,
@@ -46,7 +45,6 @@ export function Settings() {
     } = useEnsembleState((s) => ({
         countIn: s.playback.countIn,
         metronome: s.playback.metronome,
-        practiceMode: s.playback.practiceMode,
         visualFlash: s.playback.visualFlash,
         qualityColors: s.playback.qualityColors,
         sessionTimer: s.playback.sessionTimer,
@@ -258,20 +256,6 @@ export function Settings() {
                                             dispatch(ACTIONS.SET_PARAM, {
                                                 module: 'playback',
                                                 param: 'countIn',
-                                                value: val,
-                                            });
-                                        }}
-                                    />
-                                </SettingRow>
-
-                                <SettingRow label="Practice Mode" id="practiceModeCheck">
-                                    <Toggle
-                                        id="practiceModeCheck"
-                                        checked={practiceMode}
-                                        onChange={(val) => {
-                                            dispatch(ACTIONS.SET_PARAM, {
-                                                module: 'playback',
-                                                param: 'practiceMode',
                                                 value: val,
                                             });
                                         }}

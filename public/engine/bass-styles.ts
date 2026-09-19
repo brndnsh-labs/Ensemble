@@ -1,7 +1,32 @@
 import { REGGAE_RIDDIMS } from '../config.js';
 import type { EnsembleState, StepInfo } from '../types.js';
-import { getFrequency } from '../utils.js';
+import { chordHasPerfectFifth, getFrequency } from '../utils.js';
 import { scrambleHash } from './hash-utils.js';
+import { chordTargetTones } from './soloist-pitch-engine.js';
+
+/**
+ * What a bass FIFTH slot should sound over this chord, as an interval above the root (#1334).
+ *
+ * The diminished family keeps its b5: it is a chord tone the bass idiomatically outlines, and
+ * these slots already voiced it. Everything else without a perfect fifth — `aug`, `augmaj7`,
+ * `7b5`, `7alt`, `maj7b5` — returns 0, the ROOT. That is `chordHasPerfectFifth`'s documented
+ * answer for this lane: down at MIDI 34-46 a b5/#5 fights the root the bass is sounding, so the
+ * bass states the root and leaves the alteration to the comper's register. Before this, three
+ * slots hand-rolled `hasFlat5 = quality === 'dim' || 'halfdim'` and played a natural 5 a
+ * semitone from the altered fifth the comp was voicing.
+ *
+ * Ordinary chords are unchanged by construction: every quality with a perfect fifth still
+ * returns 7, and the diminished family still returns 6.
+ */
+function fifthSlotInterval(quality: string | undefined | null): number {
+    const q = (quality || '').toLowerCase();
+    // Same union `chordHasPerfectFifth` reads: the canonical 'dim'/'halfdim' plus the longer
+    // spellings that reach us from imported or hand-built chord objects.
+    if (q.includes('dim') || q === 'm7b5' || q === 'half-diminished') {
+        return 6;
+    }
+    return chordHasPerfectFifth(q) ? 7 : 0;
+}
 
 type ChordChangeShape = {
     rootMidi: number;
@@ -1121,8 +1146,7 @@ export function getBassNoteStyle(
         // pulse. #941 removed the `+ intensity * 0.15` macro slope.
         let vel = 0.95;
         if (intensity > 0.65 && bassDraw(112) < 0.3 + intensity * 0.2 && !isSoloistBusy) {
-            const hasFlat5 = chord.quality === 'dim' || chord.quality === 'halfdim';
-            const fifthOffset = hasFlat5 ? 6 : 7;
+            const fifthOffset = fifthSlotInterval(chord.quality); // #1334
             note = bassDraw(113) < 0.5 ? baseRoot + 12 : baseRoot + fifthOffset;
             note = clampAndNormalize(note);
             vel *= 1.1;
@@ -1134,8 +1158,9 @@ export function getBassNoteStyle(
     // --- BOSSA NOVA / SAMBA STYLE ---
     if (style === 'bossa') {
         const root = baseRoot;
-        const hasFlat5 = chord.quality.includes('dim') || chord.quality.includes('halfdim');
-        const fifthInterval = hasFlat5 ? 6 : 7;
+        // #1334 — the same slot one genre over: on a chord with no perfect fifth this becomes a
+        // root/root-octave alternation rather than a natural 5 against the comp's altered one.
+        const fifthInterval = fifthSlotInterval(chord.quality);
         const fifthUp = clampAndNormalize(root + fifthInterval);
         const fifthDown = clampAndNormalize(root - (12 - fifthInterval)); // same pitch class, octave lower
         const rootOctaveUp = clampAndNormalize(root + 12);
@@ -1837,17 +1862,41 @@ export function getBassNoteStyle(
                 // and pick the best. If no chord tones in the scale, fall back to a
                 // scale neighbor of the root. This is the mid-bar "approach"
                 // gesture — chord tone, not chromatic.
-                const hasFlat5 = chord.quality === 'dim' || chord.quality === 'halfdim';
-                const hasSharp5 = chord.quality === 'aug' || chord.quality === 'augmaj7';
-                const has_m3 =
-                    chord.quality.startsWith('m') ||
-                    chord.quality === 'dim' ||
-                    chord.quality === 'halfdim';
-                const thirdInterval = has_m3 ? 3 : 4;
-                const fifthInterval = hasFlat5 ? 6 : hasSharp5 ? 8 : 7;
+                // why (#1333): this slot used to hand-roll the 3rd as
+                // `quality.startsWith('m')` with no `&& !startsWith('maj')` guard, so
+                // 'major', 'maj7', 'maj9', 'maj11', 'maj13' and 'maj7#11' all read as MINOR
+                // and the line targeted an Eb under a Cmaj7 — in the very slot whose comment
+                // below picks the 3rd *because* it carries the major/minor identity. It also
+                // assumed a 3rd exists: a suspension got a major 3rd (the one tone it
+                // replaces) and a power chord got one out of nowhere.
+                // `chordTargetTones` is the single place that knows a written quality's
+                // functional tones — it already feeds the soloist, the comp's echo voice and
+                // `bass-walking-route.ts` — so ask it instead of adding a third hand-rolled
+                // quality test to this file.
+                const { guides, pillars } = chordTargetTones(baseRoot, chord.quality);
+                const rootPc = ((baseRoot % 12) + 12) % 12;
+                const chordDegrees = new Set(
+                    [...guides, ...pillars].map(
+                        (pitchClass) => (((pitchClass - rootPc) % 12) + 12) % 12,
+                    ),
+                );
+                // The identity voice: the 3rd, or the suspension standing in for it (sus4's
+                // 4th, sus2's 2nd), or nothing at all on a power chord.
+                const thirdInterval = [3, 4, 5, 2].find((degree) => chordDegrees.has(degree));
+                // The 5th as the chord spells it. Absent on altered-5 qualities, where the
+                // pillars deliberately don't target an ambiguous b5/#5 — there the slot just
+                // plays the identity voice rather than inventing a natural 5 (which is what
+                // `chordHasPerfectFifth` in utils.ts says the bass must not do).
+                const fifthInterval = [7, 6, 8].find((degree) => chordDegrees.has(degree));
 
-                const thirdMidi = normalizeToRange(baseRoot + thirdInterval);
-                const fifthMidi = normalizeToRange(baseRoot + fifthInterval);
+                const thirdMidi =
+                    thirdInterval === undefined
+                        ? undefined
+                        : normalizeToRange(baseRoot + thirdInterval);
+                const fifthMidi =
+                    fifthInterval === undefined
+                        ? undefined
+                        : normalizeToRange(baseRoot + fifthInterval);
 
                 // why: §C.84 — score by stepwise distance to prevMidi (voice
                 // leading) but tilt toward the 3rd. The 3rd carries the chord's
@@ -1859,9 +1908,16 @@ export function getBassNoteStyle(
                 // move, while keeping bar-to-bar variety.
                 const prev = prevMidi ?? baseRoot;
                 const thirdBias = scrambleHash((compoundPitchSeed + 21) | 0) < 0.7 ? 1.5 : 0;
-                const dThird = Math.abs(thirdMidi - prev) - thirdBias;
-                const dFifth = Math.abs(fifthMidi - prev);
-                const approachChordTone = dThird <= dFifth ? thirdMidi : fifthMidi;
+                const dThird =
+                    thirdMidi === undefined
+                        ? Number.POSITIVE_INFINITY
+                        : Math.abs(thirdMidi - prev) - thirdBias;
+                const dFifth =
+                    fifthMidi === undefined ? Number.POSITIVE_INFINITY : Math.abs(fifthMidi - prev);
+                // Root only if the quality somehow offers neither — the slot's contract is
+                // to sound a chord tone, never a guessed one.
+                const approachChordTone =
+                    dThird <= dFifth ? (thirdMidi ?? baseRoot) : (fifthMidi ?? baseRoot);
                 return result(
                     getFrequency(clampAndNormalize(approachChordTone)),
                     ts.stepsPerBeat * 0.6,
@@ -1883,13 +1939,11 @@ export function getBassNoteStyle(
             if (isDownbeat) {
                 return result(getFrequency(withOctaveJump(baseRoot)), 2, 1.05);
             }
-            const hasFlat5 = chord.quality === 'dim' || chord.quality === 'halfdim';
-            const hasSharp5 = chord.quality === 'aug' || chord.quality === 'augmaj7';
+            // #1334 — the augmented branch used to sound the #5 here; per the decision the
+            // aug-family fifth is the comper's, and the bass states the root.
             return result(
                 getFrequency(
-                    clampAndNormalize(
-                        withOctaveJump(baseRoot + (hasFlat5 ? 6 : hasSharp5 ? 8 : 7)),
-                    ),
+                    clampAndNormalize(withOctaveJump(baseRoot + fifthSlotInterval(chord.quality))),
                 ),
                 2,
                 1.05,
@@ -1910,8 +1964,7 @@ export function getBassNoteStyle(
 
         if (intBeat === 2 && isBeatStart && !isSoloistBusy) {
             // Beat 3: High preference for 5th or Octave
-            const hasFlat5 = chord.quality === 'dim' || chord.quality === 'halfdim';
-            const fifthOffset = hasFlat5 ? 6 : 7;
+            const fifthOffset = fifthSlotInterval(chord.quality); // #1334
             const targetInterval = bassDraw(119) < 0.7 ? fifthOffset : 0;
             return result(
                 getFrequency(clampAndNormalize(baseRoot + targetInterval)),

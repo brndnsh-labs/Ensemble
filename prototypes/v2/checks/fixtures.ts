@@ -88,79 +88,88 @@ export interface AccountApi {
 }
 
 /**
- * The real account API behind the worker's preview server, on one origin (#1258).
+ * The real account API, one process PER TEST, behind the worker's shared preview proxy, on one
+ * origin (#1258; made test-scoped in the #1263 patch review, item 5).
  *
- * Opt-in: only a spec that uses `accountTest` starts it, so guest specs never need the API
- * built or running. It runs the SHIPPED bundle (`dist/server.js`, built once by
- * `checks/global-setup.ts`) on a throwaway `node:sqlite` file with registration open.
+ * Opt-in: only a spec that uses `accountTest` starts it, so guest specs never need the API built
+ * or running. Each test runs the SHIPPED bundle (`dist/server.js`, built once by
+ * `checks/global-setup.ts`) on its OWN throwaway `node:sqlite` file with registration open, torn
+ * down and deleted in `finally` when that test ends.
+ *
+ * Test-scoped rather than worker-scoped on purpose: `POST /api/auth/recovery/enroll` is rate
+ * limited to 5 per 10 minutes, keyed by source IP, and the harness runs the API in `socket-only`
+ * identity mode — so a worker-scoped process made every test on that worker share ONE bucket,
+ * and the account specs' budget arithmetic had to track how many enrolments the whole suite spent
+ * per worker (see the account spec files' history for the old accounting). A fresh process per
+ * test means a fresh rate limiter per test instead: tests on one worker already run serially
+ * (Playwright never overlaps two tests on the same worker), so spawning + health-checking one API
+ * process per test costs a little more wall time than the old one-per-worker but removes the
+ * shared-bucket hazard entirely, along with the two-plus-worker minimum it used to require.
  *
  * The origin is `localhost`, not the `127.0.0.1` the preview server prints: WebAuthn only
  * accepts an IP-less RP ID, and the API's config only accepts `https:` or `http://localhost`.
  * Spawned as plain `node`, never through the `tsx` CLI — a SIGKILLed `tsx` orphans its child.
  */
-export const accountTest = test.extend<Record<never, never>, { accountApi: AccountApi }>({
-    accountApi: [
-        async ({ previewServer }, use) => {
-            if (liveTest) {
-                throw new Error('Account specs need the local harness; unset V2_LIVE_TEST.');
-            }
-            if (!existsSync(API_ENTRY)) {
-                throw new Error(
-                    `${API_ENTRY} is missing. Run \`npm ci --prefix prototypes/v2-api\` — the suite's global setup builds it when those dependencies are installed.`,
-                );
-            }
-            const origin = previewServer.replace('127.0.0.1', 'localhost');
-            const port = await freePort();
-            const data = mkdtempSync(path.join(tmpdir(), 'ensemble-v2-api-'));
-            const child = spawn(process.execPath, [API_ENTRY], {
-                cwd: API_DIR,
-                env: {
-                    ...process.env,
-                    PORT: String(port),
-                    HOST: '127.0.0.1',
-                    ENSEMBLE_ORIGIN: origin,
-                    ENSEMBLE_RP_ID: 'localhost',
-                    ENSEMBLE_RP_NAME: 'Ensemble (test harness)',
-                    ENSEMBLE_DB_PATH: path.join(data, 'db.sqlite'),
-                    ENSEMBLE_REGISTRATION: 'open',
-                    ENSEMBLE_AUTH_IP_MODE: 'socket-only',
-                    // At least 32 bytes or the API refuses to start; it keys nothing that outlives the run.
-                    ENSEMBLE_AUTH_IP_SECRET: 'harness-only-'.padEnd(48, 'x'),
-                },
-                // Its startup line is noise across three workers; a crash still reaches stderr.
-                stdio: ['ignore', 'ignore', 'inherit'],
+export const accountTest = test.extend<{ accountApi: AccountApi }>({
+    accountApi: async ({ previewServer }, use) => {
+        if (liveTest) {
+            throw new Error('Account specs need the local harness; unset V2_LIVE_TEST.');
+        }
+        if (!existsSync(API_ENTRY)) {
+            throw new Error(
+                `${API_ENTRY} is missing. Run \`npm ci --prefix prototypes/v2-api\` — the suite's global setup builds it when those dependencies are installed.`,
+            );
+        }
+        const origin = previewServer.replace('127.0.0.1', 'localhost');
+        const port = await freePort();
+        const data = mkdtempSync(path.join(tmpdir(), 'ensemble-v2-api-'));
+        const child = spawn(process.execPath, [API_ENTRY], {
+            cwd: API_DIR,
+            env: {
+                ...process.env,
+                PORT: String(port),
+                HOST: '127.0.0.1',
+                ENSEMBLE_ORIGIN: origin,
+                ENSEMBLE_RP_ID: 'localhost',
+                ENSEMBLE_RP_NAME: 'Ensemble (test harness)',
+                ENSEMBLE_DB_PATH: path.join(data, 'db.sqlite'),
+                ENSEMBLE_REGISTRATION: 'open',
+                ENSEMBLE_AUTH_IP_MODE: 'socket-only',
+                // At least 32 bytes or the API refuses to start; it keys nothing that outlives the run.
+                ENSEMBLE_AUTH_IP_SECRET: 'harness-only-'.padEnd(48, 'x'),
+            },
+            // Its startup line is noise across three workers; a crash still reaches stderr.
+            stdio: ['ignore', 'ignore', 'inherit'],
+        });
+        try {
+            const target = `http://127.0.0.1:${port}`;
+            await expect
+                .poll(
+                    async () => {
+                        if (child.exitCode !== null) {
+                            throw new Error(`account API exited with ${child.exitCode}`);
+                        }
+                        return fetch(`${target}/healthz`).then(
+                            (reply) => reply.status,
+                            () => 0,
+                        );
+                    },
+                    { timeout: 15_000 },
+                )
+                .toBe(200);
+            await fetch(`${previewServer}/__test/api?target=${encodeURIComponent(target)}`, {
+                method: 'POST',
             });
-            try {
-                const target = `http://127.0.0.1:${port}`;
-                await expect
-                    .poll(
-                        async () => {
-                            if (child.exitCode !== null) {
-                                throw new Error(`account API exited with ${child.exitCode}`);
-                            }
-                            return fetch(`${target}/healthz`).then(
-                                (reply) => reply.status,
-                                () => 0,
-                            );
-                        },
-                        { timeout: 15_000 },
-                    )
-                    .toBe(200);
-                await fetch(`${previewServer}/__test/api?target=${encodeURIComponent(target)}`, {
-                    method: 'POST',
-                });
-                await use({ origin });
-            } finally {
-                await fetch(`${previewServer}/__test/api`, { method: 'POST' }).catch(() => {});
-                if (child.exitCode === null) {
-                    child.kill();
-                    await once(child, 'exit');
-                }
-                rmSync(data, { recursive: true, force: true });
+            await use({ origin });
+        } finally {
+            await fetch(`${previewServer}/__test/api`, { method: 'POST' }).catch(() => {});
+            if (child.exitCode === null) {
+                child.kill();
+                await once(child, 'exit');
             }
-        },
-        { scope: 'worker' },
-    ],
+            rmSync(data, { recursive: true, force: true });
+        }
+    },
     baseURL: async ({ accountApi }, use) => {
         await use(accountApi.origin);
     },

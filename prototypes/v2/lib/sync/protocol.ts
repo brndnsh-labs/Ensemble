@@ -35,6 +35,200 @@ export interface RemoteVersion {
     document: ChartDocument;
 }
 
+export type UnsupportedReason = 'needs-app-update' | 'invalid';
+
+/**
+ * What a library download learned about one document and was NOT allowed to apply to the saved
+ * record. Exactly one record per (owner, document), because the three kinds are mutually
+ * exclusive outcomes of the same question — "the cloud moved, can this device adopt it?":
+ *
+ * - `version`: the remote body is valid but local work would be lost by adopting it (a draft, a
+ *   queued Save, or the chart currently on the stand). Kept beside the untouched saved record
+ *   so a later Keep-both/adopt decision has both sides to show.
+ * - `deleted`: the cloud tombstoned a document this device still has divergent local work for.
+ *   The local work stays; this is the flag that explains why the cloud copy is gone.
+ * - `unsupported`: the body could not be validated — a newer `schemaVersion` this build has no
+ *   decoder for, or a corrupt record. `body` is the observed value, preserved and NEVER passed
+ *   through `snapshot()`, migrated or coerced; it is untrusted data for display and export only.
+ */
+export type RemoteOutcome = {
+    documentId: string;
+    revision: string;
+} & (
+    | ({ kind: 'version' } & Pick<RemoteVersion, 'document'>)
+    | { kind: 'deleted' }
+    | { kind: 'unsupported'; body: unknown; reason: UnsupportedReason }
+);
+
+/** The stored form: the same observation, bound to an owner and its `meta` key. */
+export type RemoteCandidate = RemoteOutcome & { key: string; ownerId: string };
+
+/**
+ * Remote candidates live in the `meta` store rather than a store of their own: adding one would
+ * need an IndexedDB version bump on a database that already exists wherever this app has run,
+ * and a schema upgrade is a destructive-data decision that a download feature does not get to
+ * make on its own. `meta` is a generic keyed store (keyPath `'key'`), is already inside every
+ * transaction's scope in `AccountDatabase.run` — so a candidate and a saved record still commit
+ * together — and its only other key is `'active'`.
+ *
+ * The identifier grammar excludes `':'`, so this composition is unambiguous: no owner or
+ * document ID can be spelled to collide with another's key or with `'active'`.
+ */
+export function candidatePrefix(ownerId: string): string {
+    identifier(ownerId);
+    return `remote:${ownerId}:`;
+}
+
+export function candidateKey(ownerId: string, documentId: string): string {
+    identifier(documentId);
+    return `${candidatePrefix(ownerId)}${documentId}`;
+}
+
+/**
+ * The frozen half of an explicit cloud deletion (#1270), keyed into the SAME generic `meta` store
+ * the remote candidates live in — and for the same reason: a store of its own would need an
+ * IndexedDB version bump on a database that already exists wherever this app has run, and a schema
+ * upgrade is a destructive-data decision a delete feature does not get to make on its own.
+ *
+ * `'delete:'` sorts strictly below `'remote:'`, so `remoteCandidates`' prefix range cannot see one,
+ * and the `'active'` pointer sorts below both. The identifier grammar excludes `':'`, so no owner
+ * or document ID can be spelled to collide across the two namespaces.
+ *
+ * It is persisted BEFORE the request leaves, and that is the whole point: a lost response (the tab
+ * closed, the network died mid-flight) leaves the server's receipt written and this device unsure.
+ * Retrying with the SAME operation id is what makes the second attempt a replay the server answers
+ * from its receipt rather than a second delete — so the id has to outlive a reload, which a
+ * module-level variable would not.
+ */
+export function deletionPrefix(ownerId: string): string {
+    identifier(ownerId);
+    return `delete:${ownerId}:`;
+}
+
+export function deletionKey(ownerId: string, documentId: string): string {
+    identifier(documentId);
+    return `${deletionPrefix(ownerId)}${documentId}`;
+}
+
+/**
+ * Which chart this account last had on the stand (#1299), in the SAME generic `meta` store as the
+ * remote candidates and frozen deletions above — and for the same reason: a store of its own would
+ * need an IndexedDB version bump on a database that already exists wherever this app has run.
+ *
+ * One key per owner, because it is one fact per account. `'last-opened:'` sorts strictly between
+ * `'delete:'` and `'remote:'`, so neither prefix range can see it, and the `'active'` pointer sorts
+ * below all three. The identifier grammar excludes `':'`, so no owner ID can collide across them.
+ *
+ * It is a convenience preference and never a document edit — the guest half is `lib/session.ts`'s
+ * `last-opened` key. An account chart's belongs in the account database so that it is removed by
+ * the same sign-out that removes the songs it names, rather than outliving them in guest storage.
+ */
+export function lastOpenedKey(ownerId: string): string {
+    identifier(ownerId);
+    return `last-opened:${ownerId}`;
+}
+
+/** The stored form. An absent record means this account has not opened a chart on this device. */
+export interface LastOpened {
+    key: string;
+    ownerId: string;
+    documentId: string;
+}
+
+/** The stored frozen delete. Four scalars: everything the canonical request bytes are made of. */
+export interface PendingDeletion {
+    key: string;
+    ownerId: string;
+    documentId: string;
+    operationId: string;
+    /** The confirmed remote revision this delete was aimed at. Never null: see `DeleteCommand`. */
+    expectedRevision: string;
+}
+
+export interface PreparedDelete {
+    ownerId: string;
+    documentId: string;
+    operationId: string;
+    expectedRevision: string;
+    body: string;
+    digest: string;
+}
+
+/**
+ * The canonical delete envelope, in the exact key set and ORDER the server's decoder pins
+ * (`prototypes/v2-api/src/http/document-delete-request.ts`, which rebuilds this string and refuses
+ * a body that differs by so much as a space).
+ *
+ * Unlike a Save, this is DERIVED at send time rather than frozen as bytes. A Save freezes its
+ * `wireBody` because the document inside it is a whole chart that keeps being edited; a delete is
+ * four scalars that `PendingDeletion` already holds immutably, so re-deriving them is byte-identical
+ * by construction and there is no second copy to keep in agreement with the first.
+ */
+export function deleteBody(request: Omit<PendingDeletion, 'key'>): string {
+    identifier(request.ownerId);
+    identifier(request.documentId);
+    identifier(request.operationId);
+    remoteRevision(request.expectedRevision);
+    return JSON.stringify({
+        ownerId: request.ownerId,
+        documentId: request.documentId,
+        operationId: request.operationId,
+        expectedRevision: request.expectedRevision,
+    });
+}
+
+export type DeleteReply = {
+    ownerId: string;
+    documentId: string;
+    operationId: string;
+    digest: string;
+    revision: string;
+} & ({ kind: 'deleted' } | { kind: 'conflict' });
+
+/**
+ * Validate a delete reply before starting an IDB write, exactly as `reply()` does for a Save.
+ *
+ * The 409 conflict body carries a `remote` version too, and it is deliberately NOT read here: a
+ * delete conflict is reported, never resolved — the id is still live at a revision this request did
+ * not expect, and the next library download is what brings that version in under the ordinary
+ * preservation rules. Decoding it here would put a second adoption path beside `reconcile`'s.
+ */
+export function deleteReply(candidate: unknown, request: PreparedDelete): DeleteReply {
+    if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) {
+        throw new Error('Invalid delete response. Nothing was removed from this device.');
+    }
+    const value = candidate as Record<string, unknown>;
+    if (
+        value.ownerId !== request.ownerId ||
+        value.documentId !== request.documentId ||
+        value.operationId !== request.operationId ||
+        value.digest !== request.digest ||
+        (value.kind !== 'deleted' && value.kind !== 'conflict')
+    ) {
+        throw new Error('Delete response does not match the request.');
+    }
+    remoteRevision(value.revision);
+    return {
+        ownerId: request.ownerId,
+        documentId: request.documentId,
+        operationId: request.operationId,
+        digest: request.digest,
+        revision: value.revision,
+        kind: value.kind,
+    };
+}
+
+/**
+ * Why the account will never accept the exact bytes at the head of a document's outbox (#1298),
+ * distinct from a `'conflict'`: a conflict is a two-sided version disagreement `acknowledge`
+ * resolves from a structured `SaveReply`; a refusal is a transport-level verdict about the
+ * REQUEST itself (`sync-loop.ts`'s `STEP_OVER_CODES`) that no retry of the same bytes can change.
+ * `'too-large'` is its own member rather than a second spelling of `'refused'` for the same
+ * reason `SyncFailureReason` keeps them apart: a payload the server will not accept is fixed by
+ * shrinking the chart and saving again, never by anything to do with the operation/document id.
+ */
+export type SaveRefusalReason = 'too-large' | 'refused';
+
 export interface SaveOperation {
     ownerId: string;
     documentId: string;
@@ -43,9 +237,11 @@ export interface SaveOperation {
     snapshot: ChartDocument;
     base: { revision: string | null } | { operationId: string };
     wireBody: string | null;
-    status: 'queued' | 'conflict';
+    status: 'queued' | 'conflict' | 'refused';
     // null is an explicit missing/deleted remote song; undefined means no conflict.
     remote?: RemoteVersion | null;
+    /** Present only when `status === 'refused'` (#1298). Never set for `'queued'`/`'conflict'`. */
+    reason?: SaveRefusalReason;
 }
 
 export interface PreparedSave {

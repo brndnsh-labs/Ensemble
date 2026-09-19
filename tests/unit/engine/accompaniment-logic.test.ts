@@ -82,7 +82,6 @@ describe('Accompaniment Engine Logic', () => {
         harmony.rhythmicMask = 0;
         playback.bandIntensity = 0.5;
         playback.complexity = 0.5;
-        playback.practiceMode = false;
     });
 
     describe('Generation & Styles', () => {
@@ -140,17 +139,19 @@ describe('Accompaniment Engine Logic', () => {
             ).toBe(true);
         });
 
-        it('should perform rootless reduction for stable chords when practice spacing is active', () => {
-            const { playback, bass } = getState();
+        // #1313 — bass space follows the bass LANE: a muted bass means the player is
+        // covering that part, so the comp keeps the full voicing. (#1314 retired the
+        // default-on preference that used to force it on regardless of the lane.)
+        it('should perform rootless reduction for stable chords only while the bass is sounding', () => {
+            const { bass } = getState();
             bass.enabled = false;
-            playback.practiceMode = false;
 
             const notesNormal = getAccompanimentNotes(getState(), mockChord, 0, 0, 0, {
                 isBeatStart: true,
                 isGroupStart: true,
             });
 
-            playback.practiceMode = true; // This reserves the space even if bass is disabled
+            bass.enabled = true;
 
             const notesRootless = getAccompanimentNotes(getState(), mockChord, 16, 0, 0, {
                 isBeatStart: true,
@@ -254,7 +255,7 @@ describe('Accompaniment Engine Logic', () => {
             };
 
             groove.genreFeel = 'Jazz';
-            playback.practiceMode = true;
+            bass.enabled = true; // bass sounding -> comp leaves it the bottom
             playback.bandIntensity = 0.35;
             compingState.currentCell[0] = 1;
             compingState.lockedUntil = 100;
@@ -270,7 +271,7 @@ describe('Accompaniment Engine Logic', () => {
             expect(pitchClasses).toContain(5); // F = b7 of G7
         });
 
-        it('should keep dominant guide tones when slimming rich practice voicings', () => {
+        it('should keep dominant guide tones when slimming rich voicings over a sounding bass', () => {
             const richTurnaroundDominant = {
                 rootMidi: 67,
                 freqs: [246.94, 349.23, 440, 659.26], // B3, F4, A4, E5
@@ -281,7 +282,7 @@ describe('Accompaniment Engine Logic', () => {
             };
 
             groove.genreFeel = 'Jazz';
-            playback.practiceMode = true;
+            bass.enabled = true; // bass sounding -> comp leaves it the bottom
             playback.bandIntensity = 0.65;
             playback.complexity = 0.65;
             compingState.currentCell[0] = 1;
@@ -298,7 +299,7 @@ describe('Accompaniment Engine Logic', () => {
             expect(pitchClasses).toContain(5); // F = b7 of G7
         });
 
-        it('should keep half-diminished identity in practice mode', () => {
+        it('should keep half-diminished identity with the bass muted', () => {
             const halfdimChord = {
                 rootMidi: 64, // E
                 freqs: [329.63, 392.0, 466.16, 587.33], // E4, G4, Bb4, D5
@@ -310,7 +311,6 @@ describe('Accompaniment Engine Logic', () => {
 
             groove.genreFeel = 'Jazz';
             chords.style = 'jazz';
-            playback.practiceMode = true;
             playback.bandIntensity = 0.35;
             bass.enabled = false;
             compingState.currentCell[0] = 1;
@@ -356,7 +356,6 @@ describe('Accompaniment Engine Logic', () => {
 
             groove.genreFeel = 'Jazz';
             chords.style = 'jazz';
-            playback.practiceMode = true;
             bass.enabled = false;
             arranger.progression = [preDominant, alteredDominant, tonicMinor];
             compingState.currentCell = [1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0];
@@ -385,7 +384,6 @@ describe('Accompaniment Engine Logic', () => {
         it('should store jazz voicings for continuity between chord hits', () => {
             groove.genreFeel = 'Jazz';
             chords.style = 'jazz';
-            playback.practiceMode = true;
             bass.enabled = false;
 
             getAccompanimentNotes(getState(), mockChord, 0, 0, 0, {

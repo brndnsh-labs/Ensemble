@@ -27,6 +27,15 @@ const QUALITIES: Readonly<Record<string, readonly number[]>> = {
     add9: [0, 4, 7, 14],
     '6': [0, 4, 7, 9],
     m6: [0, 3, 7, 9],
+    // #1321/#1322/#1323 — a quality missing from this table falls back to MAJOR, which
+    // would hand the guitar/piano voicers a major 3rd over a minor chord.
+    mMaj7: [0, 3, 7, 11],
+    madd9: [0, 3, 7, 14],
+    'm#5': [0, 3, 8], // #1336 — no natural 5; a missing row falls back to MAJOR
+    'm7#5': [0, 3, 8, 10], // #1340 — the same, with the written b7
+    mb6: [0, 3, 7, 8], // #1340 — a minor triad plus the ♭6; the natural 5 stays
+    '9sus4': [0, 5, 7, 10, 14],
+    '13sus4': [0, 5, 7, 10, 14, 21],
     '6/9': [0, 4, 7, 9, 14],
     '9': [0, 4, 7, 10, 14],
     maj9: [0, 4, 7, 11, 14],
@@ -38,6 +47,7 @@ const QUALITIES: Readonly<Record<string, readonly number[]>> = {
     maj13: [0, 4, 7, 11, 14, 21],
     m13: [0, 3, 7, 10, 14, 21],
     'maj7#11': [0, 4, 7, 11, 18],
+    maj7b5: [0, 4, 6, 11], // #1329 — no natural 5; a missing row falls back to MAJOR
     '7#11': [0, 4, 7, 10, 18],
     '7b9': [0, 4, 7, 10, 13],
     '7#9': [0, 4, 7, 10, 15],

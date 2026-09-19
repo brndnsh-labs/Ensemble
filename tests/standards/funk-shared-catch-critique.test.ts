@@ -47,7 +47,12 @@ function buildState() {
     state.arranger.timeSignature = '4/4';
     state.chords.enabled = true;
     state.chords.style = 'smart';
-    state.bass.enabled = false;
+    // #1313 — the bass LANE stays on (the renders below still exclude its notes via
+    // `includeBass: false`). Bass space now follows the lane rather than
+    // the retired practice-mode preference, and the pinned seed/step were derived under reserved bass
+    // space (rootless C9 shells); a muted lane would re-voice the comp rooted and
+    // shift the seeded soloist line the catch is pinned to.
+    state.bass.enabled = true;
     state.harmony.enabled = false;
     state.soloist.enabled = true;
     validateProgression(state);

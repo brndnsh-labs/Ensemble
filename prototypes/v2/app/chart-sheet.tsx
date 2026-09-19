@@ -1,5 +1,6 @@
 import type { LeadSheetMeasure, LeadSheetSectionBlock } from '@engine/song/lead-sheet-model';
 import type { SemanticScore } from '@engine/songbook/score-types';
+import type { ChartNotation } from '@engine/songbook/types';
 import type { EnsembleState } from '@engine/types';
 import { useRef } from 'react';
 import { arrangementOf } from '../lib/documents';
@@ -8,6 +9,21 @@ import { directionLabel } from '../lib/score-labels';
 
 type WrittenSection = SemanticScore['sections'][number];
 type WrittenBar = WrittenSection['measures'][number];
+
+/**
+ * The visible chord symbol in the chart's current notation (#1276). `chord.display`
+ * (`FormattedChordNames`) is precomputed for all three notations by
+ * `chords-engine.validateProgression()` regardless of which one is selected — the
+ * same shared field `ChordVisualizer.tsx` reads in v1 — so switching notation is a
+ * pure read-time choice, never a re-analysis of the chord.
+ */
+function chordSymbol(chord: LeadSheetMeasure['chords'][number], notation: ChartNotation): string {
+    const disp = chord.display?.[notation];
+    if (!disp) {
+        return chord.absName;
+    }
+    return `${disp.root}${disp.suffix}${disp.bass ? `/${disp.bass}` : ''}`;
+}
 
 interface ChartSheetProps {
     current: ChartDocument;
@@ -53,6 +69,7 @@ export function ChartSheet({
     // for #937) plain-tap handler.
     const sectionLoopPress = useRef<number | null>(null);
     const suppressSectionTap = useRef(false);
+    const notation = arrangementOf(current).notation;
     let barNumber = 0;
     return (
         <article className="sheet">
@@ -354,7 +371,7 @@ export function ChartSheet({
                                                         : measureRepeat.display === 'two-bar-start'
                                                           ? '𝄎 1'
                                                           : '𝄎 2'
-                                                    : c.absName}
+                                                    : chordSymbol(c, notation)}
                                             </button>
                                         ))}
                                     {notes

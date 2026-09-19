@@ -38,6 +38,7 @@ vi.mock('../../../public/config.js', async (importOriginal) => {
 });
 
 // --- Import Module Under Test ---
+import { GENRE_NAMES } from '../../../public/data/smart-genres.js';
 import { getScaleForChord } from '../../../public/engine/theory-scales.js';
 
 describe('Music Theory: Scale Correctness', () => {
@@ -131,6 +132,123 @@ describe('Music Theory: Scale Correctness', () => {
         it('assigns Lydian Augmented to augmaj7 chords', () => {
             const chordAugMaj7 = { rootMidi: 60, quality: 'augmaj7', intervals: [0, 4, 8, 11] };
             expect(getScaleForChord(mockState, chordAugMaj7)).toEqual([0, 2, 4, 6, 8, 9, 11]);
+        });
+
+        it('assigns fifth-less Lydian to maj7b5 chords', () => {
+            const chordMaj7b5 = { rootMidi: 60, quality: 'maj7b5', intervals: [0, 4, 6, 11] };
+            expect(getScaleForChord(mockState, chordMaj7b5)).toEqual([0, 2, 4, 6, 9, 11]);
+        });
+
+        it('assigns fifth-less Aeolian to m#5 chords', () => {
+            const chordMSharp5 = { rootMidi: 60, quality: 'm#5', intervals: [0, 3, 8] };
+            expect(getScaleForChord(mockState, chordMSharp5)).toEqual([0, 2, 3, 5, 8, 10]);
+        });
+
+        // #1340 — the 7th-chord sibling reuses the same pool: the b3, the ♯5 (as Aeolian's ♭6)
+        // and the b7 are all there, and the 5 the chart sharpened is not. LOCRIAN also fits the
+        // four chord tones but adds a FLAT fifth beside the written sharp one.
+        it('assigns fifth-less Aeolian to m7#5 chords', () => {
+            const chordM7Sharp5 = { rootMidi: 60, quality: 'm7#5', intervals: [0, 3, 8, 10] };
+            expect(getScaleForChord(mockState, chordM7Sharp5)).toEqual([0, 2, 3, 5, 8, 10]);
+        });
+
+        // #1340 — `mb6` keeps its natural 5 (a ♭6 is a colour above the fifth, not an alteration
+        // of it), so the honest pool is plain Aeolian. The branch exists to outrank the minor
+        // family's DORIAN flavour override, whose natural 6 is the tone the chart flattened.
+        it('assigns Aeolian to mb6 chords', () => {
+            const chordMFlat6 = { rootMidi: 60, quality: 'mb6', intervals: [0, 3, 7, 8] };
+            expect(getScaleForChord(mockState, chordMFlat6)).toEqual([0, 2, 3, 5, 7, 8, 10]);
+        });
+
+        /**
+         * #1336 — `maj7b5` used to have no branch at all and fell through to LYDIAN, whose
+         * natural 5 contradicts the written b5 on the one lane that still offered it (the
+         * soloist's scale and the jazz walking bass's beat-2 path note); `m#5` fell through
+         * to the minor family's Aeolian/Dorian, same defect one alteration over. The natural
+         * 5 must be unreachable for EVERY root and EVERY genre, not just the jazz default:
+         * country's MINOR/MAJOR_PENTATONIC, funk/blues' MAJOR_BLUES, the minor family's
+         * DORIAN flavour override and the jazz/bossa non-diatonic LYDIAN fallback all carry a
+         * 7, so this sweep is what pins the branches above them. The tension sweep covers
+         * country's high-tension pool and the altered-dominant substitution, both of which
+         * sit downstream of the branches.
+         */
+        it.each([
+            // quality, its chord tones, the identity degrees the pool must still state
+            ['maj7b5', [0, 4, 6, 11], [4, 6, 11]],
+            ['m#5', [0, 3, 8], [3, 8]],
+            // #1340 — the ♯5's 7th-chord sibling. Without its own branch the minor family below
+            // answered DORIAN (Jazz/Neo-Soul/funk/bossa) or NATURAL_MINOR; both carry the 7.
+            ['m7#5', [0, 3, 8, 10], [3, 8, 10]],
+        ])('never offers the natural 5 of a %s in any key or genre', (quality, tones, identity) => {
+            expect(GENRE_NAMES.length).toBe(13);
+            for (const genre of GENRE_NAMES) {
+                for (const tension of [0, 0.8]) {
+                    for (let root = 60; root < 72; root++) {
+                        mockState.groove.genreFeel = genre;
+                        mockState.soloist.session.tension = tension;
+                        const chord = { rootMidi: root, quality, intervals: tones };
+                        const scale = getScaleForChord(mockState, chord, null, 'smart');
+                        const where = `${quality} in ${genre} root=${root} tension=${tension}`;
+                        expect(scale, `${where} offers the natural 5`).not.toContain(7);
+                        // Subset-not-contradiction: the pool must still state the chord's own
+                        // identity (its 3rd, its altered 5th, and its 7th where it has one).
+                        for (const degree of identity) {
+                            expect(scale, `${where} drops degree ${degree}`).toContain(degree);
+                        }
+                    }
+                }
+            }
+        });
+
+        // Same rule, one degree over: country's MINOR_PENTATONIC early return used to answer
+        // before the mMaj7 specialist, handing the soloist the b7 the chord's maj7 replaces.
+        it('never offers the b7 of an mMaj7 in any key or genre', () => {
+            for (const genre of GENRE_NAMES) {
+                for (const tension of [0, 0.8]) {
+                    for (let root = 60; root < 72; root++) {
+                        mockState.groove.genreFeel = genre;
+                        mockState.soloist.session.tension = tension;
+                        const chord = {
+                            rootMidi: root,
+                            quality: 'mMaj7',
+                            intervals: [0, 3, 7, 11],
+                        };
+                        const scale = getScaleForChord(mockState, chord, null, 'smart');
+                        const where = `mMaj7 in ${genre} root=${root} tension=${tension}`;
+                        expect(scale, `${where} offers the b7`).not.toContain(10);
+                        expect(scale, `${where} drops the b3`).toContain(3);
+                        expect(scale, `${where} drops the maj7`).toContain(11);
+                    }
+                }
+            }
+        });
+
+        /**
+         * #1340 — the mirror sweep for `mb6`. Here the contradicted tone is the NATURAL 6
+         * (degree 9): the minor family's genre flavour override answers DORIAN in Jazz,
+         * Neo-Soul, funk and bossa, and Dorian's 6 is exactly the note the chart flattened —
+         * the soloist would run it a semitone above the ♭6 the comper is voicing. The chord's
+         * own 5 must SURVIVE (unlike the ♯5 qualities above, this fifth is written), and so
+         * must the b3 and the ♭6 itself, or the written colour is unreachable — which is what
+         * country's MINOR_PENTATONIC early return would have left it.
+         */
+        it('never offers the natural 6 of an mb6 in any key or genre, and keeps its 5th', () => {
+            expect(GENRE_NAMES.length).toBe(13);
+            for (const genre of GENRE_NAMES) {
+                for (const tension of [0, 0.8]) {
+                    for (let root = 60; root < 72; root++) {
+                        mockState.groove.genreFeel = genre;
+                        mockState.soloist.session.tension = tension;
+                        const chord = { rootMidi: root, quality: 'mb6', intervals: [0, 3, 7, 8] };
+                        const scale = getScaleForChord(mockState, chord, null, 'smart');
+                        const where = `mb6 in ${genre} root=${root} tension=${tension}`;
+                        expect(scale, `${where} offers the natural 6`).not.toContain(9);
+                        for (const degree of [3, 7, 8]) {
+                            expect(scale, `${where} drops degree ${degree}`).toContain(degree);
+                        }
+                    }
+                }
+            }
         });
     });
 

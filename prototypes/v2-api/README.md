@@ -44,7 +44,8 @@ route/socket identity is not built or verified. See the explicit receipt in that
 | `src/http/auth-policy.ts` | Exhaustive route registry: allowlisted bounded request shapes and independent rate limits; unknown endpoints/fields/query input fail closed. |
 | `src/http/client-identity.ts` | Domain-separated HMAC-SHA256 caller keys, canonical IPs, and an explicitly configured header trusted only from exact immediate proxy peers. Upstream sanitization must be verified separately. |
 | `src/auth/security-events.ts` | Best-effort metadata-only event recording, fixed error descriptions, 30-day/10,000-row retention bounds. |
-| `src/db/account-deletion-registry.ts` | Explicit future wipe order and retained/global classification; drift guard covers every table, including no-FK challenges. No deletion endpoint yet. |
+| `src/db/account-deletion-registry.ts` | The wipe order as `{ table, column }` pairs plus the retained/global classification; drift guard covers every table, including no-FK challenges. `deleteAccount` walks this list — nothing else may restate it. |
+| `src/auth/account-deletion.ts` | `deleteAccount` (#1271) — one `BEGIN IMMEDIATE` transaction: fresh-auth check, the registry's wipe, then one metadata-only `account_deleted` event registering the deleted identity. See "Account deletion (#1271, stage 7)" below. |
 | `src/auth/recovery.ts` | `enrollRecoveryCode` / `confirmRecoveryCode` / `claimRecoveryCode` / `readLiveRecoverySession` / `startRecoveryEnrollPasskey` / `verifyRecoveryEnrollPasskey` (#1191) — see "Recovery codes and the recovery-only session (#1191)" below. |
 | `src/auth/reauth.ts` | `startReauth` / `verifyReauth` (#1190) — step-up re-authentication. `allowCredentials` is the account's own credentials (unlike login's empty/usernameless list); the challenge binds `account_id` AND `session_id`; verify shares `assertion-commit.ts`'s core with login. Success does not itself rotate the session — the caller (the HTTP route) does that via `finishAuthentication`. |
 | `src/auth/passkeys.ts` | `startAddPasskey` / `verifyAddPasskey` / `revokePasskey` / `listPasskeys` (#1190). Add-passkey requires a FRESH session (checked at options AND re-checked inside the verify commit transaction) and binds `account_id` + `session_id` into the challenge; an already-registered credential on the same account is a no-op (`alreadyRegistered: true`), on another account it's `credential_exists`. `revokePasskey` is one synchronous transaction: fresh check, owner-scoped lookup, last-credential guard (owner-scoped SELECT/DELETE and account-scoped session revocation — never trust `id`/`credential_id` alone), revoke every session the credential created, delete. `listPasskeys` never returns the public key or counter. |
@@ -102,7 +103,9 @@ server. The service is reachable over a real socket for the first time here.
 - `readSession` performs **zero writes** — one `SELECT`, requiring `revoked_at IS NULL`,
   `expires_at > now`, and that the owning account row still exists (via a `JOIN`).
 - `revokeSession` is owner-scoped: presenting a foreign `accountId` is a silent no-op, never a
-  throw. `revokeOtherSessions` returns the count revoked.
+  throw. `revokeOtherSessions` returns the count revoked, and only ever revokes `'standard'`
+  sessions — a live `'recovery'` session on another device survives "sign out other devices"
+  (#1296), since it already can't read anything and expires on its own.
 
 **HTTP layer** (`src/http/`, `src/server.ts`), built on Hono `4.13.7` + `@hono/node-server`
 `2.1.1` — zero additional runtime dependencies:
@@ -367,6 +370,302 @@ trigger that fails the receipt insert) and `test/http/documents-save.test.ts` (t
 `app.request()` with a real passkey session and bodies frozen exactly as `prepare()` freezes
 them).
 
+## Library read routes (#1259, stage 3)
+
+`GET /api/documents` and `GET /api/documents/:id` are the whole of **S1** in
+[`ensemble-v2-rollout.md`](../../docs/design/ensemble-v2-rollout.md) decision 9: the client
+pages an `(id, revision, deleted)` manifest, diffs it against its local records, and downloads
+the ids whose revision moved. There is deliberately **no** change feed, watermark or
+cursor-expiry machinery — do not add one. The manifest query is `listManifest` in
+`src/db/documents.ts`; both routes live in `src/http/documents.ts` beside Save.
+
+| Request | Reply |
+| --- | --- |
+| `GET /api/documents` | `200 { documents: [{ documentId, revision, deleted, bytes }], nextAfterDocumentId }` |
+| `GET /api/documents?after=<id>&limit=<n>` | the next page; `nextAfterDocumentId` is `null` exactly at the end of the library |
+| `GET /api/documents/:id` | `200 { documentId, revision, document }` — the stored bytes verbatim |
+| Absent id, tombstoned id, or another owner's id | `404 { error: 'not_found' }` — one status, one body, all three |
+| Unknown or repeated query key, `limit` outside `1..MAX_LIST_LIMIT` or not an exact integer, `after`/`:id` outside the identifier grammar | `400 { error: 'malformed_request' }` |
+| No session, or a recovery-purpose session | `401 { error: 'unauthenticated' }` |
+| Past the per-identity budget (30/min manifest, 180/min download) | `429 { error: 'rate_limited' }` with `Retry-After` |
+| Stored body that is not one well-formed JSON object | `500 { error: 'internal_error' }` — nothing echoed |
+
+Design points worth knowing before changing it:
+
+- **The manifest is ordered by `document_id`, not `updated_at`, and that is the whole
+  stability argument.** `listDocuments` (`updated_at DESC` with an `OFFSET`) is a
+  "recently edited" view and is unusable as a manifest cursor: every Save rewrites `updated_at`,
+  so a document can cross an offset boundary between two page fetches and be skipped or returned
+  twice. Keyset paging on the immutable id means a concurrent Save can change a row's `revision`
+  but can never move it past the cursor. A create *below* the cursor is missed by the pass in
+  progress and picked up by the next one — exactly what a diff tolerates, and why decision 9
+  needs no watermark. Proven in `test/http/documents-read.test.ts` by paging a real database
+  while real Saves (one update of an already-returned id, one fresh create) land between the
+  pages; mutation-proved by making the cursor inclusive (`>=`) and by taking `nextAfter` from the
+  lookahead row, each of which the test catches. **Do not "unify" the two list functions** — they
+  have opposite ordering requirements.
+- **Tombstones are manifest rows, not omissions.** A deleted id comes back as
+  `deleted: true, bytes: 0`, in its own id position, carrying the revision it died at, because
+  the client needs it to drop a clean local mirror. The single ordered page is a `UNION ALL` over
+  `documents` and `tombstones` with a `NOT EXISTS` that makes "at most one row per id" a property
+  of the query rather than an assumption about future writers. No schema change was needed.
+- **A tombstoned id is a `404` on the download, not a deleted marker.** The manifest is where a
+  client learns an id was deleted; it never has to download one to find out. Keeping the download
+  to one shape is also what makes absent, tombstoned and foreign genuinely indistinguishable —
+  and that indistinguishability is *structural*, not a branch: `readDocument` folds the owner
+  into the SQL and a deleted document has no row, so all three paths reach the same
+  `sendError(c, 404, 'not_found')` with nothing to get wrong later. The test asserts the status
+  AND the response text are equal, not merely both 404.
+- **The download splices the stored TEXT in verbatim** rather than parsing and re-serializing it.
+  What `commitSave` stored is exactly the document bytes the client froze and this service
+  digested (`decodeSaveRequest` refuses anything that is not that canonical serialization), and a
+  `JSON.parse` → `JSON.stringify` round trip is not guaranteed to reproduce them byte for byte —
+  an object with integer-like keys comes back reordered. Save's *conflict* reply parses instead,
+  because there the document is nested in a reply built from computed values; that is not an
+  inconsistency to unify in this direction.
+  **Splicing is only safe while the body is one well-formed JSON object, so the read site checks
+  it** (review F3): it parses purely as a validity check, discards the result, and still sends the
+  verbatim text. The guarantee lives in `save.ts`/`decodeSaveRequest`; this is the backstop,
+  because it was asserted nowhere at the read site and a body of `{"a":1},"injected":true` written
+  through `writeDocument` spliced into a reply with a smuggled top-level key. A bare parse is not
+  enough — `1`, `"x"` and `[]` are valid JSON values that would shape-shift the `document`
+  member, so a plain object is required. A failing row is a broken server, not a bad request:
+  `500 internal_error`, body never echoed, and the manifest still lists the row.
+- **A safe method is exempt from same-origin and JSON-only, and that does not open a cross-site
+  read.** `sameOriginGuard`/`jsonOnlyGuard` gate unsafe methods only (`http-safe-methods.ts`), so
+  neither runs on a `GET`. The session cookie is `__Host-`-prefixed and `SameSite=Strict`
+  (`src/http/cookies.ts`), so a cross-site navigation or `fetch` carries no credentials at all
+  and these routes answer it `401`; there is no CORS middleware anywhere in this service, so a
+  foreign page's reader never sees a body even when a browser sends the request; and
+  `securityHeaders` puts `Cache-Control: private, no-store` on every response, asserted per route
+  in the tests. Extending the unsafe-method guards to `GET` would take nothing away from an
+  attacker and would refuse the app's own fetch on a page load that sends no `Origin`.
+- **`limit` is rejected, not clamped, at the HTTP boundary** (`listManifest` still clamps, as
+  defense in depth for a future in-process caller). Deny-by-default, the same posture as
+  `auth-policy.ts`'s exact-key-set check: a client that asked for 10,000 rows has a bug, and
+  answering 500 teaches it the wrong page size. Repeated keys are refused for the same reason —
+  `?limit=1&limit=500` must not resolve to whichever one `get` happens to return. In
+  `listManifest` the clamp floor is **1, not 0** (review F5): an empty page with
+  `nextAfter: null` reads as *end of library*, so a caller whose computed page size came out
+  zero would diff a whole library away against it.
+- **Guard order is Save's, unchanged:** session → syntactic refusal → this route's own budget →
+  the database. The budget is spent only by an authenticated identity, so an anonymous caller
+  can never exhaust one.
+- **The 300/min transport budget is SHARED, and per-route budgets are ceilings under it, not a
+  sub-budget that sums to it** (review F1 — the P1 of the review). `transportRateLimitGuard`'s
+  300/min covers every `/api/*` request from one identity, **`/api/auth/*` included**, and it is
+  keyed by **network identity, not by account** — two accounts behind one NAT share it, and so do
+  two tabs of one account, and so does every device behind one carrier gateway or shared Wi-Fi.
+  So a per-route budget is only a promise the caller can keep while the shared ceiling still has
+  room, and this table does not keep that promise as an invariant: the four current budgets sum
+  to 30 + 180 + 120 + 30 = 360/min, already over 300 before `/api/auth/*` is counted at all —
+  Save's own 120 is what breaks it. The #1259 review demonstrated the consequence directly: a
+  client that spent both documented read budgets in one window got `429` on its next
+  `GET /api/auth/session` **and** on Save, both of which it is entitled to. **Treat any `429`
+  from this service as a signal to back off across the whole origin**, with the response's
+  `Retry-After` — the next request to a *different* route is just as likely to be refused, and a
+  client paced to stay under one route's number can still be over the shared one.
+  Cold-start arithmetic for a full 2,000-document library: 4 manifest pages at
+  `MAX_LIST_LIMIT`, then 2,000 downloads at 180/min ≈ **11 minutes**, paced. That is deliberate —
+  a full library is a one-time cost on a new device, and the alternative is starving the account
+  routes it takes to stay signed in while it happens.
+- **`GET /api/documents` keeps the 64 KB `/api/*` body limit.** The exemption in `src/http/app.ts`
+  is the prefix *with* its trailing slash, so the bare mount path is not exempt, and both
+  limiters match it — which is fine, the lower ceiling wins and the route reads no body. Review
+  F2 proved over a real socket that exempting the bare path too (which the first cut did, for
+  comment symmetry) only raised the ceiling an **unauthenticated** caller can make this process
+  buffer on that path from 64 KB to ~1 MiB, in exchange for nothing. Don't widen it again.
+- **Wire vocabulary follows the client's.** `documentId` matches the Save reply, and
+  `nextAfterDocumentId` is the name `SongPage` already uses for this cursor in
+  `prototypes/v2/lib/sync/repository.ts`, so the transport and the local store speak one
+  language. (The issue's draft wrote `id`/`nextAfter`; the API-wide names won.)
+
+Tests: `test/http/documents-read.test.ts` (both routes over `app.request()` with two real
+passkey accounts, every document written through the real Save route — including the
+cross-owner tombstone case and the three malformed stored bodies) and the `listManifest`
+case in `test/db/documents.test.ts` (tombstone interleaving, owner scoping, cursor exclusivity,
+UTF-8 `bytes`, the clamp floor). The deny-by-default pair in `test/http/auth-hardening.test.ts`
+covers both new routes automatically, since it is parameterized over `DOCUMENT_POLICIES`.
+
+## Document delete (#1260, stage 3)
+
+`POST /api/documents/delete` is the sync contract's deletion rule
+([`ensemble-v2-sync.md`](../../docs/design/ensemble-v2-sync.md), *Sharing, deletion, operations
+and privacy*): "cloud document deletion is an explicit online operation with a tombstone …, not a
+side effect of removing a local download", and "a stale Save cannot resurrect the deleted cloud
+ID". The decision table is `commitDelete` in `src/db/document-delete.ts` (one `withTransaction`,
+`BEGIN IMMEDIATE`); the request decoder is `src/http/document-delete-request.ts`; the route lives
+in `src/http/documents.ts` beside Save and the read routes.
+
+The request body is the Save envelope's field *names* minus its document, in one canonical order:
+
+```json
+{"ownerId":"…","documentId":"…","operationId":"…","expectedRevision":"…"}
+```
+
+| Situation | Reply |
+| --- | --- |
+| `expectedRevision` equals the current revision | `200 { …receipt, revision: <the revision it died at>, kind: 'deleted' }` — row gone, tombstone written, receipt recorded |
+| Same operation id, same bytes (retry after an uncertain response) | the original `200`, byte for byte; nothing deleted twice |
+| Same operation id, different bytes or a different document — including an id a **Save** committed | `409 { error: 'operation_mismatch' }` |
+| A different operation id, id already deleted | `200 … kind: 'deleted'` at the tombstone's revision; no receipt, no second tombstone, `expectedRevision` not consulted |
+| Stale `expectedRevision`, id still live | `409 { …receipt, revision: <current>, kind: 'conflict', remote: { revision, document } }` — nothing deleted, no receipt |
+| Id absent with no tombstone, or another owner's id | `404 { error: 'not_found' }` — one status, one body, both; nothing written at all |
+| Any decoder refusal — reordered/unknown/missing keys, added whitespace, `expectedRevision: null`, an envelope `ownerId` that is not the session's account, any query string | `400 { error: 'malformed_request' }` |
+| No session, or a recovery-purpose session | `401 { error: 'unauthenticated' }` |
+| Body above `MAX_DELETE_REQUEST_BYTES` (1 KiB) | `413 { error: 'payload_too_large' }` |
+| Past the per-identity budget (30/min) | `429 { error: 'rate_limited' }` with `Retry-After` |
+
+Design points worth knowing before changing it:
+
+- **It is Save's decision order, line for line:** receipt → current state → expected revision →
+  write, all inside one `BEGIN IMMEDIATE` transaction on the session's account id. A delete writes
+  the same three tables the Save protocol owns, so it has to be idempotent the same way and refuse
+  a stale base the same way. Divergence between `commitDelete` and `commitSave` is a bug in one of
+  them, not a local style choice. One id per operation, too: one operation id is one receipt, and a
+  partially-applied bulk delete could not replay honestly. Account deletion is #1271's own story.
+- **Two things are deliberately NOT Save's.** There is no `expectedRevision: null` form — `null`
+  means "this operation creates the document" and there is nothing to create — and a conflict here
+  always carries a `remote` version, because the cases where Save answers `remote: null` (absent,
+  tombstoned) are answered by `404`/idempotent-`deleted` before the revision check.
+- **The already-deleted answer is idempotent, and it writes NO receipt.** A tombstone is
+  terminal: there is no newer version to offer for Keep-both and nothing the caller could do with
+  a refusal except ask again, so a second device's queued delete is told the truth (the
+  tombstone's revision) rather than refused. `expectedRevision` is not consulted on that path for
+  the same reason. No receipt is written because none is needed: the tombstone's revision is
+  immutable (`commitSave`'s non-resurrection check refuses both a create and a stale update
+  against it), so a retry — this exact request again, or a fresh operation id from a third caller
+  — re-derives the identical reply from one indexed primary-key read of the tombstone alone.
+  Writing a receipt here anyway would have let an owner holding a single tombstone mint an
+  unbounded number of charged rows by resending fresh operation ids forever; this path is the
+  fix for exactly that. It mirrors the `404` path, which also writes **nothing**: in both cases
+  nothing happened that a receipt needs to remember, so a retry stays free.
+- **One operation id is one operation, across both endpoints.** Receipts are one namespace per
+  owner, so reusing a Save's operation id for a delete must be refused — and it is, by the digest
+  comparison alone, with no discriminator column: the digest covers the whole request body, and a
+  four-key delete envelope can never serialize to a six-key Save envelope's bytes. "Same id,
+  different operation" is therefore always "same id, different bytes".
+- **Deleting is exempt from the storage quota's refusal, and only from the refusal.** The
+  tombstone and the receipt a delete leaves are both **charged** by `readOwnerUsage` (new in
+  #1260 — see the next bullet), so the accounting stays honest.
+  But `commitDelete` has no quota gate: Save's "an owner over the cap may not grow" clause would
+  refuse a delete whose freed body is smaller than the 1,536 bytes it leaves behind, which is
+  exactly the owner who most needs to delete something. Deletion is the only operation that gives
+  document bytes back, so making it refusable by the cap would lock an account at the cap out of
+  its own remedy. This is NOT the residual rollout decision 11 / #1256 accepted for receipts —
+  that decision covered an unbounded fresh-operation-id loop against one tombstone, and the
+  already-deleted path above closes exactly that loop by writing no receipt. What remains is
+  smaller: the only receipt a delete can still leave requires a *live* document to delete, which
+  requires a charged, refusable `commitSave` create that already passed the quota gate — so
+  delete-side receipt growth is bounded by how many live documents an owner is permitted to hold,
+  not by an unbounded loop. Proven at the *shipped* caps in both suites (document cap and byte
+  cap), not at an injected one, because `commitDelete` takes no caps to inject.
+- **Tombstones are now charged against the byte cap**, which the stage-3 authorization review
+  asked for at exactly this point: "when stage 4/5 ships a delete route, charge tombstones the way
+  receipts are charged so the cap keeps meaning what it says" (residual risk 4). They are charged
+  at the receipt's rate and by `RECEIPT_COST_BYTES` itself, not a second constant — a tombstone
+  row is strictly smaller than a receipt row (four columns to six, one secondary index to two), so
+  that measured worst case over-charges it in the safe direction, and the "one number cannot
+  drift" rule that put the receipt size in `src/db/documents.ts` forbids a near-identical second
+  one. It closes no unbounded hole (the tombstone insert is an upsert keyed on
+  `(owner, document)`, so re-deleting adds no rows, and a fresh id costs a charged receipt to
+  create); it makes the cap mean what it says in real disk.
+- **The tombstone carries the revision the document died at**, per `deleteDocument`'s existing
+  contract — never a freshly minted one, and `commitDelete` mints nothing at all. That is the
+  revision `commitSave`'s non-resurrection reply answers with (`revision: <tombstone>`,
+  `remote: null`) — but it is only a revision the CALLING client would recognise when that client
+  was current at the moment of deletion. A client holding rev-1 after a second device saved
+  rev-2 and then deleted the id gets back `conflict rev-2, remote: null`, and rev-2 is not a
+  revision the first client ever saw. #1270's client must not build recognition logic on this
+  value; the only safe use of it is recording it as the id's terminal revision.
+- **A 1 KiB body limit, applied by the route itself.** The whole `/api/documents/` prefix is
+  exempt from the parent app's 64 KB limit so a Save can carry a chart, and the sub-app's
+  catch-all then bounds the prefix at `MAX_SAVE_REQUEST_BYTES` (~1 MiB). A delete request is **653
+  bytes** at its legal maximum (three 128-character identifiers and a 200-character revision, from
+  character sets that need no JSON escaping), so it applies `MAX_DELETE_REQUEST_BYTES` nested
+  inside that one. Registered with `routes.use('/delete', …)`, not as a second handler argument:
+  `routes.post(path, limiter, handler)` registers the path **twice** in `app.routes` and breaks the
+  route-drift test's comparison, while `use` registers as `ALL`, which that test filters out.
+  Proven over a real socket (`test/http/body-limit.socket.test.ts`) on both the Content-Length and
+  the chunked branch, because `bodyLimit`'s Content-Length branch trusts a *declared* length and
+  only Node's HTTP parser enforces framing — and the same 4 KB body reaching the Save route proves
+  the small limit belongs to `/delete` alone.
+- **There is no client producer yet.** `prototypes/v2/lib/sync/protocol.ts` has no delete operation
+  type and no tombstone receipt shape (checked, not assumed), so this is the smallest **server**
+  contract for #1270 to mirror, and the decoder lives in this package rather than in the shared
+  sync module — putting a request shape in the shared bundle before the client produces it would
+  be inventing the client's half from the server side. It borrows the shared *validators*
+  (`identifier`, `remoteRevision`, `digest`) so the ids and revisions it accepts are exactly the
+  language the Save path writes. Open choices for #1270 to settle: the reply's
+  `kind: 'deleted'` (the client's `reply()` validator currently accepts only
+  `committed`/`conflict`); the absence of a `protocolVersion` field — the exact-key-set check
+  already makes adding any field a breaking change an old server refuses rather than misreads,
+  which is the property a version field buys; and the contract's "recovery/export preflight"
+  (`ensemble-v2-sync.md`'s deletion paragraph) — this server enforces the tombstone and the
+  non-resurrection rule, but the preflight itself (warning the user, offering an export, before
+  the delete is even sent) is entirely client-owned and unenforced here. #1270 has to decide
+  where that lives; this route will delete on request the moment it is asked, with no server-side
+  confirmation step of its own.
+
+Tests: `test/db/document-delete.test.ts` (the decision table, the storage accounting, the
+transaction rollback, and non-resurrection after a *real* delete),
+`test/db/document-delete-concurrency.test.ts` (four real OS processes racing one revision, under
+different operation ids and under one duplicated id — the harness and the reason for it are
+`save-concurrency.test.ts`'s; there is no sequenced variant, deliberately, because every assertion
+here is an invariant that survives non-overlap and `commitDelete` has no `mintRevision` seam to
+pause at), and
+`test/http/documents-delete.test.ts` (the route over `app.request()` with two real passkey
+accounts and every document written by a real Save). `test/http/auth-hardening.test.ts` covers the
+new route automatically, since it is parameterized over `DOCUMENT_POLICIES`.
+
+## Account deletion (#1271, stage 7)
+
+`POST /api/auth/account/delete` is the way out the accounts contract requires before accounts
+ship (DECISION 2026-09-17). One route, one transaction, no body, `204` on success.
+
+- **Gated on the SAME fresh-authentication predicate as add/revoke passkey and recovery enroll**,
+  checked inside the deletion transaction (`src/auth/account-deletion.ts`) rather than only at the
+  HTTP boundary — the write and the read that authorizes it see one database state. A valid but
+  stale session gets `403 fresh_auth_required`, which the client answers with its one step-up
+  retry (`withFreshAuth`). No new error code: the taxonomy is unchanged, so the client's
+  `ApiErrorCode` copy needed no edit. `requireSession` refuses a recovery-purpose session here
+  like everywhere else — a recovery code authorizes enrolling one passkey, never deleting.
+- **The wipe consumes the registry, it does not restate it.**
+  `src/db/account-deletion-registry.ts`'s `ACCOUNT_DELETION_WIPED` is now an ordered list of
+  `{ table, column }` pairs, and `deleteAccount` walks exactly that list — the only interpolated
+  identifiers in this service's SQL, and deliberately so, because a hand-written statement list
+  can drift from `assertAccountDeletionCoverage`, which still fails on any table nobody
+  classifies. Order is children-before-parents (`foreign_keys=ON`), `accounts` last.
+- **The deleted identity is registered as one metadata-only `account_deleted` security event** —
+  account id and timestamp, no credential, no chart, no request data — written INSIDE the same
+  transaction, after the wipe has emptied this account's audit history. A rolled-back deletion
+  therefore leaves no record claiming it happened, and that single row is the only trace the
+  service keeps. It ages out under `recordSecurityEvent`'s existing 30-day/10,000-row bounds like
+  every other event.
+- **What refuses a disconnected device is absence, not a flag.** No session row, no credential
+  row, no account row: every authenticated route answers `401 unauthenticated` for the old cookie
+  (`readSession` finds nothing, and its `JOIN accounts` is a second reason it would find nothing),
+  a late queued Save from another context is refused rather than recreating a document, and a
+  login ceremony with the old passkey fails `credential_not_found`. There is deliberately NO
+  credential-level blocklist: the same authenticator must be able to register a brand-new account
+  afterwards, and it can, because the row holding its credential id is gone.
+- **Rate limit**: `policy('empty', 10, 10 * minute)` — well below the ceremony routes, because
+  this is a once-in-a-lifetime action already behind a passkey ceremony, but not tighter than
+  `10`: the client's own step-up retry (`withFreshAuth`) spends two requests per stale-session
+  attempt (`403 fresh_auth_required` then the re-proved retry), so two dismissed platform
+  prompts plus one real deletion already spends 6.
+- **Backups are out of scope, and the client says so.** Nightly snapshots age out on their own
+  schedule; the account page's copy discloses that rather than promising an erasure this route
+  cannot deliver.
+
+Tests: `test/http/account-delete.test.ts` (real migrated database, real ceremonies, injected
+clock) — the unauthenticated and stale-session refusals with a row-count proof that nothing
+changed, the full wipe with a second account untouched beside it, every route answering
+signed-out for the old cookie including a late Save, and the same passkey registering a brand-new
+account afterwards. `test/http/auth-hardening.test.ts` covers the route automatically, since it
+is parameterized over `AUTH_POLICIES` (route/policy parity, unknown-field refusal, rate
+threshold).
+
 ## Commands
 
 Run from this directory, or via `npm run test:api` from the repo root:
@@ -379,7 +678,8 @@ npm run build     # esbuild bundle -> dist/server.js (+ .map); see build.mjs —
                   # shared public/ songbook codecs the Save endpoint decodes with (#1202)
 npm start         # node dist/server.js — needs ENSEMBLE_RP_ID, ENSEMBLE_RP_NAME, ENSEMBLE_ORIGIN,
                   # ENSEMBLE_DB_PATH (a file, never :memory:), ENSEMBLE_AUTH_IP_SECRET (>=32 bytes)
-                  # optional PORT (8080), HOST (0.0.0.0); verified proxy configuration below
+                  # optional PORT (8080), HOST (0.0.0.0), ENSEMBLE_REGISTRATION (closed),
+                  # ENSEMBLE_REGISTRATION_CAP (25); verified proxy configuration below
 npm run dev       # tsx src/server.ts, development only
 ```
 
@@ -445,6 +745,24 @@ answers `403 registration_closed` from `register/options` and `register/verify` 
 guards and rate limits as every route) and changes nothing else — login, sessions, passkey
 management and recovery keep working for existing accounts. Both deployed stacks run closed until
 the product wires accounts in (phase 3 of the rollout); the flip is one env line plus a release.
+
+**A service-wide registration cap backstops the per-owner storage caps (#1272 — DECISION
+2026-09-17 on #1256).** `MAX_BYTES_PER_OWNER` (`src/db/save.ts`, 256 MiB) bounds one account's
+footprint, but nothing bounded how many accounts could exist — an unbounded account count has no
+disk ceiling at all. `ENSEMBLE_REGISTRATION_CAP` sets that ceiling: at or above this many existing
+accounts, `register/options` and `register/verify` answer the SAME `403 registration_closed` as
+the closed-by-policy case above, so **reaching the cap looks identical to closed registration to
+a client** — no new branch, no distinct error code. It defaults to `25` when unset (worst case
+25 × 256 MiB = **6.4 GiB**); size it against the box's real free disk before raising it, not
+because one deployment happened to fill up. Malformed values fail loudly at startup with the same
+digits-only validation as `PORT` (no sign, decimal point, exponent, hex prefix, or surrounding
+whitespace) — `0` and negative values are rejected too, since a cap of zero or less can never
+admit a registration. So is anything that is not a safe integer: a long enough digit string
+passes the shape check and parses to `Infinity`, which would silently remove the cap. The check is enforced twice: a cheap count in `register/options` refuses
+early, and the authoritative count runs INSIDE the same database transaction that inserts the new
+account, so two registrations racing at cap-minus-one cannot both succeed. Existing accounts are
+completely unaffected at the cap — login, sessions, saves and adding a second passkey all keep
+working.
 
 **The API is publicly routed since 2026-09-15** (#1217 stacks, #1218 Caddy split with the verified
 proxy-trust receipt in the threat model). No account UI exists yet; the routes answer, nothing calls them. The container does not guess a trusted

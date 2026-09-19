@@ -158,11 +158,13 @@ export function readSession(db: DatabaseSync, token: unknown, now: number): Sess
 
     const row = db
         .prepare(
-            // The JOIN can't currently matter: `sessions.account_id` has no `ON DELETE CASCADE`,
-            // so an account with live sessions cannot be deleted at all today (see #1188's
-            // schema). If a future story adds account deletion, it must delete/revoke that
-            // account's sessions FIRST, or this JOIN silently stops being redundant defense and
-            // starts being load-bearing without anyone having verified it. Tracked on #1190/#1192.
+            // Account deletion exists now (#1271) and honors exactly the condition this JOIN was
+            // written against: `deleteAccount` walks `ACCOUNT_DELETION_WIPED`, which deletes
+            // `sessions` BEFORE `accounts` (children before parents — `sessions.account_id` has no
+            // `ON DELETE CASCADE`, so the reverse order would fail the foreign key outright). So
+            // the JOIN remains redundant defense rather than the thing standing between a deleted
+            // account and a live session: the session row is already gone. Keep it that way — a
+            // future wipe that spared a session row would make this load-bearing silently.
             `SELECT s.id AS session_id, s.account_id AS account_id, s.expires_at AS expires_at,
                     s.credential_id AS credential_id, s.purpose AS purpose
              FROM sessions s
@@ -211,9 +213,21 @@ export function revokeSession(
 }
 
 /**
- * Revokes every other live session on `accountId`, leaving `keepSessionId` untouched. Returns
- * the number of sessions revoked so callers (e.g. a "signed out N other devices" response) don't
- * need a second query.
+ * Revokes every other live, **standard** session on `accountId`, leaving `keepSessionId`
+ * untouched. Returns the number of sessions revoked so callers (e.g. a "signed out N other
+ * devices" response) don't need a second query.
+ *
+ * `AND purpose = 'standard'` (#1296) deliberately excludes a live `'recovery'` session from this
+ * sweep. The caller here always holds a `'standard'` session — `requireSession` refuses a
+ * `'recovery'` one outright (see `src/http/app.ts`) — so `keepSessionId` itself is never the
+ * recovery session; without this predicate, "sign out other devices" would also end an
+ * in-flight recovery ceremony on a different device. A `'recovery'` session already can't read
+ * anything but the recovery-enroll-passkey routes and expires on its own
+ * (`RECOVERY_SESSION_TTL_MS`), so it needs no revoke-others exposure at all — but a stolen
+ * `'standard'` session repeatedly hitting this route could otherwise abort the real owner's
+ * in-progress recovery over and over: `claimRecoveryCode` (`recovery.ts`) won't let the code be
+ * re-claimed until `RECOVERY_SESSION_TTL_MS` has passed since the ORIGINAL claim, so each forced
+ * abort-and-reclaim cycle re-starts that same 10-minute lock rather than shortening it.
  */
 export function revokeOtherSessions(
     db: DatabaseSync,
@@ -224,7 +238,7 @@ export function revokeOtherSessions(
     const info = db
         .prepare(
             `UPDATE sessions SET revoked_at = ?
-             WHERE account_id = ? AND id != ? AND revoked_at IS NULL`,
+             WHERE account_id = ? AND id != ? AND revoked_at IS NULL AND purpose = 'standard'`,
         )
         .run(now, accountId, keepSessionId);
     return Number(info.changes);

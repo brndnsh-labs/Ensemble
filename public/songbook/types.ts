@@ -156,7 +156,6 @@ export interface WorkspacePracticePreferences {
     applyPresetSettings: boolean;
     sessionTimer: number;
     songMode: boolean;
-    practiceMode: boolean;
     rampBpmPerLoop: number;
     rampStartPct: number;
 }

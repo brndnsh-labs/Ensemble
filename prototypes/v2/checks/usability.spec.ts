@@ -95,6 +95,42 @@ test('export and Save a copy include typed text but do not overwrite the origina
     expect(await savedBlue(page)).toEqual(original);
 });
 
+// #1331 — the guard's job is "new editor text must never silently become another chord", and
+// it did that by comparing the parser's canonical spelling back to the typed text. Once the
+// parser learned to normalise case, parentheses, Δ and the in-quality slash (#1320-#1324),
+// that string comparison rejected exactly the spellings it had just learned to read.
+test('the editor accepts every spelling the playback parser understands', async ({ page }) => {
+    await openEditor(page);
+    const supported = [
+        'CMaj7 | CM7 | CΔ7', // capitalised / Greek-delta major 7ths
+        'Cm7(b5) | G7(b9) | C13(#11b9)', // parenthesised alterations
+        'CmMaj7 | Cm/maj7 | Cmadd9', // minor-major and minor added tone
+        'Gsus | G7sus | G9sus4 | G13sus', // suspension shorthand
+        'C6/9 | Cm6/9 | C69 | Cmaj7b5', // in-quality slash, and the exact maj7b5
+        'Cm7#5 | C-7#5 | Cm(b6) | C-b6', // #1340 — written altered 5ths and the added b6
+        'Cmaj7/G | Am7/E', // real slash basses still split
+    ].join(' | ');
+    await page.getByLabel('Chord text').fill(supported);
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.locator('.error-banner')).toHaveCount(0);
+    expect((await savedBlue(page)).chart.arrangement.sections[0].value).toBe(supported);
+});
+
+test('the editor still rejects a partly-understood spelling', async ({ page }) => {
+    await openEditor(page);
+    // `m7#11` consumes `m7` and drops the `#11`: the chord would silently lose its alteration,
+    // which is the case this guard exists for. A leading slash is unfinished text.
+    // (#1340 swapped the example from `Cm7#5`, which is now a real quality — see the accepted
+    // list above. The guard is about partial matches, so it needs a spelling that still is one.)
+    for (const token of ['Cm7#11', 'C/9', 'Cm7add11']) {
+        await page.getByLabel('Chord text').fill(`Dm7 | ${token}`);
+        await page.getByRole('button', { name: 'Save', exact: true }).click();
+        await expect(page.locator('.error-banner')).toContainText(
+            `unsupported chord spelling “${token}”`,
+        );
+    }
+});
+
 test('unsupported text blocks save, export, navigation and transforms without losing any buffer', async ({
     page,
 }) => {
@@ -157,8 +193,7 @@ test('editor validation consumes complete supported spellings and preserves reje
         '%',
         'N.C.',
         'C7 x2',
-        'B♭7',
-        'C13(#11b9)',
+        'B♭7', // the unicode flat is deliberately not in the vocabulary
         'C '.repeat(501),
     ]) {
         await page.getByLabel('Chord text').fill(text);
@@ -167,8 +202,12 @@ test('editor validation consumes complete supported spellings and preserves reje
         await expect(page.getByLabel('Chord text')).toHaveValue(text);
         expect(await savedBlue(page)).toEqual(original);
     }
+    // `C13(#11b9)` moved here from the reject list above (#1331): the parser reads
+    // parenthesised alterations now, and #1329 maps this one to 7b9 instead of a 13 whose
+    // natural 9 contradicts the written b9. The editor rejected it for the old reason — the
+    // canonical spelling no longer equals the typed text.
     const supported =
-        '| Dm7 G7 | Cmaj7 | #ivm7b5 VII7alt | 1 4 57 | C6/9 | G7/B IVmaj9/5 | B#maj7 Cbmaj7 |';
+        '| Dm7 G7 | Cmaj7 | #ivm7b5 VII7alt | 1 4 57 | C6/9 | G7/B IVmaj9/5 | B#maj7 Cbmaj7 | C13(#11b9) |';
     await page.getByLabel('Chord text').fill(supported);
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();

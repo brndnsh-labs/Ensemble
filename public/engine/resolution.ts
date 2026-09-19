@@ -106,10 +106,33 @@ const DOMINANT_QUALITIES = new Set([
     '7b9',
     '7#9',
     '7sus4',
+    // #1323 — a suspended dominant still functions as a dominant; these spellings used to
+    // collapse to '9'/'13' and were already in this set by that name.
+    '9sus4',
+    '13sus4',
 ]);
 // Minor-family qualities → the landing tonic is voiced minor.
 // (the parser collapses m7 → 'minor', so 'm7' is intentionally absent.)
-const MINOR_QUALITIES = new Set(['minor', 'm6', 'm9', 'm11', 'm13', 'halfdim', 'dim']);
+// #1321/#1322 — mMaj7 (the melodic-minor tonic) and madd9 are minor-triad chords, so a
+// cadence landing on one voices minor.
+const MINOR_QUALITIES = new Set([
+    'minor',
+    'm6',
+    'm9',
+    'm11',
+    'm13',
+    'mMaj7',
+    'madd9',
+    // #1336 — a raised fifth is a colour on a MINOR triad, so a chart cadencing on `Cm#5`
+    // lands on a minor tonic. Absent this the ending resolution voiced it major.
+    'm#5',
+    // #1340 — same rule for the ♯5's 7th-chord sibling and for the added ♭6: both are minor
+    // triads with one extra tone, so a chart cadencing on either lands on a minor tonic.
+    'm7#5',
+    'mb6',
+    'halfdim',
+    'dim',
+]);
 
 function isDominantChord(c: any): boolean {
     return DOMINANT_QUALITIES.has(c.quality) || (c.quality === 'aug' && c.is7th === true);

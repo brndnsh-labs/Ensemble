@@ -12,6 +12,7 @@ interface TransportBarProps {
     onTempo: (bpm: number) => void;
     onKey: (key: string) => void;
     onGenre: (genre: string) => void;
+    onFeel: () => void;
     onToggleLane: (lane: Lane) => void;
 }
 
@@ -23,6 +24,7 @@ export function TransportBar({
     onTempo,
     onKey,
     onGenre,
+    onFeel,
     onToggleLane,
 }: TransportBarProps) {
     return (
@@ -77,6 +79,19 @@ export function TransportBar({
                         <option key={g}>{g}</option>
                     ))}
                 </select>
+                {/* The rest of the feel — swing, humanize, mix, notation — opens from
+                    here rather than the song header, which has no room for a fifth
+                    control on a phone (#1276). */}
+                <button
+                    type="button"
+                    className="feel-button"
+                    disabled={busy}
+                    onClick={onFeel}
+                    aria-label="Feel and mix"
+                    title="Feel and mix"
+                >
+                    More…
+                </button>
             </div>
             <div className="band-controls" aria-label="Band instruments">
                 {lanes.map(([key, label]) => (

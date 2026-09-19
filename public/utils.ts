@@ -6,7 +6,7 @@ import type { StepInfo } from './types.js';
  * logic worker can import it freely.
  *
  * What belongs here: pitch/frequency conversion (`getFrequency`, `getMidi`,
- * `midiToNote`, `getChordMidiNotes`) and the step/meter timing core
+ * `midiToNote`) and the step/meter timing core
  * (`getStepInfo`, `secondsPerStepFor`, `getStepsPerMeasure`, `binarySearchMap`,
  * `normalizeKey`) — the things every lane's generator needs.
  *
@@ -136,16 +136,17 @@ export function getMidi(freq: number): number | null {
 }
 
 /**
- * Chord-quality families whose triad has NO perfect fifth.
- *
- * Hoisted to module level so `getChordMidiNotes` (which picks a scale-degree table per
- * family) and `chordHasPerfectFifth` (which asks the narrower "is scale degree 5 natural"
- * question) read the SAME membership. Two local copies of the same list is how one of them
- * silently acquires a quality the other doesn't know about.
+ * Chord-quality families whose triad has NO perfect fifth, read by
+ * `chordHasPerfectFifth` below.
  *
  * Spellings are the union of what `getChordDetails` (`engine/chords-engine.ts`) normalizes
  * to (`dim`, `halfdim`, `aug`) and the longer forms that reach us from imported/hand-built
  * chord objects (`diminished`, `m7b5`, `half-diminished`, `augmented`, `+`).
+ *
+ * #1329 — the second reader, `getChordMidiNotes`, is gone: it was a scale-degree table with
+ * no production caller (`scheduler-core.ts` has its own local function of that name and the
+ * only importer was this module's unit test), so every new chord quality had to be taught to
+ * it for nothing.
  */
 const DIMINISHED_QUALITIES = ['dim', 'dim7', 'diminished', 'halfdim', 'm7b5', 'half-diminished'];
 const AUGMENTED_QUALITIES = ['augmented', 'aug', '+'];
@@ -180,121 +181,6 @@ export function chordHasPerfectFifth(quality: string | undefined | null): boolea
         return false;
     }
     return !(q.includes('alt') || q.includes('b5') || q.includes('#5') || q.includes('aug'));
-}
-
-/**
- * Calculates MIDI notes for specific scale degrees (Full 10-note scale)
- * based on a given chord object.
- */
-export function getChordMidiNotes(chordObj: any, baseOctave = 4): number[] {
-    if (!chordObj || typeof chordObj.rootMidi !== 'number' || !Number.isFinite(chordObj.rootMidi)) {
-        return [];
-    }
-
-    const quality = chordObj.quality || 'major';
-    const isMinorQuality =
-        quality === 'minor' ||
-        quality === 'm6' ||
-        quality === 'm9' ||
-        quality === 'm11' ||
-        quality === 'm13';
-    const isDiminishedFamily = DIMINISHED_QUALITIES.includes(quality);
-    const isDominantFamily =
-        quality === 'dominant' ||
-        quality === '7' ||
-        quality === '9' ||
-        quality === '11' ||
-        quality === '13' ||
-        quality.startsWith('7');
-
-    let safeIntervals: number[] = [0, 4, 7, 11, 14];
-    let colorIntervals: number[] = [2, 5, 9, 12, 16];
-
-    if (isMinorQuality) {
-        safeIntervals = [0, 3, 7, 10, 14];
-        colorIntervals = [2, 5, 8, 12, 15];
-    } else if (isDiminishedFamily) {
-        safeIntervals = [0, 3, 6, 10, 13];
-        colorIntervals = [1, 5, 8, 12, 15];
-    } else if (AUGMENTED_QUALITIES.includes(quality)) {
-        safeIntervals = [0, 4, 8, 10, 14];
-        colorIntervals = [2, 6, 9, 12, 16];
-    } else if (isDominantFamily) {
-        safeIntervals = [0, 4, 7, 10, 14];
-        colorIntervals = [2, 5, 9, 12, 16];
-    }
-
-    const pc = chordObj.rootMidi % 12;
-    const baseMidi = (baseOctave + 1) * 12 + pc;
-
-    const expandIntervals = (source: number[], targetCount: number): number[] => {
-        const unique = [...new Set(source.filter(Number.isFinite))].sort((a, b) => a - b);
-        if (unique.length === 0) {
-            return [];
-        }
-        const result = unique.slice(0, targetCount);
-        let octaveOffset = 12;
-        while (result.length < targetCount) {
-            for (const interval of unique) {
-                const candidate = interval + octaveOffset;
-                if (!result.includes(candidate)) {
-                    result.push(candidate);
-                }
-                if (result.length >= targetCount) {
-                    break;
-                }
-            }
-            octaveOffset += 12;
-        }
-        return result.sort((a, b) => a - b);
-    };
-
-    const parsedIntervals: number[] = Array.isArray(chordObj.intervals)
-        ? chordObj.intervals.filter(Number.isFinite)
-        : [];
-    if (parsedIntervals.length > 0) {
-        safeIntervals = expandIntervals(parsedIntervals, 5);
-        const remainingParsed = parsedIntervals.filter(
-            (interval: number) => !safeIntervals.includes(interval),
-        );
-        const mergedColors = [...remainingParsed, ...colorIntervals].filter(
-            (interval: number) => !safeIntervals.includes(interval),
-        );
-        colorIntervals = expandIntervals(mergedColors, 5);
-    }
-
-    let notes: number[] = [
-        ...safeIntervals.map((interval) => baseMidi + interval),
-        ...colorIntervals.map((interval) => baseMidi + interval),
-    ];
-
-    if (
-        typeof chordObj.bassMidi === 'number' &&
-        Number.isFinite(chordObj.bassMidi) &&
-        notes.length > 0
-    ) {
-        const bassPc = chordObj.bassMidi % 12;
-        let slashBassMidi = (baseOctave + 1) * 12 + bassPc;
-        while (slashBassMidi >= notes[0]) {
-            slashBassMidi -= 12;
-        }
-
-        let removedUpperBass = false;
-        const upperNotes = notes.filter((note) => {
-            if (!removedUpperBass && note % 12 === bassPc) {
-                removedUpperBass = true;
-                return false;
-            }
-            return true;
-        });
-
-        if (!removedUpperBass && upperNotes.length > 0) {
-            upperNotes.pop();
-        }
-        notes = [slashBassMidi, ...upperNotes].slice(0, 10);
-    }
-
-    return notes;
 }
 
 /**

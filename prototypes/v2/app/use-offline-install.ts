@@ -1,8 +1,21 @@
 import { useEffect, useState } from 'react';
 
-/** Registers the `/v2/` service worker and reports, in words, whether the app shell is offline-ready. */
-export function useOfflineInstall(): string {
-    const [offline, setOffline] = useState('Preparing offline access…');
+/**
+ * Registers the `/v2/` service worker and reports whether the app shell is offline-ready, both in
+ * words and as the three-state fact `lib/sync/status.ts` wants (#1266). They are one observation
+ * with two readers, not two: `'unknown'` is the honest answer until the registration settles, and
+ * a shell that failed to install is `'missing'`, never quietly unknown.
+ */
+export interface OfflineInstall {
+    label: string;
+    shell: 'unknown' | 'verified' | 'missing';
+}
+
+export function useOfflineInstall(): OfflineInstall {
+    const [offline, setOffline] = useState<OfflineInstall>({
+        label: 'Preparing offline access…',
+        shell: 'unknown',
+    });
     useEffect(() => {
         let alive = true;
         if ('serviceWorker' in navigator) {
@@ -35,28 +48,46 @@ export function useOfflineInstall(): string {
                             check();
                         });
                     }
+                    // A waiting update means the shell IS installed and verified — the newer one
+                    // simply cannot activate while a tab holds the old one open.
+                    const installed = (label: string): OfflineInstall => ({
+                        label,
+                        shell: 'verified',
+                    });
                     if (alive) {
                         setOffline(
-                            registration.waiting
-                                ? 'Update ready · close all music stand tabs to install'
-                                : 'App available offline',
+                            installed(
+                                registration.waiting
+                                    ? 'Update ready · close all music stand tabs to install'
+                                    : 'App available offline',
+                            ),
                         );
                     }
                     registration.addEventListener('updatefound', () => {
                         registration.installing?.addEventListener('statechange', () => {
                             if (registration.waiting && alive) {
-                                setOffline('Update ready · close all music stand tabs to install');
+                                setOffline(
+                                    installed(
+                                        'Update ready · close all music stand tabs to install',
+                                    ),
+                                );
                             }
                         });
                     });
                 })
                 .catch(() => {
                     if (alive) {
-                        setOffline('Offline download unavailable · retry by reloading');
+                        setOffline({
+                            label: 'Offline download unavailable · retry by reloading',
+                            shell: 'missing',
+                        });
                     }
                 });
         } else {
-            setOffline('Offline installation unavailable in this browser');
+            setOffline({
+                label: 'Offline installation unavailable in this browser',
+                shell: 'missing',
+            });
         }
         return () => {
             alive = false;

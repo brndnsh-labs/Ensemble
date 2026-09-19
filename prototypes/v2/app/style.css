@@ -151,6 +151,13 @@ html [hidden] {
     border-color: transparent;
     color: var(--green);
 }
+/* #1271. The one action in this app with no undo, and the only button that reads as destructive
+   on sight. Outline rather than filled: it sits beside Export and Cancel, and a solid red block
+   would pull the eye to the button nobody should reach for by accident. */
+.btn.danger {
+    border-color: var(--danger);
+    color: var(--danger);
+}
 .text-button {
     font-size: 13px;
     font-weight: 600;
@@ -1989,6 +1996,20 @@ dialog textarea {
     font-size: 13px;
     margin-bottom: 12px;
 }
+/* #1268's offer preview: every title that is about to be copied, scrollable rather than
+   pushing the Add/Not now buttons off a phone screen on a generous guest songbook. */
+.adopt-guest-preview {
+    list-style: none;
+    margin-bottom: 17px;
+    max-height: 30dvh;
+    overflow-y: auto;
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--muted);
+}
+.adopt-guest-preview li {
+    overflow-wrap: anywhere;
+}
 .error-banner {
     background: var(--danger-bg);
     color: var(--danger);
@@ -2030,6 +2051,16 @@ dialog textarea {
     color: var(--ink);
     max-width: 125px;
     cursor: pointer;
+}
+/* Opens the Feel sheet (#1276) beside the genre select: same type, muted, no chrome. */
+.feel-button {
+    font-size: 13px;
+    font-weight: 650;
+    color: var(--muted);
+    padding: 0 0 0 6px;
+}
+.feel-button:hover {
+    color: var(--ink);
 }
 .section-text {
     width: 100%;
@@ -2322,6 +2353,22 @@ dialog textarea {
     gap: 16px;
     padding-top: 16px;
 }
+/* One compact block per lane (#1275): heading, sound/style/density/mode
+   selects, then the volume + reverb sliders — grouped so the whole lane
+   reads as one unit at music-stand distance instead of a flat control list. */
+.sound-lane {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 0;
+    padding: 12px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+}
+.sound-lane h3 {
+    font-size: 13px;
+    margin: 0;
+}
 .sound-choices label {
     display: flex;
     flex-direction: column;
@@ -2344,6 +2391,24 @@ dialog textarea {
     color: var(--muted);
     line-height: 1.4;
 }
+.sound-range-control {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.sound-range-control input[type="range"] {
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 32px;
+    accent-color: var(--green);
+}
+.sound-range-value {
+    flex: 0 0 auto;
+    width: 2.4em;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    color: var(--muted);
+}
 .resolved-sound {
     display: block;
     color: var(--green);
@@ -2359,6 +2424,103 @@ dialog textarea {
 }
 .sound-progress:empty {
     display: none;
+}
+
+/* Feel & mix sheet (#1276) — same dialog/heading/close-button shape as `.sound-panel`
+   above, kept as its own scoped block rather than sharing class names across the two
+   unrelated features (per-instrument sound settings vs. band-wide feel settings). */
+.feel-panel {
+    width: min(480px, calc(100vw - 24px));
+    padding: 24px;
+    max-height: calc(100dvh - 32px);
+    overflow: auto;
+}
+.feel-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+}
+.feel-heading h2 {
+    margin: 0;
+}
+.feel-heading p {
+    margin: 6px 0 16px;
+}
+.feel-groups {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+.feel-group {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+}
+.feel-group h3 {
+    font-size: 13px;
+    margin: 0;
+}
+.feel-group label {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-size: 13px;
+}
+.feel-group select {
+    width: 100%;
+    min-height: 44px;
+    font: inherit;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 8px;
+    background: var(--surface);
+    color: var(--ink);
+}
+.feel-swing-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 12px;
+    align-items: end;
+}
+.feel-group .feel-hint {
+    font-size: 11px;
+    color: var(--muted);
+    margin: 0;
+}
+.feel-range-control {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.feel-range-control input[type="range"] {
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 32px;
+    accent-color: var(--green);
+}
+.feel-range-value {
+    flex: 0 0 auto;
+    width: 2.4em;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    color: var(--muted);
+}
+.feel-group .feel-toggle {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+}
+@media (max-width: 760px) {
+    .feel-panel {
+        padding: 18px;
+    }
+    .feel-swing-row {
+        grid-template-columns: minmax(0, 1fr);
+    }
 }
 
 /* The open song owns the viewport. Branding and installation belong outside
@@ -2439,7 +2601,8 @@ dialog textarea {
 .performance-focus .mode-switch,
 .performance-focus .save-btn,
 .performance-focus .menu-btn,
-.performance-focus .sounds-button {
+.performance-focus .sounds-button,
+.performance-focus .feel-button {
     display: none;
 }
 /* One size for idle and playing: a second, larger playing-only scale used to
@@ -2542,4 +2705,241 @@ html[data-theme="stage"] {
     background: var(--ink);
     color: var(--on-ink);
     border-color: var(--ink);
+}
+/* Account entry point and sign-in dialog (#1262). Dark-launched: only a device
+   that opted in via `/v2/?accounts=on` renders any of this. Everything reuses
+   the existing tokens and the .btn / .modal-box / .dialog-actions vocabulary,
+   so both Day and Stage follow from light-dark() with nothing redefined. */
+.account-entry {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 9px;
+}
+.account-state {
+    /* Opens the account page (#1264) — reset to look like the plain status text it always was,
+       not a bordered .account-btn. */
+    font: inherit;
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--muted);
+    white-space: nowrap;
+}
+.account-state:hover,
+.account-state:focus-visible {
+    color: var(--ink);
+    text-decoration: underline;
+}
+/* Sign-out offline reason / failure (#1262 P1-3): small status text next to the header entry
+   rather than a dialog, to keep the fix minimal — the reason is inline, not something the person
+   has to open anything to see. */
+.account-status-detail {
+    font-size: 11px;
+    color: var(--muted);
+    white-space: nowrap;
+}
+.account-status-detail[role="alert"] {
+    color: var(--danger);
+}
+.account-btn.account-warn {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+.account-dialog,
+.account-page {
+    /* .modal-box is width:100%/max-width:480px, which at phone width runs edge
+       to edge. The recovery code needs a readable gutter, so this dialog keeps
+       one (same idea as .sound-panel's min()). Two distinct dialogs (#1262's
+       sign-in, #1264's account page) share this rule but NOT a class, since
+       both are mounted at once and `dialog.account-dialog` must resolve to
+       exactly one element for a Playwright strict-mode locator to work. */
+    max-width: min(480px, calc(100vw - 32px));
+}
+.recovery-code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 15px;
+    line-height: 1.7;
+    /* .modal-box p is --muted; the code itself is the content, not commentary. */
+    color: var(--ink);
+    background: var(--paper-raised);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 14px;
+    margin-bottom: 14px;
+    overflow-wrap: anywhere;
+    /* One click selects the whole code: it is 43 unbroken base64url characters,
+       and a partial selection is a silently unusable code. */
+    user-select: all;
+}
+.recovery-confirm {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    font-size: 13px;
+    line-height: 1.6;
+    margin-top: 18px;
+}
+.recovery-confirm input {
+    /* .modal-box input is a full-width text field; a checkbox is not. */
+    width: auto;
+    flex-shrink: 0;
+    margin: 2px 0 0;
+    padding: 0;
+    accent-color: var(--ink);
+}
+/* Recovery entry and code entry (#1263). */
+.recovery-link {
+    /* Not a .btn: that is `white-space: nowrap`, and this label is a sentence that has to wrap at
+       phone width. A text link is also the right weight for a way out of trouble sitting under
+       the two things most people actually came for. */
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--ink);
+    text-align: left;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    padding: 0;
+    background: none;
+    border: 0;
+}
+.recovery-link:disabled {
+    color: var(--muted);
+    text-decoration: none;
+}
+.recovery-entry {
+    display: block;
+    font-size: 13px;
+    line-height: 1.6;
+    margin-bottom: 4px;
+}
+.recovery-entry input {
+    /* The code is 43 unbroken base64url characters; a proportional face makes an l/1/I mix-up
+       impossible to spot while checking a typo. */
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 13px;
+    margin-top: 6px;
+}
+.account-notice,
+.account-error {
+    font-size: 13px;
+    line-height: 1.6;
+    border-radius: 10px;
+    padding: 11px 13px;
+    margin-top: 16px;
+}
+.account-notice {
+    background: var(--green-light);
+    color: var(--green);
+}
+.account-error {
+    background: var(--danger-bg);
+    color: var(--danger);
+}
+/* The account page (#1264): passkeys, sessions, recovery code. Reuses .account-dialog's width
+   and the .btn/.dialog-actions vocabulary; only the passkey list and section rhythm are new. */
+.account-page section {
+    margin-bottom: 22px;
+}
+.account-page h3 {
+    font-size: 14px;
+    font-weight: 650;
+    margin-bottom: 10px;
+}
+.passkey-list {
+    list-style: none;
+    margin: 0 0 12px;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.passkey-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 13px;
+    color: var(--muted);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 9px 12px;
+}
+/* Deleting the account (#1271): the last section on the page, set apart by a rule rather than a
+   red panel — it is a legitimate thing to want, not a hazard sign. */
+.account-page .account-danger {
+    border-top: 1px solid var(--line);
+    padding-top: 18px;
+}
+.account-page .account-danger h3 {
+    color: var(--danger);
+}
+/* The typed confirmation's label. `.modal-box input` is already a full-width field. */
+.delete-confirm {
+    display: block;
+    font-size: 13px;
+    line-height: 1.6;
+    margin-top: 18px;
+    margin-bottom: 8px;
+}
+/* Sync status chip (#1266). Three separate facts, laid out as three separate lines rather
+   than one badge — a musician who saved offline needs to see local safety and cloud
+   confirmation disagree. Rendered only on the music stand, and only for a device with an
+   account, so the guest DOM and the songbook page are both unchanged. */
+.sync-status {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    font-size: 11px;
+    line-height: 1.5;
+    color: var(--muted);
+    min-width: 0;
+}
+.sync-fact {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.sync-failure {
+    color: var(--accent);
+    /* The reason can be a full sentence; it wraps rather than being clipped like the facts. */
+    white-space: normal;
+}
+/* Conflict banner (#1267). Accent rather than danger: a refused Save is a decision waiting to be
+   made, not a fault — nothing was lost, and the danger palette is spent on things that were. Every
+   colour is a light-dark() token, so the dark stage gets this for free. */
+.conflict-banner {
+    background: var(--accent-light);
+    color: var(--accent);
+    padding: 12px 20px;
+    font-size: 13px;
+    line-height: 1.6;
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    justify-content: space-between;
+}
+.conflict-banner-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+.conflict-banner .btn {
+    flex-shrink: 0;
+}
+@media (max-width: 640px) {
+    .conflict-banner {
+        flex-direction: column;
+        align-items: stretch;
+        padding: 12px 16px;
+    }
+}
+/* "We haven't read your account library yet" — never the empty-library table (#1266). */
+.library-loading {
+    color: var(--muted);
+    font-size: 13px;
+    padding: 14px 0;
 }

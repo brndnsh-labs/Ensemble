@@ -89,7 +89,6 @@ const FLAT_KEY_OWNERS: Record<string, [string, string]> = {
     sessionTimer: ['playback', 'sessionTimer'],
     songMode: ['playback', 'songMode'],
     autoIntensity: ['playback', 'autoIntensity'],
-    practiceMode: ['playback', 'practiceMode'],
     masterVolume: ['playback', 'masterVolume'],
     vizEnabled: ['vizState', 'enabled'],
 };
@@ -318,14 +317,14 @@ describe('#1259 RESET_STATE is a complete inverse of the persisted session', () 
         expect(afterReset).toEqual(fresh);
     });
 
-    // The eight originally-surviving fields, named individually. The snapshot
+    // The originally-surviving fields, named individually (one more was listed here until
+    // #1314 retired the practice-mode preference). The snapshot
     // comparison above already covers them, but a regression there reports as one
     // opaque diff — these keep the specific defects legible, and `midi` stands for
     // the whole slice, which had no case at all.
     it.each([
         ['lastChordPreset'],
         ['randomizeSeed'],
-        ['practiceMode'],
         ['songMode'],
         ['masterVolume'],
         ['chords.style'],

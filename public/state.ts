@@ -58,7 +58,6 @@ export function buildPlaybackSyncPayload(playback: GlobalContext) {
         bandIntensity: playback.bandIntensity,
         complexity: playback.complexity,
         autoIntensity: playback.autoIntensity,
-        practiceMode: playback.practiceMode,
         sessionTimer: playback.sessionTimer,
         sessionStartTime: playback.sessionStartTime,
         modals: {},

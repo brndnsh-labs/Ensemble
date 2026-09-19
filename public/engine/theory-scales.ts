@@ -1,7 +1,7 @@
 import { KEY_ORDER, resolveMappedStyle, SMART_SCALE_STYLE_MAP } from '../config.js';
 import type { EnsembleState } from '../types.js';
 
-// cspell:ignore tonicization
+// cspell:ignore tonicization hexatonic heptatonic
 
 /**
  * THEORY-SCALES.TS
@@ -39,6 +39,27 @@ const SCALE_INTERVALS = {
     WHOLE_HALF_DIMINISHED: [0, 2, 3, 5, 6, 8, 9, 11], // Diminished chord function
     WHOLE_TONE: [0, 2, 4, 6, 8, 10],
     PHRYGIAN_DOMINANT: [0, 1, 4, 5, 7, 8, 10], // 5th mode of harmonic minor
+
+    // why (#1336): Lydian with the perfect 5th OMITTED — the honest pool for a written
+    // ♭5 on a major-7th chord (`maj7b5`, whose tones are 0/4/6/11). Lydian already
+    // supplies the ♯4/♭5 as a scale degree, so dropping only its 7 leaves a pool that
+    // states the alteration and never contradicts it. The 7-note Lydian-augmented
+    // substitute [0,2,4,6,8,9,11] was rejected: its 8 is a SECOND alteration (a ♯5) the
+    // chart never wrote, and a hexatonic pool is safe here because every consumer of
+    // `getScaleForChord`'s return indexes by `scale.length`, never a hardcoded 7 —
+    // verified across `soloist-seeder.ts` (both degree walks use `scaleLen`),
+    // `bass-walking-route.ts` (`composeRoute` only does `scale.includes`),
+    // `bass-engine.ts` (`scale.map`, `scale.at(-1)`, `scale[1]`) and the existing
+    // non-heptatonic members of this very table (pentatonics, BLUES, WHOLE_TONE).
+    LYDIAN_NO_FIFTH: [0, 2, 4, 6, 9, 11],
+
+    // why (#1336): natural minor (aeolian) with the perfect 5th OMITTED — the pool for a
+    // written ♯5 on a minor triad (`m#5`, whose tones are 0/3/8). Aeolian is already the
+    // minor default here and its ♭6 IS the chord's ♯5 enharmonically, so dropping only its
+    // 7 needs no substitute degree: b3, ♯5/♭6 and ♭7 all remain. There is no 7-note
+    // alternative that both states the ♯5 and omits the 5 (harmonic minor keeps the 5), and
+    // a hexatonic pool is safe for the same verified reason as `LYDIAN_NO_FIFTH` above.
+    AEOLIAN_NO_FIFTH: [0, 2, 3, 5, 8, 10],
 };
 
 function hasDominantFunction(chord: any): boolean {
@@ -112,6 +133,50 @@ export function getScaleForChord(
     // 1. Resolve 'smart' style to specific genre style if needed
     if (style === 'smart') {
         style = resolveMappedStyle(SMART_SCALE_STYLE_MAP, groove.genreFeel);
+    }
+
+    // --- WRITTEN-ALTERATION SPECIALISTS (outrank every genre branch) ---
+    // A written ♭5/♯5 (or a minor chord's written maj7, or its written ♭6 — #1340) is harmonic
+    // FACT, not colour, so no genre may pick a pool that contradicts it. These branches therefore
+    // sit ABOVE the genre switches rather than in SPECIAL QUALITY HANDLING below: `maj7b5`
+    // previously fell through to
+    // LYDIAN (#1336), whose natural 5 sat a semitone under the ♯4/♭5 the comp voices —
+    // and country's MINOR/MAJOR_PENTATONIC early returns below, funk/blues' MAJOR_BLUES,
+    // the minor family's DORIAN flavour override and the jazz/bossa non-diatonic LYDIAN
+    // fallback ALL carry a 7, so a branch placed after them would still leak the natural 5.
+    const alteredFifthQuality = chord.quality || 'major';
+    if (alteredFifthQuality === 'maj7b5') {
+        return SCALE_INTERVALS.LYDIAN_NO_FIFTH;
+    }
+    if (alteredFifthQuality === 'm#5') {
+        return SCALE_INTERVALS.AEOLIAN_NO_FIFTH;
+    }
+    // #1340 — `m7#5` takes the SAME pool, with no new scale needed: its tones are 0/3/8/10 and
+    // the fifth-less Aeolian states every one of them (b3, ♯5/♭6, b7) while omitting the 5 the
+    // chart sharpened. The only 7-note members of this table that state all four tones without a
+    // natural 5 are LOCRIAN, LOCRIAN_NATURAL_2 and ALTERED, and every one of them carries a ♭5
+    // (degree 6) beside this chord's written sharp fifth — two different fifths in one pool, the
+    // reason `LYDIAN_NO_FIFTH` rejects Lydian-augmented. Without the branch the minor family
+    // below answered DORIAN (Jazz/Neo-Soul/funk/bossa) or NATURAL_MINOR, both with a natural 7.
+    if (alteredFifthQuality === 'm7#5') {
+        return SCALE_INTERVALS.AEOLIAN_NO_FIFTH;
+    }
+    // #1340 — `mb6` belongs in this block for the mirror-image reason: its written tone is the
+    // ♭6 (interval 8) and the minor family's genre flavour override picks DORIAN in Jazz,
+    // Neo-Soul, funk and bossa, whose NATURAL 6 (interval 9) sits a semitone above it — the
+    // soloist running the one note the chart flattened. Plain Aeolian already contains 3, 5 and
+    // ♭6, so the honest pool needs no omission at all; only the genre override had to be
+    // outranked. (Country's MINOR_PENTATONIC early return has no 6 of either kind, so it would
+    // not have contradicted the chord — but it would have left the written colour unreachable.)
+    if (alteredFifthQuality === 'mb6') {
+        return SCALE_INTERVALS.NATURAL_MINOR;
+    }
+    // Minor-major 7th: the melodic-minor tonic (#1321). Same "written fact outranks genre"
+    // rule, one degree over: left beside the other specialists below, country's early return
+    // answered MINOR_PENTATONIC first, and its b7 is the one tone this chord's maj7 replaces
+    // — the soloist would sound the m7 the comper no longer plays.
+    if (alteredFifthQuality === 'mMaj7') {
+        return SCALE_INTERVALS.MELODIC_MINOR;
     }
 
     if (style === 'country') {

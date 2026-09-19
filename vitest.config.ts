@@ -5,11 +5,10 @@ import { configDefaults, defineConfig } from 'vitest/config';
 export default defineConfig({
     plugins: [preact()],
     resolve: {
-        // Mirrors `prototypes/v2/tsconfig.json`'s `@engine/*` -> `public/*` path, so a
-        // `prototypes/v2/lib/*.test.ts` file (in scope for this config; only its `checks/`
-        // Playwright dir and `v2-api` are excluded below) can import the real preview
-        // modules without a separate Vite config.
         alias: {
+            // The same alias `prototypes/v2/tsconfig.json` and `next.config.mjs` give the preview,
+            // so a unit test can import a v2 `lib/` module whose own imports reach back into the
+            // shared engine. Inert for `public/` and `tests/`, which never spell it.
             '@engine': fileURLToPath(new URL('./public', import.meta.url)),
         },
     },

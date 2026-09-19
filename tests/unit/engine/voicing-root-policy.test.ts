@@ -1,0 +1,549 @@
+// @ts-nocheck
+// cspell:ignore Bdim Gsus madd
+// #1313 — "leave room for the bass" (a register floor) and "rootless voicing" (drop
+// the root for shell tones) are different things. Rootless is only for chords the
+// chart WRITES as 7ths/extensions, and only while a bass line is actually sounding;
+// muting the bass means the player is covering that part, so the comp states the
+// harmony itself.
+//
+// Two layers, because they can disagree: the PARSE layer (`validateProgression` ->
+// `chord.freqs`, the voicing every comp lane starts from) and the LIVE layer
+// (`getAccompanimentNotes`, where each lane re-reduces that voicing — Funk's clav
+// cell, Neo-Soul's cluster window, the low-intensity two-voice thinning). A parse-only
+// test passed while Funk still sounded Am6 as C-G-B; the live block is what guards
+// the audible claim.
+import { beforeEach, describe, expect, it } from 'vitest';
+import { getChordDetails } from '../../../public/engine/chords-engine.js';
+import { getIntervals, getRootlessVoicing } from '../../../public/engine/chords-styles.js';
+import { BASS_SPACE_FEELS, COMP_REGISTER_FLOOR } from '../../../public/engine/voicing-policy.js';
+import { dispatch, getState } from '../../../public/state.js';
+import { ACTIONS } from '../../../public/types.js';
+// The two-layer probes (parse voicing / what the comp actually sounds) are shared with
+// tests/unit/engine/chord-identity-matrix.test.ts — one harness, so the two files can't
+// drift on what "sounds" means.
+import { degreeOf, sound, voice, voicings } from '../../utils/voicing-probe.js';
+
+const FEELS = [...BASS_SPACE_FEELS];
+
+describe('Voicing root policy (#1313)', () => {
+    beforeEach(() => {
+        dispatch(ACTIONS.RESET_STATE);
+    });
+
+    it('covers the seven bass-space feels', () => {
+        expect(FEELS).toHaveLength(7);
+    });
+
+    describe.each(FEELS)('%s', (feel) => {
+        it.each([true, false])(
+            'parses a plain minor triad rooted, no invented b7 below the colour tier (bass on: %s)',
+            (bassOn) => {
+                const [, , am] = voice(feel, bassOn, 'C | G | Am | F');
+                expect(am.name).toBe('Am');
+                expect(am.degrees.has(0)).toBe(true); // A — without it Am reads as C major
+                expect(am.degrees.has(3)).toBe(true);
+                expect(am.degrees.has(10)).toBe(false); // no G: the chart wrote a triad
+            },
+        );
+
+        it.each([true, false])(
+            'parses an m6 with its 6th and never a b7 (bass on: %s)',
+            (bassOn) => {
+                for (const chord of voice(feel, bassOn, 'Am6 | Dm6', 'A')) {
+                    expect(chord.degrees.has(0)).toBe(true);
+                    expect(chord.degrees.has(3)).toBe(true);
+                    expect(chord.degrees.has(9)).toBe(true); // the 6th IS the chord
+                    expect(chord.degrees.has(10)).toBe(false);
+                }
+            },
+        );
+
+        it('a written m7 is rootless over a sounding bass and rooted over a muted one', () => {
+            const [withBass] = voice(feel, true, 'Am7');
+            const [muted] = voice(feel, false, 'Am7');
+            expect(withBass.degrees.has(0)).toBe(false);
+            expect(muted.degrees.has(0)).toBe(true);
+            expect(muted.degrees.has(10)).toBe(true);
+        });
+
+        // Decision B on #1313: over a sounding bass the altered/augmented qualities
+        // play their rootless shells; bass muted they keep the root. Either way the
+        // tones that NAME the chord must sound — asserting only "root present?" let a
+        // Cmaj7#5 voiced as a C7 shell (E-G-Bb) sail through.
+        it.each([
+            // symbol, defining degrees, degrees that would misname it
+            ['Cmaj7#5', [4, 8, 11], [7, 10]],
+            ['G7#9', [4, 10, 3], [11]],
+            ['G7b9', [4, 10, 1], [11]],
+            ['G7alt', [4, 10], [7, 11]],
+            ['G7b5', [4, 6, 10], [7, 11]],
+            ['G+7', [4, 8, 10], [7, 11]],
+        ])('%s keeps its defining tones in both bass states', (symbol, defining, misnaming) => {
+            const [withBass] = voice(feel, true, symbol);
+            const [muted] = voice(feel, false, symbol);
+            for (const chord of [withBass, muted]) {
+                for (const degree of defining) {
+                    expect(chord.degrees.has(degree), `${symbol} needs degree ${degree}`).toBe(
+                        true,
+                    );
+                }
+                for (const degree of misnaming) {
+                    expect(chord.degrees.has(degree), `${symbol} must not sound ${degree}`).toBe(
+                        false,
+                    );
+                }
+            }
+            // A lean shell spends every voice on a different chord tone — the old 7#9
+            // shell doubled the major 3rd directly above the #9 (16 = 4 + 12).
+            expect(withBass.degrees.size, `${symbol} doubles a pitch class`).toBe(
+                withBass.midis.length,
+            );
+            expect(withBass.degrees.has(0), `${symbol} is a rootless shell over the bass`).toBe(
+                false,
+            );
+            expect(muted.degrees.has(0), `${symbol} is rooted with the bass muted`).toBe(true);
+        });
+
+        // #1316 — the rootless DOMINANT bucket is "non-minor, non-dim, and is7th", and
+        // `is7th` comes from a string heuristic over the chart symbol, so a suspension
+        // or an added tone fell into the 3-5-b7 shell whenever a bass line was sounding:
+        // the 4th that IS G7sus4 was replaced by a major 3rd (a plain G7), and Cadd9 —
+        // written precisely to mean "9th, no 7th" — gained a b7 (a C9 shell). These keep
+        // their rooted getIntervals stack instead.
+        it.each([
+            // symbol, quality, defining degrees, degrees that would rename the chord
+            ['G7sus4', '7sus4', [5, 10], [4]],
+            ['Cadd9', 'add9', [2, 4], [10]],
+            ['Gsus4', 'sus4', [5], [4, 10]],
+            ['Csus2', 'sus2', [2], [4, 10]],
+            ['Cadd2', 'add2', [2, 4], [10]],
+            ['C6', '6', [4, 9], [10]],
+        ])('%s keeps its own tones in both bass states', (symbol, quality, defining, misnaming) => {
+            for (const bassOn of [true, false]) {
+                const [chord] = voice(feel, bassOn, symbol);
+                const where = `${symbol} in ${feel}, bass on: ${bassOn}`;
+                expect(chord.quality, where).toBe(quality);
+                for (const degree of defining) {
+                    expect(chord.degrees.has(degree), `${where} needs degree ${degree}`).toBe(true);
+                }
+                for (const degree of misnaming) {
+                    expect(chord.degrees.has(degree), `${where} must not sound ${degree}`).toBe(
+                        false,
+                    );
+                }
+                // A suspension/added tone is rooted, not a rootless shell — but it still
+                // voices inside the comp register, never down in the bass's octave.
+                expect(chord.degrees.has(0), `${where} states its root`).toBe(true);
+                expect(Math.min(...chord.midis), where).toBeGreaterThanOrEqual(COMP_REGISTER_FLOOR);
+            }
+        });
+
+        it('dim and half-dim stay rooted in both bass states', () => {
+            // shouldUseRootlessVoicing never routes them rootless at the parse layer.
+            for (const symbol of ['Bm7b5', 'Bdim7']) {
+                for (const bassOn of [true, false]) {
+                    const [chord] = voice(feel, bassOn, symbol);
+                    expect(chord.degrees.has(0), `${symbol} bass on: ${bassOn}`).toBe(true);
+                    expect(chord.degrees.has(3)).toBe(true);
+                    expect(chord.degrees.has(6)).toBe(true);
+                }
+            }
+        });
+
+        // The comp register is a fixed slot (tick-logic clamps chords to 52-84 per
+        // note), so a bass-aware parse floor only ever got its low notes folded up
+        // one at a time. This pins that no voicing is parsed into the fold zone.
+        it('never parses a voicing below the comp register, bass on or muted', () => {
+            expect(COMP_REGISTER_FLOOR).toBe(52);
+            for (const bassOn of [true, false]) {
+                for (const intensity of [0.35, 0.65, 0.9]) {
+                    const chart = 'C | Dm | Eb | Am | Am6 | Dm7 | G7 | Cmaj7';
+                    for (const chord of voice(feel, bassOn, chart, 'C', intensity)) {
+                        expect(
+                            Math.min(...chord.midis),
+                            `${chord.name} bass on: ${bassOn} @${intensity}`,
+                        ).toBeGreaterThanOrEqual(COMP_REGISTER_FLOOR);
+                    }
+                }
+            }
+        });
+    });
+
+    describe.each(FEELS)('%s — what actually sounds', (feel) => {
+        it.each([0.35, 0.65])(
+            'an m6 never sounds a b7, bass on or muted (intensity %s)',
+            (intensity) => {
+                for (const bassOn of [true, false]) {
+                    for (const chord of sound(feel, bassOn, 'Am6 | Dm6', intensity)) {
+                        expect(chord.sets.length).toBeGreaterThan(0);
+                        for (const degrees of chord.sets) {
+                            expect(degrees, `${chord.name} bass on: ${bassOn}`).not.toContain(10);
+                        }
+                    }
+                }
+            },
+        );
+
+        it.each([0.35, 0.65])(
+            'with the bass muted, the fullest Am the comp plays states A and C (intensity %s)',
+            (intensity) => {
+                const [am] = sound(feel, false, 'Am | F', intensity);
+                // The fullest hit is the statement; sparser answers/ghosts echo under it.
+                expect(am.sets[0]).toContain(0);
+                expect(am.sets[0]).toContain(3);
+                // No hit may be a bare major third on the b3 (C-E): alone, that IS C major.
+                for (const degrees of am.sets) {
+                    expect(degrees.join(','), 'bare C-E dyad').not.toBe('3,7');
+                }
+            },
+        );
+
+        // #1348 — the altered-fifth family the #1313->#1344 series finished
+        // (`maj7b5`, `m#5`, `m7#5`) joining `GROUNDING_QUALITIES`. Two halves, and the
+        // identity matrix's live layer (c) covers neither for all seven feels: it runs
+        // Jazz/Funk/Neo-Soul only, and it asserts misnaming degrees are ABSENT, never
+        // that the root is PRESENT.
+        //   * root present — rootless, these three lose their name outright: an `m7#5`
+        //     shell is Eb-Ab-Bb, which IS an Eb sus4, and a `maj7b5` without its root
+        //     is E-Gb-B. With the bass muted nothing else states it.
+        //   * no natural 5 — the tone the chart altered. Degree 7 over any of the three
+        //     is a semitone grind against the written #5/b5, not a colour.
+        // Measured honestly: this is COVERAGE, not the mutation-sensitive pin for the
+        // #1348 change. Both halves already hold here without the `GROUNDING_QUALITIES`
+        // entries, because with the bass muted `shouldUseRootlessVoicing` is off outright
+        // and #1313's `selectRootedDyad`/`ensureRootVoice` keep the root for every
+        // quality. The assertion that DOES go red when the grounding half is dropped is
+        // the harmony pad's, in tests/standards/harmony-lane-written-fifth-critique.ts —
+        // the pad is the one lane whose tension density cap can strip the root.
+        it.each([0.35, 0.9])(
+            'the altered-fifth family states its root and never a natural 5, bass muted (intensity %s)',
+            (intensity) => {
+                const chart = 'Cmaj7b5 | Cm#5 | Cm7#5';
+                for (const heard of sound(feel, false, chart, intensity, 4)) {
+                    const where = `${heard.name} in ${feel} @${intensity}`;
+                    expect(heard.sets.length, `${where} never sounds`).toBeGreaterThan(0);
+                    // The fullest hit is the statement; sparser answers echo under it.
+                    expect(heard.sets[0], `${where} has no root under a muted bass`).toContain(0);
+                    for (const degrees of heard.sets) {
+                        expect(degrees, `${where} sounds the 5 it altered`).not.toContain(7);
+                    }
+                }
+            },
+        );
+
+        // #1316 — the parse fix is only half the claim: every lane re-reduces the
+        // voicing, and Funk's clav cell BUILDS its own by pitch class with a
+        // synthesized fallback, so it invented the exact tones the parse layer stopped
+        // inventing (G7sus4 -> F-A-B, a G9; Cadd9 -> E-Bb-D, a C9).
+        it.each([0.35, 0.65])(
+            'a suspension is never voiced as a 3rd and an added tone never as a b7 (intensity %s)',
+            (intensity) => {
+                const cases = [
+                    { symbol: 'G7sus4', defining: 5, misnaming: 4, renamed: 'a plain G7/G9' },
+                    { symbol: 'Cadd9', defining: 2, misnaming: 10, renamed: 'a C9 shell' },
+                ];
+                for (const bassOn of [true, false]) {
+                    const heard = sound(feel, bassOn, 'G7sus4 | Cadd9', intensity);
+                    cases.forEach(({ symbol, misnaming, renamed }, index) => {
+                        const { sets } = heard[index];
+                        expect(sets.length, `${symbol} in ${feel} never sounds`).toBeGreaterThan(0);
+                        for (const degrees of sets) {
+                            expect(
+                                degrees,
+                                `${symbol} in ${feel} (bass on: ${bassOn}) sounds as ${renamed}`,
+                            ).not.toContain(misnaming);
+                        }
+                    });
+                    // The suspension itself has to reach the ear in every lane. (The
+                    // add9's 9th is NOT asserted here: the 3-note cluster lanes
+                    // (Neo-Soul/Hip Hop/Reggae) window it out and sound a plain C
+                    // major triad — a subset of Cadd9, not a different chord, unlike
+                    // the C9 shell above.)
+                    expect(
+                        heard[0].sets.some((degrees) => degrees.includes(cases[0].defining)),
+                        `G7sus4 in ${feel} (bass on: ${bassOn}) never sounds its 4th`,
+                    ).toBe(true);
+                }
+            },
+        );
+    });
+
+    // #1318 — Jazz voices altered dominants through `buildResolvingAlteredVoicing`,
+    // which seats each voice independently at its own nearest octave to the register
+    // center. For 7#9 that folded the #9 to a semitone UNDER the major 3rd (G7#9 ->
+    // Bb3-B3-F4) — a chromatic smear, not the "Hendrix" shell — and the 3+#9
+    // clash-penalty exemption is what let that placement win the scoring. The
+    // idiomatic voicing is the 3rd below and the #9 on top, a major 7th apart
+    // (B3-F4-Bb4), which is the spacing that makes the #9 read as a blue note.
+    describe('#1318 — Jazz 7#9 voices the #9 above the 3rd, not under it', () => {
+        it.each([0.35, 0.65, 0.9])(
+            'every G7#9 that sounds both tones spaces them a major 7th apart (intensity %s)',
+            (intensity) => {
+                for (const bassOn of [true, false]) {
+                    // A ii-V-i so the voicing has a real previous/next chord to lead from.
+                    const [, dominant] = voicings('Jazz', bassOn, 'Dm7 | G7#9 | Cmaj7', intensity);
+                    expect(dominant.emitted.length).toBeGreaterThan(0);
+                    let sawBoth = 0;
+                    for (const midis of dominant.emitted) {
+                        const where = `G7#9 bass on: ${bassOn} @${intensity}: ${midis.join(',')}`;
+                        for (const midi of midis) {
+                            expect(midi, `${where} left the comp register`).toBeGreaterThanOrEqual(
+                                COMP_REGISTER_FLOOR,
+                            );
+                            expect(midi, `${where} left the comp register`).toBeLessThanOrEqual(84);
+                        }
+                        const thirds = midis.filter((m) => degreeOf(m, dominant.chord) === 4);
+                        const sharpNines = midis.filter((m) => degreeOf(m, dominant.chord) === 3);
+                        if (thirds.length === 0 || sharpNines.length === 0) {
+                            continue; // a 2-voice reduction dropped one of them
+                        }
+                        sawBoth++;
+                        for (const third of thirds) {
+                            for (const sharpNine of sharpNines) {
+                                expect(
+                                    sharpNine - third,
+                                    `${where} smears the #9`,
+                                ).toBeGreaterThanOrEqual(11);
+                            }
+                        }
+                    }
+                    // Guard the guard: a reduction that always dropped one of the two
+                    // tones would make every assertion above vacuous.
+                    expect(
+                        sawBoth,
+                        'no G7#9 voicing carried both the 3rd and the #9',
+                    ).toBeGreaterThan(0);
+                }
+            },
+        );
+
+        // G alone proves one register; the repair lifts the #9 by octaves against a
+        // fixed 84 ceiling, so a root whose 3rd seats high is where it would give up.
+        it('holds for every root, not just G', () => {
+            const roots = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
+            for (const root of roots) {
+                for (const bassOn of [true, false]) {
+                    const [, dominant] = voicings('Jazz', bassOn, `Dm7 | ${root}7#9 | Cmaj7`, 0.65);
+                    let sawBoth = 0;
+                    for (const midis of dominant.emitted) {
+                        const third = midis.find((m) => degreeOf(m, dominant.chord) === 4);
+                        const sharpNine = midis.find((m) => degreeOf(m, dominant.chord) === 3);
+                        if (third === undefined || sharpNine === undefined) {
+                            continue;
+                        }
+                        sawBoth++;
+                        expect(
+                            sharpNine - third,
+                            `${root}7#9 bass on: ${bassOn}: ${midis.join(',')}`,
+                        ).toBeGreaterThanOrEqual(11);
+                        expect(Math.max(...midis)).toBeLessThanOrEqual(84);
+                    }
+                    expect(sawBoth, `${root}7#9 never carried both tones`).toBeGreaterThan(0);
+                }
+            }
+        });
+    });
+
+    // #1348 (tests only, no behaviour change) — `mb6` is the one member of the family
+    // the #1313->#1344 series added whose fifth is WRITTEN: [0, 3, 7, 8] states the
+    // natural 5 AND the b6 a semitone above it, so the two have to be SPACED, not just
+    // both present. The textbook answer, and what the generic minor-2nd spread produces
+    // today, is the b6 UNDER the 5 a major 7th apart (Ab3-G4 = 11 semitones); an
+    // adjacent semitone (Ab-G in one octave) is the other acceptable reading. The one
+    // inversion that is not is the 5 below the b6 at a MINOR NINTH (G3-Ab4 = 13) — the
+    // harshest interval in tonal voicing, and exactly what an octave-shift change to
+    // `spreadMinorSeconds` could flip this into. This pin is the guard against that.
+    // Measured when written: all 336 cells carry both tones and every one of them spaces
+    // them at -11 (the b6 a major 7th below the 5), so the pin has the whole 24-semitone
+    // gap to the forbidden +13 as headroom — it can only go red on a real inversion.
+    it('never places an mb6 fifth a minor 9th below its b6', () => {
+        const roots = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
+        const offenders = [];
+        let sawBoth = 0;
+        for (const feel of FEELS) {
+            for (const root of roots) {
+                for (const bassOn of [true, false]) {
+                    for (const intensity of [0.35, 0.9]) {
+                        const [parsed] = voice(feel, bassOn, `${root}mb6`, root, intensity);
+                        expect(parsed.quality, `${root}mb6 in ${feel}`).toBe('mb6');
+                        const [chord] = getState().arranger.progression;
+                        const fifths = parsed.midis.filter((m) => degreeOf(m, chord) === 7);
+                        const flatSixes = parsed.midis.filter((m) => degreeOf(m, chord) === 8);
+                        if (fifths.length === 0 || flatSixes.length === 0) {
+                            continue;
+                        }
+                        sawBoth++;
+                        for (const fifth of fifths) {
+                            for (const flatSix of flatSixes) {
+                                if (flatSix - fifth === 13) {
+                                    offenders.push(
+                                        `${root}mb6 in ${feel}, bass on: ${bassOn} @${intensity}: ${parsed.midis.join(',')}`,
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        // Guard the guard: a voicing that dropped one of the two tones everywhere would
+        // make every check above vacuous.
+        expect(sawBoth, 'no mb6 voicing carried both the 5 and the b6').toBeGreaterThan(0);
+        expect(offenders, 'an mb6 5th sits a minor 9th below its b6').toEqual([]);
+    });
+
+    it('getChordDetails never marks an m6 as a 7th chord (Am6/9\'s "9" is not a 7th)', () => {
+        expect(getChordDetails('m6')).toMatchObject({ quality: 'm6', is7th: false });
+        expect(getChordDetails('m6/9')).toMatchObject({ quality: 'm6', is7th: false });
+        const [am69] = voice('Jazz', true, 'Am6/9', 'A');
+        expect(am69.degrees.has(10)).toBe(false);
+    });
+
+    it('written minor extensions reach their own branches outside the bass-space feels', () => {
+        // getIntervals' generic minor-family test used to shadow m6/m9/m11/m13.
+        const [am6, am9] = voice('Acoustic', true, 'Am6 | Am9');
+        expect(am6.degrees.has(9)).toBe(true);
+        expect(am9.degrees.has(10)).toBe(true);
+        expect(am9.degrees.has(2)).toBe(true);
+    });
+
+    it('getRootlessVoicing refuses m6 rather than answering with a minor-7 shell', () => {
+        expect(getRootlessVoicing(getState(), 'm6', false, false)).toBeNull();
+        expect(getRootlessVoicing(getState(), 'm6', false, true)).toBeNull();
+    });
+
+    // #1336 — same class as the m6 refusal above. `shouldUseRootlessVoicing` already says no
+    // (its minor bucket requires `is7th`, and no SUFFIX_QUALITIES row gives `m#5` a seventh),
+    // so this asserts the DIRECT-caller contract the m6 guard exists for: without it the
+    // minor-family fallthrough answers [3, 7, 10] — a natural 5 on a chord written with a
+    // sharp one, plus an unwritten b7.
+    it('getRootlessVoicing refuses m#5 rather than answering with a minor-7 shell', () => {
+        expect(getRootlessVoicing(getState(), 'm#5', false, false)).toBeNull();
+        expect(getRootlessVoicing(getState(), 'm#5', false, true)).toBeNull();
+    });
+
+    // #1336 — the rich-density extension tier, driven through `getIntervals` directly because
+    // the shared `voice()` probe only parses at `standard` density (as does the whole identity
+    // matrix), so nothing else in the suite reaches this tier. The generic `isAltered5`
+    // default is [9, #11], and the #11 is a FLAT fifth stacked onto a chord written with a
+    // sharp one; `m#5` takes the minor family's own 9/11 colours instead.
+    it('a rich m#5 takes the minor 9/11 colours, never a b5 beside its #5', () => {
+        for (const genre of ['Jazz', 'Acoustic']) {
+            const state = getState();
+            state.playback.bandIntensity = 0.35; // below every intensity-driven backfill tier
+            const intervals = getIntervals(state, 'm#5', false, 'rich', genre, true);
+            const degrees = new Set(intervals.map((i) => ((i % 12) + 12) % 12));
+            expect(
+                [...degrees].sort((a, b) => a - b),
+                genre,
+            ).toEqual([0, 2, 3, 5, 8]);
+            expect(degrees.has(6), `${genre} sounds a b5 beside the #5`).toBe(false);
+            expect(degrees.has(7), `${genre} sounds a natural 5`).toBe(false);
+        }
+    });
+
+    // #1340 — `m7#5` is the one member of this family that DOES reach the rootless shell in
+    // production: `shouldUseRootlessVoicing`'s minor bucket is `minor-family && is7th`, which
+    // is shape-based, not a name list, so the new quality qualified the moment it existed.
+    // Without its own branch in `getRootlessVoicing` it fell through to the standard minor-7
+    // shell [3, 7, 10] — the natural 5 the chart sharpened, over a sounding bass.
+    it('getRootlessVoicing gives m7#5 a b3-#5-b7 shell, never the minor-7 one', () => {
+        expect(getRootlessVoicing(getState(), 'm7#5', true, false)).toEqual([3, 8, 10]);
+        expect(getRootlessVoicing(getState(), 'm7#5', true, true)).toEqual([3, 8, 10, 14]);
+        for (const shell of [
+            getRootlessVoicing(getState(), 'm7#5', true, false),
+            getRootlessVoicing(getState(), 'm7#5', true, true),
+        ]) {
+            expect(shell.map((i) => i % 12)).not.toContain(7);
+        }
+    });
+
+    // #1340 — the rooted rich tier for `m7#5`. The musical claim is the output, not the table
+    // row: four written tones plus the 9, and NO fifth of either kind — not the natural 5 the
+    // chart sharpened, and not the #11 (a b5) the generic `isAltered5` rich default would reach
+    // for. (The `safeExtensions` row's second entry is unreachable today; see its comment.)
+    it('a rich m7#5 adds the 9 and no fifth of either kind', () => {
+        const state = getState();
+        state.playback.bandIntensity = 0.35; // below every intensity-driven backfill tier
+        const intervals = getIntervals(state, 'm7#5', true, 'rich', 'Acoustic', false);
+        expect(intervals).toEqual([0, 3, 8, 10, 14]);
+        const degrees = new Set(intervals.map((i) => ((i % 12) + 12) % 12));
+        expect(degrees.has(7), 'sounds a natural 5').toBe(false);
+        expect(degrees.has(6), 'sounds a b5 beside the #5').toBe(false);
+    });
+
+    // #1340 — and `mb6` is the m6 case exactly: a triad plus a colour tone, so there is no
+    // 3rd-plus-7th shell to state. Production never routes here (the bucket above needs
+    // `is7th`), so this is the direct-caller contract; the fallthrough would answer [3, 7, 10],
+    // swapping the written ♭6 for an unwritten b7.
+    it('getRootlessVoicing refuses mb6 rather than answering with a minor-7 shell', () => {
+        expect(getRootlessVoicing(getState(), 'mb6', false, false)).toBeNull();
+        expect(getRootlessVoicing(getState(), 'mb6', false, true)).toBeNull();
+    });
+
+    // #1340 — `mb6` is NOT `isAltered5` (its name carries no 'b5'/'#5', and its natural 5 is
+    // real), so the intensity tier that hands a plain triad a seventh had nothing stopping it:
+    // a written Cm(b6) came out C-Eb-G-Ab-Bb, the `min7b6` iReal spells with a different token.
+    // `NO_SEVENTH_QUALITIES` is the guard, the same one `m6`/`madd9` use. 0.65 is the lowest
+    // intensity that reaches the tier; Jazz/Funk/Rock are excluded from it by genre, which is
+    // why the probe genres are Acoustic and Neo-Soul.
+    it('a loud mb6 keeps its b6 and never gains a b7', () => {
+        for (const genre of ['Acoustic', 'Neo-Soul']) {
+            for (const intensity of [0.65, 0.9]) {
+                const state = getState();
+                state.playback.bandIntensity = intensity;
+                const intervals = getIntervals(state, 'mb6', false, 'standard', genre, true);
+                const degrees = new Set(intervals.map((i) => ((i % 12) + 12) % 12));
+                const where = `${genre} @${intensity}`;
+                expect(degrees.has(10), `${where} gained an unwritten b7`).toBe(false);
+                expect(degrees.has(9), `${where} sounds the natural 6 it flattens`).toBe(false);
+                expect(degrees.has(8), `${where} lost its b6`).toBe(true);
+                expect(degrees.has(7), `${where} lost its natural 5`).toBe(true);
+                expect(degrees.has(3), `${where} lost its b3`).toBe(true);
+            }
+        }
+    });
+
+    // #1340 — the rich tier: 9 only. The generic default would be [14] anyway for a quality
+    // that is not `isAltered5`, so the row's real job is to be explicit that the 11 is NOT
+    // wanted here (the 5 and ♭6 are already a semitone pair; an 11 under them crowds it).
+    it('a rich mb6 takes the 9 alone', () => {
+        const state = getState();
+        state.playback.bandIntensity = 0.35; // below every intensity-driven backfill tier
+        const intervals = getIntervals(state, 'mb6', false, 'rich', 'Acoustic', true);
+        expect(intervals).toEqual([0, 3, 7, 8, 14]);
+    });
+
+    // #1341 — the `aug` rich row held 22 (a b7) under a "#11" comment, so a plain C+ became
+    // C+7 at rich density: dominant function the chart never wrote.
+    it('a rich aug TRIAD never gains a b7; aug7 keeps the one it was written with', () => {
+        for (const genre of ['Jazz', 'Acoustic', 'Rock']) {
+            const state = getState();
+            state.playback.bandIntensity = 0.35;
+            const triad = getIntervals(state, 'aug', false, 'rich', genre, true);
+            const triadDegrees = new Set(triad.map((i) => ((i % 12) + 12) % 12));
+            expect(triadDegrees.has(10), `${genre} C+ sounds a b7`).toBe(false);
+            expect(triadDegrees.has(7), `${genre} C+ sounds a natural 5`).toBe(false);
+            expect(
+                [...triadDegrees].sort((a, b) => a - b),
+                genre,
+            ).toEqual([0, 2, 4, 6, 8]);
+
+            const seventh = getIntervals(state, 'aug', true, 'rich', genre, true);
+            expect(
+                seventh.some((i) => ((i % 12) + 12) % 12 === 10),
+                `${genre} C+7 lost its b7`,
+            ).toBe(true);
+        }
+    });
+
+    // #1341 — `quality` derives from chart text; an inherited Object.prototype key must not be
+    // read out of the extension table as a truthy "row".
+    it('an inherited-property quality name takes the fallback instead of throwing', () => {
+        const state = getState();
+        state.playback.bandIntensity = 0.35;
+        for (const hostile of ['constructor', 'toString', '__proto__', 'hasOwnProperty']) {
+            expect(() => getIntervals(state, hostile, false, 'rich', 'Jazz', true)).not.toThrow();
+        }
+    });
+});

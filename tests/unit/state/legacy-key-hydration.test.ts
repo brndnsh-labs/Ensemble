@@ -61,3 +61,46 @@ describe('legacy session hydration (#1174 removed keys)', () => {
         expect(getState().soloist.doubleStopProb).toBeUndefined();
     });
 });
+
+/**
+ * #1314 — `playback.practiceMode` was a default-on preference whose last two behavioural
+ * readers went away in #1313 (bass space now follows the bass LANE). Every session saved
+ * before this release carries it, so hydration has to walk past it: no throw, and no
+ * ad-hoc field appearing on the live slice for a reducer or a sync payload to pick up.
+ */
+describe('legacy session hydration (#1314 retired practiceMode)', () => {
+    beforeEach(() => {
+        store.clear();
+    });
+
+    it.each([true, false])(
+        'ignores a saved practiceMode: %s without throwing or resurrecting it',
+        (saved) => {
+            localStorage.setItem(
+                'ensemble_currentState',
+                JSON.stringify({
+                    bpm: 132,
+                    key: 'F',
+                    timeSignature: '4/4',
+                    practiceMode: saved, // retired in #1314
+                    countIn: false,
+                    songMode: false,
+                    sections: [{ id: 's1', label: 'A', value: 'I | V', repeat: 1 }],
+                }),
+            );
+
+            expect(() => hydrateState()).not.toThrow();
+
+            // The rest of the saved session still hydrates — proof the read reached the
+            // fields around the retired one rather than bailing out early.
+            expect(playback.bpm).toBe(132);
+            expect(playback.countIn).toBe(false);
+            expect(playback.songMode).toBe(false);
+            expect(arranger.sections[0].label).toBe('A');
+
+            // The retired key is not on the live slice, under any spelling.
+            expect(playback.practiceMode).toBeUndefined();
+            expect(Object.hasOwn(playback, 'practiceMode')).toBe(false);
+        },
+    );
+});

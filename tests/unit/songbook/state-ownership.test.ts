@@ -32,7 +32,6 @@ const { captured, mockState } = vi.hoisted(() => ({
             sessionTimer: 5,
             songMode: true,
             autoIntensity: true,
-            practiceMode: true,
             masterVolume: 0.4,
         },
         chords: {},

@@ -105,6 +105,32 @@ The URL pin uses top-level `?seed=` so audition links don't have to
 round-trip through the base64 `bnd` payload that the in-app share
 modal produces.
 
+### Ad-hoc scenarios — a link per listen-checklist line
+
+`--prog` replaces `--scene` with any progression in any genre, which is
+what turns a `verify-by-ear` checklist line into something clickable.
+Post the links as an issue/PR comment next to the line they audition:
+
+```bash
+npm run --silent audition-link -- --base-url=https://ensemble.brndn.zip/ \
+    --prog="C | C+ | C6 | C7" --genre=Jazz --density=rich
+npm run --silent audition-link -- --base-url=https://ensemble.brndn.zip/ \
+    --prog="Cm | Cmb6 | Cm6 | Cmb6" --genre=Neo-Soul --on=soloist --off=harmony
+```
+
+Flags: `--genre` (one of the 13, validated — hydration silently drops an
+unknown one), `--key`, `--ts` (e.g. `6/8`), `--bpm` (omit to leave tempo to the app), `--int`
+(band intensity 0–1, default 0.35), `--density=thin|standard|rich`,
+`--on=` / `--off=` with any of `soloist,bass,chords,harmony`. **The
+soloist is off by default**, so a line about the soloist needs
+`--on=soloist`. Drums can't be switched from a link: the `bnd` groove
+block also carries swing, so emitting it would pin swing to a number and
+override the genre's feel. Only the blocks a link switches are emitted,
+each as the part's full default config — hydration applies a block
+wholesale, so a bare `{e:0}` would reset that part's octave.
+`tests/scripts/audition-link-roundtrip.test.ts` feeds generated links
+through the real `loadFromUrl`.
+
 ## `npm run mix:analyze -- <file> [<file> ...]`
 
 Runs the same spectral / stereo / RMS analysis as `mix:report` on an arbitrary

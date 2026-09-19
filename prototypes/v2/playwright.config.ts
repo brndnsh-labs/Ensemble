@@ -10,7 +10,8 @@ const liveTest = process.env.V2_LIVE_TEST === '1';
 // and `2/2` ran 50 tests each in 1.7m against 3.7m, and the job was no faster than not sharding.
 // `foundation.spec.ts` alone is 42% of the suite's seconds, so it gets its own runner and
 // everything else — including any spec added later, which needs no change here — gets the other.
-const heavy = '**/foundation.spec.ts';
+// The audio-export spec (#1278) joins it: five full offline WAV renders, minutes of wall clock.
+const heavy = ['**/foundation.spec.ts', '**/audio-export.chromium.spec.ts'];
 const shard = process.env.V2_SHARD;
 // Passkey specs drive a CDP virtual authenticator, which only Chromium has.
 const chromiumOnly = '**/*.chromium.spec.ts';
@@ -43,7 +44,7 @@ export default defineConfig({
             name: 'webkit-phone',
             use: { ...devices['iPhone 13'], viewport: { width: 402, height: 874 } },
             // A project-level `testIgnore` REPLACES the top-level one, so restate the shard's.
-            testIgnore: shard === 'rest' ? [heavy, chromiumOnly] : chromiumOnly,
+            testIgnore: shard === 'rest' ? [...heavy, chromiumOnly] : chromiumOnly,
         },
     ],
 });

@@ -24,6 +24,15 @@ export const AUTH_POLICIES: Readonly<Record<string, Policy>> = Object.freeze({
     'GET /api/auth/session': policy('empty', 120),
     'POST /api/auth/logout': policy('empty', 30),
     'POST /api/auth/sessions/revoke-others': policy('empty', 10),
+    // #1271. Deleting an account is a once-in-a-lifetime action already gated on a fresh passkey
+    // ceremony, so this stays well below the ceremony routes' own budgets — but not as tight as
+    // 3/10min: the client's own step-up retry (`withFreshAuth`) spends TWO requests on a stale
+    // session (the first attempt answers `403 fresh_auth_required`, then the re-proved retry),
+    // so two dismissed platform prompts plus one real deletion already spends 6, more than the
+    // old ceiling had for the whole window. `10`, the same max attempts `sessions/revoke-others`
+    // allows (albeit over a longer window here), for the same reason: both are rare,
+    // already-authenticated, already-gated actions.
+    'POST /api/auth/account/delete': policy('empty', 10, 10 * minute),
     'GET /api/auth/passkeys': policy('empty', 60),
     'POST /api/auth/passkeys/options': policy('label', 10),
     'POST /api/auth/passkeys/verify': policy('registration', 20),

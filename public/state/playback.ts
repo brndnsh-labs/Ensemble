@@ -31,7 +31,6 @@ export const playback = deepSignal<GlobalContext>({
     bandIntensity: 0.35,
     complexity: 0.3,
     autoIntensity: true,
-    practiceMode: true,
     metronome: false,
     applyPresetSettings: false,
     sustainActive: false,
@@ -104,7 +103,6 @@ export function playbackReducer(action: Action): boolean {
             // the one with teeth: it is clamped to [0,1], so a persisted `0` survived
             // the fallback and booted the app **silent** — a silent app on top of a
             // deliberately silent recovery is the worst case to debug.
-            p.practiceMode = true;
             p.songMode = true;
             p.masterVolume = 0.4;
             return true;
