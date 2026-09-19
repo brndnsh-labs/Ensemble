@@ -12,6 +12,12 @@
  *       degree and no MISNAMING degree, across bass-space and rooted feels, bass on and
  *       muted, at a quiet and a loud intensity (the intensity tiers add extensions, which
  *       is where a "different chord" creeps back in).
+ *   (d) the functional TARGET tones (`chordTargetTones`) never include a MISNAMING degree.
+ *       They are derived from the quality string, not the voicing, and feed three lanes:
+ *       the soloist's strong-beat landing, the walking bass, and the comp's Q&A echo
+ *       support voice (which builds a real note from them). A new quality that falls into
+ *       the wrong class is the comper's bug one lane over — `madd9` shipped its first
+ *       draft in the minor-7 class, b7 and all.
  *   (c) the LIVE layer (`getAccompanimentNotes`) never sounds a MISNAMING degree — the
  *       Funk clav cell rebuilds the voicing by pitch class with a synthesized fallback,
  *       so it can invent the very tone the parse layer refused to.
@@ -25,6 +31,7 @@
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 import { getChordDetails } from '../../../public/engine/chords-engine.js';
+import { chordTargetTones } from '../../../public/engine/soloist-pitch-engine.js';
 import { COMP_REGISTER_FLOOR } from '../../../public/engine/voicing-policy.js';
 import { dispatch } from '../../../public/state.js';
 import { ACTIONS } from '../../../public/types.js';
@@ -366,6 +373,30 @@ describe('Chord identity matrix (#1320-#1324)', () => {
                     is7th,
                 });
             }
+        });
+    });
+
+    describe('(d) functional target tones', () => {
+        it.each(MATRIX)('C$spelling targets none of its misnaming degrees', (row) => {
+            const { guides, pillars } = chordTargetTones(0, row.quality);
+            for (const pc of [...guides, ...pillars]) {
+                expect(row.misnaming, `C${row.spelling} targets degree ${pc}`).not.toContain(pc);
+            }
+        });
+
+        it('a suspended dominant targets its 4th and b7, never the major 3rd (#1328)', () => {
+            for (const quality of ['7sus4', '9sus4', '13sus4']) {
+                const { guides, pillars } = chordTargetTones(0, quality);
+                expect(guides, quality).toEqual([5, 10]);
+                expect([...guides, ...pillars], quality).not.toContain(4);
+            }
+            expect(chordTargetTones(0, 'sus2').guides).toEqual([2]);
+        });
+
+        it('a minor-major 7th targets its major 7th, never the b7', () => {
+            const { guides, pillars } = chordTargetTones(0, 'mMaj7');
+            expect(guides).toContain(11);
+            expect([...guides, ...pillars]).not.toContain(10);
         });
     });
 
