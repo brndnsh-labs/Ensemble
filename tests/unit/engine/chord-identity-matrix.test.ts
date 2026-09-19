@@ -54,9 +54,12 @@ const MATRIX = [
         is7th: false,
         defining: [4],
         misnaming: [3, 11],
-        // why: the Funk clav cell synthesizes a b7 over a plain triad (C -> E-Bb-D). That
-        // is the lane's dominant-7 idiom, not a parse defect — flagged for a decision.
-        liveAllows: [10],
+        // why: the Funk clav cell adds a seventh over a plain triad — that is the lane's
+        // idiom, not a parse defect. Since #1327 the tone is the one the chart's KEY gives
+        // this root, so on the I of this C-major sweep it is the maj7 (C -> E-B-D). What
+        // stops it being the out-of-key b7 again is the cross-lane test in
+        // tests/standards/funk-clav-key-agreement-critique.test.ts, not this row.
+        liveAllows: [11],
     },
     { spelling: 'm', quality: 'minor', is7th: false, defining: [3], misnaming: [4, 11] },
     { spelling: 'min', quality: 'minor', is7th: false, defining: [3], misnaming: [4, 11] },
@@ -101,9 +104,6 @@ const MATRIX = [
         is7th: true,
         defining: [5, 10],
         misnaming: [4],
-        // why: the Funk clav cell finds no 3rd on an 11 chord and synthesizes a major one,
-        // the same synthesized-fallback class as its plain-triad b7 — #1327 owns that cell.
-        liveAllows: [4],
     },
     { spelling: '13', quality: '13', is7th: true, defining: [4, 10], misnaming: [3, 11] },
     { spelling: '7b9', quality: '7b9', is7th: true, defining: [4, 10, 1], misnaming: [3, 11] },
@@ -140,9 +140,6 @@ const MATRIX = [
         is7th: false,
         defining: [3, 6],
         misnaming: [4, 7, 11],
-        // why: the clav cell's "seventh" picker finds no b7/maj7 on a diminished chord and
-        // synthesizes a b7 (out-of-scope gap — a dim7's own 7th is the bb7).
-        liveAllows: [10],
     },
     {
         spelling: 'dim7',
@@ -150,7 +147,6 @@ const MATRIX = [
         is7th: true,
         defining: [3, 6, 9],
         misnaming: [4, 7, 11],
-        liveAllows: [10],
     },
     {
         spelling: 'o7',
@@ -158,7 +154,6 @@ const MATRIX = [
         is7th: true,
         defining: [3, 6, 9],
         misnaming: [4, 7, 11],
-        liveAllows: [10],
     },
     { spelling: 'aug', quality: 'aug', is7th: false, defining: [4, 8], misnaming: [3, 7] },
     { spelling: '+', quality: 'aug', is7th: false, defining: [4, 8], misnaming: [3, 7] },
@@ -193,11 +188,6 @@ const MATRIX = [
         is7th: false,
         defining: [0, 7],
         misnaming: [3, 4],
-        // why: a power chord's identity is the ABSENCE of a third, and the Funk clav cell
-        // has no two-note form — it builds 3-b7-9 by pitch class and synthesizes all three
-        // over a bare [0, 7]. Pre-existing and a genuine design call (what does a clav play
-        // on a power chord?), so the parse layer is guarded and the live layer is not.
-        liveAllows: [3, 4],
     },
 
     // ---- #1320 capitalised / Greek-delta major-7 spellings ----
@@ -228,7 +218,7 @@ const MATRIX = [
         is7th: false,
         defining: [4],
         misnaming: [3, 11],
-        liveAllows: [10],
+        liveAllows: [11], // the clav's key-diatonic seventh (#1327) — see the '' row above
     },
     // #1329 — a bare `maj`/`ma` is the major TRIAD; `△`/`^` alone stay maj7 (iReal grammar).
     {
@@ -237,7 +227,7 @@ const MATRIX = [
         is7th: false,
         defining: [4],
         misnaming: [3, 11],
-        liveAllows: [10],
+        liveAllows: [11], // the clav's key-diatonic seventh (#1327) — see the '' row above
     },
     {
         spelling: 'ma',
@@ -245,7 +235,7 @@ const MATRIX = [
         is7th: false,
         defining: [4],
         misnaming: [3, 11],
-        liveAllows: [10],
+        liveAllows: [11], // the clav's key-diatonic seventh (#1327) — see the '' row above
     },
     { spelling: '△', quality: 'maj7', is7th: true, defining: [4, 11], misnaming: [3, 10] },
     { spelling: '^', quality: 'maj7', is7th: true, defining: [4, 11], misnaming: [3, 10] },
@@ -286,7 +276,7 @@ const MATRIX = [
         is7th: false,
         defining: [4],
         misnaming: [3, 11],
-        liveAllows: [10],
+        liveAllows: [11], // the clav's key-diatonic seventh (#1327) — see the '' row above
     },
     {
         spelling: 'add4',
@@ -294,7 +284,7 @@ const MATRIX = [
         is7th: false,
         defining: [4],
         misnaming: [3, 11],
-        liveAllows: [10],
+        liveAllows: [11], // the clav's key-diatonic seventh (#1327) — see the '' row above
     },
     { spelling: 'sus4add9', quality: 'sus4', is7th: false, defining: [5], misnaming: [3, 4] },
 
