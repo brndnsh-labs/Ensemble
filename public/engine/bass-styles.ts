@@ -1,8 +1,32 @@
 import { REGGAE_RIDDIMS } from '../config.js';
 import type { EnsembleState, StepInfo } from '../types.js';
-import { getFrequency } from '../utils.js';
+import { chordHasPerfectFifth, getFrequency } from '../utils.js';
 import { scrambleHash } from './hash-utils.js';
 import { chordTargetTones } from './soloist-pitch-engine.js';
+
+/**
+ * What a bass FIFTH slot should sound over this chord, as an interval above the root (#1334).
+ *
+ * The diminished family keeps its b5: it is a chord tone the bass idiomatically outlines, and
+ * these slots already voiced it. Everything else without a perfect fifth — `aug`, `augmaj7`,
+ * `7b5`, `7alt`, `maj7b5` — returns 0, the ROOT. That is `chordHasPerfectFifth`'s documented
+ * answer for this lane: down at MIDI 34-46 a b5/#5 fights the root the bass is sounding, so the
+ * bass states the root and leaves the alteration to the comper's register. Before this, three
+ * slots hand-rolled `hasFlat5 = quality === 'dim' || 'halfdim'` and played a natural 5 a
+ * semitone from the altered fifth the comp was voicing.
+ *
+ * Ordinary chords are unchanged by construction: every quality with a perfect fifth still
+ * returns 7, and the diminished family still returns 6.
+ */
+function fifthSlotInterval(quality: string | undefined | null): number {
+    const q = (quality || '').toLowerCase();
+    // Same union `chordHasPerfectFifth` reads: the canonical 'dim'/'halfdim' plus the longer
+    // spellings that reach us from imported or hand-built chord objects.
+    if (q.includes('dim') || q === 'm7b5' || q === 'half-diminished') {
+        return 6;
+    }
+    return chordHasPerfectFifth(q) ? 7 : 0;
+}
 
 type ChordChangeShape = {
     rootMidi: number;
@@ -1122,8 +1146,7 @@ export function getBassNoteStyle(
         // pulse. #941 removed the `+ intensity * 0.15` macro slope.
         let vel = 0.95;
         if (intensity > 0.65 && bassDraw(112) < 0.3 + intensity * 0.2 && !isSoloistBusy) {
-            const hasFlat5 = chord.quality === 'dim' || chord.quality === 'halfdim';
-            const fifthOffset = hasFlat5 ? 6 : 7;
+            const fifthOffset = fifthSlotInterval(chord.quality); // #1334
             note = bassDraw(113) < 0.5 ? baseRoot + 12 : baseRoot + fifthOffset;
             note = clampAndNormalize(note);
             vel *= 1.1;
@@ -1135,8 +1158,9 @@ export function getBassNoteStyle(
     // --- BOSSA NOVA / SAMBA STYLE ---
     if (style === 'bossa') {
         const root = baseRoot;
-        const hasFlat5 = chord.quality.includes('dim') || chord.quality.includes('halfdim');
-        const fifthInterval = hasFlat5 ? 6 : 7;
+        // #1334 — the same slot one genre over: on a chord with no perfect fifth this becomes a
+        // root/root-octave alternation rather than a natural 5 against the comp's altered one.
+        const fifthInterval = fifthSlotInterval(chord.quality);
         const fifthUp = clampAndNormalize(root + fifthInterval);
         const fifthDown = clampAndNormalize(root - (12 - fifthInterval)); // same pitch class, octave lower
         const rootOctaveUp = clampAndNormalize(root + 12);
@@ -1915,13 +1939,11 @@ export function getBassNoteStyle(
             if (isDownbeat) {
                 return result(getFrequency(withOctaveJump(baseRoot)), 2, 1.05);
             }
-            const hasFlat5 = chord.quality === 'dim' || chord.quality === 'halfdim';
-            const hasSharp5 = chord.quality === 'aug' || chord.quality === 'augmaj7';
+            // #1334 — the augmented branch used to sound the #5 here; per the decision the
+            // aug-family fifth is the comper's, and the bass states the root.
             return result(
                 getFrequency(
-                    clampAndNormalize(
-                        withOctaveJump(baseRoot + (hasFlat5 ? 6 : hasSharp5 ? 8 : 7)),
-                    ),
+                    clampAndNormalize(withOctaveJump(baseRoot + fifthSlotInterval(chord.quality))),
                 ),
                 2,
                 1.05,
@@ -1942,8 +1964,7 @@ export function getBassNoteStyle(
 
         if (intBeat === 2 && isBeatStart && !isSoloistBusy) {
             // Beat 3: High preference for 5th or Octave
-            const hasFlat5 = chord.quality === 'dim' || chord.quality === 'halfdim';
-            const fifthOffset = hasFlat5 ? 6 : 7;
+            const fifthOffset = fifthSlotInterval(chord.quality); // #1334
             const targetInterval = bassDraw(119) < 0.7 ? fifthOffset : 0;
             return result(
                 getFrequency(clampAndNormalize(baseRoot + targetInterval)),
