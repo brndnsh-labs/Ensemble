@@ -208,6 +208,76 @@ export const SIGN_OUT_MESSAGES = {
         'Signed out — but your account’s songs could not be removed from this device. Sign in again and sign out to clear them.',
 } as const;
 
+/**
+ * The one sentence an account-store write refused for belonging to SOMEONE ELSE produces (#1311).
+ *
+ * Deliberately one constant rather than an entry in each table above: the refusal is the same fact
+ * whether it stopped a Save, a retained draft, a Keep-both or a cloud delete, and a musician who
+ * meets it twice through two different actions must not be told two different stories about which
+ * account their chart is in. It is also the only sentence here that is NOT about a document's
+ * relationship with the cloud — nothing was attempted against the server at all — so stretching
+ * `SYNC_MESSAGES`' "Saved on this device" prefix or `DELETE_MESSAGES`' "nothing was deleted" over
+ * it would be a template rather than an honest sentence.
+ *
+ * It names the two things that actually work: export the chart (a file on the musician's own disk
+ * needs no account), or sign back in as the account that holds it. It never suggests a retry,
+ * because nothing about trying again changes whose account this device is attached to.
+ *
+ * **What the fence is for, and what it is deliberately not.** It stops a SILENT crossing: a write
+ * the musician never asked to make into this account, produced by a keystroke or a Save landing
+ * somewhere they had no way to see. Exporting the chart and then importing that file into the
+ * signed-in account is the opposite of that — two deliberate human acts, with a file on disk in
+ * between — and it is by design not refused. The sentence says "export it" because that IS the
+ * supported way to carry music between accounts on one device.
+ */
+export const OWNER_MESSAGES = {
+    mismatch:
+        'This chart belongs to a different account on this device — export it, or sign back in as that account.',
+} as const;
+
+/**
+ * Is a chart that belongs to `owner` out of bounds for the account `attached` to this device
+ * (#1311)? The ONE predicate both layers ask — the shell against what it believes is attached, the
+ * loop against the scope it actually holds — so the two halves of the fence can never disagree
+ * about what a mismatch is.
+ *
+ * A null on either side is deliberately NOT a mismatch. A null `owner` is a caller making no claim
+ * at all (a brand-new document, an adopted guest song, a chart the stand opened before the loop
+ * published an owner), which belongs to whichever account is live; a null `attached` is a device
+ * holding no account, which is a different refusal with a different sentence — "signed out" — and
+ * conflating the two would tell a musician their own chart belongs to somebody else.
+ */
+export function belongsToAnotherAccount(owner: string | null, attached: string | null): boolean {
+    return owner !== null && attached !== null && owner !== attached;
+}
+
+/**
+ * A write refused because the chart it carries belongs to another account (#1311).
+ *
+ * A typed error rather than a bare `Error` for the reason `AccountChangedError` and
+ * `SaveTransportError` are: the refusal has to be distinguishable from a storage failure or a
+ * lapsed session WITHOUT matching on the sentence, since the sentence is copy and copy moves.
+ * `storeSave` and `retainInTab` in `app/ensemble.tsx` both branch on `instanceof` — a mismatch is
+ * not a failed Save (`saveFailed` stays false for it) and not a storage error (the draft warning
+ * drops its "Draft is only in this tab:" wrapper for it).
+ *
+ * The two owners ride along for diagnosis. Nothing renders them and nothing should: an account id
+ * is a server identifier, and putting one in front of a musician explains nothing.
+ */
+export class AccountMismatchError extends Error {
+    /** The account the caller says the chart belongs to, or null when it claimed none. */
+    readonly chartOwner: string | null;
+    /** The account this device actually holds, or null while it holds none. */
+    readonly attachedOwner: string | null;
+
+    constructor(chartOwner: string | null, attachedOwner: string | null) {
+        super(OWNER_MESSAGES.mismatch);
+        this.name = 'AccountMismatchError';
+        this.chartOwner = chartOwner;
+        this.attachedOwner = attachedOwner;
+    }
+}
+
 const UNOBSERVED: Progress = { required: null, verified: null };
 
 /** One page per 25 documents (`OUTBOX_PAGE_LIMIT`) over the server's 2,000-document cap. */
@@ -490,8 +560,22 @@ export interface SyncLoop {
     watch(documentId: string | null): Promise<void>;
     /** Every saved song for this account, paged to the end. */
     listLibrary(): Promise<SavedSong[]>;
-    /** Commit locally and queue that exact version. Does NOT send; the caller triggers a pass. */
-    save(document: ChartDocument, expected: number | null): Promise<SavedSong>;
+    /**
+     * Commit locally and queue that exact version. Does NOT send; the caller triggers a pass.
+     *
+     * `owner` is the account the CALLER believes this chart belongs to, or null when it makes no
+     * claim — a brand-new document, or a guest song being adopted (#1311). A claim that does not
+     * match the attached scope is refused with `AccountMismatchError` BEFORE the songbook is
+     * touched, so a refused Save writes no record, no outbox operation and no draft. The case:
+     * the session expires under account A's chart, "Sign in again" is answered with B's passkey,
+     * and a plain Save — or `Save a copy`, which passes `expected: null` and would therefore
+     * succeed — files A's chart content inside B's account.
+     */
+    save(
+        document: ChartDocument,
+        expected: number | null,
+        owner: string | null,
+    ): Promise<SavedSong>;
     /**
      * Retain this writer's unsaved experiment on an account chart (#1299) — the account half of
      * `lib/repository.ts`'s guest `recover`, and emphatically NOT an upload: it writes one row to
@@ -514,7 +598,9 @@ export interface SyncLoop {
          * point: a session can expire under an account chart and the musician can answer "Sign in
          * again" with a DIFFERENT passkey. The loop then holds account B while the stand still
          * holds A's song, and the next keystroke would retain A's chart text inside B's database.
-         * Named here, compared in `retentionScope`, and refused rather than written.
+         * Named here, compared in `retentionScope`, and refused rather than written — with
+         * `AccountMismatchError` since #1311, so the shell can tell this refusal from a storage
+         * failure without reading the sentence.
          */
         owner: string | null,
     ): Promise<void>;
@@ -536,23 +622,41 @@ export interface SyncLoop {
      * per-gesture cap starts dropping them.
      */
     retainedDrafts(documentIds: string[]): Promise<Map<string, ChartDocument>>;
-    /** Drop this writer's retained experiment, once a Save has committed what it held. */
-    discardDraft(documentId: string): Promise<void>;
+    /**
+     * Drop this writer's retained experiment, once a Save has committed what it held.
+     *
+     * Takes the `owner` for the reason every write here does (#1311 patch): a delete keyed by
+     * document id against the WRONG account's `drafts` store is a no-op only while the assumption
+     * that it is the wrong account holds. It is a write, so it is fenced like one.
+     */
+    discardDraft(documentId: string, owner: string | null): Promise<void>;
     /**
      * Drop every writer's, once the chart on the stand is its committed version again — see
-     * `AccountSongbook.discardDrafts` for why a revert cannot be a per-writer operation.
+     * `AccountSongbook.discardDrafts` for why a revert cannot be a per-writer operation. Fenced
+     * on `owner` like `discardDraft`, and for the same reason.
      */
-    discardDrafts(documentId: string): Promise<void>;
-    /** Remember/read which chart this account last had on the stand here (#1299). */
-    rememberOpened(documentId: string): Promise<void>;
+    discardDrafts(documentId: string, owner: string | null): Promise<void>;
+    /**
+     * Remember which chart this account last had on the stand here (#1299).
+     *
+     * Fenced on `owner` since #1311: it writes a document id into an account's own `meta`, and an
+     * id belonging to somebody else's library there is both a leak of what was open and a Continue
+     * card that cannot open anything.
+     */
+    rememberOpened(documentId: string, owner: string | null): Promise<void>;
     lastOpened(): Promise<string | null>;
     /**
      * Delete one document from the cloud (#1270): an explicit ONLINE operation with a frozen,
      * retry-safe operation id, never a side effect of removing a local copy. Sends immediately
      * rather than joining the outbox — a delete is a deliberate human act that must report its own
      * outcome, not a queued intention the musician walks away from.
+     *
+     * `owner` is the account the caller believes this chart belongs to (#1311). A mismatch is
+     * reported as an ordinary `refused` result rather than thrown, exactly as this method's other
+     * pre-send refusals are — and, like them, it answers before `prepareDelete`, so no operation
+     * id is frozen for a request that never left and nothing local moves.
      */
-    deleteFromCloud(documentId: string): Promise<CloudDeleteResult>;
+    deleteFromCloud(documentId: string, owner: string | null): Promise<CloudDeleteResult>;
     /**
      * Resolve this document's refused Save by keeping both (#1267) — the one way out of a
      * conflicted outbox head, which is otherwise terminal and parks every later Save of that song
@@ -564,8 +668,21 @@ export interface SyncLoop {
      *
      * `null` when the queue no longer holds a refused Save. The caller is then a moment stale, not
      * wrong, and the fresh observation published below is the answer.
+     *
+     * `owner` is the account the caller believes this chart belongs to (#1311). A mismatch is
+     * refused with `AccountMismatchError` before the transaction opens: keeping both writes a new
+     * local line for the chart on the stand, and under the wrong account that line is one person's
+     * music filed in another person's library.
+     *
+     * The resolution carries `ownerId` — the scope this transaction actually SETTLED TO, not the
+     * caller's claim (#1311 patch review R1). The shell re-points the chart on the stand at the
+     * new identity and must bind it to the account the line really landed in; deriving that from
+     * a render snapshot instead is how a stale `null` owner becomes an unfenced binding.
      */
-    keepBoth(documentId: string): Promise<KeepBothResolution | null>;
+    keepBoth(
+        documentId: string,
+        owner: string | null,
+    ): Promise<(KeepBothResolution & { ownerId: string }) | null>;
     /**
      * What signing out would cost (#1269), as far as the ACCOUNT DATABASE can see. A read; it
      * changes nothing and sends nothing. The caller completes `drafts`/`atRisk` with the drafts no
@@ -644,6 +761,35 @@ export function createSyncLoop(
     }
 
     /**
+     * The fence itself (#1311), in one place: a scope this device holds may only take writes for
+     * the account the caller says the chart belongs to.
+     *
+     * Deliberately a throw rather than a returned verdict for every caller but `deleteFromCloud`,
+     * whose own contract is a reported `CloudDeleteResult`. A Save, a retained draft and a
+     * Keep-both all have one honest outcome here — the write did not happen — and a result object
+     * for it would be a second way to ignore a refusal that must never be ignored.
+     */
+    function refuseForeign(held: AccountScope, owner: string | null): void {
+        if (owner !== null && belongsToAnotherAccount(owner, held.ownerId)) {
+            throw new AccountMismatchError(owner, held.ownerId);
+        }
+    }
+
+    /**
+     * The attached scope, refused when the chart the caller is carrying belongs to a DIFFERENT
+     * account (#1311). Every account-store write the shell can reach goes through this or
+     * `retentionScope`, and both ask `refuseForeign`.
+     *
+     * The refusal comes BEFORE the songbook is touched, which is the whole property: a refused
+     * write leaves no record, no outbox operation, no draft and no receipt under the wrong owner.
+     */
+    async function ownedScope(owner: string | null): Promise<AccountScope> {
+        const current = await settledScope();
+        refuseForeign(current, owner);
+        return current;
+    }
+
+    /**
      * The scope a RETAINED DRAFT may be written under (#1299): the attached one, or — when the
      * session expired underneath a chart that is still the account's — the account this device
      * still holds locally.
@@ -664,17 +810,16 @@ export function createSyncLoop(
      * exactly once — an expired session answered with another passkey — and the disagreement means
      * this text belongs to neither the account now held nor the guest namespace. It is refused,
      * and the shell's in-tab fallback keeps it where it can still be exported.
+     *
+     * Since #1311 the comparison is `refuseForeign`'s rather than its own inline one, so the draft
+     * half and the Save half of that transition cannot drift apart on what a mismatch is.
      */
     async function retentionScope(owner: string | null): Promise<AccountScope> {
         const held = scope || attaching ? await settledScope() : await songbook.currentScope();
         if (!held) {
             throw new Error('The account songbook is not available while signed out.');
         }
-        if (owner !== null && held.ownerId !== owner) {
-            throw new Error(
-                'This chart belongs to a different account than the one on this device.',
-            );
-        }
+        refuseForeign(held, owner);
         return held;
     }
 
@@ -1092,8 +1237,10 @@ export function createSyncLoop(
             }
             throw new Error('Account library paging did not terminate.');
         },
-        async save(document, expected) {
-            const current = await settledScope();
+        async save(document, expected, owner) {
+            // #1311: before `songbook.save`, deliberately. A Save refused here has written
+            // nothing at all — no record, no queued operation, no bump of this owner's library.
+            const current = await ownedScope(owner);
             const song = await songbook.save(current, document, expected);
             publish({ libraryVersion: state.libraryVersion + 1 });
             await observe();
@@ -1123,20 +1270,28 @@ export function createSyncLoop(
             }
             return held;
         },
-        async discardDraft(documentId) {
-            await songbook.discardDraft(await settledScope(), documentId, writerId);
+        async discardDraft(documentId, owner) {
+            await songbook.discardDraft(await ownedScope(owner), documentId, writerId);
         },
-        async discardDrafts(documentId) {
-            await songbook.discardDrafts(await settledScope(), documentId);
+        async discardDrafts(documentId, owner) {
+            await songbook.discardDrafts(await ownedScope(owner), documentId);
         },
-        async rememberOpened(documentId) {
-            await songbook.rememberOpened(await settledScope(), documentId);
+        async rememberOpened(documentId, owner) {
+            await songbook.rememberOpened(await ownedScope(owner), documentId);
         },
         async lastOpened() {
             return songbook.lastOpened(await settledScope());
         },
-        async deleteFromCloud(documentId) {
+        async deleteFromCloud(documentId, owner) {
             const current = await settledScope();
+            if (belongsToAnotherAccount(owner, current.ownerId)) {
+                // #1311: the id on the stand is another account's, so this device has no honest
+                // request to build — the revision it would name is a fact about a library it is
+                // not attached to. Refused here, ahead of `prepareDelete`, so nothing is frozen
+                // and nothing local moves; reported rather than thrown, like the two refusals
+                // below, because the confirm step renders the sentence beside its own button.
+                return { kind: 'refused', retry: false, message: OWNER_MESSAGES.mismatch };
+            }
             if (Date.now() < backoffUntil) {
                 // The 429 the Save path already met answers for the whole ORIGIN, and a
                 // destructive POST inside that window is precisely what the server asked this
@@ -1224,8 +1379,11 @@ export function createSyncLoop(
                 message: retained ? DELETE_MESSAGES.retained : DELETE_MESSAGES.deleted,
             };
         },
-        async keepBoth(documentId) {
-            const current = await settledScope();
+        async keepBoth(documentId, owner) {
+            // #1311: before the transaction opens. Keeping both CREATES a local line for the
+            // chart on the stand, and under the wrong account that is one person's music filed
+            // in another person's library — the one outcome this resolution must never have.
+            const current = await ownedScope(owner);
             const mine = epoch;
             const resolution = await songbook.keepBoth(current, documentId);
             if (mine !== epoch) {
@@ -1234,7 +1392,7 @@ export function createSyncLoop(
                 // on the stand with it — but nothing of THIS loop's state may be written from a
                 // superseded epoch: a publish, a re-pointed `watched` or a pass would all describe
                 // an account that is no longer attached. The same rule `pass()` follows.
-                return resolution === 'none' ? null : resolution;
+                return resolution === 'none' ? null : { ...resolution, ownerId: current.ownerId };
             }
             if (resolution === 'none') {
                 // Nothing moved, so the library is unchanged — but the observation the caller was
@@ -1256,7 +1414,7 @@ export function createSyncLoop(
             // Detached, exactly as `deleteFromCloud`'s own follow-up pass is: the resolution is
             // already committed here, and the upload is the loop's problem from this point.
             void loop.run().catch(() => {});
-            return resolution;
+            return { ...resolution, ownerId: current.ownerId };
         },
         async signOutPreflight() {
             const current = await settledScope();

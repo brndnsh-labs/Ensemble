@@ -12,8 +12,11 @@ import {
     libraryDownloaded,
 } from '../lib/account/adopt-guest';
 import {
+    AccountMismatchError,
     accountSync,
+    belongsToAnotherAccount,
     type CloudDeleteResult,
+    OWNER_MESSAGES,
     type SignOutPreflight,
 } from '../lib/account/sync-loop';
 import { arrangementOf, blankSong, convertedCopy, extendedScore } from '../lib/documents';
@@ -52,6 +55,25 @@ import { useStageTheme } from './use-stage-theme';
 
 const same = (a: ChartDocument, b: ChartDocument) =>
     a.title === b.title && JSON.stringify(a.chart) === JSON.stringify(b.chart);
+
+/**
+ * Which songbook the chart on the stand came from — and, for an account chart, WHOSE account
+ * (#1311).
+ *
+ * The owner is part of the answer rather than a second ref beside it, because the two are one
+ * fact and a pair of them is a pair that can disagree. #1299 carried the owner separately for the
+ * draft path only, which left the Save path binding a chart to a STORE and not to a library: expire
+ * as A, answer "Sign in again" with B's passkey, and `storeSave` still read `'account'` and filed
+ * A's chart — or, on `Save a copy`, a fresh create of A's music — inside B's account.
+ *
+ * `ownerId` is REQUIRED for an account chart (#1311 patch review R1). An account binding with no
+ * owner is an unfenced binding — `belongsToAnotherAccount` reads a null as "makes no claim", so
+ * one that survived a change of account would wave every later write straight through, which is
+ * precisely the leak this type exists to close. Making it impossible to express beats remembering
+ * not to write one, and the two places that produce a binding (`liveStand`, and the owner a
+ * committed write reports back) can both always name an account.
+ */
+type StandStore = { store: 'account'; ownerId: string } | { store: 'guest' };
 
 /**
  * The account library in the order the songbook already reads in (#1266): most recently updated
@@ -145,17 +167,29 @@ export default function Ensemble() {
     const [current, setCurrent] = useState<ChartDocument | null>(null);
     const [saved, setSaved] = useState<ChartDocument | null>(null);
     /**
-     * Which songbook the chart on the stand came from, or null when nothing is open (#1266).
+     * Which songbook the chart on the stand came from — and whose account it is — or null when
+     * nothing is open (#1266, owner-bound since #1311).
      *
      * A session can expire without any user gesture — `createSaveTransport`/`createLibraryTransport`
      * call `session.markExpired()` on any 401 — and `signedIn` flips to false underneath a chart
      * that is still the account's. Without this, `storeSave` would silently re-route to the guest
      * repository: plain Save reports a nonsense conflict, and `Save a copy` (which passes
-     * `expected = null`) SUCCEEDS and writes account content into guest IndexedDB. A ref rather
-     * than state on purpose — nothing renders it, and `newSong` has to set it and read it back in
-     * the same tick.
+     * `expected = null`) SUCCEEDS and writes account content into guest IndexedDB.
+     *
+     * The `ownerId` half answers the other question that store alone could not (#1311): WHICH
+     * account. `'account'` is not one destination, it is one per person who has signed in on this
+     * device, and every account-store write the shell makes now carries this owner so the loop can
+     * refuse one that names somebody else's library.
+     *
+     * **A ref AND a state mirror, one writer.** The ref is the synchronous read an event handler
+     * needs — `newSong` sets it and `storeSave` reads it back in the same tick, and an action must
+     * decide against the binding as it is NOW, not as the last render saw it. The state is what
+     * RENDER may read, because a ref does not re-render and a mismatch that is a standing fact has
+     * to survive on screen (#1311 patch review R5). Both are written only by `bindStand`, so there
+     * is one authority with two views rather than two facts that can drift.
      */
-    const currentStore = useRef<'guest' | 'account' | null>(null);
+    const currentStore = useRef<StandStore | null>(null);
+    const [standStore, setStandStore] = useState<StandStore | null>(null);
     const [ready, setReady] = useState(false);
     const [busy, setBusy] = useState(false);
     const volatileDrafts = useRef(new Map<string, ChartDocument>());
@@ -169,18 +203,6 @@ export default function Ensemble() {
      * leaves this device.
      */
     const accountDrafts = useRef(new Map<string, ChartDocument>());
-    /**
-     * The account the chart on the stand belongs to, captured when it was opened (#1299 patch
-     * review P2) — not "whoever is attached right now", which is a different question the moment a
-     * session expires.
-     *
-     * It travels with every retention write, and `retentionScope` refuses one whose owner is not
-     * the account this device holds. The case it exists for: expire as A with A's chart on the
-     * stand, answer "Sign in again" with B's passkey, type one character. Without this the
-     * keystroke retains A's chart text inside B's database, where B's sign-out is what removes it
-     * and B's library download is what it protects.
-     */
-    const standOwner = useRef<string | null>(null);
     /**
      * The last account this loop actually attached to, null only before the first one. Deliberately
      * NOT cleared on detach: an expiry publishes `owner: null` on its way past, so a ref that
@@ -286,19 +308,42 @@ export default function Ensemble() {
     const signedIn = accountsOn && account.session.status === 'signedIn';
     const sync = useAccountLibrary(accountsOn, account.session, current?.id ?? null);
     /**
+     * Does the chart on the stand belong to an account this device is NOT attached to (#1311)?
+     *
+     * Derived at RENDER time, from the state mirror rather than the ref, because this is a
+     * standing fact and not an event: it has to survive `run()`'s `setError('')`, a re-render, a
+     * press of Play, and anything else that clears a transient line. It is also why `bindStand`
+     * writes state at all — a ref alone could be true for minutes with nothing on screen saying so
+     * (#1311 patch review R5).
+     *
+     * `sync.owner` is the loop's published owner; `standStore.ownerId` is the account the chart
+     * was bound to when it was opened or last committed. The same comparison the handlers make
+     * through `standBelongsElsewhere`, over the same predicate — this one reads the mirror, that
+     * one reads the ref, because a render may only read state and an action must read the truth
+     * as of now.
+     */
+    const standMismatch =
+        standStore?.store === 'account' && belongsToAnotherAccount(standStore.ownerId, sync.owner);
+    /**
      * Is the chart on the stand one the ACCOUNT holds a confirmed copy of (#1270)?
      *
-     * All four clauses are load-bearing. `signedIn` and `currentStore` together are what keep a
+     * All five clauses are load-bearing. `signedIn` and `currentStore` together are what keep a
      * guest chart, and an account chart whose session lapsed underneath it, out of a destructive
      * cloud operation — the same pairing `storeSave`'s expiry guard rests on. `sync.observation` is
      * the watched document's own cloud fact, read from storage rather than inferred, and a null
      * `remoteRevision` means the cloud has never acknowledged this song: there is nothing up there
      * to delete, so the action is not offered rather than offered and then refused.
+     *
+     * `standMismatch` is the fifth (#1311). In practice the observation clause already answers it
+     * — B's store holds no record for A's document id, so `remoteRevision` is null — but that is a
+     * coincidence of two facts lining up, and the question "may this device act on this chart's
+     * account copy?" deserves to be asked outright rather than inferred.
      */
     const inAccount =
         accountsOn &&
         signedIn &&
-        currentStore.current === 'account' &&
+        standStore?.store === 'account' &&
+        !standMismatch &&
         sync.observation?.remoteRevision != null;
     /**
      * Is the Save at the head of this song's outbox refused, and which way (#1267)?
@@ -312,9 +357,16 @@ export default function Ensemble() {
      * The observation is the watched document's own cloud fact, read from storage by the loop —
      * `useAccountLibrary` keeps it pointed at `current?.id` — so this is never inferred from a
      * request result.
+     *
+     * A chart whose account is not the one attached is not the account's at all as far as this
+     * device is concerned (#1311), so the banner — whose only button WRITES — is not offered.
      */
     const conflict: 'none' | 'version' | 'gone' =
-        accountsOn && signedIn && currentStore.current === 'account' && current !== null
+        accountsOn &&
+        signedIn &&
+        standStore?.store === 'account' &&
+        !standMismatch &&
+        current !== null
             ? (sync.observation?.conflict ?? 'none')
             : 'none';
     // `?? []` is the LIST, not the claim: "we haven't read the account library yet" is carried
@@ -425,7 +477,10 @@ export default function Ensemble() {
                 setSaved(null);
                 setCurrent(document);
                 // A shared draft belongs to no songbook yet; "Keep a copy" decides that.
+                // `bindStand` inlined: a component-scope function is a new reference every
+                // render, which useExhaustiveDependencies rightly rejects as a dependency.
                 currentStore.current = null;
+                setStandStore(null);
                 setSharedDraft(true);
                 // Inlined clearBuffers()/selectSection(): both are plain function
                 // declarations (a new reference every render), which
@@ -525,12 +580,29 @@ export default function Ensemble() {
      * Keyed on `sync.owner` for the same reason the reads above are: it is published only once the
      * loop has a scope, so this cannot race the attach.
      *
-     * It is also where a change of ACCOUNT clears the stand (#1299 patch review P2). A session can
-     * expire under an account chart and "Sign in again" can be answered with a different passkey;
-     * the loop then attaches B while the stand still holds A's song, `currentStore` still says
-     * `'account'`, and the next keystroke would try to retain A's chart under B. `standOwner`
-     * refuses that write; this is the other half — the musician is put back where a sign-out puts
-     * them, rather than left typing into a chart no Save of theirs can reach.
+     * It is also where a change of ACCOUNT used to CLEAR the stand (#1299 patch review P2). A
+     * session can expire under an account chart and "Sign in again" can be answered with a
+     * different passkey; the loop then attaches B while the stand still holds A's song, and the
+     * next keystroke or Save would file A's chart under B.
+     *
+     * #1311 keeps the chart instead, and takes the refusal to the writes themselves: the stand is
+     * bound to its owner (`currentStore`), every account-store write the shell makes carries that
+     * owner, and the loop compares it to the scope it holds. Pulling the song off the stand was
+     * the blunter half of the old stopgap and it cost the musician the one thing that always
+     * works — A's chart is not in B's library, so once it is gone from the stand there is nothing
+     * left on this device to export it FROM. Keeping it costs nothing: the writes are refused at
+     * two independent layers, the destructive cloud actions are not offered (`inAccount`,
+     * `conflict`), and the refusal sentence names export as the way out.
+     *
+     * `accountDrafts` still goes, because it is this tab's cache of A's account rows and B's
+     * database is what answers now. The chart on the stand does not need it — `current` IS the
+     * text, and `exportSong` writes `current`.
+     *
+     * Nothing here announces the mismatch any more (#1311 patch review R5). It used to set the
+     * shell's error line once, which the very next `run()` wiped — pressing Play was enough — and
+     * left the musician with a Save button and a chip that both invited the one action guaranteed
+     * to be refused. The mismatch is a STANDING fact, so it is derived at render (`standMismatch`)
+     * and rendered for as long as it holds, rather than fired as an event.
      */
     useEffect(() => {
         if (sync.owner === null) {
@@ -541,22 +613,11 @@ export default function Ensemble() {
         const previous = attachedOwner.current;
         attachedOwner.current = sync.owner;
         if (previous !== null && previous !== sync.owner) {
+            // The chart on the stand is deliberately left where it is: `standMismatch` renders
+            // the explanation, both layers refuse every write, and playback is none of this
+            // effect's business — the old stopgap stopped the band because it was about to take
+            // the chart away, and nothing about a change of account makes the music unplayable.
             accountDrafts.current = new Map();
-            standOwner.current = null;
-            if (currentStore.current === 'account') {
-                // The same shape signing out has, and for the same reason: the songbook this
-                // chart came from is no longer the one this device is reading. (`clearBuffers`
-                // is inlined because a plain function declaration is a new reference every
-                // render, which useExhaustiveDependencies rightly rejects as a dependency.)
-                runtime.stop();
-                setCurrent(null);
-                setSaved(null);
-                currentStore.current = null;
-                pendingText.current = false;
-                setBuffers(new Map());
-                setPendingMeasures(false);
-                measureEditor.current?.reset();
-            }
         }
         let alive = true;
         accountSync
@@ -781,30 +842,116 @@ export default function Ensemble() {
         }
     }
     /**
+     * The ONE writer of the stand's binding (#1311 patch review R1/R5): the synchronous ref an
+     * action reads back in the same tick, and the state a render is allowed to read, always
+     * together. Every assignment in this file goes through here — except one, inside the shared-link
+     * effect, which inlines the same pair, because a component-scope function is a new reference every render
+     * and `useExhaustiveDependencies` rightly refuses it as a hook dependency.
+     */
+    function bindStand(next: StandStore | null) {
+        currentStore.current = next;
+        setStandStore(next);
+    }
+    /**
+     * The songbook this device writes to right now, bound to the account the SESSION names
+     * (#1311 patch review R1).
+     *
+     * Read from `account.session`, never from `sync.owner`: `signedIn` flips true the instant the
+     * session reports an owner, and `attach()` runs from an effect AFTER that render, so the loop
+     * has published nothing yet. A binding taken from the loop's snapshot in that window is
+     * `ownerId: null` — an unfenced account binding that then survives a later change of account
+     * and waves A's chart straight into B. The session cannot be null here by construction: this
+     * is the very owner `useAccountLibrary` is about to attach to.
+     *
+     * The redundant `status === 'signedIn'` is what narrows `account.session` for TypeScript;
+     * `signedIn` is a boolean and carries no narrowing with it.
+     */
+    function liveStand(): StandStore {
+        return signedIn && account.session.status === 'signedIn'
+            ? { store: 'account', ownerId: account.session.owner }
+            : { store: 'guest' };
+    }
+    /**
+     * The account the chart on the stand belongs to, captured when it was opened or last committed
+     * (#1299 patch review P2, folded into `currentStore` by #1311) — not "whoever is attached right
+     * now", which is a different question the moment a session expires.
+     *
+     * Null for a guest chart and for no chart: the shell making no claim, which the loop reads as
+     * "whichever account this device holds". Never null for an account chart — see `StandStore`.
+     */
+    function standOwner(): string | null {
+        const stand = currentStore.current;
+        return stand?.store === 'account' ? stand.ownerId : null;
+    }
+    /**
+     * Does the chart on the stand belong to an account this device is no longer attached to
+     * (#1311)? The shell's own half of the fence, asked against what IT believes — the loop asks
+     * the same predicate against the scope it actually holds, and neither trusts the other.
+     *
+     * The action-time twin of the render-time `standMismatch`: same predicate, same two inputs,
+     * but read off the REF, because a handler must decide against the binding as it is at the
+     * moment it runs rather than as the last committed render saw it.
+     *
+     * Both halves of the fence are load-bearing, and they catch different moments. The loop
+     * catches the one the shell cannot see: a pass, another tab or a `signOut` can move the
+     * attached scope while an `await` in a handler is still unwinding, so the scope a write lands
+     * in is only ever knowable inside the loop. This half refuses without a round trip, and
+     * without touching a store that would only say no.
+     */
+    function standBelongsElsewhere(): boolean {
+        return belongsToAnotherAccount(standOwner(), sync.owner);
+    }
+    /**
      * Remember the chart on the stand, in the songbook it came from (#1299).
      *
      * An account chart's "last opened" is one of that account's own facts — it names a song only
      * that account holds — so it lives in the account database and leaves with it. The guest key
      * keeps answering for guest charts, and for a signed-out device that is the only songbook there
      * is. Fire-and-forget: the Continue card is a convenience, and nothing waits on it.
+     *
+     * An account chart the attached account does not hold is remembered NOWHERE (#1311): B's
+     * `meta` must not name A's song, and the guest key must not either — a Continue card pointing
+     * at a chart in neither of this device's songbooks is a dead link. Belt and braces, since
+     * every caller here has just committed or opened under the live account; "last opened" is
+     * still a write into an account database, and that rule has no exceptions worth carving.
      */
     function rememberOpened(id: string) {
-        if (currentStore.current === 'account') {
-            accountSync.rememberOpened(id).catch(() => {
-                /* A preference nobody can store is still a chart the musician just opened. */
-            });
+        const stand = currentStore.current;
+        if (stand?.store === 'account') {
+            if (!standBelongsElsewhere()) {
+                // The owner travels with it (#1311 patch review R4): the loop refuses this write
+                // too, so neither layer is the only thing keeping A's id out of B's `meta`.
+                accountSync.rememberOpened(id, stand.ownerId).catch(() => {
+                    /* A preference nobody can store is still a chart just opened. */
+                });
+            }
         } else {
             rememberSong(id);
         }
         setLastOpened(id);
     }
-    /** The in-tab fallback both retention paths share when storage would not take the draft. */
+    /**
+     * The in-tab fallback both retention paths share when storage would not take the draft.
+     *
+     * A REFUSAL is not a storage failure, and gets its own sentence (#1311 patch review R7). The
+     * "Draft is only in this tab:" wrapper is an apology for something going wrong on this device;
+     * an account mismatch is the product working, and the sentence already says what to do about
+     * it. Branched on the TYPE, never on the words — which is the whole reason the refusal is a
+     * typed error.
+     *
+     * The trailing stop is trimmed off whatever the wrapper does carry (#1311 patch review R6):
+     * a message that is already a sentence would otherwise render "…went away.. Export before
+     * closing."
+     */
     function retainInTab(next: ChartDocument, failure: unknown) {
         volatileDrafts.current.set(next.id, next);
         setRecoveryHealthy(false);
-        setError(
-            `Draft is only in this tab: ${failure instanceof Error ? failure.message : String(failure)}. Export before closing.`,
-        );
+        if (failure instanceof AccountMismatchError) {
+            setError(`${failure.message} Your edit is kept in this tab until then.`);
+            return;
+        }
+        const reason = failure instanceof Error ? failure.message : String(failure);
+        setError(`Draft is only in this tab: ${reason.replace(/\.$/, '')}. Export before closing.`);
     }
     function retained(next: ChartDocument) {
         volatileDrafts.current.delete(next.id);
@@ -825,12 +972,23 @@ export default function Ensemble() {
      * A concurrent tab's live experiment goes with it. That is the same trade `clearRecovery`
      * makes at sign-out, and the tab in question still holds its text and retains it again on its
      * next keystroke.
+     *
+     * A chart whose account is not the attached one clears only what THIS TAB holds (#1311). The
+     * account half would be a delete against B's `drafts` store keyed by A's document id: a no-op
+     * on any store that is actually B's, and a destructive one the moment that assumption is
+     * wrong. The guest half is not offered either — nothing account-side has ever been written
+     * there, and reaching for it would be the guest namespace answering for an account chart,
+     * which is exactly what #1299 removed.
      */
     function retainNothingFor(id: string) {
         volatileDrafts.current.delete(id);
-        if (currentStore.current === 'account') {
+        const stand = currentStore.current;
+        if (stand?.store === 'account') {
             accountDrafts.current.delete(id);
-            accountSync.discardDrafts(id).catch(() => {
+            if (standBelongsElsewhere()) {
+                return;
+            }
+            accountSync.discardDrafts(id, stand.ownerId).catch(() => {
                 /* Recovery is a convenience; a row that will not clear is not worth an error. */
             });
             return;
@@ -869,6 +1027,13 @@ export default function Ensemble() {
      * retained row identical to the commit is a draft of nothing, and it would hold this record
      * against every later remote advance, tell the sign-out step an experiment is at stake, and
      * answer a cloud delete `retained` — forever, because nothing but a Save ever clears it.
+     *
+     * An account chart whose account is not the attached one is retained in this TAB and nowhere
+     * else (#1311). The loop refuses that write anyway (`retentionScope`), and the fallback below
+     * would catch it — but the fallback's sentence would be a storage failure's, and nothing has
+     * failed here: this is a refusal with a reason, said in its own words and without a pointless
+     * round trip to a store that is going to say no. The text stays in memory, which is where the
+     * banner and `exportSong` can still reach it.
      */
     function draft(next: ChartDocument) {
         setCurrent(next);
@@ -877,9 +1042,16 @@ export default function Ensemble() {
             setRecoveryHealthy(true);
             return;
         }
-        if (currentStore.current === 'account') {
+        const stand = currentStore.current;
+        if (stand?.store === 'account') {
+            if (standBelongsElsewhere()) {
+                // The TYPED refusal, so `retainInTab` reports it as the refusal it is rather
+                // than dressing it up as a storage failure (#1311 patch review R7).
+                retainInTab(next, new AccountMismatchError(stand.ownerId, sync.owner));
+                return;
+            }
             accountDrafts.current.set(next.id, next);
-            accountSync.recover(next, next.revision, standOwner.current).then(
+            accountSync.recover(next, next.revision, stand.ownerId).then(
                 () => retained(next),
                 (failure: unknown) => retainInTab(next, failure),
             );
@@ -1022,7 +1194,7 @@ export default function Ensemble() {
             updateChart();
             runtime.stop();
             setCurrent(null);
-            currentStore.current = null;
+            bindStand(null);
         });
     }
     function selectSection(document: ChartDocument, id?: string) {
@@ -1086,7 +1258,9 @@ export default function Ensemble() {
      */
     async function recoveryOptionsFor(document: ChartDocument) {
         const slots = repository.recoveriesFor(document);
-        if (currentStore.current !== 'account') {
+        // A chart whose account is not the attached one has no rows to read here either (#1311):
+        // `preservedDrafts` would query B's store for A's document id, which is at best nothing.
+        if (currentStore.current?.store !== 'account' || standBelongsElsewhere()) {
             return slots;
         }
         let held: Array<{ document: ChartDocument; capturedAt: string }> = [];
@@ -1111,11 +1285,10 @@ export default function Ensemble() {
         runtime.load(next);
         setSaved(document);
         setCurrent(next);
-        currentStore.current = signedIn ? 'account' : 'guest';
-        // The account this chart belongs to, for as long as it is on the stand. Null for a guest
-        // chart, and for a signed-in device whose loop has not published an owner yet — which
-        // leaves the retention write unfenced, exactly as it was before (#1299 patch review P2).
-        standOwner.current = signedIn ? sync.owner : null;
+        // The songbook this chart came from AND the account it belongs to, for as long as it is
+        // on the stand (#1311). From the SESSION, not `sync.owner` — see `liveStand` for why the
+        // loop's snapshot is null in exactly the window this has to be right in.
+        bindStand(liveStand());
         setSharedDraft(false);
         clearBuffers();
         rememberOpened(next.id);
@@ -1157,7 +1330,9 @@ export default function Ensemble() {
             createdAt: now,
             updatedAt: now,
         };
-        const created = await storeSave(copy, null);
+        // No owner claim (#1311): a shared draft belongs to no songbook at all until this commit
+        // decides one, so it is the live account's — `currentStore` is already null here.
+        const created = await storeSave(copy, null, { owner: null, stand: false });
         await refreshSongs();
         await open(created);
         setMessage('Saved a local copy');
@@ -1209,10 +1384,30 @@ export default function Ensemble() {
      * to send them. Save never waits for the network: an offline Save is an ordinary successful
      * Save with an upload still owed, which is the whole reason local safety and cloud
      * confirmation are reported as two separate facts.
+     *
+     * `intent.owner` is the account these bytes belong to (#1311), and it is a PARAMETER rather
+     * than a read of `currentStore` because the two kinds of caller genuinely differ. A Save, a
+     * `Save a copy`, an editor upgrade and a recovered-draft copy are all the chart on the stand's
+     * music under a new wrapper, so they carry the stand's owner and are refused when it is not
+     * the attached one. A brand-new song, an imported file and a shared-link copy are nobody's
+     * yet: they pass null and belong to whichever account is live. Deriving this from the document
+     * id would get `Save a copy` exactly backwards — a fresh id carrying A's music.
+     *
+     * `intent.stand` is who owns the BINDING afterwards (#1311 patch review R1b). Only `save()`
+     * both commits and keeps the result on the stand without going through `open()`; every other
+     * caller either opens the created document next — which binds it properly — or is writing a
+     * document that has nothing to do with the chart currently showing. Rebinding on those was a
+     * real hole: an Import committed under B while A's chart was still open re-pointed the stand
+     * at B, and a `refreshSongs()`/`open()` that then threw left A's music sitting on a stand
+     * claiming to belong to B, with both layers of the fence waving it through.
      */
-    async function storeSave(document: ChartDocument, expected: number | null) {
+    async function storeSave(
+        document: ChartDocument,
+        expected: number | null,
+        intent: { owner: string | null; stand: boolean },
+    ) {
         try {
-            if (currentStore.current === 'account' && !signedIn) {
+            if (currentStore.current?.store === 'account' && !signedIn) {
                 // The session lapsed under an account chart. Falling through would write it to
                 // the GUEST songbook — a conflict that isn't one on a plain Save, and a silent
                 // copy of account content into guest storage on `Save a copy` (#1266). The full
@@ -1223,19 +1418,37 @@ export default function Ensemble() {
             }
             if (!signedIn) {
                 const committed = await repository.save(document, expected);
-                currentStore.current = 'guest';
+                if (intent.stand) {
+                    bindStand({ store: 'guest' });
+                }
                 setSaveFailed(false);
                 return committed;
             }
-            const song = await accountSync.save(document, expected);
-            currentStore.current = 'account';
+            if (belongsToAnotherAccount(intent.owner, sync.owner)) {
+                // The shell's half of the fence (#1311). It refuses before a single byte is
+                // committed, without a round trip to a store that would only say no, and the
+                // chart stays exactly where it is so it can still be exported.
+                throw new AccountMismatchError(intent.owner, sync.owner);
+            }
+            const song = await accountSync.save(document, expected, intent.owner);
+            if (intent.stand) {
+                // `song.ownerId` is the account the commit ACTUALLY landed under, reported back
+                // by the loop from the scope it settled to (#1311 patch review R1). Binding from
+                // a render snapshot instead is how a stale null owner becomes an unfenced stand.
+                bindStand({ store: 'account', ownerId: song.ownerId });
+            }
             setSaveFailed(false);
             // Save is one of the four things that runs a pass. Not awaited: the commit is
             // already durable, and the upload is the loop's problem from here.
             void accountSync.run();
             return song.document;
         } catch (failure) {
-            setSaveFailed(true);
+            // A mismatch is not a failed Save (#1311 patch review R5): nothing on this device
+            // went wrong, and "Save failed on this device" would blame the one store that is
+            // working perfectly. Caught by TYPE, never by matching the sentence.
+            if (!(failure instanceof AccountMismatchError)) {
+                setSaveFailed(true);
+            }
             throw failure;
         }
     }
@@ -1267,11 +1480,23 @@ export default function Ensemble() {
             return;
         }
         const documentId = current.id;
+        const owner = standOwner();
         void run(async () => {
+            if (standBelongsElsewhere()) {
+                // #1311, and asked BEFORE the active claim is dropped: this device is attached to
+                // another account, so the revision it would name is a fact about a library it is
+                // not reading. `inAccount` already hides the action, so this is the second layer;
+                // the loop's own check is the third. Written to the shell's error line as well as
+                // the confirm step, because `inAccount` going false is what UNMOUNTS that step —
+                // a reason rendered only there would be a refusal nobody could read.
+                setDeleteFailure(OWNER_MESSAGES.mismatch);
+                setError(OWNER_MESSAGES.mismatch);
+                return;
+            }
             accountSync.setActiveDocument(null);
             let result: CloudDeleteResult;
             try {
-                result = await accountSync.deleteFromCloud(documentId);
+                result = await accountSync.deleteFromCloud(documentId, owner);
             } catch (failure) {
                 accountSync.setActiveDocument(documentId);
                 // Written to the confirm step as well, because that step is modal: everything
@@ -1299,7 +1524,7 @@ export default function Ensemble() {
             setDeleteOpen(false);
             setCurrent(null);
             setSaved(null);
-            currentStore.current = null;
+            bindStand(null);
             clearBuffers();
             if (!result.retained) {
                 // The account copy is gone and this device kept nothing — a retained draft is one
@@ -1346,8 +1571,20 @@ export default function Ensemble() {
         if (!current) {
             return;
         }
+        const owner = standOwner();
         void run(async () => {
             setKeepBothFailure(null);
+            if (standBelongsElsewhere()) {
+                // #1311, and before the bar editor is committed: keeping both CREATES a line in
+                // the attached account's library, and this chart is not that account's. The
+                // banner is already withheld for a mismatched stand (`conflict`), so this is the
+                // second layer in front of the loop's own — and for that same reason the sentence
+                // goes to the shell's error line too, since the banner it would otherwise live in
+                // is exactly the thing a mismatch removes.
+                setKeepBothFailure(OWNER_MESSAGES.mismatch);
+                setError(OWNER_MESSAGES.mismatch);
+                return;
+            }
             // The editor is committed FIRST, exactly as `save()` does — and for a reason that is
             // specific to this operation. `current.id` is about to change, and `MeasureEditor` and
             // `TempoControl` are mounted with `key={current.id}`: a remount throws away every bar
@@ -1360,9 +1597,11 @@ export default function Ensemble() {
             // folded whatever was pending INTO `original`, so what is unsaved from here is exactly
             // what that document holds over the account's own baseline.
             const experiment = sharedDraft || !!(saved && !same(original, saved));
-            let resolution: KeepBothResolution | null;
+            // `ownerId` is the scope the transaction settled to, which is what the stand is
+            // rebound from below — never this render's snapshot (#1311 patch review R1).
+            let resolution: (KeepBothResolution & { ownerId: string }) | null;
             try {
-                resolution = await accountSync.keepBoth(original.id);
+                resolution = await accountSync.keepBoth(original.id, owner);
             } catch (failure) {
                 // Written to the banner as well as the shell's error line: the banner is where the
                 // button was, and it is the thing the musician is looking at.
@@ -1389,8 +1628,9 @@ export default function Ensemble() {
             accountSync.setActiveDocument(moved.id);
             setCurrent(moved);
             setSaved(resolution.document);
-            currentStore.current = 'account';
-            standOwner.current = sync.owner;
+            // The account the transaction actually SETTLED TO, reported back by the loop rather
+            // than read from this render's snapshot (#1311 patch review R1).
+            bindStand({ store: 'account', ownerId: resolution.ownerId });
             rememberOpened(moved.id);
             if (experiment) {
                 // Storage has already re-keyed the rows a PREVIOUS edit captured onto the new id;
@@ -1401,7 +1641,7 @@ export default function Ensemble() {
                 // P3): the flag is a claim about a write that can still fail. The success arm sets
                 // no message — this resolution has its own sentence below, and a later "Draft
                 // recovered on this device" would land on top of it.
-                accountSync.recover(moved, moved.revision, standOwner.current).then(
+                accountSync.recover(moved, moved.revision, resolution.ownerId).then(
                     () => setRecoveryHealthy(true),
                     (failure: unknown) => retainInTab(moved, failure),
                 );
@@ -1459,9 +1699,9 @@ export default function Ensemble() {
             // chart is open, so in practice `currentStore` is already null by the time this runs —
             // which is exactly why the guard below must not be what protects `saved`.)
             setSaved(null);
-            if (currentStore.current === 'account') {
+            if (currentStore.current?.store === 'account') {
                 setCurrent(null);
-                currentStore.current = null;
+                bindStand(null);
                 clearBuffers();
             }
             setAccountSongs(null);
@@ -1530,9 +1770,9 @@ export default function Ensemble() {
         runtime.stop();
         await account.forgetDeletedAccount();
         setSaved(null);
-        if (currentStore.current === 'account') {
+        if (currentStore.current?.store === 'account') {
             setCurrent(null);
-            currentStore.current = null;
+            bindStand(null);
             clearBuffers();
         }
         setAccountSongs(null);
@@ -1578,18 +1818,24 @@ export default function Ensemble() {
                   title: `${candidate.title.slice(0, 150)} — copy`,
               }
             : candidate;
-        // A recovered stale draft must not borrow the newer saved revision.
-        const result = await storeSave(next, copy ? null : current.revision);
+        // A recovered stale draft must not borrow the newer saved revision. The owner claim is the
+        // STAND's, for `copy` as much as for a plain Save (#1311): a copy mints a fresh document
+        // id, but the music inside it is the chart on the stand's, so a copy made while attached
+        // to another account is the same leak wearing a new id.
+        const result = await storeSave(next, copy ? null : current.revision, {
+            owner: standOwner(),
+            stand: true,
+        });
         setSaved(result);
         setCurrent(result);
         rememberOpened(result.id);
         volatileDrafts.current.delete(current.id);
         setRecoveryHealthy(true);
-        if (currentStore.current === 'account') {
+        if (currentStore.current?.store === 'account') {
             accountDrafts.current.delete(current.id);
             // This writer's row only, exactly like `clearOwnRecovery` below: another tab editing
             // this song holds its own live experiment, and this Save does not speak for it (#1299).
-            accountSync.discardDraft(current.id).catch(() => {
+            accountSync.discardDraft(current.id, standOwner()).catch(() => {
                 /* The committed Save is authoritative; a retained row is harmless. */
             });
             try {
@@ -1626,9 +1872,13 @@ export default function Ensemble() {
             }
             // A brand-new song belongs to whichever songbook is live right now, not to whatever
             // was last on the stand — set before `storeSave` so its expiry guard reads the truth.
-            currentStore.current = signedIn ? 'account' : 'guest';
+            // Its owner claim is null for the same reason (#1311): these bars are nobody's yet.
+            // From the SESSION (`liveStand`), never `sync.owner`: New song is reachable from the
+            // songbook the moment the session reports an owner, which is BEFORE `attach()` has
+            // published one, and a binding taken from the loop there would be unfenced.
+            bindStand(liveStand());
             const document = repository.validated(blankSong(template));
-            const created = await storeSave(document, null);
+            const created = await storeSave(document, null, { owner: null, stand: false });
             await refreshSongs();
             await open(created);
             revealEditor(arrangementOf(created).sections[0].id);
@@ -1643,7 +1893,12 @@ export default function Ensemble() {
             const converted = convertedCopy(original);
             // Capability preflight before creating a copy or changing the active song.
             prepareScorePlayback(converted.chart.score);
-            const created = await storeSave(converted, null);
+            // The stand's owner (#1311): a converted copy is the open chart's music, so it is as
+            // much that account's as a `Save a copy` is.
+            const created = await storeSave(converted, null, {
+                owner: standOwner(),
+                stand: false,
+            });
             await refreshSongs();
             await open(created);
             revealEditor(arrangementOf(created).sections[0].id);
@@ -1791,6 +2046,11 @@ export default function Ensemble() {
                 recovery={!dirty ? 'none' : recoveryHealthy ? 'confirmed' : 'failed'}
                 shell={offline.shell}
                 sounds={soundsProgress}
+                // #1311 — outranks every other cloud reading: the loop can only watch this
+                // document id in the account that IS attached, which has never held it, so
+                // without this the chip would read "Not in your account yet" about a song that
+                // is fully saved in somebody else's library.
+                foreign={standMismatch}
                 sync={sync}
             />
         ) : null;
@@ -1807,7 +2067,7 @@ export default function Ensemble() {
                         onClick={() => {
                             runtime.stop();
                             setCurrent(null);
-                            currentStore.current = null;
+                            bindStand(null);
                         }}
                     >
                         ♬ ensemble
@@ -1819,7 +2079,7 @@ export default function Ensemble() {
                             onClick={() => {
                                 runtime.stop();
                                 setCurrent(null);
-                                currentStore.current = null;
+                                bindStand(null);
                             }}
                         >
                             My songbook
@@ -1870,6 +2130,26 @@ export default function Ensemble() {
                 </div>
             )}
             {/*
+             * #1311 — the chart on the stand belongs to an account this device is not attached to.
+             *
+             * DERIVED and PERSISTENT, never a one-shot line (#1311 patch review R5). It survives
+             * `run()`'s `setError('')`, a re-render and a press of Play, and it has no Dismiss:
+             * while the mismatch stands, every account write is refused, so a musician who
+             * dismissed it would be left with a Save button and a chip that both invite the one
+             * action that cannot work. It goes away the moment the fact does — by signing back in
+             * as that account, or by leaving the chart.
+             *
+             * `role="status"`, matching the expired banner beside it rather than the error line's
+             * `alert`: nothing was lost, nothing went wrong on this device, and the chart is still
+             * here to export. Rendered only with a chart open, because with nothing on the stand
+             * there is no mismatch to be in.
+             */}
+            {standMismatch && current && (
+                <div className="error-banner" role="status" data-testid="stand-mismatch-banner">
+                    <span>{OWNER_MESSAGES.mismatch}</span>
+                </div>
+            )}
+            {/*
              * #1267 — the refused Save, and the one move that resolves it. Above the stand rather
              * than inside it because it is a fact about the SONG, not about the chart view, and
              * next to the other banners because that is where this app says things that are true
@@ -1912,9 +2192,13 @@ export default function Ensemble() {
                         if (candidate.schemaVersion === 2) {
                             prepareScorePlayback(candidate.chart.score);
                         }
+                        // No owner claim (#1311): a file off this device's disk is nobody's chart
+                        // until it is committed, so it belongs to whichever account is live —
+                        // never to whoever happens to be on the stand behind this dialog.
                         const result = await storeSave(
                             { ...candidate, id: crypto.randomUUID() },
                             null,
+                            { owner: null, stand: false },
                         );
                         await refreshSongs();
                         await open(result);
@@ -1933,9 +2217,11 @@ export default function Ensemble() {
                         if (current) {
                             updateChart();
                         }
+                        // No owner claim, exactly as the file import above (#1311).
                         const result = await storeSave(
                             { ...checked, id: crypto.randomUUID() },
                             null,
+                            { owner: null, stand: false },
                         );
                         await refreshSongs();
                         await open(result);
@@ -2296,6 +2582,9 @@ export default function Ensemble() {
                 onOpenRecovery={(record) =>
                     void run(async () => {
                         updateChart();
+                        // The STAND's owner (#1311): a preserved draft is this chart's own
+                        // earlier text, so the copy it becomes carries the same account as the
+                        // song it was a draft of.
                         const copy = await storeSave(
                             {
                                 ...record.document,
@@ -2303,6 +2592,7 @@ export default function Ensemble() {
                                 title: `${record.document.title.slice(0, 140)} — recovered`,
                             },
                             null,
+                            { owner: standOwner(), stand: false },
                         );
                         await refreshSongs();
                         await open(copy);

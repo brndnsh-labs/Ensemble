@@ -2,8 +2,11 @@ import { describe, expect, it, vi } from 'vitest';
 import type { AccountApi, ApiResult } from '../../../prototypes/v2/lib/account/api.js';
 import { createAccountSession } from '../../../prototypes/v2/lib/account/session.js';
 import {
+    AccountMismatchError,
+    belongsToAnotherAccount,
     createSyncLoop,
     DELETE_MESSAGES,
+    OWNER_MESSAGES,
     SIGN_OUT_MESSAGES,
     SYNC_MESSAGES,
 } from '../../../prototypes/v2/lib/account/sync-loop.js';
@@ -657,7 +660,7 @@ describe('the sync loop never publishes a stale observation over a fresher one',
         const stale = loop.watch('song-1');
         await Promise.resolve();
         queue.push({ status: 'queued' });
-        await loop.save({ id: 'song-1' } as never, null);
+        await loop.save({ id: 'song-1' } as never, null, OWNER);
         expect(loop.getSnapshot().observation?.pendingCount).toBe(1);
 
         releaseFirstRead();
@@ -841,7 +844,7 @@ describe('the sync loop deletes from the cloud as one explicit, retry-safe opera
         const { api } = fakeApi(post);
         const loop = createSyncLoop(api, createAccountSession(api), parts.songbook);
         await loop.attach(OWNER);
-        const result = await loop.deleteFromCloud('song-1');
+        const result = await loop.deleteFromCloud('song-1', OWNER);
         return { loop, result, ...parts };
     }
 
@@ -853,7 +856,7 @@ describe('the sync loop deletes from the cloud as one explicit, retry-safe opera
         loop.setActiveDocument(null);
         const before = loop.getSnapshot().libraryVersion;
 
-        const result = await loop.deleteFromCloud('song-1');
+        const result = await loop.deleteFromCloud('song-1', OWNER);
 
         expect(api.post).toHaveBeenCalledWith('/api/documents/delete', PREPARED_DELETE.body);
         expect(result).toEqual({
@@ -887,7 +890,7 @@ describe('the sync loop deletes from the cloud as one explicit, retry-safe opera
         const loop = createSyncLoop(api, createAccountSession(api), parts.songbook);
         await loop.attach(OWNER);
         loop.setActiveDocument('song-1');
-        await loop.deleteFromCloud('song-1');
+        await loop.deleteFromCloud('song-1', OWNER);
         expect(parts.acknowledged).toEqual([{ active: true }]);
     });
 
@@ -910,7 +913,7 @@ describe('the sync loop deletes from the cloud as one explicit, retry-safe opera
         await loop.attach(OWNER);
         expect(documentReads(reads)).toEqual([]);
 
-        expect((await loop.deleteFromCloud('song-1')).kind).toBe('refused');
+        expect((await loop.deleteFromCloud('song-1', OWNER)).kind).toBe('refused');
 
         // Kicked detached — nothing awaits it inside the delete — so this waits for the pass the
         // refusal asked for rather than starting one of its own, which would prove nothing.
@@ -963,7 +966,7 @@ describe('the sync loop deletes from the cloud as one explicit, retry-safe opera
         const loop = createSyncLoop(api, createAccountSession(api), parts.songbook);
         await loop.attach(OWNER);
 
-        const first = await loop.deleteFromCloud('song-1');
+        const first = await loop.deleteFromCloud('song-1', OWNER);
         expect(first).toEqual({
             kind: 'refused',
             retry: true,
@@ -975,7 +978,7 @@ describe('the sync loop deletes from the cloud as one explicit, retry-safe opera
         // The 429 answers for the whole ORIGIN, so the next attempt is refused here: a destructive
         // POST inside the window is what the server just asked this device not to send, and
         // nothing is frozen for a request that never left.
-        const second = await loop.deleteFromCloud('song-1');
+        const second = await loop.deleteFromCloud('song-1', OWNER);
         expect(second).toEqual({
             kind: 'refused',
             retry: true,
@@ -1086,7 +1089,7 @@ describe('the sync loop deletes from the cloud as one explicit, retry-safe opera
             const songbook = stubSongbook({ prepareDelete: async () => reply });
             const loop = createSyncLoop(api, createAccountSession(api), songbook);
             await loop.attach(OWNER);
-            expect(await loop.deleteFromCloud('song-1')).toEqual({
+            expect(await loop.deleteFromCloud('song-1', OWNER)).toEqual({
                 kind: 'refused',
                 retry: false,
                 message,
@@ -1161,7 +1164,7 @@ describe('a Save the cloud can no longer hold reads differently from a two-sided
         expect(loop.getSnapshot().observation?.conflict).toBe('gone');
         const before = loop.getSnapshot().libraryVersion;
 
-        expect(await loop.keepBoth('song-1')).toEqual(resolution);
+        expect(await loop.keepBoth('song-1', OWNER)).toEqual({ ...resolution, ownerId: OWNER });
 
         expect(parts.asked).toEqual(['song-1']);
         // The library moved on disk — a song left it and another arrived — so the shell re-reads.
@@ -1199,7 +1202,7 @@ describe('a Save the cloud can no longer hold reads differently from a two-sided
 
         // Still reported: the commit happened, and the caller has to move the chart on the stand
         // onto the identity its line now lives under whatever this loop is attached to.
-        expect(await loop.keepBoth('song-1')).toEqual(resolution);
+        expect(await loop.keepBoth('song-1', OWNER)).toEqual({ ...resolution, ownerId: OWNER });
 
         // ...but nothing of THIS loop's state may be written from an epoch that is gone: a library
         // bump, a re-pointed `watched` or a pass would all describe an account that has detached.
@@ -1216,7 +1219,7 @@ describe('a Save the cloud can no longer hold reads differently from a two-sided
         await loop.watch('song-1');
         const before = loop.getSnapshot().libraryVersion;
 
-        expect(await loop.keepBoth('song-1')).toBe(null);
+        expect(await loop.keepBoth('song-1', OWNER)).toBe(null);
 
         expect(parts.asked).toEqual(['song-1']);
         expect(loop.getSnapshot().libraryVersion).toBe(before);
@@ -1227,7 +1230,7 @@ describe('a Save the cloud can no longer hold reads differently from a two-sided
         const { api } = fakeApi({ ok: true, value: { kind: 'committed' }, status: 200 });
         const parts = resolvable('none');
         const loop = createSyncLoop(api, createAccountSession(api), parts.songbook);
-        await expect(loop.keepBoth('song-1')).rejects.toThrow('signed out');
+        await expect(loop.keepBoth('song-1', OWNER)).rejects.toThrow('signed out');
         expect(parts.asked).toEqual([]);
     });
 
@@ -1608,7 +1611,7 @@ describe('the sync loop retains an account chart’s unsaved experiment', () => 
         expect(written[1][1]).toBe(written[0][1]);
         // And it is only the DRAFT that reaches past the detached scope — a Save still waits for
         // reauthentication, which is the whole point of pausing the outbox.
-        await expect(loop.save(EDIT, 2)).rejects.toThrow(/signed out/);
+        await expect(loop.save(EDIT, 2, OWNER)).rejects.toThrow(/signed out/);
     });
 
     it('refuses to retain anything once the device is genuinely signed out', async () => {
@@ -1689,5 +1692,227 @@ describe('the sync loop retains an account chart’s unsaved experiment', () => 
                 capturedAt: '2026-09-18T10:30:00.000Z',
             },
         ]);
+    });
+});
+
+/**
+ * The stand is bound to an OWNER, not just to a store (#1311).
+ *
+ * The transition every test here is about: the session expires under account A's chart, the
+ * musician answers "Sign in again" with B's passkey, and the shell still has A's song on the
+ * stand. #1299 fenced the draft half of that; the Save half shipped unfenced, and `Save a copy`
+ * — which passes `expected: null`, so it cannot even report a conflict — would quietly create
+ * A's music inside B's library.
+ *
+ * What is proven here is the LOOP's half: every account-store write takes the owner the caller
+ * believes the chart belongs to, compares it to the scope this device actually holds, and refuses
+ * a mismatch BEFORE touching storage. The shell carries its own copy of the same check
+ * (`standBelongsElsewhere` in `app/ensemble.tsx`, over the same `belongsToAnotherAccount`), and
+ * the two are deliberately independent: neither is allowed to be the only thing standing there.
+ */
+describe('the sync loop refuses a write for a chart that belongs to another account', () => {
+    const OTHER = 'owner-b';
+    const CHART = accountChart('Set list', 'song-1');
+
+    /** Records every write the loop asks the songbook for, so "nothing happened" is measurable. */
+    function recording(overrides: Record<string, unknown> = {}) {
+        const writes: string[] = [];
+        const songbook = stubSongbook({
+            read: async () => ({ remoteRevision: 'cloud-1' }),
+            pending: async () => [{ status: 'conflict', remote: null }],
+            save: async () => {
+                writes.push('save');
+                return { documentId: 'song-1', remoteRevision: null, document: CHART };
+            },
+            recover: async () => {
+                writes.push('recover');
+            },
+            keepBoth: async () => {
+                writes.push('keepBoth');
+                return 'none';
+            },
+            prepareDelete: async () => {
+                writes.push('prepareDelete');
+                return 'missing';
+            },
+            ...overrides,
+        });
+        return { songbook, writes };
+    }
+
+    async function attachedTo(songbook: AccountSongbook) {
+        const { api } = fakeApi({ ok: true, value: { kind: 'committed' }, status: 200 });
+        const loop = createSyncLoop(api, createAccountSession(api), songbook);
+        await loop.attach(OWNER);
+        await loop.watch('song-1');
+        return { api, loop };
+    }
+
+    it('refuses a Save for another account’s chart before committing a single byte', async () => {
+        const parts = recording();
+        const { loop } = await attachedTo(parts.songbook);
+        const before = loop.getSnapshot().libraryVersion;
+
+        await expect(loop.save(CHART, null, OTHER)).rejects.toThrow(AccountMismatchError);
+
+        // `expected: null` is `Save a copy`, which is the dangerous shape: a plain Save at least
+        // reports a nonsense conflict, while a create simply succeeds. Nothing reached storage,
+        // so B's library holds no record, no queued operation and no bump the songbook re-reads.
+        expect(parts.writes).toEqual([]);
+        expect(loop.getSnapshot().libraryVersion).toBe(before);
+    });
+
+    it('still saves for the attached account, so the fence is about the mismatch and not the claim', async () => {
+        const parts = recording();
+        const { loop } = await attachedTo(parts.songbook);
+
+        await loop.save(CHART, null, OWNER);
+        await loop.save(CHART, null, null);
+
+        // Naming the attached account writes, and naming NO account writes: a caller with nothing
+        // to claim — a brand-new song, an imported file, a guest song being adopted — belongs to
+        // whichever account is live, which is exactly what it was before this fence existed.
+        expect(parts.writes).toEqual(['save', 'save']);
+    });
+
+    it('refuses a retained draft for another account, with the same typed error the rest use', async () => {
+        // #1299 fenced this path first, with its own inline comparison and its own sentence. It
+        // asks `belongsToAnotherAccount` now, and answers with the one sentence — a musician who
+        // meets this refusal by typing and again by pressing Save must not be told two stories.
+        const parts = recording();
+        const { loop } = await attachedTo(parts.songbook);
+
+        await expect(loop.recover(CHART, 2, OTHER)).rejects.toThrow(AccountMismatchError);
+        await expect(loop.recover(CHART, 2, OTHER)).rejects.toThrow(OWNER_MESSAGES.mismatch);
+
+        expect(parts.writes).toEqual([]);
+    });
+
+    it('refuses Keep both for another account’s chart, so no line is created in B’s library', async () => {
+        // The one operation here that CREATES a document: `keepBoth` files the local line under a
+        // fresh id in the attached account. Run against a chart that is not that account's, it is
+        // one person's music appearing in another person's songbook out of nowhere.
+        const parts = recording();
+        const { loop } = await attachedTo(parts.songbook);
+        expect(loop.getSnapshot().observation?.conflict).toBe('gone');
+
+        await expect(loop.keepBoth('song-1', OTHER)).rejects.toThrow(AccountMismatchError);
+
+        expect(parts.writes).toEqual([]);
+    });
+
+    it('refuses a cloud delete for another account’s chart without freezing or sending anything', async () => {
+        // Reported rather than thrown, like this method's other pre-send refusals — and, like
+        // them, ahead of `prepareDelete`, so no operation id is frozen for a request that never
+        // left and there are no bytes a later retry could replay.
+        const parts = recording();
+        const { api, loop } = await attachedTo(parts.songbook);
+
+        expect(await loop.deleteFromCloud('song-1', OTHER)).toEqual({
+            kind: 'refused',
+            retry: false,
+            message: OWNER_MESSAGES.mismatch,
+        });
+
+        expect(parts.writes).toEqual([]);
+        // Nothing was sent, so nothing can have been deleted from either account.
+        expect(api.post).not.toHaveBeenCalled();
+    });
+
+    it('answers "signed out" rather than "another account" when this device holds none', async () => {
+        // Two different facts, and the sentences are not interchangeable: a device with no account
+        // has nowhere to put this chart, while a device attached to B is being asked to file A's
+        // music. Telling a musician their own chart belongs to somebody else is the failure mode.
+        const { api } = fakeApi({ ok: true, value: { kind: 'committed' }, status: 200 });
+        const signedOut = createSyncLoop(
+            api,
+            createAccountSession(api),
+            stubSongbook({ currentScope: async () => null }),
+        );
+
+        await expect(signedOut.save(CHART, null, OWNER)).rejects.toThrow(/signed out/);
+        await expect(signedOut.recover(CHART, 2, OWNER)).rejects.toThrow(/signed out/);
+    });
+
+    it('says what actually works, and never a retry or an account id', async () => {
+        const sentence = OWNER_MESSAGES.mismatch;
+
+        // Export is the move that always works — a file on the musician's own disk needs no
+        // account at all — and signing back in is the other. A retry is not offered, because
+        // nothing about trying again changes which account this device is attached to.
+        expect(sentence).toContain('export it');
+        expect(sentence).toContain('sign back in');
+        expect(sentence).not.toContain('try again');
+        // An owner id is a server identifier, not something a musician can read or act on.
+        expect(sentence).not.toContain(OWNER);
+        expect(new AccountMismatchError(OTHER, OWNER).message).toBe(sentence);
+    });
+
+    it('refuses every smaller account write too, not just the ones that commit a version', async () => {
+        // #1311 patch review R4. These three are easy to read as bookkeeping — a last-opened
+        // pointer, a draft row being dropped — but each is a WRITE into an account database keyed
+        // by a document id, and "it would be a no-op against the wrong store" is only true while
+        // the assumption that it is the wrong store holds. A shell guard was the only thing in
+        // front of them; now there are two, like every other write here.
+        const writes: string[] = [];
+        const { loop } = await attachedTo(
+            stubSongbook({
+                rememberOpened: async () => {
+                    writes.push('rememberOpened');
+                },
+                discardDraft: async () => {
+                    writes.push('discardDraft');
+                },
+                discardDrafts: async () => {
+                    writes.push('discardDrafts');
+                },
+            }),
+        );
+
+        await expect(loop.rememberOpened('song-1', OTHER)).rejects.toThrow(AccountMismatchError);
+        await expect(loop.discardDraft('song-1', OTHER)).rejects.toThrow(AccountMismatchError);
+        await expect(loop.discardDrafts('song-1', OTHER)).rejects.toThrow(AccountMismatchError);
+        expect(writes).toEqual([]);
+
+        // ...and all three still write for the account that IS attached.
+        await loop.rememberOpened('song-1', OWNER);
+        await loop.discardDraft('song-1', OWNER);
+        await loop.discardDrafts('song-1', OWNER);
+        expect(writes).toEqual(['rememberOpened', 'discardDraft', 'discardDrafts']);
+    });
+
+    it('reports the account Keep both actually settled to, not the caller’s claim', async () => {
+        // #1311 patch review R1: the shell re-points the chart on the stand at the identity this
+        // resolution created, and binds it to an account. Reading that account from a render
+        // snapshot is how a stale `null` owner becomes an unfenced binding, so the transaction
+        // reports the scope it really committed in and the shell binds from THAT.
+        const resolution = {
+            conflict: 'gone',
+            documentId: 'song-2',
+            document: { id: 'song-2' },
+            operationId: 'op-fresh',
+            adopted: null,
+        };
+        const { loop } = await attachedTo(
+            stubSongbook({
+                read: async () => ({ remoteRevision: 'cloud-1' }),
+                pending: async () => [{ status: 'conflict', remote: null }],
+                keepBoth: async () => resolution,
+            }),
+        );
+
+        // Claimed with no owner at all, which is the caller saying "whichever account is live".
+        expect(await loop.keepBoth('song-1', null)).toEqual({ ...resolution, ownerId: OWNER });
+    });
+
+    it('treats a missing owner on either side as no mismatch at all', async () => {
+        // The predicate both layers ask. A null `owner` is a caller making no claim; a null
+        // `attached` is a device holding no account — and reading either as a mismatch would
+        // refuse a brand-new song, or print the wrong sentence for a signed-out device.
+        expect(belongsToAnotherAccount(OWNER, OTHER)).toBe(true);
+        expect(belongsToAnotherAccount(OWNER, OWNER)).toBe(false);
+        expect(belongsToAnotherAccount(null, OWNER)).toBe(false);
+        expect(belongsToAnotherAccount(OWNER, null)).toBe(false);
+        expect(belongsToAnotherAccount(null, null)).toBe(false);
     });
 });

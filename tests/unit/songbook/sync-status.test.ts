@@ -20,6 +20,9 @@ const CLEAN_LOCAL: StatusFacts['local'] = {
 const IDLE_CLOUD: StatusFacts['cloud'] = {
     observation: { remoteRevision: 'cloud-3', pendingCount: 0, conflict: 'none', refused: null },
     activity: 'idle',
+    // #1311 — the chart on the stand belongs to the account this device is attached to. Every
+    // case below inherits this through `facts()`; the one that flips it is its own test.
+    foreign: false,
 };
 const READY_OFFLINE: StatusFacts['offline'] = {
     shell: 'verified',
@@ -204,13 +207,52 @@ describe('cloud confirmation never borrows a local fact', () => {
         const view = projectSyncStatus(
             facts({
                 local: { ...CLEAN_LOCAL, editing: 'dirty' },
-                cloud: { observation: observed({}), activity: 'idle' },
+                cloud: { observation: observed({}), activity: 'idle', foreign: false },
             }),
         );
         expect(view.local.status).toBe('unsaved');
         // The dirty editor did not add itself to the queue or invalidate the confirmation.
         expect(view.cloud.status).toBe('confirmed');
         expect(view.cloud.pendingCount).toBe(0);
+    });
+
+    it('a chart belonging to another account outranks every reading of the wrong library (#1311)', () => {
+        // The exact shape the loop produces for it: it can only watch this document id in the
+        // account that IS attached, which has never held it — so the observation comes back
+        // empty and confirms nothing. Read as `not-uploaded`, that is an invitation to press the
+        // one button guaranteed to be refused; the chart is fully saved in somebody else's
+        // library, and "not in YOUR account yet" is true only in the least useful sense.
+        const empty = {
+            remoteRevision: null,
+            pendingCount: 0,
+            conflict: 'none',
+            refused: null,
+        } as const;
+        expect(cloud({ observation: empty, activity: 'idle', foreign: false }).status).toBe(
+            'not-uploaded',
+        );
+        expect(cloud({ observation: empty, activity: 'idle', foreign: true }).status).toBe(
+            'foreign',
+        );
+
+        // It outranks a confirmation and an unobserved library too. Whatever the observation
+        // beside it says, it is an answer about a different library than this chart's.
+        expect(cloud({ foreign: true }).status).toBe('foreign');
+        expect(cloud({ observation: null, activity: 'idle', foreign: true }).status).toBe(
+            'foreign',
+        );
+    });
+
+    it('refuses to guess whether a chart belongs to this account', () => {
+        // The same deny-by-default rule every other fact here follows: an unobserved fact must be
+        // explicit, and a missing one is a caller mistake rather than a quiet `false`.
+        expect(() =>
+            projectSyncStatus({
+                local: CLEAN_LOCAL,
+                cloud: { observation: null, activity: 'idle' } as never,
+                offline: READY_OFFLINE,
+            }),
+        ).toThrow('cloud.foreign is required');
     });
 });
 
@@ -290,6 +332,7 @@ describe('the offline Save journey keeps the three results independent', () => {
                         refused: null,
                     },
                     activity: 'idle',
+                    foreign: false,
                 },
                 offline: {
                     shell: 'verified',
@@ -316,6 +359,7 @@ describe('the offline Save journey keeps the three results independent', () => {
                         refused: null,
                     },
                     activity: 'sending',
+                    foreign: false,
                 },
             }),
             ['unsaved', 'sending', 'ready'],
@@ -337,6 +381,7 @@ describe('the offline Save journey keeps the three results independent', () => {
                         refused: null,
                     },
                     activity: 'idle',
+                    foreign: false,
                 },
             }),
             ['unsaved', 'queued', 'ready'],
@@ -358,6 +403,7 @@ describe('the offline Save journey keeps the three results independent', () => {
                         refused: null,
                     },
                     activity: 'idle',
+                    foreign: false,
                 },
             }),
             ['unsaved', 'confirmed', 'ready'],
@@ -379,6 +425,7 @@ describe('the offline Save journey keeps the three results independent', () => {
                         refused: null,
                     },
                     activity: 'idle',
+                    foreign: false,
                 },
             }),
             ['unsaved', 'conflict', 'ready'],
@@ -400,6 +447,7 @@ describe('the offline Save journey keeps the three results independent', () => {
                         refused: null,
                     },
                     activity: 'idle',
+                    foreign: false,
                 },
             }),
             ['save-failed', 'confirmed', 'ready'],
@@ -416,6 +464,7 @@ describe('the offline Save journey keeps the three results independent', () => {
                         refused: null,
                     },
                     activity: 'reauth',
+                    foreign: false,
                 },
             }),
             ['saved', 'queued', 'ready'],
