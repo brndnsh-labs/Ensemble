@@ -14,7 +14,7 @@
 // the audible claim.
 import { beforeEach, describe, expect, it } from 'vitest';
 import { getChordDetails } from '../../../public/engine/chords-engine.js';
-import { getRootlessVoicing } from '../../../public/engine/chords-styles.js';
+import { getIntervals, getRootlessVoicing } from '../../../public/engine/chords-styles.js';
 import { BASS_SPACE_FEELS, COMP_REGISTER_FLOOR } from '../../../public/engine/voicing-policy.js';
 import { dispatch, getState } from '../../../public/state.js';
 import { ACTIONS } from '../../../public/types.js';
@@ -329,5 +329,35 @@ describe('Voicing root policy (#1313)', () => {
     it('getRootlessVoicing refuses m6 rather than answering with a minor-7 shell', () => {
         expect(getRootlessVoicing(getState(), 'm6', false, false)).toBeNull();
         expect(getRootlessVoicing(getState(), 'm6', false, true)).toBeNull();
+    });
+
+    // #1336 — same class as the m6 refusal above. `shouldUseRootlessVoicing` already says no
+    // (its minor bucket requires `is7th`, and no SUFFIX_QUALITIES row gives `m#5` a seventh),
+    // so this asserts the DIRECT-caller contract the m6 guard exists for: without it the
+    // minor-family fallthrough answers [3, 7, 10] — a natural 5 on a chord written with a
+    // sharp one, plus an unwritten b7.
+    it('getRootlessVoicing refuses m#5 rather than answering with a minor-7 shell', () => {
+        expect(getRootlessVoicing(getState(), 'm#5', false, false)).toBeNull();
+        expect(getRootlessVoicing(getState(), 'm#5', false, true)).toBeNull();
+    });
+
+    // #1336 — the rich-density extension tier, driven through `getIntervals` directly because
+    // the shared `voice()` probe only parses at `standard` density (as does the whole identity
+    // matrix), so nothing else in the suite reaches this tier. The generic `isAltered5`
+    // default is [9, #11], and the #11 is a FLAT fifth stacked onto a chord written with a
+    // sharp one; `m#5` takes the minor family's own 9/11 colours instead.
+    it('a rich m#5 takes the minor 9/11 colours, never a b5 beside its #5', () => {
+        for (const genre of ['Jazz', 'Acoustic']) {
+            const state = getState();
+            state.playback.bandIntensity = 0.35; // below every intensity-driven backfill tier
+            const intervals = getIntervals(state, 'm#5', false, 'rich', genre, true);
+            const degrees = new Set(intervals.map((i) => ((i % 12) + 12) % 12));
+            expect(
+                [...degrees].sort((a, b) => a - b),
+                genre,
+            ).toEqual([0, 2, 3, 5, 8]);
+            expect(degrees.has(6), `${genre} sounds a b5 beside the #5`).toBe(false);
+            expect(degrees.has(7), `${genre} sounds a natural 5`).toBe(false);
+        }
     });
 });

@@ -1,5 +1,5 @@
 // @ts-nocheck
-// cspell:ignore Cmaj Cmadd Gsus Bdim madd domsus iadd Iadd Cdom domin
+// cspell:ignore Cmaj Cmadd Gsus Bdim madd domsus iadd Iadd Cdom domin Cmin minsharp
 /**
  * CHORD IDENTITY MATRIX (#1320–#1324)
  *
@@ -387,6 +387,21 @@ const MATRIX = [
         defining: [4, 10, 1],
         misnaming: [2, 3, 11],
     },
+
+    // ---- #1336 minor with a RAISED fifth ----
+    // A real quality for the same reason `maj7b5` is: no other quality voices a minor 3rd
+    // without a natural 5, so every spelling matched the bare `m`/`min`/`-` row and came out
+    // a plain minor triad — the natural 5 the chart had sharpened. `-#5` was already in the
+    // v2 score vocabulary (`songbook/score-text.ts`) while parsing as a plain minor.
+    { spelling: 'm#5', quality: 'm#5', is7th: false, defining: [3, 8], misnaming: [4, 7] },
+    { spelling: 'm(#5)', quality: 'm#5', is7th: false, defining: [3, 8], misnaming: [4, 7] },
+    { spelling: 'mi#5', quality: 'm#5', is7th: false, defining: [3, 8], misnaming: [4, 7] },
+    { spelling: 'min#5', quality: 'm#5', is7th: false, defining: [3, 8], misnaming: [4, 7] },
+    { spelling: '-#5', quality: 'm#5', is7th: false, defining: [3, 8], misnaming: [4, 7] },
+    // The `+5` spelling of the same chord. Bare `m+` is deliberately NOT a supported
+    // spelling — see the SUFFIX_QUALITIES comment: it would also capture `m+7`/`m+9`,
+    // whose reading is contested.
+    { spelling: 'm+5', quality: 'm#5', is7th: false, defining: [3, 8], misnaming: [4, 7] },
 ];
 
 const PARSE_FEELS = ['Jazz', 'Funk', 'Neo-Soul', 'Acoustic'];
@@ -434,6 +449,16 @@ describe('Chord identity matrix (#1320-#1324)', () => {
         it('a minor-major 7th targets its major 7th, never the b7', () => {
             const { guides, pillars } = chordTargetTones(0, 'mMaj7');
             expect(guides).toContain(11);
+            expect([...guides, ...pillars]).not.toContain(10);
+        });
+
+        it('a minor #5 targets its #5 and b3, never the natural 5 or a 7th (#1336)', () => {
+            const { guides, pillars } = chordTargetTones(0, 'm#5');
+            // The #5 is this chord's identity, so unlike `7alt`'s ambiguous altered 5 it IS
+            // a landing tone — `aug` treats its own #5 the same way.
+            expect(pillars.sort((a, b) => a - b)).toEqual([0, 3, 8]);
+            expect(guides).toEqual([3]);
+            // A triad has no functional 7th; the minor class's b7 must not leak in.
             expect([...guides, ...pillars]).not.toContain(10);
         });
     });
@@ -585,6 +610,13 @@ describe('Chord identity matrix (#1320-#1324)', () => {
         ['Bm7(b5)', 'Bm7b5'],
         ['G7(b9)', 'G7b9'],
         ['Cdom7', 'C7'],
+        // #1336 — without a branch of its own the new quality fell to the default EMPTY
+        // suffix, so a written Cm#5 displayed as a bare "C": the chord it is furthest from.
+        ['Cm#5', 'Cm#5'],
+        ['Cm(#5)', 'Cm#5'],
+        ['C-#5', 'Cm#5'],
+        ['Cmin#5', 'Cm#5'],
+        ['Cm+5', 'Cm#5'],
     ])('%s displays as %s', (token, expected) => {
         const [chord] = voice('Acoustic', true, token);
         expect(chord.name).toBe(expected);

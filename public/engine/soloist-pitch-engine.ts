@@ -23,6 +23,7 @@ type ChordQualityClass =
     | 'domsus' // 7sus4, 9sus4, 13sus4 — dominant function, the 4th in place of the 3rd
     | 'power' // 5 — root and 5th only
     | 'majb5' // maj7b5 — lydian; the 3rd and maj7 are the guides, the 5 is FLAT
+    | 'minsharp5' // m#5 — a minor TRIAD whose 5 is SHARP; b3 guides, no 7th, no natural 5
     | 'aug'; // aug, augmaj7 — whole-tone / lydian-aug, no perfect 5
 
 export function classifyChordQuality(quality: string | undefined): ChordQualityClass {
@@ -74,6 +75,14 @@ export function classifyChordQuality(quality: string | undefined): ChordQualityC
     // without inventing one (the b5 is a colour the comper states, not a landing tone).
     if (q === 'maj7b5') {
         return 'majb5';
+    }
+    // why (#1336): 'm#5' passes the minor-family test below, and the 'min' pillars are
+    // (1, b3, 5, b7) — the NATURAL 5 this chord sharpens, plus a b7 a triad never wrote.
+    // Its own class targets the b3 and the #5 and nothing else, so neither the soloist's
+    // strong-beat landing, the walking bass's targets nor the comp's Q&A echo voice can
+    // build the natural 5. Must branch BEFORE the minor fallthrough, like 'mmaj7'/'madd9'.
+    if (q === 'm#5') {
+        return 'minsharp5';
     }
     if (q === 'm6') {
         return 'min6';
@@ -135,6 +144,10 @@ const FUNCTIONAL_PILLARS_BY_QUALITY: Record<ChordQualityClass, number> = {
     domsus: pcMask(0, 5, 7, 10), // suspended dominant: the 4th stands where the 3rd would
     power: pcMask(0, 7),
     majb5: pcMask(0, 4, 6),
+    // #1336 — 1, b3, #5. No natural 5 (the chord sharpens it) and no b7 (it is a triad);
+    // unlike `alt`'s deliberately-omitted altered 5, the #5 IS this chord's whole point, so
+    // it is a landing tone the way `aug`'s #5 is.
+    minsharp5: pcMask(0, 3, 8),
     aug: pcMask(0, 4, 8),
 };
 
@@ -161,6 +174,9 @@ const GUIDE_INTERVALS_BY_QUALITY: Record<ChordQualityClass, number[]> = {
     domsus: [5, 10], // 4, b7 — the suspension and the dominant 7th, never the 3rd
     power: [7],
     majb5: [4, 11], // 3, maj7 — the pair that names it; never the natural 5
+    // #1336 — b3 only. A triad has no functional 7th to guide toward (mirrors 'minadd'),
+    // and the b3 is what names the chord minor against its augmented fifth.
+    minsharp5: [3],
     aug: [4], // major 3rd
 };
 

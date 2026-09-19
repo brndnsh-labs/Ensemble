@@ -39,6 +39,10 @@ const ALTERED = [
     { rootMidi: 67, quality: '7alt', intervals: [0, 4, 10, 13, 15, 18, 20], label: 'G7alt' },
     { rootMidi: 60, quality: 'aug', intervals: [0, 4, 8], label: 'C+' },
     { rootMidi: 60, quality: 'maj7b5', intervals: [0, 4, 6, 11], label: 'Cmaj7b5' },
+    // #1336 — the minor-#5 triad is the same lane's case one alteration over:
+    // `chordHasPerfectFifth` already reads its '#5' (so `fifthSlotInterval` returns the ROOT
+    // with no new code), and its scale is now Aeolian-without-the-5th, so beat 2 holds too.
+    { rootMidi: 60, quality: 'm#5', intervals: [0, 3, 8], label: 'Cm#5' },
 ];
 const PLAIN = [
     { rootMidi: 62, quality: 'minor', intervals: [0, 3, 7, 10], label: 'Dm7' },
@@ -128,13 +132,16 @@ describe('Walking bass over a chord with no perfect fifth (#1334)', () => {
 
     /**
      * The fifth SLOTS, by position: beat 3 (mStep 8) is the beat-3 fifth and, at intensity < 0.3,
-     * the jazz low-intensity fifth; the off-eighths are the fifth-or-octave variation. The beat-2
-     * onset (mStep 4) is deliberately excluded — it is the jazz path-note walk, which picks from
-     * `getScaleForChord`, and that scale legitimately contains a natural 5 for `maj7b5` (the repo
-     * answers LYDIAN there). A scale table is a different decision from a fifth slot; see the
-     * out-of-scope note in the story.
+     * the jazz low-intensity fifth; the off-eighths are the fifth-or-octave variation.
+     *
+     * #1336 added beat 2 (mStep 4) — the jazz path-note walk, which picks from
+     * `getScaleForChord`. It used to be excluded because `maj7b5` had no branch there and fell
+     * through to LYDIAN, whose natural 5 the walk duly sounded (measured: degree 7 at mStep 4
+     * over `Cmaj7b5` in this very chart). `maj7b5` now answers a fifth-less Lydian
+     * [0,2,4,6,9,11], so the scale lane holds the same line as the fifth slots and beat 2 is
+     * asserted with them. Only mStep 0 (the downbeat root) and mStep 12 are outside the set.
      */
-    const isFifthSlot = (mStep) => mStep === 8 || mStep % 4 === 2;
+    const isFifthSlot = (mStep) => mStep === 4 || mStep === 8 || mStep % 4 === 2;
 
     // 0.2 reaches the `isJazz && intensity < 0.3` low-intensity fifth; 0.9 reaches the beat-3
     // fifth and the eighth-note fifth-or-octave variation.
