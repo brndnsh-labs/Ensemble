@@ -42,20 +42,11 @@ const STYLE_FOR_FEEL = { Jazz: 'jazz', Blues: 'jazz', Funk: 'funk' };
  * `options.isMinor` sets the key's minor flag (roman-numeral spelling + the
  * lowercase-numeral remap read it).
  */
-export function voice(
-    feel,
-    bassOn,
-    progression,
-    key = 'C',
-    practiceMode = true,
-    intensity = 0.35,
-    options = {},
-) {
+export function voice(feel, bassOn, progression, key = 'C', intensity = 0.35, options = {}) {
     const state = getState();
     state.groove.genreFeel = feel;
     state.chords.style = options.style || STYLE_FOR_FEEL[feel] || 'smart';
     state.bass.enabled = bassOn;
-    state.playback.practiceMode = practiceMode;
     state.playback.bandIntensity = intensity; // 0.35 default: below the 0.6 colour tier
     state.chords.density = options.density || 'standard';
     state.arranger.key = key;
@@ -76,7 +67,7 @@ export function voice(
 }
 
 function eachEmission(feel, bassOn, progression, intensity, laps, visit, options = {}) {
-    voice(feel, bassOn, progression, options.key || 'C', true, intensity, options);
+    voice(feel, bassOn, progression, options.key || 'C', intensity, options);
     const state = getState();
     resetCompingState(compingState);
     const ts = TIME_SIGNATURES['4/4'];

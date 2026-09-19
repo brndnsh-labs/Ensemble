@@ -41,7 +41,6 @@ export function saveCurrentState(): void {
         songMode: playback.songMode,
         vizEnabled: vizState.enabled,
         autoIntensity: playback.autoIntensity,
-        practiceMode: playback.practiceMode,
         masterVolume: playback.masterVolume,
         mixerVersion: MIXER_SETTINGS_VERSION,
         chords: {

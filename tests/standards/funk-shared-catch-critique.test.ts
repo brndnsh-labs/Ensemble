@@ -49,7 +49,7 @@ function buildState() {
     state.chords.style = 'smart';
     // #1313 — the bass LANE stays on (the renders below still exclude its notes via
     // `includeBass: false`). Bass space now follows the lane rather than
-    // `practiceMode`, and the pinned seed/step were derived under reserved bass
+    // the retired practice-mode preference, and the pinned seed/step were derived under reserved bass
     // space (rootless C9 shells); a muted lane would re-voice the comp rooted and
     // shift the seeded soloist line the catch is pinned to.
     state.bass.enabled = true;

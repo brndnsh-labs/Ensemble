@@ -1242,8 +1242,6 @@ export interface GlobalContext {
     readonly complexity: number;
     /** Whether the intensity automatically drifts over time. */
     readonly autoIntensity: boolean;
-    /** Whether muted instruments strictly reserve their sonic space. */
-    readonly practiceMode: boolean;
     /** Whether the metronome is active. */
     readonly metronome: boolean;
     /** Whether to apply BPM/Style from presets. */

@@ -278,7 +278,7 @@ describe('Funk clav cell agrees with the chart key (#1327)', () => {
 
     it('the parse layer is untouched by any of this', () => {
         // The cell is a LIVE-layer reducer; `chord.freqs` still comes from getIntervals.
-        const [c, f] = voice('Funk', true, 'C | F', 'C', true, 0.35);
+        const [c, f] = voice('Funk', true, 'C | F', 'C', 0.35);
         expect([...c.degrees].sort((a, b) => a - b)).toEqual([0, 4, 7]);
         expect([...f.degrees].sort((a, b) => a - b)).toEqual([0, 4, 7]);
     });

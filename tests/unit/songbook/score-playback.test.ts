@@ -66,7 +66,7 @@ function stateFixture(score: SemanticScore, feel = 'Jazz', bassEnabled = true) {
     // or the global deep-signal slices. No browser, transport or audio graph is needed.
     return {
         arranger,
-        playback: { bandIntensity: 0.6, practiceMode: false },
+        playback: { bandIntensity: 0.6 },
         chords: { density: 'rich' as const, octave: 60 },
         groove: { genreFeel: feel },
         bass: { enabled: bassEnabled },
