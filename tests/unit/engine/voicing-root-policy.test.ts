@@ -360,4 +360,37 @@ describe('Voicing root policy (#1313)', () => {
             expect(degrees.has(7), `${genre} sounds a natural 5`).toBe(false);
         }
     });
+
+    // #1341 — the `aug` rich row held 22 (a b7) under a "#11" comment, so a plain C+ became
+    // C+7 at rich density: dominant function the chart never wrote.
+    it('a rich aug TRIAD never gains a b7; aug7 keeps the one it was written with', () => {
+        for (const genre of ['Jazz', 'Acoustic', 'Rock']) {
+            const state = getState();
+            state.playback.bandIntensity = 0.35;
+            const triad = getIntervals(state, 'aug', false, 'rich', genre, true);
+            const triadDegrees = new Set(triad.map((i) => ((i % 12) + 12) % 12));
+            expect(triadDegrees.has(10), `${genre} C+ sounds a b7`).toBe(false);
+            expect(triadDegrees.has(7), `${genre} C+ sounds a natural 5`).toBe(false);
+            expect(
+                [...triadDegrees].sort((a, b) => a - b),
+                genre,
+            ).toEqual([0, 2, 4, 6, 8]);
+
+            const seventh = getIntervals(state, 'aug', true, 'rich', genre, true);
+            expect(
+                seventh.some((i) => ((i % 12) + 12) % 12 === 10),
+                `${genre} C+7 lost its b7`,
+            ).toBe(true);
+        }
+    });
+
+    // #1341 — `quality` derives from chart text; an inherited Object.prototype key must not be
+    // read out of the extension table as a truthy "row".
+    it('an inherited-property quality name takes the fallback instead of throwing', () => {
+        const state = getState();
+        state.playback.bandIntensity = 0.35;
+        for (const hostile of ['constructor', 'toString', '__proto__', 'hasOwnProperty']) {
+            expect(() => getIntervals(state, hostile, false, 'rich', 'Jazz', true)).not.toThrow();
+        }
+    });
 });

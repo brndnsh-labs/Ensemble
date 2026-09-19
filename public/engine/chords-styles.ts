@@ -505,16 +505,26 @@ export function getIntervals(
             // with a sharp one, two different fifths in one voicing. The minor family's own
             // colours (9, 11) are the honest rich extension here, so this mirrors `minor`.
             'm#5': [14, 17], // 9, 11
-            aug: [14, 22], // 9, #11
+            // why (#1341): this row read [14, 22] under the same "9, #11" comment — but 22 is
+            // pitch class 10, a b7. A plain C+ at rich density became C+7: dominant function
+            // the chart never wrote, which states the 7th two bars early in the line cliché
+            // an aug triad usually lives in (C | C+ | C6 | C7). The #11 keeps the whole-tone
+            // colour without changing the chord's function; aug7 arrives with its own b7.
+            aug: [14, 18], // 9, #11
             augmaj7: [14, 18], // 9, #11
             '7alt': [13, 15, 20], // b9, #9, b13
             9: [21], // 13
             13: [18], // #11
         };
 
+        // `quality` derives from chart text, so guard the lookup (#1341): a bare
+        // `safeExtensions['constructor']` is a truthy function that sails past `||`.
+        const ownExtensions = Object.hasOwn(safeExtensions, quality)
+            ? safeExtensions[quality]
+            : undefined;
         const potential = isAltered9
             ? [18] // #11 only: a natural 9 would rub the written b9/#9 (see isAltered9)
-            : safeExtensions[quality] || (isAltered5 ? [14, 18] : [14]);
+            : ownExtensions || (isAltered5 ? [14, 18] : [14]);
         for (const ext of potential) {
             if (!intervals.includes(ext) && !intervals.includes(ext % 12)) {
                 // Final safety: don't add natural 5th if quality is altered/augmented
