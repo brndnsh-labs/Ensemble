@@ -197,7 +197,8 @@ export function getChordMidiNotes(chordObj: any, baseOctave = 4): number[] {
         quality === 'm6' ||
         quality === 'm9' ||
         quality === 'm11' ||
-        quality === 'm13';
+        quality === 'm13' ||
+        quality === 'madd9';
     const isDiminishedFamily = DIMINISHED_QUALITIES.includes(quality);
     const isDominantFamily =
         quality === 'dominant' ||
@@ -210,7 +211,12 @@ export function getChordMidiNotes(chordObj: any, baseOctave = 4): number[] {
     let safeIntervals: number[] = [0, 4, 7, 11, 14];
     let colorIntervals: number[] = [2, 5, 9, 12, 16];
 
-    if (isMinorQuality) {
+    if (quality === 'mMaj7') {
+        // #1321 — minor triad with a MAJOR 7th (melodic minor). Neither the minor table
+        // below (b7) nor the major default above (natural 3rd) states this chord.
+        safeIntervals = [0, 3, 7, 11, 14];
+        colorIntervals = [2, 5, 9, 12, 15];
+    } else if (isMinorQuality) {
         safeIntervals = [0, 3, 7, 10, 14];
         colorIntervals = [2, 5, 8, 12, 15];
     } else if (isDiminishedFamily) {

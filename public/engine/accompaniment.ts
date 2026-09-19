@@ -1,3 +1,4 @@
+// cspell:ignore madd
 import { TIME_SIGNATURES } from '../config.js';
 import { getEffectiveTimeSignature } from '../meter.js';
 import type { Chord, EnsembleState, Mutable, StepInfo } from '../types.js';
@@ -2103,7 +2104,9 @@ export function getAccompanimentNotes(
             // so a sus chord came out with an invented major 3rd (G7sus4 -> F-A-B, a
             // plain G9 — the suspension gone). Take the 4th (or the 2nd) instead, the
             // note the chart actually wrote.
-            const isSuspendedChord = ['sus4', '7sus4', 'sus2'].includes(clavQuality);
+            const isSuspendedChord = ['sus4', '7sus4', '9sus4', '13sus4', 'sus2'].includes(
+                clavQuality,
+            );
             const clavThird = isSuspendedChord
                 ? pickClavDegree(clavQuality === 'sus2' ? [2] : [5], clavQuality === 'sus2' ? 2 : 5)
                 : pickClavDegree([3, 4], isMinorQuality ? 3 : 4);
@@ -2117,7 +2120,7 @@ export function getAccompanimentNotes(
             // that slot — a real chord tone — and the cell states Cadd9. A plain triad
             // still gets the funk b7: it says nothing about its 7th, and the dominant-7
             // default is the idiom the clav lane is built on.
-            const isAddedToneChord = ['add9', 'add2'].includes(clavQuality);
+            const isAddedToneChord = ['add9', 'add2', 'madd9'].includes(clavQuality);
             const clavSeventh = isSixthChord
                 ? pickClavDegree([9], 9)
                 : isAddedToneChord
@@ -2125,11 +2128,22 @@ export function getAccompanimentNotes(
                   : pickClavDegree([10, 11], 10);
             // the 9 is rarely a literal chord tone — default to a synthesized
             // major 9th so the gapped cell is guaranteed its color voice.
+            // why (#1324): unless the chart ALTERED the 9th, in which case the cell's colour
+            // voice is that written alteration — synthesizing the natural 9 put it a semitone
+            // from the b9 the chart asked for (G7b9 -> the cell sounded A natural against Ab).
+            // Live-layer pair of the `isAltered9` guard in `getIntervals`; the b9/#9 is always
+            // a literal tone of these voicings, so the picker finds it.
             // why (#1316): on a sus2 the identity voice above IS the 9th's pitch class,
             // which would collapse the cell to two pitch classes and octave-double one
             // of them. Fall back to the 5th so the cell keeps three distinct voices.
+            const hasAlteredNinth =
+                clavQuality.includes('b9') || clavQuality.includes('#9') || clavQuality === '7alt';
             const clavNinth =
-                pcFromRoot(clavThird) === 2 ? pickClavDegree([7], 7) : pickClavDegree([2], 14);
+                pcFromRoot(clavThird) === 2
+                    ? pickClavDegree([7], 7)
+                    : hasAlteredNinth
+                      ? pickClavDegree([1, 3], clavQuality.includes('b9') ? 13 : 15)
+                      : pickClavDegree([2], 14);
             // why: the gapped cell's three pitch classes are fixed, but its
             // ABSOLUTE register has to voice-lead from the prior cell. Building
             // it as raw `root + interval` pins the cell to `chord.rootMidi`,

@@ -133,6 +133,13 @@ export function getScaleForChord(
 
     // --- SPECIAL QUALITY HANDLING ---
 
+    // Minor-major 7th: the melodic-minor tonic (#1321). Without this it fell through to
+    // `isMinor`'s natural-minor/dorian default, whose b7 is the one tone the chord's maj7
+    // replaces — the soloist would sound the m7 the comper no longer plays.
+    if (quality === 'mMaj7') {
+        return SCALE_INTERVALS.MELODIC_MINOR;
+    }
+
     // Fully diminished chords typically want the symmetric collection.
     // Plain dim triads can still fall through to diatonic awareness (for example natural vii degrees).
     if (quality === 'dim7') {

@@ -13,123 +13,17 @@
 // test passed while Funk still sounded Am6 as C-G-B; the live block is what guards
 // the audible claim.
 import { beforeEach, describe, expect, it } from 'vitest';
-import { TIME_SIGNATURES } from '../../../public/config.js';
-import {
-    compingState,
-    getAccompanimentNotes,
-    resetCompingState,
-} from '../../../public/engine/accompaniment.js';
-import { getChordDetails, validateProgression } from '../../../public/engine/chords-engine.js';
+import { getChordDetails } from '../../../public/engine/chords-engine.js';
 import { getRootlessVoicing } from '../../../public/engine/chords-styles.js';
 import { BASS_SPACE_FEELS, COMP_REGISTER_FLOOR } from '../../../public/engine/voicing-policy.js';
 import { dispatch, getState } from '../../../public/state.js';
 import { ACTIONS } from '../../../public/types.js';
-import { getStepInfo } from '../../../public/utils.js';
+// The two-layer probes (parse voicing / what the comp actually sounds) are shared with
+// tests/unit/engine/chord-identity-matrix.test.ts — one harness, so the two files can't
+// drift on what "sounds" means.
+import { degreeOf, sound, voice, voicings } from '../../utils/voicing-probe.js';
 
 const FEELS = [...BASS_SPACE_FEELS];
-const toMidi = (f) => Math.round(69 + 12 * Math.log2(f / 440));
-
-// The chord style Smart Genres selects for each feel (`smart-genres.ts` `chord:`).
-const STYLE_FOR_FEEL = { Jazz: 'jazz', Blues: 'jazz', Funk: 'funk' };
-const degreeOf = (midi, chord) => (((midi - chord.rootMidi) % 12) + 12) % 12;
-
-function voice(feel, bassOn, progression, key = 'C', practiceMode = true, intensity = 0.35) {
-    const state = getState();
-    state.groove.genreFeel = feel;
-    state.chords.style = STYLE_FOR_FEEL[feel] || 'smart';
-    state.bass.enabled = bassOn;
-    state.playback.practiceMode = practiceMode;
-    state.playback.bandIntensity = intensity; // 0.35 default: below the 0.6 colour tier
-    state.chords.density = 'standard';
-    state.arranger.key = key;
-    state.arranger.sections = [{ id: 'a', label: 'A', value: progression, repeat: 1 }];
-    validateProgression(state);
-    return state.arranger.progression.map((chord) => {
-        const midis = chord.freqs.map(toMidi);
-        return {
-            name: chord.absName,
-            quality: chord.quality,
-            midis,
-            // pitch classes measured from the chord root: 0 = root, 9 = 6th, 10 = b7
-            degrees: new Set(midis.map((m) => degreeOf(m, chord))),
-        };
-    });
-}
-
-// Every voicing the comp actually emits for each chord over 8 laps, as raw sorted midi
-// arrays. `sound()` below keys its hits by root-relative degree set, which collapses two
-// different REGISTERS of the same pitch classes into one entry — fine for "which tones
-// sound", useless for a spacing/ordering claim (#1318). This keeps every emission.
-function voicings(feel, bassOn, progression, intensity) {
-    voice(feel, bassOn, progression, 'C', true, intensity);
-    const state = getState();
-    resetCompingState(compingState);
-    const ts = TIME_SIGNATURES['4/4'];
-    const lapSteps = state.arranger.progression.length * 16;
-    return state.arranger.progression.map((chord, chordIndex) => {
-        const emitted = [];
-        for (let lap = 0; lap < 8; lap++) {
-            for (let mStep = 0; mStep < 16; mStep++) {
-                const step = lap * lapSteps + chordIndex * 16 + mStep;
-                state.playback.step = step;
-                const midis = getAccompanimentNotes(
-                    state,
-                    chord,
-                    step,
-                    mStep,
-                    mStep,
-                    getStepInfo(step, ts),
-                    { bassEffectiveEnabled: bassOn },
-                )
-                    .filter((note) => note.midi > 0 && !note.muted)
-                    .map((note) => note.midi)
-                    .sort((a, b) => a - b);
-                if (midis.length > 0) {
-                    emitted.push(midis);
-                }
-            }
-        }
-        return { name: chord.absName, chord, emitted };
-    });
-}
-
-// Every distinct set of notes the comp actually SOUNDS for each chord, over 8 laps
-// of the chart, as root-relative degree sets (largest first).
-function sound(feel, bassOn, progression, intensity) {
-    voice(feel, bassOn, progression, 'C', true, intensity);
-    const state = getState();
-    resetCompingState(compingState);
-    const ts = TIME_SIGNATURES['4/4'];
-    const lapSteps = state.arranger.progression.length * 16;
-    return state.arranger.progression.map((chord, chordIndex) => {
-        const hits = new Map();
-        for (let lap = 0; lap < 8; lap++) {
-            for (let mStep = 0; mStep < 16; mStep++) {
-                const step = lap * lapSteps + chordIndex * 16 + mStep;
-                state.playback.step = step;
-                const midis = getAccompanimentNotes(
-                    state,
-                    chord,
-                    step,
-                    mStep,
-                    mStep,
-                    getStepInfo(step, ts),
-                    { bassEffectiveEnabled: bassOn },
-                )
-                    .filter((note) => note.midi > 0 && !note.muted)
-                    .map((note) => note.midi);
-                if (midis.length > 0) {
-                    const degrees = [...new Set(midis.map((m) => degreeOf(m, chord)))].sort(
-                        (a, b) => a - b,
-                    );
-                    hits.set(degrees.join(','), degrees);
-                }
-            }
-        }
-        const sets = [...hits.values()].sort((a, b) => b.length - a.length);
-        return { name: chord.absName, sets };
-    });
-}
 
 describe('Voicing root policy (#1313)', () => {
     beforeEach(() => {

@@ -12,6 +12,7 @@ type ChordQualityClass =
     | 'maj' // major triad, maj7/maj9/maj11/maj13/maj7#11, 6, add9
     | 'min' // m7/m9/m11/m13 and plain minor triad — m7's 6 is b5 (avoid)
     | 'min6' // m6 chord — dorian context, 6 = M6 is the chord tone itself
+    | 'minmaj' // mMaj7 — melodic minor; the MAJOR 7th is the guide tone, never the b7
     | 'dom' // 7, 9, 11, 13 — full dominant extension vocabulary legal
     | 'alt' // 7alt, 7b9, 7#9, 7b13 — altered scale; route via alteredHookIntervals
     | 'halfdim' // halfdim / m7b5 — locrian; 6 = b5 is a chord tone, not an extension
@@ -47,6 +48,13 @@ export function classifyChordQuality(quality: string | undefined): ChordQualityC
     if (q === 'm6') {
         return 'min6';
     }
+    // why (#1321): 'mmaj7' passes the minor-family test below (starts with 'm', not 'maj'),
+    // which would hand it the minor pillars — and those include the b7 the chord exists to
+    // replace. A soloist targeting Bb over a CmMaj7 is the same defect as the comper
+    // voicing it as a Cm7, one lane over.
+    if (q === 'mmaj7') {
+        return 'minmaj';
+    }
     // Minor family: 'minor', 'm', 'm7', 'm9', 'm11', 'm13'. Mirrors the
     // theory-scales.ts isMinorQuality predicate: starts with 'm' but NOT 'maj'.
     if (q.startsWith('m') && !q.startsWith('maj')) {
@@ -71,6 +79,7 @@ const FUNCTIONAL_PILLARS_BY_QUALITY: Record<ChordQualityClass, number> = {
     maj: pcMask(0, 4, 7),
     min: pcMask(0, 3, 7, 10),
     min6: pcMask(0, 3, 7, 9),
+    minmaj: pcMask(0, 3, 7, 11),
     dom: pcMask(0, 4, 7, 10),
     alt: pcMask(0, 4, 10), // altered 5 is ambiguous — don't target it
     halfdim: pcMask(0, 3, 6, 10),
@@ -91,6 +100,7 @@ const GUIDE_INTERVALS_BY_QUALITY: Record<ChordQualityClass, number[]> = {
     maj: [4], // major 3rd (maj7's 7 is left to a later idiom slice)
     min: [3, 10], // b3, b7
     min6: [3, 9], // b3, 6
+    minmaj: [3, 11], // b3, maj7 — the chord's whole identity is that 7th
     dom: [4, 10], // 3, b7 — the classic dominant tritone
     alt: [4, 10],
     halfdim: [3, 10], // b3, b7

@@ -67,6 +67,10 @@ export const NEVER_ROOTLESS_DOMINANT_QUALITIES = new Set([
     'sus4',
     'sus2',
     '7sus4',
+    // #1323 — the extended suspended dominants are the same case as '7sus4': the rootless
+    // dominant shell states a major 3rd, which is the one tone a suspension replaces.
+    '9sus4',
+    '13sus4',
     'add9',
     'add2',
     '6',
