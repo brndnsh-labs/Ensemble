@@ -1,5 +1,5 @@
 // @ts-nocheck
-// cspell:ignore Cmaj Cmadd Gsus Bdim madd domsus iadd Iadd Cdom domin Cmin minsharp
+// cspell:ignore Cmaj Cmadd Gsus Bdim madd domsus iadd Iadd Cdom domin Cmin minsharp minb fakebooks minadd Cminb
 /**
  * CHORD IDENTITY MATRIX (#1320–#1324)
  *
@@ -33,7 +33,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { getChordDetails } from '../../../public/engine/chords-engine.js';
 import { chordTargetTones } from '../../../public/engine/soloist-pitch-engine.js';
 import { COMP_REGISTER_FLOOR } from '../../../public/engine/voicing-policy.js';
-import { dispatch } from '../../../public/state.js';
+import { dispatch, getState } from '../../../public/state.js';
 import { ACTIONS } from '../../../public/types.js';
 import { degreeOf, sound, voice } from '../../utils/voicing-probe.js';
 
@@ -402,6 +402,77 @@ const MATRIX = [
     // spelling — see the SUFFIX_QUALITIES comment: it would also capture `m+7`/`m+9`,
     // whose reading is contested.
     { spelling: 'm+5', quality: 'm#5', is7th: false, defining: [3, 8], misnaming: [4, 7] },
+
+    // ---- #1340 minor SEVENTH with a raised fifth ----
+    // The 7th-chord sibling of the rows above, and the last minor-family spelling where the
+    // band contradicted a written tone: every one of these matched the `m7` row and the comp
+    // played C-Eb-G-Bb over a chart that had sharpened the fifth. Unlike `m#5` this quality
+    // reaches the rootless shell in production (`shouldUseRootlessVoicing`'s minor bucket is
+    // `minor-family && is7th`), which is why b3/♯5/b7 must all hold with the bass sounding too.
+    { spelling: 'm7#5', quality: 'm7#5', is7th: true, defining: [3, 8, 10], misnaming: [4, 7] },
+    { spelling: 'm7(#5)', quality: 'm7#5', is7th: true, defining: [3, 8, 10], misnaming: [4, 7] },
+    { spelling: 'mi7#5', quality: 'm7#5', is7th: true, defining: [3, 8, 10], misnaming: [4, 7] },
+    { spelling: 'min7#5', quality: 'm7#5', is7th: true, defining: [3, 8, 10], misnaming: [4, 7] },
+    { spelling: '-7#5', quality: 'm7#5', is7th: true, defining: [3, 8, 10], misnaming: [4, 7] },
+    { spelling: 'm7+5', quality: 'm7#5', is7th: true, defining: [3, 8, 10], misnaming: [4, 7] },
+    { spelling: 'm7(+5)', quality: 'm7#5', is7th: true, defining: [3, 8, 10], misnaming: [4, 7] },
+    { spelling: '-7+5', quality: 'm7#5', is7th: true, defining: [3, 8, 10], misnaming: [4, 7] },
+
+    // ---- #1340 minor triad with an added FLAT SIXTH ----
+    // The mirror case of the ♯5 rows: a SUBSET defect, not a contradiction — the parser matched
+    // the bare `m`/`min`/`-` row and simply dropped the ♭6, while iReal's `-b6` had been in the
+    // score vocabulary all along. The natural 5 is written here and must SURVIVE (degree 7 is
+    // `defining`, not `misnaming`); what may never sound is the natural 6 the ♭6 flattens.
+    // The b7 is misnaming for the same reason it is on `madd9`: iReal spells the chord that has
+    // one `min7b6`, a different token, so this one is a triad plus colour.
+    {
+        spelling: 'mb6',
+        quality: 'mb6',
+        is7th: false,
+        defining: [3, 7, 8],
+        misnaming: [4, 9, 10],
+        // No `liveAllows`: the Funk clav's seventh slot takes this chord's 5th (it is in
+        // `isAddedToneChord`, like `madd9`), so no lane may synthesize a b7 over it.
+    },
+    {
+        spelling: 'm(b6)',
+        quality: 'mb6',
+        is7th: false,
+        defining: [3, 7, 8],
+        misnaming: [4, 9, 10],
+    },
+    {
+        spelling: 'mib6',
+        quality: 'mb6',
+        is7th: false,
+        defining: [3, 7, 8],
+        misnaming: [4, 9, 10],
+    },
+    {
+        spelling: 'minb6',
+        quality: 'mb6',
+        is7th: false,
+        defining: [3, 7, 8],
+        misnaming: [4, 9, 10],
+    },
+    {
+        spelling: '-b6',
+        quality: 'mb6',
+        is7th: false,
+        defining: [3, 7, 8],
+        misnaming: [4, 9, 10],
+    },
+
+    // ---- #1340 the CONTESTED `m+` family, deliberately left as a plain minor TRIAD ----
+    // Not a gap to fix: `+7` means a MAJOR 7th in older fakebooks (-> mMaj7) and a raised 5th
+    // by this very table's `+7` -> aug7 analogy (-> m7#5). A plain minor triad is a subset of
+    // BOTH readings, so it is the one answer that cannot sound a tone the chart didn't write —
+    // exactly the rule the whole table serves. `m+5`/`m7+5` are unambiguous ("minor, raised 5")
+    // and DO have rows; these three must keep falling through to `m`. Changing that is a
+    // musical decision with a written-down alternative, not a bug — see #1340.
+    { spelling: 'm+', quality: 'minor', is7th: false, defining: [3], misnaming: [4, 11] },
+    { spelling: 'm+7', quality: 'minor', is7th: false, defining: [3], misnaming: [4, 11] },
+    { spelling: 'm+9', quality: 'minor', is7th: false, defining: [3], misnaming: [4, 11] },
 ];
 
 const PARSE_FEELS = ['Jazz', 'Funk', 'Neo-Soul', 'Acoustic'];
@@ -460,6 +531,65 @@ describe('Chord identity matrix (#1320-#1324)', () => {
             expect(guides).toEqual([3]);
             // A triad has no functional 7th; the minor class's b7 must not leak in.
             expect([...guides, ...pillars]).not.toContain(10);
+        });
+
+        it('a minor 7#5 targets b3, #5 and its written b7, never the natural 5 (#1340)', () => {
+            const { guides, pillars } = chordTargetTones(0, 'm7#5');
+            expect(pillars.sort((a, b) => a - b)).toEqual([0, 3, 8, 10]);
+            // This one IS a seventh chord, so it keeps the minor family's b3/b7 guide pair —
+            // the difference from 'min' is the missing natural 5, not the missing seventh.
+            expect(guides).toEqual([3, 10]);
+            expect([...guides, ...pillars]).not.toContain(7);
+        });
+
+        it('a minor b6 targets the plain minor triad, never its b6 or a 7th (#1340)', () => {
+            const { guides, pillars } = chordTargetTones(0, 'mb6');
+            // Reuses the `minadd` class: the ♭6 is a colour the comper states, not a landing
+            // tone — it sits a semitone above the 5 this chord still plays, so a soloist
+            // landing on it (or the comp's echo voice BUILDING it) would grind against that 5.
+            expect(pillars.sort((a, b) => a - b)).toEqual([0, 3, 7]);
+            expect(guides).toEqual([3]);
+            expect([...guides, ...pillars]).not.toContain(8);
+            expect([...guides, ...pillars]).not.toContain(10);
+        });
+    });
+
+    /**
+     * #1340 — the contested `m+` family, pinned so nobody "fixes" it. `+7` means a MAJOR 7th in
+     * older fakebooks (-> mMaj7) and a raised 5th by this table's own `+7` -> aug7 analogy
+     * (-> m7#5). Both readings are live in print, so the parser takes neither: a plain minor
+     * TRIAD is a subset of both, and a subset can never sound a tone that contradicts a written
+     * one — the rule the whole table exists to serve. `recognised: false` is the other half of
+     * the contract: the v2 editor refuses to SAVE these spellings (`prototypes/v2/lib/editor.ts`),
+     * so a chart that means one of the two readings gets told to spell it out (`m+5`/`m7+5` for
+     * the raised fifth, `mMaj7` for the major seventh — both unambiguous and both supported).
+     * Changing any of this is a musical decision with a written-down alternative, not a bug.
+     */
+    describe('(a) the contested m+ family stays a plain minor triad', () => {
+        it.each(['m+', 'm+7', 'm+9', '-+', '-+7', 'min+', 'mi+'])(
+            'C%s parses as an unrecognised minor triad',
+            (spelling) => {
+                expect(getChordDetails(spelling)).toMatchObject({
+                    quality: 'minor',
+                    is7th: false,
+                    recognised: false,
+                });
+            },
+        );
+
+        it('and its target tones carry neither reading', () => {
+            const { guides, pillars } = chordTargetTones(0, 'minor');
+            expect(pillars.sort((a, b) => a - b)).toEqual([0, 3, 7, 10]);
+            expect(guides).toEqual([3, 10]);
+            // no #5 (the m7#5 reading) and no major 7th (the mMaj7 reading)
+            expect([...guides, ...pillars]).not.toContain(8);
+            expect([...guides, ...pillars]).not.toContain(11);
+        });
+
+        it('while the unambiguous spellings of both readings DO parse', () => {
+            expect(getChordDetails('m+5')).toMatchObject({ quality: 'm#5', recognised: true });
+            expect(getChordDetails('m7+5')).toMatchObject({ quality: 'm7#5', recognised: true });
+            expect(getChordDetails('mMaj7')).toMatchObject({ quality: 'mMaj7', recognised: true });
         });
     });
 
@@ -617,6 +747,18 @@ describe('Chord identity matrix (#1320-#1324)', () => {
         ['C-#5', 'Cm#5'],
         ['Cmin#5', 'Cm#5'],
         ['Cm+5', 'Cm#5'],
+        // #1340 — `m7#5` also has to sit in the "don't append 7" list, or the same branch that
+        // rendered `G7sus4` as "G7sus47" renders this as "Cm7#57". `mb6` needs no such guard
+        // (`is7th` is false) but had the same default-empty-suffix bug: it displayed as "C".
+        ['Cm7#5', 'Cm7#5'],
+        ['Cm7(#5)', 'Cm7#5'],
+        ['C-7#5', 'Cm7#5'],
+        ['Cmin7#5', 'Cm7#5'],
+        ['Cm7+5', 'Cm7#5'],
+        ['Cmb6', 'Cmb6'],
+        ['Cm(b6)', 'Cmb6'],
+        ['C-b6', 'Cmb6'],
+        ['Cminb6', 'Cmb6'],
     ])('%s displays as %s', (token, expected) => {
         const [chord] = voice('Acoustic', true, token);
         expect(chord.name).toBe(expected);
@@ -677,6 +819,21 @@ describe('Chord identity matrix (#1320-#1324)', () => {
         for (const junk of ['', '!!!', '---------', 'øøø', 'sus2sus4', 'maj7maj7', 'm7m7', 'zz']) {
             expect(() => getChordDetails(junk)).not.toThrow();
             expect(getChordDetails(junk)).toHaveProperty('quality');
+        }
+    });
+
+    // The parsed chord's `isMinor` flag drives the UI's major/minor colouring and minor-key
+    // display. It is a hand-kept name list, so every new minor-triad quality has to join it —
+    // `m#5` shipped (#1336) rendering a lowercase numeral while still flagged major.
+    it('every minor-triad quality parses with isMinor set, and major ones without', () => {
+        const minor = 'Cm | Cm7 | Cm6 | Cm9 | CmMaj7 | Cmadd9 | Cm#5 | Cm7#5 | Cmb6 | Cm7b5 | Cdim';
+        voice('Jazz', true, minor);
+        for (const chord of getState().arranger.progression) {
+            expect(chord.isMinor, `${chord.absName} should be flagged minor`).toBe(true);
+        }
+        voice('Jazz', true, 'C | Cmaj7 | C7 | C6 | Cadd9 | Cmaj7b5 | C+ | Csus4');
+        for (const chord of getState().arranger.progression) {
+            expect(chord.isMinor, `${chord.absName} should not be flagged minor`).toBe(false);
         }
     });
 

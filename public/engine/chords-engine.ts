@@ -1,4 +1,4 @@
-// cspell:ignore mmaj madd majadd minadd susadd
+// cspell:ignore mmaj madd majadd minadd susadd minb
 import {
     INTERVAL_TO_NNS,
     INTERVAL_TO_ROMAN,
@@ -47,7 +47,7 @@ export interface ChordDetails {
     suffix: string;
     /**
      * True when the whole normalised suffix was consumed by that spelling — i.e. the parser
-     * understood all of it, not just a prefix (#1331). `Cm7#5` matches `m7` and leaves `#5`
+     * understood all of it, not just a prefix (#1331). `Cm7#11` matches `m7` and leaves `#11`
      * behind, so it is NOT recognised; `CMaj7`, `Cm7(b5)` and `CΔ7` are, even though the
      * matched spelling differs from what was typed. An empty suffix (a bare triad) counts as
      * recognised. Consumers that need "would this text silently become a different chord"
@@ -198,6 +198,35 @@ const SUFFIX_QUALITIES = new Map<string, string>([
     ['m+5', 'm#5'],
     ['min+5', 'm#5'],
     ['-+5', 'm#5'],
+
+    // --- minor SEVENTH with a raised fifth (#1340): the 7th-chord sibling of the rows above,
+    // and the last minor-family spelling where the band contradicted a written tone. Every
+    // spelling matched the `m7` row, so the comp voiced C-Eb-G-Bb: the natural 5 the chart had
+    // sharpened. Unlike `m#5` this one IS a seventh chord, so it carries the `!`: [0,3,8,10] is
+    // the m7 with its fifth raised — the same four pitch classes as an `add9` a major third
+    // below it (Cm7#5 = Ab-C-Eb-Bb), which is why dropping the ♯5 to a natural 5 does not read
+    // as a near miss but as a different chord.
+    // `mi7#5` needs no row (the normaliser folds `mi` -> `m`); `min7…` does,
+    // because only the UPPERCASE `MIN`/`Min` are normalised. Rows are 4+ characters so the
+    // longest-first matcher puts them ahead of `m7`/`min7`/`-7` — and `m7#9`/`m7#11`/`m7b9`
+    // keep matching `m7` as before, since none of them starts with one of these spellings.
+    ['m7#5', 'm7#5!'],
+    ['min7#5', 'm7#5!'],
+    ['-7#5', 'm7#5!'],
+    ['m7+5', 'm7#5!'],
+    ['min7+5', 'm7#5!'],
+    ['-7+5', 'm7#5!'],
+
+    // --- minor triad with an added FLAT SIXTH (#1340). iReal's `-b6` was already in
+    // `songbook/score-text.ts`'s accepted vocabulary while the parser matched the bare
+    // `m`/`min`/`-` row and dropped the ♭6 entirely — a subset, so never a wrong chord, but
+    // the written colour was silently unplayable. A TRIAD plus colour, like `madd9`: iReal
+    // spells the version WITH a seventh `min7b6`, which is the evidence that `mb6` means "no
+    // 7th". `mib6` folds onto `mb6` in the normaliser. `mb5`/`-b5` are untouched — neither
+    // starts with one of these spellings.
+    ['mb6', 'mb6'],
+    ['minb6', 'mb6'],
+    ['-b6', 'mb6'],
 
     // --- minor family. `minor` + is7th true IS m7 (the canonical pair, not a shortcut).
     ['m7b5', 'halfdim!'],
@@ -900,6 +929,19 @@ export function getFormattedChordNames(
         absSuffix = 'm#5';
         nnsSuffix = '-#5';
         romSuffix = '#5';
+    } else if (quality === 'm7#5') {
+        // why (#1340): same default-empty-suffix trap as `m#5` above — a written `Cm7#5` showed
+        // as a bare `C`. The quality spells its own seventh, so it also has to sit in the
+        // "don't append 7" list below or it renders `Cm7#57`.
+        absSuffix = 'm7#5';
+        nnsSuffix = '-7#5';
+        romSuffix = '7#5';
+    } else if (quality === 'mb6') {
+        // why (#1340): `-b6` is iReal's spelling of the same chord and was already accepted by
+        // the score vocabulary; `is7th` is false here, so no append guard is needed.
+        absSuffix = 'mb6';
+        nnsSuffix = '-b6';
+        romSuffix = 'b6';
     } else if (quality === 'madd9') {
         absSuffix = 'madd9';
         nnsSuffix = '-add9';
@@ -1043,6 +1085,9 @@ export function getFormattedChordNames(
             '9sus4',
             '13sus4',
             'mMaj7',
+            // why (#1340): `m7#5` spells its own seventh too — without this a written Cm7#5
+            // displayed as "Cm7#57", the exact nonsense #1323 is named for.
+            'm7#5',
         ].includes(quality)
     ) {
         absSuffix += '7';
@@ -1065,7 +1110,10 @@ export function getFormattedChordNames(
         quality === 'mMaj7' ||
         quality === 'madd9' ||
         // #1336 — a raised fifth does not make the chord major; its b3 does the naming.
-        quality === 'm#5'
+        quality === 'm#5' ||
+        // #1340 — same rule for the 7th-chord sibling and for the added ♭6: the b3 names both.
+        quality === 'm7#5' ||
+        quality === 'mb6'
     ) {
         romanName = rootRomanBase.toLowerCase();
     } else {
@@ -1340,7 +1388,13 @@ function parseProgressionPart(
                     // #1321/#1322 — both are minor-triad chords; the flag drives minor-key
                     // display and the UI's major/minor colouring.
                     quality === 'mMaj7' ||
-                    quality === 'madd9';
+                    quality === 'madd9' ||
+                    // #1336/#1340 — same again: a raised 5th or an added b6 sits on a
+                    // MINOR triad. These rendered a lowercase numeral while this flag
+                    // still coloured them major.
+                    quality === 'm#5' ||
+                    quality === 'm7#5' ||
+                    quality === 'mb6';
 
                 parsed.push({
                     romanName: finalRomName,

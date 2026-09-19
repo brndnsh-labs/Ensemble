@@ -7,8 +7,9 @@ const ROOT = /^(?:[#b]?(?:III|II|IV|I|VII|VI|V|iii|ii|iv|i|vii|vi|v)|[#b]?[1-7]|
  * Did the parser understand this whole quality? `recognised` (#1331) is the signal: it means
  * the entire normalised suffix matched one table spelling, so `Maj7`, `m7(b5)`, `Δ7` and
  * `mMaj7` pass even though the canonical spelling differs from what was typed — comparing
- * strings is what used to reject them. A partial match (`m7#5` consumes `m7`, drops `#5`) is
- * still rejected, which is this guard's real job.
+ * strings is what used to reject them. A partial match (`m7#11` consumes `m7`, drops `#11`) is
+ * still rejected, which is this guard's real job. (#1340 swapped that example: `m7#5` became a
+ * real quality, so it is now accepted — the guard's behaviour is unchanged.)
  *
  * The `suffix !== ''` half covers the other direction: normalisation strips parentheses,
  * slashes and spaces before matching, so a tail of `(` normalises to nothing and would
@@ -30,7 +31,8 @@ function supportedChord(token: string): boolean {
     // parentheses, Δ and the in-quality slash before matching, so `Maj7`, `m7(b5)`, `Δ7` and
     // `mMaj7` all parse correctly while returning a spelling that differs from what was typed
     // — the old string equality rejected exactly the chords that now work. A partial match
-    // (`m7#5` consumes `m7` and drops `#5`) is still rejected: that is this guard's real job.
+    // (`m7#11` consumes `m7` and drops `#11`) is still rejected: that is this guard's real job.
+    // (#1340 swapped the example; `m7#5` is a real quality now and parses whole.)
     const parts = tail.split('/');
     if (parts.length > 2) {
         return false;

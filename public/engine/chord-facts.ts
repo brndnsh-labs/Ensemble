@@ -32,6 +32,8 @@ const QUALITIES: Readonly<Record<string, readonly number[]>> = {
     mMaj7: [0, 3, 7, 11],
     madd9: [0, 3, 7, 14],
     'm#5': [0, 3, 8], // #1336 — no natural 5; a missing row falls back to MAJOR
+    'm7#5': [0, 3, 8, 10], // #1340 — the same, with the written b7
+    mb6: [0, 3, 7, 8], // #1340 — a minor triad plus the ♭6; the natural 5 stays
     '9sus4': [0, 5, 7, 10, 14],
     '13sus4': [0, 5, 7, 10, 14, 21],
     '6/9': [0, 4, 7, 9, 14],

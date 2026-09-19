@@ -138,6 +138,11 @@ describe('Ending-cadence tonic critique (#830)', () => {
      */
     it.each([
         ['Cm#5', 3, 'minor'],
+        // #1340 — the same rule for the ♯5's 7th-chord sibling and for the added ♭6. Both are
+        // minor triads with one extra tone, so both were absent from `MINOR_QUALITIES` and both
+        // ended the song bright over a written minor chord.
+        ['Cm7#5', 3, 'minor'],
+        ['Cmb6', 3, 'minor'],
         ['Cm', 3, 'minor'],
         ['C', 4, 'major'],
     ])('a chart ending on %s resolves into a %s tonic', (finalChord, pickup) => {

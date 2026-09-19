@@ -45,6 +45,15 @@ export function getRootlessVoicing(
         return null;
     }
 
+    // #1340 — the same refusal for `mb6`: a minor TRIAD plus a ♭6 colour, so there is no
+    // 3rd-plus-7th shell to state. `shouldUseRootlessVoicing`'s minor bucket requires `is7th`
+    // and no `SUFFIX_QUALITIES` row gives this quality one, so production never routes here;
+    // this keeps the function honest for a direct caller, which would otherwise get the
+    // minor-7 shell [3, 7, 10] — an unwritten b7 in place of the written ♭6.
+    if (quality === 'mb6') {
+        return null;
+    }
+
     // #1316 — same class as the m6 refusal above: a suspension, an added tone or a
     // 6th has no 3rd-plus-b7 shell to state, so the `is7th` string heuristic routing
     // one here produced a different chord (G7sus4 -> B-D-F, a plain G7; Cadd9 ->
@@ -108,6 +117,15 @@ export function getRootlessVoicing(
         // rootless minor-major voicing.
         if (quality === 'mMaj7') {
             return isRich ? [3, 11, 14] : [3, 7, 11]; // b3, (5 | 7, 9)
+        }
+        // #1340 — `m7#5` DOES reach here in production, unlike its `m#5` triad sibling:
+        // `shouldUseRootlessVoicing`'s minor bucket is `startsWith('m') && !startsWith('maj')
+        // && is7th`, which this quality satisfies. Without its own branch it fell through to
+        // the standard minor-7 shell below and came back [3, 7, 10] — the natural 5 the chart
+        // sharpened. b3-#5-b7 IS the shell here (the #5 is a guide tone, not a colour: it is
+        // the one tone distinguishing this chord from a plain m7), rich adds the 9 on top.
+        if (quality === 'm7#5') {
+            return isRich ? [3, 8, 10, 14] : [3, 8, 10]; // b3, #5, b7, (9)
         }
         // Neo-Soul Quartal / Clusters
         if (genre === 'Neo-Soul' && quality === 'minor' && is7th) {
@@ -230,7 +248,12 @@ export function isStrummedChordVoice(voice: string | undefined | null): boolean 
  * skipped the same block. A written `Cadd9` gaining a b7 at intensity 0.6 is the same
  * defect by a different route.
  */
-const NO_SEVENTH_QUALITIES = new Set(['6', 'm6', '6/9', 'add9', 'add2', 'madd9']);
+// why (#1340): `mb6` joins them. Its ♭6 is the named colour tone standing in for a seventh —
+// iReal spells the version that HAS one `min7b6`, a different token — and unlike `m#5` this
+// quality is not `isAltered5` (no 'b5'/'#5' in the name, and its natural 5 is real), so
+// nothing else stopped the >= 0.6 tier slamming a b7 onto a written triad. Same defect as
+// `Cadd9` -> C9, one colour tone over.
+const NO_SEVENTH_QUALITIES = new Set(['6', 'm6', '6/9', 'add9', 'add2', 'madd9', 'mb6']);
 
 export function getIntervals(
     state: EnsembleState,
@@ -328,6 +351,21 @@ export function getIntervals(
             // `SUFFIX_QUALITIES` encodes this quality with a seventh, so it never arrives with
             // one (unlike `aug`, whose `aug7`/`+7`/`7#5` rows do).
             intervals = [0, 3, 8];
+        } else if (quality === 'm7#5') {
+            // 1 b3 #5 b7 (#1340) — the m7 with its fifth raised (its scale is the fifth-less
+            // Aeolian; see `theory-scales.ts`). No
+            // natural 5: `isAltered5` matches this name's '#5' too, so neither the >= 0.8
+            // "Wall of Sound" backfill nor the rich-density tier can add one back, and the
+            // final-safety filter strips pitch class 7 regardless. The b7 is written, so the
+            // `is7th` backfill at the end of this function finds it already present.
+            intervals = [0, 3, 8, 10];
+        } else if (quality === 'mb6') {
+            // 1 b3 5 b6 (#1340) — a minor TRIAD plus the written ♭6: the Aeolian-tonic colour, a
+            // minor chord voiced with the ♭6 of its own key sitting above the 5. The 5 STAYS —
+            // a ♭6 is an added colour a semitone above it, not an alteration OF it, which is
+            // why this quality is deliberately not `isAltered5`. `NO_SEVENTH_QUALITIES` is what
+            // keeps the intensity tier from adding the b7 that would make it `min7b6`.
+            intervals = [0, 3, 7, 8];
         } else if (quality === 'mMaj7') {
             intervals = [0, 3, 7, 11]; // 1 b3 5 maj7 — the melodic-minor tonic (#1321)
         } else if (quality === 'madd9') {
@@ -505,6 +543,19 @@ export function getIntervals(
             // with a sharp one, two different fifths in one voicing. The minor family's own
             // colours (9, 11) are the honest rich extension here, so this mirrors `minor`.
             'm#5': [14, 17], // 9, 11
+            // why (#1340): identical reasoning to the `m#5` row above — the generic
+            // `isAltered5 ? [14, 18]` default's 18 is the #11, a FLAT fifth beside this chord's
+            // written SHARP one, two different fifths in one voicing. The minor family's own
+            // 9/11 are the honest colours. NOTE both these rows are intent, not behaviour,
+            // TODAY: each quality writes four tones, so the loop below pushes the 9 and hits its
+            // 5-voice cap before reading the second entry — the rows are what keeps the #11 out
+            // if either the cap or the written tone count ever changes.
+            'm7#5': [14, 17], // 9, 11
+            // why (#1340): a ♭6 chord's top two voices (5 and ♭6) are already a semitone pair,
+            // so the 9 alone is the colour that fits — the 11 would crowd that pair from below.
+            // Same as the non-altered default by value; explicit so a later `isAltered5`-style
+            // reclassification of this quality can't silently hand it the #11.
+            mb6: [14], // 9
             // why (#1341): this row read [14, 22] under the same "9, #11" comment — but 22 is
             // pitch class 10, a b7. A plain C+ at rich density became C+7: dominant function
             // the chart never wrote, which states the 7th two bars early in the line cliché

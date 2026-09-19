@@ -107,6 +107,7 @@ test('the editor accepts every spelling the playback parser understands', async 
         'CmMaj7 | Cm/maj7 | Cmadd9', // minor-major and minor added tone
         'Gsus | G7sus | G9sus4 | G13sus', // suspension shorthand
         'C6/9 | Cm6/9 | C69 | Cmaj7b5', // in-quality slash, and the exact maj7b5
+        'Cm7#5 | C-7#5 | Cm(b6) | C-b6', // #1340 — written altered 5ths and the added b6
         'Cmaj7/G | Am7/E', // real slash basses still split
     ].join(' | ');
     await page.getByLabel('Chord text').fill(supported);
@@ -117,9 +118,11 @@ test('the editor accepts every spelling the playback parser understands', async 
 
 test('the editor still rejects a partly-understood spelling', async ({ page }) => {
     await openEditor(page);
-    // `m7#5` consumes `m7` and drops the `#5`: the chord would silently lose its alteration,
+    // `m7#11` consumes `m7` and drops the `#11`: the chord would silently lose its alteration,
     // which is the case this guard exists for. A leading slash is unfinished text.
-    for (const token of ['Cm7#5', 'C/9', 'Cm7add11']) {
+    // (#1340 swapped the example from `Cm7#5`, which is now a real quality — see the accepted
+    // list above. The guard is about partial matches, so it needs a spelling that still is one.)
+    for (const token of ['Cm7#11', 'C/9', 'Cm7add11']) {
         await page.getByLabel('Chord text').fill(`Dm7 | ${token}`);
         await page.getByRole('button', { name: 'Save', exact: true }).click();
         await expect(page.locator('.error-banner')).toContainText(

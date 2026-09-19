@@ -197,20 +197,40 @@ describe('Acoustic guitar: playable harmony and dependable phrasing (#1150)', ()
                 // below is what catches that, not the bounded-shape check.
                 'm#5',
                 'maj7b5',
+                // #1340 — `m7#5` is the same case one seventh over, and `mb6` is the MIRROR
+                // case: its natural 5 is real, so there the assertion is that the fifth
+                // survives while the natural 6 the ♭6 flattens never appears.
+                'm7#5',
+                'mb6',
                 '5',
             ]) {
                 const facts = chordFacts({ rootMidi, quality, bassMidi: null, is7th: false });
-                const noPerfectFifth = quality === 'm#5' || quality === 'maj7b5';
+                const noPerfectFifth =
+                    quality === 'm#5' || quality === 'maj7b5' || quality === 'm7#5';
                 if (noPerfectFifth) {
+                    // `maj7b5` is the flat-5-over-a-major-3rd member; both ♯5 qualities are
+                    // sharp-5-over-a-minor-3rd.
+                    const isFlatFive = quality === 'maj7b5';
                     expect(facts.tones, `${quality} tones sound a natural 5`).not.toContain(
                         (rootMidi + 7) % 12,
                     );
                     expect(facts.tones, `${quality} lost its altered 5`).toContain(
-                        (rootMidi + (quality === 'm#5' ? 8 : 6)) % 12,
+                        (rootMidi + (isFlatFive ? 6 : 8)) % 12,
                     );
                     expect(facts.tones, `${quality} wrong third`).toContain(
-                        (rootMidi + (quality === 'm#5' ? 3 : 4)) % 12,
+                        (rootMidi + (isFlatFive ? 4 : 3)) % 12,
                     );
+                }
+                if (quality === 'm7#5') {
+                    expect(facts.tones, 'm7#5 lost its written b7').toContain((rootMidi + 10) % 12);
+                }
+                if (quality === 'mb6') {
+                    expect(facts.tones, 'mb6 lost its natural 5').toContain((rootMidi + 7) % 12);
+                    expect(facts.tones, 'mb6 lost its b6').toContain((rootMidi + 8) % 12);
+                    expect(facts.tones, 'mb6 sounds the natural 6 it flattens').not.toContain(
+                        (rootMidi + 9) % 12,
+                    );
+                    expect(facts.tones, 'mb6 wrong third').toContain((rootMidi + 3) % 12);
                 }
                 const shape = chooseGuitarShape(facts, false);
                 if (noPerfectFifth) {

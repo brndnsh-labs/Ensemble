@@ -2185,7 +2185,9 @@ export function getAccompanimentNotes(
             // every added-tone chord into a dominant: Cadd9 -> E-Bb-D. Voice the 5th in
             // that slot — a real chord tone — and the cell states Cadd9. A plain triad
             // says nothing about its 7th, so it takes the KEY's (`diatonicSeventh`, #1327).
-            const isAddedToneChord = ['add9', 'add2', 'madd9'].includes(clavQuality);
+            // `mb6` (#1340) is the same shape: a triad plus one written colour, no 7th.
+            // (`m#5` is NOT — it has no natural 5 for this slot to take.)
+            const isAddedToneChord = ['add9', 'add2', 'madd9', 'mb6'].includes(clavQuality);
             // why (#1327): a plain suspended TRIAD takes no synthesized 7th at all. The
             // key's 7th over a sus4 on I or IV is the major 7th, a tritone from the
             // suspended 4th (Csus4 -> F-B-D reads as G7 over C) — a colour nobody wrote.

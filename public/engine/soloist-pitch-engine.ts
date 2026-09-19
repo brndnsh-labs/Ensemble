@@ -12,7 +12,9 @@ type ChordQualityClass =
     | 'maj' // major triad, maj7/maj9/maj11/maj13/maj7#11, 6, add9
     | 'min' // m7/m9/m11/m13 and plain minor triad — m7's 6 is b5 (avoid)
     | 'min6' // m6 chord — dorian context, 6 = M6 is the chord tone itself
-    | 'minadd' // madd9 — a minor TRIAD plus colour; "add" means no 7th to target
+    // #1340 — serves `mb6` too: same shape (minor triad + one named colour, no 7th), and its ♭6
+    // is likewise a comper's colour rather than a landing tone (it rubs the 5 a semitone below).
+    | 'minadd' // madd9, mb6 — a minor TRIAD plus colour; "add" means no 7th to target
     | 'minmaj' // mMaj7 — melodic minor; the MAJOR 7th is the guide tone, never the b7
     | 'dom' // 7, 9, 11, 13 — full dominant extension vocabulary legal
     | 'alt' // 7alt, 7b9, 7#9, 7b13, 7b5 — altered scale; route via alteredHookIntervals
@@ -24,6 +26,7 @@ type ChordQualityClass =
     | 'power' // 5 — root and 5th only
     | 'majb5' // maj7b5 — lydian; the 3rd and maj7 are the guides, the 5 is FLAT
     | 'minsharp5' // m#5 — a minor TRIAD whose 5 is SHARP; b3 guides, no 7th, no natural 5
+    | 'min7sharp5' // m7#5 — the same chord WITH its b7; b3 + b7 guide, still no natural 5
     | 'aug'; // aug, augmaj7 — whole-tone / lydian-aug, no perfect 5
 
 export function classifyChordQuality(quality: string | undefined): ChordQualityClass {
@@ -84,6 +87,13 @@ export function classifyChordQuality(quality: string | undefined): ChordQualityC
     if (q === 'm#5') {
         return 'minsharp5';
     }
+    // why (#1340): the 7th-chord sibling needs its OWN class, not `minsharp5` and not `min`.
+    // `min` would hand it the natural 5 it sharpens; `minsharp5` would drop the b7 the chart
+    // actually wrote, leaving the walking bass and the comp's Q&A echo voice no seventh to
+    // outline over what is genuinely a seventh chord. Branch before the minor fallthrough.
+    if (q === 'm7#5') {
+        return 'min7sharp5';
+    }
     if (q === 'm6') {
         return 'min6';
     }
@@ -99,7 +109,13 @@ export function classifyChordQuality(quality: string | undefined): ChordQualityC
     // the walking bass's targets, and the comp's Q&A echo support voice, which BUILDS a
     // note from them. "add9" is written to say "no 7th", so a b7 from any of those is the
     // comper's Cm(add9) -> Cm7 defect one lane over. Mirrors 'add9' -> 'maj' below.
-    if (q === 'madd9') {
+    //
+    // why (#1340): `mb6` shares the class. It is the same shape — a minor triad plus one named
+    // colour tone, no seventh — and the ♭6 deliberately does NOT join the target set: it sits a
+    // semitone above the 5 the chord still plays, so a soloist landing on it, a walking bass
+    // targeting it, or the comp's echo voice BUILDING it would grind against the comper's fifth.
+    // The ♭6 is a colour the comper states, not a tone the other lanes aim at.
+    if (q === 'madd9' || q === 'mb6') {
         return 'minadd';
     }
     // Minor family: 'minor', 'm', 'm7', 'm9', 'm11', 'm13'. Mirrors the
@@ -148,6 +164,9 @@ const FUNCTIONAL_PILLARS_BY_QUALITY: Record<ChordQualityClass, number> = {
     // unlike `alt`'s deliberately-omitted altered 5, the #5 IS this chord's whole point, so
     // it is a landing tone the way `aug`'s #5 is.
     minsharp5: pcMask(0, 3, 8),
+    // #1340 — 1, b3, #5, b7. The `minsharp5` set plus the b7 the chart wrote; still no natural
+    // 5. Every tone here is literally in the voicing, so nothing invents a fifth of either kind.
+    min7sharp5: pcMask(0, 3, 8, 10),
     aug: pcMask(0, 4, 8),
 };
 
@@ -177,6 +196,9 @@ const GUIDE_INTERVALS_BY_QUALITY: Record<ChordQualityClass, number[]> = {
     // #1336 — b3 only. A triad has no functional 7th to guide toward (mirrors 'minadd'),
     // and the b3 is what names the chord minor against its augmented fifth.
     minsharp5: [3],
+    // #1340 — b3, b7. This one IS a seventh chord, so it has the minor family's usual guide
+    // pair; what it must never guide toward is the natural 5, and 7 is absent from both tables.
+    min7sharp5: [3, 10],
     aug: [4], // major 3rd
 };
 

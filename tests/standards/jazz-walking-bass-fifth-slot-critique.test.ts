@@ -43,6 +43,12 @@ const ALTERED = [
     // `chordHasPerfectFifth` already reads its '#5' (so `fifthSlotInterval` returns the ROOT
     // with no new code), and its scale is now Aeolian-without-the-5th, so beat 2 holds too.
     { rootMidi: 60, quality: 'm#5', intervals: [0, 3, 8], label: 'Cm#5' },
+    // #1340 — and its SEVENTH-chord sibling, for the same reason: `chordHasPerfectFifth` reads
+    // the '#5' in the name (so `fifthSlotInterval` answers with the ROOT, still no new code),
+    // and `getScaleForChord` now answers the same fifth-less Aeolian, so the beat-2 path note
+    // holds too. Unlike `m#5` this chord is what the chart usually writes — the natural 5 used
+    // to sound under a comp playing an actual b7 above it.
+    { rootMidi: 60, quality: 'm7#5', intervals: [0, 3, 8, 10], label: 'Cm7#5' },
 ];
 const PLAIN = [
     { rootMidi: 62, quality: 'minor', intervals: [0, 3, 7, 10], label: 'Dm7' },

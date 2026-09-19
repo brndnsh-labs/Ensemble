@@ -1,4 +1,4 @@
-// cspell:ignore Cmin Cnope
+// cspell:ignore Cmin Cnope Cminb
 import { describe, expect, it } from 'vitest';
 import {
     addScoreDurations,
@@ -127,6 +127,16 @@ describe('semantic score chord-bar text', () => {
         ['C-#5:4', '4/4', [{ kind: 'chord', symbol: 'C-#5', duration: [4, 1] }]],
         ['Cmin#5:4', '4/4', [{ kind: 'chord', symbol: 'Cmin#5', duration: [4, 1] }]],
         ['Cm+5:4', '4/4', [{ kind: 'chord', symbol: 'Cm+5', duration: [4, 1] }]],
+        // #1340 — the ♯5 triad's SEVENTH-chord sibling and the minor triad with an added ♭6.
+        // iReal's `-b6` was already accepted while the playback parser dropped the ♭6 entirely;
+        // now both agree on the same chord, so the `m…`/`min…`/`-7…` spellings belong here too.
+        ['Cm7#5:4', '4/4', [{ kind: 'chord', symbol: 'Cm7#5', duration: [4, 1] }]],
+        ['Cm7+5:4', '4/4', [{ kind: 'chord', symbol: 'Cm7+5', duration: [4, 1] }]],
+        ['C-7#5:4', '4/4', [{ kind: 'chord', symbol: 'C-7#5', duration: [4, 1] }]],
+        ['Cmin7#5:4', '4/4', [{ kind: 'chord', symbol: 'Cmin7#5', duration: [4, 1] }]],
+        ['Cmb6:4', '4/4', [{ kind: 'chord', symbol: 'Cmb6', duration: [4, 1] }]],
+        ['C-b6:4', '4/4', [{ kind: 'chord', symbol: 'C-b6', duration: [4, 1] }]],
+        ['Cminb6:4', '4/4', [{ kind: 'chord', symbol: 'Cminb6', duration: [4, 1] }]],
         [
             'C7[F7,Bb7]:4',
             '4/4',
