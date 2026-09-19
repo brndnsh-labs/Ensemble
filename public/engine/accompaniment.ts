@@ -1,4 +1,4 @@
-// cspell:ignore madd
+// cspell:ignore madd Bdim
 import { TIME_SIGNATURES } from '../config.js';
 import { getEffectiveTimeSignature } from '../meter.js';
 import type { Chord, EnsembleState, Mutable, StepInfo } from '../types.js';
@@ -24,6 +24,8 @@ import { getGuitarNotes } from './guitar-player.js';
 import { scrambleHash, stringHash31 } from './hash-utils.js';
 import { getPianoNotes } from './piano-player.js';
 import { isInstrumentActiveAtStep, isSoloistBusyAtStep } from './section-overrides.js';
+import { chordTargetTones } from './soloist-pitch-engine.js';
+import { getKeyContext } from './theory-scales.js';
 import {
     averageMidi,
     COMP_REGISTER_FLOOR,
@@ -2096,6 +2098,54 @@ export function getAccompanimentNotes(
             // `/^m/` would wrongly flag maj7/maj9 as minor and synthesize a b3
             // fallback over a major chord.
             const clavQuality = chord.quality || '';
+            // #1327 — "what you type is what you hear". `pickClavDegree` SYNTHESIZES the degree
+            // it cannot find, and a hardcoded b7 fallback is out of key on the I and IV of a
+            // diatonic chart: F in C major came out A-Eb-G while the bass and soloist, which
+            // derive their notes from the chord quality plus the key (`theory-scales.ts`), play
+            // E natural in the same bar — a semitone collision BETWEEN lanes that no comp-only
+            // test can see. So a chord the chart writes with no seventh takes the seventh its
+            // KEY gives that root: maj7 on the degrees whose diatonic seventh is major (I and IV
+            // of a major key; bIII and bVI of a natural-minor one), b7 everywhere else. A root
+            // outside the key keeps the b7 — a chromatic chord in a funk chart is almost always
+            // dominant — and so does a chart with no key at all. No tonic exception: a player
+            // who wants I7 writes I7.
+            //
+            // `getKeyContext` is the same reader `getScaleForChord` uses, so the comp's choice
+            // is made from the same key + major/minor the other lanes resolve (including a
+            // per-section key override, which lives on the chord). The two scale literals mirror
+            // theory-scales.ts's `SCALE_INTERVALS.MAJOR`/`NATURAL_MINOR`, which are module-local
+            // there; the diatonic-awareness block in `getScaleForChord` picks between exactly
+            // these two the same way.
+            const KEY_SCALE_MAJOR = [0, 2, 4, 5, 7, 9, 11];
+            const KEY_SCALE_NATURAL_MINOR = [0, 2, 3, 5, 7, 8, 10];
+            const clavKey = getKeyContext(state, chord);
+            const clavKeyPcs =
+                clavKey.keyRootIdx < 0
+                    ? null
+                    : new Set(
+                          (clavKey.isMinor ? KEY_SCALE_NATURAL_MINOR : KEY_SCALE_MAJOR).map(
+                              (interval) => (clavKey.keyRootIdx + interval) % 12,
+                          ),
+                      );
+            const clavRootPc = ((chord.rootMidi % 12) + 12) % 12;
+            const clavInKey = (interval: number) =>
+                clavKeyPcs?.has((clavRootPc + interval) % 12) ?? false;
+            // The CHORD has to belong to the key, not just its root: a C minor triad in C major
+            // shares the key's root and would otherwise be handed the key's B natural — an
+            // mMaj7 nobody wrote. `chordTargetTones` gives the chord's functional tones (the
+            // same table `bass-styles.ts` asks), and this is the test `getScaleForChord`'s own
+            // diatonic-awareness block makes: every chord tone in the key's scale.
+            const clavIsDiatonic =
+                clavKeyPcs !== null &&
+                chordTargetTones(chord.rootMidi, chord.quality).pillars.every((pitchClass) =>
+                    clavKeyPcs.has(pitchClass),
+                );
+            const diatonicSeventh = clavIsDiatonic && clavInKey(11) ? 11 : 10;
+            // The colour voice has the same hazard one degree up: the whole step above a iii or
+            // vii root leaves the key (Em in C major -> F#), so there the cell takes the chord's
+            // own 5th rather than a chromatic 9th. A chromatic root keeps the natural 9, for the
+            // same reason it keeps the b7.
+            const diatonicNinth = !clavIsDiatonic || clavInKey(14) ? 14 : 7;
             const isMinorQuality =
                 (clavQuality.startsWith('m') && !clavQuality.startsWith('maj')) ||
                 clavQuality.includes('dim');
@@ -2104,12 +2154,28 @@ export function getAccompanimentNotes(
             // so a sus chord came out with an invented major 3rd (G7sus4 -> F-A-B, a
             // plain G9 — the suspension gone). Take the 4th (or the 2nd) instead, the
             // note the chart actually wrote.
-            const isSuspendedChord = ['sus4', '7sus4', '9sus4', '13sus4', 'sus2'].includes(
+            // '11' joins them (#1327): a dominant 11th features the 4th and omits the 3rd, so
+            // the `[3, 4]` pick below found neither and synthesized a major 3rd a semitone
+            // under the 11th the comper is sounding.
+            const isSuspendedChord = ['sus4', '7sus4', '9sus4', '13sus4', '11', 'sus2'].includes(
                 clavQuality,
             );
-            const clavThird = isSuspendedChord
-                ? pickClavDegree(clavQuality === 'sus2' ? [2] : [5], clavQuality === 'sus2' ? 2 : 5)
-                : pickClavDegree([3, 4], isMinorQuality ? 3 : 4);
+            // #1327 — a power chord is a root and a 5th. There is no third to find, so the
+            // `[3, 4]` pick synthesized a major one and named the chord the player deliberately
+            // left unnamed; the cell states root/5th/(9th or octave) instead.
+            const isPowerChord = clavQuality === '5';
+            // #1327 — a diminished chord's seventh is the bb7 (degree 9), never the b7 the
+            // `[10, 11]` pick used to synthesize (which made a Bdim7 sound half-diminished).
+            // A plain dim TRIAD has no seventh at all: it keeps its own three tones.
+            const isDiminishedChord = clavQuality === 'dim';
+            const clavThird = isPowerChord
+                ? pickClavDegree([0], 0)
+                : isSuspendedChord
+                  ? pickClavDegree(
+                        clavQuality === 'sus2' ? [2] : [5],
+                        clavQuality === 'sus2' ? 2 : 5,
+                    )
+                  : pickClavDegree([3, 4], isMinorQuality ? 3 : 4);
             // #1313 — a 6th chord's colour voice is its 6th. Synthesizing a b7 here
             // swapped the written 6th for an unwritten 7th (Am6 -> C-G-B), the same
             // defect the parse layer had; b3-6-9 is the Dorian clav cell instead.
@@ -2118,14 +2184,26 @@ export function getAccompanimentNotes(
             // 7th" (Cadd9 exists precisely to not be C9), so the synthesized b7 turned
             // every added-tone chord into a dominant: Cadd9 -> E-Bb-D. Voice the 5th in
             // that slot — a real chord tone — and the cell states Cadd9. A plain triad
-            // still gets the funk b7: it says nothing about its 7th, and the dominant-7
-            // default is the idiom the clav lane is built on.
+            // says nothing about its 7th, so it takes the KEY's (`diatonicSeventh`, #1327).
             const isAddedToneChord = ['add9', 'add2', 'madd9'].includes(clavQuality);
+            // why (#1327): a plain suspended TRIAD takes no synthesized 7th at all. The
+            // key's 7th over a sus4 on I or IV is the major 7th, a tritone from the
+            // suspended 4th (Csus4 -> F-B-D reads as G7 over C) — a colour nobody wrote.
+            // The 5th (the root for sus2, whose colour slot already holds the 5th) keeps
+            // the cell inside the written chord. 7sus4/9sus4/13sus4/11 carry a real b7.
+            const isSuspendedTriad = clavQuality === 'sus4' || clavQuality === 'sus2';
             const clavSeventh = isSixthChord
                 ? pickClavDegree([9], 9)
-                : isAddedToneChord
-                  ? pickClavDegree([7], 7)
-                  : pickClavDegree([10, 11], 10);
+                : isSuspendedTriad
+                  ? clavQuality === 'sus2'
+                      ? pickClavDegree([0], 0)
+                      : pickClavDegree([7], 7)
+                  : isAddedToneChord || isPowerChord
+                    ? pickClavDegree([7], 7)
+                    : isDiminishedChord
+                      ? // dim7 has the bb7; a dim triad falls back to its own b5.
+                        pickClavDegree([9], 6)
+                      : pickClavDegree([10, 11], diatonicSeventh);
             // the 9 is rarely a literal chord tone — default to a synthesized
             // major 9th so the gapped cell is guaranteed its color voice.
             // why (#1324): unless the chart ALTERED the 9th, in which case the cell's colour
@@ -2143,7 +2221,12 @@ export function getAccompanimentNotes(
                     ? pickClavDegree([7], 7)
                     : hasAlteredNinth
                       ? pickClavDegree([1, 3], clavQuality.includes('b9') ? 13 : 15)
-                      : pickClavDegree([2], 14);
+                      : isDiminishedChord
+                        ? // The remaining tone of the chord itself: root over a dim7 (b3-bb7-1),
+                          // root over a dim triad (b3-b5-1). Never an invented 9th, whose whole
+                          // step above a leading-tone root leaves the key (vii° in C -> C#).
+                          pickClavDegree([2], 0)
+                        : pickClavDegree([2], diatonicNinth);
             // why: the gapped cell's three pitch classes are fixed, but its
             // ABSOLUTE register has to voice-lead from the prior cell. Building
             // it as raw `root + interval` pins the cell to `chord.rootMidi`,
