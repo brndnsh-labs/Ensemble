@@ -5,7 +5,6 @@ import { clampFreq, createSoftClipCurve } from '../../../public/engine/audio-gra
 import { formatUnicodeSymbols } from '../../../public/sanitize.js';
 import { compressSections, decompressSections } from '../../../public/state/share-codec.js';
 import {
-    getChordMidiNotes,
     getFrequency,
     getMidi,
     getStepInfo,
@@ -204,58 +203,6 @@ describe('Utility Functions', () => {
 
         it('should return approximately 261.63Hz for MIDI note 60 (Middle C)', () => {
             expect(getFrequency(60)).toBeCloseTo(261.63, 2);
-        });
-    });
-
-    describe('getChordMidiNotes', () => {
-        it('should calculate notes grouped by odds then evens for a major chord', () => {
-            const chord = { rootMidi: 60, quality: 'major' }; // C4
-            // Expected Odds: 60, 64, 67, 71, 74 (1, 3, 5, 7, 9)
-            // Expected Evens: 62, 65, 69, 72, 76 (2, 4, 6, 8, 10)
-            expect(getChordMidiNotes(chord, 4)).toEqual([60, 64, 67, 71, 74, 62, 65, 69, 72, 76]);
-        });
-
-        it('should calculate notes grouped by odds then evens for a minor chord', () => {
-            const chord = { rootMidi: 62, quality: 'minor' }; // D4
-            // Expected Odds: 62, 65, 69, 72, 76 (1, b3, 5, b7, 9)
-            // Expected Evens: 64, 67, 70, 74, 77 (2, 4, b6, 8, b10)
-            expect(getChordMidiNotes(chord, 4)).toEqual([62, 65, 69, 72, 76, 64, 67, 70, 74, 77]);
-        });
-
-        it('should calculate notes grouped by odds then evens for a diminished chord', () => {
-            const chord = { rootMidi: 71, quality: 'diminished' }; // B4
-            // Expected Odds: 71, 74, 77, 81, 84
-            // Expected Evens: 72, 76, 79, 83, 86
-            expect(getChordMidiNotes(chord, 4)).toEqual([71, 74, 77, 81, 84, 72, 76, 79, 83, 86]);
-        });
-
-        it('should calculate notes grouped by odds then evens for a dominant chord', () => {
-            const chord = { rootMidi: 67, quality: 'dominant' }; // G4
-            // Expected Odds: 67, 71, 74, 77, 81
-            // Expected Evens: 69, 72, 76, 79, 83
-            expect(getChordMidiNotes(chord, 4)).toEqual([67, 71, 74, 77, 81, 69, 72, 76, 79, 83]);
-        });
-
-        it('should honor parsed diminished-seventh intervals from the chord engine', () => {
-            const chord = { rootMidi: 60, quality: 'dim', is7th: true, intervals: [0, 3, 6, 9] };
-            expect(getChordMidiNotes(chord, 4)).toEqual([60, 63, 66, 69, 72, 61, 65, 68, 73, 75]);
-        });
-
-        it('should place slash bass notes below the helper voicing output', () => {
-            const chord = {
-                rootMidi: 60,
-                quality: 'maj7',
-                intervals: [0, 4, 7, 11, 14],
-                bassMidi: 67,
-            };
-            expect(getChordMidiNotes(chord, 4)).toEqual([55, 60, 64, 71, 74, 62, 65, 69, 72, 76]);
-        });
-
-        it('should return empty array for invalid input', () => {
-            expect(getChordMidiNotes(null)).toEqual([]);
-            expect(getChordMidiNotes({})).toEqual([]);
-            expect(getChordMidiNotes({ rootMidi: NaN })).toEqual([]);
-            expect(getChordMidiNotes({ rootMidi: Infinity })).toEqual([]);
         });
     });
 

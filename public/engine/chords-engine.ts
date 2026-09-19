@@ -23,6 +23,16 @@ const ROMAN_REGEX = /^([#b])?(III|II|IV|I|VII|VI|V|iii|ii|iv|i|vii|vi|v)/;
 const NNS_REGEX = /^([#b])?([1-7])/;
 const NOTE_REGEX = /^([A-G][#b]?)/i;
 
+/**
+ * Can this text be a chord ROOT — a roman numeral, a Nashville number, or a note name?
+ * The three regexes above are the only ways `resolveChordRoot` recognises one, and it
+ * silently falls back to the key root when none matches, so a caller that needs to know
+ * "is this a slash BASS or part of the quality" has to ask here (#1329).
+ */
+function looksLikeChordRoot(part: string): boolean {
+    return ROMAN_REGEX.test(part) || NNS_REGEX.test(part) || NOTE_REGEX.test(part);
+}
+
 // The optional semantic host supplies this adapter once at boot. Legacy startup
 // does not download v2-only code; detached audio renders share this module instance.
 let scoreRenderer: typeof renderScorePlayback | undefined;
@@ -33,7 +43,18 @@ export function registerScorePlaybackRenderer(renderer: typeof renderScorePlayba
 export interface ChordDetails {
     quality: string;
     is7th: boolean;
+    /** The canonical table spelling that matched, NOT the text the caller passed. */
     suffix: string;
+    /**
+     * True when the whole normalised suffix was consumed by that spelling — i.e. the parser
+     * understood all of it, not just a prefix (#1331). `Cm7#5` matches `m7` and leaves `#5`
+     * behind, so it is NOT recognised; `CMaj7`, `Cm7(b5)` and `CΔ7` are, even though the
+     * matched spelling differs from what was typed. An empty suffix (a bare triad) counts as
+     * recognised. Consumers that need "would this text silently become a different chord"
+     * must read THIS, not compare `suffix` to their own string: normalisation (case,
+     * parentheses, Δ, the slash) means the canonical spelling legitimately differs.
+     */
+    recognised: boolean;
 }
 
 export interface ResolvedChordRoot {
@@ -122,11 +143,13 @@ const SUFFIX_QUALITIES = new Map<string, string>([
     ['maj7#11', 'maj7#11!'],
     ['maj7#5', 'augmaj7!'],
     ['maj7+', 'augmaj7!'],
-    // why: no quality voices a flat 5 WITHOUT a natural 5, so maj7#11 is the only mapping
-    // that sounds the written b5/#11 pitch class at all; the 5 + #11 pair is the standard
-    // Lydian colour. Dropping to a plain major triad would keep the natural 5 AND lose the
-    // written maj7 — strictly worse.
-    ['maj7b5', 'maj7#11!'],
+    // #1329 — a real quality, because no OTHER quality voices a flat 5 without a natural 5:
+    // the previous maj7#11 mapping sounded the written b5 pitch class but kept the 5 the
+    // chart had flattened. `M7b5` normalises onto this row.
+    ['maj7b5', 'maj7b5!'],
+    // Same contradiction one extension up: `maj9b5` matched 'maj9', which voices the
+    // natural 5 the chart flattened. Drops the 9th as a subset (#1329).
+    ['maj9b5', 'maj7b5!'],
     ['maj13', 'maj13!'],
     ['maj11', 'maj11!'],
     ['maj9', 'maj9!'],
@@ -137,13 +160,11 @@ const SUFFIX_QUALITIES = new Map<string, string>([
     // An added tone REPLACES the seventh; the 4/11 is dropped as a subset, never voiced
     // as the dominant 11th quality (#1322).
     ['majadd4', 'major'],
-    ['maj', 'maj7!'],
-    ['ma13', 'maj13!'],
-    ['ma11', 'maj11!'],
-    ['ma9', 'maj9!'],
-    ['ma7', 'maj7!'],
-    ['ma6', '6'],
-    ['ma', 'maj7!'],
+    // why (#1329): in chart convention a bare `Cmaj` is a major TRIAD — the old code's
+    // own comment said so ("Cmaj = major, C△ = maj7") while returning maj7, so a
+    // written Cmaj displayed "Cmaj7" and sounded a B. `△`/`^` alone stay maj7: that IS
+    // their meaning in the iReal grammar this vocabulary follows.
+    ['maj', 'major'],
     ['△9', 'maj9!'],
     ['△7', 'maj7!'],
     ['△', 'maj7!'],
@@ -170,7 +191,6 @@ const SUFFIX_QUALITIES = new Map<string, string>([
     ['m11', 'm11!'],
     ['m9', 'm9!'],
     ['m7', 'minor!'],
-    ['m6/9', 'm6'],
     ['m69', 'm6'],
     ['m6', 'm6'],
     ['madd9', 'madd9'],
@@ -262,7 +282,11 @@ const SUFFIX_QUALITIES = new Map<string, string>([
     // A 13th's voicing carries the NATURAL 9, so a written b9/#9 has to move to the
     // dominant quality that states the alteration (#1324). The 13 is dropped as a subset.
     ['13b9', '7b9!'],
+    ['13#11b9', '7b9!'],
+    ['13#11#9', '7#9!'],
     ['13#9', '7#9!'],
+    // A 13 whose b9/#9 arrives after ANOTHER alteration is the same chord as `13b9`:
+    // the 13 voicing's natural 9 contradicts the written one either way (#1329).
     ['13', '13!'],
     ['11', '11!'],
     ['9', '9!'],
@@ -297,6 +321,13 @@ const SUFFIX_NORMALISATIONS: ReadonlyArray<readonly [RegExp, string]> = [
     [/^(?:MIN|Min|min|MI|Mi|mi|m|-)(?:△|\^)(?=7|9|11|13|$)/, 'mmaj'],
     // Capitalised major-7 family. `Ma`/`MA` alone reads as maj7 like bare `ma` does.
     [/^(?:MAJ|Maj|MA|Ma)(?=\d|#|\+|$)/, 'maj'],
+    // why (#1329): `ma` means maj7 — but only as a whole word. As a TABLE row it is also a
+    // prefix of every `madd…` spelling, so `Cmadd11` matched it and came back a major chord
+    // (the `ma`-inside-`madd9` trap the anchored matcher was built to kill, reintroduced by
+    // dropping the redundant-looking `madd11`/`madd4` rows). Normalising `ma`-not-followed-
+    // by-a-letter onto `maj` lets the table drop the whole `ma*` family, so no minor
+    // spelling can ever reach it again.
+    [/^ma(?![a-z])/, 'maj'],
     // A capital M is the major-7 family ONLY when an extension follows it; bare `CM` is a
     // major triad.
     [/^M(?=6|7|9|11|13)/, 'maj'],
@@ -317,13 +348,16 @@ const SUFFIX_NORMALISATIONS: ReadonlyArray<readonly [RegExp, string]> = [
  * variants onto the canonical spellings — so the matcher itself stays a flat table.
  *
  * Parentheses are the iReal/Real Book house style for an alteration (`m7(b5)`, `7(b9)`,
- * `6(9)`) and were previously dropped along with the alteration inside them (#1324). A
+ * `6(9)`) and were previously dropped along with the alteration inside them (#1324). The
+ * slash goes with them (#1329): by the time a suffix reaches here `parseProgressionPart`
+ * has already split off a real slash BASS, so any surviving `/` is notation inside the
+ * quality — `6/9`, `m6/9`, `m/maj7` — and every one of those has a slash-less row. A
  * leading root note is tolerated so callers can pass a whole symbol (`Cma7`) or just the
  * suffix (`ma7`) — production always passes the suffix, since `resolveChordRoot` has
  * already consumed the root, and no supported suffix starts with an uppercase A-G.
  */
 function normalizeChordSuffix(symbol: string): string {
-    let suffix = symbol.replace(/[()\s]/g, '').replace(/[Δ∆]/g, '△');
+    let suffix = symbol.replace(/[()\s/]/g, '').replace(/[Δ∆]/g, '△');
     // A capitalised quality WORD is not a root: `Add9`, `Aug7`, `Dim7`, `Dom7` start with
     // a root letter, and stripping it first left `dd9` / `ug7` / `im7` / `om7` (-> dim).
     if (!/^(?:ADD|Add|AUG|Aug|DIM|Dim|DOM|Dom|ALT|Alt)/.test(suffix)) {
@@ -346,7 +380,12 @@ export function getChordDetails(symbol: string): ChordDetails {
     const suffix = SUFFIX_SPELLINGS.find((spelling) => normalised.startsWith(spelling)) ?? '';
     const encoded = SUFFIX_QUALITIES.get(suffix) ?? 'major';
     const is7th = encoded.endsWith('!');
-    return { quality: is7th ? encoded.slice(0, -1) : encoded, is7th, suffix };
+    return {
+        quality: is7th ? encoded.slice(0, -1) : encoded,
+        is7th,
+        suffix,
+        recognised: suffix === normalised,
+    };
 }
 
 /**
@@ -861,6 +900,10 @@ export function getFormattedChordNames(
         absSuffix = 'maj7#11';
         nnsSuffix = 'maj7#11';
         romSuffix = 'maj7#11';
+    } else if (quality === 'maj7b5') {
+        absSuffix = 'maj7b5';
+        nnsSuffix = 'maj7b5';
+        romSuffix = 'maj7b5';
     } else if (quality === 'sus4') {
         absSuffix = 'sus4';
         nnsSuffix = 'sus4';
@@ -951,6 +994,7 @@ export function getFormattedChordNames(
             'maj11',
             'maj13',
             'maj7#11',
+            'maj7b5',
             'aug',
             'augmaj7',
             'halfdim',
@@ -1056,10 +1100,15 @@ function parseProgressionPart(
                 const slashParts = part.split('/');
                 let chordPart = slashParts[0];
                 let bassPart: string | undefined = slashParts[1];
-                // `6/9` is a chord *quality* (major triad + 6th + 9th), not a slash
-                // bass — the `/` is notation, not "C6 over a 9th bass". Recombine
-                // before the bass branch below mistakes the `9` for a bass note (#780).
-                if (bassPart === '9' && /6$/.test(chordPart)) {
+                // A slash inside a chord symbol is only a BASS note when what follows it is
+                // actually a root — `Am/G`, `Imaj7/V`, `F/A`. Otherwise the slash is
+                // notation inside the quality (`C6/9`, `Cm/maj7`, `Cm6/9`) and the token has
+                // to be recombined before the bass branch below reads that text as a root.
+                // #780 solved this for `6/9` with a literal `bassPart === '9'` test; #1329
+                // generalises it, because `Cm/maj7` hit the same trap the other way — the
+                // suffix became a bare `m` (a plain Cm) and `maj7` was resolved as a bass
+                // note, which silently falls back to the KEY root when nothing matches.
+                if (bassPart !== undefined && !looksLikeChordRoot(bassPart)) {
                     chordPart = part;
                     bassPart = undefined;
                 }

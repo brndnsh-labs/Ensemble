@@ -61,7 +61,12 @@ test('deleting an account: typed confirmation, an export offer, a step-up, and n
 
     await addVirtualAuthenticator(page);
     await openWithAccounts(page);
+    // #1330 — same pre-render capture as account-sign-out: the rows arrive after the hero
+    // heading and after the first session read, so wait for them before reading.
+    await expect(page.getByTestId('library-loading')).toHaveCount(0);
+    await expect(songTitles(page)).not.toHaveCount(0);
     const guestSongs = await songTitles(page).allInnerTexts();
+    expect(guestSongs.length).toBeGreaterThan(0);
     await signUp(page);
 
     // Two songs the account really holds, both confirmed by the server.
@@ -123,14 +128,14 @@ test('deleting an account: typed confirmation, an export offer, a step-up, and n
     await expect(page.getByTestId('account-sign-in')).toHaveText('Sign in');
     await expect(page.getByTestId('account-expired-banner')).toHaveCount(0);
     await expect(page.getByTestId('library-heading')).toHaveText('Your songbook');
-    expect(await songTitles(page).allInnerTexts()).toEqual(guestSongs);
+    await expect(songTitles(page)).toHaveText(guestSongs); // web-first, retries (#1330)
     expect(await sessionStatus(page)).toBe(401);
 
     // And it stays that way across a reload: nothing of the account was left in storage to re-list.
     await page.reload();
     await expect(page.getByTestId('library-loading')).toHaveCount(0);
     await expect(page.getByTestId('library-heading')).toHaveText('Your songbook');
-    expect(await songTitles(page).allInnerTexts()).toEqual(guestSongs);
+    await expect(songTitles(page)).toHaveText(guestSongs); // web-first, retries (#1330)
 
     // The SAME passkey makes a brand-new account: deletion frees the credential rather than
     // blacklisting it, or somebody who deleted an account could never use that passkey again.

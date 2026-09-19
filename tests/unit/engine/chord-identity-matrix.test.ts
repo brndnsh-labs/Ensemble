@@ -92,11 +92,19 @@ const MATRIX = [
     // The Jazz block-chord shell (Red Garland, intensity > 0.7) voices a 9 as 1-5-8/3-7,
     // dropping the 9th — a subset, so only the guide tones are asserted as defining.
     { spelling: '9', quality: '9', is7th: true, defining: [4, 10], misnaming: [3, 11] },
-    // A dominant 11th has no 3rd, but `getRootlessVoicing`'s `isRich` shortcut answers the
-    // 13 shell [3, b7, 9, 13] for it at rich density / high intensity, which both loses the
-    // 4th and states a major 3rd. Pre-existing, out of scope here (no issue names '11'),
-    // so the row asserts only what holds today — see the out-of-scope report.
-    { spelling: '11', quality: '11', is7th: true, defining: [10], misnaming: [3] },
+    // #1326 — a dominant 11th features the 4th and omits the 3rd; the rooted stack
+    // ([0,5,7,10,14,17]) never had one and the rootless shell no longer falls through to
+    // the 13 shell that did.
+    {
+        spelling: '11',
+        quality: '11',
+        is7th: true,
+        defining: [5, 10],
+        misnaming: [4],
+        // why: the Funk clav cell finds no 3rd on an 11 chord and synthesizes a major one,
+        // the same synthesized-fallback class as its plain-triad b7 — #1327 owns that cell.
+        liveAllows: [4],
+    },
     { spelling: '13', quality: '13', is7th: true, defining: [4, 10], misnaming: [3, 11] },
     { spelling: '7b9', quality: '7b9', is7th: true, defining: [4, 10, 1], misnaming: [3, 11] },
     { spelling: '7#9', quality: '7#9', is7th: true, defining: [4, 10, 3], misnaming: [11] },
@@ -222,6 +230,25 @@ const MATRIX = [
         misnaming: [3, 11],
         liveAllows: [10],
     },
+    // #1329 — a bare `maj`/`ma` is the major TRIAD; `△`/`^` alone stay maj7 (iReal grammar).
+    {
+        spelling: 'maj',
+        quality: 'major',
+        is7th: false,
+        defining: [4],
+        misnaming: [3, 11],
+        liveAllows: [10],
+    },
+    {
+        spelling: 'ma',
+        quality: 'major',
+        is7th: false,
+        defining: [4],
+        misnaming: [3, 11],
+        liveAllows: [10],
+    },
+    { spelling: '△', quality: 'maj7', is7th: true, defining: [4, 11], misnaming: [3, 10] },
+    { spelling: '^', quality: 'maj7', is7th: true, defining: [4, 11], misnaming: [3, 10] },
     { spelling: 'maj6', quality: '6', is7th: false, defining: [4, 9], misnaming: [3, 10] },
     { spelling: 'M6', quality: '6', is7th: false, defining: [4, 9], misnaming: [3, 10] },
     { spelling: 'maj69', quality: '6/9', is7th: false, defining: [4, 9, 2], misnaming: [3, 10] },
@@ -328,15 +355,22 @@ const MATRIX = [
     { spelling: '13#9', quality: '7#9', is7th: true, defining: [4, 10, 3], misnaming: [11] },
     { spelling: '9b5', quality: '7b5', is7th: true, defining: [4, 6, 10], misnaming: [7, 11] },
     { spelling: '9#5', quality: 'aug', is7th: true, defining: [4, 8, 10], misnaming: [3, 7] },
-    // maj7b5: no quality voices a flat 5 WITHOUT a natural 5, so maj7#11 is the closest —
-    // it is the only option that sounds the written b5/#11 pitch class at all, and the 5 +
-    // #11 pair is the standard Lydian colour. Reported as a judgment call.
+    // #1329 — a real `maj7b5` quality, so the written b5 sounds and the 5th it flattens
+    // does not. Every other quality in the table voices a natural 5 with its b5, which is
+    // why this spelling used to approximate to maj7#11.
     {
         spelling: 'maj7b5',
-        quality: 'maj7#11',
+        quality: 'maj7b5',
         is7th: true,
         defining: [4, 11, 6],
-        misnaming: [3, 10],
+        misnaming: [3, 10, 7],
+    },
+    {
+        spelling: 'M7b5',
+        quality: 'maj7b5',
+        is7th: true,
+        defining: [4, 11, 6],
+        misnaming: [3, 10, 7],
     },
     { spelling: '7#5#9', quality: '7alt', is7th: true, defining: [4, 10], misnaming: [7, 11] },
     { spelling: '7b5b9', quality: '7alt', is7th: true, defining: [4, 10], misnaming: [7, 11] },
@@ -346,9 +380,23 @@ const MATRIX = [
     { spelling: '7#9b13', quality: '7#9', is7th: true, defining: [4, 10, 3], misnaming: [11] },
     { spelling: '7b9#9', quality: '7b9', is7th: true, defining: [4, 10, 1], misnaming: [2, 3, 11] },
     { spelling: 'dom7', quality: '7', is7th: true, defining: [4, 10], misnaming: [3, 11] },
-    // Legacy pin (#776): a 13 with TWO alterations keeps '13' — #1324 acceptance says every
-    // spelling chords-logic.test.ts already covers must parse unchanged.
-    { spelling: '13(#11b9)', quality: '13', is7th: true, defining: [4, 10], misnaming: [3, 11] },
+    // #1329 — the last spelling that still sounded a natural 9 against a written b9. It kept
+    // '13' through #1324 only because chords-logic.test.ts pinned it, and that pin asserted
+    // the bug; both now expect the altered dominant that states the alteration.
+    {
+        spelling: '13(#11b9)',
+        quality: '7b9',
+        is7th: true,
+        defining: [4, 10, 1],
+        misnaming: [2, 3, 11],
+    },
+    {
+        spelling: '13#11b9',
+        quality: '7b9',
+        is7th: true,
+        defining: [4, 10, 1],
+        misnaming: [2, 3, 11],
+    },
 ];
 
 const PARSE_FEELS = ['Jazz', 'Funk', 'Neo-Soul', 'Acoustic'];
@@ -554,10 +602,51 @@ describe('Chord identity matrix (#1320-#1324)', () => {
         expect(chord.name).not.toMatch(/\d7$|77$/);
     });
 
+    // A slash inside a chord symbol is only a bass note when what follows it is a ROOT.
+    // `Cm/maj7` used to split there, leaving a plain Cm whose "bass" was the unparseable
+    // text `maj7` — which `resolveChordRoot` silently resolves to the KEY root (#1329).
+    it.each([
+        ['Cm/maj7', 'mMaj7', 'CmMaj7'],
+        ['Cm/M7', 'mMaj7', 'CmMaj7'],
+        ['C-/maj7', 'mMaj7', 'CmMaj7'],
+        ['C6/9', '6/9', 'C6/9'],
+        ['Cm6/9', 'm6', 'Cm6'],
+    ])('%s is one chord, not a slash bass', (token, quality, absName) => {
+        const [chord] = voice('Acoustic', true, token);
+        expect(chord.quality).toBe(quality);
+        expect(chord.name).toBe(absName);
+        // A real slash bass still splits: the bass note lands below the comp voicing.
+        const [slash] = voice('Acoustic', true, 'Cmaj7/G');
+        expect(slash.name).toBe('Cmaj7/G');
+    });
+
+    // #1329 — `Cmaj`/`Cma` are major TRIADS. The bare triangle/caret keep their iReal
+    // meaning (maj7), which is the distinction that makes this worth pinning.
+    it('bare maj/ma is a triad while bare △/^ is a maj7', () => {
+        const [cmaj, cma, triangle, caret] = voice('Acoustic', true, 'Cmaj | Cma | C△ | C^');
+        for (const chord of [cmaj, cma]) {
+            expect(chord.quality).toBe('major');
+            expect(chord.is7th).toBe(false);
+            expect(chord.name).toBe('C');
+            expect(chord.degrees.has(11), 'no unwritten major 7th').toBe(false);
+        }
+        for (const chord of [triangle, caret]) {
+            expect(chord.quality).toBe('maj7');
+            expect(chord.degrees.has(11)).toBe(true);
+        }
+    });
+
     // The matcher is anchored at the start of the suffix, so an alternative can no longer
     // match mid-word — the mechanism behind Cmadd9 -> maj7 and Cdom7 -> dim7.
     it('never matches a quality alternative inside a longer word', () => {
         expect(getChordDetails('madd9').quality).not.toBe('maj7');
+        // #1329 — every `madd…` spelling, including the ones with no row of their own, is a
+        // MINOR chord. `ma` (maj7) is a prefix of all of them, so it lives in the normaliser
+        // behind a not-followed-by-a-letter guard rather than in the table.
+        for (const spelling of ['madd9', 'madd2', 'madd11', 'madd4', 'madd13', 'madd']) {
+            const { quality } = getChordDetails(spelling);
+            expect(['madd9', 'minor'], `${spelling} -> ${quality}`).toContain(quality);
+        }
         expect(getChordDetails('dom7').quality).not.toBe('dim');
         expect(getChordDetails('domin7').quality).not.toBe('dim');
     });

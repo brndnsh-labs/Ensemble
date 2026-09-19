@@ -107,7 +107,7 @@ test('a song saved on one device opens on another, and the guest songbook is unt
     await page.getByTestId('sign-out-confirm').click();
     await expect(page.getByTestId('account-sign-in')).toBeVisible();
     await expect(page.getByTestId('library-heading')).toHaveText('Your songbook');
-    expect(await songTitles(page).allInnerTexts()).toEqual(guestSongs);
+    await expect(songTitles(page)).toHaveText(guestSongs); // web-first, retries (#1330)
 });
 
 test('an offline Save is safe here and confirms on reconnect; a refusal arrives as words', async ({

@@ -60,7 +60,15 @@ test('sign-out names the work it would destroy, then leaves nothing of that acco
 }) => {
     const authenticator = await addVirtualAuthenticator(page);
     await openWithAccounts(page);
+    // #1330 — `openWithAccounts` waits for the hero heading, which renders before the library
+    // rows do, and with accounts on the list is held back until the first session read answers.
+    // A bare `allInnerTexts()` here captured `[]` on a slow runner, and the closing comparison
+    // then measured the real three starters against that empty array (v2-suite red on #1325,
+    // green on rerun). Wait for the rows, and say out loud that there were some.
+    await expect(page.getByTestId('library-loading')).toHaveCount(0);
+    await expect(songTitles(page)).not.toHaveCount(0);
     const guestSongs = await songTitles(page).allInnerTexts();
+    expect(guestSongs.length).toBeGreaterThan(0);
     await signUp(page);
 
     await newSongOnTheStand(page);
@@ -150,7 +158,8 @@ test('sign-out names the work it would destroy, then leaves nothing of that acco
     await expect(page.getByTestId('account-sign-in')).toHaveText('Sign in');
     await expect(page.getByTestId('account-expired-banner')).toHaveCount(0);
     await expect(page.getByTestId('library-heading')).toHaveText('Your songbook');
-    expect(await songTitles(page).allInnerTexts()).toEqual(guestSongs);
+    // Web-first, so it retries while the guest library re-renders after sign-out (#1330).
+    await expect(songTitles(page)).toHaveText(guestSongs);
     // Still nothing in the guest namespace — it never held this account's text (#1299), and the
     // clear that runs over `documentIds` anyway is belt and braces for a slot an older build could
     // have left. (One page load can only produce its own slot, so the across-writers half of that
