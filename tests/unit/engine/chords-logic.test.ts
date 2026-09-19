@@ -511,13 +511,15 @@ describe('Chords & Voicing Logic', () => {
             expect(intervals).toEqual([0, 4, 7, 14]);
         });
 
-        // #1316 — the case above passes is7th=false, but production never does:
-        // `getChordDetails('add9')` reports is7th=TRUE (its "9" trips the string
-        // heuristic), which sent the "ENSURE 7th" backfill in to add a b7 the chart
-        // explicitly didn't write — Cadd9 sounded as a C9. Same exclusion, same
-        // reason, as the one `getFormattedChordNames` already had for the display name.
-        it('Cadd9 gains no b7 even though getChordDetails reports is7th (#1316)', () => {
-            expect(getChordDetails('add9').is7th).toBe(true);
+        // #1316 → #1322. The case above passes is7th=false, which production only started
+        // doing in #1322: `getChordDetails('add9')` used to report is7th=TRUE (its "9"
+        // tripped the raw-symbol heuristic), which sent the "ENSURE 7th" backfill in to add
+        // a b7 the chart explicitly didn't write — Cadd9 sounded as a C9. #1322 derives
+        // `is7th` from the matched QUALITY, so an added tone can no longer claim a seventh;
+        // the getIntervals exclusion stays as the belt to that braces, since any direct
+        // caller can still pass is7th=true.
+        it('Cadd9 declares no seventh, and gains no b7 even if a caller claims one', () => {
+            expect(getChordDetails('add9').is7th).toBe(false);
             const intervals = getIntervals(getState(), 'add9', true, 'standard', 'Rock', false);
             expect(intervals).toEqual([0, 4, 7, 14]);
             expect(intervals.map((i) => i % 12)).not.toContain(10);

@@ -78,6 +78,14 @@ export function getRootlessVoicing(
     }
 
     if (isMinor) {
+        // #1321 — the minor-major 7th is in the minor family (b3), so without its own
+        // branch it fell through to the minor-7 shell below and swapped its defining
+        // maj7 for a b7 — a plain m7. Shell mirrors the maj7 family's (3-5-7 for
+        // clarity, 3-7-9 for richness) with the minor 3rd, which is the idiomatic
+        // rootless minor-major voicing.
+        if (quality === 'mMaj7') {
+            return isRich ? [3, 11, 14] : [3, 7, 11]; // b3, (5 | 7, 9)
+        }
         // Neo-Soul Quartal / Clusters
         if (genre === 'Neo-Soul' && quality === 'minor' && is7th) {
             // why: D'Angelo quartal m11 voicing — b3, 4, b7, 9 (pcs 3, 5, 10, 14).
@@ -113,10 +121,15 @@ export function getRootlessVoicing(
 
         // Alt Dominants
         if (quality === '7alt') {
-            // Must have: 3, b7 AND at least one altered extension (b9/13 or #9/20)
-            const base = [4, 10];
-            const altExtensions = intensity > 0.6 ? [13, 15, 20] : [13, 20];
-            return isRich ? [4, 10, 13, 15, 18, 20] : [...base, ...altExtensions.slice(0, 2)];
+            // Must have: 3, b7 AND at least one altered extension. The lean shell takes the
+            // b9 plus ONE more: the #9 when the band is loud enough to carry that heat,
+            // otherwise the b13.
+            // why: the old form listed three extensions at high intensity and then
+            // `.slice(0, 2)` them, so the third (b13) was unreachable and the line read as
+            // "b9 + #9 + b13" when it played "b9 + #9". Behaviour-identical at every
+            // intensity and density — the slice's only effect was dropping that dead entry.
+            const altExtensions = intensity > 0.6 ? [13, 15] : [13, 20];
+            return isRich ? [4, 10, 13, 15, 18, 20] : [4, 10, ...altExtensions];
         }
         if (quality === '7b9') {
             // 3, b7, b9 + the 5th, or the b13 in its place when rich. (The old top
@@ -179,6 +192,16 @@ export function isStrummedChordVoice(voice: string | undefined | null): boolean 
     return typeof voice === 'string' && voice.toLowerCase().includes('guitar');
 }
 
+/**
+ * Qualities whose NAME says the colour tone stands in for the seventh, so the
+ * intensity-driven extension tier must never backfill one (#1322). `6`/`m6` were already
+ * hard-coded here; `add9`/`add2`/`6/9`/`madd9` only became reachable once `is7th` stopped
+ * being sniffed out of the raw symbol — before that their `is7th: true` accidentally
+ * skipped the same block. A written `Cadd9` gaining a b7 at intensity 0.6 is the same
+ * defect by a different route.
+ */
+const NO_SEVENTH_QUALITIES = new Set(['6', 'm6', '6/9', 'add9', 'add2', 'madd9']);
+
 export function getIntervals(
     state: EnsembleState,
     quality: string,
@@ -207,6 +230,13 @@ export function getIntervals(
         quality.includes('#5') ||
         quality.includes('aug');
     const isAug = quality.includes('aug') || quality.includes('+');
+    // why (#1324): the same shape as isAltered5 one interval up. A chart that writes an
+    // ALTERED 9th has said "not the natural 9", so the colour/extension tiers below must
+    // not backfill a natural 9 a semitone from it — G7b9 came out with both the b9 (13)
+    // and a natural 9 (14) at intensity >= 0.6 outside Rock/Jazz/Funk, the exact
+    // b5-next-to-natural-5 defect #1315 fixed for the diminished family. '7alt' is
+    // covered by its own name; the 13b9/13#9 spellings now map to 7b9/7#9 upstream.
+    const isAltered9 = quality.includes('alt') || quality.includes('b9') || quality.includes('#9');
 
     // 1. JAZZ & SOUL: ROOTLESS VOICINGS
     const shouldBeRootless = shouldUseRootlessVoicing(state, quality, is7th, genre, bassActive);
@@ -261,6 +291,14 @@ export function getIntervals(
             intervals = [0, 4, 7, 9];
         } else if (quality === 'm6') {
             intervals = [0, 3, 7, 9];
+        } else if (quality === 'mMaj7') {
+            intervals = [0, 3, 7, 11]; // 1 b3 5 maj7 — the melodic-minor tonic (#1321)
+        } else if (quality === 'madd9') {
+            intervals = [0, 3, 7, 14]; // 1 b3 5 9 — a minor triad plus the added 9th (#1322)
+        } else if (quality === '9sus4') {
+            intervals = [0, 5, 7, 10, 14]; // 1 4 5 b7 9 — suspended dominant + 9th (#1323)
+        } else if (quality === '13sus4') {
+            intervals = [0, 5, 7, 10, 14, 21]; // 1 4 5 b7 9 13 (#1323)
         } else if (quality === '9') {
             intervals = [0, 4, 7, 10, 14];
         } else if (quality === 'maj9') {
@@ -359,7 +397,7 @@ export function getIntervals(
         !['Rock', 'Jazz', 'Funk'].includes(genre) &&
         !isAltered5
     ) {
-        if (!is7th && quality !== '6' && quality !== 'm6') {
+        if (!is7th && !NO_SEVENTH_QUALITIES.has(quality)) {
             const isMajor7th = ['maj7', 'maj9', 'maj11', 'maj13', 'maj7#11'].includes(quality);
 
             // Diatonic aware: If this is the tonic chord in a major key, prefer Maj7 (11)
@@ -377,7 +415,7 @@ export function getIntervals(
                 }
             }
         }
-        if (!intervals.includes(14)) {
+        if (!isAltered9 && !intervals.includes(14)) {
             intervals.push(14); // 9th
         }
     }
@@ -428,7 +466,9 @@ export function getIntervals(
             13: [18], // #11
         };
 
-        const potential = safeExtensions[quality] || (isAltered5 ? [14, 18] : [14]);
+        const potential = isAltered9
+            ? [18] // #11 only: a natural 9 would rub the written b9/#9 (see isAltered9)
+            : safeExtensions[quality] || (isAltered5 ? [14, 18] : [14]);
         for (const ext of potential) {
             if (!intervals.includes(ext) && !intervals.includes(ext % 12)) {
                 // Final safety: don't add natural 5th if quality is altered/augmented
@@ -461,6 +501,10 @@ export function getIntervals(
             '7alt',
             '9',
             'dim',
+            // why (#1321): the minor-major 7th's seventh IS the maj7 (11) it already
+            // carries. Without this the backfill added a b7 next to it — a b7 + maj7
+            // semitone rub, and the m7 the chord exists to NOT be.
+            'mMaj7',
             // why (#1316): `add9` is the one quality whose NAME says "9th but no
             // 7th" — that distinction from `C9` is the reason the symbol exists —
             // yet its "9" makes `getChordDetails` report `is7th`, so this backfill

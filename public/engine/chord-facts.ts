@@ -27,6 +27,12 @@ const QUALITIES: Readonly<Record<string, readonly number[]>> = {
     add9: [0, 4, 7, 14],
     '6': [0, 4, 7, 9],
     m6: [0, 3, 7, 9],
+    // #1321/#1322/#1323 — a quality missing from this table falls back to MAJOR, which
+    // would hand the guitar/piano voicers a major 3rd over a minor chord.
+    mMaj7: [0, 3, 7, 11],
+    madd9: [0, 3, 7, 14],
+    '9sus4': [0, 5, 7, 10, 14],
+    '13sus4': [0, 5, 7, 10, 14, 21],
     '6/9': [0, 4, 7, 9, 14],
     '9': [0, 4, 7, 10, 14],
     maj9: [0, 4, 7, 11, 14],

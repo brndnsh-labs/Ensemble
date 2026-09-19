@@ -1,3 +1,4 @@
+// cspell:ignore mmaj madd majadd minadd susadd
 import {
     INTERVAL_TO_NNS,
     INTERVAL_TO_ROMAN,
@@ -93,132 +94,259 @@ function ensurePitchClassAboveFloor(
 }
 
 /**
+ * Canonical quality + `is7th` for every chord SPELLING the parser accepts (#1320-#1324).
+ *
+ * `is7th` is a property of the matched QUALITY, never sniffed out of the raw symbol. The
+ * old `symbol.includes('7' | '9' | '11' | '13')` heuristic is what gave `Cadd9` a b7,
+ * `C69` a b7 over its written 6th, and `Cm(add9)` a Cm7 — the digit that names a colour
+ * tone is not evidence of a seventh. Three qualities encode the triad/seventh pair in
+ * `is7th` rather than in the quality name, and that encoding is load-bearing for every
+ * downstream consumer: `minor` + true == m7, `dim` + true == dim7, `aug` + true == aug7.
+ *
+ * Matching is LONGEST-SPELLING-FIRST (derived below, not hand-ordered) and anchored at
+ * the start of the normalised suffix. Anchoring is what stops an alternative matching
+ * mid-word — `ma` inside `madd9` (which made a minor chord a maj7) and `o` inside `dom7`
+ * (which made a dominant a dim7). Trailing text the table can't represent is IGNORED,
+ * which implements the one rule behind the whole table: never sound a tone that
+ * contradicts a written one. A subset of the written chord is acceptable (a dropped
+ * colour tone); a different chord is not — so a compound alteration whose first match
+ * would sound the NATURAL version of an altered tone gets its own row mapping it to the
+ * richest quality that is a genuine subset (`13b9` -> `7b9`, `9b5` -> `7b5`,
+ * `m11b5` -> `halfdim`, `7#9#5` -> `7alt`).
+ *
+ * ENCODING: the value is the canonical quality, with a trailing `!` when that quality
+ * carries a seventh — so `'minor!'` IS m7 and `'minor'` is the plain triad.
+ */
+const SUFFIX_QUALITIES = new Map<string, string>([
+    // --- major 7th family. `maj`/`ma`/`△`/`^` alone read as maj7 (Cmaj = major, C△ = maj7).
+    ['maj7#11', 'maj7#11!'],
+    ['maj7#5', 'augmaj7!'],
+    ['maj7+', 'augmaj7!'],
+    // why: no quality voices a flat 5 WITHOUT a natural 5, so maj7#11 is the only mapping
+    // that sounds the written b5/#11 pitch class at all; the 5 + #11 pair is the standard
+    // Lydian colour. Dropping to a plain major triad would keep the natural 5 AND lose the
+    // written maj7 — strictly worse.
+    ['maj7b5', 'maj7#11!'],
+    ['maj13', 'maj13!'],
+    ['maj11', 'maj11!'],
+    ['maj9', 'maj9!'],
+    ['maj7', 'maj7!'],
+    // A written 6th is not a 7th: `maj6`/`M6` is the 6 chord, `maj69` the 6/9 (#1320).
+    ['maj69', '6/9'],
+    ['maj6', '6'],
+    // An added tone REPLACES the seventh; the 4/11 is dropped as a subset, never voiced
+    // as the dominant 11th quality (#1322).
+    ['majadd4', 'major'],
+    ['maj', 'maj7!'],
+    ['ma13', 'maj13!'],
+    ['ma11', 'maj11!'],
+    ['ma9', 'maj9!'],
+    ['ma7', 'maj7!'],
+    ['ma6', '6'],
+    ['ma', 'maj7!'],
+    ['△9', 'maj9!'],
+    ['△7', 'maj7!'],
+    ['△', 'maj7!'],
+    ['^7#11', 'maj7#11!'],
+    ['^7#5', 'augmaj7!'],
+    ['^13', 'maj13!'],
+    ['^9', 'maj9!'],
+    ['^7', 'maj7!'],
+    ['^', 'maj7!'],
+
+    // --- minor-major 7th (#1321). Every spelling normalises to `mmaj…` before matching.
+    ['mmaj13', 'mMaj7!'],
+    ['mmaj11', 'mMaj7!'],
+    ['mmaj9', 'mMaj7!'],
+    ['mmaj7', 'mMaj7!'],
+    ['mmaj', 'mMaj7!'],
+
+    // --- minor family. `minor` + is7th true IS m7 (the canonical pair, not a shortcut).
+    ['m7b5', 'halfdim!'],
+    ['min7b5', 'halfdim!'],
+    ['m9b5', 'halfdim!'],
+    ['m11b5', 'halfdim!'],
+    ['m13', 'm13!'],
+    ['m11', 'm11!'],
+    ['m9', 'm9!'],
+    ['m7', 'minor!'],
+    ['m6/9', 'm6'],
+    ['m69', 'm6'],
+    ['m6', 'm6'],
+    ['madd9', 'madd9'],
+    ['madd2', 'madd9'],
+    ['min13', 'm13!'],
+    ['min11', 'm11!'],
+    ['min9', 'm9!'],
+    ['min7', 'minor!'],
+    ['min69', 'm6'],
+    ['min6', 'm6'],
+    ['min', 'minor'],
+    ['m', 'minor'],
+    ['-7b5', 'halfdim!'],
+    ['-13', 'm13!'],
+    ['-11', 'm11!'],
+    ['-9', 'm9!'],
+    ['-7', 'minor!'],
+    ['-69', 'm6'],
+    ['-6', 'm6'],
+    ['-', 'minor'],
+
+    // --- diminished / half-diminished. `dim` + is7th true IS dim7.
+    ['dim7', 'dim!'],
+    ['dim', 'dim'],
+    ['o7', 'dim!'],
+    ['o', 'dim'],
+    ['°7', 'dim!'],
+    ['°', 'dim'],
+    ['ø7', 'halfdim!'],
+    ['ø', 'halfdim!'],
+    ['h7', 'halfdim!'],
+    ['h9', 'halfdim!'],
+    ['h', 'halfdim!'],
+
+    // --- augmented. `aug` + is7th true IS aug7 (a dominant #5).
+    ['aug7', 'aug!'],
+    ['aug9', 'aug!'],
+    ['aug', 'aug'],
+    ['+7', 'aug!'],
+    ['+9', 'aug!'],
+    ['+', 'aug'],
+
+    // --- suspended, including the shorthand where `sus` alone means sus4 (#1323).
+    ['7sus4', '7sus4!'],
+    ['7sus2', 'sus2'],
+    ['7sus', '7sus4!'],
+    ['9sus4', '9sus4!'],
+    ['9sus', '9sus4!'],
+    ['13sus4', '13sus4!'],
+    ['13sus', '13sus4!'],
+    // A suspended dominant keeps its suspension; the b9/b13 colour has no sus quality to
+    // live in and is dropped as a subset.
+    ['7b9sus', '7sus4!'],
+    ['7b13sus', '7sus4!'],
+    ['sus4', 'sus4'],
+    ['sus2', 'sus2'],
+    ['sus', 'sus4'],
+
+    // --- added tones and 6ths. The added colour tone REPLACES the seventh (#1322).
+    ['add9', 'add9'],
+    ['add2', 'add2'],
+    ['add11', 'major'],
+    ['add4', 'major'],
+    ['6/9', '6/9'],
+    ['69', '6/9'],
+    ['6add9', '6/9'],
+    ['6', '6'],
+
+    // --- dominants and their alterations.
+    ['7alt', '7alt!'],
+    ['alt', '7alt!'],
+    ['7#5#9', '7alt!'],
+    ['7#9#5', '7alt!'],
+    ['7b5b9', '7alt!'],
+    ['7#9b5', '7alt!'],
+    ['7b9#5', '7alt!'],
+    ['7b9b5', '7alt!'],
+    ['7#11', '7#11!'],
+    ['9#11', '7#11!'],
+    ['7b13', '7b13!'],
+    ['7b9', '7b9!'],
+    ['7#9', '7#9!'],
+    ['7b5', '7b5!'],
+    ['7#5', 'aug!'],
+    ['7+', 'aug!'],
+    ['7aug', 'aug!'],
+    ['9b5', '7b5!'],
+    ['9#5', 'aug!'],
+    // A 13th's voicing carries the NATURAL 9, so a written b9/#9 has to move to the
+    // dominant quality that states the alteration (#1324). The 13 is dropped as a subset.
+    ['13b9', '7b9!'],
+    ['13#9', '7#9!'],
+    ['13', '13!'],
+    ['11', '11!'],
+    ['9', '9!'],
+    ['7', '7!'],
+    // `dom`/`dom7` is dominant, not diminished — the `o` used to match inside it (#1324).
+    ['dom7', '7!'],
+    ['dom', '7!'],
+
+    // --- quality-neutral.
+    ['5', '5'],
+    ['2', 'sus2'],
+]);
+
+// Longest spelling first, so a shorter one can never shadow a more specific one
+// ('m7b5' before 'm7' before 'm'; '13b9' before '13'). DERIVED rather than hand-ordered:
+// hand-ordering a ~160-row alternation is exactly how `ma` came to match inside `madd9`.
+const SUFFIX_SPELLINGS = [...SUFFIX_QUALITIES.keys()].sort((a, b) => b.length - a.length);
+
+/**
+ * Case/notation normalisation applied to the START of a chord suffix, in order, once.
+ *
+ * The ONE case-sensitive distinction that must survive is bare `M` (major) vs bare `m`
+ * (minor) — everything else is folded onto the lowercase spelling the table knows. `Δ`
+ * (Greek capital delta, U+0394) and `∆` (increment, U+2206) are what most keyboards and
+ * pastes produce for the maj7 triangle `△` (U+25B3).
+ */
+const SUFFIX_NORMALISATIONS: ReadonlyArray<readonly [RegExp, string]> = [
+    // Minor-major FIRST: every spelling of it starts with a minor marker followed by a
+    // major-7 marker, and both halves have case variants. Matching `m`/`min`/`-` before
+    // this rule ran is what made CmMaj7 a Cm7.
+    [/^(?:MIN|Min|min|MI|Mi|mi|m|-)(?:MAJ|Maj|maj|MA|Ma|ma|M)(?=7|9|11|13|$)/, 'mmaj'],
+    [/^(?:MIN|Min|min|MI|Mi|mi|m|-)(?:△|\^)(?=7|9|11|13|$)/, 'mmaj'],
+    // Capitalised major-7 family. `Ma`/`MA` alone reads as maj7 like bare `ma` does.
+    [/^(?:MAJ|Maj|MA|Ma)(?=\d|#|\+|$)/, 'maj'],
+    // A capital M is the major-7 family ONLY when an extension follows it; bare `CM` is a
+    // major triad.
+    [/^M(?=6|7|9|11|13)/, 'maj'],
+    [/^(?:MIN|Min)/, 'min'],
+    // `mi` is the Real Book's minor (Cmi7, Cmi7b5). Folded onto `m` so every minor row
+    // serves it; without this the bare `m` row matched and dropped the written 7th.
+    [/^(?:MI|Mi|mi)(?![nN])/, 'm'],
+    [/^(?:SUS|Sus)/, 'sus'],
+    [/^(?:DIM|Dim)/, 'dim'],
+    [/^(?:AUG|Aug)/, 'aug'],
+    [/^(?:ADD|Add)/, 'add'],
+    [/^(?:DOM|Dom)/, 'dom'],
+    [/^(?:ALT|Alt)/, 'alt'],
+];
+
+/**
+ * Strip the notation a chord symbol carries for the reader's benefit and fold case
+ * variants onto the canonical spellings — so the matcher itself stays a flat table.
+ *
+ * Parentheses are the iReal/Real Book house style for an alteration (`m7(b5)`, `7(b9)`,
+ * `6(9)`) and were previously dropped along with the alteration inside them (#1324). A
+ * leading root note is tolerated so callers can pass a whole symbol (`Cma7`) or just the
+ * suffix (`ma7`) — production always passes the suffix, since `resolveChordRoot` has
+ * already consumed the root, and no supported suffix starts with an uppercase A-G.
+ */
+function normalizeChordSuffix(symbol: string): string {
+    let suffix = symbol.replace(/[()\s]/g, '').replace(/[Δ∆]/g, '△');
+    // A capitalised quality WORD is not a root: `Add9`, `Aug7`, `Dim7`, `Dom7` start with
+    // a root letter, and stripping it first left `dd9` / `ug7` / `im7` / `om7` (-> dim).
+    if (!/^(?:ADD|Add|AUG|Aug|DIM|Dim|DOM|Dom|ALT|Alt)/.test(suffix)) {
+        suffix = suffix.replace(/^[A-G](?:#|b)?/, '');
+    }
+    for (const [pattern, replacement] of SUFFIX_NORMALISATIONS) {
+        const normalised = suffix.replace(pattern, replacement);
+        if (normalised !== suffix) {
+            return normalised;
+        }
+    }
+    return suffix;
+}
+
+/**
  * Extracts quality and 7th status from a chord symbol string.
  */
 export function getChordDetails(symbol: string): ChordDetails {
-    let quality = 'major',
-        is7th =
-            symbol.includes('7') ||
-            symbol.includes('9') ||
-            symbol.includes('11') ||
-            symbol.includes('13') ||
-            symbol.includes('alt');
-    const suffixMatch = symbol.match(
-        // why: △/^/ma/ma7 are common jazz shorthand for major-7; they must appear BEFORE the bare
-        // 'm' and '7' alternatives so leftmost-match picks the correct maj7-family suffix.
-        // Extended ma9/ma11/ma13 and △9 follow the same pattern for consistency.
-        // why: 6/9, 7sus4, add2 are listed before their shorter prefixes (6, sus4/7, add9-adjacent)
-        // so leftmost-match resolves the compound quality, not the bare 6 / 7 / sus4 (#780).
-        /(maj7#11|maj7#5|maj7\+|maj7|maj9|maj11|maj13|maj|ma13|ma11|ma9|ma7|ma|M7#5|M7\+|M7|△9|△7|△|\^7|\^|m13|m11|m9|m7b5|m7|m6|min|m|dim7|dim|o7|o|°7|°|7#5|7\+|7aug|aug7|aug|\+7|\+|-|ø7|ø|h7|7b5|7sus4|sus4|sus2|add9|add2|7alt|7b13|7#11|7b9|7#9|7|alt|13|11|9|6\/9|6|5)/,
-    );
-    const suffix = suffixMatch ? suffixMatch[1] : '';
-
-    if (suffix === 'maj13' || suffix === 'ma13') {
-        quality = 'maj13';
-    } else if (suffix === 'maj11' || suffix === 'ma11') {
-        quality = 'maj11';
-    } else if (suffix === 'maj9' || suffix === 'ma9' || suffix === '△9') {
-        quality = 'maj9';
-    } else if (suffix === 'maj7#11') {
-        quality = 'maj7#11';
-    } else if (suffix === 'maj7#5' || suffix === 'maj7+' || suffix === 'M7#5' || suffix === 'M7+') {
-        quality = 'augmaj7';
-        is7th = true;
-    } else if (
-        suffix.includes('maj') ||
-        suffix === 'M7' ||
-        suffix === 'ma7' ||
-        suffix === '△7' ||
-        suffix === '^7'
-    ) {
-        // why: △7 (triangle-7) and ^7 are jazz shorthand for major-7; ma/ma7 are also common
-        quality = 'maj7';
-    } else if (suffix === 'ma' || suffix === '△' || suffix === '^') {
-        // why: bare △/^/ma without a numeric extension are often written for plain major or
-        // major-7 context; treat as maj7 to match common usage (Cmaj = major, C△ = maj7)
-        quality = 'maj7';
-    } else if (suffix === 'm13') {
-        quality = 'm13';
-    } else if (suffix === 'm11') {
-        quality = 'm11';
-    } else if (suffix === 'm9') {
-        quality = 'm9';
-    } else if (suffix === 'm7b5' || suffix === 'ø7' || suffix === 'ø' || suffix === 'h7') {
-        quality = 'halfdim';
-    } else if (suffix === '7b5') {
-        // A dominant flat-five retains its major third; m7b5 alone is half-diminished.
-        quality = '7b5';
-    } else if (suffix === 'm6') {
-        quality = 'm6';
-        // #1313 — `Am6/9` trips the includes('9') heuristic above; a 6th chord has no
-        // 7th, and a true `is7th` here re-adds the b7 this quality must never carry.
-        is7th = false;
-    } else if (suffix === 'm7' || suffix === 'min' || suffix === 'm' || suffix === '-') {
-        quality = 'minor';
-    } else if (
-        suffix === 'o7' ||
-        (suffix === 'o' && is7th) ||
-        suffix === 'dim7' ||
-        suffix === '°7' ||
-        (suffix === '°' && is7th)
-    ) {
-        quality = 'dim';
-        is7th = true;
-    } else if (suffix === 'o' || suffix === 'dim' || suffix === '°') {
-        quality = 'dim';
-    } else if (
-        suffix === '7#5' ||
-        suffix === '7+' ||
-        suffix === '7aug' ||
-        suffix === 'aug7' ||
-        suffix === '+7'
-    ) {
-        quality = 'aug';
-        is7th = true;
-    } else if (suffix.includes('aug') || suffix === '+') {
-        quality = 'aug';
-    } else if (suffix === '7sus4') {
-        quality = '7sus4';
-        is7th = true;
-    } else if (suffix === 'sus4') {
-        quality = 'sus4';
-    } else if (suffix === 'sus2') {
-        quality = 'sus2';
-    } else if (suffix === 'add9') {
-        quality = 'add9';
-    } else if (suffix === 'add2') {
-        quality = 'add2';
-        is7th = false; // add2 = added 2nd color, no 7th
-    } else if (suffix === '6/9') {
-        quality = '6/9';
-        // 6/9 = major triad + 6th + 9th. No 7th — override the includes('9')
-        // heuristic so it isn't misclassified as a dominant (rootless guard) (#780).
-        is7th = false;
-    } else if (suffix === '7alt' || suffix === 'alt') {
-        quality = '7alt';
-    } else if (suffix === '7b13') {
-        quality = '7b13';
-    } else if (suffix === '7#11') {
-        quality = '7#11';
-    } else if (suffix === '7b9') {
-        quality = '7b9';
-    } else if (suffix === '7#9') {
-        quality = '7#9';
-    } else if (suffix === '13') {
-        quality = '13';
-    } else if (suffix === '11') {
-        quality = '11';
-    } else if (suffix === '9') {
-        quality = '9';
-    } else if (suffix === '7') {
-        quality = '7';
-    } else if (suffix === '6') {
-        quality = '6';
-    } else if (suffix === '5') {
-        quality = '5';
-    }
-
-    return { quality, is7th, suffix };
+    const normalised = normalizeChordSuffix(symbol);
+    const suffix = SUFFIX_SPELLINGS.find((spelling) => normalised.startsWith(spelling)) ?? '';
+    const encoded = SUFFIX_QUALITIES.get(suffix) ?? 'major';
+    const is7th = encoded.endsWith('!');
+    return { quality: is7th ? encoded.slice(0, -1) : encoded, is7th, suffix };
 }
 
 /**
@@ -703,6 +831,16 @@ export function getFormattedChordNames(
         absSuffix = 'maj13';
         nnsSuffix = 'maj13';
         romSuffix = 'maj13';
+    } else if (quality === 'mMaj7') {
+        // why (#1321): the chart wrote a minor-major 7th; `mMaj7` is the spelling the Real
+        // Book uses and it must not collapse to 'm' + the is7th '7' append below (Cm7).
+        absSuffix = 'mMaj7';
+        nnsSuffix = '-Maj7';
+        romSuffix = 'Maj7';
+    } else if (quality === 'madd9') {
+        absSuffix = 'madd9';
+        nnsSuffix = '-add9';
+        romSuffix = 'add9';
     } else if (quality === 'm9') {
         absSuffix = 'm9';
         nnsSuffix = '-9';
@@ -731,6 +869,14 @@ export function getFormattedChordNames(
         absSuffix = '7sus4';
         nnsSuffix = '7sus4';
         romSuffix = '7sus4';
+    } else if (quality === '9sus4') {
+        absSuffix = '9sus4';
+        nnsSuffix = '9sus4';
+        romSuffix = '9sus4';
+    } else if (quality === '13sus4') {
+        absSuffix = '13sus4';
+        nnsSuffix = '13sus4';
+        romSuffix = '13sus4';
     } else if (quality === 'sus2') {
         absSuffix = 'sus2';
         nnsSuffix = 'sus2';
@@ -823,6 +969,12 @@ export function getFormattedChordNames(
             // why: add9 contains '9' so is7th=true, but the quality resolves to 'add9' not a
             // dominant/extended chord — excluding it prevents a stray '7' being appended (→ "add97")
             'add9',
+            // why (#1323): these qualities SPELL their own seventh, so appending another one
+            // renders the nonsense the issue is named for — `G7sus4` displayed as "G7sus47".
+            '7sus4',
+            '9sus4',
+            '13sus4',
+            'mMaj7',
         ].includes(quality)
     ) {
         absSuffix += '7';
@@ -838,7 +990,12 @@ export function getFormattedChordNames(
         quality === 'm9' ||
         quality === 'm11' ||
         quality === 'm13' ||
-        quality === 'm6'
+        quality === 'm6' ||
+        // #1321/#1322 — a minor-major 7th and a minor add9 are MINOR chords, so the numeral
+        // is lowercase like every other minor quality's. Without these a chart in roman
+        // notation displayed `IMaj7` for what it plays as a minor tonic.
+        quality === 'mMaj7' ||
+        quality === 'madd9'
     ) {
         romanName = rootRomanBase.toLowerCase();
     } else {
@@ -964,9 +1121,31 @@ function parseProgressionPart(
                             // everyday minor-key chords (Minor Swing is `i6 | iv6 | V7`). Without
                             // this branch `iv6` parsed as the MAJOR 6th quality — F6 in C, with an
                             // A natural over the F minor triad. `m6` keeps `is7th === false`
-                            // (#1313): a 6th chord has no 7th. '6/9' has no minor counterpart
-                            // quality yet, so `iv6/9` still reads major — filed, not fixed here.
+                            // (#1313): a 6th chord has no 7th.
                             quality = 'm6';
+                        } else if (quality === '6/9') {
+                            // why (#1322): there is no minor 6/9 quality, so `iv6/9` read major
+                            // (an A natural over an F minor triad). `m6` is the honest subset —
+                            // it keeps the b3 and the 6th and drops only the 9th colour, which is
+                            // also what the `m6/9` spelling already resolves to.
+                            quality = 'm6';
+                        } else if (quality === 'add9' || quality === 'add2') {
+                            // why (#1322): same class — a lowercase numeral's added-tone chord is
+                            // a MINOR triad plus that colour tone; `add9`'s major 3rd contradicts
+                            // the numeral.
+                            quality = 'madd9';
+                        } else if (
+                            quality === 'maj7' ||
+                            quality === 'maj9' ||
+                            quality === 'maj11' ||
+                            quality === 'maj13'
+                        ) {
+                            // why (#1321): `imaj7` / `iM7` is the minor-major 7th — the melodic-minor
+                            // tonic, not a major chord on a minor degree. Without this the numeral's
+                            // lowercase (minor) reading was silently overridden by the suffix's major
+                            // 3rd. The extensions collapse to the same quality (a subset: the 9/11/13
+                            // colour is dropped, the defining b3 + maj7 is not).
+                            quality = 'mMaj7';
                         }
                     }
 
@@ -1082,7 +1261,11 @@ function parseProgressionPart(
                     quality === 'm9' ||
                     quality === 'm11' ||
                     quality === 'm13' ||
-                    quality === 'm6';
+                    quality === 'm6' ||
+                    // #1321/#1322 — both are minor-triad chords; the flag drives minor-key
+                    // display and the UI's major/minor colouring.
+                    quality === 'mMaj7' ||
+                    quality === 'madd9';
 
                 parsed.push({
                     romanName: finalRomName,
