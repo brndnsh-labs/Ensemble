@@ -157,7 +157,9 @@ export async function adoptGuestSongs(
     const failures: AdoptFailure[] = [];
     for (const candidate of candidates) {
         try {
-            await accountSync.save(candidate.document, null);
+            // No owner claim (#1311): these are GUEST songs, which belong to no account at all
+            // until this copy files them under whichever one is attached right now.
+            await accountSync.save(candidate.document, null, null);
             adopted += 1;
         } catch (error) {
             if (error instanceof LocalRevisionError) {

@@ -49,6 +49,18 @@ export interface StatusFacts {
             refused: null | 'too-large' | 'refused';
         };
         activity: 'idle' | 'sending' | 'reauth' | 'retry';
+        /**
+         * True when the chart on the stand belongs to an account this device is NOT attached to
+         * (#1311). Supplied by the caller, like every other fact here — this module reads no
+         * session and no storage.
+         *
+         * It outranks every other cloud reading because the observation beside it is an answer
+         * about the wrong library: the loop watches this document id in the account that IS
+         * attached, which does not hold it, so `remoteRevision` comes back null and the chip
+         * would otherwise say "Not in your account yet" — an invitation to press the one button
+         * that can only ever be refused.
+         */
+        foreign: boolean;
     };
     offline: {
         shell: 'unknown' | 'verified' | 'missing';
@@ -64,6 +76,7 @@ export interface StatusView {
     cloud: {
         status:
             | 'unknown'
+            | 'foreign'
             | 'conflict'
             | 'gone'
             | 'refused'
@@ -173,8 +186,11 @@ function readLocal(facts: unknown): StatusView['local'] {
 }
 
 function readCloud(facts: unknown): StatusView['cloud'] {
-    const record = object(facts, 'cloud', ['observation', 'activity']);
+    const record = object(facts, 'cloud', ['observation', 'activity', 'foreign']);
     const activity = member(record.activity, 'cloud.activity', ACTIVITY);
+    if (typeof record.foreign !== 'boolean') {
+        throw new Error('cloud.foreign must be observed as a boolean.');
+    }
     const observation =
         record.observation === null
             ? null
@@ -220,25 +236,30 @@ function readCloud(facts: unknown): StatusView['cloud'] {
     if (activity === 'sending' && !(observation && observation.pendingCount > 0)) {
         throw new Error('Sending requires an observation with a positive pending queue.');
     }
-    const status = !observation
-        ? ('unknown' as const)
-        : observation.conflict === 'gone'
-          ? // Ranked ABOVE an ordinary conflict, and above the queue behind it: "the cloud no
-            // longer has this song" is the fact that changes what the musician can actually do,
-            // and it is not resolvable by choosing a version.
-            ('gone' as const)
-          : observation.conflict === 'version'
-            ? ('conflict' as const)
-            : observation.refused !== null
-              ? // A permanent transport-level refusal (#1298), never a version to choose between.
-                ('refused' as const)
-              : observation.pendingCount > 0
-                ? activity === 'sending'
-                    ? ('sending' as const)
-                    : ('queued' as const)
-                : observation.remoteRevision !== null
-                  ? ('confirmed' as const)
-                  : ('not-uploaded' as const);
+    const status = record.foreign
+        ? // Ranked above everything, including `unknown` (#1311). Whatever the observation says,
+          // it is a reading of a document id inside a library that is not this chart's — so it is
+          // not a weaker version of the truth, it is a different song's answer.
+          ('foreign' as const)
+        : !observation
+          ? ('unknown' as const)
+          : observation.conflict === 'gone'
+            ? // Ranked ABOVE an ordinary conflict, and above the queue behind it: "the cloud no
+              // longer has this song" is the fact that changes what the musician can actually do,
+              // and it is not resolvable by choosing a version.
+              ('gone' as const)
+            : observation.conflict === 'version'
+              ? ('conflict' as const)
+              : observation.refused !== null
+                ? // A permanent transport-level refusal (#1298), never a version to choose between.
+                  ('refused' as const)
+                : observation.pendingCount > 0
+                  ? activity === 'sending'
+                      ? ('sending' as const)
+                      : ('queued' as const)
+                  : observation.remoteRevision !== null
+                    ? ('confirmed' as const)
+                    : ('not-uploaded' as const);
     // Activity survives independently: reauth and retry are wait reasons, not lost work, and
     // they never erase a conflict or the queued count beside them.
     return {

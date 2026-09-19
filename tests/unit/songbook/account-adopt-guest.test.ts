@@ -174,8 +174,14 @@ describe('adoptGuestSongs', () => {
             'copied:3/3',
         ]);
         // Every call is a create (`expected = null`) and passes NO operation id: the store mints a
-        // fresh one per attempt, which is the patch review's P0 fix.
-        expect(save.mock.calls.map((call) => call.slice(1))).toEqual([[null], [null], [null]]);
+        // fresh one per attempt, which is the patch review's P0 fix. The trailing `null` is the
+        // owner claim (#1311): a GUEST song belongs to no account until this copy files it under
+        // whichever one is attached, so naming one here would refuse the very adoption it is for.
+        expect(save.mock.calls.map((call) => call.slice(1))).toEqual([
+            [null, null],
+            [null, null],
+            [null, null],
+        ]);
         // ONE pass for the whole batch, never one per song (#1268's explicit design constraint).
         expect(run).toHaveBeenCalledTimes(1);
     });

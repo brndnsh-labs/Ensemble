@@ -98,6 +98,11 @@ const LOCAL_LABELS = {
 
 const CLOUD_LABELS = {
     unknown: 'Account library not checked yet',
+    // #1311 — the chart on the stand is another account's, so there is no cloud fact about it to
+    // report at all: the loop can only ask the library this device IS attached to, and that one
+    // has never held this song. Short on purpose; the banner above the stand carries the sentence
+    // that says what to do, and repeating it in a status chip would be the same words twice.
+    foreign: 'Belongs to another account',
     conflict: 'This song differs from your account — choose which to keep',
     // #1270: the one-sided refusal. The cloud has no version to weigh this one against, so the
     // sentence must not offer a choice — it says where the work actually is instead.
@@ -144,6 +149,12 @@ export interface SyncStatusProps {
     shell: StatusFacts['offline']['shell'];
     /** The open chart's sound files. Unobserved until something has actually checked. */
     sounds: Progress;
+    /**
+     * The chart on the stand belongs to an account this device is not attached to (#1311). The
+     * shell derives it; this surface only reports it, and it outranks every other cloud reading
+     * because the observation beside it describes the wrong library.
+     */
+    foreign: boolean;
     sync: SyncSnapshot;
 }
 
@@ -154,6 +165,7 @@ export function SyncStatus({
     recovery,
     shell,
     sounds,
+    foreign,
     sync,
 }: SyncStatusProps) {
     const observation = sync.observation;
@@ -170,7 +182,7 @@ export function SyncStatus({
                 : 'idle';
     const view = projectSyncStatus({
         local: { savedRevision, editing, lastSave, recovery },
-        cloud: { observation, activity },
+        cloud: { observation, activity, foreign },
         offline: { shell, documents: sync.documents, sounds },
     });
     const songs = counted('Songs', view.offline.documents);
