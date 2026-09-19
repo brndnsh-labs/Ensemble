@@ -158,22 +158,13 @@ describe('Voicing root policy (#1313)', () => {
             for (const bassOn of [true, false]) {
                 for (const intensity of [0.35, 0.65, 0.9]) {
                     const chart = 'C | Dm | Eb | Am | Am6 | Dm7 | G7 | Cmaj7';
-                    for (const chord of voice(feel, bassOn, chart, 'C', true, intensity)) {
+                    for (const chord of voice(feel, bassOn, chart, 'C', intensity)) {
                         expect(
                             Math.min(...chord.midis),
                             `${chord.name} bass on: ${bassOn} @${intensity}`,
                         ).toBeGreaterThanOrEqual(COMP_REGISTER_FLOOR);
                     }
                 }
-            }
-        });
-
-        it('practiceMode no longer changes any voicing', () => {
-            const chart = 'C | Am | Am6 | Dm7 | G7alt | Bm7b5 | Cmaj7';
-            for (const bassOn of [true, false]) {
-                const on = voice(feel, bassOn, chart, 'C', true).map((c) => c.midis);
-                const off = voice(feel, bassOn, chart, 'C', false).map((c) => c.midis);
-                expect(on).toEqual(off);
             }
         });
     });

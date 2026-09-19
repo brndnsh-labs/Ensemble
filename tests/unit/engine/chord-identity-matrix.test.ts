@@ -441,7 +441,7 @@ describe('Chord identity matrix (#1320-#1324)', () => {
     describe.each(PARSE_FEELS)('(b) parse layer — %s', (feel) => {
         it.each([0.35, 0.9])('states every written chord at intensity %s', (intensity) => {
             for (const bassOn of [true, false]) {
-                const parsed = voice(feel, bassOn, CHART, 'C', true, intensity);
+                const parsed = voice(feel, bassOn, CHART, 'C', intensity);
                 expect(parsed).toHaveLength(MATRIX.length);
                 MATRIX.forEach((row, index) => {
                     const chord = parsed[index];
@@ -506,7 +506,7 @@ describe('Chord identity matrix (#1320-#1324)', () => {
             ['ii9', 'm9', [3, 10], [4, 11]],
         ])('%s parses as %s', (token, quality, defining, misnaming) => {
             for (const feel of ['Jazz', 'Acoustic']) {
-                const [chord] = voice(feel, true, token, 'C', true, 0.35, { isMinor: true });
+                const [chord] = voice(feel, true, token, 'C', 0.35, { isMinor: true });
                 expect(chord.quality, `${token} in ${feel}`).toBe(quality);
                 for (const degree of defining) {
                     expect(chord.degrees.has(degree), `${token} lost ${degree}`).toBe(true);
@@ -531,7 +531,7 @@ describe('Chord identity matrix (#1320-#1324)', () => {
     // #1321's line cliché: the whole point of the chord is the chromatic descent from the
     // root through the maj7 and b7 to the 6th.
     it('voices the Am | AmMaj7 | Am7 | Am6 descent as G# G F#', () => {
-        const parsed = voice('Acoustic', false, 'Am | AmMaj7 | Am7 | Am6', 'A', true, 0.35);
+        const parsed = voice('Acoustic', false, 'Am | AmMaj7 | Am7 | Am6', 'A', 0.35);
         const [am, amMaj7, am7, am6] = parsed;
         expect(am.quality).toBe('minor');
         expect(amMaj7.quality).toBe('mMaj7');
@@ -551,7 +551,7 @@ describe('Chord identity matrix (#1320-#1324)', () => {
         // public/data/chord-presets.ts / song-templates.ts: 'IVmaj9 | III7#9 | vi11 | V9sus4'
         const chart = 'IVmaj9 | III7#9 | vi11 | V9sus4';
         for (const bassOn of [true, false]) {
-            const [, , , v9sus4] = voice('Neo-Soul', bassOn, chart, 'C', true, 0.35);
+            const [, , , v9sus4] = voice('Neo-Soul', bassOn, chart, 'C', 0.35);
             expect(v9sus4.quality).toBe('9sus4');
             expect(v9sus4.name).toBe('G9sus4');
             expect(v9sus4.degrees.has(5), 'the 4th IS the chord').toBe(true);

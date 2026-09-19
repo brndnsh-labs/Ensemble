@@ -762,21 +762,36 @@ function validatePractice(
     candidate: unknown,
     path: string,
 ): WorkspacePracticePreferences {
-    const record = ctx.object(candidate, path, [
-        'countIn',
-        'applyPresetSettings',
-        'sessionTimer',
-        'songMode',
-        'practiceMode',
-        'rampBpmPerLoop',
-        'rampStartPct',
-    ]);
+    const record = ctx.object(
+        candidate,
+        path,
+        [
+            'countIn',
+            'applyPresetSettings',
+            'sessionTimer',
+            'songMode',
+            'rampBpmPerLoop',
+            'rampStartPct',
+        ],
+        // RETIRED LEGACY KEY (#1314). `practiceMode` was a default-on preference with no
+        // behavioural reader left after #1313 moved "leave room for the bass" onto the bass
+        // LANE, so it is gone from the slice, the types and every writer. It stays listed here
+        // — as OPTIONAL, and deliberately not read below — for one reason: every workspace
+        // document saved before this release carries it, and `ctx.object` rejects any key it
+        // does not know. Listing it keeps those documents loading; omitting it from the
+        // returned object means the key is dropped on read and never written again (the
+        // encoder stringifies what the validator BUILDS, so a round-trip strips it). No schema
+        // version bump: nothing about the meaning of any surviving field changed.
+        //
+        // Do not "tidy" this into a `booleanField` read — required or not, reading it would
+        // put the key back into the encoder's output and resurrect the field.
+        ['practiceMode'],
+    );
     return {
         countIn: booleanField(ctx, record, 'countIn', path),
         applyPresetSettings: booleanField(ctx, record, 'applyPresetSettings', path),
         sessionTimer: numberField(ctx, record, 'sessionTimer', path, 0, 60, true),
         songMode: booleanField(ctx, record, 'songMode', path),
-        practiceMode: booleanField(ctx, record, 'practiceMode', path),
         rampBpmPerLoop: numberField(ctx, record, 'rampBpmPerLoop', path, 1, 20, true),
         rampStartPct: numberField(ctx, record, 'rampStartPct', path, 0.4, 0.95),
     };

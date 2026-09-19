@@ -472,7 +472,6 @@ function hydrateSavedState(): void {
             // #1259 (saved on every write, silently dropped on every load), and the next
             // person diffing writer against reader will land on exactly these two lines.
             autoIntensity: true,
-            practiceMode: savedState.practiceMode !== undefined ? !!savedState.practiceMode : true,
             metronome: false,
             visualFlash: !!savedState.visualFlash,
             qualityColors:

@@ -62,7 +62,6 @@ const MOCK_STATE = {
         sessionTimer: 5,
         songMode: true,
         autoIntensity: true,
-        practiceMode: true,
         masterVolume: 0.4,
     },
     chords: {},
@@ -113,7 +112,6 @@ const PERSISTENCE_MANIFEST: Record<string, { restored: true } | { resetOnLoad: s
     sessionTimer: { restored: true },
     songMode: { restored: true },
     vizEnabled: { restored: true },
-    practiceMode: { restored: true },
     masterVolume: { restored: true },
     // --- Deliberate reset-on-load exceptions (Brandon's call, #1127) ---
     metronome: {

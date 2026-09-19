@@ -101,8 +101,9 @@ function isBassSpaceFeel(feel: string | undefined | null): boolean {
  * input to "leave room for the bass" (#1313): muting the bass means the player
  * is practicing that part, so the remaining lanes must state the harmony
  * themselves — the register floor drops and rootless voicings switch off. It
- * used to also be forced true by `playback.practiceMode` (default on), which
- * made `bassActive` dead and left a muted-bass band with no root anywhere.
+ * used to also be forced true by a default-on "practice mode" preference, which
+ * made `bassActive` dead and left a muted-bass band with no root anywhere. That
+ * preference had no other reader left and was retired in #1314.
  */
 export function shouldReserveBassSpace(
     state: EnsembleState,
@@ -115,8 +116,8 @@ export function shouldReserveBassSpace(
  * Some chords lose too much identity without a root under them (the root is what
  * disambiguates a dim/ø/altered/augmented shape). Over a sounding bass the bass
  * supplies it and the comp plays the idiomatic rootless shell; with the bass
- * MUTED — the player covering that part, which is what `practiceMode` used to
- * stand in for (#1313) — the smart-comp, Neo-Soul, Funk and pad reducers keep
+ * MUTED — the player covering that part, which the retired practice-mode
+ * preference used to stand in for (#1313) — the smart-comp, Neo-Soul, Funk and pad reducers keep
  * these chords grounded (root retained, fuller voice count) instead of thinning
  * them to bare shells. Jazz's resolving altered-dominant voicing is the one
  * exception: it stays a 3-b7 tritone shell either way, which still states the

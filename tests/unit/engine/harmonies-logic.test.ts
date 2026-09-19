@@ -584,9 +584,8 @@ describe('Harmony Engine Logic', () => {
         });
     });
 
-    describe('Practice Mode', () => {
+    describe('Bass-lane grounding & register floor', () => {
         it('keeps the harmony lane above 52 even with the bass muted (register slot)', () => {
-            _playback.practiceMode = true;
             _bass.enabled = false;
             _groove.genreFeel = 'Rock';
             _harmony.style = 'smart';
@@ -600,8 +599,9 @@ describe('Harmony Engine Logic', () => {
         });
 
         // #1313 — muting the bass IS practicing the bass part: nothing else states the
-        // root, so the pads must. `practiceMode` no longer forces bass space on.
-        it('keeps the root in Funk when the bass is muted, regardless of practiceMode', () => {
+        // root, so the pads must. The bass LANE is the only input — #1314 retired the
+        // default-on preference that used to force this on as well.
+        it('keeps the root in Funk when the bass is muted, and drops it when it sounds', () => {
             _groove.genreFeel = 'Funk';
             const chord = {
                 rootMidi: 60,
@@ -612,16 +612,13 @@ describe('Harmony Engine Logic', () => {
                 beats: 4,
             };
 
-            for (const practiceMode of [true, false]) {
-                _playback.practiceMode = practiceMode;
-                _bass.enabled = false;
-                getHarmonyNotes(getState(), chord, null, 0, 60, 'smart', 0);
-                expect(getLastRequestedIntervals()).toContain(0);
+            _bass.enabled = false;
+            getHarmonyNotes(getState(), chord, null, 0, 60, 'smart', 0);
+            expect(getLastRequestedIntervals()).toContain(0);
 
-                _bass.enabled = true;
-                getHarmonyNotes(getState(), chord, null, 0, 60, 'smart', 0);
-                expect(getLastRequestedIntervals()).not.toContain(0);
-            }
+            _bass.enabled = true;
+            getHarmonyNotes(getState(), chord, null, 0, 60, 'smart', 0);
+            expect(getLastRequestedIntervals()).not.toContain(0);
         });
 
         it('never strips the root from a plain triad, even with the bass sounding', () => {
@@ -640,7 +637,6 @@ describe('Harmony Engine Logic', () => {
         });
 
         it('reserves or releases bass space from the effective section lane gate', () => {
-            _playback.practiceMode = false;
             _groove.genreFeel = 'Funk';
             const chord = {
                 rootMidi: 60,
@@ -665,8 +661,7 @@ describe('Harmony Engine Logic', () => {
             expect(getLastRequestedIntervals()).toContain(0);
         });
 
-        it('should keep half-diminished grounding tones in Jazz practice mode', () => {
-            _playback.practiceMode = true;
+        it('should keep half-diminished grounding tones in Jazz with the bass muted', () => {
             _bass.enabled = false;
             _groove.genreFeel = 'Jazz';
 
@@ -688,12 +683,11 @@ describe('Harmony Engine Logic', () => {
         // why: epic-harmony-polish S3 (review P0). selectGroundedIntervals fires
         // here (Jazz + bass MUTED + tension quality satisfies
         // shouldPreferGroundedVoicing — #1313 moved the trigger from
-        // `practiceMode` to the bass lane). For 7b9 the characteristic
+        // the retired practice-mode preference to the bass lane). For 7b9 the characteristic
         // alteration (b9 = interval 13) IS the chord identity; if a reorder
         // ever evicted it in favor of the perfect 5th, the chord would emit a
         // plain dominant 7 instead. This test guards bucket-order regressions.
         it('should preserve the b9 in grounded 7b9 voicings (Jazz, bass muted)', () => {
-            _playback.practiceMode = true;
             _bass.enabled = false;
             _groove.genreFeel = 'Jazz';
 
@@ -717,7 +711,6 @@ describe('Harmony Engine Logic', () => {
         });
 
         it('should ALWAYS reserve bass register (stay above 52) given new safety rules', () => {
-            _playback.practiceMode = false;
             _bass.enabled = false;
             _groove.genreFeel = 'Rock';
 
