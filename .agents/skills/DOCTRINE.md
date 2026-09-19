@@ -1,4 +1,4 @@
-<!-- cycle:rendered template=DOCTRINE.md.tmpl hash=f78f54f24f84 — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=DOCTRINE.md.tmpl hash=4c226553da65 — managed by the-cycle; edit the template, not this file -->
 # Pipeline doctrine (shared)
 
 Single source of truth for the rules the Ensemble work-loop skills share. A skill that says
@@ -160,6 +160,17 @@ npm run test:e2e      # Playwright vs a `vite preview` build (Desktop Chrome, Mo
 `/done` that touches more than one file. CI runs `npm test` + `npm run test:e2e` in
 parallel; both must be green to merge.
 
+**Two CI gates `validate` does NOT cover — run them locally before `/done`:**
+- `npm run typecheck:tests` — the root typecheck skips `tests/`; CI's `checks` job does not.
+- **The v2 suite, for any diff under `public/`** (not just `prototypes/v2/`): the v2 export
+  compiles `public/` and its checks drive the shared controllers, codecs and engine, and
+  `v2-checks` is a required context. `npm run build --prefix prototypes/v2` then
+  `(cd prototypes/v2 && npx playwright test)` — build FIRST, or the suite runs a stale export.
+
+Run the gates **sequentially from the repo root** and log an exit code per gate. The shell is
+zsh: an unquoted `$cmd` holding a command string never word-splits, so a loop over gate strings
+exits 127 on every one — "never ran", which a piped `tail` reports as a pass.
+
 **Track-specific DoD on top of the gates:**
 - **musical** → run the matching critique test
   (`npx vitest run tests/standards/<…>-critique.test.ts`) and read its Critique Report
@@ -290,7 +301,11 @@ lightweight residual check instead of gating the merge on it:
 - `verify-on-device` — a real-device visual glance (mobile safe-area/viewport/touch
   target); lands on `/nightly`'s morning device-verify checklist.
 - `verify-by-ear` — a musical-correctness change whose idiom is captured by a critique
-  test; ships with a 🎧 listen checklist (genre/setting, what changed, old-vs-new). The
+  test; ships with a 🎧 listen checklist (genre/setting, what changed, old-vs-new) in which
+  **every line is a link**: `npm run --silent audition-link -- --base-url=<host>/ --prog="…"
+  --genre=… [--key --ts --int --density --on=soloist --off=chords,harmony]` opens the scenario
+  pre-set behind a ▶ Play overlay (`docs/guides/listening-gate-tools.md`). Put the links in the
+  PR's 🎧 section **and** post them as a `**[claude]**` comment on the issue. The
   test is the correctness gate, the listen is *confirmation* — a follow-up tweak if it
   feels off, never a rollback (musical diffs are reversible).
 
