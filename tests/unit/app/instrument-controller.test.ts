@@ -316,6 +316,11 @@ describe('Instrument Controller', () => {
 
             const order = (fn) => fn.mock.invocationCallOrder[0];
             expect(ChordsEngine.validateProgression).toHaveBeenCalledTimes(1);
+            // The WHOLE state tree — togglePower's local lane map is also called
+            // `stateMap`, and passing that one throws on `arranger.scorePlan`.
+            const [passedState] = ChordsEngine.validateProgression.mock.calls[0];
+            expect(passedState.arranger).toBe(getState().arranger);
+            expect(passedState.arranger).toBeDefined();
             expect(order(dispatch)).toBeLessThan(order(ChordsEngine.validateProgression));
             expect(order(ChordsEngine.validateProgression)).toBeLessThan(
                 order(WorkerClient.syncWorker),

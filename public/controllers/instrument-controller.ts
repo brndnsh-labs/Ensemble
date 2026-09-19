@@ -243,7 +243,9 @@ export function togglePower(type: string): void {
     // soloist: a player muting the bass mid-groove must not hear the time hiccup.
     const bassToggled = normalizedType === 'bass';
     if (bassToggled) {
-        validateProgression(stateMap, dispatch);
+        // getState(), NOT `stateMap`: this function's local `stateMap` is the lane
+        // lookup above and shadows the imported state tree.
+        validateProgression(getState(), dispatch);
     }
 
     syncWorker();
