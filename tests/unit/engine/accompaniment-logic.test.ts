@@ -140,17 +140,19 @@ describe('Accompaniment Engine Logic', () => {
             ).toBe(true);
         });
 
-        it('should perform rootless reduction for stable chords when practice spacing is active', () => {
+        // #1313 — bass space follows the bass LANE, not `practiceMode`: a muted bass
+        // means the player is covering that part, so the comp keeps the full voicing.
+        it('should perform rootless reduction for stable chords only while the bass is sounding', () => {
             const { playback, bass } = getState();
             bass.enabled = false;
-            playback.practiceMode = false;
+            playback.practiceMode = true; // inert: no longer reserves bass space on its own
 
             const notesNormal = getAccompanimentNotes(getState(), mockChord, 0, 0, 0, {
                 isBeatStart: true,
                 isGroupStart: true,
             });
 
-            playback.practiceMode = true; // This reserves the space even if bass is disabled
+            bass.enabled = true;
 
             const notesRootless = getAccompanimentNotes(getState(), mockChord, 16, 0, 0, {
                 isBeatStart: true,
@@ -254,7 +256,7 @@ describe('Accompaniment Engine Logic', () => {
             };
 
             groove.genreFeel = 'Jazz';
-            playback.practiceMode = true;
+            bass.enabled = true; // bass sounding -> comp leaves it the bottom
             playback.bandIntensity = 0.35;
             compingState.currentCell[0] = 1;
             compingState.lockedUntil = 100;
@@ -270,7 +272,7 @@ describe('Accompaniment Engine Logic', () => {
             expect(pitchClasses).toContain(5); // F = b7 of G7
         });
 
-        it('should keep dominant guide tones when slimming rich practice voicings', () => {
+        it('should keep dominant guide tones when slimming rich voicings over a sounding bass', () => {
             const richTurnaroundDominant = {
                 rootMidi: 67,
                 freqs: [246.94, 349.23, 440, 659.26], // B3, F4, A4, E5
@@ -281,7 +283,7 @@ describe('Accompaniment Engine Logic', () => {
             };
 
             groove.genreFeel = 'Jazz';
-            playback.practiceMode = true;
+            bass.enabled = true; // bass sounding -> comp leaves it the bottom
             playback.bandIntensity = 0.65;
             playback.complexity = 0.65;
             compingState.currentCell[0] = 1;
