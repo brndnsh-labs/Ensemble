@@ -30,13 +30,33 @@ import type { SignOutPreflight } from '../../lib/account/sync-loop';
  *    is already disabled offline; this covers the network dropping while the step is open.
  * 4. **Nothing dismisses this step while the request is in flight** — not Cancel, not Escape. The
  *    answer to a destructive request is written here.
+ *
+ * `mode` is the one thing that varies (#1351), and every difference follows from a single fact:
+ * whether there is still a session to revoke.
+ *
+ * - `'session'` — the ordinary sign-out. A live session, a logout round trip, and a queue that can
+ *   still be emptied before it is discarded.
+ * - `'device'` — "Sign out on this device", for a device that still HOLDS an account with no live
+ *   session (#1351): the session expired, or it expired and the page was reloaded. There is no
+ *   request to make, so point 3 does not apply and the destructive button works offline.
+ *
+ *   Sync now is not offered either, and the copy has to be careful about why. It is NOT that the
+ *   queued Save can never upload — signing in again as the same account re-attaches the same scope
+ *   and drains the outbox, which is the other button on the banner this step was opened from. It
+ *   is that THIS action discards it, and that no button on THIS step can send it first. So the
+ *   sentence is scoped to the action and names the alternative (#1351 patch R4); promising that
+ *   the work is doomed would talk a musician out of the one move that saves it.
  */
 
 const OFFLINE_REASON = 'Connect to sign out — exporting works either way.';
 
+export type SignOutMode = 'session' | 'device';
+
 export interface SignOutDialogProps {
     dialogRef: RefObject<HTMLDialogElement | null>;
-    /** `false` disables the destructive action and shows the offline reason. */
+    /** Which of the two steps this is; see the module comment. */
+    mode: SignOutMode;
+    /** `false` disables the destructive action and shows the offline reason — `'session'` only. */
     online: boolean;
     busy: boolean;
     /** Null while this device is still being read. The step never guesses at a count. */
@@ -57,6 +77,7 @@ export interface SignOutDialogProps {
 
 export function SignOutDialog({
     dialogRef,
+    mode,
     online,
     busy,
     preflight,
@@ -71,10 +92,16 @@ export function SignOutDialog({
     const drafts = preflight?.drafts ?? 0;
     const exposed = preflight?.atRisk.length ?? 0;
     const atRisk = exposed > 0;
+    const device = mode === 'device';
     // Every unsent Save is one the account has already refused, so there is nothing left for a
     // sync to send. A partial overlap still offers Sync now: it can empty the rest of the queue,
     // and the refused ones were never going anywhere either way.
-    const onlyRefused = unsent > 0 && (preflight?.refusedSaves ?? 0) >= unsent;
+    //
+    // With the session already gone (#1351) that is true of the WHOLE queue, whatever the account
+    // said about any of it: there is no session left to send through.
+    const onlyRefused = device || (unsent > 0 && (preflight?.refusedSaves ?? 0) >= unsent);
+    // The network gates the destructive button only while there is a request to make of it.
+    const blocked = !device && !online;
     return (
         <dialog
             ref={dialogRef}
@@ -89,10 +116,13 @@ export function SignOutDialog({
             }}
             onClose={onClose}
         >
-            <h2 id="sign-out-title">Sign out of your account?</h2>
+            <h2 id="sign-out-title">
+                {device ? 'Sign out on this device?' : 'Sign out of your account?'}
+            </h2>
             <p>
-                Your account songbook is removed from this device. It stays in your account, and
-                signing back in downloads it again. Songs you saved as a guest are untouched.
+                {device
+                    ? 'Your session has ended, so this device isn’t uploading anything until you sign in again. Signing out here removes your account songbook from this device instead. It stays in your account, and signing in downloads it again. Songs you saved as a guest are untouched.'
+                    : 'Your account songbook is removed from this device. It stays in your account, and signing back in downloads it again. Songs you saved as a guest are untouched.'}
             </p>
             {preflight === null ? (
                 <p className="status-detail" data-testid="sign-out-checking">
@@ -105,11 +135,20 @@ export function SignOutDialog({
                             {unsent === 1
                                 ? 'One saved version hasn’t reached your account yet.'
                                 : `${unsent} saved versions haven’t reached your account yet.`}{' '}
-                            {onlyRefused
-                                ? unsent === 1
-                                    ? 'Your account won’t accept this version — export it before signing out.'
-                                    : 'Your account won’t accept these versions — export them before signing out.'
-                                : 'Signing out discards them. Sync now, or export the song first.'}
+                            {device
+                                ? // Scoped to THIS action, and naming the move that still works
+                                  // (#1351 patch R4). "Sync now, or export the song first" would
+                                  // name a button that is not on this step; "it can never upload"
+                                  // would be false, because cancelling and signing back in as this
+                                  // account re-attaches the same scope and drains the queue.
+                                  unsent === 1
+                                    ? 'Signing out here discards it — this session can’t upload it any more. Export it, or cancel and sign in again to let it upload.'
+                                    : 'Signing out here discards them — this session can’t upload them any more. Export them, or cancel and sign in again to let them upload.'
+                                : onlyRefused
+                                  ? unsent === 1
+                                      ? 'Your account won’t accept this version — export it before signing out.'
+                                      : 'Your account won’t accept these versions — export them before signing out.'
+                                  : 'Signing out discards them. Sync now, or export the song first.'}
                         </p>
                     )}
                     {drafts > 0 && (
@@ -129,7 +168,7 @@ export function SignOutDialog({
                     )}
                 </>
             )}
-            {!online && (
+            {blocked && (
                 <p className="status-detail" data-testid="sign-out-offline">
                     {OFFLINE_REASON}
                 </p>
@@ -170,11 +209,11 @@ export function SignOutDialog({
                     data-testid="sign-out-confirm"
                     // Never while the preflight is unread: "Sign out" with nothing said about
                     // what is at stake is the preflight not having happened.
-                    disabled={busy || !online || preflight === null}
-                    title={online ? undefined : OFFLINE_REASON}
+                    disabled={busy || blocked || preflight === null}
+                    title={blocked ? OFFLINE_REASON : undefined}
                     onClick={onConfirm}
                 >
-                    {atRisk ? 'Sign out anyway' : 'Sign out'}
+                    {atRisk ? 'Sign out anyway' : device ? 'Sign out on this device' : 'Sign out'}
                 </button>
                 <button
                     className="btn"

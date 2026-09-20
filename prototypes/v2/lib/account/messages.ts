@@ -117,3 +117,57 @@ export function failureFromClaim(error: ApiError): AccountFailure {
     }
     return failureFromApi(error);
 }
+
+/**
+ * Why this device is holding an account songbook with nobody signed in (#1351 patch N1).
+ *
+ * `expired` is the live session that lapsed in THIS page load. `guest` is every other way of
+ * arriving there — a reload after that, or a sign-out whose local clear failed. `deleted` is the
+ * one this tab has to remember for itself: #1271 removed the account on the server and the clear
+ * failed afterwards, so the songs are here and the account they belong to no longer exists.
+ */
+export type HeldAccountState = 'expired' | 'guest' | 'deleted';
+
+/**
+ * What the held-account banner says, and whether signing in is one of the answers (#1351 patch N1).
+ *
+ * A pure function of one state, in this file rather than in the shell, because the three sentences
+ * are the whole point: ONE of them said in all three states is a lie in two of them.
+ *
+ * - `expired` keeps #1269's sentence exactly. A session that lapsed under a musician really can be
+ *   picked back up, and "everything you saved is still on this device" is true and reassuring.
+ * - `guest` cannot promise that. It is reached by a RELOAD (the session store has no memory of the
+ *   lapse) and by a sign-out whose clear failed — and telling somebody who deliberately left to
+ *   "sign in again to keep syncing" reads as though the sign-out did not happen. It states the fact
+ *   instead and offers both answers, with "Sign in" rather than "Sign in again": this page load
+ *   never saw a session.
+ * - `deleted` offers NO sign-in at all. "Being told to 'sign in again' to an account that no longer
+ *   exists is the one reading this must never produce" (`forgetDeletedAccount`), and a sign-in
+ *   control for a deleted account is exactly that reading with a button attached. The only honest
+ *   move left is to finish removing the songs, so that is the only one offered.
+ */
+export function heldAccountBanner(state: HeldAccountState): {
+    sentence: string;
+    /** The sign-in control's label, or null when signing in must not be offered. */
+    signIn: string | null;
+} {
+    if (state === 'expired') {
+        return {
+            sentence:
+                'Sign in again to keep syncing. Everything you saved is still on this device.',
+            signIn: 'Sign in again',
+        };
+    }
+    if (state === 'deleted') {
+        return {
+            sentence:
+                'Your account was deleted, but its songs could not be removed from this device yet.',
+            signIn: null,
+        };
+    }
+    return {
+        sentence:
+            'This device still has an account songbook on it and nobody is signed in. Sign in to use it, or sign out on this device to remove it.',
+        signIn: 'Sign in',
+    };
+}

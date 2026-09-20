@@ -18,7 +18,12 @@ import { syncAccountsFlag } from '../../lib/account/feature';
 import type { AccountFailure } from '../../lib/account/messages';
 import { recoveryEnrolled, signOut } from '../../lib/account/passkeys';
 import type { SessionState } from '../../lib/account/session';
-import { accountSync, SIGN_OUT_MESSAGES, type SignOutOutcome } from '../../lib/account/sync-loop';
+import {
+    AccountMismatchError,
+    accountSync,
+    SIGN_OUT_MESSAGES,
+    type SignOutOutcome,
+} from '../../lib/account/sync-loop';
 
 // Module scope keeps both references stable across renders, which is what `useSyncExternalStore`
 // requires to avoid resubscribing (and, for the snapshot, re-rendering) on every pass.
@@ -91,9 +96,37 @@ export interface AccountView {
      * itself failed on unreadable storage — so the caller's own error handling (`ensemble.tsx`'s
      * `run()`) shows `SIGN_OUT_MESSAGES.notCleared` instead of a misleading "Account deleted"
      * success message. `markSignedOut` still runs first: the account is gone on the server
-     * whatever this device's storage did, and the header must not offer "sign in again" to it.
+     * whatever this device's storage did, and nothing may offer "sign in again" to it.
+     *
+     * Since #1351 that last rule has a second surface to hold on: a deletion whose local clear
+     * failed leaves this device HOLDING an account, which is what the held-account banner renders
+     * for. The shell remembers that a deletion ran in this tab and asks for
+     * `heldAccountBanner('deleted')`, which states the fact and offers no sign-in control at all —
+     * only the step that finishes removing the songs (patch N1).
      */
     forgetDeletedAccount: () => Promise<void>;
+    /**
+     * The local half of sign-out for an EXPIRED session (#1351) — "Sign out on this device".
+     *
+     * The third and last way the same ordered work is reached, and the only one that needs no
+     * network: the server session is already dead, so `revoke` is a resolved `true` exactly as
+     * `forgetDeletedAccount`'s is, and rollout decision 9 S2's "sign-out needs a connection" does
+     * not apply — there is nothing to revoke, so there is nothing this device could be dishonest
+     * about having revoked. It works offline.
+     *
+     * `owner` is the account the expired banner is talking about, named rather than derived: the
+     * expiry detached the loop, so there is no attached scope to read one from. The loop compares
+     * it to the account this device actually holds and refuses a mismatch BEFORE the fence moves —
+     * which is why that failure must not reach `markSignedOut`: nothing was cleared, and this
+     * device is still exactly what it was.
+     *
+     * THROWS only when NOTHING happened, with the sentence that fits: `elsewhere` when this device
+     * holds somebody else's account now, `notChanged` when the fence write itself failed. A clear
+     * that failed AFTER the fence moved does not throw — `signOut` reports that one on the loop's
+     * snapshot, having put the owner back so the step stays reachable for a retry. The caller
+     * renders either inside the step's own dialog (#1351 patch R3), never behind it.
+     */
+    signOutOnThisDevice: (owner: string) => Promise<void>;
 }
 
 /**
@@ -230,6 +263,40 @@ export function useAccountSession(active: boolean): AccountView {
         }
     }, [refresh]);
 
+    // No `refresh()` anywhere below, and that is the point rather than an omission: this path makes
+    // NO request of any kind, so it works with the network off. `signOut`'s sibling paths re-read
+    // the session because something just happened on the server that this device should hear about;
+    // here nothing did — the session was already gone before the musician pressed anything, and
+    // `markSignedOut` states the one fact a read could have confirmed. A `GET /api/auth/session`
+    // would answer 401 into a store that is already `guest`, which is a request spent to learn
+    // nothing and a failure to swallow whenever this runs offline.
+    const signOutOnThisDevice = useCallback(async (owner: string): Promise<void> => {
+        // NOTHING HAPPENED if this throws (#1351 patch R2). A failed `clearAccount` does not
+        // reach here at all — `signOut` turns it into its own `notCleared` failure on the snapshot
+        // and returns normally — so the only throws are `heldScope` refusing the named account and
+        // the fence write itself failing, and in both the fence never moved and every row is still
+        // on the disk. `markSignedOut` would be wrong for either: it takes the device to `guest`,
+        // and with the sign-out surface derived from `meta.active` that is a state the retry is
+        // still reachable from, but claiming the session was resolved when it was not is a lie
+        // this hook has no business telling. The sentence is what is owed instead.
+        try {
+            await accountSync.signOut(async () => true, owner);
+        } catch (error) {
+            throw new Error(
+                error instanceof AccountMismatchError
+                    ? SIGN_OUT_MESSAGES.elsewhere
+                    : // NOT `notCleared` (#1351 patch N2): that sentence opens "Signed out —",
+                      // and nothing here was signed out of. The fence never moved and not a row
+                      // was touched, so the honest answer is that nothing changed.
+                      SIGN_OUT_MESSAGES.notChanged,
+            );
+        }
+        // The session was dead before this ran; `markSignedOut` is what stops the header and the
+        // expired banner going on offering "sign in again" for an account whose records this
+        // device has just removed.
+        accountSession.markSignedOut();
+    }, []);
+
     return {
         session,
         recoveryEnrolled: enrolled,
@@ -240,5 +307,6 @@ export function useAccountSession(active: boolean): AccountView {
         refresh,
         signOut: runSignOut,
         forgetDeletedAccount,
+        signOutOnThisDevice,
     };
 }

@@ -1916,3 +1916,368 @@ describe('the sync loop refuses a write for a chart that belongs to another acco
         expect(belongsToAnotherAccount(null, null)).toBe(false);
     });
 });
+
+/**
+ * "Sign out on this device", for a session that has already expired (#1351).
+ *
+ * The state every test here starts in is the one an expiry leaves behind: the loop is DETACHED
+ * (`app/account/library.tsx` detaches the moment the session stops reporting an owner), while
+ * `meta.active` still names the account whose songs, outbox, receipts and drafts are on this disk.
+ * Before this, nothing in the product could remove them — `signOut()` needed a live scope and a
+ * logout round trip, and expiry has neither — so a device that changed hands kept A's library
+ * forever, fenced out of B's reach but still on the disk.
+ *
+ * What is proven here is that this is the SAME clearing path rather than a second one: the ordered
+ * `switchAccount(null)` -> revoke -> `clearAccount(owner)` that #1269 and #1271 both run, with the
+ * revocation pre-resolved because there is nothing left to revoke. What differs is only where the
+ * scope comes from — the account this device HOLDS, named by the caller and refused if it is not
+ * the one held — and that it sends nothing at all, so it works offline.
+ *
+ * The real transaction behavior of the clear is proven against IndexedDB in
+ * `tests/browser/account-sign-out.browser.test.ts`, which also drives this exact call.
+ */
+describe('an expired session signs out on this device without a round trip (#1351)', () => {
+    const OTHER = 'owner-b';
+
+    /**
+     * A device that HOLDS an account with nothing attached, recording every write the loop asks
+     * for. `currentScope` is what answers, because there is no attached scope to answer with.
+     */
+    function held(overrides: Record<string, unknown> = {}) {
+        const steps: string[] = [];
+        const songbook = stubSongbook({
+            currentScope: async () => SCOPE,
+            switchAccount: async (ownerId: string | null) => {
+                steps.push(`switchAccount:${ownerId}`);
+                return ownerId === null ? null : SCOPE;
+            },
+            clearAccount: async (ownerId: string) => {
+                steps.push(`clearAccount:${ownerId}`);
+            },
+            save: async () => {
+                steps.push('save');
+                return { documentId: 'song-1', remoteRevision: null };
+            },
+            recover: async () => {
+                steps.push('recover');
+            },
+            discardDrafts: async () => {
+                steps.push('discardDrafts');
+            },
+            ...overrides,
+        });
+        return { steps, songbook };
+    }
+
+    /** The loop as an expiry leaves it: constructed, never attached. */
+    function expired(songbook: AccountSongbook) {
+        const { api, reads } = fakeApi({ ok: true, value: {}, status: 204 });
+        const loop = createSyncLoop(api, createAccountSession(api), songbook);
+        expect(loop.getSnapshot().owner).toBeNull();
+        return { api, reads, loop };
+    }
+
+    it('bumps the fence, then forgets the account, from the scope this device holds', async () => {
+        const { steps, songbook } = held();
+        const { api, reads, loop } = expired(songbook);
+
+        const outcome = await loop.signOut(async () => {
+            steps.push('revoke');
+            return true;
+        }, OWNER);
+
+        expect(outcome).toBe('signed-out');
+        // The same three steps in the same order #1269 proves for a live session, and the fence
+        // is still first: a reply for this account that is somehow still in flight meets a
+        // generation that no longer matches. `clearAccount` is named with the held owner, which
+        // is the only thing that could have told it which rows to take.
+        expect(steps).toEqual(['switchAccount:null', 'revoke', `clearAccount:${OWNER}`]);
+        // And nothing was sent, by either half of the API. There is no session to revoke, so a
+        // logout would be a request spent to be told what this device already knows — which is
+        // also why this whole step works with the network off.
+        expect(api.post).not.toHaveBeenCalled();
+        expect(api.get).not.toHaveBeenCalled();
+        expect(documentReads(reads)).toEqual([]);
+    });
+
+    it('refuses an account this device no longer holds, before the fence moves', async () => {
+        // Another tab signed in as somebody else while this one still showed the expired banner.
+        // Applying the step to whoever is held now would delete THEIR whole library — which is
+        // why the refusal has to land ahead of `switchAccount(null)`, not after it.
+        const { steps, songbook } = held();
+        const { loop } = expired(songbook);
+
+        await expect(
+            loop.signOut(async () => {
+                steps.push('revoke');
+                return true;
+            }, OTHER),
+        ).rejects.toThrow(AccountMismatchError);
+
+        // Not one step ran: no fence, no revocation, no clear. The device is exactly as it was.
+        expect(steps).toEqual([]);
+    });
+
+    it('leaves the loop detached, whether the clear lands or the fence write fails', async () => {
+        // An expiry detached this loop deliberately, and `app/account/library.tsx` will not do it
+        // again — its effect is keyed on an owner that is already null. So a re-attach here would
+        // stick: the loop would hold a scope for a dead session, publish an owner while the header
+        // is telling the musician to sign back in, and spend a pass on the next `online` event.
+        const { loop } = expired(held().songbook);
+        await loop.signOut(async () => true, OWNER);
+        expect(loop.getSnapshot().owner).toBeNull();
+
+        const broken = expired(
+            held({
+                switchAccount: async () => {
+                    throw new Error('storage went away');
+                },
+            }).songbook,
+        );
+        await expect(broken.loop.signOut(async () => true, OWNER)).rejects.toThrow(
+            'storage went away',
+        );
+        expect(broken.loop.getSnapshot().owner).toBeNull();
+    });
+
+    it('reads the same preflight off the held scope, and reading it writes nothing', async () => {
+        const SAVED_AT = '2026-09-18T10:00:00.000Z';
+        const { steps, songbook } = held({
+            list: async () => ({
+                songs: [
+                    { documentId: 'song-1', document: { updatedAt: SAVED_AT } },
+                    { documentId: 'song-2', document: { updatedAt: SAVED_AT } },
+                ],
+                nextAfterDocumentId: null,
+            }),
+            pending: async (_scope: unknown, documentId: string) =>
+                documentId === 'song-1' ? [{ status: 'queued' }] : [],
+            drafts: async (_scope: unknown, documentId: string) =>
+                documentId === 'song-2'
+                    ? [{ writerId: 'w', capturedAt: '2026-09-18T10:30:00.000Z' }]
+                    : [],
+        });
+        const { api, loop } = expired(songbook);
+
+        // The identical two counts #1269's step names, from a device with nothing attached: the
+        // committed version the account never took, and the experiment that was never committed.
+        expect(await loop.signOutPreflight(OWNER)).toEqual({
+            documentIds: ['song-1', 'song-2'],
+            atRisk: ['song-1', 'song-2'],
+            unsentSaves: 1,
+            refusedSaves: 0,
+            drafts: 1,
+        });
+        // The export the step offers reads through the held scope too, or it would have no library
+        // to write files from — the loop is detached, so `accountSongs` in the shell is gone.
+        expect((await loop.listLibrary(OWNER)).map((song) => song.documentId)).toEqual([
+            'song-1',
+            'song-2',
+        ]);
+        expect((await loop.retainedDrafts(['song-2'], OWNER)).size).toBe(0);
+
+        // A CANCEL is this, and nothing after it. The preflight is a read: it moved no fence,
+        // cleared no account and wrote nothing at all, so a musician who backs out has lost
+        // nothing — which is the whole reason the step is allowed to be in front of the button.
+        expect(steps).toEqual([]);
+        expect(api.post).not.toHaveBeenCalled();
+    });
+
+    it('refuses a library read for the account the SESSION names while storage still holds another', async () => {
+        // #1351 patch R6 — the attach-lag window. `refreshSongs` and `computeAdoptCandidates` are
+        // both gated on a session fact ("B is signed in") while `listLibrary` reads a storage one,
+        // and `attach` runs from a passive effect: between B's session landing and `meta.active`
+        // moving, an UNNAMED read hands back the account this device still HOLDS. Rendered under
+        // B's heading, that is A's whole library shown as B's.
+        const { loop } = expired(held().songbook);
+
+        await expect(loop.listLibrary('owner-b')).rejects.toThrow(AccountMismatchError);
+        // Named with the account that really is held, the same read answers normally.
+        expect(await loop.listLibrary(OWNER)).toEqual([]);
+    });
+
+    it('refuses every read of the step for an account this device no longer holds', async () => {
+        // The counts, the library the export writes from and the drafts that make those files the
+        // newest bytes all answer about ONE account, and answering them about whoever is held now
+        // would put another person's song titles in front of this musician.
+        const { loop } = expired(held().songbook);
+
+        await expect(loop.signOutPreflight(OTHER)).rejects.toThrow(AccountMismatchError);
+        await expect(loop.listLibrary(OTHER)).rejects.toThrow(AccountMismatchError);
+        await expect(loop.retainedDrafts(['song-1'], OTHER)).rejects.toThrow(AccountMismatchError);
+    });
+
+    it('still says what it could not remove when the clear itself fails', async () => {
+        // Shared with #1269 and #1271 because it is the same code: the account is being left
+        // whatever storage did, and a cheerful "signed out" over a library that is still on the
+        // disk is the one reading this step must never produce.
+        const { loop } = expired(
+            held({
+                clearAccount: async () => {
+                    throw new Error('storage went away');
+                },
+            }).songbook,
+        );
+
+        expect(await loop.signOut(async () => true, OWNER)).toBe('signed-out');
+        expect(loop.getSnapshot().failure).toEqual({
+            reason: 'server',
+            message: SIGN_OUT_MESSAGES.notCleared,
+        });
+    });
+
+    it('puts the owner back when the clear fails, so the retry stays reachable (patch R2)', async () => {
+        // The fence is only SETTLED once the records are actually gone. Left pointing at nobody
+        // with every row still on the disk, `heldOwner()` would answer null, the banner would not
+        // render, and there would be no surface left anywhere to ask for the clear again — the
+        // exact dead end this whole story exists to remove.
+        const steps: string[] = [];
+        const { songbook } = held({
+            clearAccount: async (ownerId: string) => {
+                steps.push(`clearAccount:${ownerId}`);
+                throw new Error('storage went away');
+            },
+            switchAccount: async (ownerId: string | null) => {
+                steps.push(`switchAccount:${ownerId}`);
+                return ownerId === null ? null : SCOPE;
+            },
+        });
+        const { loop } = expired(songbook);
+
+        expect(await loop.signOut(async () => true, OWNER)).toBe('signed-out');
+
+        // Out, then back: two more generations, so nothing captured under the original scope can
+        // commit — and the device is holding its account again, which is what makes it offerable.
+        expect(steps).toEqual([
+            'switchAccount:null',
+            `clearAccount:${OWNER}`,
+            `switchAccount:${OWNER}`,
+        ]);
+        expect(await loop.heldOwner()).toBe(OWNER);
+        // And the sentence names the step that is now reachable rather than a whole sign-in.
+        expect(SIGN_OUT_MESSAGES.notCleared).toContain('Sign out on this device');
+    });
+
+    it('refuses an UNNAMED sign-out while nothing is attached (patch R5)', async () => {
+        // An optional `owner` must never mean "no fence". Detached, an unnamed claim resolves
+        // through `currentScope()` with nothing to compare — so it would destroy whichever account
+        // this device happens to hold, where before #1351 it simply threw.
+        const { steps, songbook } = held();
+        const { loop } = expired(songbook);
+
+        await expect(loop.signOut(async () => true)).rejects.toThrow(/needs the account/);
+
+        expect(steps).toEqual([]);
+        // Named, the very same call works: the refusal is about the missing claim, not the shape.
+        expect(await loop.signOut(async () => true, OWNER)).toBe('signed-out');
+    });
+
+    it('still lets the two ATTACHED callers omit the owner, exactly as #1269 and #1271 do', async () => {
+        // The attached scope IS the answer, so there is nothing for a claim to add — and both
+        // legacy callers pass no owner at all.
+        const { steps, songbook } = held();
+        const { api } = fakeApi({ ok: true, value: {}, status: 204 });
+        const loop = createSyncLoop(api, createAccountSession(api), songbook);
+        await loop.attach(OWNER);
+        steps.length = 0;
+
+        expect(await loop.signOut(async () => true)).toBe('signed-out');
+        expect(steps).toEqual(['switchAccount:null', `clearAccount:${OWNER}`]);
+    });
+
+    it('answers which account this device holds, from storage rather than from an attach', async () => {
+        // The banner's condition (patch R1). It has to be readable with nothing attached, because
+        // that is the only state it is ever asked in — and it must answer null for a device that
+        // has never held an account, which is every ordinary guest.
+        const { loop } = expired(held().songbook);
+        expect(await loop.heldOwner()).toBe(OWNER);
+
+        const { api } = fakeApi({ ok: true, value: {}, status: 204 });
+        const guest = createSyncLoop(
+            api,
+            createAccountSession(api),
+            stubSongbook({ currentScope: async () => null }),
+        );
+        expect(await guest.heldOwner()).toBeNull();
+        // A read, not a claim: nothing was written and nothing was sent to answer it.
+        expect(api.get).not.toHaveBeenCalled();
+        expect(api.post).not.toHaveBeenCalled();
+    });
+
+    it('names the retry control only while it is on screen (patch N2)', async () => {
+        // Three outcomes, three sentences. The one that must not be reused is "Signed out — …Use
+        // “Sign out on this device”": with the fence restore ALSO refused, `meta.active` names
+        // nobody, no banner renders, and that sentence is an instruction to press something that
+        // is not there.
+        const stranded = held({
+            clearAccount: async () => {
+                throw new Error('storage went away');
+            },
+            switchAccount: async (ownerId: string | null) => {
+                if (ownerId === null) {
+                    return null;
+                }
+                throw new Error('storage went away');
+            },
+        });
+        const { loop } = expired(stranded.songbook);
+
+        expect(await loop.signOut(async () => true, OWNER)).toBe('signed-out');
+
+        expect(loop.getSnapshot().failure).toEqual({
+            reason: 'server',
+            message: SIGN_OUT_MESSAGES.notClearedStranded,
+        });
+        expect(SIGN_OUT_MESSAGES.notClearedStranded).not.toContain('Sign out on this device');
+        expect(SIGN_OUT_MESSAGES.notClearedStranded).toContain('Reload this page');
+    });
+
+    it('retries the fence restore once before giving up on it (patch N2)', async () => {
+        // A blocked or momentarily unavailable store is the likeliest reason to be here at all, so
+        // one rejection is not an answer. The second attempt succeeding is the difference between
+        // a retry the musician can press and a reload.
+        let attempts = 0;
+        const { songbook } = held({
+            clearAccount: async () => {
+                throw new Error('storage went away');
+            },
+            switchAccount: async (ownerId: string | null) => {
+                if (ownerId === null) {
+                    return null;
+                }
+                attempts += 1;
+                if (attempts === 1) {
+                    throw new Error('storage was busy');
+                }
+                return SCOPE;
+            },
+        });
+        const { loop } = expired(songbook);
+
+        expect(await loop.signOut(async () => true, OWNER)).toBe('signed-out');
+
+        expect(attempts).toBe(2);
+        expect(loop.getSnapshot().failure?.message).toBe(SIGN_OUT_MESSAGES.notCleared);
+    });
+
+    it('does not open "Signed out" about a step that changed nothing (patch N2)', async () => {
+        // `signOutOnThisDevice`'s catch is reached only when the fence never moved and not a row
+        // was touched, so the sentence it throws must not claim a sign-out happened.
+        expect(SIGN_OUT_MESSAGES.notChanged).not.toContain('Signed out');
+        expect(SIGN_OUT_MESSAGES.notChanged).toContain('nothing was changed');
+        // And the two that DO follow a completed sign-out both say so.
+        expect(SIGN_OUT_MESSAGES.notCleared.startsWith('Signed out')).toBe(true);
+        expect(SIGN_OUT_MESSAGES.notClearedStranded.startsWith('Signed out')).toBe(true);
+    });
+
+    it('names the account that is signed in now, and never the chart sentence', async () => {
+        // A musician who meets this refusal is not being told about a chart on a stand — this step
+        // never mentioned one — so `OWNER_MESSAGES.mismatch`'s "export it" would send them looking
+        // for a song nobody named. It says which account to sign out from instead.
+        const sentence = SIGN_OUT_MESSAGES.elsewhere;
+        expect(sentence).not.toBe(OWNER_MESSAGES.mismatch);
+        expect(sentence).not.toContain('chart');
+        expect(sentence).not.toContain(OWNER);
+        expect(sentence).toContain('nothing here to sign out of');
+    });
+});

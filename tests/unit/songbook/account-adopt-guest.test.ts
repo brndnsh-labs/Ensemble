@@ -3,6 +3,7 @@ import {
     type AdoptCandidate,
     adoptGuestSongs,
     computeAdoptCandidates,
+    forgetAdoptionDecision,
     hasDecidedAdoption,
     libraryDownloaded,
     rememberAdoptionDecision,
@@ -52,6 +53,20 @@ beforeEach(() => {
 });
 
 describe('computeAdoptCandidates', () => {
+    it('reads the account library BY OWNER, never whichever one this device holds', async () => {
+        // #1351 patch R6. `listLibrary` resolves through `heldScope`, which answers from
+        // `meta.active` when nothing is attached — so an unnamed read here could diff this
+        // device's guest songs against a DIFFERENT account's library and offer to copy songs it
+        // already holds, or hide ones it does not. The owner this offer is FOR is right there in
+        // the signature, so it is named, and a disagreement becomes a refusal rather than an offer.
+        list.mockResolvedValue([guestSong('a')]);
+        listLibrary.mockResolvedValue([]);
+
+        await computeAdoptCandidates('owner-1');
+
+        expect(listLibrary).toHaveBeenCalledWith('owner-1');
+    });
+
     it('derives a deterministic account document id per guest song, and no operation id at all', async () => {
         list.mockResolvedValue([guestSong('a'), guestSong('b')]);
         listLibrary.mockResolvedValue([]);
@@ -239,6 +254,12 @@ function withStorage(store: Map<string, string>, options: { throws?: boolean } =
             }
             store.set(key, value);
         },
+        removeItem: (key: string) => {
+            if (options.throws) {
+                throw new Error('storage is blocked');
+            }
+            store.delete(key);
+        },
     };
     vi.stubGlobal('localStorage', fake as unknown as Storage);
 }
@@ -263,5 +284,31 @@ describe('hasDecidedAdoption / rememberAdoptionDecision', () => {
         withStorage(new Map(), { throws: true });
         expect(hasDecidedAdoption('owner-1')).toBe(true);
         expect(() => rememberAdoptionDecision('owner-1')).not.toThrow();
+    });
+});
+
+describe('forgetAdoptionDecision (#1351 patch R11)', () => {
+    it('drops only the named owner\u2019s answer, so signing out asks again and nobody else moves', () => {
+        // Every local trace of an account goes when it is signed out of, and this is one — it is
+        // keyed by an owner id, which is a server identifier sitting in `localStorage` outside
+        // everything `clearAccount` reaches. It is also the correct answer rather than merely the
+        // tidy one: that account's library has been removed from this device, so "which guest
+        // songs is it missing?" has a different answer than the one that was given.
+        const store = new Map<string, string>();
+        withStorage(store);
+        rememberAdoptionDecision('owner-1');
+        rememberAdoptionDecision('owner-2');
+
+        forgetAdoptionDecision('owner-1');
+
+        expect(hasDecidedAdoption('owner-1')).toBe(false);
+        // Exactly one key, built the same way it is read: a second account on this profile keeps
+        // its own answer, which is the property that makes this safe to run on every sign-out.
+        expect(hasDecidedAdoption('owner-2')).toBe(true);
+    });
+
+    it('never throws on unwritable storage; one redundant prompt is the worst case', () => {
+        withStorage(new Map(), { throws: true });
+        expect(() => forgetAdoptionDecision('owner-1')).not.toThrow();
     });
 });

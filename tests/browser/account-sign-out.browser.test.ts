@@ -1,4 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import type { AccountApi } from '../../prototypes/v2/lib/account/api.js';
+import { createAccountSession } from '../../prototypes/v2/lib/account/session.js';
+import { AccountMismatchError, createSyncLoop } from '../../prototypes/v2/lib/account/sync-loop.js';
 import {
     ACCOUNT_DATABASE,
     AccountChangedError,
@@ -174,6 +177,93 @@ describe('signing out removes every trace of that account from this device', () 
 
         const asA = (await book.switchAccount(A))!;
         expect((await book.list(asA, { limit: 100 })).songs).toEqual([]);
+    });
+
+    /**
+     * An API that fails loudly. "Sign out on this device" (#1351) must send nothing at all — the
+     * session it would log out of is already gone — so any request on this path is a test failure
+     * rather than a mocked success.
+     */
+    function refusingApi(): AccountApi {
+        const refuse = () => {
+            throw new Error('The expired sign-out path must not send a request.');
+        };
+        return { get: refuse, post: refuse } as unknown as AccountApi;
+    }
+
+    /** The loop as an expired session leaves it: over this database, never attached. */
+    function detachedLoop() {
+        const api = refusingApi();
+        const loop = createSyncLoop(api, createAccountSession(api), book);
+        expect(loop.getSnapshot().owner).toBeNull();
+        return loop;
+    }
+
+    it('clears from the scope the device HOLDS when no session is attached (#1351)', async () => {
+        await book.save(scope, chart('Set list', 'study'), null);
+        await book.recover(scope, 'writer-1', chart('Set list', 'study', 1), 0);
+        await book.rememberOpened(scope, 'study');
+
+        // No `attach`, no revocation, no request: the expired session is already dead, and the
+        // account being left is NAMED rather than read off a scope that does not exist.
+        expect(await detachedLoop().signOut(async () => true, A)).toBe('signed-out');
+
+        const again = (await book.switchAccount(A))!;
+        // The fence moved before the clear, so the same owner signing back in gets a fresh
+        // generation over empty stores rather than a resumed outbox.
+        expect(again.generation).toBeGreaterThan(scope.generation);
+        expect((await book.list(again, { limit: 100 })).songs).toEqual([]);
+        expect(await book.pending(again, 'study')).toEqual([]);
+        expect(await book.drafts(again, 'study')).toEqual([]);
+        expect(await book.lastOpened(again)).toBeNull();
+    });
+
+    it('puts the owner back when the clear fails, so the offer stays reachable (#1351 patch R2)', async () => {
+        await book.save(scope, chart('Set list', 'study'), null);
+        // The one failure a fake store cannot prove anything about: everything else here is real,
+        // and what is being asserted is the state of `meta.active` and the six ranges afterwards.
+        const failing = new Proxy(book, {
+            get: (target, key) =>
+                key === 'clearAccount'
+                    ? async () => {
+                          throw new Error('storage went away');
+                      }
+                    : Reflect.get(target, key, target),
+        });
+        const api = refusingApi();
+        const loop = createSyncLoop(api, createAccountSession(api), failing);
+
+        expect(await loop.signOut(async () => true, A)).toBe('signed-out');
+
+        // The fence is only SETTLED once the records are gone. Left at null with every row still
+        // here, `heldOwner()` would answer null, the banner would not render and there would be no
+        // surface anywhere left to ask for the clear again.
+        expect(await loop.heldOwner()).toBe(A);
+        const back = (await book.currentScope())!;
+        expect(back.ownerId).toBe(A);
+        // Out and back is two more generations, so anything captured under the original scope is
+        // still fenced out — restoring the pointer is not undoing the fence.
+        expect(back.generation).toBeGreaterThan(scope.generation + 1);
+        // And the work really is still here, which is the thing the retry exists to remove.
+        expect((await book.list(back, { limit: 100 })).songs).toHaveLength(1);
+        expect(await book.pending(back, 'study')).toHaveLength(1);
+    });
+
+    it('refuses to clear an account this device no longer holds, moving nothing', async () => {
+        await book.save(scope, chart('Set list', 'study'), null);
+        // Another tab signed in as B while this one still showed A's expired banner.
+        const asB = (await book.switchAccount(B))!;
+
+        await expect(detachedLoop().signOut(async () => true, A)).rejects.toThrow(
+            AccountMismatchError,
+        );
+
+        // B's fence never moved — a bumped generation here would fence B's own in-flight work out
+        // of its own account — and A's records are untouched, so the step can be retried after
+        // signing back in as A.
+        expect(await book.currentScope()).toEqual(asB);
+        const back = (await book.switchAccount(A))!;
+        expect((await book.list(back, { limit: 100 })).songs).toHaveLength(1);
     });
 
     it('takes the queued Saves with it, so a later sign-in does not resume a forgotten outbox', async () => {

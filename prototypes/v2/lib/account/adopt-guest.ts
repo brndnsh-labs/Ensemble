@@ -108,7 +108,12 @@ export function libraryDownloaded(documents: Progress): boolean {
 export async function computeAdoptCandidates(ownerId: string): Promise<AdoptOffer> {
     const [guestSongs, accountSongs] = await Promise.all([
         repository.list(),
-        accountSync.listLibrary(),
+        // Named with the owner this offer is being computed FOR (#1351 patch R6). `listLibrary`
+        // resolves through `heldScope`, which answers from `meta.active` when nothing is attached
+        // — so an unnamed read here could diff this device's guest songs against a DIFFERENT
+        // account's library and offer to copy songs it already holds, or hide ones it does not.
+        // Named, that case is an `AccountMismatchError` the caller reports.
+        accountSync.listLibrary(ownerId),
     ]);
     const known = new Set(accountSongs.map((song) => song.documentId));
     // The server refuses a CREATE past `MAX_DOCUMENTS_PER_OWNER` (2,000 — the same number
@@ -203,5 +208,25 @@ export function rememberAdoptionDecision(ownerId: string): void {
         localStorage.setItem(DECIDED_PREFIX + ownerId, new Date().toISOString());
     } catch {
         // Best-effort preference; a future session asking again is safe either way.
+    }
+}
+
+/**
+ * Forget that this device ever answered, for ONE owner (#1351 patch R11).
+ *
+ * Called only when the account is DELETED (`forgetDeletedAccount`): that owner can never sign in
+ * here again, so the key is pure residue naming a server identifier. A sign-out — ordinary or
+ * "Sign out on this device" — deliberately keeps it: #1268's decline is per device and permanent,
+ * and the same musician signing back in must not be asked again (`account-recovery.chromium.spec`
+ * walks exactly that: decline, sign out, recover, sign in).
+ *
+ * Exactly one key, built the same way `hasDecidedAdoption` reads it, so it can only ever reach the
+ * owner it was named with. No other account's answer is touched.
+ */
+export function forgetAdoptionDecision(ownerId: string): void {
+    try {
+        localStorage.removeItem(DECIDED_PREFIX + ownerId);
+    } catch {
+        // Unwritable storage: the worst case is one redundant prompt on a later sign-in.
     }
 }
