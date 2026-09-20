@@ -12,6 +12,7 @@ import {
     hasDecidedAdoption,
     libraryDownloaded,
 } from '../lib/account/adopt-guest';
+import { stripAccountsParam } from '../lib/account/feature';
 import { heldAccountBanner } from '../lib/account/messages';
 import {
     AccountMismatchError,
@@ -54,6 +55,7 @@ import { start } from '../lib/starters';
 import type { SavedSong } from '../lib/sync/protocol';
 import type { KeepBothResolution } from '../lib/sync/repository';
 import type { Progress } from '../lib/sync/status';
+import { hasV1SharePayload, openV1ShareLink, stripV1ShareParams } from '../lib/v1-link';
 import { AccountEntry } from './account/account-entry';
 import { AccountPage } from './account/account-page';
 import { AdoptGuestDialog } from './account/adopt-guest';
@@ -605,67 +607,112 @@ export default function Ensemble() {
     }, []);
     useEffect(() => {
         // Runtime must be initialized (awaited inside `start()`, gated on `ready`)
-        // before `runtime.load` is safe to call. `sharedLinkHandled` guards against
-        // re-processing on every `ready`-dependent re-render, not just the first.
-        if (!ready || sharedLinkHandled.current || !window.location.hash) {
+        // before `runtime.load` is safe to call.
+        if (!ready || sharedLinkHandled.current) {
             return;
         }
+        // Latched HERE, before anything is decided, because a share link is a property of the
+        // page LOAD and nothing else (#1279 patch R1). Latching only when a link was found
+        // left this effect armed on an ordinary URL, and it re-reads `window.location` on
+        // every run: a same-document fragment navigation (pasting a `#chart=` URL into the
+        // tab the musician is already working in — the browser does nothing) followed by any
+        // re-run would then open the stranger's chart over the stand and discard unsaved
+        // chord text. `template` is in the dependency array for `useExhaustiveDependencies`
+        // and is harmless with the latch in front of it; it is already resolved on the first
+        // `ready` render, since `start()`'s `.then` batches `setGuestSongs` with `setReady`.
         sharedLinkHandled.current = true;
         const hash = window.location.hash;
+        const search = window.location.search;
+        // Which entry, if either, owns this page load (#1279 patch R5) — in order:
+        //   1. a `#chart=` fragment, so the modern link always wins where both are present;
+        //   2. otherwise a v1 `?s=`/`?prog=` payload, INCLUDING under an unrelated fragment
+        //      (a `#:~:text=` scroll anchor, a chat client's `#`) that is nobody's share link;
+        //   3. otherwise any other non-empty hash, which stays on the v2 path so a corrupt
+        //      `#chart=…` still says so.
+        // The `chart` key is `chart-link.ts`'s `CHART_LINK_KEY`; read here rather than
+        // imported because `public/` is live v1 production code this story does not touch.
+        const chartFragment = new URLSearchParams(hash.replace(/^#/, '')).has('chart');
+        const entry = chartFragment ? 'v2' : hasV1SharePayload(search) ? 'v1' : hash ? 'v2' : null;
+        if (!entry) {
+            return;
+        }
         let alive = true;
-        void decodeChartLink(hash).then((document) => {
-            // Consumed on load either way: a corrupt/foreign fragment must not
-            // resurrect on reload, and a successfully opened draft must not
-            // resurrect after "Keep a copy" replaces it with a saved document.
+        // Effect-local, so both entries open the SAME draft rather than two drifting copies
+        // of it, and so `useExhaustiveDependencies` has nothing to object to: a
+        // component-scope function declaration is a new reference every render, which biome
+        // rightly rejects as a hook dependency. Deliberately not `open()`: no `saved`
+        // baseline (so it can't masquerade as already committed), no recovery-storage write
+        // (the sender's document id is untrusted and shouldn't collide with this device's
+        // own recovery keys), and `lastOpened`/`rememberSong` are left alone since this
+        // isn't a library entry yet. "Keep a copy" (`keepSharedCopy`) is what turns it into
+        // one.
+        const openSharedDraft = (document: ChartDocument, note: string) => {
+            runtime.load(document);
+            setSaved(null);
+            setCurrent(document);
+            // A shared draft belongs to no songbook yet; "Keep a copy" decides that.
+            // `bindStand` inlined: a component-scope function is a new reference every
+            // render, which useExhaustiveDependencies rightly rejects as a dependency.
+            currentStore.current = null;
+            setStandStore(null);
+            setSharedDraft(true);
+            // Inlined clearBuffers()/selectSection(): both are plain function
+            // declarations (a new reference every render), which
+            // useExhaustiveDependencies rightly rejects as hook dependencies.
+            pendingText.current = false;
+            setBuffers(new Map());
+            setPendingMeasures(false);
+            measureEditor.current?.reset();
+            setRecoveryHealthy(true);
+            setEditing(false);
+            setFollowing(true);
+            setMessage(note);
+            const section = arrangementOf(document).sections[0];
+            setSectionId(section.id);
+            if (document.schemaVersion === 2) {
+                setMeasureId(
+                    document.chart.score.sections.find((s) => s.id === section.id)!.measures[0].id,
+                );
+            }
+        };
+        // Consumed on load either way: a corrupt/foreign payload must not resurrect on
+        // reload, and a successfully opened draft must not resurrect after "Keep a copy"
+        // replaces it with a saved document. The hash goes, the v1 parameters go (#1279),
+        // and so does the account flag — a share link must never carry a feature-flag side
+        // effect (`accountsFlagRequest` refuses to APPLY one; leaving it in the tidied URL
+        // would just let the next reload apply it instead). Everything else survives.
+        const consumeLink = () =>
             window.history.replaceState(
                 null,
                 '',
-                window.location.pathname + window.location.search,
+                window.location.pathname +
+                    stripV1ShareParams(stripAccountsParam(window.location.search)),
             );
+        if (entry === 'v1') {
+            // The band and tempo defaults for the two fields v1 never persisted; see
+            // `linkSession` for how little else of this actually reaches the chart. A
+            // songbook with nothing in it yet falls back to the live engine's defaults.
+            const older = openV1ShareLink(
+                search,
+                template
+                    ? { performance: template.chart.performance, band: template.chart.band }
+                    : runtime.captureContent(),
+            );
+            consumeLink();
+            if (older.kind === 'ok') {
+                openSharedDraft(older.document, 'Opened from an older shared link · not saved yet');
+            } else {
+                setError("This older link couldn't be opened");
+            }
+            return;
+        }
+        void decodeChartLink(hash).then((document) => {
+            consumeLink();
             if (!alive) {
                 return;
             }
             if (document) {
-                // Inlined rather than a separate `openSharedDraft` helper: this is
-                // its only call site, and keeping it inline avoids a
-                // useExhaustiveDependencies conflict (a plain function declaration
-                // is a new reference every render — biome rightly rejects it as a
-                // hook dependency, and this effect must only run once anyway,
-                // guarded by `sharedLinkHandled`). Deliberately not `open()`: no
-                // `saved` baseline (so it can't masquerade as already committed),
-                // no recovery-storage write (the sender's document id is untrusted
-                // and shouldn't collide with this device's own recovery keys), and
-                // `lastOpened`/`rememberSong` are left alone since this isn't a
-                // library entry yet. "Keep a copy" (`keepSharedCopy`) is what turns
-                // it into one.
-                runtime.load(document);
-                setSaved(null);
-                setCurrent(document);
-                // A shared draft belongs to no songbook yet; "Keep a copy" decides that.
-                // `bindStand` inlined: a component-scope function is a new reference every
-                // render, which useExhaustiveDependencies rightly rejects as a dependency.
-                currentStore.current = null;
-                setStandStore(null);
-                setSharedDraft(true);
-                // Inlined clearBuffers()/selectSection(): both are plain function
-                // declarations (a new reference every render), which
-                // useExhaustiveDependencies rightly rejects as hook dependencies.
-                pendingText.current = false;
-                setBuffers(new Map());
-                setPendingMeasures(false);
-                measureEditor.current?.reset();
-                setRecoveryHealthy(true);
-                setEditing(false);
-                setFollowing(true);
-                setMessage('Opened from a shared link · not saved yet');
-                const section = arrangementOf(document).sections[0];
-                setSectionId(section.id);
-                if (document.schemaVersion === 2) {
-                    setMeasureId(
-                        document.chart.score.sections.find((s) => s.id === section.id)!.measures[0]
-                            .id,
-                    );
-                }
+                openSharedDraft(document, 'Opened from a shared link · not saved yet');
             } else {
                 setError(
                     'This link could not be opened. It may be corrupted or made with a different version of the app.',
@@ -675,7 +722,7 @@ export default function Ensemble() {
         return () => {
             alive = false;
         };
-    }, [ready]);
+    }, [ready, template]);
     useEffect(() => {
         // #1274 — look for v1 data only once the songbook is ready: guest startup owns
         // the critical path, and nothing here may delay or block it. A profile whose v1
