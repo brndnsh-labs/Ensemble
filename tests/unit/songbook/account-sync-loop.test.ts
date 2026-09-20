@@ -2281,3 +2281,246 @@ describe('an expired session signs out on this device without a round trip (#135
         expect(sentence).toContain('nothing here to sign out of');
     });
 });
+
+/**
+ * Publishing a preserved remote advance, and adopting one (#1310).
+ *
+ * The loop's half only, as everywhere else in this file: WHICH observations reach a musician's
+ * screen, which owner may ask for the resolution, and what the loop does with its own state
+ * afterwards. The transaction is proven against real IndexedDB in
+ * `tests/browser/account-adopt-candidate.browser.test.ts`.
+ */
+describe('the sync loop publishes the remote updates it preserved', () => {
+    const version = (documentId: string, revision: string) => ({
+        kind: 'version',
+        documentId,
+        revision,
+        document: { id: documentId },
+    });
+
+    it('publishes one entry per preserved version, with nothing on the stand', async () => {
+        const { api } = fakeApi({ ok: true, value: { kind: 'committed' }, status: 200 });
+        const loop = createSyncLoop(
+            api,
+            createAccountSession(api),
+            stubSongbook({
+                remoteCandidates: async () => [version('song-1', 'cloud-9')],
+            }),
+        );
+
+        await loop.attach(OWNER);
+
+        // The songbook is exactly where this is needed and exactly where nothing is watched.
+        expect(loop.getSnapshot().observation).toBe(null);
+        expect(loop.getSnapshot().candidates).toEqual([
+            { documentId: 'song-1', revision: 'cloud-9' },
+        ]);
+    });
+
+    it('publishes only versions — never a tombstone or a body it cannot read', async () => {
+        const { api } = fakeApi({ ok: true, value: { kind: 'committed' }, status: 200 });
+        const loop = createSyncLoop(
+            api,
+            createAccountSession(api),
+            stubSongbook({
+                remoteCandidates: async () => [
+                    { kind: 'deleted', documentId: 'song-gone', revision: 'cloud-2' },
+                    {
+                        kind: 'unsupported',
+                        documentId: 'song-future',
+                        revision: 'cloud-3',
+                        body: { schemaVersion: 99 },
+                        reason: 'needs-app-update',
+                    },
+                    version('song-1', 'cloud-9'),
+                ],
+            }),
+        );
+
+        await loop.attach(OWNER);
+
+        // "A newer version is in your account" is a sentence about a version. A tombstone is the
+        // account no longer holding the song at all, and an unsupported body is one this build
+        // cannot read — marking either as a newer version would describe a document that does not
+        // exist in the form the marker claims.
+        expect(loop.getSnapshot().candidates).toEqual([
+            { documentId: 'song-1', revision: 'cloud-9' },
+        ]);
+    });
+
+    it('keeps the last list rather than retracting it when the store cannot be read', async () => {
+        const { api } = fakeApi({ ok: true, value: { kind: 'committed' }, status: 200 });
+        let readable = true;
+        const loop = createSyncLoop(
+            api,
+            createAccountSession(api),
+            stubSongbook({
+                read: async () => ({ remoteRevision: 'cloud-1' }),
+                remoteCandidates: async () => {
+                    if (!readable) {
+                        throw new Error('one corrupt row');
+                    }
+                    return [version('song-1', 'cloud-9')];
+                },
+            }),
+        );
+        await loop.attach(OWNER);
+        expect(loop.getSnapshot().candidates).toHaveLength(1);
+
+        readable = false;
+        await loop.watch('song-1');
+
+        // Unreadable is not "none": dropping the marker would quietly retract a state nothing has
+        // resolved. The observation beside it is still published — one corrupt candidate row must
+        // not silence the chip for every document in the account.
+        expect(loop.getSnapshot().candidates).toHaveLength(1);
+        expect(loop.getSnapshot().observation).toMatchObject({ remoteRevision: 'cloud-1' });
+    });
+
+    it('publishes none at all for an account it is no longer attached to', async () => {
+        const { api } = fakeApi({ ok: true, value: { kind: 'committed' }, status: 200 });
+        const loop = createSyncLoop(
+            api,
+            createAccountSession(api),
+            stubSongbook({ remoteCandidates: async () => [version('song-1', 'cloud-9')] }),
+        );
+        await loop.attach(OWNER);
+        expect(loop.getSnapshot().candidates).toHaveLength(1);
+
+        loop.detach();
+
+        // A marker is a claim about one library's rows, and this device is reading none.
+        expect(loop.getSnapshot().candidates).toEqual([]);
+    });
+});
+
+describe('the sync loop adopts a preserved remote version on the musician’s word', () => {
+    const OTHER = 'owner-b';
+
+    function adoptable(result: unknown, overrides: Record<string, unknown> = {}) {
+        const asked: Array<{ documentId: string; revision: string }> = [];
+        let preserved: unknown[] = [
+            {
+                kind: 'version',
+                documentId: 'song-1',
+                revision: 'cloud-9',
+                document: { id: 'song-1' },
+            },
+        ];
+        const songbook = stubSongbook({
+            read: async () => ({ remoteRevision: 'cloud-1' }),
+            remoteCandidates: async () => preserved,
+            adoptRemoteVersion: async (_scope: unknown, documentId: string, revision: string) => {
+                asked.push({ documentId, revision });
+                if (typeof result !== 'string') {
+                    preserved = [];
+                }
+                return result;
+            },
+            ...overrides,
+        });
+        return { songbook, asked };
+    }
+
+    const adopted = {
+        documentId: 'song-1',
+        document: { id: 'song-1' },
+        revision: 'cloud-9',
+    };
+
+    it('carries the revision the musician was shown, and republishes what moved', async () => {
+        const { api, reads } = fakeApi({ ok: true, value: { kind: 'committed' }, status: 200 });
+        const parts = adoptable(adopted);
+        const loop = createSyncLoop(api, createAccountSession(api), parts.songbook);
+        await loop.attach(OWNER);
+        await loop.watch('song-1');
+        const before = loop.getSnapshot().libraryVersion;
+
+        expect(await loop.adoptRemoteVersion('song-1', 'cloud-9', OWNER)).toEqual({
+            ...adopted,
+            ownerId: OWNER,
+        });
+
+        // The compare-and-swap base is the one the banner was rendering, never re-derived here.
+        expect(parts.asked).toEqual([{ documentId: 'song-1', revision: 'cloud-9' }]);
+        expect(loop.getSnapshot().libraryVersion).toBeGreaterThan(before);
+        // The marker goes with the divergence it described.
+        expect(loop.getSnapshot().candidates).toEqual([]);
+        // No pass: the record now sits at a revision the account already holds, and nothing is
+        // queued for it. Spending requests here would ask to be told what just committed.
+        // `run()` starts `pass()` synchronously and `pass()` publishes `running` before its first
+        // await, so a detached one — `keepBoth`'s shape — would already be visible here.
+        expect(loop.getSnapshot().running).toBe(false);
+        expect(documentReads(reads)).toEqual([]);
+    });
+
+    it('re-reads rather than guessing when the store refuses the resolution', async () => {
+        for (const refusal of ['none', 'stale', 'queued'] as const) {
+            const { api } = fakeApi({ ok: true, value: { kind: 'committed' }, status: 200 });
+            const parts = adoptable(refusal);
+            const loop = createSyncLoop(api, createAccountSession(api), parts.songbook);
+            await loop.attach(OWNER);
+            await loop.watch('song-1');
+            const before = loop.getSnapshot().libraryVersion;
+
+            expect(await loop.adoptRemoteVersion('song-1', 'cloud-9', OWNER)).toBe(refusal);
+
+            // Nothing moved, so the library is unchanged — but the fact the caller was reading is
+            // very likely why they are here, so it is re-read rather than left alone.
+            expect(loop.getSnapshot().libraryVersion).toBe(before);
+            expect(loop.getSnapshot().candidates).toHaveLength(1);
+        }
+    });
+
+    it('refuses a chart that belongs to another account, before the store is touched', async () => {
+        const { api } = fakeApi({ ok: true, value: { kind: 'committed' }, status: 200 });
+        const parts = adoptable(adopted);
+        const loop = createSyncLoop(api, createAccountSession(api), parts.songbook);
+        await loop.attach(OWNER);
+
+        // #1311 — this resolution DESTROYS local work, so a claim naming somebody else's library
+        // must not reach a store that would delete this one's drafts.
+        await expect(loop.adoptRemoteVersion('song-1', 'cloud-9', OTHER)).rejects.toThrow(
+            AccountMismatchError,
+        );
+        expect(parts.asked).toEqual([]);
+    });
+
+    it('refuses to adopt anything while signed out', async () => {
+        const { api } = fakeApi({ ok: true, value: { kind: 'committed' }, status: 200 });
+        const parts = adoptable(adopted);
+        const loop = createSyncLoop(api, createAccountSession(api), parts.songbook);
+
+        await expect(loop.adoptRemoteVersion('song-1', 'cloud-9', OWNER)).rejects.toThrow(
+            'signed out',
+        );
+        expect(parts.asked).toEqual([]);
+    });
+
+    it('writes none of its own state back from an epoch that has been superseded', async () => {
+        const { api } = fakeApi({ ok: true, value: { kind: 'committed' }, status: 200 });
+        let loop!: ReturnType<typeof createSyncLoop>;
+        const parts = adoptable(adopted, {
+            adoptRemoteVersion: async () => {
+                // The session expires, or the musician signs out, while the transaction is open.
+                loop.detach();
+                return adopted;
+            },
+        });
+        loop = createSyncLoop(api, createAccountSession(api), parts.songbook);
+        await loop.attach(OWNER);
+        await loop.watch('song-1');
+        const before = loop.getSnapshot().libraryVersion;
+
+        // Still reported: the commit happened, and the caller has to re-open the chart on the
+        // stand with it whatever this loop is attached to now.
+        expect(await loop.adoptRemoteVersion('song-1', 'cloud-9', OWNER)).toEqual({
+            ...adopted,
+            ownerId: OWNER,
+        });
+
+        expect(loop.getSnapshot().owner).toBe(null);
+        expect(loop.getSnapshot().libraryVersion).toBe(before);
+        expect(loop.getSnapshot().observation).toBe(null);
+    });
+});

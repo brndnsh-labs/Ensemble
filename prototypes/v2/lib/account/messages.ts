@@ -119,6 +119,24 @@ export function failureFromClaim(error: ApiError): AccountFailure {
 }
 
 /**
+ * The one sentence a preserved remote advance is said in (#1310).
+ *
+ * It is said in two places — the songbook row for that song, and the banner over the stand when it
+ * is the chart that is open — and they must be the same words: a musician who sees a row marked one
+ * way and then opens it to read something else has to work out whether they are the same fact. Each
+ * surface keeps its own surrounding prose (the banner explains the choice, the row has no room to);
+ * this is only the claim they share.
+ *
+ * "Newer" is a fact about the ACCOUNT's revision line, not about wall-clock time — the contract
+ * forbids choosing a winner by timestamp, and nothing here does: it is newer because the account's
+ * revision succeeded the one this device mirrors. The word "candidate" is deliberately absent, here
+ * and everywhere a musician reads.
+ */
+export const REMOTE_UPDATE_MESSAGES = {
+    marker: 'A newer version is in your account',
+} as const;
+
+/**
  * Why this device is holding an account songbook with nobody signed in (#1351 patch N1).
  *
  * `expired` is the live session that lapsed in THIS page load. `guest` is every other way of

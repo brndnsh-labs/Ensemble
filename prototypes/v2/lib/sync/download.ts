@@ -183,14 +183,26 @@ export interface LibraryDownloadFailure {
 export interface LibraryDownloadResult {
     /**
      * True only when the manifest was fully paged AND every planned document resolved. An
-     * adopted, preserved-as-candidate or app-update-flagged document IS resolved: its state is
-     * known and no retry would improve it. A network failure, a malformed frame, an invalid
-     * body or a body that never arrived is not — so a partial run, and an empty result produced
-     * by a failed first page, can never read as a complete (or an empty) library.
+     * adopted, preserved-as-candidate, superseded or app-update-flagged document IS resolved: its
+     * state is known and no retry OF THIS PLAN would improve it. A network failure, a malformed
+     * frame, an invalid body or a body that never arrived is not — so a partial run, and an empty
+     * result produced by a failed first page, can never read as a complete (or an empty) library.
      */
     complete: boolean;
     advanced: string[];
     candidates: string[];
+    /**
+     * Rows whose body was DROPPED because the saved record moved under the plan (#1310 patch R1):
+     * the observation described a state this device has left behind, so nothing was written — not
+     * the record, and not a candidate either.
+     *
+     * Never an error and never a candidate. The next pass's manifest diff re-plans these against
+     * the revision the record really holds, which is why they cost nothing: this is the ordinary
+     * outcome of Saving while a download of the previous revision was in flight. They are also not
+     * counted as `documents.verified`, because this device demonstrably does not hold the revision
+     * this pass was told about.
+     */
+    superseded: string[];
     unchanged: string[];
     removed: string[];
     retainedDeleted: string[];
@@ -496,6 +508,7 @@ async function libraryDownloadPass(
     const buckets: Record<ReconcileOutcome, string[]> = {
         advanced: [],
         candidate: [],
+        superseded: [],
         unchanged: [],
         removed: [],
         'retained-deleted': [],
@@ -538,6 +551,7 @@ async function libraryDownloadPass(
         complete,
         advanced: buckets.advanced,
         candidates: buckets.candidate,
+        superseded: buckets.superseded,
         unchanged: buckets.unchanged,
         removed: buckets.removed,
         retainedDeleted: buckets['retained-deleted'],

@@ -56,10 +56,23 @@ export interface SongPage {
     nextAfterDocumentId: string | null;
 }
 
-/** What `reconcile` did. One term per preservation rule, so a caller never has to infer it. */
+/**
+ * What `reconcile` did. One term per preservation rule, so a caller never has to infer it.
+ *
+ * `'superseded'` is the one that writes NOTHING (#1310 patch R1). Every other term describes a
+ * commit — including `'candidate'`, which stores a row a musician is now offered. A `version`
+ * observation whose plan base no longer matches the saved record describes a state this device has
+ * left behind, and storing it would put a stale offer in front of somebody: adopting it rolls the
+ * song back to an older body and relabels it with an older revision. Revisions are opaque strings,
+ * so nothing downstream can order them — the plan base is the only trustworthy signal, and the
+ * honest answer to a base that has moved is "this pass was looking at something else". S1's
+ * manifest diff re-plans the document against its real revision on the next pass, so nothing is
+ * lost by declining to write.
+ */
 export type ReconcileOutcome =
     | 'advanced'
     | 'candidate'
+    | 'superseded'
     | 'unchanged'
     | 'removed'
     | 'retained-deleted'
@@ -92,6 +105,21 @@ export interface KeepBothResolution {
     adopted: ChartDocument | null;
 }
 
+/**
+ * What `adoptRemoteVersion` committed (#1310) — the mirror of `KeepBothResolution`, and far smaller
+ * because only one line survives it: there is no fresh identity, no queued create and no second
+ * song. The caller still needs all three fields, because the shell re-opens the adopted document on
+ * the stand through its ordinary `open()` path and that path is given a document, not an id.
+ */
+export interface AdoptedRemoteVersion {
+    /** The ORIGINAL id. Adoption never mints one — minting one is the other resolution. */
+    documentId: string;
+    /** The account's version, re-decoded from the preserved candidate rather than handed through. */
+    document: ChartDocument;
+    /** Its revision, now the record's `remoteRevision`: the record IS that version, so it says so. */
+    revision: string;
+}
+
 export interface ReconcileOptions {
     /**
      * True when this document is the chart on the stand right now. The caller owns that fact —
@@ -105,12 +133,18 @@ export interface ReconcileOptions {
      * confirmed one. This is a compare-and-swap base, and it is the ONLY thing that can catch the
      * one dangerous interleaving the re-reads below cannot — a Save queued AND acknowledged while
      * the remote body was in flight, which leaves a record that is clean, unheld, and NEWER than
-     * the observation about to be written over it. When it does not match, the record moved under
-     * the plan and the observation is preserved as a candidate instead of applied.
+     * the observation about to be written over it.
      *
-     * Omitting it therefore ASSERTS that no saved record existed. That default fails closed — it
-     * can only turn an adoption into a preserved candidate, never the reverse — so a caller that
-     * holds a record must pass its revision or it will simply be told the record moved.
+     * When it does not match a saved record that exists, a `version` observation is DROPPED and
+     * answered `'superseded'` (#1310 patch R1): nothing is written, not even a candidate row.
+     * Preserving one used to look like the cautious choice and is the opposite — a candidate is an
+     * offer, and an offer built from a base that has moved is an offer to roll the song back to an
+     * older body under an older revision label. A tombstone in the same position is still retained
+     * and flagged, because "the cloud no longer has this" does not go stale the way a body does.
+     *
+     * Omitting it therefore ASSERTS that no saved record existed. That default fails closed — with
+     * a record present it can only turn an adoption into a no-op, never into a write — so a caller
+     * that holds a record must pass its revision or it will simply be told the record moved.
      */
     expectedRemoteRevision?: string | null;
 }
@@ -1075,6 +1109,129 @@ export class AccountSongbook {
     }
 
     /**
+     * Adopt a preserved remote candidate under the ORIGINAL id, discarding this device's unsaved
+     * work for that song (#1310) — the mirror of `keepBoth`, and the reconciliation half the
+     * contract's "dirty records receive a separate remote candidate for reconciliation" has never
+     * had. `keepBoth` keeps this device's line and gives the account's version the original id;
+     * this keeps the account's version and gives up the line. There is no third option: no merge,
+     * and no wall-clock winner.
+     *
+     * ONE transaction, because the four writes are one decision. The saved record becomes the
+     * candidate's document labelled with the candidate's own revision — so it reads as
+     * cloud-confirmed because it is — every draft for that id goes, and the candidate row goes with
+     * the divergence it described. A partial commit would be the worst of both: a record claiming a
+     * revision it does not hold, or a candidate still flagging a divergence that has been settled.
+     *
+     * **The candidate is re-proved inside the transaction and compare-and-swapped against the
+     * revision the musician was shown.** `savedCandidate` re-reads it against this scope and its own
+     * key, and `expectedRevision` is what makes this safe to interleave with a download: a pass that
+     * landed between the banner being read and this button being pressed leaves a candidate for a
+     * NEWER revision, and adopting that one would commit a version nobody ever looked at. It answers
+     * `'stale'` instead, and the caller shows the new one. `'none'` covers every way the divergence
+     * stopped existing — the pass advanced the record, another tab resolved it, the candidate is a
+     * `deleted` or `unsupported` one (neither is adoptable, and neither is this call's business), or
+     * the row will not validate. It also covers the row that never described one: the saved record
+     * is re-read here, and a candidate whose revision the record ALREADY holds is deleted rather
+     * than adopted (#1310 patch R1). `reconcile` no longer writes such a row, but a device that ran
+     * an earlier build can be holding one, and nothing else would ever clear it.
+     *
+     * **A document with ANYTHING in its outbox answers `'queued'`, and that is a deliberate
+     * narrowing.** The work this resolution destroys must be work the musician never committed. A
+     * queued Save is the opposite — an explicit version of their own that the account has not taken
+     * yet — and retiring that queue (which the `base` chain would require in full, `keepBoth`'s and
+     * `save()`'s precedent) would throw away committed versions to resolve a disagreement the
+     * musician has another exit from: the queued Save is refused as a conflict on its next pass, and
+     * `keepBoth` resolves it without losing a note. So this call refuses rather than widens.
+     *
+     * Every writer's drafts go, not only the caller's — `discardDrafts`' rule, for `discardDrafts`'
+     * reason: the row the chart was recovered from usually belongs to an earlier page load, and
+     * leaving it would recover the very experiment this adoption discarded on the next open. A
+     * concurrent tab's live experiment goes with it, which is the same trade a revert makes.
+     *
+     * A frozen delete (#1270) is deliberately left where it is. A `version` candidate is evidence
+     * that the cloud still HOLDS this id, so the delete this device froze has not been committed at
+     * that revision; its `expectedRevision` is simply stale now, and the account answers a retry of
+     * it with the 409 that drops the frozen id through `acknowledgeDelete`. Clearing it here would
+     * be this call reaching into an operation it is not about.
+     */
+    async adoptRemoteVersion(
+        scope: AccountScope,
+        documentId: string,
+        expectedRevision: string,
+    ): Promise<AdoptedRemoteVersion | 'none' | 'stale' | 'queued'> {
+        scope = copyScope(scope);
+        identifier(documentId);
+        remoteRevision(expectedRevision);
+        return this.database.run('readwrite', scope, (tx) => {
+            const key = candidateKey(scope.ownerId, documentId);
+            tx.read(tx.table('meta').get(key), (row: RemoteCandidate | undefined) => {
+                let stored: RemoteCandidate | null = null;
+                try {
+                    stored = row ? savedCandidate(row, scope, documentId) : null;
+                } catch {
+                    // An observation this build cannot read is not one it may adopt. It stays
+                    // exactly where it is: preserved, like every other unreadable record here.
+                    stored = null;
+                }
+                if (stored?.kind !== 'version') {
+                    return tx.finish('none');
+                }
+                if (stored.revision !== expectedRevision) {
+                    return tx.finish('stale');
+                }
+                // Captured as a `const` so the narrowing above survives into the nested callback:
+                // a `let` read from inside a closure widens back to its declared type.
+                const candidate = stored;
+                const adopted = snapshot(candidate.document);
+                tx.read(
+                    tx.table('songs').get([scope.ownerId, documentId]),
+                    (savedRow: SavedSong | undefined) => {
+                        const song = savedRow ? savedSong(savedRow, scope, documentId) : null;
+                        if (song && song.remoteRevision === candidate.revision) {
+                            // The record already IS this version, so the row describes no
+                            // divergence at all (#1310 patch R1, the belt at the consumer). A
+                            // device that stored a stale candidate before that fix — or one whose
+                            // record another tab advanced to exactly this revision — must not be
+                            // offered a "newer version" it already holds, and must not be offered
+                            // it again, so the row goes with the question it was asking.
+                            tx.table('meta').delete(key);
+                            return tx.finish('none');
+                        }
+                        operations(tx, scope, documentId, (queue) => {
+                            if (queue.length > 0) {
+                                return tx.finish('queued');
+                            }
+                            tx.table('songs').put({
+                                ownerId: scope.ownerId,
+                                documentId,
+                                document: adopted,
+                                remoteRevision: candidate.revision,
+                            } satisfies SavedSong);
+                            // The writer id is the third key element, so an array upper bound
+                            // stops at this document's last row — the same bound `discardDrafts`
+                            // pages one with.
+                            tx.table('drafts').delete(
+                                IDBKeyRange.bound(
+                                    [scope.ownerId, documentId],
+                                    [scope.ownerId, documentId, []],
+                                    false,
+                                    true,
+                                ),
+                            );
+                            tx.table('meta').delete(key);
+                            tx.finish({
+                                documentId,
+                                document: adopted,
+                                revision: candidate.revision,
+                            });
+                        });
+                    },
+                );
+            });
+        });
+    }
+
+    /**
      * Freeze an explicit cloud deletion for this document and hand back the bytes to send (#1270).
      *
      * The operation id is minted ONCE and stored before anything leaves this device, so a lost
@@ -1319,6 +1476,12 @@ export class AccountSongbook {
      * and newer, and nothing readable here would distinguish it from the record the plan saw.
      * `expectedRemoteRevision` is what does: a write only proceeds against the exact revision the
      * caller diffed against.
+     *
+     * And for a `version` observation that base is asked BEFORE `held` (#1310 patch R1). A body
+     * whose base has moved is not a divergence to preserve, it is a reading of a state that is
+     * gone: it answers `'superseded'` and writes nothing at all. Asking `held` first — as this did
+     * until #1310 made candidates visible — stored exactly the same stale body whenever the other
+     * tab that moved the record was still holding the chart or still typing.
      */
     async reconcile(
         scope: AccountScope,
@@ -1376,15 +1539,42 @@ export class AccountSongbook {
                                 tx.table('meta').delete(key);
                                 return tx.finish('unchanged');
                             }
+                            if (song && song.remoteRevision !== expected) {
+                                // NOT the record the caller diffed: it moved between the plan
+                                // and this transaction, so this body describes a state this
+                                // device has left behind. Nothing is written — not the record,
+                                // and deliberately not a candidate either (#1310 patch R1).
+                                //
+                                // Held or clean makes no difference, and that is the whole
+                                // correction: the old order asked `held` first, so the two-tab
+                                // case (the other tab Saved and kept typing) stored the same
+                                // stale body under a draft instead of under a clean record.
+                                // Revisions are opaque strings, so no reader downstream can
+                                // tell this body is OLDER than the record — which is what made
+                                // the preserved row a destructive, mislabelled offer once #1310
+                                // started showing candidates to a musician.
+                                //
+                                // Any candidate already stored for this id is left exactly as
+                                // it is: a row that WAS written against a matching base is not
+                                // made wrong by this pass's stale one, and clearing it would
+                                // retract an offer nothing has resolved.
+                                //
+                                // Residual, accepted: such a row could itself be behind a record
+                                // that has moved since, and nothing can order two opaque
+                                // revisions. It needs a Save accepted while a candidate is
+                                // outstanding — which a server that checks the base refuses — and
+                                // the next pass's `'unchanged'` or `'advanced'` deletes the row.
+                                return tx.finish('superseded');
+                            }
                             if (held || song?.remoteRevision === null) {
                                 tx.table('meta').put(candidate());
                                 return tx.finish('candidate');
                             }
                             if (song?.remoteRevision !== expected) {
-                                // Clean, unheld — and NOT the record the caller diffed. It
-                                // moved between the plan and this transaction, so this body
-                                // is an observation about a state that no longer exists here
-                                // and may not be written over the one that does.
+                                // No saved record here, and the caller's plan says there was
+                                // one: it has been removed since. The body is preserved rather
+                                // than written, because nothing it could be compared against
+                                // exists any more and this is the only copy of it on the device.
                                 tx.table('meta').put(candidate());
                                 return tx.finish('candidate');
                             }

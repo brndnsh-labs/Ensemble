@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { REMOTE_UPDATE_MESSAGES } from '../lib/account/messages';
 import { arrangementOf } from '../lib/documents';
 import { v1OfferDeclines } from '../lib/import-v1';
 import type { ChartDocument } from '../lib/runtime';
@@ -49,6 +50,15 @@ interface SongbookProps {
      * from one that failed. This is the difference between the two.
      */
     loading: boolean;
+    /**
+     * The account songs a newer version is waiting for (#1310) — `reconcile` preserved a remote
+     * advance rather than applying it over this device's unsaved work. Document ids, marked in the
+     * list so the state is visible from the one place a musician can see the whole library; the
+     * choice itself lives on the stand, where the song's own text is.
+     *
+     * Always empty for a guest songbook, which no account can advance underneath.
+     */
+    newerInAccount: readonly string[];
     /** The card at the top: the last-opened song (with any recovered draft), else a starter. */
     featured: ChartDocument | null;
     /** True when `featured` is the song the musician last had open. */
@@ -70,6 +80,7 @@ export function Songbook({
     songs,
     accountLibrary,
     loading,
+    newerInAccount,
     featured,
     continued,
     busy,
@@ -83,6 +94,9 @@ export function Songbook({
     onImportV1,
     onDismissV1,
 }: SongbookProps) {
+    // A set, not `includes`: both this list and the account library are capped at 2,000, and the
+    // pair of them scanned against each other is the one place that product would be paid for.
+    const newer = new Set(newerInAccount);
     return (
         <main className="home">
             <div className="home-intro">
@@ -194,6 +208,18 @@ export function Songbook({
                                                             ? 'In your account'
                                                             : 'Saved locally'}
                                                     </span>
+                                                    {/* #1310 — said here as well as on the stand
+                                                        because this is the only surface that shows
+                                                        the whole library at once, and the song it
+                                                        is about may not be the one open. */}
+                                                    {newer.has(s.id) && (
+                                                        <span
+                                                            className="song-marker"
+                                                            data-testid="song-newer-in-account"
+                                                        >
+                                                            {REMOTE_UPDATE_MESSAGES.marker}
+                                                        </span>
+                                                    )}
                                                 </span>
                                             </button>
                                         </td>
