@@ -12,6 +12,11 @@ import { addVirtualAuthenticator } from './virtual-authenticator';
  * in the guest songbook, the account library and the network are untouched, and the card
  * says in the account page's own words how to get them the rest of the way.
  *
+ * Since #1359 the offer to copy them into the account opens on the back of that run — what
+ * that offer then does is `import-v1-adopt.chromium.spec.ts`'s subject. It changes nothing
+ * here: until the musician answers it, the import has still written one songbook, and the
+ * "not one byte was sent" reading below is exactly as load-bearing as it was.
+ *
  * `*.chromium.spec.ts`: the CDP virtual authenticator is Chromium-only.
  */
 
@@ -82,7 +87,7 @@ test('signed in, the song menu still brings v1 songs over — into this device�
     await expect(card).toBeVisible();
     // Said up front, in the account page's own words (`account-page.tsx`), not paraphrased.
     await expect(page.getByTestId('v1-import-account-pointer')).toContainText(
-        'These go to this device’s songbook, not your account.',
+        'These go to this device’s songbook first',
     );
     await expect(page.getByTestId('v1-import-account-pointer')).toContainText(
         'Add this device’s songs',

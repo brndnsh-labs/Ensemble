@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { REMOTE_UPDATE_MESSAGES } from '../lib/account/messages';
+import { REMOTE_UPDATE_MESSAGES, V1_IMPORT_ACCOUNT_MESSAGES } from '../lib/account/messages';
 import { arrangementOf } from '../lib/documents';
 import { v1OfferDeclines } from '../lib/import-v1';
 import type { ChartDocument } from '../lib/runtime';
@@ -31,7 +31,10 @@ export interface V1ImportOffer {
     /**
      * True while this device is signed in (#1274 patch R2). The import is guest-only — it
      * never writes to an account — so the card has to say where the songs land and how they
-     * reach the account from there, in the account page's own words.
+     * reach the account from there, in the account page's own words. Since #1359 a run that
+     * lands something opens that offer itself, and the sentence
+     * (`V1_IMPORT_ACCOUNT_MESSAGES.pointer`) covers both: the offer that follows, and the
+     * account page's standing button for every run that opens none.
      */
     accountPointer: boolean;
 }
@@ -368,8 +371,7 @@ function V1ImportCard({
             )}
             {offer.accountPointer && (
                 <p className="import-pointer" data-testid="v1-import-account-pointer">
-                    These go to this device’s songbook, not your account. To add them to your
-                    account afterwards, use “Add this device’s songs” on your account page.
+                    {V1_IMPORT_ACCOUNT_MESSAGES.pointer}
                 </p>
             )}
             <p className="import-result" role="status" data-testid="v1-import-result">

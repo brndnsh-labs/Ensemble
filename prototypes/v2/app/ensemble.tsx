@@ -416,6 +416,16 @@ export default function Ensemble() {
     // manually from the account page's "Add this device's songs" button at any later time.
     const [adoptOpen, setAdoptOpen] = useState(false);
     /**
+     * Which guest songs the OPEN offer is about (#1359), or null for the whole guest songbook.
+     *
+     * Only the post-import path sets it: a signed-in import writes the guest songbook, and the
+     * offer that follows is the second half of that one gesture, so it asks about the songs that
+     * just landed rather than about every guest song this device happens to hold. State rather
+     * than a ref because the dialog recomputes its offer from it, and cleared by whichever control
+     * opens or closes an offer so a scope can never outlive the import it came from.
+     */
+    const [adoptScope, setAdoptScope] = useState<readonly string[] | null>(null);
+    /**
      * The owner this device has already been OFFERED the copy for during this attach (#1268 patch
      * review P3-6a). `hasDecidedAdoption` only remembers an ANSWER, so an escaped prompt — Escape
      * or the backdrop, deliberately not a decision — was re-opened by the very next `accountDialog`
@@ -423,6 +433,15 @@ export default function Ensemble() {
      * effect that writes it. Cleared when the owner goes null, so the next sign-in asks again.
      */
     const adoptOffered = useRef<string | null>(null);
+    /**
+     * Is an offer on screen right now (#1359 patch P2-2)?
+     *
+     * A mirror of `adoptOpen` rather than the state itself, because the sign-in effect below must
+     * be able to BAIL on it without taking it as a dependency: in the dependency array it would
+     * re-run the moment a dialog closed, and an offer the musician escaped without answering would
+     * be reopened as the whole-songbook question — the nag `adoptOffered` exists to prevent.
+     */
+    const adoptOnScreen = useRef(false);
     // #1266 — signed in, the songbook IS the account library. `current?.id` is the chart on the
     // stand: the loop hands it to the download's `isActive` so a remote update can never be
     // swapped in underneath whoever is playing.
@@ -1099,12 +1118,54 @@ export default function Ensemble() {
         };
     }, [signOutStep, heldOwner, sync.owner]);
     useEffect(() => {
+        // Mirrored here rather than written during render, the way the dialog itself mirrors its
+        // own `open` prop: one place that knows whether a question is on screen (#1359).
+        adoptOnScreen.current = adoptOpen;
         if (adoptOpen) {
             adoptDialogRef.current?.showModal();
         } else {
             adoptDialogRef.current?.close();
         }
     }, [adoptOpen]);
+    /**
+     * What the post-import offer is decided against, as of the LATEST render (#1359 patch P1-2).
+     *
+     * `importV1Songs` awaits a whole import run before it decides whether to open the offer, and
+     * `signedIn`/`sync` inside it are the snapshots of whichever render defined that handler — the
+     * moment the button was pressed. Two things really go wrong when the run is the slow one: a
+     * session that expires mid-run still passes a stale `signedIn` and sets `adoptOpen` true while
+     * the dialog is no longer rendered (the flag sticks, and the account page's button is then a
+     * no-op for the rest of the page load, since `adoptOpen` never transitions), and a library
+     * that finishes downloading mid-run is still read as not downloaded and says nothing at all.
+     *
+     * So the three facts are re-read from here after the awaits. A ref updated on every commit,
+     * not state: nothing renders from it, and it must not re-run anything.
+     */
+    const adoptGate = useRef({
+        signedIn,
+        owner: sync.owner,
+        documents: sync.documents,
+    });
+    // No dependency array on purpose: this is a mirror of the current render, not a reaction to
+    // one particular field changing.
+    useEffect(() => {
+        adoptGate.current = { signedIn, owner: sync.owner, documents: sync.documents };
+    });
+    /**
+     * An offer cannot outlive the session it is about (#1359 patch P1-2).
+     *
+     * The dialog only renders while signed in, so a sign-out (or an expiry) with one on screen
+     * takes the dialog away without touching `adoptOpen` — which then stays true, and every later
+     * `setAdoptOpen(true)` is a no-op transition that never reaches `showModal`. Clearing the flag
+     * with the session is what keeps the account page's standing button working after signing back
+     * in during the same page load.
+     */
+    useEffect(() => {
+        if (!signedIn) {
+            setAdoptOpen(false);
+            setAdoptScope(null);
+        }
+    }, [signedIn]);
     // #1310 — `offered` is a dependency, not just a guard, for the reason the cloud-delete step's
     // `inAccount` is: the confirm step unmounts when its own question stops existing (a pass
     // adopting the body elsewhere, a Save queued, the chart closed), and an offer left set would
@@ -1158,6 +1219,12 @@ export default function Ensemble() {
         }
         if (
             accountDialog !== null ||
+            // A question already on screen is never re-asked underneath its own musician (#1359
+            // patch P2-2): this effect re-runs whenever the library's counts change, and an
+            // import's scoped offer carries no `adoptOffered` mark of its own until it opens, so
+            // without this a download landing mid-answer would turn "Add the song you just
+            // brought over?" into the whole-songbook question with the buttons in the same place.
+            adoptOnScreen.current ||
             adoptOffered.current === owner ||
             hasDecidedAdoption(owner) ||
             !libraryDownloaded(sync.documents)
@@ -1169,6 +1236,9 @@ export default function Ensemble() {
             .then((offer) => {
                 if (alive && offer.candidates.length > 0) {
                     adoptOffered.current = owner;
+                    // The sign-in offer is about the whole guest songbook; only an import scopes
+                    // one (#1359), and a scope left over from an earlier offer must not narrow it.
+                    setAdoptScope(null);
                     setAdoptOpen(true);
                 }
             })
@@ -2517,7 +2587,10 @@ export default function Ensemble() {
      * Straight through `repository`, never `storeSave`: these are v1's songs arriving on
      * this device, they make no owner claim, and they must not land in an account library
      * or re-point the stand's binding (#1311). #1268's "Add this device's songs" is the
-     * bridge from here into an account, and it is a separate, explicit gesture.
+     * bridge from here into an account — and signed in, this run now opens that same offer
+     * itself (#1359), scoped to what it just brought over, rather than leaving one intent
+     * split across two gestures. What the import WRITES is unchanged: the guest songbook,
+     * and only on the musician's explicit Add does anything reach the account.
      *
      * Item-atomic and resumable: each song that lands is saved and remembered on its
      * own, so a failure partway through keeps everything before it and a rerun picks up
@@ -2582,6 +2655,49 @@ export default function Ensemble() {
                 asked: v1Data.asked,
             });
             setV1Result(describeV1Outcome(outcome));
+            /**
+             * Signed in, the second half of the same gesture (#1359): the songs are in the guest
+             * songbook, and the offer to copy them into the account opens by itself instead of
+             * pointing at a button on the account page.
+             *
+             * OPENING it consults nothing — the same `setAdoptOpen(true)` the account page's "Add
+             * this device's songs" button runs, and deliberately not `hasDecidedAdoption`: this is
+             * the musician asking, so a standing "Not now" from a sign-in does not silence it.
+             * ANSWERING it (Add or Not now) records the same per-device answer any answer has
+             * always recorded (`rememberAdoptionDecision`, in the dialog), which also retires the
+             * whole-songbook sign-in offer for this owner. That is deliberate: re-asking about the
+             * same songs on the next sign-in, right after a "Not now" here, is exactly the nag the
+             * latch exists to prevent, and the account page's button remains the way back.
+             * `forgetAdoptionDecision` is account-deletion-only (#1351) and is not called here.
+             *
+             * Four conditions. `landed` is this run's own work: something actually reached the
+             * guest songbook (a run that found everything already here, was blocked, or failed
+             * asks nothing new). The other three come from `adoptGate`, which is the latest
+             * COMMITTED render rather than the one that defined this handler — an import run is
+             * slow enough to outlive the facts it started with (patch P1-2). This device must
+             * still be SIGNED IN, which by `signedIn`'s own definition excludes an expired
+             * session and a device holding an account without one; the loop must have published
+             * an owner; and the account library must have been downloaded, since the offer is a
+             * diff against it and a library not yet downloaded re-offers songs the account
+             * already has (#1268's P0). Without that download this says nothing — the card's
+             * pointer to the account page is still on screen and is the way through.
+             */
+            const landed = [...outcome.imported, ...outcome.updated].map((song) => song.id);
+            const gate = adoptGate.current;
+            if (
+                landed.length > 0 &&
+                gate.signedIn &&
+                gate.owner !== null &&
+                libraryDownloaded(gate.documents)
+            ) {
+                // This attach has now made its offer (#1359 patch P2-2). The sign-in effect's own
+                // escape guard, set for the same reason it sets it: an offer the musician escapes
+                // without answering must not be reopened — as the whole-songbook question, no
+                // less — by the next download or dialog transition.
+                adoptOffered.current = gate.owner;
+                setAdoptScope(landed);
+                setAdoptOpen(true);
+            }
         });
     }
     /**
@@ -3513,6 +3629,8 @@ export default function Ensemble() {
                     }}
                     onOpenAdopt={() => {
                         setAccountPageOpen(false);
+                        // The standing invitation is about every guest song (#1359).
+                        setAdoptScope(null);
                         setAdoptOpen(true);
                     }}
                     // Same P0 gate as the auto-prompt above: until this device has downloaded the
@@ -3526,7 +3644,11 @@ export default function Ensemble() {
                     open={adoptOpen}
                     ownerId={sync.owner}
                     online={account.online}
-                    onClose={() => setAdoptOpen(false)}
+                    scopeGuestIds={adoptScope}
+                    onClose={() => {
+                        setAdoptOpen(false);
+                        setAdoptScope(null);
+                    }}
                 />
             )}
             {accountsOn && (signedIn || heldWithoutSession) && (

@@ -146,6 +146,91 @@ describe('computeAdoptCandidates', () => {
     });
 });
 
+/**
+ * The scope a signed-in v1 import hands in (#1359): the offer that follows an import is about the
+ * songs that import just brought over, not about every guest song this device holds. It narrows
+ * WHICH guest songs are considered and nothing else — the deterministic-id dedup and the
+ * account-wide cap are the same code either way, which is the whole reason it is a parameter
+ * rather than a second implementation.
+ */
+describe('computeAdoptCandidates, scoped to named guest songs', () => {
+    it('offers only the named guest songs, leaving the rest of the songbook out of the question', async () => {
+        list.mockResolvedValue([guestSong('starter-blues'), guestSong('v1-session')]);
+        listLibrary.mockResolvedValue([]);
+
+        const offer = await computeAdoptCandidates('owner-1', new Set(['v1-session']));
+
+        expect(offer.candidates.map((c) => c.guestId)).toEqual(['v1-session']);
+        expect(offer.omitted).toBe(0);
+    });
+
+    it('derives the same account document id scoped as unscoped', async () => {
+        // The dedup key cannot depend on how the question was asked, or adopting the same guest
+        // song through the two entry points would file it twice.
+        list.mockResolvedValue([guestSong('a'), guestSong('v1-session')]);
+        listLibrary.mockResolvedValue([]);
+
+        const { candidates: whole } = await computeAdoptCandidates('owner-1');
+        const { candidates: scoped } = await computeAdoptCandidates(
+            'owner-1',
+            new Set(['v1-session']),
+        );
+
+        expect(scoped[0].accountDocumentId).toBe(
+            whole.find((c) => c.guestId === 'v1-session')?.accountDocumentId,
+        );
+    });
+
+    it('still drops a named song the account already holds', async () => {
+        list.mockResolvedValue([guestSong('v1-session')]);
+        listLibrary.mockResolvedValue([]);
+        const [already] = (await computeAdoptCandidates('owner-1', new Set(['v1-session'])))
+            .candidates;
+
+        listLibrary.mockResolvedValue([{ documentId: already.accountDocumentId }]);
+        const offer = await computeAdoptCandidates('owner-1', new Set(['v1-session']));
+
+        // "Nothing new to add", said about the import — never a second copy under a fresh id.
+        expect(offer.candidates).toEqual([]);
+        expect(offer.omitted).toBe(0);
+    });
+
+    it('measures room against the WHOLE account library, not against the scope', async () => {
+        // One slot left, two just-imported songs wanting it. The server's `quota_exceeded` is
+        // account-wide however narrow the offer is, so the cap is unchanged by scoping.
+        list.mockResolvedValue([guestSong('a'), guestSong('v1-one'), guestSong('v1-two')]);
+        listLibrary.mockResolvedValue(
+            Array.from({ length: MAX_REMOTE_CANDIDATES - 1 }, (_, index) => ({
+                documentId: `held-${index}`,
+            })),
+        );
+
+        const offer = await computeAdoptCandidates('owner-1', new Set(['v1-one', 'v1-two']));
+
+        expect(offer.room).toBe(1);
+        expect(offer.candidates.map((c) => c.guestId)).toEqual(['v1-one']);
+        expect(offer.omitted).toBe(1);
+    });
+
+    it('offers nothing for a scope naming no guest song this device holds', async () => {
+        list.mockResolvedValue([guestSong('a')]);
+        listLibrary.mockResolvedValue([]);
+
+        const offer = await computeAdoptCandidates('owner-1', new Set(['gone']));
+
+        expect(offer).toMatchObject({ candidates: [], omitted: 0 });
+    });
+
+    it('is the whole songbook again when no scope is given', async () => {
+        list.mockResolvedValue([guestSong('a'), guestSong('b')]);
+        listLibrary.mockResolvedValue([]);
+
+        expect(
+            (await computeAdoptCandidates('owner-1', null)).candidates.map((c) => c.guestId),
+        ).toEqual(['a', 'b']);
+    });
+});
+
 describe('libraryDownloaded', () => {
     it('is false until both halves of the manifest progress are observed', () => {
         // `attach()` publishes `UNOBSERVED`, and a partially paged manifest leaves one half null.

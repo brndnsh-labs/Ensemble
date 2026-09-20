@@ -104,8 +104,19 @@ export function libraryDownloaded(documents: Progress): boolean {
  * after an interruption" mean something: a candidate here is one this device can currently prove
  * is missing, not one that was missing the last time somebody asked. Call it only once
  * `libraryDownloaded` is true, or "missing" means "not downloaded yet".
+ *
+ * `onlyGuestIds` narrows WHICH guest songs are on the table (#1359) and nothing else: the offer
+ * opened by a signed-in v1 import is about the songs that import just brought over, not about the
+ * whole guest songbook a musician has been building here for months. It is a filter on the input
+ * side of the one loop below, deliberately, so the two rules that matter stay exactly one
+ * implementation — the deterministic-id dedup against the account library, and the account-wide
+ * `room`/`omitted` cap, which is still measured against the WHOLE library because the server's
+ * refusal is account-wide however few songs are being offered.
  */
-export async function computeAdoptCandidates(ownerId: string): Promise<AdoptOffer> {
+export async function computeAdoptCandidates(
+    ownerId: string,
+    onlyGuestIds?: ReadonlySet<string> | null,
+): Promise<AdoptOffer> {
     const [guestSongs, accountSongs] = await Promise.all([
         repository.list(),
         // Named with the owner this offer is being computed FOR (#1351 patch R6). `listLibrary`
@@ -125,6 +136,9 @@ export async function computeAdoptCandidates(ownerId: string): Promise<AdoptOffe
     const candidates: AdoptCandidate[] = [];
     let omitted = 0;
     for (const guest of guestSongs) {
+        if (onlyGuestIds && !onlyGuestIds.has(guest.id)) {
+            continue;
+        }
         const accountDocumentId = `guest-${await stableId('adopt-doc', ownerId, guest.id)}`;
         if (known.has(accountDocumentId)) {
             continue;
