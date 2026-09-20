@@ -69,6 +69,15 @@ function createFixture() {
     writeExecutable(path.join(bin, 'curl'), [
         '#!/usr/bin/env bash',
         'set -euo pipefail',
+        // The routed-to-image probe (#1356) comes before everything and is not one of the
+        // counted phases: only the `ensemble-web` image serves a root /build.json.
+        'for probe_url in "$@"; do :; done',
+        'if [ "$probe_url" = "https://ensemble.brndn.zip/build.json" ]; then',
+        '    printf "%s\\n" "curl-routed-probe" >> "$DEPLOY_TEST_TRACE"',
+        '    [ "${DEPLOY_TEST_ROUTED:-static}" = image ] || exit 22',
+        `    printf '%s\n' '{ "sourceRevision": "0000000000000000000000000000000000000000" }'`,
+        '    exit 0',
+        'fi',
         'count=0',
         '[ ! -f "$DEPLOY_TEST_CURL_COUNT" ] || read -r count < "$DEPLOY_TEST_CURL_COUNT"',
         'count=$((count + 1))',
@@ -124,6 +133,7 @@ function runDeploy(
     post: PostDeployResult,
     preflight: 'available' | 'unreachable' = 'available',
     worker: { result?: WorkerResult; cacheControl?: string } = {},
+    routed: 'static' | 'image' = 'static',
 ) {
     const fixture = createFixture();
     const result = spawnSync('bash', [DEPLOY_SCRIPT, 'prod'], {
@@ -134,6 +144,7 @@ function runDeploy(
             DEPLOY_TEST_CURL_COUNT: fixture.curlCount,
             DEPLOY_TEST_POST: post,
             DEPLOY_TEST_PREFLIGHT: preflight,
+            DEPLOY_TEST_ROUTED: routed,
             DEPLOY_TEST_TRACE: fixture.trace,
             DEPLOY_TEST_URLS: fixture.urls,
             DEPLOY_TEST_WORKER: worker.result ?? 'match',
@@ -151,6 +162,23 @@ function cleanup(root: string) {
 }
 
 describe('deploy post-transfer verification', () => {
+    it('refuses before transferring anything when the origin is routed to the web image', () => {
+        const { fixture, result } = runDeploy('match', 'available', {}, 'image');
+
+        try {
+            expect(result.error).toBeUndefined();
+            expect(result.status).toBe(1);
+            expect(`${result.stdout}${result.stderr}`).toContain(
+                'is routed to the ensemble-web image',
+            );
+            const trace = readFileSync(fixture.trace, 'utf8');
+            expect(trace).toContain('curl-routed-probe');
+            expect(trace).not.toContain('rsync:');
+        } finally {
+            cleanup(fixture.root);
+        }
+    });
+
     it.each(['empty', 'unreachable'] as const)(
         'fails closed when the post-deploy origin is %s and retains dist',
         (post) => {
@@ -200,6 +228,8 @@ describe('deploy post-transfer verification', () => {
             // Atomic releases are kept for inspection/promotion — no local-build cleanup.
             expect(existsSync(path.join(fixture.root, 'dist'))).toBe(true);
             expect(readFileSync(fixture.trace, 'utf8').trim().split('\n')).toEqual([
+                // Asked first, and before anything is transferred (#1356).
+                'curl-routed-probe',
                 'rsync:dist-present',
                 'curl-after:dist-present',
                 'curl-worker:dist-present',

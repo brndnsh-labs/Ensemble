@@ -17,7 +17,7 @@ sees atomic symlink changes instead of Docker pinning one release's inode.
 ```text
 /opt/docker/{ensembletest,ensemble}/
   docker-compose.yml          rendered stack: static runtime + api service (#1217)
-  .env                        ENSEMBLE_API_TAG=sha-… — written by the release step (#1219)
+  .env                        ENSEMBLE_API_TAG= / ENSEMBLE_WEB_TAG= — written by the release step (#1219, #1356)
 /var/lib/docker-data/{ensembletest,ensemble}/env/api.env   root-only API secret
 /var/lib/docker/volumes/{ensembletest,ensemble}-api-data/   SQLite database (named volume)
 /srv/ensemble-{test,prod}/www/
@@ -145,31 +145,52 @@ proof that needs no registry — same build, `load: true` instead of `push`, sam
 so a rule as easy to get wrong as the `/v2/sw.js` carve-out is provable on the pull request that
 writes it. Neither one touches the required contexts, and `deploy` deliberately does not
 `needs:` the image job: the site is still published by the rsync/symlink path, and a red image
-build must not hold up today's release. **A brand-new GHCR package is private**, and docker04
-pulls anonymously, so after the first successful `web-image` run the owner has to flip
-`ensemble-web` to public in the GitHub package settings — the one-off `ensemble-api` also needed.
+build must not hold up today's release. `ensemble-web` is a public package, like
+`ensemble-api`: docker04 pulls anonymously. (The image is pushed with `provenance: false`, so an
+anonymous manifest probe has to send `Accept: application/vnd.oci.image.manifest.v1+json` — a
+probe that offers only the index types gets a 404 that reads like "private".)
 
-Still to come, the infra half of #1356: a `web` service in `static/compose.yml` and
-`render.mjs`, `ensemble-release` accepting `web` as a service and keeping BOTH image tags in the
-stack's `.env`, the Caddy route, and the test-host deploy.
+### Running and releasing the image (#1356, infra half)
 
-**One gap that half has to close.** Because `deploy` does not `needs:` `web-image`, a commit can
-be deployed while its `ensemble-web:sha-<commit>` was never pushed — a red or skipped image job
-does not stop the release today, and that is the right trade only while nothing serves the
-image. The moment `ensemble-release … web` exists, releasing a tag that is not in the registry
-must fail loudly (the API's gate already waits on a healthcheck and restores the previous tag,
-which is the shape to copy) rather than leaving the service on an older tag and reporting
-success. Deciding between that and making `deploy` depend on `web-image` is the infra half's
-call; what must not happen is a silent divergence between the commit on `main` and the image
-serving `/`.
+`static/compose.yml` carries a `web` service beside `static`, and `render.mjs` renders it as
+`<stack>-web` — the name `ensemble-release` derives from its `web` argument:
 
-What that half needs from this image
-is short: container port **8080**; **no environment**, **no volumes**, **no secrets**; the same
-`read_only: true`, `cap_drop: [ALL]`, `no-new-privileges`, `tmpfs: /tmp` posture as the `static`
-service, and `user: "101:101"` which is already the image's default; and a healthcheck it can
-simply inherit, since the image bakes in `wget --quiet --output-document=/dev/null
-http://127.0.0.1:8080/index.html` — the same busybox `wget` probe the `static` service spells
-out today.
+| | ensembletest | ensemble |
+| --- | --- | --- |
+| Host port (Caddy only; 8095 stays CLOSED in the firewall until #1357) | 8094 | 8095 |
+| Tag variable in the stack's `.env` | `ENSEMBLE_WEB_TAG` | `ENSEMBLE_WEB_TAG` |
+| Routed by Caddy | yes — the host's `/` | not until the flip (#1357) |
+
+It runs **beside** the bind-mounted runtime on its own port rather than replacing it, so moving a
+host onto the image — and back — is one `reverse_proxy` line in Caddy and never a rebuild. No
+environment, no volumes, no secrets; the same `read_only`, `cap_drop: [ALL]`,
+`no-new-privileges`, `tmpfs: /tmp` posture as `static`; uid 101 is the image's default. The
+healthcheck restates the image's own, command and timings, so the release step's health wait
+is visible from the compose file. `render.mjs` now requires `ENSEMBLE_WEB_TAG` as well as `ENSEMBLE_API_TAG`; each
+becomes a `${VAR:-<pinned>}` default the on-box `.env` overrides.
+
+The Caddy handle for a host on the image imports **neither** `default_app_policy` nor
+`ensemble_cache_policy`: both replace upstream headers, and the image owns its cache and framing
+policy (`frame-ancestors 'none'` is stricter than the edge default; `X-Frame-Options` goes away
+with the import, and `frame-ancestors` is what every current browser honours over it). HSTS
+still comes from the site-level `security_headers`. The `/api/*` handles sit above it and are unchanged.
+
+Releases go through the same forced command as the API — `release <stack> <api|web>
+sha-<40 hex>` — and the root script keeps BOTH tags in `.env` (it rewrites one service's line
+and carries every other line over), holds a per-stack lock for the whole run so an API and a web
+release from one merge cannot interleave, waits for the container's healthcheck, and otherwise
+recreates the service at the previous tag — or, on a first release with no previous tag, at the
+rendered default. That closes the gap the image half recorded: `deploy` still does not
+`needs:` `web-image`, but a release names a tag, and a tag that is not in the registry cannot
+become healthy — the script fails, restores the previous tag, and the job is red.
+
+CI's `web-release` job (`needs: [web-image, deploy]`, main only, not a required context)
+releases each merge's image to **ensembletest only**, then asserts that
+`https://ensembletest.brndn.zip/build.json` names that commit's `sourceRevision` — "released"
+means the public origin serves it, not that a command exited 0. Production joins that loop at
+the flip (#1357). Until then `scripts/deploy.sh test` and `deploy.mjs test` still publish to the
+bind-mounted test runtime on :8090, which keeps running but is no longer what the hostname
+routes to: a v1 audition on the test host means pointing Caddy back at :8090 first.
 
 The static root contains no database or credentials. Hidden paths, `/current`, and `/api/*`
 return 404. Both environments serve the v2 music stand at `/v2/` from the `v2` symlink; on
@@ -250,14 +271,15 @@ Caddy's, and it is what the container actually sees as the socket peer: Docker D
 ports without rewriting the source (measured in the static container's nginx log, 2026-09-15).
 The API trusts the header from that peer alone; anything else is keyed on its own socket address.
 
-**The image tag is the one interpolation in a rendered stack, on purpose.** Render with the tag
-to pin as the default — `ENSEMBLE_API_TAG=sha-<full sha> node hosting/static/render.mjs prod` —
-and `docker compose config` validates the file anywhere with no `.env` present, which is what
-`bin/docker-deploy` does from `/tmp` on the box. On the box, `/opt/docker/<stack>/.env` holds
-the live `ENSEMBLE_API_TAG=` line written by the forced-command release step (#1219); Compose
-reads it from the project directory (the compose file's directory), so a config redeploy with
-`bin/docker-deploy` keeps the released tag rather than rolling the API back to the render-time
-pin. Rendering runs Compose with `--no-env-resolution` so the `env_file` reference survives
+**The two image tags are the only interpolations in a rendered stack, on purpose.** Render with
+the tags to pin as the defaults — `ENSEMBLE_API_TAG=sha-<full sha> ENSEMBLE_WEB_TAG=sha-<full
+sha> node hosting/static/render.mjs prod` (both are required since #1356) — and `docker compose
+config` validates the file anywhere with no `.env` present, which is what `bin/docker-deploy`
+does from `/tmp` on the box. On the box, `/opt/docker/<stack>/.env` holds the live
+`ENSEMBLE_API_TAG=` and `ENSEMBLE_WEB_TAG=` lines written by the forced-command release step
+(#1219); Compose reads it from the project directory (the compose file's directory), so a config
+redeploy with `bin/docker-deploy` keeps the released tags rather than rolling a service back to
+its render-time pin. Rendering runs Compose with `--no-env-resolution` so the `env_file` reference survives
 into the output instead of being inlined (empty) at render time.
 
 `/healthz` is reachable from docker04 only (`curl http://127.0.0.1:8092/healthz`); Caddy

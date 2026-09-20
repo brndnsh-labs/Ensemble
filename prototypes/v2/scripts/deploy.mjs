@@ -54,6 +54,20 @@ if (!/^[a-f0-9]{64}$/.test(hash)) {
 // `ensemble-web` image. So refuse an artifact built for another base (`ENSEMBLE_V2_BASE`,
 // #1354) rather than publishing a root build under `/v2/` — the manifest's own asset keys are
 // the evidence, since CI downloads this artifact instead of rebuilding it.
+// Since #1356 a host can be routed to the `ensemble-web` image instead of the runtime this
+// publishes under. Every verification below asks the public origin, and the image answers
+// `/v2/*` with a redirect to its OWN root files, so the run would fail at the end — after the
+// release directory and the symlink had already changed. Only the image serves a root
+// `/build.json`; ask first and stop with the actual remedy.
+const routed = await fetch(`${origin}/build.json?probe=${hash}`, {
+    cache: 'no-store',
+    redirect: 'manual',
+}).catch(() => null);
+if (routed?.ok && typeof (await routed.json().catch(() => null))?.sourceRevision === 'string') {
+    throw new Error(
+        `${origin} is routed to the ensemble-web image, not the /v2 runtime this script publishes. Point Caddy's handle for this host back at the static runtime's port (homelab-maintenance caddy/Caddyfile; see hosting/README.md) to audition here, then point it back.`,
+    );
+}
 const foreign = Object.keys(manifest.assets).find((url) => !url.startsWith('/v2/'));
 if (foreign) {
     throw new Error(
