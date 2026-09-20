@@ -23,11 +23,11 @@ function render(environment: string, env: Record<string, string | undefined>) {
 
 describe.skipIf(!hasCompose)('hosting/static/render.mjs', () => {
     it.each([
-        ['test', 'ensembletest', '8092', '8094'],
-        ['prod', 'ensemble', '8093', '8095'],
+        ['test', 'ensembletest', '8092', '8094', 'open'],
+        ['prod', 'ensemble', '8093', '8095', 'closed'],
     ])(
         '%s keeps both tag interpolations and the on-box env file',
-        (environment, stack, port, webPort) => {
+        (environment, stack, port, webPort, registration) => {
             const result = render(environment, {
                 ENSEMBLE_API_TAG: TAG,
                 ENSEMBLE_WEB_TAG: WEB_TAG,
@@ -49,6 +49,8 @@ describe.skipIf(!hasCompose)('hosting/static/render.mjs', () => {
                 `image: ghcr.io/brndnsh-labs/ensemble-web:\${ENSEMBLE_WEB_TAG:-${WEB_TAG}}`,
             );
             expect(out).toContain(`published: "${webPort}"`);
+            // Registration is a reviewed, per-environment value — never an on-box surprise.
+            expect(out).toContain(`ENSEMBLE_REGISTRATION: ${registration}\n`);
             // The image runs under the same posture as `static`, with nothing mounted into it.
             const web = out.slice(out.indexOf(`  ${stack}-web:\n`)).split(/\n {2}\S/)[0];
             expect(web).toContain('read_only: true');

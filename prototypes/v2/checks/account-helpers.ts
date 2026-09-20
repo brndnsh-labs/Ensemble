@@ -12,6 +12,108 @@ import { appUrl, editorRevealed, expect } from './fixtures';
  */
 
 /**
+ * Make this page look like a device that already holds an account, without signing one in.
+ *
+ * Since #1357's patch a device that has never held an account asks the server nothing at all
+ * (`deviceMayHoldAccount`), so a spec about what happens to the session READ has to be on a
+ * device that has a reason to make one. This seeds the same per-device marker the fence writes;
+ * it does not fabricate a session, and the server is still the only thing that can grant one.
+ */
+export async function asHeldDevice(page: Page): Promise<void> {
+    await page.addInitScript(() => {
+        try {
+            localStorage.setItem('ensemble-v2-preview:account-held', 'yes');
+        } catch {
+            // A device that cannot store it asks anyway, which is the same behaviour.
+        }
+    });
+}
+
+/** What an `/api/*` request meets, for a spec that needs a server behaving badly. */
+export type ApiBehaviour =
+    /** `fetch` rejects, as it does for a refused connection, a dead DNS name or an offline device. */
+    | 'unreachable'
+    /** An origin that IS there and refuses: `503 internal_error`. */
+    | 'error'
+    /** An origin that accepts the request and never answers, until `releaseApi` lets it. */
+    | 'hold';
+
+/**
+ * Make `/api/*` behave badly for this page, by replacing `window.fetch` before any page script
+ * runs (`lib/account/client.ts` captures `fetch` at module scope, so this is the copy it gets).
+ *
+ * NOT `page.route`, and that is the whole point of this helper existing. Measured on this suite
+ * 2026-09-20: in the `webkit-phone` project a route registered for these URLs — as a glob, as a
+ * predicate, and intermittently even as a RegExp — never enters its handler, and the request
+ * reaches the preview server, which answers its ordinary 404. It passes when the box is idle and
+ * loses the race under the full suite's three workers, so the failure mode is a test that
+ * quietly asserts nothing about the server it claimed to be simulating (confirmed from the trace:
+ * `GET /api/auth/session` → 404 in 2ms, un-intercepted). An init script has no such race: it is
+ * installed before the document's first script and `fetch` is simply already ours.
+ *
+ * `only` shapes exactly one pathname and lets every other `/api/*` request through, for a spec
+ * that needs the session read to hang while the rest of an account works normally.
+ */
+export async function shapeApi(
+    page: Page,
+    behaviour: ApiBehaviour,
+    options: { only?: string } = {},
+): Promise<void> {
+    await page.addInitScript(
+        ([mode, only]: [ApiBehaviour, string]) => {
+            const real = window.fetch.bind(window);
+            const held: Array<() => void> = [];
+            (window as unknown as { __releaseApi?: () => void }).__releaseApi = () => {
+                for (const resume of held.splice(0)) {
+                    resume();
+                }
+            };
+            window.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+                const href =
+                    typeof input === 'string'
+                        ? input
+                        : input instanceof URL
+                          ? input.href
+                          : input.url;
+                const { pathname } = new URL(href, location.href);
+                const mine = only
+                    ? pathname === only
+                    : pathname === '/api' || pathname.startsWith('/api/');
+                if (!mine) {
+                    return real(input, init);
+                }
+                if (mode === 'unreachable') {
+                    // What a browser's `fetch` rejects with; `lib/account/api.ts` maps any
+                    // rejection to `{ kind: 'network' }`, so the exact class is not load-bearing.
+                    return Promise.reject(new TypeError('Load failed'));
+                }
+                if (mode === 'error') {
+                    return Promise.resolve(
+                        new Response(JSON.stringify({ error: 'internal_error' }), {
+                            status: 503,
+                            headers: { 'content-type': 'application/json' },
+                        }),
+                    );
+                }
+                // Held: resolved by re-issuing the real request, so what lands afterwards is a
+                // genuine answer from the server rather than a fixture's idea of one.
+                return new Promise<Response>((resolve) => {
+                    held.push(() => resolve(real(input, init)));
+                });
+            }) as typeof fetch;
+        },
+        [behaviour, options.only ?? ''] as [ApiBehaviour, string],
+    );
+}
+
+/** Let every request `shapeApi(page, 'hold')` is holding finish for real. */
+export async function releaseApi(page: Page): Promise<void> {
+    await page.evaluate(() => {
+        (window as unknown as { __releaseApi?: () => void }).__releaseApi?.();
+    });
+}
+
+/**
  * `randomBytes(32).toString('base64url')` — what the server mints, and nothing else. Re-exported
  * under this file's established name; the single source of truth is `lib/account/messages.ts`'s
  * `RECOVERY_CODE_SHAPE`, which `recover.tsx` also validates a typed code against (#1263 patch
@@ -20,9 +122,14 @@ import { appUrl, editorRevealed, expect } from './fixtures';
  */
 export const CODE_SHAPE = RECOVERY_CODE_SHAPE;
 
-/** Opt this device into the dark-launched account UI, then land on the songbook. */
+/**
+ * Land on the songbook with the account UI available — which since the cutover (#1357) is the
+ * plain URL, no parameter. Deliberately not `?accounts=on`: every account spec then rides the
+ * real default, so a regression that took the entry point away from an ordinary visitor fails
+ * here rather than hiding behind an opt-in nobody types any more.
+ */
 export async function openWithAccounts(page: Page): Promise<void> {
-    await page.goto(appUrl('?accounts=on'));
+    await page.goto(appUrl());
     await expect(page.getByRole('heading', { name: 'Let’s play something.' })).toBeVisible();
 }
 

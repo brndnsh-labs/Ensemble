@@ -2737,10 +2737,10 @@ html[data-theme="stage"] {
     color: var(--on-ink);
     border-color: var(--ink);
 }
-/* Account entry point and sign-in dialog (#1262). Dark-launched: only a device
-   that opted in via `/v2/?accounts=on` renders any of this. Everything reuses
-   the existing tokens and the .btn / .modal-box / .dialog-actions vocabulary,
-   so both Day and Stage follow from light-dark() with nothing redefined. */
+/* Account entry point and sign-in dialog (#1262). Rendered for every device since the
+   cutover (#1357) — only one that opted out with `?accounts=off` shows none of it.
+   Everything reuses the existing tokens and the .btn / .modal-box / .dialog-actions
+   vocabulary, so both Day and Stage follow from light-dark() with nothing redefined. */
 .account-entry {
     display: flex;
     align-items: center;
@@ -2973,4 +2973,16 @@ html[data-theme="stage"] {
     color: var(--muted);
     font-size: 13px;
     padding: 14px 0;
+}
+/* The two things the songbook says about the account switch itself (#1357): the deadline
+   fallback, and the way back from `?accounts=off`. Unobtrusive on purpose — a muted line the
+   width of the library, not a banner competing with the songs. */
+.library-notice {
+    color: var(--muted);
+    font-size: 13px;
+    padding: 10px 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
 }

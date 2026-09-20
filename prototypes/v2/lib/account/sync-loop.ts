@@ -25,6 +25,7 @@ import type { Progress } from '../sync/status';
 import { writerId } from '../writer';
 import type { AccountApi, ApiError, ApiErrorCode } from './api';
 import { accountApi, accountSession } from './client';
+import { rememberAccountHeld } from './feature';
 import { createLibraryTransport } from './library-transport';
 import type { AccountSession } from './session';
 import {
@@ -1023,6 +1024,22 @@ export function createSyncLoop(
      * while a Save is still sitting in the outbox: the precise lie this surface exists to avoid.
      * So a newer observation always wins, and an older one that finishes late publishes nothing.
      */
+    /**
+     * Move the `meta.active` fence AND the per-device marker that mirrors it (#1357 patch).
+     *
+     * One helper rather than the five call sites below, because the marker is a CACHE of that
+     * pointer — `lib/account/feature.ts`'s `deviceMayHoldAccount` reads it to decide whether this
+     * device asks the server who it is at all — and a cache written in five places is a cache that
+     * drifts. Every path that moves the fence goes through here, including sign-out's restore of
+     * an owner whose records a failed clear left behind: that device still holds an account, and
+     * the marker has to say so or its next load would stop asking about it.
+     */
+    async function moveFence(ownerId: string | null): Promise<AccountScope | null> {
+        const next = await songbook.switchAccount(ownerId);
+        rememberAccountHeld(ownerId !== null);
+        return next;
+    }
+
     async function observe(): Promise<void> {
         const mine = epoch;
         observation += 1;
@@ -1354,10 +1371,7 @@ export function createSyncLoop(
             const mine = epoch;
             const work = (async () => {
                 const existing = await songbook.currentScope();
-                const next =
-                    existing?.ownerId === ownerId
-                        ? existing
-                        : await songbook.switchAccount(ownerId);
+                const next = existing?.ownerId === ownerId ? existing : await moveFence(ownerId);
                 if (mine !== epoch || !next) {
                     return;
                 }
@@ -1759,7 +1773,7 @@ export function createSyncLoop(
                     await loop.attach(owner);
                     return;
                 }
-                await songbook.switchAccount(owner);
+                await moveFence(owner);
             };
             // Detach before the fence moves, not after: the loop's own scope is now stale, and a
             // pass that started against it would spend requests for an account this device is in
@@ -1771,7 +1785,7 @@ export function createSyncLoop(
             // generation that does not match and writes nothing, whatever the server says next.
             let revoked: boolean;
             try {
-                await songbook.switchAccount(null);
+                await moveFence(null);
                 revoked = await revoke();
             } catch (error) {
                 // Storage that would not commit the fence, or a `revoke` that threw instead of
@@ -1822,10 +1836,10 @@ export function createSyncLoop(
                  * all. Whether it worked decides which sentence is owed, so it is answered rather
                  * than swallowed: a control that is not on screen must not be named.
                  */
-                restored = await songbook.switchAccount(owner).then(
+                restored = await moveFence(owner).then(
                     () => true,
                     () =>
-                        songbook.switchAccount(owner).then(
+                        moveFence(owner).then(
                             () => true,
                             () => false,
                         ),
@@ -1880,6 +1894,6 @@ export function createSyncLoop(
 /**
  * The app's one loop, beside the one session store `client.ts` owns. Constructing it is inert —
  * no request, no storage access, no listener, no timer — so importing this module cannot touch
- * guest startup; the dark-launch flag still gates every call.
+ * guest startup, and the loop stays detached until a session says otherwise.
  */
 export const accountSync = createSyncLoop(accountApi, accountSession);

@@ -1,5 +1,9 @@
 import { useEffect, useRef } from 'react';
-import { REMOTE_UPDATE_MESSAGES, V1_IMPORT_ACCOUNT_MESSAGES } from '../lib/account/messages';
+import {
+    ACCOUNT_SWITCH_MESSAGES,
+    REMOTE_UPDATE_MESSAGES,
+    V1_IMPORT_ACCOUNT_MESSAGES,
+} from '../lib/account/messages';
 import { arrangementOf } from '../lib/documents';
 import { v1OfferDeclines } from '../lib/import-v1';
 import type { ChartDocument } from '../lib/runtime';
@@ -54,6 +58,17 @@ interface SongbookProps {
      */
     loading: boolean;
     /**
+     * True when the first session read was released by its deadline instead of answered (#1357),
+     * so `songs` is the guest library standing in for one this device could not check. Distinct
+     * from `loading`: the list below is real and openable, it just may not be the whole story,
+     * and saying nothing would make a fallback indistinguishable from an answer.
+     */
+    accountFallback: boolean;
+    /** True when this device opted out with `?accounts=off` (#1357) — and only once known. */
+    accountsOff: boolean;
+    /** Turns the account surfaces back on for this device, in place, with no reload. */
+    onEnableAccounts: () => void;
+    /**
      * The account songs a newer version is waiting for (#1310) — `reconcile` preserved a remote
      * advance rather than applying it over this device's unsaved work. Document ids, marked in the
      * list so the state is visible from the one place a musician can see the whole library; the
@@ -83,6 +98,9 @@ export function Songbook({
     songs,
     accountLibrary,
     loading,
+    accountFallback,
+    accountsOff,
+    onEnableAccounts,
     newerInAccount,
     featured,
     continued,
@@ -181,6 +199,27 @@ export function Songbook({
                             {accountLibrary
                                 ? 'Loading your account songbook…'
                                 : 'Loading your songbook…'}
+                        </p>
+                    )}
+                    {/* Both notices sit with the library they are about, under its heading and
+                        above the list itself. `role="status"` rather than an alert: neither is a
+                        failure to act on, and the fallback one appears without the musician
+                        having done anything. */}
+                    {accountFallback && !loading && (
+                        <p className="library-notice" role="status" data-testid="account-fallback">
+                            {ACCOUNT_SWITCH_MESSAGES.fallback}
+                        </p>
+                    )}
+                    {accountsOff && (
+                        <p className="library-notice" role="status" data-testid="accounts-off">
+                            <span>{ACCOUNT_SWITCH_MESSAGES.off}</span>
+                            <button
+                                className="account-btn"
+                                data-testid="accounts-turn-on"
+                                onClick={onEnableAccounts}
+                            >
+                                {ACCOUNT_SWITCH_MESSAGES.turnOn}
+                            </button>
                         </p>
                     )}
                     <table className="song-table" hidden={loading}>

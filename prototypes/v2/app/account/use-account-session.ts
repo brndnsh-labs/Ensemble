@@ -14,7 +14,12 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { accountApi, accountSession } from '../../lib/account/client';
-import { syncAccountsFlag } from '../../lib/account/feature';
+import {
+    accountsEnabled,
+    deviceMayHoldAccount,
+    setAccountsEnabled,
+    syncAccountsFlag,
+} from '../../lib/account/feature';
 import type { AccountFailure } from '../../lib/account/messages';
 import { recoveryEnrolled, signOut } from '../../lib/account/passkeys';
 import type { SessionState } from '../../lib/account/session';
@@ -31,16 +36,56 @@ const subscribe = (listener: () => void) => accountSession.subscribe(listener);
 const snapshot = () => accountSession.getSnapshot();
 
 /**
- * Whether this device opted into the unfinished account UI. Applies and strips a `?accounts=`
- * parameter on the way. `false` until the effect runs, so nothing account-shaped is ever in the
- * first render.
+ * How long the songbook waits for the FIRST session read before falling back to the guest
+ * library (`settled` below). Long enough that an ordinary slow connection answers first — the
+ * read is one same-origin GET of a few bytes — and short enough that a hung origin is not a hung
+ * song list.
  */
-export function useAccountsEnabled(): boolean {
-    const [enabled, setEnabled] = useState(false);
+const FIRST_READ_DEADLINE_MS = 4_000;
+
+export interface AccountsSwitch {
+    /**
+     * Whether the account UI is on for this device — the default since the cutover (#1357), off
+     * only for a profile that asked with `?accounts=off`. `false` until `resolved`, so nothing
+     * account-shaped is ever in the first render: the prerendered HTML has no storage to read,
+     * and the guest app is what every device sees first whatever this settles on.
+     */
+    enabled: boolean;
+    /**
+     * `true` once this device's answer has actually been read. It exists so the songbook can tell
+     * "off" from "not asked yet" — without it, the opted-out notice would flash on every load of
+     * every device, since `enabled` starts `false` for all of them.
+     */
+    resolved: boolean;
+    /**
+     * The way back from `?accounts=off`, for the notice the songbook renders (#1357). No reload:
+     * every account surface in `ensemble.tsx` is derived from this hook's `enabled` through hooks
+     * that key off it — `useAccountSession(accountsOn && ready)` starts the session read, and
+     * `useAccountLibrary(accountsOn, …)` stays detached until a session says otherwise — so
+     * flipping it re-renders the shell into exactly the state a fresh load would have reached.
+     */
+    turnOn: () => void;
+}
+
+/**
+ * This device's account switch. Applies and strips a `?accounts=` parameter on the way.
+ */
+export function useAccountsSwitch(): AccountsSwitch {
+    const [state, setState] = useState<{ enabled: boolean; resolved: boolean }>({
+        enabled: false,
+        resolved: false,
+    });
     useEffect(() => {
-        setEnabled(syncAccountsFlag());
+        setState({ enabled: syncAccountsFlag(), resolved: true });
     }, []);
-    return enabled;
+    const turnOn = useCallback(() => {
+        setAccountsEnabled(true);
+        // Read back rather than assuming `true`: unreadable storage swallows the write, and this
+        // hook's answer is whatever `accountsEnabled` says — which for that device is also `true`,
+        // so the switch still works, it just does not persist past this page.
+        setState({ enabled: accountsEnabled(), resolved: true });
+    }, []);
+    return { enabled: state.enabled, resolved: state.resolved, turnOn };
 }
 
 export interface AccountView {
@@ -58,8 +103,20 @@ export interface AccountView {
      * the guest list only to swap it for the account library a moment later is a wrong claim,
      * not a loading state (#1266). It settles on any answer, so an offline cold start still
      * reaches the guest songbook without a server — accounts must never gate guest startup.
+     *
+     * Since #1357 it also settles on a DEADLINE, because with accounts on by default this is
+     * every device's startup path — see `FIRST_READ_DEADLINE_MS` and `fellBack`.
      */
     settled: boolean;
+    /**
+     * `true` when `settled` came from that deadline and no answer has landed since (#1357 patch
+     * P1-4). The songbook says so, because a deadline settle is a FALLBACK, not an answer: on a
+     * signed-in device whose read lands at six seconds it puts the guest library under "Your
+     * songbook" for those six seconds, and a silent one is indistinguishable from a claim that
+     * this is the library. It clears the moment the read resolves — late or not — after which
+     * everything proceeds exactly as an on-time answer would have.
+     */
+    fellBack: boolean;
     signingOut: boolean;
     /**
      * `navigator.onLine`, kept live. Rollout decision 9 S2: offline, sign-out is disabled with a
@@ -140,6 +197,11 @@ export function useAccountSession(active: boolean): AccountView {
     const session = useSyncExternalStore(subscribe, snapshot, snapshot);
     const [enrolled, setEnrolled] = useState<boolean | null>(null);
     const [settled, setSettled] = useState(false);
+    const [fellBack, setFellBack] = useState(false);
+    // Whether the first read has resolved, for the deadline below to check. A ref, not the
+    // `settled` state: the timer closes over the value it was scheduled with, and re-scheduling
+    // it on every settle change would restart the deadline instead of honouring it.
+    const answered = useRef(false);
     const [signingOut, setSigningOut] = useState(false);
     const [signOutFailure, setSignOutFailure] = useState<AccountFailure | null>(null);
     // `true` until the effect below resolves the real value — `navigator` is unavailable during
@@ -177,8 +239,12 @@ export function useAccountSession(active: boolean): AccountView {
         void accountSession.refresh().then(async () => {
             // Any answer settles it, including "still unknown" after a network failure: the
             // device has now asked, and the guest songbook is the honest fallback.
+            answered.current = true;
             if (mounted.current) {
                 setSettled(true);
+                // An answer retires the fallback notice whenever it lands — including long after
+                // the deadline, which is the whole case the notice was written for.
+                setFellBack(false);
             }
             if (accountSession.getSnapshot().status !== 'signedIn') {
                 if (mounted.current) {
@@ -194,9 +260,56 @@ export function useAccountSession(active: boolean): AccountView {
     }, []);
 
     useEffect(() => {
-        if (active) {
-            refresh();
+        if (!active) {
+            return;
         }
+        let alive = true;
+        let deadline: ReturnType<typeof setTimeout> | undefined;
+        answered.current = false;
+        /**
+         * The first read is BOUNDED, because since the cutover (#1357) accounts are on by default:
+         * `songbookLoading` in `ensemble.tsx` waits for `settled` to know which library it is
+         * showing, and `lib/account/api.ts` sets no deadline of its own — deliberately, since a
+         * Save upload has no business being cut off mid-flight. A server that REFUSES the
+         * connection rejects at once and needs none of this; one that accepts and then says
+         * nothing would otherwise leave the song list behind "Loading your songbook…" for as long
+         * as the tab stays open. Settling on the timer claims exactly what settling on a failed
+         * read already claims — this device has asked, and the guest songbook is the honest
+         * fallback — and a late answer still applies, because `refresh` sets the session state
+         * whenever it lands. It is not a SILENT claim either: `fellBack` is what the songbook says
+         * it out loud with (patch P1-4).
+         */
+        const askTheServer = () => {
+            refresh();
+            deadline = setTimeout(() => {
+                if (answered.current || !mounted.current) {
+                    return;
+                }
+                setSettled(true);
+                setFellBack(true);
+            }, FIRST_READ_DEADLINE_MS);
+        };
+        // A device that has never held an account is asked NOTHING on its behalf (#1357 patch) —
+        // `deviceMayHoldAccount` explains why that is a guest-boundary rule before it is anything
+        // else, and what it cost to find out. Settled at once: there is no question outstanding,
+        // so there is nothing to wait for and nothing to fall back from.
+        void deviceMayHoldAccount().then((may) => {
+            if (!alive) {
+                return;
+            }
+            if (!may) {
+                answered.current = true;
+                if (mounted.current) {
+                    setSettled(true);
+                }
+                return;
+            }
+            askTheServer();
+        });
+        return () => {
+            alive = false;
+            clearTimeout(deadline);
+        };
     }, [active, refresh]);
 
     const runSignOut = useCallback(async (): Promise<SignOutOutcome> => {
@@ -301,6 +414,7 @@ export function useAccountSession(active: boolean): AccountView {
         session,
         recoveryEnrolled: enrolled,
         settled,
+        fellBack,
         signingOut,
         online,
         signOutFailure,

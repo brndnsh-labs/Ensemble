@@ -64,7 +64,11 @@ test('an old v1 share link opens as an unsaved draft; Keep a copy persists it an
             comp: '0.55',
             notation: 'name',
             // A share link must never carry a feature-flag side effect (#1279 patch R2).
-            accounts: 'on',
+            // `off` rather than `on` since the cutover (#1357): with accounts on by default,
+            // opting OUT is the side effect a stranger's link could actually inflict, and an
+            // applied `on` would now leave the same absent key an unapplied one does — the
+            // assertion below would have stopped meaning anything.
+            accounts: 'off',
         }),
     );
 
@@ -81,6 +85,8 @@ test('an old v1 share link opens as an unsaved draft; Keep a copy persists it an
     await expect(page.getByLabel('Key', { exact: true })).toHaveValue('C');
     // Consumed on load: the v1 parameters AND the account flag are gone from the address
     // bar, and the flag was never applied — otherwise a reload of the tidied URL would.
+    // An applied `?accounts=off` writes the key; an absent key is this device still on the
+    // default, which is what following somebody's song link must leave it on.
     expect(new URL(page.url()).search).toBe('');
     expect(
         await page.evaluate(() => localStorage.getItem('ensemble-v2-preview:accounts')),

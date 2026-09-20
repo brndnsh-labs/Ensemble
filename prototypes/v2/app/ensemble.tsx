@@ -66,7 +66,7 @@ import { DeleteSongDialog } from './account/delete-song';
 import { SyncStatus, useAccountLibrary } from './account/library';
 import { type AccountDialogMode, SignInDialog } from './account/sign-in';
 import { SignOutDialog, type SignOutMode } from './account/sign-out';
-import { useAccountSession, useAccountsEnabled } from './account/use-account-session';
+import { useAccountSession, useAccountsSwitch } from './account/use-account-session';
 import { ChartSheet } from './chart-sheet';
 import { EditPanel } from './edit-panel';
 import { FeelSheet, type FeelSnapshot } from './feel-sheet';
@@ -350,11 +350,14 @@ export default function Ensemble() {
     // permission) — the visible fallback the acceptance criteria calls for.
     const [shareLinkFallback, setShareLinkFallback] = useState<string | null>(null);
     const sharedLinkHandled = useRef(false);
-    // Accounts are dark-launched (#1262): every merge publishes this app to the public `/v2/`
-    // beta, so the entry point, the dialog and every `/api/*` request stay behind a per-device
-    // opt-in (`/v2/?accounts=on`) until the account work is finished. `ready` gates the session
-    // read so it lands after the songbook is up; nothing here is ever awaited by startup.
-    const accountsOn = useAccountsEnabled();
+    // Accounts are on by default since the cutover (#1262, flipped by #1357); `?accounts=off` is
+    // the per-device way out, and it silences the entry point, the dialog and every `/api/*`
+    // request. `accounts.turnOn` is the way back, offered on the songbook — the parameter is
+    // stripped from the URL the moment it applies, so it cannot be the only route. `ready` gates
+    // the session read so it lands after the songbook is up; nothing here is ever awaited by
+    // startup.
+    const accounts = useAccountsSwitch();
+    const accountsOn = accounts.enabled;
     const account = useAccountSession(accountsOn && ready);
     const [accountDialog, setAccountDialog] = useState<AccountDialogMode | null>(null);
     // The account page (#1264: passkeys, sessions, recovery code) is a second, independent
@@ -1024,11 +1027,11 @@ export default function Ensemble() {
     /**
      * #1351 patch R1 — read which account this device HOLDS, from storage.
      *
-     * Deliberately off the guest first-paint path, on three counts: `accountsOn` is a per-device
-     * opt-in that is false for every ordinary visitor, `ready` means the guest songbook is already
-     * up, and `settled` means the first session read has already answered. Nothing here is ever
-     * awaited by startup or by playback, and a device that never opted in never opens the account
-     * database at all.
+     * Deliberately off the guest first-paint path, on three counts: `ready` means the guest
+     * songbook is already up, `settled` means the first session read has answered (or the
+     * deadline released it), and `accountsOn` is false for a device that opted out — which since
+     * #1357 is the only device that skips this entirely, the default having flipped to on.
+     * Nothing here is ever awaited by startup or by playback.
      *
      * `unknown` is excluded rather than read: the answer would be fine, but acting on it is not —
      * see `heldWithoutSession`.
@@ -3179,6 +3182,18 @@ export default function Ensemble() {
                     offline={offline.label}
                     accountLibrary={signedIn}
                     loading={songbookLoading}
+                    // #1357 patch P1-4 — the first session read was released by its deadline
+                    // rather than answered, so this list is a fallback and says so.
+                    accountFallback={accountsOn && account.fellBack}
+                    // #1357 patch P2-1 — the in-product way back from `?accounts=off`. Gated on
+                    // `resolved` so it cannot be rendered before this device's answer is read,
+                    // when `enabled` is `false` for everybody. Insurance rather than an observed
+                    // fix: today the switch's effect resolves before `ready` flips, so the
+                    // songbook never mounts in that state anyway (measured — see the note in
+                    // `checks/account-entry.spec.ts`). It costs one boolean and it stops that
+                    // ordering being load-bearing.
+                    accountsOff={accounts.resolved && !accountsOn}
+                    onEnableAccounts={accounts.turnOn}
                     // #1310 — only the account library can have one waiting; signed out the loop
                     // publishes none at all, so this is the same empty list either way.
                     newerInAccount={candidateIds}

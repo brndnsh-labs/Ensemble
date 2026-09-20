@@ -1,25 +1,31 @@
 /**
- * The dark-launch gate for every account surface (#1262, orchestrator DECISION 2026-09-17).
+ * The per-device account switch (#1262; default flipped ON by the cutover, #1357).
  *
- * Merging to `main` publishes this app to the public `/v2/` beta, and accounts are not finished:
- * prod registration stays closed by policy until #1272 lands, the sign-out preflight is #1269 and
- * passkey management is #1264. So the entry point, the dialog and — crucially — every `/api/*`
- * request are hidden behind a PER-DEVICE opt-in: visiting `/v2/?accounts=on` turns them on for
- * this browser profile, `?accounts=off` turns them back off, and a profile that has never asked
- * sees the app exactly as it was before this story. Not a build flag, because the whole point is
- * being able to exercise the real thing on the real deployment without exposing it.
+ * The dark launch is over. This app is the site, accounts shipped, and a musician who opens it
+ * gets the entry point without having to know a query parameter. What survives from the beta is
+ * the per-device switch, INVERTED: `?accounts=off` turns every account surface off for this
+ * browser profile — the entry point, the dialog and, crucially, every `/api/*` request — and
+ * `?accounts=on` is the way back. A profile that has never asked gets the product.
+ *
+ * Still not a build flag, for the reason it never was: the switch has to be exercisable against
+ * the real deployment. The stored value is now an opt-OUT, which is what makes the inversion
+ * free — nothing has ever written `'off'`, so no device is opted out by accident, and a beta
+ * profile still carrying the old `'on'` reads as on, which is the default anyway.
  *
  * The flag is a per-device convenience under v2's existing `localStorage` prefix (`lib/session.ts`
  * owns the same namespace), never a document field and never a security boundary — a device that
- * flips it on gets the UI, not an account. Authorization still comes only from a verified server
+ * has it on gets the UI, not an account. Authorization still comes only from a verified server
  * session. Every storage access is wrapped: a private window, blocked site data or a quota error
- * must leave the app playable, which for this flag means "off".
+ * must leave the app playable, which for this flag now means the DEFAULT rather than "off" —
+ * see `accountsEnabled`.
  */
 
+import { ACCOUNT_DATABASE } from '../sync/protocol';
 import { hasV1SharePayload } from '../v1-link';
 
 const ACCOUNTS_FLAG = 'ensemble-v2-preview:accounts';
 const ACCOUNTS_PARAM = 'accounts';
+const HELD_FLAG = 'ensemble-v2-preview:account-held';
 
 /** What a `?accounts=` query parameter is asking for, or `null` when it is absent/unrecognized. */
 export type AccountsFlagRequest = 'on' | 'off' | null;
@@ -32,35 +38,116 @@ export function accountsFlagFromSearch(search: string): AccountsFlagRequest {
     return value === 'off' ? 'off' : null;
 }
 
+/**
+ * On unless THIS device has explicitly opted out.
+ *
+ * Unreadable storage answers `true` — the default — because the stored value is an opt-OUT and a
+ * device that cannot be asked has not opted out of anything. Answering "off" instead would hide
+ * the sign-in button from exactly the profile most likely to be a private window or a locked-down
+ * borrowed browser, and it would not even be a stable answer: the same blocked storage cannot
+ * persist an opt-out either, so every reload would ask again. What "on" costs a profile with no
+ * session is one `GET /api/auth/session` after the songbook is up (`use-account-session.ts`),
+ * which no startup or playback path awaits.
+ */
 export function accountsEnabled(): boolean {
     try {
-        return localStorage.getItem(ACCOUNTS_FLAG) === 'on';
+        return localStorage.getItem(ACCOUNTS_FLAG) !== 'off';
     } catch {
-        // No readable storage means no opt-in on record, which is the safe answer.
-        return false;
+        return true;
     }
 }
 
 export function setAccountsEnabled(enabled: boolean): void {
     try {
         if (enabled) {
-            localStorage.setItem(ACCOUNTS_FLAG, 'on');
-        } else {
-            // Removed rather than set to 'off': an absent key is the default state, so opting
-            // back out leaves no trace of the experiment behind.
+            // Removed rather than set to 'on': an absent key is the default state, so coming
+            // back leaves no trace — and it retires a beta profile's old opt-in value on the way.
             localStorage.removeItem(ACCOUNTS_FLAG);
+        } else {
+            localStorage.setItem(ACCOUNTS_FLAG, 'off');
         }
     } catch {
-        // The opt-in simply does not persist past this page; nothing else depends on it.
+        // The choice simply does not persist past this page; nothing else depends on it.
+    }
+}
+
+/**
+ * Whether this device has any reason to ask the server who it is (#1357 patch).
+ *
+ * A device that has never held an account cannot have a session to discover: signing in is what
+ * creates its records, and that path asks for itself. So the bootstrap `GET /api/auth/session`
+ * is skipped for it entirely — no request, and therefore no account database either, since
+ * `ensemble.tsx`'s held-account read is gated on the session having answered.
+ *
+ * That is a guest-boundary rule before it is anything else — a musician who never signed in
+ * should not have this app talking to a server on their behalf — but it was found the hard way.
+ * With accounts on by default, that one request fires on EVERY load including an offline one,
+ * where it fails against a dead socket, and on WebKit a failed request in the window around a
+ * service-worker-served navigation loses the GUEST database: measured 2026-09-20 on
+ * `checks/semantic-chart.spec.ts` at 7 failures in 180 against 0 in 180 with the flag off and 0
+ * in 180 on `main`, with a trace showing `indexedDB.open('ensemble-v2-preview', 1)` firing
+ * `upgradeneeded` and returning zero object stores seconds after the app had listed songs out of
+ * it. Answering the same read locally, with no socket, was 20/20 green — including the account
+ * database being created and opened, which is how we know the second database was never the
+ * problem. Their songbook is not worth one request nobody needed.
+ *
+ * The marker MIRRORS `meta.active`, which `lib/sync/repository.ts`'s `switchAccount` owns and
+ * `lib/account/sync-loop.ts`'s `moveFence` mirrors from, so the two cannot drift. Three states,
+ * and the absent one matters: a device that signed in under an older build has account records
+ * and no marker, so "absent" is resolved ONCE against `indexedDB.databases()` and then written
+ * down. Anything this cannot answer — no `databases()`, a rejection, unreadable storage — reads
+ * as "ask", because a missing marker must never be what hides a held account.
+ */
+export async function deviceMayHoldAccount(): Promise<boolean> {
+    let stored: string | null;
+    try {
+        stored = localStorage.getItem(HELD_FLAG);
+    } catch {
+        return true;
+    }
+    if (stored === 'yes' || stored === 'no') {
+        return stored === 'yes';
+    }
+    const existing = await accountDatabaseExists();
+    if (existing !== null) {
+        rememberAccountHeld(existing);
+    }
+    return existing ?? true;
+}
+
+/** `null` when this browser cannot be asked, which is not the same as "no". */
+async function accountDatabaseExists(): Promise<boolean | null> {
+    try {
+        if (typeof indexedDB === 'undefined' || typeof indexedDB.databases !== 'function') {
+            return null;
+        }
+        const existing = await indexedDB.databases();
+        return existing.some((database) => database.name === ACCOUNT_DATABASE);
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Records whether this device holds account records, beside every move of the `meta.active`
+ * fence it mirrors. Written rather than removed in both directions: an absent marker means "not
+ * asked yet" and costs a `databases()` probe, while `'no'` is an answer worth keeping.
+ */
+export function rememberAccountHeld(held: boolean): void {
+    try {
+        localStorage.setItem(HELD_FLAG, held ? 'yes' : 'no');
+    } catch {
+        // Unreadable storage already answers `true` above: it asks, every load.
     }
 }
 
 /**
  * What `syncAccountsFlag` should do with a `?accounts=` request, given the URL's hash too.
  *
- * A share link must never carry a feature-flag side effect: a stranger who only meant to open
- * a shared song would otherwise have this device's account UI flipped on permanently. So the
- * request is ignored outright — not merely left unpersisted — whenever the URL is a share link,
+ * A share link must never carry a feature-flag side effect: a stranger who only meant to open a
+ * shared song would otherwise have this device's account UI flipped — since #1357 the side effect
+ * worth naming is `?accounts=off`, which would silently take the product's account surfaces away
+ * from whoever followed the link. So the request is ignored outright — not merely left unpersisted — whenever the URL is a share link,
  * whatever it asked for. There are two shapes of one, and both are refused:
  *
  * - a v2 payload, which lives in the hash (`ensemble.tsx`'s `decodeChartLink`) — any non-empty
@@ -97,9 +184,9 @@ export function stripAccountsParam(search: string): string {
  * prerender (which is also why `useAccountsEnabled` resolves it in an effect, not during render).
  *
  * The parameter is removed with `replaceState` so it never survives into a shared or bookmarked
- * URL: the opt-in belongs to the device, and a link carrying it would silently enable unfinished
- * account UI for whoever opened it. A request riding alongside a share hash is never applied at
- * all (see `accountsFlagRequest`), so the flag setter below is never reached for one.
+ * URL: the choice belongs to the device, and a link carrying it would silently change the account
+ * surfaces for whoever opened it. A request riding alongside a share hash is never applied at
+ * all (see `accountsFlagRequest`), so the flag setter above is never reached for one.
  */
 export function syncAccountsFlag(): boolean {
     const requested = accountsFlagRequest(window.location.search, window.location.hash);

@@ -47,6 +47,9 @@ const env = {
     ENSEMBLE_HOSTNAME: environment === 'test' ? 'ensembletest.brndn.zip' : 'ensemble.brndn.zip',
     ENSEMBLE_API_ENV_FILE: apiEnvStandIn,
     ENSEMBLE_API_VOLUME: `${name}-api-data`,
+    // Test is open so the whole sign-up path can be exercised on a real origin; production
+    // opens at the cutover (#1357) and not before — until then its account UI is a beta.
+    ENSEMBLE_REGISTRATION: environment === 'test' ? 'open' : 'closed',
     ENSEMBLE_API_TAG: TAG_PLACEHOLDER,
     // Beside the static runtime, not instead of it, until the cutover (#1357).
     ENSEMBLE_WEB_PORT: environment === 'test' ? '8094' : '8095',
