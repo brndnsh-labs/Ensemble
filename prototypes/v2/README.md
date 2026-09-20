@@ -249,6 +249,14 @@ coexistence/production migration has not shipped. Prefer a corrective release an
 
 ## Deployment
 
+**Since the cutover (#1357) production is not published by this script.** `ensemble.brndn.zip/`
+serves this app at the site root from the `ensemble-web` image — the same export built with
+`ENSEMBLE_V2_BASE=/` — and a release is a container tag bump by the CI `deploy` job, verified
+through the host's public `/build.json`. `/v2/*` is an edge redirect to the same path at the
+root. Everything below describes the `/v2` runtime that is still installed on both hosts for a
+manual audition; both scripts refuse an origin already served by the image, and #1358 retires
+them.
+
 `node scripts/deploy.mjs <test|prod>` (from this directory, after a successful build) publishes
 `out/` as an immutable release beside the root app and atomically switches the `v2` symlink:
 `/srv/ensemble-test/www/.v2-previews/<artifact SHA256>-<unique deploy ID>/` on test,
@@ -259,11 +267,13 @@ change. `build.json` fingerprints output bytes and the offline recipe, not just 
 audition build cannot masquerade as a clean commit, and the prod target additionally refuses
 any build whose `sourceRevision` is not a clean checked-out HEAD.
 
-- **Test** is a workstation audition: `node scripts/deploy.mjs test` over `docker04-admin`.
-- **Production** is CI only: the `deploy` job in `.github/workflows/ci.yml` runs
-  `deploy.mjs prod` after the root release on every merge to `main`, over the scoped
-  `ensemble-deploy` account. The required `v2-checks` context (build + this suite) gates the
-  merge. There is no manual prod path from a laptop.
+- **Test** is a workstation audition: `node scripts/deploy.mjs test` over `docker04-admin`. It
+  publishes to the `/v2` runtime on :8090, which the hostname no longer routes to — point that
+  host's Caddy handle back at it first (`hosting/README.md`), and back afterwards.
+- **Production** was CI only, through the `deploy` job and the scoped `ensemble-deploy`
+  account. That step is gone: the job releases the `ensemble-web` tag instead, and `deploy.mjs
+  prod` would refuse the origin anyway. The required `v2-checks` context (build + this suite)
+  still gates the merge.
 
 Rollback means repointing the `v2` symlink to the previous verified release using the same
 temporary-symlink/rename operation. No database migration occurs. Old releases are retained;

@@ -6,11 +6,13 @@
 #
 #   ./scripts/deploy.sh <test|prod> [--artifact DIRECTORY] [--dry-run] [--quiet]
 #
-# Prod is continuously deployed: the CI `deploy` job (.github/workflows/ci.yml)
-# runs `deploy.sh prod` on every merge to main. This script is also the manual
-# path for both environments; the *ceremony* lives in the SKILLS, not here:
+# PROD IS NO LONGER PUBLISHED BY THIS SCRIPT. Since the v2 cutover (#1357) the public
+# origin is the `ensemble-web` image and the CI `deploy` job releases a container tag; the
+# preflight below refuses any origin that serves a root `/build.json`, so a `prod` run stops
+# before it transfers anything. #1358 deletes this script with the rest of v1. What is left
+# is the manual `test` path for the /v2 runtime; the *ceremony* lives in the SKILLS, not here:
 #   /deploy-test  — low ceremony, pre-merge audition box (the private staging box).
-#   /deploy-prod  — manual break-glass (CI down / forced redeploy off-pipeline).
+#   /deploy-prod  — manual break-glass, now a re-run of the CI release job.
 # This script owns mechanics only — plus one hard safety guard: it refuses a PROD
 # deploy from a dirty tree, so the public origin can never serve an unreviewed
 # build even if the skill gate is bypassed. (CI checks out a clean tree, so the

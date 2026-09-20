@@ -23,24 +23,25 @@ companions, first read [`prototypes/v2/CLAUDE.md`](prototypes/v2/CLAUDE.md). Thi
 handoff for Claude, Codex and other agents; no previous conversation or private agent memory
 is required.
 
-**A merge to `main` releases the v2 music stand too (since #1207, 2026-09-15).** The CI
-`deploy` job publishes two static releases per merge: the root app (`dist/`, the Vite build of
-`public/`, at `/`) and the v2 music stand (`prototypes/v2/` Next static export, at `/v2/` on
-the same origin, via `prototypes/v2/scripts/deploy.mjs prod`). `prototypes/v2-api/` (standalone
-Node service) still has **no** deploy target; accounts and sync are parked. So:
+**The v2 music stand IS the site (cutover #1357).** `ensemble.brndn.zip/` serves the
+`prototypes/v2/` Next static export built at `ENSEMBLE_V2_BASE=/`, inside the `ensemble-web`
+image; `/v2/*` is an edge redirect to the same path without the prefix. A merge to `main`
+releases it: the CI `deploy` job publishes no files at all any more — it releases this commit's
+`ensemble-web` and `ensemble-api` tags to prod and then test, and asserts each host's public
+`/build.json` names the commit. So:
 
-- A story touching **`prototypes/v2/**`** is live at `ensemble.brndn.zip/v2/` on merge, gated by
+- A story touching **`prototypes/v2/**`** is live at `ensemble.brndn.zip/` on merge, gated by
   the required `v2-checks` context (v2 build + its Playwright suite) alongside `checks` and
-  `e2e-tests`. It cannot regress the root app — the v2 publish asserts the root HTML is
-  byte-identical before and after — but it is a release.
-- A story touching **`public/**`** is live production code on that same merge, under the full
-  prod gate — the shared songbook codecs, engine hooks and state slices very much included, and
-  the v2 export compiles `public/` too, so `v2-checks` must stay green.
-- **This is not yet the v1→v2 cutover.** v1 stays at `/` and is the app the PWA install and share
-  links point at. v2 keeps its own IndexedDB and `localStorage` keys; anything saved there is
-  invisible to the v1 app. The cutover is planned and authorized as the end of
-  [`docs/design/ensemble-v2-rollout.md`](docs/design/ensemble-v2-rollout.md) (DECISION
-  2026-09-15): API online → document API → accounts in the product → core parity → hard cut.
+  `e2e-tests`. There is no longer a v1 app beside it for it to regress; it is the release.
+- A story touching **`public/**`** is live production code on that same merge — the shared
+  songbook codecs, engine hooks and state slices very much included, since the v2 export
+  compiles `public/`, so `v2-checks` must stay green. What is no longer live is v1's own UI
+  shell: nothing serves it, and #1358 deletes it.
+- **The cutover is a hard cut.** No `/v1/` grace path. v1's browser data is reachable only
+  through v2's import (#1274), and an old `?s=` share link opens best-effort (#1279). The plan
+  and its decisions are [`docs/design/ensemble-v2-rollout.md`](docs/design/ensemble-v2-rollout.md)
+  (DECISION 2026-09-15): API online → document API → accounts in the product → core parity →
+  hard cut.
 
 The original application's Preact/component conventions below still apply to `public/`. The
 isolated v2 shell uses its existing React components; do not migrate either UI as a side effect
@@ -232,7 +233,7 @@ Scheduled work is tracked in **GitHub issues** on `brndnsh-labs/Ensemble` (publi
 
 **Issue numbers `#N` are continuous up to #935.** Ensemble started on GitHub, moved to Forgejo in 2026-07 — where the counter *continued* rather than restarting — and came back on 2026-08-04 via a repo transfer that kept all 224 issues and 710 PRs at their original numbers. So a bare `#N` in an old commit or doc resolves correctly for **N ≤ 935**. Only the Forgejo-only window (#936–#1355) is renumbered; that map lives in homelab-maintenance `migration-maps/Ensemble-issue-map.tsv`. Only the **8 issues still open** at migration carried over to GitHub — those are the map's rows. Everything **closed** in that window stayed behind, readable in the read-only archive repo `git.brndn.zip/brandon/Ensemble-archive` (private + archived; `brandon/Ensemble` itself is now a pull mirror with its issue tracker disabled, so look in `-archive`, not there). So an unmapped `#N` in 936–1355 is archive provenance, not a live GitHub link.
 
-**Autonomy posture (DOCTRINE §5/§6):** the pipeline runs **full-auto** — well-specified, gate-verifiable, non-destructive stories build → branch → PR → **auto-merge to `main`** (CI-gated, via `gh pr merge --auto --squash` — GitHub holds the merge until the required `checks` + `e2e-tests` contexts pass; no client-side polling) without a per-step nod. It **stops and surfaces** on a judgment call: a **synth or by-ear** story (the listening gate is a hard human stop → `Needs-ear`), a destructive data op (persisted sessions / share-URL schema / preset data / state migration), a state-or-worker-contract design call, a P0 finding, or a genuinely ambiguous choice. A merge to `main` **is** a prod deploy: `main` is continuously deployed to `ensemble.brndn.zip` by the CI `deploy` job once `checks` + `e2e-tests` pass on the merged commit (DOCTRINE §6). Because `Needs-ear`/synth work is a *pre-merge* stop, nothing un-auditioned ships. `scripts/deploy.sh prod` remains as the manual break-glass path (CI down / forced redeploy); rollback is roll-forward via `git revert` → PR.
+**Autonomy posture (DOCTRINE §5/§6):** the pipeline runs **full-auto** — well-specified, gate-verifiable, non-destructive stories build → branch → PR → **auto-merge to `main`** (CI-gated, via `gh pr merge --auto --squash` — GitHub holds the merge until the required `checks` + `e2e-tests` contexts pass; no client-side polling) without a per-step nod. It **stops and surfaces** on a judgment call: a **synth or by-ear** story (the listening gate is a hard human stop → `Needs-ear`), a destructive data op (persisted sessions / share-URL schema / preset data / state migration), a state-or-worker-contract design call, a P0 finding, or a genuinely ambiguous choice. A merge to `main` **is** a prod deploy: `main` is continuously deployed to `ensemble.brndn.zip` by the CI `deploy` job once `checks` + `e2e-tests` pass on the merged commit (DOCTRINE §6). Because `Needs-ear`/synth work is a *pre-merge* stop, nothing un-auditioned ships. Since the cutover (#1357) a deploy is a container-tag release, so the break-glass path is a re-run of that job (`workflow_dispatch` on `main`) and an immediate rollback is the previous `ensemble-web` tag on the box; `scripts/deploy.sh prod` is **not** it any more — it refuses an origin served by the image. The normal correction is still roll-forward via `git revert` → PR.
 
 ## Agent skills
 

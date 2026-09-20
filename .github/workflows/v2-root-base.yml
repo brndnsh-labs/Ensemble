@@ -1,36 +1,37 @@
-# Proof that the v2 music stand still builds and passes its own suite at basePath `/`
-# (#1354), and that the `ensemble-web` image which serves that build honours the cutover's
-# edge contract (#1356) — see docs/design/ensemble-v2-rollout.md decision 1,
+# Proof that the v2 music stand builds and passes its own suite at basePath `/` (#1354), and
+# that the `ensemble-web` image which serves that build honours the cutover's edge contract
+# (#1356) — see docs/design/ensemble-v2-rollout.md decision 1,
 # `prototypes/v2/scripts/base-path.mjs` and hosting/README.md.
 #
-# DELIBERATELY NOT A REQUIRED CONTEXT, and deliberately a separate workflow rather than a leg
-# of ci.yml's `v2-suite`: the required `v2-checks` aggregate is `needs: v2-suite`, so any new
-# matrix leg there would gate merges on a build nothing ships yet. Nothing here uploads
-# `ensemble-v2-static-<sha>` or touches the `deploy` job's artifact — `/v2` remains the only
-# thing CI publishes until the cutover replaces that publisher with the web image.
+# **Since the cutover (#1357) `/` is the base production actually serves**, and this is the only
+# PR-time proof of it: ci.yml's `v2-suite` still builds at the default `/v2`, which nothing
+# publishes any more, and `web-image` only runs after the merge. So the filter below is scoped
+# to what can break the root build — the app, the shared `public/` code it compiles, and the
+# image's own config — rather than to the base-path machinery alone, which was the right scope
+# only while this base shipped nothing (patch P2-2).
 #
-# It runs on demand, and automatically on a PR that touches the base-path machinery itself —
-# the only change that can plausibly break the root build without breaking the `/v2` one.
+# STILL NOT A REQUIRED CONTEXT, and still a separate workflow rather than a leg of `v2-suite`:
+# the required `v2-checks` aggregate is `needs: v2-suite`, so a new matrix leg there would have
+# to be gated by branch protection this repository's owner controls. Making the root base
+# required means either adding an aggregate job here and naming it in protection, or pointing
+# `v2-suite` itself at `ENSEMBLE_V2_BASE=/` and letting `v2-checks` cover it — the tidier end
+# state, and #1358's business along with deleting v1.
+#
+# Nothing here uploads `ensemble-v2-static-<sha>` or publishes anything at all.
 name: v2 root base
 
 on:
   workflow_dispatch:
   pull_request:
     branches: [main]
+    # Broad on purpose (patch P2-2). The root-only surfaces — `root-handover.chromium.spec.ts`,
+    # the manifest, the `/v2/sw.js` tombstone — skip with a reason on a `/v2` build, so this
+    # workflow is the only place they run at all.
     paths:
-      - 'prototypes/v2/scripts/base-path.mjs'
-      - 'prototypes/v2/lib/base-path.ts'
-      - 'prototypes/v2/next.config.mjs'
-      - 'prototypes/v2/scripts/offline.mjs'
-      - 'prototypes/v2/scripts/serve.mjs'
-      - 'prototypes/v2/scripts/deploy.mjs'
-      - 'prototypes/v2/lib/sounds.ts'
-      - 'prototypes/v2/app/use-offline-install.ts'
-      - 'prototypes/v2/app/layout.tsx'
-      - 'prototypes/v2/checks/fixtures.ts'
-      # The root-only handover, manifest and offline-navigation specs (#1355). They skip with a
-      # reason on a `/v2` build, so this job is the only place they actually run.
-      - 'prototypes/v2/checks/root-handover.chromium.spec.ts'
+      - 'prototypes/v2/**'
+      # The export compiles the shared engine and songbook code through webpack, so a `public/`
+      # change can break the root build exactly as it can break the `/v2` one.
+      - 'public/**'
       # The image that serves that root build, and the edge config it carries (#1356).
       - 'hosting/web/**'
       - '.github/workflows/v2-root-base.yml'
