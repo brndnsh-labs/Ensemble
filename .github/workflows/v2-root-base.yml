@@ -25,7 +25,11 @@ on:
       - 'prototypes/v2/scripts/deploy.mjs'
       - 'prototypes/v2/lib/sounds.ts'
       - 'prototypes/v2/app/use-offline-install.ts'
+      - 'prototypes/v2/app/layout.tsx'
       - 'prototypes/v2/checks/fixtures.ts'
+      # The root-only handover, manifest and offline-navigation specs (#1355). They skip with a
+      # reason on a `/v2` build, so this job is the only place they actually run.
+      - 'prototypes/v2/checks/root-handover.chromium.spec.ts'
       - '.github/workflows/v2-root-base.yml'
 
 concurrency:
@@ -109,6 +113,10 @@ jobs:
             echo '::error::build.json is still keyed under /v2/'; exit 1
           fi
           grep -q 'const SCOPE = "/";' prototypes/v2/out/sw.js
+          # The cutover's own artifacts (#1355): the web manifest v1's installed PWA updates
+          # into, and the tombstone that retires the beta's `/v2/` worker. Both exist only here.
+          test -f prototypes/v2/out/manifest.json
+          test -f prototypes/v2/out/v2/sw.js
 
       - name: Run the v2 Playwright suite at basePath /
         run: npm run test:e2e --prefix prototypes/v2
