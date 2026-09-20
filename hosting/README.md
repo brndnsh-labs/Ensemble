@@ -29,6 +29,48 @@ sees atomic symlink changes instead of Docker pinning one release's inode.
   v2 -> .v2-{previews,releases}/...  atomic activation of the v2 music stand at /v2/
 ```
 
+### What the cutover's edge config must do (#1355 → #1356)
+
+The root-scope service worker and web manifest landed ahead of the web image, and they put five
+hard requirements on whatever serves `/` after the flip. Getting any of them wrong strands a
+returning browser on a shell that no longer exists, and a service worker is the one thing a
+user cannot fix by reloading.
+
+- **`/v2/sw.js` must be served as a FILE, never redirected.** The root build emits
+  `out/v2/sw.js`: a tombstone that retires the beta's `/v2/`-scoped worker, forwards its windows
+  to the same path without the prefix (query and fragment intact) and unregisters itself. It is
+  the only way to reach a browser holding that worker, because that worker answers its whole
+  scope from cache — a bookmarked `/v2/` never reaches the origin at all — and its ONE remaining
+  request is the update check for `/v2/sw.js`, which the spec fetches with redirects disabled.
+  So the blanket `/v2/* → /` redirect must carve out `/v2/sw.js`. Everything else under `/v2/`
+  redirects as planned.
+- **`/sw.js` and `/v2/sw.js` stay `no-store`**, as the current config already keeps the v1
+  worker. The registration also asks for `updateViaCache: 'none'`, but the origin must not be
+  the thing that pins a browser to the old script.
+- **`/manifest.json` must keep being served at that exact path**, with `no-cache` like the other
+  mutable entry points. It deliberately reuses v1's path, `id`, name and colours so an installed
+  v1 PWA updates in place instead of becoming a second app; moving or renaming it mints a new
+  identity.
+- **The `/v2/* → /` redirect should carry the rest of the path and the query**: `/v2/x?y` →
+  `/x?y`, which is what the tombstone does for the windows it can reach, so a browser gets the
+  same destination either way. A blanket redirect to `/` throws away whichever old link the
+  musician actually followed.
+- **No SPA fallback.** The worker now serves the cached shell for a navigation the NETWORK
+  refuses, which is an offline affordance, not a rewrite rule: online, a missing path must still
+  be a real 404, exactly as this layout already promises.
+
+One residual the edge cannot fix, recorded so it is not mistaken for a bug: a browser whose v1
+caches were already evicted under storage pressure still holds v1's registration but offers the
+new worker no evidence that it is replacing v1, so the update installs and WAITS until that
+browser's last v1 tab closes, then activates normally. It self-heals at the next tab close, and
+the alternative — skipping waiting on a timer, with no evidence — would risk swapping the code
+out from under a running band. Waiting is the safe side of that trade.
+
+A second one: the first root worker deletes every `ensemble-v2-preview-*` cache, including the
+shell of a `/v2/` beta tab that is open at that moment. Online that tab's next navigation falls
+through to the network, meets the redirect and lands on `/`; OFFLINE it gets a network-error page
+until the device reconnects. The beta's cache was always going to be deleted at the cut.
+
 The static root contains no database or credentials. Hidden paths, `/current`, and `/api/*`
 return 404. Both environments serve the v2 music stand at `/v2/` from the `v2` symlink; on
 production the scoped `ensemble-deploy` account (which owns the static root) creates

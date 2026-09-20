@@ -4,7 +4,7 @@ import { ensurePackLoaded } from '@engine/engine/pack-runtime';
 import { type PackManifest, setPackAssetFetcher, withRevToken } from '@engine/engine/sample-loader';
 import type { ChartContent } from '@engine/songbook/types';
 import type { InstrumentModule, InstrumentVoice } from '@engine/types';
-import { withBase } from './base-path';
+import { BASE_PATH, withBase } from './base-path';
 
 export { packsForInstrument };
 export const allSoundsSizeMB = SOUND_PACKS.reduce((total, pack) => total + pack.approxSizeMB, 0);
@@ -42,14 +42,37 @@ async function asset(source: string, cachedOnly = false): Promise<Response> {
         throw new Error('This sound references an unsupported file.');
     }
     // The key IS the served URL, so it carries the build's base (#1354). `CACHE` survives app-
-    // shell upgrades by design, and moving the base moves every key in it: at the cutover this
-    // cache goes cold once and the musician re-downloads the packs they had. Accepted there,
-    // never acceptable as a drive-by — a key change in a `/v2` build orphans everyone's sounds.
+    // shell upgrades by design, and moving the base moves every key in it — which is why the
+    // cutover re-keys them rather than letting them go cold (`migrateSoundCacheBase`, #1355).
+    // A key change is only ever acceptable WITH that migration; as a drive-by in a `/v2` build
+    // it silently orphans everyone's sounds.
     const key = `${withBase(url.pathname)}?asset=${hash}`;
     const cache = await caches.open(CACHE);
     const cached = await cache.match(key);
     if (cached && (await digest(await cached.clone().arrayBuffer())) === hash) {
         return cached;
+    }
+    // A read-through move for the entries `migrateSoundCacheBase` has not reached yet (#1355
+    // review R6). That pass runs unawaited from startup, so on the FIRST load after the cutover
+    // this read can arrive first — and offline (`cachedOnly`) it would answer "Sound download is
+    // incomplete" while the bytes sit one key away under the old base. Moving it here on demand
+    // makes the background pass pure tidy-up rather than a race the musician can lose on a gig.
+    // The digest is the same one this function already trusts, so an adopted entry is verified
+    // exactly as a cached one is, and a failure falls through to the network path below.
+    // `BASE_PATH` is a build constant, so this whole block is eliminated from the `/v2` bundle.
+    if (BASE_PATH === '') {
+        try {
+            const legacy = await cache.match(`/v2${url.pathname}?asset=${hash}`);
+            if (legacy && (await digest(await legacy.clone().arrayBuffer())) === hash) {
+                await cache.put(key, legacy.clone());
+                // Tidy-up only, so never awaited into the result: once the new key holds the
+                // verified bytes this read has succeeded, whatever becomes of the old entry.
+                void cache.delete(`/v2${url.pathname}?asset=${hash}`).catch(() => {});
+                return legacy;
+            }
+        } catch {
+            // The old entry stays where it is and the pack downloads again. Never a hard failure.
+        }
     }
     if (cachedOnly) {
         throw new Error('Sound download is incomplete. Reconnect and retry.');
@@ -69,6 +92,67 @@ async function asset(source: string, cachedOnly = false): Promise<Response> {
 
 export function initializeSounds(): void {
     setPackAssetFetcher(asset);
+}
+
+/**
+ * Move a musician's downloaded packs across the cutover instead of making them download them
+ * again (#1355).
+ *
+ * `asset()` keys this cache by the URL it fetched, which carries the build's base, so every
+ * entry a `/v2` build wrote is filed under `/v2/packs/…` and a root build looks straight past
+ * it. Re-keying is safe precisely because the keys are content-addressed: the `?asset=<sha256>`
+ * that survives the move is the same digest `asset()` verifies the bytes against on every read,
+ * so a move that corrupted anything would be caught at the next read rather than played.
+ * Someone who installed all thirteen packs for a gig keeps them through the flip.
+ *
+ * Root build only, never awaited by startup, and safe to run twice: an entry is removed from
+ * its old key only once the new one reads back, so a failure part-way leaves the cache whole
+ * and the next page load finishes the job. `asset()` carries the same move as a read-through, so
+ * nothing here is on anyone's critical path.
+ *
+ * One entry's failure is ONE entry's failure (#1355 review R10). The `try` is inside the loop:
+ * with it around the whole walk, a single browser-refused `cache.put` — a quota trip on the
+ * largest pack, say — abandoned every entry after it, and because the walk is ordered, every
+ * later page load would abandon at exactly the same place and never finish the job.
+ */
+export async function migrateSoundCacheBase(): Promise<void> {
+    if (BASE_PATH !== '' || typeof caches === 'undefined') {
+        return;
+    }
+    let cache: Cache;
+    let entries: readonly Request[];
+    try {
+        cache = await caches.open(CACHE);
+        entries = await cache.keys();
+    } catch {
+        return;
+    }
+    for (const request of entries) {
+        try {
+            const url = new URL(request.url);
+            // Exactly the shape `asset()` writes, and nothing else: a key this app did not
+            // author is not ours to rewrite.
+            if (
+                url.origin !== location.origin ||
+                !url.pathname.startsWith('/v2/packs/') ||
+                !/^\?asset=[a-f0-9]{64}$/.test(url.search)
+            ) {
+                continue;
+            }
+            const moved = `${url.pathname.slice('/v2'.length)}${url.search}`;
+            const stored = await cache.match(request);
+            if (!stored) {
+                continue;
+            }
+            await cache.put(moved, stored);
+            if (await cache.match(moved)) {
+                await cache.delete(request);
+            }
+        } catch {
+            // A pack that did not move is a pack that downloads again, or that `asset()` adopts
+            // on its next read. Never a startup failure, and never a reason to stop.
+        }
+    }
 }
 
 export function validateVoice(module: InstrumentModule, voice: InstrumentVoice): void {
