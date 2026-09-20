@@ -20,6 +20,15 @@ if (!/^sha-[0-9a-f]{40}$/.test(pinnedTag ?? '')) {
     throw new Error('Set ENSEMBLE_API_TAG=sha-<full commit sha> to the tag to pin as the default');
 }
 const TAG_PLACEHOLDER = 'RENDER-API-TAG-PLACEHOLDER';
+// The web image (#1356) is pinned and released the same way, through its own variable:
+// the release step rewrites ONE service's line in .env and must never move the other.
+const pinnedWebTag = process.env.ENSEMBLE_WEB_TAG;
+if (!/^sha-[0-9a-f]{40}$/.test(pinnedWebTag ?? '')) {
+    throw new Error(
+        'Set ENSEMBLE_WEB_TAG=sha-<full commit sha> to the web image tag to pin as the default',
+    );
+}
+const WEB_TAG_PLACEHOLDER = 'RENDER-WEB-TAG-PLACEHOLDER';
 // Compose stats env_file at config time, so an empty stand-in satisfies the first pass.
 // The reference itself is then dropped from the model and re-inserted into the rendered
 // YAML by hand: whether `config` preserves env_file varies by Compose version (v5 keeps
@@ -39,6 +48,9 @@ const env = {
     ENSEMBLE_API_ENV_FILE: apiEnvStandIn,
     ENSEMBLE_API_VOLUME: `${name}-api-data`,
     ENSEMBLE_API_TAG: TAG_PLACEHOLDER,
+    // Beside the static runtime, not instead of it, until the cutover (#1357).
+    ENSEMBLE_WEB_PORT: environment === 'test' ? '8094' : '8095',
+    ENSEMBLE_WEB_TAG: WEB_TAG_PLACEHOLDER,
 };
 let model;
 try {
@@ -69,6 +81,9 @@ model.services[name] = { ...model.services.static, container_name: name };
 delete model.services.static;
 model.services[`${name}-api`] = { ...model.services.api, container_name: `${name}-api` };
 delete model.services.api;
+// `<stack>-web` is the name the release script derives from its `web` argument.
+model.services[`${name}-web`] = { ...model.services.web, container_name: `${name}-web` };
+delete model.services.web;
 delete model.services[`${name}-api`].env_file;
 delete model.services[`${name}-api`].environment?.ENSEMBLE_AUTH_IP_SECRET;
 const yaml = execFileSync(
@@ -89,9 +104,13 @@ const substitute = (text, from, to) => {
 };
 const rendered = substitute(
     substitute(
-        yaml.trim(),
-        `ensemble-api:${TAG_PLACEHOLDER}`,
-        `ensemble-api:\${ENSEMBLE_API_TAG:-${pinnedTag}}`,
+        substitute(
+            yaml.trim(),
+            `ensemble-api:${TAG_PLACEHOLDER}`,
+            `ensemble-api:\${ENSEMBLE_API_TAG:-${pinnedTag}}`,
+        ),
+        `ensemble-web:${WEB_TAG_PLACEHOLDER}`,
+        `ensemble-web:\${ENSEMBLE_WEB_TAG:-${pinnedWebTag}}`,
     ),
     `    container_name: ${name}-api\n`,
     `    container_name: ${name}-api\n    env_file:\n      - path: ${apiEnvFile}\n        required: true\n`,
@@ -100,5 +119,5 @@ if (rendered.includes(apiEnvStandIn) || rendered.includes('ENSEMBLE_AUTH_IP_SECR
     throw new Error('Render-time stand-in leaked into the rendered stack');
 }
 console.log(
-    `# Generated from Ensemble hosting/static/compose.yml via render.mjs ${environment}.\n# Do not edit independently; regenerate both environment recipes from the shared source.\n# The API image tag is the one interpolation here, by design: its default is the tag\n# pinned at render time and the on-box .env (written by the release step) overrides it.\n${rendered}`,
+    `# Generated from Ensemble hosting/static/compose.yml via render.mjs ${environment}.\n# Do not edit independently; regenerate both environment recipes from the shared source.\n# The two image tags are the only interpolations here, by design: each default is the tag\n# pinned at render time and the on-box .env (written by the release step) overrides it.\n${rendered}`,
 );

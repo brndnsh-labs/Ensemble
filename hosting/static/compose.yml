@@ -1,8 +1,8 @@
 # One runtime recipe; only the data directory, host ports, origin and image tag vary
 # by environment. Copy this reviewed recipe + nginx.conf through homelab config-as-code
-# tooling (render.mjs resolves everything except the API image tag, which stays an
-# interpolation with a default so the forced-command release step can bump it through
-# the stack's .env without a config redeploy — see hosting/README.md).
+# tooling (render.mjs resolves everything except the two image tags, which stay
+# interpolations with a default so the forced-command release step can bump either
+# through the stack's .env without a config redeploy — see hosting/README.md).
 services:
   static:
     image: nginx:1.29-alpine@sha256:5616878291a2eed594aee8db4dade5878cf7edcb475e59193904b198d9b830de
@@ -75,6 +75,39 @@ services:
       - type: volume
         source: api-data
         target: /data
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+  # The v2 music stand as an immutable image (#1356, rollout decision 1): the root build
+  # inside `ensemble-web`, which carries its own nginx.conf — no bind mounts, because the
+  # release IS the tag. It runs BESIDE `static` on its own port until the cutover (#1357)
+  # points Caddy at it, so going back is one Caddy line and never a rebuild.
+  # ENSEMBLE_WEB_TAG is the one value the release step changes, exactly like the API's.
+  web:
+    image: ghcr.io/brndnsh-labs/ensemble-web:${ENSEMBLE_WEB_TAG:?set the pinned web image tag}
+    # Already the image's default (USER nginx); pinned so this file is the authority.
+    user: "101:101"
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 100
+    mem_limit: 128m
+    # nginx.conf keeps its pid and every scratch path under /tmp so read_only holds.
+    tmpfs: ["/tmp:size=32m,mode=1777"]
+    ports: ["${ENSEMBLE_WEB_PORT:?set environment web port}:8080"]
+    # The image's own HEALTHCHECK, restated so the release step's health wait does not
+    # depend on a default nobody can see from here; hosting/web/smoke.mjs runs the image's
+    # copy, so a missing wget fails in CI and not as a stack that never goes healthy.
+    healthcheck:
+      test: [CMD, wget, --quiet, --output-document=/dev/null, "http://127.0.0.1:8080/index.html"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
     logging:
       driver: json-file
       options:

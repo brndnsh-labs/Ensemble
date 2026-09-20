@@ -71,6 +71,21 @@ case "$ENV_NAME" in
         ;;
 esac
 
+# Since #1356 a host can be routed to the `ensemble-web` IMAGE (the v2 stand at `/`) instead
+# of the bind-mounted runtime this script publishes to. The rsync would still land, but every
+# check below asks the public origin, which would answer with the image: the run would fail at
+# the last step AFTER changing the release root. Only the image serves a root /build.json, so
+# ask first and stop with the actual remedy. (Production joins at the cutover, #1357, which
+# retires this script for it.)
+if curl --connect-timeout 10 --max-time 20 -fsS "${ORIGIN_URL}/build.json" 2>/dev/null |
+    grep -q '"sourceRevision"'; then
+    echo "❌ ${ORIGIN_URL} is routed to the ensemble-web image, not the static runtime this script publishes."
+    echo "   To audition a build here, point Caddy's handle for this host back at the static"
+    echo "   runtime's port (homelab-maintenance caddy/Caddyfile; see hosting/README.md), deploy,"
+    echo "   and point it back afterwards."
+    exit 1
+fi
+
 # Both environments are the shared atomic runtime on docker04. Test uses the
 # `docker04-admin` alias directly; prod uses `ensemble-admin`, which CI
 # materializes per-run pointing at docker04's scoped `ensemble-deploy` account
