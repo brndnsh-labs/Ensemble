@@ -137,6 +137,27 @@ export const REMOTE_UPDATE_MESSAGES = {
 } as const;
 
 /**
+ * What a signed-in musician is told about where a v1 import's songs land (#1274, reworded for
+ * #1359) — said on the import card, and here rather than in `app/songbook.tsx` because it is a
+ * sentence about their ACCOUNT, in the same file as the rest of them.
+ *
+ * It has to be true in four moments with one wording: before the import (nothing has landed yet),
+ * right after one (the offer is opening by itself over this card), after a run that brought
+ * nothing new over (no offer opens), and on a device whose account songbook has not finished
+ * downloading — where the offer is deliberately withheld, because "which songs are missing?" has
+ * no honest answer against a library this device has not read yet (#1268's P0). So the offer is
+ * promised with the condition it actually has, and the account page's standing button — named in
+ * its own words, `account-page.tsx` — is stated as always available, which is what makes the
+ * sentence true in the one moment nothing opens by itself.
+ */
+export const V1_IMPORT_ACCOUNT_MESSAGES = {
+    pointer:
+        'These go to this device’s songbook first. When your account’s songs have loaded, this ' +
+        'app offers to add them to your account; you can also use “Add this device’s songs” on ' +
+        'your account page at any time.',
+} as const;
+
+/**
  * Why this device is holding an account songbook with nobody signed in (#1351 patch N1).
  *
  * `expired` is the live session that lapsed in THIS page load. `guest` is every other way of
