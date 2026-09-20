@@ -381,6 +381,104 @@ jobs:
           echo "::error::API image never answered /healthz" >&2
           exit 1
 
+  # Publish the v2 music stand as an immutable static image on every merge to main —
+  # decision 1 of docs/design/ensemble-v2-rollout.md (#1356), the other half of the pair
+  # `api-image` above already ships. NOTHING consumes it yet: the site is still published by
+  # the rsync/symlink path in the `deploy` job, and `deploy` deliberately does NOT `needs:`
+  # this job, so a red image build cannot hold up today's release. The required contexts
+  # (`checks`, `e2e-tests`, `v2-checks`) are untouched for the same reason — this publishes an
+  # artifact for the cutover to switch to, it does not gate a merge.
+  #
+  # `needs: v2-checks` is the analogue of `api-image`'s `needs: checks`: the suite that
+  # actually exercises this app has to be green before its bytes are published under a tag a
+  # release command can name.
+  #
+  # FIRST PUSH: a brand-new GHCR package is PRIVATE, and docker04 pulls anonymously. After the
+  # first successful run, flip `ensemble-web` to public in the GitHub package settings, the
+  # same one-off `ensemble-api` needed.
+  web-image:
+    runs-on: ubuntu-latest
+    needs: v2-checks
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    env:
+      IMAGE: ghcr.io/brndnsh-labs/ensemble-web
+      # The cutover build: the stand at the site root, not at /v2. This is the ONE value that
+      # changes what gets built (prototypes/v2/scripts/base-path.mjs, #1354).
+      ENSEMBLE_V2_BASE: /
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Use Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            prototypes/v2/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install v2 dependencies
+        run: npm ci --prefix prototypes/v2
+
+      # Built here rather than downloaded: `v2-suite` uploads the `/v2` export, which is a
+      # different artifact. The image COPYs this prebuilt output through a named build context,
+      # so the Docker context stays hosting/web — same prebuilt-bundle shape as `api-image`.
+      - name: Build the v2 static export at basePath /
+        run: npm run build --prefix prototypes/v2
+
+      - name: Assert the artifact is the root build
+        run: |
+          # `set -e` ignores a command inverted with `!`, so each negative is an explicit `if`.
+          set -euo pipefail
+          grep -q 'const SCOPE = "/";' prototypes/v2/out/sw.js
+          # The cutover's own artifacts (#1355): the web manifest v1's installed PWA updates
+          # into, and the tombstone that retires the beta's `/v2/` worker.
+          test -f prototypes/v2/out/manifest.json
+          test -f prototypes/v2/out/v2/sw.js
+          if grep -q '/v2/_next/' prototypes/v2/out/index.html; then
+            echo '::error::index.html still references /v2/_next'; exit 1
+          fi
+
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # No `cache-from`/`cache-to`: this image is one COPY of a freshly built export over a
+      # digest-pinned base, so there is no layer worth caching that pulling the base does not
+      # already give — and the export's layer changes on every commit by construction.
+      - name: Build and push
+        uses: docker/build-push-action@v7
+        with:
+          context: hosting/web
+          build-contexts: site=prototypes/v2/out
+          push: true
+          provenance: false
+          build-args: REVISION=${{ github.sha }}
+          tags: |
+            ${{ env.IMAGE }}:sha-${{ github.sha }}
+            ${{ env.IMAGE }}:main
+
+      # Prove the pushed bytes serve: pull the sha tag back from the registry and run the
+      # container under the same flags the stack uses. Fails the run (so the tag stays
+      # unreleased) on a redirected /v2/sw.js, an SPA fallback, an absolute redirect, a wrong
+      # revision or any of the other contract lines in hosting/web/smoke.mjs.
+      - name: Smoke-test the pushed image
+        run: |
+          set -euo pipefail
+          docker pull --quiet "$IMAGE:sha-$GITHUB_SHA"
+          node hosting/web/smoke.mjs "$IMAGE:sha-$GITHUB_SHA" "$GITHUB_SHA"
+
   # Continuous deployment: main IS live. A push to main only happens via a green PR
   # merge, so reaching this job means the full gate already passed on this exact
   # commit — deploy it. `workflow_dispatch` on main is a manual break-glass redeploy

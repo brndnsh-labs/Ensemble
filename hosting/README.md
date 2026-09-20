@@ -71,6 +71,106 @@ shell of a `/v2/` beta tab that is open at that moment. Online that tab's next n
 through to the network, meets the redirect and lands on `/`; OFFLINE it gets a network-error page
 until the device reconnects. The beta's cache was always going to be deleted at the cut.
 
+### The `ensemble-web` image (#1356)
+
+`hosting/web/` is the in-repo half of decision 1: a `Dockerfile`, the `nginx.conf` that answers
+the five requirements above, and `smoke.mjs`, which turns each of them into an assertion against
+a container that is actually running. Together they build
+`ghcr.io/brndnsh-labs/ensemble-web:sha-<commit>` — the v2 stand exported at
+`ENSEMBLE_V2_BASE=/` (#1354) inside `nginxinc/nginx-unprivileged`, digest-pinned the way
+`static/compose.yml` pins nginx. At the cutover this image replaces the whole layout above: no
+release directory, no `current` symlink, no `v2` symlink, because the release IS the tag and
+rollback is the previous tag rather than a re-activation.
+
+The Docker build context is `hosting/web`: three small files, of which the Dockerfile copies two
+(`smoke.mjs` lives there because it belongs beside what it tests, and never enters the image).
+The export itself arrives as a *named* build context, so the repository never becomes the
+context and there is no `.dockerignore` to keep correct against a tree holding `node_modules`
+and `.next`. Same prebuilt-artifact shape as `prototypes/v2-api/Dockerfile`; the bytes served
+are the bytes the v2 gates ran against — and only those, since the Dockerfile empties the
+document root first, which is what retires the base image's own `50x.html`.
+
+```sh
+ENSEMBLE_V2_BASE=/ npm run build --prefix prototypes/v2
+docker build hosting/web --build-context site=prototypes/v2/out \
+    --build-arg REVISION="$(git rev-parse HEAD)" --tag ensemble-web:local
+node hosting/web/smoke.mjs ensemble-web:local "$(git rev-parse HEAD)"
+```
+
+`smoke.mjs` starts the container with `--read-only --tmpfs /tmp --cap-drop ALL --security-opt
+no-new-privileges`, so the posture the stack runs containers under is proven rather than
+assumed, and it speaks raw `node:http` rather than `fetch` because the assertions are about
+status codes, `Location` and `Content-Encoding` — all three of which `fetch` hides by following,
+decoding or both. It checks the root HTML and its `/_next/` references, `build.json`'s
+`sourceRevision` and the image's `org.opencontainers.image.revision` label against the commit it
+was built from, `/sw.js` and its `SCOPE`, the `/v2/sw.js` tombstone served as a file with no
+`Location`, each `/v2/*` redirect's exact target **parsed** back to this origin rather than
+prefix-tested, the manifest's `id`, immutable vs no-cache vs no-store policy, MIME types, byte
+ranges and gzip on text but not on audio, an exact 404 for every deterministic refusal (missing
+paths, `/api/*`, dotfiles, `/50x.html`) and 403-or-404 for the one directory case, uid 101, a
+read-only root filesystem, and the image's own `HEALTHCHECK` command.
+
+It was mutation-tested four ways, each of which fails it:
+
+| Mutation | What the smoke reports |
+| --- | --- |
+| `/v2/sw.js` carve-out removed | `/v2/sw.js` answers 308 with `Location: /sw.js` instead of the tombstone |
+| SPA `try_files … /index.html` fallback added | missing paths answer 200 with the app shell |
+| `absolute_redirect on` | `Location: http://127.0.0.1/x/y?a=b` instead of `/x/y?a=b` |
+| open-redirect guard removed from `$ensemble_v2_moved` | `/v2//evil.example/x` → `//evil.example/x`, which resolves to `http://evil.example` |
+
+That last row is why the redirect assertion parses instead of testing a `/` prefix:
+`'//evil.example/x'.startsWith('/')` is perfectly true, and an earlier version of this script
+passed against a config that would have sent a returning musician off-origin.
+
+What the config carries over from `static/nginx.conf`: the tmpfs pid/temp paths, `server_tokens
+off`, the dotfile and `/api/*` 404s, the no-SPA-fallback `try_files`, and the no-store/no-cache
+policy for workers and mutable entry points. What it drops, and why: the `/current` 404s and
+`disable_symlinks off` were about a bind-mounted release directory that an image does not have,
+and the second `location /v2/` document root is now the redirect. What it adds: the `/v2/sw.js`
+carve-out, `absolute_redirect off` (this container speaks plain HTTP on a LAN port behind Caddy
+and Cloudflare, so an absolute `Location` would publish that address to a public browser),
+an open-redirect guard in front of it (a second separator right after `/v2/` means the rest of
+the target is an authority, not a path), long-lived immutable caching for `/_next/static/`, gzip
+for text only, and two of the three response headers `docs/SECURITY.md` F5 names as needing the
+web-server layer: `X-Content-Type-Options: nosniff` and `frame-ancestors 'none'`. F5's third is
+HSTS, which is deliberately not set here — it belongs to Caddy and is ignored over plain HTTP
+anyway. `Referrer-Policy` is an addition of this config's own, not an F5 item. No brotli either —
+the base image has no such module and this config does not add one.
+
+CI builds it in two places. `web-image` in `ci.yml` runs on a merge to `main` only, beside
+`api-image`: it builds the root export, pushes `:sha-<commit>` and `:main`, pulls the sha tag
+back and runs the smoke script against it. `v2-root-image` in `v2-root-base.yml` is the PR-time
+proof that needs no registry — same build, `load: true` instead of `push`, same smoke script —
+so a rule as easy to get wrong as the `/v2/sw.js` carve-out is provable on the pull request that
+writes it. Neither one touches the required contexts, and `deploy` deliberately does not
+`needs:` the image job: the site is still published by the rsync/symlink path, and a red image
+build must not hold up today's release. **A brand-new GHCR package is private**, and docker04
+pulls anonymously, so after the first successful `web-image` run the owner has to flip
+`ensemble-web` to public in the GitHub package settings — the one-off `ensemble-api` also needed.
+
+Still to come, the infra half of #1356: a `web` service in `static/compose.yml` and
+`render.mjs`, `ensemble-release` accepting `web` as a service and keeping BOTH image tags in the
+stack's `.env`, the Caddy route, and the test-host deploy.
+
+**One gap that half has to close.** Because `deploy` does not `needs:` `web-image`, a commit can
+be deployed while its `ensemble-web:sha-<commit>` was never pushed — a red or skipped image job
+does not stop the release today, and that is the right trade only while nothing serves the
+image. The moment `ensemble-release … web` exists, releasing a tag that is not in the registry
+must fail loudly (the API's gate already waits on a healthcheck and restores the previous tag,
+which is the shape to copy) rather than leaving the service on an older tag and reporting
+success. Deciding between that and making `deploy` depend on `web-image` is the infra half's
+call; what must not happen is a silent divergence between the commit on `main` and the image
+serving `/`.
+
+What that half needs from this image
+is short: container port **8080**; **no environment**, **no volumes**, **no secrets**; the same
+`read_only: true`, `cap_drop: [ALL]`, `no-new-privileges`, `tmpfs: /tmp` posture as the `static`
+service, and `user: "101:101"` which is already the image's default; and a healthcheck it can
+simply inherit, since the image bakes in `wget --quiet --output-document=/dev/null
+http://127.0.0.1:8080/index.html` — the same busybox `wget` probe the `static` service spells
+out today.
+
 The static root contains no database or credentials. Hidden paths, `/current`, and `/api/*`
 return 404. Both environments serve the v2 music stand at `/v2/` from the `v2` symlink; on
 production the scoped `ensemble-deploy` account (which owns the static root) creates
