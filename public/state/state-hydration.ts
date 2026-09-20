@@ -33,6 +33,17 @@ import { saveCurrentState } from './persistence.js';
 import { decodeBase64Unicode, decompressSections, generateId } from './share-codec.js';
 
 /**
+ * Why several of this file's normalizers are exported (#1274): the v2 stand's v1
+ * importer (`prototypes/v2/lib/import-v1.ts`) is a THIRD reader of
+ * `ensemble_currentState`, alongside `hydrateSavedState` here and the share reader
+ * below. It must accept exactly what v1 itself accepts — a real profile can hold a
+ * retired soloist preset, or the numeric `density`/`swingSub` a pre-#1257 share link
+ * persisted — so re-deriving these rules there would recreate the two-readers-drift
+ * bug this file is full of scar tissue from. The exported helpers are pure and
+ * unchanged; nothing about hydration's behaviour moved.
+ */
+
+/**
  * Clamp an untrusted numeric field, falling back to `defaultVal` for anything that
  * isn't a real number.
  *
@@ -44,7 +55,7 @@ import { decodeBase64Unicode, decompressSections, generateId } from './share-cod
  * `Number.isFinite` (not `!isNaN`) so `Infinity` also lands on the default instead of
  * pinning to `max`.
  */
-const clamp = (val: any, min: number, max: number, defaultVal: number): number => {
+export const clamp = (val: any, min: number, max: number, defaultVal: number): number => {
     const num = typeof val === 'string' ? parseFloat(val) : typeof val === 'number' ? val : NaN;
     if (!Number.isFinite(num)) {
         return defaultVal;
@@ -58,7 +69,7 @@ const clamp = (val: any, min: number, max: number, defaultVal: number): number =
  * explicitly picked a pack voice (via the old per-instrument picker), in which
  * case preserve that choice as a pin so auto-follow doesn't override it.
  */
-const hydrateAutoSound = (saved: unknown, voice: InstrumentVoice): boolean =>
+export const hydrateAutoSound = (saved: unknown, voice: InstrumentVoice): boolean =>
     typeof saved === 'boolean' ? saved : voice === 'synth';
 
 // Mix-pass consolidation (2026-05-23) — soloist is now a single trumpet voice;
@@ -66,7 +77,7 @@ const hydrateAutoSound = (saved: unknown, voice: InstrumentVoice): boolean =>
 // older saved sessions and share URLs keep loading without throwing.
 const SUPPORTED_SOLOIST_PRESETS = new Set(['trumpet']);
 
-function normalizeSoloistPreset(preset: any, fallback = 'trumpet'): string {
+export function normalizeSoloistPreset(preset: any, fallback = 'trumpet'): string {
     return typeof preset === 'string' && SUPPORTED_SOLOIST_PRESETS.has(preset) ? preset : fallback;
 }
 
@@ -110,7 +121,7 @@ export function normalizeSwingSub(value: unknown): SwingSub {
  * it is rendered in `PresetLibrary` and pre-fills the `prompt()` in
  * `saveProgression`.
  */
-function sanitizeDisplayString(value: unknown, fallback: string, maxLen = 100): string {
+export function sanitizeDisplayString(value: unknown, fallback: string, maxLen = 100): string {
     if (typeof value !== 'string') {
         return fallback;
     }
@@ -260,7 +271,7 @@ function decompressBandSettings(str: string): SharedBandPayload | null {
 /**
  * Validates and sanitizes sections array from untrusted source.
  */
-function validateSections(sections: any[]): any[] {
+export function validateSections(sections: any[]): any[] {
     if (!Array.isArray(sections)) {
         return [];
     }
