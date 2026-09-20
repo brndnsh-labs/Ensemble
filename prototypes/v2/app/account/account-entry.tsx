@@ -8,8 +8,8 @@ import type { SessionState } from '../../lib/account/session';
  * other surface the shell hands props to.
  *
  * `unknown` renders "Sign in" rather than nothing: the first session read can be slow, or fail
- * outright with the API unreachable, and a device that opted in should still see its way in
- * (where it will get the "can't reach the server" explanation) instead of an entry point that
+ * outright with the API unreachable, and a musician should still see their way in (where they
+ * will get the "can't reach the server" explanation) instead of an entry point that
  * silently never appears. Being wrong in that direction costs one pointless click; being wrong
  * the other way hides the feature.
  *

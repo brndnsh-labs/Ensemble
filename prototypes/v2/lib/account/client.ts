@@ -6,9 +6,9 @@
  * per-render `createAccountSession()` would not provide.
  *
  * Constructing these is inert — no request, no storage access, no timer — so importing this
- * module cannot change guest startup. The dark-launch flag (`feature.ts`) gates every CALL:
- * a device that has not opted in never reaches `refresh()` or any ceremony, and therefore never
- * issues an `/api/*` request at all.
+ * module cannot change guest startup. The per-device flag (`feature.ts`) gates every CALL:
+ * a device that opted out with `?accounts=off` never reaches `refresh()` or any ceremony, and
+ * therefore never issues an `/api/*` request at all.
  */
 
 import { createAccountApi } from './api';

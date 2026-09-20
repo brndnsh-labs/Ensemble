@@ -137,6 +137,27 @@ export const REMOTE_UPDATE_MESSAGES = {
 } as const;
 
 /**
+ * The two things the SONGBOOK has to say about the account switch itself (#1357), as opposed to
+ * about an account. Here with the rest of the copy for the same reason every sentence in this
+ * file is: a musician reads them, so they are not spelled inline in a component.
+ *
+ * `fallback` is the honest version of a silence. The first session read is bounded
+ * (`FIRST_READ_DEADLINE_MS` in `app/account/use-account-session.ts`) so a hung origin cannot hold
+ * the song list hostage — but the list that then appears is the GUEST one, and on a signed-in
+ * device that is a different library under the same heading. Saying so is the difference between
+ * a fallback and a wrong answer; the line goes the moment a real answer lands, late or not.
+ *
+ * `off` is the way back from `?accounts=off`. The opt-out is per-device and the parameter is
+ * stripped from the URL as soon as it is applied, so without this line the only route back is a
+ * query parameter nobody has written down — which is not an opt-out, it is a trapdoor.
+ */
+export const ACCOUNT_SWITCH_MESSAGES = {
+    fallback: 'Couldn’t reach your account — showing this device’s songbook.',
+    off: 'Account features are off on this device.',
+    turnOn: 'Turn on',
+} as const;
+
+/**
  * What a signed-in musician is told about where a v1 import's songs land (#1274, reworded for
  * #1359) — said on the import card, and here rather than in `app/songbook.tsx` because it is a
  * sentence about their ACCOUNT, in the same file as the rest of them.

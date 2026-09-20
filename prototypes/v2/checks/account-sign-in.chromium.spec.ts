@@ -35,8 +35,6 @@ test('creating an account shows the recovery code once, downloads it, and surviv
     page.on('console', (message) => logged.push(message.text()));
     await addVirtualAuthenticator(page);
     await openWithAccounts(page);
-    // The opt-in is per device, not per link: the parameter is stripped so it cannot be shared.
-    expect(page.url()).not.toContain('accounts=');
 
     const code = await createAccountThroughDialog(page);
 

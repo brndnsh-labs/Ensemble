@@ -6,11 +6,16 @@ import {
     setAccountsEnabled,
     stripAccountsParam,
 } from '../../../prototypes/v2/lib/account/feature.js';
+import {
+    deviceMayHoldAccount,
+    rememberAccountHeld,
+} from '../../../prototypes/v2/lib/account/held-account.js';
 
 /**
- * The v2 account dark-launch gate (#1262). Node/happy-dom has no `localStorage`, which is what
- * makes this a useful place to test the module: every accessor is wrapped, and "no storage at
- * all" has to resolve to "not opted in" rather than throwing into a render.
+ * The v2 per-device account switch (#1262; default flipped on by the cutover, #1357). Node/
+ * happy-dom has no `localStorage`, which is what makes this a useful place to test the module:
+ * every accessor is wrapped, and "no storage at all" has to resolve to the DEFAULT rather than
+ * throwing into a render.
  *
  * The URL-stripping half of `syncAccountsFlag` is proved in the browser instead
  * (`prototypes/v2/checks/account-entry.spec.ts` asserts the parameter never survives the
@@ -99,44 +104,143 @@ describe('stripAccountsParam', () => {
 });
 
 describe('accountsEnabled', () => {
-    it('is false with nothing stored', () => {
+    it('is true with nothing stored — the default since the cutover', () => {
         withStorage(new Map());
-        expect(accountsEnabled()).toBe(false);
+        expect(accountsEnabled()).toBe(true);
     });
 
-    it('is true only for the exact opt-in value', () => {
-        withStorage(new Map([['ensemble-v2-preview:accounts', 'on']]));
-        expect(accountsEnabled()).toBe(true);
+    it('is false only for the exact opt-out value', () => {
         withStorage(new Map([['ensemble-v2-preview:accounts', 'off']]));
         expect(accountsEnabled()).toBe(false);
-        withStorage(new Map([['ensemble-v2-preview:accounts', 'yes']]));
-        expect(accountsEnabled()).toBe(false);
+        // A beta profile carrying the old opt-in reads as on, which is also the default now.
+        withStorage(new Map([['ensemble-v2-preview:accounts', 'on']]));
+        expect(accountsEnabled()).toBe(true);
+        // Anything this module did not write is not an opt-out.
+        withStorage(new Map([['ensemble-v2-preview:accounts', 'no']]));
+        expect(accountsEnabled()).toBe(true);
     });
 
-    it('is false — never a throw — when storage is unavailable or blocked', () => {
+    it('is true — never a throw — when storage is unavailable or blocked', () => {
+        // The stored value is an opt-OUT, so a device that cannot be asked has not opted out.
         // No stub at all: `localStorage` is not even declared in this environment.
-        expect(accountsEnabled()).toBe(false);
+        expect(accountsEnabled()).toBe(true);
         withStorage(new Map(), { throws: true });
-        expect(accountsEnabled()).toBe(false);
+        expect(accountsEnabled()).toBe(true);
     });
 });
 
 describe('setAccountsEnabled', () => {
-    it('stores the opt in and removes the key on opt out', () => {
+    it('stores the opt out and removes the key on the way back', () => {
         const store = new Map<string, string>();
         withStorage(store);
-        setAccountsEnabled(true);
-        expect(store.get('ensemble-v2-preview:accounts')).toBe('on');
-        expect(accountsEnabled()).toBe(true);
         setAccountsEnabled(false);
-        // Removed, not set to 'off': an absent key is the default state.
-        expect(store.has('ensemble-v2-preview:accounts')).toBe(false);
+        expect(store.get('ensemble-v2-preview:accounts')).toBe('off');
         expect(accountsEnabled()).toBe(false);
+        setAccountsEnabled(true);
+        // Removed, not set to 'on': an absent key is the default state.
+        expect(store.has('ensemble-v2-preview:accounts')).toBe(false);
+        expect(accountsEnabled()).toBe(true);
+    });
+
+    it('retires a beta profile’s old opt-in value rather than leaving it behind', () => {
+        const store = new Map([['ensemble-v2-preview:accounts', 'on']]);
+        withStorage(store);
+        setAccountsEnabled(true);
+        expect(store.has('ensemble-v2-preview:accounts')).toBe(false);
+        expect(accountsEnabled()).toBe(true);
     });
 
     it('swallows a refused write', () => {
         withStorage(new Map(), { throws: true });
         expect(() => setAccountsEnabled(true)).not.toThrow();
         expect(() => setAccountsEnabled(false)).not.toThrow();
+    });
+});
+
+/**
+ * The gate that decides whether this device asks the server who it is (#1357 patch).
+ *
+ * Every branch here is a safety direction, not a preference: a device that HOLDS an account must
+ * never be talked out of asking about it by a marker that is missing, unreadable, or written by a
+ * build that did not exist yet. Only a definite "this browser has no account database" is allowed
+ * to answer "no".
+ */
+function withDatabases(names: string[] | null, options: { throws?: boolean } = {}) {
+    vi.stubGlobal('indexedDB', {
+        databases:
+            names === null
+                ? undefined
+                : () => {
+                      if (options.throws) {
+                          return Promise.reject(new Error('storage is blocked'));
+                      }
+                      return Promise.resolve(names.map((name) => ({ name, version: 1 })));
+                  },
+    } as unknown as IDBFactory);
+}
+
+describe('deviceMayHoldAccount', () => {
+    it('is true on the marker alone, without touching storage APIs', async () => {
+        withStorage(new Map([['ensemble-v2-preview:account-held', 'yes']]));
+        // No `indexedDB` stub at all: reaching for one would throw, which is the assertion.
+        vi.stubGlobal('indexedDB', undefined);
+        await expect(deviceMayHoldAccount()).resolves.toBe(true);
+    });
+
+    it('is false on the marker alone', async () => {
+        withStorage(new Map([['ensemble-v2-preview:account-held', 'no']]));
+        vi.stubGlobal('indexedDB', undefined);
+        await expect(deviceMayHoldAccount()).resolves.toBe(false);
+    });
+
+    it('resolves an absent marker against the account database, and writes the answer down', async () => {
+        const store = new Map<string, string>();
+        withStorage(store);
+        withDatabases(['ensemble-v2-preview']);
+        await expect(deviceMayHoldAccount()).resolves.toBe(false);
+        expect(store.get('ensemble-v2-preview:account-held')).toBe('no');
+    });
+
+    it('finds an account held under an older build, which wrote no marker', async () => {
+        const store = new Map<string, string>();
+        withStorage(store);
+        withDatabases(['ensemble-v2-preview', 'ensemble-v2-account-songbook']);
+        await expect(deviceMayHoldAccount()).resolves.toBe(true);
+        expect(store.get('ensemble-v2-preview:account-held')).toBe('yes');
+    });
+
+    it('asks — and records nothing — when the browser cannot be asked', async () => {
+        const store = new Map<string, string>();
+        withStorage(store);
+        // No `databases()` at all (Firefox), then one that rejects.
+        withDatabases(null);
+        await expect(deviceMayHoldAccount()).resolves.toBe(true);
+        expect(store.has('ensemble-v2-preview:account-held')).toBe(false);
+        withDatabases([], { throws: true });
+        await expect(deviceMayHoldAccount()).resolves.toBe(true);
+        expect(store.has('ensemble-v2-preview:account-held')).toBe(false);
+    });
+
+    it('asks when storage itself is unreadable', async () => {
+        withStorage(new Map(), { throws: true });
+        vi.stubGlobal('indexedDB', undefined);
+        await expect(deviceMayHoldAccount()).resolves.toBe(true);
+    });
+});
+
+describe('rememberAccountHeld', () => {
+    it('writes both answers rather than removing the key', () => {
+        const store = new Map<string, string>();
+        withStorage(store);
+        rememberAccountHeld(true);
+        expect(store.get('ensemble-v2-preview:account-held')).toBe('yes');
+        rememberAccountHeld(false);
+        // 'no' rather than absent: absent means "not asked yet" and costs a `databases()` probe.
+        expect(store.get('ensemble-v2-preview:account-held')).toBe('no');
+    });
+
+    it('swallows a refused write', () => {
+        withStorage(new Map(), { throws: true });
+        expect(() => rememberAccountHeld(true)).not.toThrow();
     });
 });

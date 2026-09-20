@@ -62,6 +62,10 @@ services:
       # Caddy overwrites this header from its verified client IP (#1218); the API
       # trusts it only when the socket peer is exactly Caddy, whose LAN address
       # survives Docker's DNAT into the container (measured 2026-09-15).
+      # Whether new accounts can be created (#1272): `open` or `closed`, per environment, set
+      # by render.mjs. Not a secret, so it lives here where a reviewer can see it rather than
+      # in the root-only env file. The ceiling is the API's own default (25 accounts).
+      ENSEMBLE_REGISTRATION: ${ENSEMBLE_REGISTRATION:?set open or closed}
       ENSEMBLE_AUTH_IP_HEADER: x-ensemble-client-ip
       ENSEMBLE_AUTH_TRUSTED_PROXY_ADDRESSES: 192.168.1.244
     # Root-only (0600) file holding ENSEMBLE_AUTH_IP_SECRET, nothing else. Compose
