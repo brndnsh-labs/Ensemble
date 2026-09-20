@@ -177,9 +177,8 @@ test('a chart from another account is exportable but can never be saved into the
     await page.getByTestId('account-create').click();
     await expect(page.getByTestId('recovery-code')).toHaveText(CODE_SHAPE);
     await page.keyboard.press('Escape');
-    // B's account library downloads, and #1268's adoption prompt auto-opens over this device's
-    // guest starters. Unrelated to this spec, but modal, so every click below would hit it.
-    await dismissAdoptGuestPrompt(page);
+    // B's account library downloads, but #1268's adoption prompt does NOT open here: a chart is
+    // on the stand, and the offer waits for the songbook (it is answered there, below).
 
     // The chart did NOT leave the stand, and the shell says why — derived, not announced, so it
     // is still saying it after everything below (#1311 patch review R5).
@@ -282,6 +281,9 @@ test('a chart from another account is exportable but can never be saved into the
 
     // B's library holds exactly that one imported copy, and nothing of A's, across a reload.
     await backToSongbook(page);
+    // The adoption offer that was held while the chart was open arrives now. Unrelated to this
+    // spec, but modal — and declined, so nothing of the guest songbook joins B's list either.
+    await dismissAdoptGuestPrompt(page);
     await expect(page.getByTestId('library-heading')).toHaveText('Your account songbook');
     await expect(songTitles(page)).toHaveText(['Set list two']);
     await page.reload();
