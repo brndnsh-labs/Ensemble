@@ -1,10 +1,10 @@
 import { readFile } from 'node:fs/promises';
 import type { Page } from '@playwright/test';
-import { expect, test } from './fixtures';
+import { appUrl, expect, test } from './fixtures';
 
 const blue = 'Blue pocket Blues · Saved locally';
 async function openEditor(page: Page) {
-    await page.goto('/v2/');
+    await page.goto(appUrl());
     await page.getByRole('button', { name: blue }).click();
     await page.getByRole('button', { name: 'Edit chart', exact: true }).click();
 }
@@ -276,7 +276,7 @@ test('tempo allows sequential typing, Enter, blur, Escape and single step commit
 test('Continue remembers opened songs and recovered setup without changing saved timestamps', async ({
     page,
 }) => {
-    await page.goto('/v2/');
+    await page.goto(appUrl());
     await expect(page.locator('.continue-card')).toContainText('A good place to start');
     await page.getByRole('button', { name: blue }).click();
     const before = await savedBlue(page);
@@ -412,7 +412,7 @@ test('Edit chart and Edit section reveal the input across laptop, phone and tabl
 test('the stand scales to its screen, holds still across play/pause and keeps mute state readable', async ({
     page,
 }, info) => {
-    await page.goto('/v2/');
+    await page.goto(appUrl());
     await page.getByRole('button', { name: blue }).click();
     await page.waitForSelector('.bar');
     // #1186 pinned a playing-only scale larger than idle; that made every play/pause
@@ -510,7 +510,7 @@ test('stage mode darkens the stand, persists per device and follows the system w
 }, info) => {
     await page.emulateMedia({ colorScheme: 'light' });
     const openStand = async () => {
-        await page.goto('/v2/');
+        await page.goto(appUrl());
         await page.getByRole('button', { name: blue }).click();
         await page.waitForSelector('.bar');
     };
@@ -580,7 +580,7 @@ test('stage mode darkens the stand, persists per device and follows the system w
 test('a muted lane reads as muted at a distance and toggling never reflows the row', async ({
     page,
 }) => {
-    await page.goto('/v2/');
+    await page.goto(appUrl());
     await page.getByRole('button', { name: blue }).click();
     await page.waitForSelector('.bar');
     const drums = page.getByRole('button', { name: 'Drums', exact: true });

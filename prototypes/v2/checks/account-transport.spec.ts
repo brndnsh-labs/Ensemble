@@ -1,4 +1,4 @@
-import { expect, test } from './fixtures';
+import { appUrl, expect, test } from './fixtures';
 
 /**
  * #1261 asked for a Chromium E2E spec that registers a passkey via the harness's CDP virtual
@@ -25,7 +25,7 @@ test('the guest app cold-starts with /api/* unreachable', async ({ page }) => {
     // app already proves "cold-starts AND plays with the API unreachable" on every green run of
     // the rest of this suite (which does exercise playback, extensively); this assertion pins
     // the unreachable-API precondition itself, directly, rather than relying on inference.
-    await page.goto('/v2/');
+    await page.goto(appUrl());
     await expect(page.getByRole('heading', { name: 'Let’s play something.' })).toBeVisible();
     const status = await page.evaluate(() =>
         fetch('/api/auth/session', { cache: 'no-store' }).then((response) => response.status),
@@ -34,15 +34,16 @@ test('the guest app cold-starts with /api/* unreachable', async ({ page }) => {
 });
 
 test('a service worker never caches an /api/ response', async ({ page }) => {
-    await page.goto('/v2/');
-    // The generated `sw.js` (`scripts/offline.mjs`) only intercepts a fetch event whose path
-    // starts with `/v2/`; an `/api/*` request never reaches its `event.respondWith` at all, so
-    // waiting for the worker to actually control this page is what makes the proof meaningful
-    // — an uncontrolled page would pass this assertion for a reason that says nothing about the
-    // worker's own fetch handler.
+    await page.goto(appUrl());
+    // The generated `sw.js` (`scripts/offline.mjs`) returns early for `/api` and everything
+    // under it — an explicit exclusion, because at the cutover's root scope the prefix test
+    // that covers it today matches the whole origin (#1354) — so an `/api/*` request never
+    // reaches its `event.respondWith` at all. Waiting for the worker to actually control this
+    // page is what makes the proof meaningful: an uncontrolled page would pass this assertion
+    // for a reason that says nothing about the worker's own fetch handler.
     await expect
         .poll(() => page.evaluate(() => navigator.serviceWorker.controller?.scriptURL || ''))
-        .toContain('/v2/sw.js');
+        .toContain(appUrl('sw.js'));
 
     await page.evaluate(() => fetch('/api/auth/session', { cache: 'no-store' }));
     // Give any (hypothetical) `event.respondWith` a moment to have run and written a cache

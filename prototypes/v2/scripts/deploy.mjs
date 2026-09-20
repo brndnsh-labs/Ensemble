@@ -48,6 +48,18 @@ const hash = manifest.fingerprint;
 if (!/^[a-f0-9]{64}$/.test(hash)) {
     throw new Error('Invalid artifact fingerprint');
 }
+// This publisher is the `/v2` rsync+symlink release and nothing else: every path below it
+// (`webRoot/v2`, `.v2-releases`, the verification URLs) is that layout, and it retires at the
+// cutover, when decision 1 of docs/design/ensemble-v2-rollout.md replaces it with the
+// `ensemble-web` image. So refuse an artifact built for another base (`ENSEMBLE_V2_BASE`,
+// #1354) rather than publishing a root build under `/v2/` — the manifest's own asset keys are
+// the evidence, since CI downloads this artifact instead of rebuilding it.
+const foreign = Object.keys(manifest.assets).find((url) => !url.startsWith('/v2/'));
+if (foreign) {
+    throw new Error(
+        `This artifact was not built for /v2 (asset ${foreign}); scripts/deploy.mjs only publishes the /v2 release. Rebuild with ENSEMBLE_V2_BASE=/v2, or publish the root build through its own image.`,
+    );
+}
 if (target.cleanHeadOnly) {
     // PROD must never serve an uncommitted or off-HEAD tree — the same rule
     // scripts/deploy.sh applies to the root app. build.json records the source

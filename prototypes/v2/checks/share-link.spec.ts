@@ -1,4 +1,4 @@
-import { expect, test } from './fixtures';
+import { appUrl, expect, test } from './fixtures';
 
 // Deterministic across both projects (Desktop Chrome and the WebKit-based
 // `webkit-phone` project, which grants no clipboard permission by default,
@@ -16,7 +16,7 @@ test('shares a link that reopens as an unsaved draft; Keep a copy persists it an
     context,
 }) => {
     await withoutClipboard(page);
-    await page.goto('/v2/');
+    await page.goto(appUrl());
     await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
     await expect(page.getByRole('heading', { name: 'Blue pocket' })).toBeVisible();
 
@@ -25,7 +25,7 @@ test('shares a link that reopens as an unsaved draft; Keep a copy persists it an
     const linkInput = page.getByTestId('share-link-fallback');
     await expect(linkInput).toBeVisible();
     const link = await linkInput.inputValue();
-    expect(link).toContain('/v2/#chart=');
+    expect(link).toContain(appUrl('#chart='));
     await page.getByRole('button', { name: 'Close', exact: true }).click();
 
     // "Opening it in a fresh browser" — a separate page/tab sharing no app state.
@@ -54,7 +54,7 @@ test('shares a link that reopens as an unsaved draft; Keep a copy persists it an
 test('a malformed share link fails closed with a visible error, not a crash', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
-    await page.goto('/v2/#chart=not-a-real-payload');
+    await page.goto(appUrl('#chart=not-a-real-payload'));
     // Scoped to the app's own banner: Next's route announcer also carries
     // `role="alert"` (empty text), which makes a bare `getByRole('alert')` match
     // two elements in strict mode.

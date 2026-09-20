@@ -1,4 +1,4 @@
-import { expect, test } from './fixtures';
+import { appUrl, expect, test } from './fixtures';
 
 // #1276 — the Feel & mix sheet: swing/swing grid/humanize/complexity/chord notation
 // (document-owned, saved with the chart), master volume (a device preference,
@@ -26,7 +26,7 @@ async function setRange(page: import('@playwright/test').Page, label: string, va
 }
 
 test('every Feel-sheet control has an accessible name', async ({ page }) => {
-    await page.goto('/v2/');
+    await page.goto(appUrl());
     await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
     await openFeel(page);
 
@@ -44,7 +44,7 @@ test('every Feel-sheet control has an accessible name', async ({ page }) => {
 test('document-owned feel fields (swing, swing grid, humanize, complexity, notation) persist through save, reload and revert', async ({
     page,
 }) => {
-    await page.goto('/v2/');
+    await page.goto(appUrl());
     await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
     await openFeel(page);
 
@@ -119,7 +119,7 @@ test('document-owned feel fields (swing, swing grid, humanize, complexity, notat
 test('master volume is a device preference: it persists across reload without Save, independent of the chart', async ({
     page,
 }) => {
-    await page.goto('/v2/');
+    await page.goto(appUrl());
     await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
     await openFeel(page);
 
@@ -140,7 +140,7 @@ test('master volume is a device preference: it persists across reload without Sa
 test('band intensity, auto intensity and the metronome are session-only: they reset on reload', async ({
     page,
 }) => {
-    await page.goto('/v2/');
+    await page.goto(appUrl());
     await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
     await openFeel(page);
 
@@ -171,7 +171,7 @@ test('band intensity, auto intensity and the metronome are session-only: they re
 });
 
 test('changing swing during playback does not stop the band', async ({ page }) => {
-    await page.goto('/v2/');
+    await page.goto(appUrl());
     await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
     await page.getByRole('button', { name: 'Start playback', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Stop playback', exact: true })).toBeEnabled();

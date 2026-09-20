@@ -1,4 +1,4 @@
-import { expect, test } from './fixtures';
+import { appUrl, expect, test } from './fixtures';
 
 /**
  * The v1 import offer, end to end (#1274).
@@ -116,7 +116,7 @@ test('brings v1 songs into the songbook, plays one, and leaves v1 untouched', as
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     await seedV1Profile(page);
-    await page.goto('/v2/');
+    await page.goto(appUrl());
     const card = page.getByTestId('v1-import');
     await expect(
         card.getByRole('heading', { name: 'Bring over 3 songs from the old Ensemble?' }),
@@ -152,7 +152,7 @@ test('brings v1 songs into the songbook, plays one, and leaves v1 untouched', as
  */
 test('declining is permanent, and the song menu brings the import back', async ({ page }) => {
     await seedV1Profile(page);
-    await page.goto('/v2/');
+    await page.goto(appUrl());
     // The button that declines is the one that SAYS so (patch N1).
     await expect(page.getByTestId('v1-import').getByRole('button', { name: 'Done' })).toHaveCount(
         0,
@@ -197,7 +197,7 @@ test('declining is permanent, and the song menu brings the import back', async (
 });
 
 test('offers nothing on a profile that never ran v1', async ({ page }) => {
-    await page.goto('/v2/');
+    await page.goto(appUrl());
     await expect(page.getByRole('heading', { name: 'Let’s play something.' })).toBeVisible();
     await expect(page.getByTestId('v1-import')).toHaveCount(0);
 });
@@ -213,7 +213,7 @@ test('lists v1 data it cannot read instead of quietly importing nothing', async 
             ]),
         );
     });
-    await page.goto('/v2/');
+    await page.goto(appUrl());
     const card = page.getByTestId('v1-import');
     await expect(
         card.getByRole('heading', { name: 'Bring over 1 song from the old Ensemble?' }),
@@ -270,7 +270,7 @@ function declined(page: import('@playwright/test').Page) {
  */
 test('Done never records the permanent decline', async ({ page }) => {
     await seedV1Profile(page);
-    await page.goto('/v2/');
+    await page.goto(appUrl());
     await page.getByTestId('v1-import').getByRole('button', { name: 'Import' }).click();
     await expect(page.getByTestId('v1-import-result')).toHaveText('Imported 3');
     await page.getByTestId('v1-import').getByRole('button', { name: 'Done' }).click();
@@ -316,7 +316,7 @@ test('dismissing an unreadable-only card settles it without declining', async ({
     await page.addInitScript(() => {
         localStorage.setItem('ensemble_currentState', '{"sections":[{"label":"Verse"');
     });
-    await page.goto('/v2/');
+    await page.goto(appUrl());
     const card = page.getByTestId('v1-import');
     await expect(
         card.getByRole('heading', { name: 'Some music in the old Ensemble could not be read' }),

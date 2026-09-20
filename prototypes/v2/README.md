@@ -46,6 +46,11 @@ npm run build --prefix prototypes/v2
 npm run test:e2e --prefix prototypes/v2
 ```
 
+Those three commands build and check the `/v2` release. `ENSEMBLE_V2_BASE` moves the whole app
+to another base in one value (#1354) — `ENSEMBLE_V2_BASE=/` builds and tests the site-root
+variant the phase-5 cutover will ship, and `scripts/serve.mjs`, the Playwright fixtures and the
+generated service worker all follow it. It is unset in every deployment path today.
+
 For UI development, `npm run dev --prefix prototypes/v2`, then visit `http://localhost:3100/v2/`.
 Sound-pack assets and their integrity index are assembled by the build script: use the built
 export (`node scripts/serve.mjs` in this directory) to exercise downloads and offline playback.

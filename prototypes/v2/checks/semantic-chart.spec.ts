@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import type { Page } from '@playwright/test';
 import type { ChartDocument } from '../lib/documents';
-import { test as base, editorRevealed, expect } from './fixtures';
+import { appUrl, test as base, editorRevealed, expect } from './fixtures';
 
 const test = base.extend<{ disconnect: () => Promise<void> }>({
     disconnect: async ({ browserName, context, request }, use) => {
@@ -10,7 +10,9 @@ const test = base.extend<{ disconnect: () => Promise<void> }>({
                 // Same real connection refusal used by the existing offline regression:
                 // this avoids WebKit's setOffline cached-navigation implementation error.
                 expect((await request.post('/__test/network?offline=1')).ok()).toBe(true);
-                await expect(request.get('/v2/not-cached', { timeout: 3000 })).rejects.toThrow();
+                await expect(
+                    request.get(appUrl('not-cached'), { timeout: 3000 }),
+                ).rejects.toThrow();
             } else {
                 await context.setOffline(true);
             }
@@ -41,7 +43,7 @@ async function documents(page: Page): Promise<ChartDocument[]> {
 }
 
 async function convertBlue(page: Page) {
-    await page.goto('/v2/');
+    await page.goto(appUrl());
     await page
         .getByRole('button', { name: '♪ Blue pocket Blues · Saved locally', exact: true })
         .click();
@@ -118,7 +120,7 @@ test('2+1+1 editor saves a source-preserving copy, transposes and reopens offlin
     );
     await expect
         .poll(() => page.evaluate(() => navigator.serviceWorker.controller?.scriptURL))
-        .toContain('/v2/sw.js');
+        .toContain(appUrl('sw.js'));
     await disconnect();
     await page.reload();
     await page
@@ -187,7 +189,7 @@ test('unfinished bars survive selection, errors and hidden editor; Save commits 
 test('new charts support bar key/meter changes, growing the chart, recovery and detached import', async ({
     page,
 }) => {
-    await page.goto('/v2/');
+    await page.goto(appUrl());
     await page.getByRole('button', { name: '＋ New song', exact: true }).click();
     await editorRevealed(page);
     await page.getByLabel('Song title').fill('Mixed meter sketch');
@@ -225,7 +227,7 @@ test('new charts support bar key/meter changes, growing the chart, recovery and 
 });
 
 test('a mode-only change is visible on the music stand and survives Save', async ({ page }) => {
-    await page.goto('/v2/');
+    await page.goto(appUrl());
     await page.getByRole('button', { name: '＋ New song', exact: true }).click();
     await page.getByRole('button', { name: 'Next bar', exact: true }).click();
     await page.getByText('Key or meter change', { exact: true }).click();
@@ -249,7 +251,7 @@ test('semantic revision conflicts keep both takes, and unsupported imports never
     await convertBlue(page);
     const original = (await documents(page)).find((document) => document.schemaVersion === 2)!;
     const second = await context.newPage();
-    await second.goto('/v2/');
+    await second.goto(appUrl());
     await second
         .getByRole('button', { name: `♪ ${original.title} Blues · Saved locally`, exact: true })
         .click();

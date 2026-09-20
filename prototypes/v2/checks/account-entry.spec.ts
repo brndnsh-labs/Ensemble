@@ -1,4 +1,4 @@
-import { expect, test } from './fixtures';
+import { appUrl, expect, test } from './fixtures';
 
 /**
  * The dark-launch gate (#1262), on both projects and with no account API at all.
@@ -20,7 +20,7 @@ test('a default profile shows no account UI and never calls the API', async ({ p
         }
     });
 
-    await page.goto('/v2/');
+    await page.goto(appUrl());
     await expect(page.getByRole('heading', { name: SONGBOOK })).toBeVisible();
     // The session read is gated on the songbook being ready, so waiting for the heading is also
     // waiting past the moment an ungated bootstrap would have fired.
@@ -39,7 +39,7 @@ test('an opted-in device still plays as a guest when the server is unreachable',
     // like to `fetch`, and it is the path the "keep playing as a guest" copy exists for.
     await page.route('**/api/**', (route) => route.abort());
 
-    await page.goto('/v2/?accounts=on');
+    await page.goto(appUrl('?accounts=on'));
     await expect(page.getByRole('heading', { name: SONGBOOK })).toBeVisible();
     expect(page.url()).not.toContain('accounts=');
     // The entry point renders even though the session could not be read: the alternative is a
@@ -64,7 +64,7 @@ test('a browser without passkeys explains itself instead of offering a dead butt
     // unsupported browser rather than a stub of one — exactly the device the copy is written for.
     test.skip(browserName === 'chromium', 'Chromium supports WebAuthn.');
     await page.route('**/api/**', (route) => route.abort());
-    await page.goto('/v2/?accounts=on');
+    await page.goto(appUrl('?accounts=on'));
     await expect(page.getByRole('heading', { name: SONGBOOK })).toBeVisible();
 
     await page.getByTestId('account-sign-in').click();
@@ -83,7 +83,7 @@ test('an unreachable server says so, and says guest playback still works', async
 }) => {
     test.skip(browserName !== 'chromium', 'needs WebAuthn to reach the ceremony path at all.');
     await page.route('**/api/**', (route) => route.abort());
-    await page.goto('/v2/?accounts=on');
+    await page.goto(appUrl('?accounts=on'));
     await expect(page.getByRole('heading', { name: SONGBOOK })).toBeVisible();
 
     await page.getByTestId('account-sign-in').click();

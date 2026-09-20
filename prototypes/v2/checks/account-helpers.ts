@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test';
 import { RECOVERY_CODE_SHAPE } from '../lib/account/messages';
-import { editorRevealed, expect } from './fixtures';
+import { appUrl, editorRevealed, expect } from './fixtures';
 
 /**
  * The account specs' shared page driving (#1262, extracted for #1263).
@@ -22,7 +22,7 @@ export const CODE_SHAPE = RECOVERY_CODE_SHAPE;
 
 /** Opt this device into the dark-launched account UI, then land on the songbook. */
 export async function openWithAccounts(page: Page): Promise<void> {
-    await page.goto('/v2/?accounts=on');
+    await page.goto(appUrl('?accounts=on'));
     await expect(page.getByRole('heading', { name: 'Let’s play something.' })).toBeVisible();
 }
 

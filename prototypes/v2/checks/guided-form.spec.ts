@@ -1,10 +1,10 @@
 import { readFile } from 'node:fs/promises';
 import type { Page } from '@playwright/test';
 import type { ChartDocument } from '../lib/documents';
-import { editorRevealed, expect, test } from './fixtures';
+import { appUrl, editorRevealed, expect, test } from './fixtures';
 
 async function start(page: Page, title = 'Guided study') {
-    await page.goto('/v2/');
+    await page.goto(appUrl());
     await page.getByRole('button', { name: '＋ New song', exact: true }).click();
     await expect(page.getByLabel('Chords in this bar')).toHaveValue('C');
     await editorRevealed(page);
@@ -166,11 +166,11 @@ test('guided endings survive save, copy, export, transpose, Revert and offline r
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
     await expect
         .poll(() => page.evaluate(() => navigator.serviceWorker.controller?.scriptURL))
-        .toContain('/v2/sw.js');
+        .toContain(appUrl('sw.js'));
     try {
         if (browserName === 'webkit') {
             expect((await request.post('/__test/network?offline=1')).ok()).toBe(true);
-            await expect(request.get('/v2/not-cached', { timeout: 3000 })).rejects.toThrow();
+            await expect(request.get(appUrl('not-cached'), { timeout: 3000 })).rejects.toThrow();
         } else {
             await context.setOffline(true);
         }
