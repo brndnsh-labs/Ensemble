@@ -15,6 +15,7 @@ export default defineConfig({
             'tests/browser/account-library-download.browser.test.ts',
             'tests/browser/account-cloud-delete.browser.test.ts',
             'tests/browser/account-keep-both.browser.test.ts',
+            'tests/browser/account-adopt-candidate.browser.test.ts',
             'tests/browser/account-sign-out.browser.test.ts',
         ],
         browser: {

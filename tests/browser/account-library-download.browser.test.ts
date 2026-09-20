@@ -433,14 +433,17 @@ describe('library download and reconcile on real IndexedDB', () => {
 
         // Nothing readable inside the commit distinguishes that record from the one the plan
         // saw. Only the revision the plan diffed against does.
-        expect(result.candidates).toEqual([id]);
+        expect(result.superseded).toEqual([id]);
         expect(result.advanced).toEqual([]);
         const after = (await book.read(scope, id))!;
         expect(after.document.title).toBe('mine');
         expect(after.remoteRevision).toBe('r3');
-        const candidate = await book.remoteCandidate(scope, id);
-        expect(candidate?.kind).toBe('version');
-        expect(candidate?.revision).toBe('r2');
+        // And NOTHING is preserved (#1310 patch R1). This body is older than the record, and a
+        // preserved row is an offer: `reconcile`'s candidate became visible to a musician in
+        // #1310, so storing one here would advertise "a newer version is in your account" for a
+        // body that would roll the song back. The next manifest diff re-plans it against `r3`.
+        expect(result.candidates).toEqual([]);
+        expect(await book.remoteCandidate(scope, id)).toBe(null);
         // Resolved, so the run is complete — but this device does not hold the cloud's revision.
         expect(result.complete).toBe(true);
         expect(result.documents).toEqual({ required: 1, verified: 0 });
@@ -452,7 +455,10 @@ describe('library download and reconcile on real IndexedDB', () => {
         await run(sky);
         const moved = { expectedRemoteRevision: 'r0' };
 
-        // A body whose plan was drawn against a revision this record no longer holds.
+        // A body whose plan was drawn against a revision this record no longer holds. Nothing is
+        // written — not the record, and deliberately not a candidate either (#1310 patch R1): a
+        // preserved body IS an offer now, and one built from a base that has moved is an offer to
+        // roll the song back. The next pass re-plans it against the revision the record has.
         expect(
             await book.reconcile(
                 scope,
@@ -464,8 +470,9 @@ describe('library download and reconcile on real IndexedDB', () => {
                 },
                 moved,
             ),
-        ).toBe('candidate');
+        ).toBe('superseded');
         expect((await book.read(scope, id))?.document.title).toBe('head');
+        expect(await book.remoteCandidate(scope, id)).toBe(null);
 
         // And a tombstone, because a removal is a write too — deleting a revision nobody ever
         // diffed is the worst version of this bug, not an exception to it.

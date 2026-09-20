@@ -314,14 +314,19 @@ describe('keeping both mints a fresh identity for the local line', () => {
         await saveAndConfirm('Set list', 'cloud-1', null);
         await saveAndRefuse('Mine', 0, chart('Their take', DOC, 7));
         // A download pass, later still: the queue is not empty, so the body is preserved rather
-        // than adopted.
+        // than adopted. Its plan base is the revision this record really holds — without that a
+        // `version` body is `'superseded'` and nothing is stored at all (#1310 patch R1).
         expect(
-            await book.reconcile(scope, {
-                kind: 'version',
-                documentId: DOC,
-                revision: 'cloud-12',
-                document: chart('Their later take', DOC, 8),
-            }),
+            await book.reconcile(
+                scope,
+                {
+                    kind: 'version',
+                    documentId: DOC,
+                    revision: 'cloud-12',
+                    document: chart('Their later take', DOC, 8),
+                },
+                { expectedRemoteRevision: 'cloud-1' },
+            ),
         ).toBe('candidate');
         expect(await book.remoteCandidate(scope, DOC)).not.toBe(null);
 

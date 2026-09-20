@@ -20,6 +20,7 @@ import {
     belongsToAnotherAccount,
     type CloudDeleteResult,
     OWNER_MESSAGES,
+    type RemoteUpdate,
     SIGN_OUT_MESSAGES,
     type SignOutPreflight,
 } from '../lib/account/sync-loop';
@@ -59,6 +60,7 @@ import { hasV1SharePayload, openV1ShareLink, stripV1ShareParams } from '../lib/v
 import { AccountEntry } from './account/account-entry';
 import { AccountPage } from './account/account-page';
 import { AdoptGuestDialog } from './account/adopt-guest';
+import { AdoptRemoteDialog } from './account/adopt-remote';
 import { ConflictBanner } from './account/conflict';
 import { DeleteSongDialog } from './account/delete-song';
 import { SyncStatus, useAccountLibrary } from './account/library';
@@ -367,6 +369,21 @@ export default function Ensemble() {
     // from. The banner is not modal, so the shell's own error line is readable too — but the
     // reason belongs beside the button that earned it.
     const [keepBothFailure, setKeepBothFailure] = useState<string | null>(null);
+    /**
+     * #1310 — the confirm step for taking the account's newer version of the open song.
+     *
+     * It holds the OFFER, not a boolean (patch R5): the exact update the musician was looking at
+     * when they pressed the button, frozen so the compare-and-swap cannot silently re-base. A pass
+     * landing a newer version while this step is open used to slide under the confirmation, and the
+     * whole point of the CAS is that nobody adopts a version they never saw.
+     */
+    const [adoptRemoteOffer, setAdoptRemoteOffer] = useState<RemoteUpdate | null>(null);
+    /**
+     * The sentence a refused adoption produced, rendered in the confirm step AND — once that step
+     * has closed itself — in the banner it was opened from. One piece of state for one sentence:
+     * whichever of the two surfaces is on screen carries it, and neither shows it twice.
+     */
+    const [adoptRemoteFailure, setAdoptRemoteFailure] = useState<string | null>(null);
     // #1269 — the sign-out preflight, and what it found. `null` while the read is still out: the
     // step says "checking" rather than "nothing at stake", which would be a claim.
     // Null when no step is open; otherwise which of the two it is (#1351) — one fact rather than
@@ -508,6 +525,46 @@ export default function Ensemble() {
         current !== null
             ? (sync.observation?.conflict ?? 'none')
             : 'none';
+    /**
+     * The remote advance this device preserved for the chart on the stand, or null (#1310).
+     *
+     * The same five clauses `conflict` rests on — this is the same kind of fact about the same
+     * chart, and a banner whose only button WRITES must not be offered for a song this device is
+     * not attached to the account of.
+     *
+     * The SIXTH is the queue, and it is the one that decides whether this is an OFFER at all.
+     * Adoption is refused outright for a document with anything in its outbox
+     * (`AccountSongbook.adoptRemoteVersion`), because the work it discards has to be work the
+     * musician never committed — so with a Save waiting, this would be a button that provably
+     * cannot do anything. That case is not silent: the chip reads "Waiting to upload", the row in
+     * the songbook still carries its marker, and the pass that sends that Save is what turns this
+     * into an ordinary refused-Save conflict with Keep both on it.
+     */
+    const standCandidate =
+        accountsOn &&
+        signedIn &&
+        standStore?.store === 'account' &&
+        !standMismatch &&
+        current !== null &&
+        sync.observation?.pendingCount === 0
+            ? (sync.candidates.find((update) => update.documentId === current.id) ?? null)
+            : null;
+    /**
+     * Which shape the one banner above the stand is in (#1267, #1310), or `'none'`.
+     *
+     * A refused Save outranks a preserved candidate, and the two genuinely can coexist — a download
+     * that met a parked outbox preserves a body beside it. The refusal is the state that blocks
+     * every later Save of this song, and it is the one `keepBoth` resolves; the candidate is
+     * reachable again the moment it is resolved.
+     */
+    const standBanner: 'none' | 'version' | 'gone' | 'candidate' =
+        conflict !== 'none' ? conflict : standCandidate !== null ? 'candidate' : 'none';
+    /**
+     * The songs the songbook marks (#1310). Ids only: the list needs to know WHICH rows, and the
+     * revision beside each one is the stand's business — it is what an adoption is compared
+     * against, and a presentational list has nothing to compare.
+     */
+    const candidateIds = sync.candidates.map((update) => update.documentId);
     // `?? []` is the LIST, not the claim: "we haven't read the account library yet" is carried
     // separately to the songbook as `loading`, so an unread library never renders as an empty one.
     const songs = signedIn ? (accountSongs ?? []) : guestSongs;
@@ -555,6 +612,7 @@ export default function Ensemble() {
     const deleteDialogRef = useRef<HTMLDialogElement>(null);
     const signOutDialogRef = useRef<HTMLDialogElement>(null);
     const adoptDialogRef = useRef<HTMLDialogElement>(null);
+    const adoptRemoteDialogRef = useRef<HTMLDialogElement>(null);
     const soundsDialog = useRef<HTMLDialogElement>(null);
     const feelDialog = useRef<HTMLDialogElement>(null);
     const file = useRef<HTMLInputElement>(null);
@@ -1047,6 +1105,22 @@ export default function Ensemble() {
             adoptDialogRef.current?.close();
         }
     }, [adoptOpen]);
+    // #1310 — `offered` is a dependency, not just a guard, for the reason the cloud-delete step's
+    // `inAccount` is: the confirm step unmounts when its own question stops existing (a pass
+    // adopting the body elsewhere, a Save queued, the chart closed), and an offer left set would
+    // spring it open again over the next chart that qualifies.
+    const adoptRemoteOffered = standCandidate !== null;
+    useEffect(() => {
+        if (!adoptRemoteOffered) {
+            setAdoptRemoteOffer(null);
+            return;
+        }
+        if (adoptRemoteOffer !== null) {
+            adoptRemoteDialogRef.current?.showModal();
+        } else {
+            adoptRemoteDialogRef.current?.close();
+        }
+    }, [adoptRemoteOffer, adoptRemoteOffered]);
     /**
      * #1268 — offer the copy once per sign-in, once this device can actually tell what the account
      * already holds. `sync.owner` is the right dependency for the same reason the preflight effect
@@ -1645,8 +1719,11 @@ export default function Ensemble() {
         // above a local status that is, for this document, simply true (#1266).
         setSaveFailed(false);
         // Same reasoning (#1267): a Keep-both that failed is a fact about the song it was asked
-        // for, and carrying its sentence into the next chart's banner would explain nothing.
+        // for, and carrying its sentence into the next chart's banner would explain nothing. The
+        // adoption step's own sentence (#1310) goes for the same reason — including when this
+        // open IS the adoption, which has nothing left to explain.
         setKeepBothFailure(null);
+        setAdoptRemoteFailure(null);
         setEditing(false);
         setFollowing(true);
         setMessage(
@@ -2028,6 +2105,131 @@ export default function Ensemble() {
                 resolution.conflict === 'version'
                     ? 'Kept both · yours is a new song, and your account’s version is back in your songbook'
                     : 'Kept yours as a new song · your account no longer has the original',
+            );
+        });
+    }
+    /**
+     * Take the account's newer version of the chart on the stand (#1310) — the mirror of
+     * `keepBothVersions`, and the only other resolution this product offers for a song two devices
+     * have moved apart.
+     *
+     * Everything about it is the opposite shape of Keep both, which is why it is a second handler
+     * rather than a branch inside that one. Keep both keeps this device's music and never touches a
+     * bar of it: the chart stays on the stand, playing, and only its identity moves. This gives the
+     * music up. So it goes through `open()` — the ordinary path a song arrives on the stand by —
+     * which loads the adopted document into the runtime, stops playback on the way (`runtime.load`
+     * stops before it applies), sets the saved baseline, re-binds the stand and re-reads whatever
+     * recovery there is for that id, which the transaction has just made "none". Re-pointing
+     * `current` the way Keep both does would leave the runtime playing the version that was just
+     * discarded.
+     *
+     * The confirm step in front of it is where the discard is agreed to, with the export offered
+     * first (`adopt-remote.tsx`). By the time this runs, that has been answered.
+     *
+     * The revision is the one the CONFIRM STEP was opened against (`adoptRemoteOffer`), not the one
+     * this render happens to hold (patch R5). A pass landing a newer version while the step is open
+     * would otherwise re-base the compare-and-swap silently, which is the exact thing the CAS
+     * exists to prevent: the musician answers about the version they were shown. When they differ,
+     * storage answers `'stale'`, the step closes, and the banner behind it is already describing
+     * the newer one.
+     */
+    function adoptAccountVersion() {
+        const update = adoptRemoteOffer;
+        // The frozen offer names a document as well as a revision, and the step's title comes
+        // from `current`: an offer for any other song is not the one this step described.
+        if (!current || update === null || update.documentId !== current.id) {
+            return;
+        }
+        // Captured before the awaits, like `owner`: whether anything was at stake is what the
+        // closing sentence reports, and by the time it runs `open()` has replaced the chart.
+        const discarding = dirty;
+        const owner = standOwner();
+        void run(async () => {
+            setAdoptRemoteFailure(null);
+            if (standBelongsElsewhere()) {
+                // #1311's second layer, ahead of the loop's own. The banner is already withheld
+                // for a mismatched stand, so this is only reachable by a session changing under
+                // an open step — and the step is modal, so the sentence goes inside it as well as
+                // to the shell's error line.
+                setAdoptRemoteFailure(OWNER_MESSAGES.mismatch);
+                setError(OWNER_MESSAGES.mismatch);
+                return;
+            }
+            let resolution: Awaited<ReturnType<typeof accountSync.adoptRemoteVersion>>;
+            try {
+                resolution = await accountSync.adoptRemoteVersion(
+                    update.documentId,
+                    update.revision,
+                    owner,
+                );
+            } catch (failure) {
+                setAdoptRemoteFailure(failure instanceof Error ? failure.message : String(failure));
+                throw failure;
+            }
+            if (typeof resolution === 'string') {
+                // Nothing was adopted and nothing local moved. Each refusal is a different fact
+                // and gets its own sentence: a newer version arrived (so the choice on screen was
+                // about a version that is no longer the one waiting), a Save was queued in the
+                // meantime (so the work at stake is no longer only an unsaved experiment), or the
+                // divergence is simply gone.
+                //
+                // The step CLOSES on all three (patch R5), and each sentence then goes to the one
+                // surface that is still there to carry it. `'stale'` leaves a banner behind — a
+                // newer version is waiting, which is what the refusal was about — so it renders
+                // beside the button it belongs to. The other two WITHDRAW the offer: a queued Save
+                // hides the banner and a settled divergence removes it, so their sentence goes to
+                // the shell instead of into a modal that is about to unmount: the refusal to the
+                // error line, and `'none'` to the neutral status line — "up to date" is good news
+                // (another tab resolved it), and must not be announced as an alert.
+                setAdoptRemoteOffer(null);
+                if (resolution === 'stale') {
+                    setAdoptRemoteFailure(
+                        'A newer version arrived while this was open. Nothing was changed — choose again if you still want it.',
+                    );
+                } else if (resolution === 'queued') {
+                    setError(
+                        'You have a saved version of this song waiting to upload. Nothing was changed — let it upload, and your account will offer to keep both.',
+                    );
+                } else {
+                    setMessage(
+                        'Your account’s newer version is no longer waiting — this song is up to date here.',
+                    );
+                }
+                await refreshSongs();
+                return;
+            }
+            setAdoptRemoteOffer(null);
+            // The experiment this device was holding is gone from the account store, so nothing
+            // may go on claiming it here either. The guest slot is belt and braces since #1299:
+            // only a build from before it could have left one under an account id.
+            volatileDrafts.current.delete(update.documentId);
+            accountDrafts.current.delete(update.documentId);
+            try {
+                repository.clearRecovery(update.documentId);
+            } catch {
+                /* Recovery is a convenience; a stale slot must not fail the resolution. */
+            }
+            // The STAND moves first, and the list after (patch R3). The transaction has committed
+            // either way, so the one thing still at stake is what is on screen: if the library
+            // re-read throws first, `open()` never runs and the stand goes on showing the
+            // discarded document as clean — and the next keystroke retains it back into the store
+            // as a draft of a song that no longer holds that music.
+            await open(resolution.document);
+            // The account the transaction actually SETTLED TO, reported back by the loop rather
+            // than read from this render's snapshot (#1311 patch review R1). `open()` binds the
+            // stand from the session a moment earlier; this is the same rule `keepBothVersions`
+            // follows, and the two must not disagree about whose library this song is in.
+            bindStand({ store: 'account', ownerId: resolution.ownerId });
+            // No second draft sweep here, deliberately. A retention this tab fired before the
+            // confirm (`draft()` writes fire-and-forget) requested its transaction BEFORE the
+            // adoption's, and IndexedDB runs them in request order, so it cannot land after the
+            // rows were removed. A sweep after `open()` could only ever catch ANOTHER tab's fresh
+            // experiment on the adopted song — work this step never described and may not discard.
+            await refreshSongs();
+            setMessage(
+                discarding
+                    ? 'Now showing your account’s version · your unsaved changes were discarded'
+                    : 'Now showing your account’s version',
             );
         });
     }
@@ -2761,12 +2963,25 @@ export default function Ensemble() {
              * next to the other banners because that is where this app says things that are true
              * regardless of which surface is open. `role="status"`, not `alert`: nothing was lost.
              */}
-            {conflict !== 'none' && (
+            {standBanner !== 'none' && (
                 <ConflictBanner
-                    conflict={conflict}
+                    conflict={standBanner}
                     busy={busy}
-                    failure={keepBothFailure}
+                    // #1310 patch R2 — ONE derivation, shared with the confirm step below, so the
+                    // banner can never promise to discard changes the musician does not have.
+                    unsavedEdits={dirty}
+                    // Each shape shows only its OWN sentence: a refused Keep-both is a fact about
+                    // a queue, a refused adoption is a fact about a preserved version, and neither
+                    // explains the other.
+                    failure={standBanner === 'candidate' ? adoptRemoteFailure : keepBothFailure}
                     onKeepBoth={keepBothVersions}
+                    // #1310 — the third shape's action opens the confirm step rather than doing
+                    // anything: this is the one choice here that destroys something. The offer is
+                    // FROZEN here (patch R5), so the answer is about the version on screen now.
+                    onUseAccountVersion={() => {
+                        setAdoptRemoteFailure(null);
+                        setAdoptRemoteOffer(standCandidate);
+                    }}
                 />
             )}
             {volatileDrafts.current.size > 0 && (
@@ -2848,6 +3063,9 @@ export default function Ensemble() {
                     offline={offline.label}
                     accountLibrary={signedIn}
                     loading={songbookLoading}
+                    // #1310 — only the account library can have one waiting; signed out the loop
+                    // publishes none at all, so this is the same empty list either way.
+                    newerInAccount={candidateIds}
                     search={search}
                     onSearch={setSearch}
                     onImport={() => setImporting(true)}
@@ -3369,6 +3587,20 @@ export default function Ensemble() {
                     }
                     onConfirm={signOutOfAccount}
                     onClose={() => setSignOutStep(null)}
+                />
+            )}
+            {standCandidate !== null && current && (
+                <AdoptRemoteDialog
+                    dialogRef={adoptRemoteDialogRef}
+                    title={current.title}
+                    busy={busy}
+                    unsavedEdits={dirty}
+                    failure={adoptRemoteFailure}
+                    // The chart as it stands, pending bars included — the same bytes Save would
+                    // commit, which is exactly what is about to be discarded.
+                    onExport={() => void run(exportSong)}
+                    onConfirm={adoptAccountVersion}
+                    onClose={() => setAdoptRemoteOffer(null)}
                 />
             )}
             {inAccount && current && (

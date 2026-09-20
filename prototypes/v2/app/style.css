@@ -474,6 +474,14 @@ html [hidden] {
     font-size: 11px;
     color: var(--muted);
 }
+/* "A newer version is in your account" (#1310). The same accent the conflict banner uses, and for
+   the same reason: a preserved remote advance is a decision waiting to be made, not a fault. */
+.song-marker {
+    display: block;
+    margin-top: 3px;
+    font-size: 11px;
+    color: var(--accent);
+}
 .song-key {
     color: var(--ink);
     font-weight: 600;

@@ -15,6 +15,7 @@ import {
 } from '../sync/protocol';
 import {
     AccountSongbook,
+    type AdoptedRemoteVersion,
     type KeepBothResolution,
     MAX_LIST_LIMIT,
     MAX_REMOTE_CANDIDATES,
@@ -111,6 +112,26 @@ export interface CloudObservation {
     refused: null | 'too-large' | 'refused';
 }
 
+/**
+ * A remote advance this device preserved BESIDE a held record rather than applying it (#1310) —
+ * `reconcile`'s `'candidate'` answer, published so the product can say so.
+ *
+ * Only `kind: 'version'` observations are here. A `'deleted'` candidate is a tombstone this device
+ * could not apply and an `'unsupported'` one is a body this build cannot read; neither is a newer
+ * version of this song to offer, and describing either as one would be a sentence about a document
+ * that does not exist in the form it claims. They stay where they are, unmentioned by this surface.
+ *
+ * The revision travels with the id because the adoption is a compare-and-swap against it: the
+ * musician answers about the version they were shown, never about whichever one a pass has landed
+ * since. See `AccountSongbook.adoptRemoteVersion`.
+ */
+export interface RemoteUpdate {
+    documentId: string;
+    revision: string;
+}
+
+const NO_UPDATES: readonly RemoteUpdate[] = [];
+
 export interface SyncSnapshot {
     /** The account this loop is attached to, or null while signed out. */
     owner: string | null;
@@ -126,6 +147,18 @@ export interface SyncSnapshot {
     failure: SyncFailure | null;
     /** Cloud facts for the watched document; null when nothing is watched or nothing observed. */
     observation: CloudObservation | null;
+    /**
+     * Every remote advance this account holds preserved beside a held record (#1310), in document
+     * order. Empty is a real answer — "nothing is waiting" — and it is what a detached loop
+     * publishes, because a candidate is a fact about an account this device is no longer reading.
+     *
+     * ONE library-wide list rather than a per-document flag beside the observation, because both
+     * readers need it and they need different halves: the songbook marks a ROW per id, and the
+     * stand needs the watched document's REVISION to adopt against. A second copy of the same fact
+     * on the observation is a second thing to keep in agreement — and `CloudObservation` is passed
+     * to `projectSyncStatus` verbatim, whose reader is deny-by-default on unknown keys.
+     */
+    candidates: readonly RemoteUpdate[];
     /** `offline.documents` for `status.ts`. Unobserved until a download pages the manifest. */
     documents: Progress;
     /** Bumped whenever a pass changed this account's stored library, so a list can re-read. */
@@ -439,9 +472,24 @@ function sameObservation(a: CloudObservation | null, b: CloudObservation | null)
     );
 }
 
+/**
+ * Compared by VALUE, not identity: `observe` rebuilds this list from storage on every pass, so an
+ * identity check would publish — and re-render the songbook — after every single one of them.
+ */
+function sameUpdates(a: readonly RemoteUpdate[], b: readonly RemoteUpdate[]): boolean {
+    return (
+        a.length === b.length &&
+        a.every(
+            (update, index) =>
+                update.documentId === b[index].documentId && update.revision === b[index].revision,
+        )
+    );
+}
+
 function sameSnapshot(a: SyncSnapshot, b: SyncSnapshot): boolean {
     return (
         a.owner === b.owner &&
+        sameUpdates(a.candidates, b.candidates) &&
         a.running === b.running &&
         a.sending === b.sending &&
         a.failure?.reason === b.failure?.reason &&
@@ -726,6 +774,30 @@ export interface SyncLoop {
         owner: string | null,
     ): Promise<(KeepBothResolution & { ownerId: string }) | null>;
     /**
+     * Adopt the remote advance this device preserved beside a held record (#1310) — the mirror of
+     * `keepBoth`, and the only other resolution this product offers.
+     *
+     * Purely local, like `keepBoth`: one transaction, nothing sent. There is nothing to send — the
+     * record ends up at a revision the account already holds, which is the whole point of adopting
+     * rather than saving over it — so unlike `keepBoth` this does NOT ask for a pass afterwards.
+     *
+     * `revision` is the one the musician was shown, carried back down as a compare-and-swap base:
+     * a download that landed between the banner and the button leaves a candidate for a version
+     * nobody has looked at, and committing that would be this resolution answering a question it
+     * was never asked. `'stale'` says so; the caller re-reads and shows the new one.
+     *
+     * `owner` is the account the caller believes this chart belongs to (#1311), refused before the
+     * transaction opens exactly as `keepBoth`'s is — this one DESTROYS local work rather than
+     * creating a line, so a mismatch here would discard one account's drafts on the strength of
+     * another's library. The resolution carries back the scope it settled to for the same reason
+     * `keepBoth`'s does: the shell rebinds the chart on the stand from it.
+     */
+    adoptRemoteVersion(
+        documentId: string,
+        revision: string,
+        owner: string | null,
+    ): Promise<(AdoptedRemoteVersion & { ownerId: string }) | 'none' | 'stale' | 'queued'>;
+    /**
      * The account this DEVICE holds, read from storage (#1351 patch R1) — `meta.active`, or the
      * attached scope when there is one, which is the same row.
      *
@@ -789,6 +861,7 @@ export function createSyncLoop(
         sending: false,
         failure: null,
         observation: null,
+        candidates: NO_UPDATES,
         documents: UNOBSERVED,
         libraryVersion: 0,
     };
@@ -956,8 +1029,36 @@ export function createSyncLoop(
         const token = observation;
         const current = scope;
         const documentId = watched;
-        if (!current || documentId === null) {
-            publish({ observation: null });
+        if (!current) {
+            publish({ observation: null, candidates: NO_UPDATES });
+            return;
+        }
+        // Read in its own try, and BEFORE the early return below: the songbook shows its rows with
+        // nothing on the stand, so `watched === null` is exactly when the list needs this. Its
+        // failure must not take the observation with it either — one corrupt candidate row would
+        // otherwise silence the chip for every document in the account.
+        //
+        // COST, stated rather than optimised (#1310 patch R8): `remoteCandidates` validates every
+        // row it returns, which decodes each preserved body, and this runs on every watch, Save and
+        // pass. Normally that is zero or one or two rows — a preserved candidate is an exception,
+        // not a steady state — and it is bounded by `MAX_REMOTE_CANDIDATES` either way. The
+        // validation is deliberately kept rather than skipped for speed: an unvalidated row is
+        // exactly what must never reach a musician as an offer to replace their song.
+        let candidates = state.candidates;
+        try {
+            const preserved = await songbook.remoteCandidates(current);
+            if (mine !== epoch || token !== observation) {
+                return;
+            }
+            candidates = preserved
+                .filter((row) => row.kind === 'version')
+                .map((row) => ({ documentId: row.documentId, revision: row.revision }));
+        } catch {
+            // Unreadable is not "none": leaving the last published list alone is the conservative
+            // direction, since dropping it would quietly retract a marker nothing has resolved.
+        }
+        if (documentId === null) {
+            publish({ observation: null, candidates });
             return;
         }
         try {
@@ -991,10 +1092,13 @@ export function createSyncLoop(
                           : 'version',
                     refused: refusal?.reason ?? null,
                 },
+                candidates,
             });
         } catch {
             // An unreadable record is not evidence about the cloud. Leave the last observation
-            // alone rather than publish a fabricated one.
+            // alone rather than publish a fabricated one — but the candidate list above was read
+            // successfully, and it is a fact about a different store's rows.
+            publish({ candidates });
         }
     }
 
@@ -1186,6 +1290,10 @@ export function createSyncLoop(
                     if (mine !== epoch) {
                         return;
                     }
+                    // `result.superseded` is deliberately absent (#1310 patch R1): that outcome
+                    // writes nothing at all, so there is no stored library change for a re-read to
+                    // find. Folding it in would bump `libraryVersion` — and re-render the songbook
+                    // — every time a Save raced a download of the previous revision.
                     changed ||=
                         result.advanced.length > 0 ||
                         result.removed.length > 0 ||
@@ -1259,6 +1367,9 @@ export function createSyncLoop(
                     owner: ownerId,
                     failure: null,
                     observation: null,
+                    // Never the previous account's (#1310): a marker is a claim about one library's
+                    // rows, and `observe()` below fills this one in from the account just attached.
+                    candidates: NO_UPDATES,
                     documents: UNOBSERVED,
                 });
                 await observe();
@@ -1286,6 +1397,7 @@ export function createSyncLoop(
                 running: false,
                 sending: false,
                 observation: null,
+                candidates: NO_UPDATES,
                 documents: UNOBSERVED,
             });
         },
@@ -1495,6 +1607,37 @@ export function createSyncLoop(
             // Detached, exactly as `deleteFromCloud`'s own follow-up pass is: the resolution is
             // already committed here, and the upload is the loop's problem from this point.
             void loop.run().catch(() => {});
+            return { ...resolution, ownerId: current.ownerId };
+        },
+        async adoptRemoteVersion(documentId, revision, owner) {
+            // #1311's fence, before the transaction opens, for the reason `keepBoth` states — and
+            // with more at stake: this call discards drafts, so applying it to the account this
+            // device happens to hold would destroy an experiment nobody asked about.
+            const current = await ownedScope(owner);
+            const mine = epoch;
+            const resolution = await songbook.adoptRemoteVersion(current, documentId, revision);
+            if (typeof resolution === 'string') {
+                // Nothing moved. The observation the caller was reading is very likely WHY they
+                // are here — a candidate that has just been superseded, or a Save queued since the
+                // banner rendered — so it is re-read rather than left alone, exactly as a `'none'`
+                // Keep-both does.
+                if (mine === epoch) {
+                    await observe();
+                }
+                return resolution;
+            }
+            if (mine !== epoch) {
+                // Signed out, or attached elsewhere, while the transaction was open. The commit
+                // still happened and is still reported — the caller has to re-open the chart on
+                // the stand with it — but nothing of THIS loop's state may be written from a
+                // superseded epoch. `keepBoth`'s rule exactly.
+                return { ...resolution, ownerId: current.ownerId };
+            }
+            publish({ libraryVersion: state.libraryVersion + 1 });
+            // No `run()`: the record now sits at a revision the account already has, and there is
+            // nothing queued for it — that is what `'queued'` refuses. A pass here would spend
+            // requests to be told what this transaction just committed.
+            await observe();
             return { ...resolution, ownerId: current.ownerId };
         },
         async signOutPreflight(owner = null) {
