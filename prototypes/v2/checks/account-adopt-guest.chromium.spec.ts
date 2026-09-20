@@ -1,5 +1,12 @@
 import type { Page } from '@playwright/test';
-import { createAccountThroughDialog, openWithAccounts } from './account-helpers';
+import {
+    backToSongbook,
+    createAccountThroughDialog,
+    newSongOnTheStand,
+    openWithAccounts,
+    releaseApi,
+    shapeApi,
+} from './account-helpers';
 import { expect, accountTest as test } from './fixtures';
 import { addVirtualAuthenticator } from './virtual-authenticator';
 
@@ -88,6 +95,42 @@ test('signing in offers to add this device’s songs; adopting reaches the accou
     await page.getByTestId('adopt-guest-close').click();
     await expect(page.getByTestId('library-loading')).toHaveCount(0);
     expect((await songTitles(page).allInnerTexts()).sort()).toEqual(guestTitles.slice().sort());
+});
+
+test('an offer that becomes ready while a chart is open waits for the songbook', async ({
+    page,
+}) => {
+    await addVirtualAuthenticator(page);
+    // The offer is gated on the account library's first download, so holding the manifest is how
+    // a slow connection looks from here: the musician has signed up and moved on before it lands.
+    await shapeApi(page, 'hold', { only: '/api/documents' });
+    await openWithAccounts(page);
+    await expect(page.getByTestId('library-loading')).toHaveCount(0);
+
+    await createAccountThroughDialog(page);
+    await page.getByTestId('recovery-not-now').click();
+    await expect(page.getByTestId('account-finish-protecting')).toBeVisible();
+    await newSongOnTheStand(page);
+
+    const dialog = page.locator('dialog[aria-labelledby="adopt-guest-title"]');
+    const downloaded = page.waitForResponse(
+        (response) => new URL(response.url()).pathname === '/api/documents' && response.ok(),
+    );
+    await releaseApi(page);
+    await downloaded;
+
+    // Found on the live test host: the modal arrived over a half-typed title and took the Save
+    // button away. With the library down and a chart open, the editor stays the musician's.
+    await page.getByLabel('Song title').fill('Typed straight through the download');
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeEnabled();
+    await expect(dialog).toBeHidden();
+
+    // Held, not dropped: the question is about the songbook, and it is asked there.
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await backToSongbook(page);
+    await expect(page.locator('#adopt-guest-title')).toHaveText(
+        /^Add your \d+ songs on this device/,
+    );
 });
 
 test('declining is remembered — reloading and signing back in does not reopen the prompt, but the account page still reaches it', async ({

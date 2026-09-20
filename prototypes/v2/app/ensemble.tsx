@@ -1211,7 +1211,14 @@ export default function Ensemble() {
      * or download transition within this attach. Finding zero candidates does NOT count as either:
      * nothing was asked, so a guest song created later in this session, or on the next sign-in,
      * still gets offered.
+     *
+     * `onStand` holds it off while a chart is open. The download gate above means this opens
+     * whenever the library lands, and on a slow connection that is after the musician has
+     * already opened a song — found on the live test host (2026-09-20), where the modal arrived
+     * over a half-typed title and took the Save button away. The question is about the songbook,
+     * so it waits for the songbook: `onStand` is a dependency, and going back re-asks it.
      */
+    const onStand = current !== null;
     useEffect(() => {
         const owner = sync.owner;
         if (owner === null) {
@@ -1222,6 +1229,7 @@ export default function Ensemble() {
         }
         if (
             accountDialog !== null ||
+            onStand ||
             // A question already on screen is never re-asked underneath its own musician (#1359
             // patch P2-2): this effect re-runs whenever the library's counts change, and an
             // import's scoped offer carries no `adoptOffered` mark of its own until it opens, so
@@ -1252,7 +1260,7 @@ export default function Ensemble() {
         return () => {
             alive = false;
         };
-    }, [sync.owner, sync.documents, accountDialog]);
+    }, [sync.owner, sync.documents, accountDialog, onStand]);
     useEffect(() => {
         if (feelMenu) {
             // Refreshed on every open: these four fields can drift from what the

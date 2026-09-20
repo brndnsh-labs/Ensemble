@@ -331,7 +331,6 @@ test('the control belongs to the expired banner, not to whoever is signed in now
     await page.getByTestId('account-create').click();
     await expect(page.getByTestId('recovery-code')).toHaveText(CODE_SHAPE);
     await page.keyboard.press('Escape');
-    await dismissAdoptGuestPrompt(page);
 
     // A's chart is still on the stand and says whose it is (#1311) — and the control is gone,
     // because the banner that carried it is gone: this session is not expired, it is B's.
@@ -345,6 +344,8 @@ test('the control belongs to the expired banner, not to whoever is signed in now
     // sentence is about a CHART on a stand, so it must never reach the shell's error line about a
     // listing. The `role="status"` mismatch banner above is a different element and stays.
     await backToSongbook(page);
+    // #1268's adoption offer waits for the songbook while a chart is open, so it arrives here.
+    await dismissAdoptGuestPrompt(page);
     await expect(page.getByTestId('library-heading')).toHaveText('Your account songbook');
     await expect(page.locator('.error-banner[role="alert"]')).toHaveCount(0);
 
