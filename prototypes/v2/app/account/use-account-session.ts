@@ -14,12 +14,8 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { accountApi, accountSession } from '../../lib/account/client';
-import {
-    accountsEnabled,
-    deviceMayHoldAccount,
-    setAccountsEnabled,
-    syncAccountsFlag,
-} from '../../lib/account/feature';
+import { accountsEnabled, setAccountsEnabled, syncAccountsFlag } from '../../lib/account/feature';
+import { deviceMayHoldAccount } from '../../lib/account/held-account';
 import type { AccountFailure } from '../../lib/account/messages';
 import { recoveryEnrolled, signOut } from '../../lib/account/passkeys';
 import type { SessionState } from '../../lib/account/session';

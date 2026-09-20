@@ -3,11 +3,13 @@ import {
     accountsEnabled,
     accountsFlagFromSearch,
     accountsFlagRequest,
-    deviceMayHoldAccount,
-    rememberAccountHeld,
     setAccountsEnabled,
     stripAccountsParam,
 } from '../../../prototypes/v2/lib/account/feature.js';
+import {
+    deviceMayHoldAccount,
+    rememberAccountHeld,
+} from '../../../prototypes/v2/lib/account/held-account.js';
 
 /**
  * The v2 per-device account switch (#1262; default flipped on by the cutover, #1357). Node/

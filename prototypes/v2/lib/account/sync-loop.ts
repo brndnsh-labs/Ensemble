@@ -25,7 +25,7 @@ import type { Progress } from '../sync/status';
 import { writerId } from '../writer';
 import type { AccountApi, ApiError, ApiErrorCode } from './api';
 import { accountApi, accountSession } from './client';
-import { rememberAccountHeld } from './feature';
+import { rememberAccountHeld } from './held-account';
 import { createLibraryTransport } from './library-transport';
 import type { AccountSession } from './session';
 import {
@@ -1028,7 +1028,7 @@ export function createSyncLoop(
      * Move the `meta.active` fence AND the per-device marker that mirrors it (#1357 patch).
      *
      * One helper rather than the five call sites below, because the marker is a CACHE of that
-     * pointer — `lib/account/feature.ts`'s `deviceMayHoldAccount` reads it to decide whether this
+     * pointer — `lib/account/held-account.ts`'s `deviceMayHoldAccount` reads it to decide whether this
      * device asks the server who it is at all — and a cache written in five places is a cache that
      * drifts. Every path that moves the fence goes through here, including sign-out's restore of
      * an owner whose records a failed clear left behind: that device still holds an account, and
