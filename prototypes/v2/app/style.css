@@ -551,6 +551,49 @@ html [hidden] {
     margin-top: 14px;
     font-size: 12px;
 }
+/* The v1 import offer (#1274) borrows the raised-card box above; it only needs to sit
+   over the library and size its own heading and button row. */
+.import-card {
+    margin-bottom: 22px;
+}
+.import-card h3 {
+    font-size: 15px;
+    font-weight: 650;
+    margin: 7px 0 8px;
+}
+.import-card p {
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--muted);
+}
+.import-card h3:focus-visible {
+    /* Focused by script when a run finishes (#1274 patch N9), so it needs a visible ring
+       of its own — it is not a control and has no default one. */
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+}
+.import-problems {
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--muted);
+    margin: 8px 0 0;
+    padding-left: 18px;
+}
+/* The result line is mounted from the first render so a screen reader is already watching
+   it when its text arrives (#1274 patch R10). Empty, it collapses to nothing — `:empty`
+   rather than `display: none`, which would take the live region out of the accessibility
+   tree and defeat the point (patch N8). */
+.import-result:empty {
+    margin: 0;
+    padding: 0;
+    height: 0;
+    overflow: hidden;
+}
+.import-actions {
+    display: flex;
+    gap: 9px;
+    margin-top: 15px;
+}
 .sync-card {
     padding: 22px 7px 0;
 }

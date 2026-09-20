@@ -99,7 +99,12 @@ export async function save(
             committed = {
                 ...document,
                 revision: expected === null ? 0 : expected + 1,
-                createdAt: previous?.createdAt || now,
+                // An update keeps the row's ORIGINAL createdAt. A brand-new row (no
+                // `previous`) instead honours the candidate's own `createdAt` — always
+                // present on `ChartDocument` — rather than overwriting real provenance
+                // (e.g. a v1 import's saved-progression timestamp, `import-v1.ts`) with
+                // this write's wall-clock time.
+                createdAt: previous?.createdAt ?? document.createdAt,
                 updatedAt: now,
             };
             store.put(committed);

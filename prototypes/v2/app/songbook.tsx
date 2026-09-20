@@ -1,5 +1,39 @@
+import { useEffect, useRef } from 'react';
 import { arrangementOf } from '../lib/documents';
+import { v1OfferDeclines } from '../lib/import-v1';
 import type { ChartDocument } from '../lib/runtime';
+
+/** The v1 import offer (#1274). Counts and copy only; the shell owns the work. */
+export interface V1ImportOffer {
+    /**
+     * How many songs pressing Import would actually bring over — not how many the old app
+     * holds (#1274 patch R12). The two differ on the song-menu path, which offers everything
+     * regardless of what is already here.
+     */
+    songs: number;
+    /** Offered items this songbook already holds. */
+    alreadyHere: number;
+    /**
+     * v1 data that exists but cannot be read, each with the reason to show. Rendered BEFORE
+     * a run, not only in its result, or a profile with nothing but unreadable items has a
+     * reason no click can reach (#1274 patch R1).
+     */
+    problems: Array<{ label: string; reason: string }>;
+    /** One-line result of the run that just finished, or null before one. */
+    result: string | null;
+    /**
+     * True when the musician opened this from the song menu rather than the app opening it
+     * by itself. An asked-for offer never records a decline (#1274 patch N1b): they came
+     * looking, which is the opposite of "stop showing me this".
+     */
+    asked: boolean;
+    /**
+     * True while this device is signed in (#1274 patch R2). The import is guest-only — it
+     * never writes to an account — so the card has to say where the songs land and how they
+     * reach the account from there, in the account page's own words.
+     */
+    accountPointer: boolean;
+}
 
 interface SongbookProps {
     songs: ChartDocument[];
@@ -26,6 +60,10 @@ interface SongbookProps {
     onImport: () => void;
     onNewSong: () => void;
     onOpenSong: (id: string) => void;
+    v1Import: V1ImportOffer | null;
+    onImportV1: () => void;
+    /** `declined` is the card's own answer — see `V1ImportCard` (#1274 patch N1). */
+    onDismissV1: (declined: boolean) => void;
 }
 
 export function Songbook({
@@ -41,6 +79,9 @@ export function Songbook({
     onImport,
     onNewSong,
     onOpenSong,
+    v1Import,
+    onImportV1,
+    onDismissV1,
 }: SongbookProps) {
     return (
         <main className="home">
@@ -96,6 +137,14 @@ export function Songbook({
                                 </div>
                             </div>
                         </section>
+                    )}
+                    {v1Import && (
+                        <V1ImportCard
+                            offer={v1Import}
+                            busy={busy}
+                            onImport={onImportV1}
+                            onDismiss={onDismissV1}
+                        />
                     )}
                     <div className="section-heading library-heading">
                         <h2 data-testid="library-heading">
@@ -211,5 +260,105 @@ export function Songbook({
                 <span>Music stand beta · {process.env.NEXT_PUBLIC_SOURCE_REV}</span>
             </footer>
         </main>
+    );
+}
+
+/**
+ * The v1 import card (#1274) — the offer, what a run did, and every piece of v1 data that
+ * could not be read, with its reason.
+ *
+ * Its own component because it needs an effect, and because its four shapes (something to
+ * bring over · everything already here · nothing readable · a finished run) are easier to
+ * keep truthful in one place than inlined in the songbook's markup.
+ *
+ * Accessibility (#1274 patch R10): the section is named by its own heading, the result line
+ * is a live region that EXISTS from the first render — a `role="status"` mounted together
+ * with its text is not reliably announced — and pressing Import, which replaces that button
+ * with Done, moves focus to the result instead of dropping it on `<body>`.
+ */
+function V1ImportCard({
+    offer,
+    busy,
+    onImport,
+    onDismiss,
+}: {
+    offer: V1ImportOffer;
+    busy: boolean;
+    onImport: () => void;
+    onDismiss: (declined: boolean) => void;
+}) {
+    const heading = useRef<HTMLHeadingElement>(null);
+    const announced = useRef<string | null>(null);
+    useEffect(() => {
+        if (offer.result && announced.current !== offer.result) {
+            announced.current = offer.result;
+            // The HEADING, not the live region (#1274 patch N9): moving focus into a
+            // `role="status"` as its text arrives invites a double announcement, and the
+            // heading is where someone lands to read what just happened anyway.
+            heading.current?.focus();
+        }
+    }, [offer.result]);
+    const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`;
+    // ONE fact behind both the label and what the button does (#1274 patch N1a), and a rule
+    // with a name and a test of its own rather than a condition spelled twice.
+    const declines = v1OfferDeclines(offer);
+    const headingText = offer.result
+        ? 'Brought over from the old Ensemble'
+        : offer.songs > 0
+          ? `Bring over ${plural(offer.songs, 'song')} from the old Ensemble?`
+          : offer.alreadyHere > 0
+            ? 'Everything from the old Ensemble is already here'
+            : offer.problems.length > 0
+              ? 'Some music in the old Ensemble could not be read'
+              : 'There is nothing in the old Ensemble to bring over';
+    const body = offer.result
+        ? null
+        : offer.songs > 0
+          ? 'They are copied into this songbook. Nothing in the old app is changed or removed.'
+          : offer.alreadyHere > 0
+            ? `Nothing new to bring over — ${plural(offer.alreadyHere, 'song')} from the old app ${offer.alreadyHere === 1 ? 'is' : 'are'} already in this songbook.`
+            : offer.problems.length > 0
+              ? 'Nothing was changed there. Open the old Ensemble to check those songs.'
+              : 'The old app is still on this device, but it has no saved songs to copy.';
+    return (
+        <section
+            className="quick-jam import-card"
+            data-testid="v1-import"
+            aria-labelledby="v1-import-heading"
+        >
+            <span className="eyebrow">From the old Ensemble</span>
+            <h3 id="v1-import-heading" ref={heading} tabIndex={-1}>
+                {headingText}
+            </h3>
+            {body && <p>{body}</p>}
+            {!offer.result && offer.problems.length > 0 && (
+                <ul className="import-problems" data-testid="v1-import-problems">
+                    {offer.problems.map((problem) => (
+                        <li key={`${problem.label} — ${problem.reason}`}>
+                            {problem.label} — {problem.reason}
+                        </li>
+                    ))}
+                </ul>
+            )}
+            {offer.accountPointer && (
+                <p className="import-pointer" data-testid="v1-import-account-pointer">
+                    These go to this device’s songbook, not your account. To add them to your
+                    account afterwards, use “Add this device’s songs” on your account page.
+                </p>
+            )}
+            <p className="import-result" role="status" data-testid="v1-import-result">
+                {offer.result ?? ''}
+            </p>
+            <div className="import-actions">
+                {!offer.result && offer.songs > 0 && (
+                    <button className="btn primary" disabled={busy} onClick={onImport}>
+                        Import
+                    </button>
+                )}
+                <button className="btn" disabled={busy} onClick={() => onDismiss(declines)}>
+                    {declines ? 'Not now' : 'Done'}
+                </button>
+            </div>
+        </section>
     );
 }
