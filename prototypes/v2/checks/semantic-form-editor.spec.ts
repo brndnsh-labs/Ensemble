@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import type { Page } from '@playwright/test';
 import type { ChartDocument } from '../lib/documents';
-import { test as base, editorRevealed, expect } from './fixtures';
+import { appUrl, test as base, editorRevealed, expect } from './fixtures';
 
 const test = base.extend<{ disconnect: () => Promise<void> }>({
     disconnect: async ({ browserName, context, request }, use) => {
@@ -10,7 +10,9 @@ const test = base.extend<{ disconnect: () => Promise<void> }>({
                 // The preview's existing offline regression uses real socket refusal to avoid
                 // WebKit's setOffline cached-navigation implementation error. No cache is faked.
                 expect((await request.post('/__test/network?offline=1')).ok()).toBe(true);
-                await expect(request.get('/v2/not-cached', { timeout: 3000 })).rejects.toThrow();
+                await expect(
+                    request.get(appUrl('not-cached'), { timeout: 3000 }),
+                ).rejects.toThrow();
             } else {
                 await context.setOffline(true);
             }
@@ -41,7 +43,7 @@ async function savedDocuments(page: Page): Promise<ChartDocument[]> {
 }
 
 async function newSong(page: Page, title: string) {
-    await page.goto('/v2/');
+    await page.goto(appUrl());
     await page.getByRole('button', { name: '＋ New song', exact: true }).click();
     await expect(page.getByLabel('Chords in this bar')).toHaveValue('C');
     await expect(page.locator('.bar .chord')).toHaveText(['C', 'G', 'Am', 'F']);
@@ -180,7 +182,7 @@ test('pending forms save atomically from the hidden editor, transpose and reopen
 
     await expect
         .poll(() => page.evaluate(() => navigator.serviceWorker.controller?.scriptURL))
-        .toContain('/v2/sw.js');
+        .toContain(appUrl('sw.js'));
     await disconnect();
     await page.reload();
     await page

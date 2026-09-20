@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import type { Page } from '@playwright/test';
 import type { ChartDocument } from '../lib/documents';
-import { test as base, expect } from './fixtures';
+import { appUrl, test as base, expect } from './fixtures';
 
 const test = base.extend<{ disconnect: () => Promise<void> }>({
     disconnect: async ({ browserName, context, request }, use) => {
@@ -10,7 +10,9 @@ const test = base.extend<{ disconnect: () => Promise<void> }>({
             if (browserName === 'webkit') {
                 // Real socket refusal matches the preview's existing WebKit offline harness.
                 expect((await request.post('/__test/network?offline=1')).ok()).toBe(true);
-                await expect(request.get('/v2/not-cached', { timeout: 3000 })).rejects.toThrow();
+                await expect(
+                    request.get(appUrl('not-cached'), { timeout: 3000 }),
+                ).rejects.toThrow();
             } else {
                 await context.setOffline(true);
             }
@@ -71,7 +73,7 @@ test('an iReal HTML preview is inert, explicitly added, transposed, exported and
     const errors: string[] = [];
     page.on('request', (request) => requests.push(request.url()));
     page.on('pageerror', (error) => errors.push(error.message));
-    await page.goto('/v2/');
+    await page.goto(appUrl());
     await page.getByRole('button', { name: 'Import chart', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: 'Review import' });
     await expect(dialog).toBeVisible();
@@ -136,7 +138,7 @@ test('an iReal HTML preview is inert, explicitly added, transposed, exported and
 
     await expect
         .poll(() => page.evaluate(() => navigator.serviceWorker.controller?.scriptURL))
-        .toContain('/v2/sw.js');
+        .toContain(appUrl('sw.js'));
     await disconnect();
     await page.reload();
     await page.getByRole('button', { name: /^♪ Blues fixture .*Saved locally$/ }).click();
@@ -151,7 +153,7 @@ test('an iReal HTML preview is inert, explicitly added, transposed, exported and
 test('an unsupported pasted chart preserves the songbook and downloads its exact original source', async ({
     page,
 }) => {
-    await page.goto('/v2/');
+    await page.goto(appUrl());
     await page.getByRole('button', { name: 'Import chart', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: 'Review import' });
     await dialog.getByText('Or paste an iReal link', { exact: true }).click();
@@ -205,7 +207,7 @@ for (const study of [
     test(`${study.name} imports and highlights exact performed visits on the compact stand`, async ({
         page,
     }) => {
-        await page.goto('/v2/');
+        await page.goto(appUrl());
         await page.getByRole('button', { name: 'Import chart', exact: true }).click();
         const dialog = page.getByRole('dialog', { name: 'Review import' });
         await dialog.getByText('Or paste an iReal link', { exact: true }).click();

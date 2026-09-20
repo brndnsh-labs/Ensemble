@@ -1,4 +1,4 @@
-import { expect, accountTest as test } from './fixtures';
+import { appUrl, expect, accountTest as test } from './fixtures';
 import { addVirtualAuthenticator } from './virtual-authenticator';
 
 // `*.chromium.spec.ts`: the CDP virtual authenticator is Chromium-only, so playwright.config.ts
@@ -10,7 +10,7 @@ test('a passkey registers against the real API on the app origin, and the sessio
     // The authenticator setup this spec introduced now lives in ./virtual-authenticator, shared
     // with the sign-in specs (#1262); the options it sends are unchanged.
     await addVirtualAuthenticator(page);
-    await page.goto('/v2/');
+    await page.goto(appUrl());
 
     const outcome = await page.evaluate(async () => {
         const post = (path: string, body: unknown) =>

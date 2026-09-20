@@ -1,4 +1,4 @@
-import { expect, test } from './fixtures';
+import { appUrl, expect, test } from './fixtures';
 
 // #1275 — per-instrument volume/reverb/style/density/soloist-mode controls in
 // the Sounds panel. Mirrors `foundation.spec.ts`'s Sounds helpers and
@@ -41,7 +41,7 @@ async function withoutClipboard(page: import('@playwright/test').Page) {
 }
 
 test('every per-instrument sound control has a lane-scoped accessible name', async ({ page }) => {
-    await page.goto('/v2/');
+    await page.goto(appUrl());
     await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
     await openSounds(page);
 
@@ -72,7 +72,7 @@ test('bass style, bass volume and chords density persist through save, reload, r
     // Registered before the first navigation, like `share-link.spec.ts`: an
     // `addInitScript` only takes effect on a page's NEXT document load.
     await withoutClipboard(page);
-    await page.goto('/v2/');
+    await page.goto(appUrl());
     await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
     await openSounds(page);
 
@@ -128,7 +128,7 @@ test('bass style, bass volume and chords density persist through save, reload, r
     const linkInput = page.getByTestId('share-link-fallback');
     await expect(linkInput).toBeVisible();
     const link = await linkInput.inputValue();
-    expect(link).toContain('/v2/#chart=');
+    expect(link).toContain(appUrl('#chart='));
     await page.getByRole('button', { name: 'Close', exact: true }).click();
 
     const fresh = await context.newPage();
@@ -142,7 +142,7 @@ test('bass style, bass volume and chords density persist through save, reload, r
 });
 
 test('changing an instrument style during playback does not stop the band', async ({ page }) => {
-    await page.goto('/v2/');
+    await page.goto(appUrl());
     await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
     await page.getByRole('button', { name: 'Start playback', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Stop playback', exact: true })).toBeEnabled();

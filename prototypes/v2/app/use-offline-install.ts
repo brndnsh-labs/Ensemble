@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
+import { withBase } from '../lib/base-path';
 
 /**
- * Registers the `/v2/` service worker and reports whether the app shell is offline-ready, both in
+ * Registers this app's service worker at its own base — `/v2/` today, the site root at the
+ * cutover (#1354) — and reports whether the app shell is offline-ready, both in
  * words and as the three-state fact `lib/sync/status.ts` wants (#1266). They are one observation
  * with two readers, not two: `'unknown'` is the honest answer until the registration settles, and
  * a shell that failed to install is `'missing'`, never quietly unknown.
@@ -20,7 +22,7 @@ export function useOfflineInstall(): OfflineInstall {
         let alive = true;
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker
-                .register('/v2/sw.js', { scope: '/v2/', updateViaCache: 'none' })
+                .register(withBase('/sw.js'), { scope: withBase('/'), updateViaCache: 'none' })
                 .then(async (registration) => {
                     // navigator.serviceWorker.ready may resolve the old root app's
                     // worker. Only this registration earns the preview's ready label.

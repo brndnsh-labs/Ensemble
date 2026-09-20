@@ -4,6 +4,7 @@ import { ensurePackLoaded } from '@engine/engine/pack-runtime';
 import { type PackManifest, setPackAssetFetcher, withRevToken } from '@engine/engine/sample-loader';
 import type { ChartContent } from '@engine/songbook/types';
 import type { InstrumentModule, InstrumentVoice } from '@engine/types';
+import { withBase } from './base-path';
 
 export { packsForInstrument };
 export const allSoundsSizeMB = SOUND_PACKS.reduce((total, pack) => total + pack.approxSizeMB, 0);
@@ -17,7 +18,7 @@ const digest = async (bytes: ArrayBuffer) =>
 
 async function files(): Promise<Record<string, string>> {
     if (!index) {
-        index = fetch('/v2/pack-files.json', { signal: AbortSignal.timeout(20_000) })
+        index = fetch(withBase('/pack-files.json'), { signal: AbortSignal.timeout(20_000) })
             .then(async (response) => {
                 if (!response.ok) {
                     throw new Error('Sound catalog unavailable. Reconnect and retry.');
@@ -40,7 +41,11 @@ async function asset(source: string, cachedOnly = false): Promise<Response> {
     if (url.origin !== location.origin || !hash || !/^[a-f0-9]{64}$/.test(hash)) {
         throw new Error('This sound references an unsupported file.');
     }
-    const key = `/v2${url.pathname}?asset=${hash}`;
+    // The key IS the served URL, so it carries the build's base (#1354). `CACHE` survives app-
+    // shell upgrades by design, and moving the base moves every key in it: at the cutover this
+    // cache goes cold once and the musician re-downloads the packs they had. Accepted there,
+    // never acceptable as a drive-by — a key change in a `/v2` build orphans everyone's sounds.
+    const key = `${withBase(url.pathname)}?asset=${hash}`;
     const cache = await caches.open(CACHE);
     const cached = await cache.match(key);
     if (cached && (await digest(await cached.clone().arrayBuffer())) === hash) {

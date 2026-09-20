@@ -1,0 +1,121 @@
+# Proof that the v2 music stand still builds and passes its own suite at basePath `/`
+# (#1354), which is what the phase-5 cutover flips it to — see
+# docs/design/ensemble-v2-rollout.md decision 1 and `prototypes/v2/scripts/base-path.mjs`.
+#
+# DELIBERATELY NOT A REQUIRED CONTEXT, and deliberately a separate workflow rather than a leg
+# of ci.yml's `v2-suite`: the required `v2-checks` aggregate is `needs: v2-suite`, so any new
+# matrix leg there would gate merges on a build nothing ships yet. Nothing here uploads
+# `ensemble-v2-static-<sha>` or touches the `deploy` job's artifact — `/v2` remains the only
+# thing CI publishes until the cutover replaces that publisher with the web image.
+#
+# It runs on demand, and automatically on a PR that touches the base-path machinery itself —
+# the only change that can plausibly break the root build without breaking the `/v2` one.
+name: v2 root base
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'prototypes/v2/scripts/base-path.mjs'
+      - 'prototypes/v2/lib/base-path.ts'
+      - 'prototypes/v2/next.config.mjs'
+      - 'prototypes/v2/scripts/offline.mjs'
+      - 'prototypes/v2/scripts/serve.mjs'
+      - 'prototypes/v2/scripts/deploy.mjs'
+      - 'prototypes/v2/lib/sounds.ts'
+      - 'prototypes/v2/app/use-offline-install.ts'
+      - 'prototypes/v2/checks/fixtures.ts'
+      - '.github/workflows/v2-root-base.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  ENSEMBLE_V2_BASE: /
+
+jobs:
+  v2-root-base:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Use Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            prototypes/v2/package-lock.json
+            prototypes/v2-api/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install v2 dependencies
+        run: npm ci --prefix prototypes/v2
+
+      # The account specs run the real API behind the preview server (#1258); the suite's
+      # global setup bundles it from these dependencies.
+      - name: Install v2 API dependencies
+        run: npm ci --prefix prototypes/v2-api
+
+      - name: Get Playwright version
+        id: playwright-version
+        run: echo "PLAYWRIGHT_VERSION=$(npx playwright --version | cut -d' ' -f2)" >> $GITHUB_ENV
+        working-directory: prototypes/v2
+
+      # Same key as ci.yml's `v2-suite`, so this job reuses that cache rather than warming
+      # a second copy of the browsers.
+      - name: Cache Playwright Browsers
+        id: playwright-cache
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-v2-${{ env.PLAYWRIGHT_VERSION }}
+
+      - name: Install Playwright browsers + system deps
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium webkit
+        working-directory: prototypes/v2
+
+      - name: Install Playwright system deps (browsers came from cache)
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium webkit
+        working-directory: prototypes/v2
+
+      # A failed build leaves whatever `out/` held before it, and the suite would happily pass
+      # against that — so the build's exit code is the gate, and the assertion below proves the
+      # artifact on disk really is the root one before any test runs.
+      - name: Build the v2 static export at basePath /
+        run: npm run build --prefix prototypes/v2
+
+      - name: Assert the artifact is the root build
+        run: |
+          # `set -e` ignores a command inverted with `!`, so each negative is an explicit `if`.
+          set -euo pipefail
+          test -f prototypes/v2/out/index.html
+          grep -q '"/_next/static/' prototypes/v2/out/index.html
+          if grep -q '/v2/_next/' prototypes/v2/out/index.html; then
+            echo '::error::index.html still references /v2/_next'; exit 1
+          fi
+          if grep -q '"/v2/' prototypes/v2/out/build.json; then
+            echo '::error::build.json is still keyed under /v2/'; exit 1
+          fi
+          grep -q 'const SCOPE = "/";' prototypes/v2/out/sw.js
+
+      - name: Run the v2 Playwright suite at basePath /
+        run: npm run test:e2e --prefix prototypes/v2
+
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: v2-root-base-playwright-failures
+          path: prototypes/v2/test-results/
+          retention-days: 7

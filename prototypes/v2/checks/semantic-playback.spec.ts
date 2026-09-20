@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test';
 import type { WorkerRequest, WorkerResponse } from '../../../public/worker-types.js';
-import { editorRevealed, expect, test } from './fixtures';
+import { appUrl, editorRevealed, expect, test } from './fixtures';
 
 interface PlaybackEvidence {
     armed: boolean;
@@ -297,7 +297,7 @@ test('semantic timing reaches the real worker, audio output and chart for two co
     const pageErrors: string[] = [];
     page.on('pageerror', (error) => pageErrors.push(error.message));
     await observePlayback(page);
-    await page.goto('/v2/');
+    await page.goto(appUrl());
     await page.getByRole('button', { name: '＋ New song', exact: true }).click();
     await editorRevealed(page);
     await page.getByLabel('Song title').fill('Two lap timing study');
@@ -403,7 +403,7 @@ test('repeat visits follow the real band while the music stand keeps four writte
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     await observePlayback(page);
-    await page.goto('/v2/');
+    await page.goto(appUrl());
     await page.getByRole('button', { name: '＋ New song', exact: true }).click();
     await editorRevealed(page);
     await page.getByLabel('Song title').fill('Two endings study');
@@ -488,7 +488,7 @@ test('section practice loop (#1211) confines playback and clears on release, Esc
     const pageErrors: string[] = [];
     page.on('pageerror', (error) => pageErrors.push(error.message));
     await observePlayback(page);
-    await page.goto('/v2/');
+    await page.goto(appUrl());
     await page.getByRole('button', { name: '＋ New song', exact: true }).click();
     await editorRevealed(page);
     await page.getByLabel('Song title').fill('Section loop study');

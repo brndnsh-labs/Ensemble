@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { test as base, editorRevealed, expect } from './fixtures';
+import { appUrl, test as base, editorRevealed, expect } from './fixtures';
 
 async function observeSamples(page: import('@playwright/test').Page) {
     await page.addInitScript(() => {
@@ -47,7 +47,7 @@ const test = base.extend<{ disconnect: () => Promise<void> }>({
                 const response = await request.post('/__test/network?offline=1');
                 expect(response.ok()).toBe(true);
                 await expect(
-                    request.get('/v2/uncached-network-proof', { timeout: 3000 }),
+                    request.get(appUrl('uncached-network-proof'), { timeout: 3000 }),
                 ).rejects.toThrow();
             } else {
                 await context.setOffline(true);
@@ -71,7 +71,7 @@ test('manual sounds save, revert, export/import and play sampled audio after off
     disconnect,
 }) => {
     await observeSamples(page);
-    await page.goto('/v2/');
+    await page.goto(appUrl());
     await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
     await openSounds(page);
     await page.getByLabel('Chords sound', { exact: true }).selectOption('pack:grand');
@@ -115,7 +115,7 @@ test('manual sounds save, revert, export/import and play sampled audio after off
     await page.getByRole('button', { name: 'Stop playback' }).click();
     await expect
         .poll(() => page.evaluate(() => navigator.serviceWorker.controller?.scriptURL || ''))
-        .toContain('/v2/sw.js');
+        .toContain(appUrl('sw.js'));
     await disconnect();
     await page.reload();
     await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).first().click();
@@ -149,7 +149,7 @@ test('manual sounds save, revert, export/import and play sampled audio after off
 test('all five lanes route real samples and every catalog choice downloads', async ({ page }) => {
     test.setTimeout(120_000);
     await observeSamples(page);
-    await page.goto('/v2/');
+    await page.goto(appUrl());
     await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
     for (const label of ['Drums', 'Bass', 'Chords', 'Harmony', 'Soloist']) {
         for (const other of ['Drums', 'Bass', 'Chords', 'Harmony', 'Soloist']) {
@@ -183,14 +183,16 @@ test('all five lanes route real samples and every catalog choice downloads', asy
 });
 
 test('corrupt downloads and storage failures preserve the previous sound', async ({ page }) => {
-    await page.addInitScript(() => {
+    // `packs` crosses into the page as an argument: this body runs in the browser, where the
+    // suite's `appUrl` does not exist.
+    await page.addInitScript((packs: string) => {
         const original = window.fetch;
         Object.assign(window, { __breakSound: 'corrupt' });
         window.fetch = async (input, init) => {
             const mode = (window as unknown as { __breakSound: string }).__breakSound;
             if (
                 mode === 'corrupt' &&
-                String(input).includes('/v2/packs/grand/') &&
+                String(input).includes(`${packs}grand/`) &&
                 String(input).includes('.m4a')
             ) {
                 return new Response('bad sample', { status: 200 });
@@ -201,14 +203,14 @@ test('corrupt downloads and storage failures preserve the previous sound', async
         Cache.prototype.put = function (request, response) {
             if (
                 (window as unknown as { __breakSound: string }).__breakSound === 'quota' &&
-                String(request).includes('/v2/packs/')
+                String(request).includes(packs)
             ) {
                 return Promise.reject(new DOMException('Storage full', 'QuotaExceededError'));
             }
             return put.call(this, request, response);
         };
-    });
-    await page.goto('/v2/');
+    }, appUrl('packs/'));
+    await page.goto(appUrl());
     await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
     await openSounds(page);
     await page.getByLabel('Chords sound', { exact: true }).selectOption('pack:grand');
@@ -235,11 +237,11 @@ test('one install applies genre sounds, preserves manual overrides and follows f
     await observeSamples(page);
     const downloads: string[] = [];
     page.on('request', (request) => {
-        if (request.url().includes('/v2/packs/')) {
+        if (request.url().includes(appUrl('packs/'))) {
             downloads.push(request.url());
         }
     });
-    await page.goto('/v2/');
+    await page.goto(appUrl());
     await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
     expect(downloads).toEqual([]);
     await openSounds(page);
@@ -297,7 +299,7 @@ test('one install applies genre sounds, preserves manual overrides and follows f
     await closeSounds(page);
     await expect
         .poll(() => page.evaluate(() => navigator.serviceWorker.controller?.scriptURL || ''))
-        .toContain('/v2/sw.js');
+        .toContain(appUrl('sw.js'));
     await disconnect();
     await page.reload();
     await page.getByRole('button', { name: 'Blue pocket Funk · Saved locally' }).first().click();
@@ -352,20 +354,21 @@ test('failed bulk installation keeps every previous voice and retries completed 
     page,
 }) => {
     test.setTimeout(120_000);
-    await page.addInitScript(() => {
+    // Browser-side body; the pack URL arrives as an argument (see the corrupt-download test).
+    await page.addInitScript((kit: string) => {
         const put = Cache.prototype.put;
         Object.assign(window, { __failBulk: true });
         Cache.prototype.put = function (request, response) {
             if (
                 (window as unknown as { __failBulk: boolean }).__failBulk &&
-                String(request).includes('/v2/packs/acoustic-kit/')
+                String(request).includes(kit)
             ) {
                 return Promise.reject(new DOMException('Storage full', 'QuotaExceededError'));
             }
             return put.call(this, request, response);
         };
-    });
-    await page.goto('/v2/');
+    }, appUrl('packs/acoustic-kit/'));
+    await page.goto(appUrl());
     await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
     await openSounds(page);
     await page.getByRole('button', { name: 'Install all & use genre sounds' }).click();
@@ -379,7 +382,7 @@ test('failed bulk installation keeps every previous voice and retries completed 
     await page.evaluate(() => Object.assign(window, { __failBulk: false }));
     const repeated: string[] = [];
     page.on('request', (request) => {
-        if (request.url().includes('/v2/packs/grand/')) {
+        if (request.url().includes(appUrl('packs/grand/'))) {
             repeated.push(request.url());
         }
     });
@@ -401,12 +404,13 @@ test('feel preparation keeps the stand stable, rolls back playback safely, and r
 }) => {
     test.setTimeout(120_000);
     await observeSamples(page);
-    await page.addInitScript(() => {
+    // Browser-side body; the pack URL arrives as an argument (see the corrupt-download test).
+    await page.addInitScript((grand: string) => {
         const match = Cache.prototype.match;
         const control = { hold: false, release: null as null | (() => void) };
         Object.assign(window, { __preparation: control });
         Cache.prototype.match = async function (request, options) {
-            if (control.hold && String(request).includes('/v2/packs/grand/')) {
+            if (control.hold && String(request).includes(grand)) {
                 control.hold = false;
                 await new Promise<void>((resolve) => {
                     control.release = resolve;
@@ -414,7 +418,7 @@ test('feel preparation keeps the stand stable, rolls back playback safely, and r
             }
             return match.call(this, request, options);
         };
-    });
+    }, appUrl('packs/grand/'));
     const hold = () =>
         page.evaluate(() => {
             const control = (
@@ -435,7 +439,7 @@ test('feel preparation keeps the stand stable, rolls back playback safely, and r
                 typeof (window as unknown as { __preparation: { release: unknown } }).__preparation
                     .release === 'function',
         );
-    await page.goto('/v2/');
+    await page.goto(appUrl());
     await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
     await openSounds(page);
     await page.getByRole('button', { name: 'Install all & use genre sounds' }).click();
@@ -510,7 +514,7 @@ test('a feel staged for the next bar settles when the musician stops inside it',
     // swapped in at the next measure start, so the window between the choice and
     // the swap is real, and a Stop landing inside it must not leave the engine on
     // the old feel while the captured document already reads the new one (#1185).
-    await page.goto('/v2/');
+    await page.goto(appUrl());
     await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
     await page.getByRole('button', { name: 'Start playback', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Stop playback' })).toBeEnabled();
@@ -567,7 +571,7 @@ test('real runtime, local saves, reload recovery and offline playback', async ({
             }
         };
     });
-    await page.goto('/v2/');
+    await page.goto(appUrl());
     await expect(page.getByRole('heading', { name: 'Let’s play something.' })).toBeVisible();
     await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
     await expect(page.getByRole('heading', { name: 'Blue pocket', exact: true })).toBeVisible();
@@ -607,7 +611,7 @@ test('real runtime, local saves, reload recovery and offline playback', async ({
     await expect(page.getByLabel('Tempo', { exact: true })).toHaveValue('115');
     await expect
         .poll(() => page.evaluate(() => navigator.serviceWorker.controller?.scriptURL || ''))
-        .toContain('/v2/sw.js');
+        .toContain(appUrl('sw.js'));
     await disconnect();
     await page.reload();
     await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
@@ -621,7 +625,7 @@ test('real runtime, local saves, reload recovery and offline playback', async ({
 });
 
 test('responsive chart and editor fit laptop, phone and tablet', async ({ page }) => {
-    await page.goto('/v2/');
+    await page.goto(appUrl());
     await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
     for (const [width, height] of [
         [1300, 940],
@@ -679,10 +683,10 @@ test('two tabs cannot overwrite a newer save; a conflicting take can become a co
     page,
     context,
 }) => {
-    await page.goto('/v2/');
+    await page.goto(appUrl());
     await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
     const second = await context.newPage();
-    await second.goto('/v2/');
+    await second.goto(appUrl());
     await second.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
     await page.getByRole('button', { name: 'Faster', exact: true }).click();
     await page.getByRole('button', { name: 'Save', exact: true }).click();
@@ -715,7 +719,7 @@ test('file export/import is detached; invalid input never changes the active son
             return read.call(this);
         };
     });
-    await page.goto('/v2/');
+    await page.goto(appUrl());
     await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
     await page.getByRole('button', { name: 'Edit chart', exact: true }).click();
     await editorRevealed(page);
@@ -752,7 +756,7 @@ test('file export/import is detached; invalid input never changes the active son
 test('failed recovery stays in memory through navigation and is never labelled recovered', async ({
     page,
 }) => {
-    await page.goto('/v2/');
+    await page.goto(appUrl());
     await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
     await page.evaluate(() => {
         Storage.prototype.setItem = () => {
@@ -773,10 +777,10 @@ test('an older competing draft remains explicitly recoverable after another tab 
     page,
     context,
 }) => {
-    await page.goto('/v2/');
+    await page.goto(appUrl());
     await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
     const second = await context.newPage();
-    await second.goto('/v2/');
+    await second.goto(appUrl());
     await second.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
     await page.getByRole('button', { name: 'Slower', exact: true }).click();
     await second.getByRole('button', { name: 'Faster', exact: true }).click();
@@ -799,11 +803,11 @@ test('all existing feels and key/mutes survive a save; long charts scroll legibl
     page,
     disconnect,
 }) => {
-    await page.goto('/v2/');
+    await page.goto(appUrl());
     await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
     await expect
         .poll(() => page.evaluate(() => navigator.serviceWorker.controller?.scriptURL || ''))
-        .toContain('/v2/sw.js');
+        .toContain(appUrl('sw.js'));
     await disconnect();
     const genres = await page
         .getByLabel('Feel', { exact: true })

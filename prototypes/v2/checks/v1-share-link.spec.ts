@@ -1,4 +1,4 @@
-import { expect, test } from './fixtures';
+import { appUrl, expect, test } from './fixtures';
 
 /**
  * Old v1 `?s=` share links landing on the v2 stand (#1279).
@@ -16,7 +16,7 @@ function v1Link(sections: Array<Record<string, unknown>>, params: Record<string,
     for (const [name, value] of Object.entries(params)) {
         search.set(name, value);
     }
-    return `/v2/?${search.toString()}`;
+    return appUrl(`?${search.toString()}`);
 }
 
 /** The blues the first test opens, reused by the precedence tests. */
@@ -39,7 +39,7 @@ async function withoutClipboard(page: import('@playwright/test').Page) {
 /** A REAL `#chart=` fragment, minted by the app itself for the starter blues. */
 async function chartFragment(page: import('@playwright/test').Page): Promise<string> {
     await withoutClipboard(page);
-    await page.goto('/v2/');
+    await page.goto(appUrl());
     await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
     await page.getByRole('button', { name: 'Song actions' }).click();
     await page.getByRole('button', { name: 'Copy link', exact: true }).click();
@@ -104,7 +104,7 @@ test('an old v1 share link opens as an unsaved draft; Keep a copy persists it an
 test('a garbage v1 link says so and leaves the songbook working', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
-    await page.goto('/v2/?s=not-a-real-payload&key=C&bpm=120');
+    await page.goto(appUrl('?s=not-a-real-payload&key=C&bpm=120'));
 
     // Scoped to the app's own banner: Next's route announcer also carries `role="alert"`.
     await expect(page.locator('.error-banner[role="alert"]')).toContainText(
@@ -119,7 +119,7 @@ test('a garbage v1 link says so and leaves the songbook working', async ({ page 
     await expect(page.getByRole('heading', { name: 'Blue pocket' })).toBeVisible();
 
     // Consumed here too: reloading must not re-show the failure indefinitely.
-    await page.goto('/v2/');
+    await page.goto(appUrl());
     await expect(page.locator('.error-banner[role="alert"]')).toHaveCount(0);
 });
 

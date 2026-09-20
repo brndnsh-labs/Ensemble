@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { expect, test } from './fixtures';
+import { appUrl, expect, test } from './fixtures';
 
 const blue = 'Blue pocket Blues · Saved locally';
 // Same starter facts `checks/midi-export.spec.ts` hardcodes, for the same reason: an
@@ -60,7 +60,7 @@ test('Export audio (mix) downloads a valid WAV of plausible duration, and the li
     // this suite's own machine has shown enough variance to need real headroom
     // rather than the default 45s.
     test.setTimeout(120_000);
-    await page.goto('/v2/');
+    await page.goto(appUrl());
     await page.getByRole('button', { name: blue }).click();
     await expect(page.getByRole('heading', { name: 'Blue pocket' })).toBeVisible();
     const before = await page.locator('.sheet').innerText();
@@ -97,7 +97,7 @@ test('Export audio (stems) downloads one WAV per instrument lane', async ({ page
     // (also comfortably slower than its default 45s here), hence the wide
     // budget (matches `foundation.spec.ts`'s heaviest per-lane-catalog test).
     test.setTimeout(240_000);
-    await page.goto('/v2/');
+    await page.goto(appUrl());
     await page.getByRole('button', { name: blue }).click();
     await page.getByRole('button', { name: 'Song actions' }).click();
 
@@ -131,7 +131,7 @@ test('Export audio during playback does not stop or glitch the band', async ({ p
     // render's step-generation loop now shares the main thread with the live
     // scheduler's real-time ticks — same generous budget, not a tighter one.
     test.setTimeout(120_000);
-    await page.goto('/v2/');
+    await page.goto(appUrl());
     await page.getByRole('button', { name: blue }).click();
     await page.getByRole('button', { name: 'Start playback', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Stop playback', exact: true })).toBeEnabled();
@@ -158,20 +158,22 @@ test('Cancel stops an in-flight export before any download', async ({ page }) =>
     // so there is one bounded, reliable window to click Cancel while
     // `exportAudio`'s pre-flight `prepareSounds` is in flight, and the rest of
     // the (locally-served, fast) install still finishes soon after.
-    await page.addInitScript(() => {
+    // `manifest` crosses into the page as an argument: this body runs in the browser, where the
+    // suite's `appUrl` does not exist.
+    await page.addInitScript((manifest: string) => {
         const original = window.fetch;
         Object.assign(window, { __delayPack: false });
         window.fetch = async (input, init) => {
             if (
                 (window as unknown as { __delayPack: boolean }).__delayPack &&
-                String(input).includes('/v2/packs/grand/manifest.json')
+                String(input).includes(manifest)
             ) {
                 await new Promise((resolve) => setTimeout(resolve, 4000));
             }
             return original(input, init);
         };
-    });
-    await page.goto('/v2/');
+    }, appUrl('packs/grand/manifest.json'));
+    await page.goto(appUrl());
     await page.getByRole('button', { name: blue }).click();
     await page.getByRole('button', { name: 'Sounds', exact: true }).click();
     await page.getByLabel('Chords sound', { exact: true }).selectOption('pack:grand');
@@ -217,20 +219,21 @@ test('Cancel stops an in-flight export before any download', async ({ page }) =>
 test('A pack that fails to install surfaces an error, never a silent synth fallback', async ({
     page,
 }) => {
-    await page.addInitScript(() => {
+    // Browser-side body; the pack URL arrives as an argument (see the Cancel test above).
+    await page.addInitScript((grand: string) => {
         const original = window.fetch;
         Object.assign(window, { __breakPack: false });
         window.fetch = async (input, init) => {
             if (
                 (window as unknown as { __breakPack: boolean }).__breakPack &&
-                String(input).includes('/v2/packs/grand/')
+                String(input).includes(grand)
             ) {
                 return new Response('offline', { status: 503 });
             }
             return original(input, init);
         };
-    });
-    await page.goto('/v2/');
+    }, appUrl('packs/grand/'));
+    await page.goto(appUrl());
     await page.getByRole('button', { name: blue }).click();
     await page.getByRole('button', { name: 'Sounds', exact: true }).click();
     await page.getByLabel('Chords sound', { exact: true }).selectOption('pack:grand');

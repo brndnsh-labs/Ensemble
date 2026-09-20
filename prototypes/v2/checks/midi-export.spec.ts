@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { expect, test } from './fixtures';
+import { appUrl, expect, test } from './fixtures';
 
 const blue = 'Blue pocket Blues · Saved locally';
 // Authored in `lib/starters.ts`: 12 one-bar-per-chord measures (`C7 | F7 | ...`)
@@ -172,7 +172,7 @@ async function readSettledMidi(path: string): Promise<{ bytes: Buffer; parsed: P
 test('Export MIDI downloads a valid multi-track file matching the chart', async ({
     page,
 }, testInfo) => {
-    await page.goto('/v2/');
+    await page.goto(appUrl());
     await page.getByRole('button', { name: blue }).click();
     await expect(page.getByRole('heading', { name: 'Blue pocket' })).toBeVisible();
 
@@ -218,7 +218,7 @@ test('Export MIDI downloads a valid multi-track file matching the chart', async 
 });
 
 test('Export MIDI during playback does not stop or glitch the band', async ({ page }) => {
-    await page.goto('/v2/');
+    await page.goto(appUrl());
     await page.getByRole('button', { name: blue }).click();
     await page.getByRole('button', { name: 'Start playback', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Stop playback', exact: true })).toBeEnabled();

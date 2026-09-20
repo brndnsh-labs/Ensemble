@@ -20,10 +20,12 @@
  * trust) maps to `{ kind: 'unknown' }` rather than being silently accepted or thrown raw.
  *
  * Never caches a private response: `cache: 'no-store'` bypasses the browser HTTP cache, and
- * separately, `scripts/offline.mjs`'s generated service worker only intercepts `fetch` events
- * whose path starts with `/v2/` (`url.pathname.startsWith('/v2/')`) — an `/api/*` request never
- * reaches its `event.respondWith` at all, so there is nothing here that could accidentally
- * route a session or Save response through the offline cache even if it tried to.
+ * separately, `scripts/offline.mjs`'s generated service worker returns early for any path in
+ * its `PASSES` list — `/api` and everything under it — so an `/api/*` request never reaches its
+ * `event.respondWith` at all and nothing here could accidentally route a session or Save reply
+ * through the offline cache even if it tried to. That exclusion is stated in the worker rather
+ * than inherited from its scope on purpose (#1354): the scope is `/v2/` today but `/` once the
+ * stand takes the site root, where a prefix test matches every path on the origin.
  */
 
 /** Mirrors `prototypes/v2-api/src/http/errors.ts`'s `ApiErrorCode`. Keep the two in sync. */

@@ -5,8 +5,24 @@ import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test as base, expect, type Page } from '@playwright/test';
+import { basePathFromEnv } from '../scripts/base-path.mjs';
 
 export { expect } from '@playwright/test';
+
+/**
+ * Where the app under test lives, read from the same `ENSEMBLE_V2_BASE` the build read
+ * (#1354) — `/v2` today, `''` for a root build. Every spec spells its URLs through `appUrl`
+ * rather than a literal, so the cutover is a build flag here too and not a hundred edits.
+ */
+export const BASE = basePathFromEnv();
+
+/**
+ * One app URL. `appUrl()` is the songbook itself; the argument is everything that followed
+ * the base in the old literal — `appUrl('sw.js')`, `appUrl('?accounts=on')`, `appUrl('#chart=')`.
+ */
+export function appUrl(suffix = ''): string {
+    return `${BASE}/${suffix}`;
+}
 
 /**
  * One preview server PER WORKER, not one for the whole run (#1223).
@@ -31,11 +47,16 @@ async function startPreviewServer(): Promise<{ child: ChildProcess; url: string 
         stdio: ['ignore', 'pipe', 'inherit'],
     });
     let buffered = '';
+    // The base is in the pattern, not just the origin: a server serving somewhere else than
+    // the suite drives is a misconfiguration worth hanging on, not a `baseURL` to adopt.
+    const startupLine = new RegExp(
+        `V2 preview: (http://127\\.0\\.0\\.1:\\d+)${BASE.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/`,
+    );
     const url = await new Promise<string>((resolvePort, reject) => {
         child.stdout?.setEncoding('utf8');
         child.stdout?.on('data', (chunk: string) => {
             buffered += chunk;
-            const match = buffered.match(/V2 preview: (http:\/\/127\.0\.0\.1:\d+)\/v2\//);
+            const match = buffered.match(startupLine);
             if (match) {
                 resolvePort(match[1]);
             }
@@ -83,7 +104,7 @@ async function freePort(): Promise<number> {
 }
 
 export interface AccountApi {
-    /** `http://localhost:<port>` — the ONE origin serving both `/v2/` and `/api/*`. */
+    /** `http://localhost:<port>` — the ONE origin serving both the app and `/api/*`. */
     origin: string;
 }
 
