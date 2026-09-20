@@ -8,6 +8,7 @@ import {
     computeAdoptCandidates,
     rememberAdoptionDecision,
 } from '../../lib/account/adopt-guest';
+import { AccountMismatchError } from '../../lib/account/sync-loop';
 
 /**
  * "Add your N songs on this device to your account?" (#1268) — a `<dialog>` in the same pattern
@@ -85,7 +86,18 @@ export function AdoptGuestDialog({
                 }
                 setPhase({
                     kind: 'error',
-                    message: error instanceof Error ? error.message : String(error),
+                    // An `AccountMismatchError` here is the attach lag, not a verdict about this
+                    // account (#1351 patch N3): the session already names this owner while
+                    // `meta.active` still names the last one, and the named library read is
+                    // refused until the attach settles. `OWNER_MESSAGES.mismatch` is a sentence
+                    // about a CHART on the stand, and this dialog has none — so it says what is
+                    // actually true and asks for a moment.
+                    message:
+                        error instanceof AccountMismatchError
+                            ? 'Your account library isn’t ready yet — try again in a moment.'
+                            : error instanceof Error
+                              ? error.message
+                              : String(error),
                 });
             },
         );

@@ -195,7 +195,7 @@ export const DELETE_MESSAGES = {
 } as const;
 
 /**
- * The one sentence signing out can need beyond the preflight's own counts (#1269).
+ * The sentences signing out can need beyond the preflight's own counts (#1269, #1351).
  *
  * Revoking the session is the irreversible half and it goes first, so by the time the local wipe
  * can fail the sign-out has already happened — there is no honest way to take it back, and
@@ -204,8 +204,37 @@ export const DELETE_MESSAGES = {
  * lead with the fact, never print a storage error, and name the step that finishes the job.
  */
 export const SIGN_OUT_MESSAGES = {
+    /**
+     * Signed out, records stayed, and the step that retries the clear IS reachable: the failed
+     * clear put the owner back into `meta.active`, so this device still HOLDS the account whose
+     * songs are still here and the banner offers "Sign out on this device" for exactly that state.
+     */
     notCleared:
-        'Signed out — but your account’s songs could not be removed from this device. Sign in again and sign out to clear them.',
+        'Signed out — but your account’s songs could not be removed from this device. Use “Sign out on this device” to try again.',
+    /**
+     * The same outcome with the fence restore ALSO refused (#1351 patch N2), so `meta.active` names
+     * nobody, no banner renders, and naming a control that is not on screen would be a instruction
+     * to press something that does not exist. A reload is the honest next move: it re-reads storage
+     * that may well have recovered by then.
+     */
+    notClearedStranded:
+        'Signed out — but your account’s songs could not be removed from this device. Reload this page and try again.',
+    /**
+     * "Sign out on this device" that did not happen at all (#1351 patch N2). The fence never moved
+     * and not a row was touched, so "Signed out —" would be the one word this sentence must not
+     * open with: the device is exactly what it was, and trying again is a real option.
+     */
+    notChanged: 'Couldn’t sign out on this device — nothing was changed. Try again.',
+    /**
+     * "Sign out on this device" (#1351) run against an account this device no longer holds —
+     * another tab signed in as somebody else while the expired banner was still on screen here.
+     * Nothing was removed and nothing was moved: the refusal happens before the fence.
+     *
+     * Deliberately not `OWNER_MESSAGES.mismatch`, which is a sentence about a CHART on the stand
+     * and would tell a musician to export a song this step never mentioned.
+     */
+    elsewhere:
+        'This device is signed in to a different account now, so there was nothing here to sign out of. Sign out from the account that’s signed in.',
 } as const;
 
 /**
@@ -558,8 +587,15 @@ export interface SyncLoop {
     setActiveDocument(documentId: string | null): void;
     /** Which document `observation` describes. */
     watch(documentId: string | null): Promise<void>;
-    /** Every saved song for this account, paged to the end. */
-    listLibrary(): Promise<SavedSong[]>;
+    /**
+     * Every saved song for this account, paged to the end.
+     *
+     * `owner` names the account the caller means, for the one case where the loop cannot derive it
+     * — an EXPIRED session's "Sign out on this device" (#1351), which exports from a library whose
+     * scope is detached. See `heldScope`: named or not, a claim that does not match the account
+     * this device holds is refused rather than answered with somebody else's library.
+     */
+    listLibrary(owner?: string | null): Promise<SavedSong[]>;
     /**
      * Commit locally and queue that exact version. Does NOT send; the caller triggers a pass.
      *
@@ -585,7 +621,7 @@ export interface SyncLoop {
      * Deliberately reachable while the SESSION has expired, which is the one thing that separates
      * it from every other call here: expiry pauses uploads and detaches the loop, but it does not
      * change which account this device holds locally, and a draft written nowhere is a draft lost
-     * on the next close. See `retentionScope`.
+     * on the next close. See `heldScope`.
      */
     recover(
         document: ChartDocument,
@@ -598,7 +634,7 @@ export interface SyncLoop {
          * point: a session can expire under an account chart and the musician can answer "Sign in
          * again" with a DIFFERENT passkey. The loop then holds account B while the stand still
          * holds A's song, and the next keystroke would retain A's chart text inside B's database.
-         * Named here, compared in `retentionScope`, and refused rather than written — with
+         * Named here, compared in `heldScope`, and refused rather than written — with
          * `AccountMismatchError` since #1311, so the shell can tell this refusal from a storage
          * failure without reading the sentence.
          */
@@ -620,8 +656,14 @@ export interface SyncLoop {
      * Read AHEAD of a sign-out or delete-account export rather than during it: those write one file
      * per song inside a single user gesture, and an await between two downloads is how a browser's
      * per-gesture cap starts dropping them.
+     *
+     * `owner` is `listLibrary`'s, for the same caller: an expired session's export (#1351) needs
+     * these bytes most of all, because nothing it finds here will ever reach the account.
      */
-    retainedDrafts(documentIds: string[]): Promise<Map<string, ChartDocument>>;
+    retainedDrafts(
+        documentIds: string[],
+        owner?: string | null,
+    ): Promise<Map<string, ChartDocument>>;
     /**
      * Drop this writer's retained experiment, once a Save has committed what it held.
      *
@@ -684,21 +726,51 @@ export interface SyncLoop {
         owner: string | null,
     ): Promise<(KeepBothResolution & { ownerId: string }) | null>;
     /**
+     * The account this DEVICE holds, read from storage (#1351 patch R1) — `meta.active`, or the
+     * attached scope when there is one, which is the same row.
+     *
+     * A STORAGE fact, deliberately, and the only honest basis for offering "Sign out on this
+     * device". The in-memory session state cannot answer it: `expired` exists only in the page
+     * load where a live session lapsed, so a RELOAD lands on `guest` (`session.ts` only ever moves
+     * a `signedIn` session to `expired`) while every one of that account's rows is still on the
+     * disk. Deriving the offer from the session would hide it in precisely the sequence the story
+     * is about — the device changes hands and is restarted in between.
+     *
+     * Null is "this device holds no account", which is the ordinary guest device and pays nothing:
+     * one `readonly` transaction, after the first session read has answered, never on the path to
+     * first paint.
+     */
+    heldOwner(): Promise<string | null>;
+    /**
      * What signing out would cost (#1269), as far as the ACCOUNT DATABASE can see. A read; it
      * changes nothing and sends nothing. The caller completes `drafts`/`atRisk` with the drafts no
      * store holds — see `SignOutPreflight['drafts']`.
+     *
+     * `owner` is `listLibrary`'s: the expired session's step (#1351) runs the SAME preflight, off
+     * the same stores, with no attached scope to read them through.
      */
-    signOutPreflight(): Promise<SignOutPreflight>;
+    signOutPreflight(owner?: string | null): Promise<SignOutPreflight>;
     /**
-     * Sign this device out of the account (#1269), in the one order that cannot lose work.
+     * Sign this device out of the account (#1269, #1351), in the one order that cannot lose work.
      *
      * The FENCE MOVES FIRST — before `revoke` is even called — so a Save reply for this account
      * that arrives after the musician asked to leave finds a generation that no longer matches and
      * commits nothing. Everything else follows from what `revoke` answers: `true` means the server
      * confirmed the session is gone and this device may forget the account; anything else means the
      * sign-out did not happen, and the account is re-attached with everything it had.
+     *
+     * **One clearing path, three ways of settling the server side.** `revoke` is the whole of that
+     * difference, and the ordered local half below never forks: an ordinary sign-out awaits the
+     * logout round trip, a deleted account (#1271) resolves `true` because the delete route removed
+     * the session itself, and an expired one (#1351) resolves `true` because the session is already
+     * dead — nothing to revoke, so the step needs no network at all and works offline.
+     *
+     * `owner` is `listLibrary`'s, and it is what makes that last case possible: an expired session
+     * has no attached scope, so the account being left is named rather than derived. Naming one
+     * this device does not hold throws `AccountMismatchError` BEFORE the fence moves, so a refused
+     * sign-out clears nothing and moves nothing.
      */
-    signOut(revoke: () => Promise<boolean>): Promise<SignOutOutcome>;
+    signOut(revoke: () => Promise<boolean>, owner?: string | null): Promise<SignOutOutcome>;
     /** One outbox + download pass, coalesced: a request during a pass re-runs once after it. */
     run(): Promise<void>;
 }
@@ -778,7 +850,7 @@ export function createSyncLoop(
     /**
      * The attached scope, refused when the chart the caller is carrying belongs to a DIFFERENT
      * account (#1311). Every account-store write the shell can reach goes through this or
-     * `retentionScope`, and both ask `refuseForeign`.
+     * `heldScope`, and both ask `refuseForeign`.
      *
      * The refusal comes BEFORE the songbook is touched, which is the whole property: a refused
      * write leaves no record, no outbox operation, no draft and no receipt under the wrong owner.
@@ -790,31 +862,40 @@ export function createSyncLoop(
     }
 
     /**
-     * The scope a RETAINED DRAFT may be written under (#1299): the attached one, or — when the
-     * session expired underneath a chart that is still the account's — the account this device
-     * still holds locally.
+     * The account this DEVICE holds: the attached scope when there is one, or — when nothing is
+     * attached — whichever owner `meta.active` still names.
      *
-     * This is the only call that reaches past `settledScope`, and only ever for the `drafts` store.
-     * An expired session detaches the loop (`app/account/library.tsx`), which is right for anything
-     * that sends: uploads wait for reauthentication. It says nothing about local ownership, though
-     * — `meta.active` still names the owner until an explicit sign-out moves it — and the shell has
-     * a chart on the stand whose unsaved text has to go SOMEWHERE. The guest namespace is precisely
-     * where it must not go, so it goes to the account that owns it, which is also the account whose
-     * sign-out will remove it.
+     * The only resolution that reaches past `settledScope`, and the two things that need it are
+     * the two things that are still true of an EXPIRED session. An expiry detaches the loop
+     * (`app/account/library.tsx`), which is right for everything that sends: uploads wait for
+     * reauthentication. It says nothing about local ownership — `meta.active` keeps naming the
+     * owner until an explicit sign-out moves it — so:
      *
-     * Genuinely signed out there is no such account and this rejects, which the caller turns into
-     * the in-tab-only retention it already falls back to when storage refuses.
+     * - **A retained draft (#1299)** has to go SOMEWHERE. The shell still has a chart on the stand
+     *   whose unsaved text is the account's, and the guest namespace is precisely where it must not
+     *   go, so it goes to the account that owns it — which is also the account whose sign-out will
+     *   remove it.
+     * - **"Sign out on this device" (#1351)** is the way to remove exactly that. The expired
+     *   session is already dead, so there is nothing to revoke and no attached scope to read; what
+     *   is left on disk belongs to the account this device still holds, and clearing it is the only
+     *   thing left to do. The reads that step is built on — the preflight, the library it exports
+     *   from, the drafts that make those files the newest bytes — resolve here for the same reason.
      *
-     * `owner` is the caller's claim about WHICH account the chart belongs to (#1299 patch review
-     * P2). The scope resolved above says which account this device holds; those two can disagree
-     * exactly once — an expired session answered with another passkey — and the disagreement means
-     * this text belongs to neither the account now held nor the guest namespace. It is refused,
-     * and the shell's in-tab fallback keeps it where it can still be exported.
+     * Genuinely signed out there is no such account and this rejects, which a draft caller turns
+     * into the in-tab-only retention it already falls back to when storage refuses.
      *
-     * Since #1311 the comparison is `refuseForeign`'s rather than its own inline one, so the draft
-     * half and the Save half of that transition cannot drift apart on what a mismatch is.
+     * `owner` is the caller's claim about WHICH account this is about (#1299 patch review P2): the
+     * chart's for a draft, the expired banner's for a sign-out. The scope resolved above says which
+     * account this device holds; those two can disagree exactly once — an expired session answered
+     * with another passkey, here or in another tab — and the disagreement means the caller is
+     * acting on an account that is no longer here. It is refused rather than applied to whoever is
+     * held now, which for a draft would file A's text in B's database and for a sign-out would
+     * delete B's whole library.
+     *
+     * Since #1311 the comparison is `refuseForeign`'s rather than its own inline one, so every
+     * half of that transition agrees on what a mismatch is.
      */
-    async function retentionScope(owner: string | null): Promise<AccountScope> {
+    async function heldScope(owner: string | null): Promise<AccountScope> {
         const held = scope || attaching ? await settledScope() : await songbook.currentScope();
         if (!held) {
             throw new Error('The account songbook is not available while signed out.');
@@ -1218,8 +1299,8 @@ export function createSyncLoop(
             watched = documentId;
             await observe();
         },
-        async listLibrary() {
-            const current = await settledScope();
+        async listLibrary(owner = null) {
+            const current = await heldScope(owner);
             const songs: SavedSong[] = [];
             let cursor: string | undefined;
             // The same ceiling `runLibraryDownload` uses locally: more pages than the server's
@@ -1247,7 +1328,7 @@ export function createSyncLoop(
             return song;
         },
         async recover(document, baseRevision, owner) {
-            await songbook.recover(await retentionScope(owner), writerId, document, baseRevision);
+            await songbook.recover(await heldScope(owner), writerId, document, baseRevision);
         },
         async retainedDraft(documentId) {
             return newestDraft(await settledScope(), documentId);
@@ -1259,8 +1340,8 @@ export function createSyncLoop(
                 capturedAt: draft.capturedAt,
             }));
         },
-        async retainedDrafts(documentIds) {
-            const current = await settledScope();
+        async retainedDrafts(documentIds, owner = null) {
+            const current = await heldScope(owner);
             const held = new Map<string, ChartDocument>();
             for (const documentId of documentIds) {
                 const draft = await newestDraft(current, documentId);
@@ -1416,9 +1497,9 @@ export function createSyncLoop(
             void loop.run().catch(() => {});
             return { ...resolution, ownerId: current.ownerId };
         },
-        async signOutPreflight() {
-            const current = await settledScope();
-            const songs = await loop.listLibrary();
+        async signOutPreflight(owner = null) {
+            const current = await heldScope(owner);
+            const songs = await loop.listLibrary(owner);
             let unsentSaves = 0;
             let refusedSaves = 0;
             let drafts = 0;
@@ -1454,9 +1535,55 @@ export function createSyncLoop(
             }
             return { documentIds, atRisk, unsentSaves, refusedSaves, drafts };
         },
-        async signOut(revoke) {
-            const current = await settledScope();
+        async heldOwner() {
+            if (attaching) {
+                await attaching;
+            }
+            return scope ? scope.ownerId : ((await songbook.currentScope())?.ownerId ?? null);
+        },
+        async signOut(revoke, claimed = null) {
+            /**
+             * An optional `owner` is a convenience for a caller the loop can already answer for,
+             * never a licence to clear whatever this device happens to hold (#1351 patch R5).
+             *
+             * Detached, `heldScope(null)` resolves through `currentScope()` and names no owner to
+             * compare — so an unnamed sign-out would destroy an account nobody asked about, where
+             * before #1351 it simply threw "not available while signed out". The two callers that
+             * omit it (#1269's sign-out, #1271's delete) are attached by construction, so this
+             * refuses only the case that has no answer.
+             *
+             * Deliberately here and not in `heldScope`: `recover(document, revision, null)` is a
+             * legitimate detached, unnamed write (#1299 — an expired session's draft goes to the
+             * account this device holds), and that call is additive where this one is destructive.
+             */
+            if (scope === null && attaching === null && claimed === null) {
+                throw new Error('Signing out of this device needs the account it is leaving.');
+            }
+            // Ahead of everything, including the fence (#1351): a step that names an account this
+            // device no longer holds has nothing here to sign out of, and applying it to whoever
+            // IS held would delete that person's whole library instead.
+            //
+            // It is a check-then-act against storage, and the window it leaves is bounded by what
+            // follows (#1351 patch R7): another tab can switch `meta.active` between this read and
+            // the `switchAccount(null)` below, but everything after it is keyed on `owner` — the
+            // id read HERE — and `clearAccount(owner)` bounds all six of its ranges by that id.
+            // So the worst a lost race can do is move a fence that a second tab will mint afresh on
+            // its next write, and delete exactly the rows the musician asked to delete. It can
+            // never reach the other account's records, which is the property that matters.
+            const current = await heldScope(claimed);
             const owner = current.ownerId;
+            /**
+             * Was this device ATTACHED when the sign-out began? Re-attaching below is putting back
+             * what `detach()` took, and it only took something if there was something to take.
+             *
+             * An expired session (#1351) starts detached and must end detached however this goes:
+             * the loop has no live session to run a pass against, `app/account/library.tsx` will
+             * not detach it again (its effect is keyed on an owner that is already null), and an
+             * attach here would publish an owner while the header is still telling the musician to
+             * sign back in. Both of today's other callers reach this with a scope attached, so
+             * nothing about #1269 or #1271 changes.
+             */
+            const reattach = scope !== null;
             // Held across the round trip because `detach()` and `attach()` both clear them, and a
             // sign-out the server REFUSED must leave this device exactly as it found it. The 429
             // floor is the load-bearing one: a refusal is not the server withdrawing the wait it
@@ -1471,6 +1598,25 @@ export function createSyncLoop(
                 if (heldFailure) {
                     publish({ failure: heldFailure });
                 }
+            };
+            /**
+             * Gives the account back, for a sign-out that did not happen — in whichever sense this
+             * device had it. `attach` mints a fresh generation, which is what un-strands the stale
+             * scope a detach left behind.
+             *
+             * With nothing attached (#1351) there is no loop scope to restore, but the FENCE has
+             * still moved: returning without putting the owner back into `meta.active` would leave
+             * this device holding an account nothing can see, with its songs, outbox and drafts all
+             * still on disk. `switchAccount` puts it back under a fresh generation, fencing off
+             * anything in flight exactly as the move out did. (Unreachable while the only detached
+             * caller answers `revoke` with a resolved `true`, and deliberately not left to rot.)
+             */
+            const reopen = async () => {
+                if (reattach) {
+                    await loop.attach(owner);
+                    return;
+                }
+                await songbook.switchAccount(owner);
             };
             // Detach before the fence moves, not after: the loop's own scope is now stale, and a
             // pass that started against it would spend requests for an account this device is in
@@ -1489,15 +1635,14 @@ export function createSyncLoop(
                 // answering. Either way the sign-out did not happen, and leaving the loop detached
                 // would strand the outbox behind a scope nothing re-attaches — the session state
                 // has not changed, so no effect is coming to do it.
-                await loop.attach(owner).catch(() => {});
+                await reopen().catch(() => {});
                 restore();
                 throw error;
             }
             if (!revoked) {
                 // The sign-out did not happen. Giving the account back is the whole point: the
                 // outbox, the drafts and the library are untouched, and the musician can retry.
-                // `attach` mints a fresh generation, which is what un-strands the stale scope.
-                await loop.attach(owner);
+                await reopen();
                 restore();
                 if (Date.now() >= backoffUntil) {
                     void loop.run().catch(() => {});
@@ -1505,17 +1650,43 @@ export function createSyncLoop(
                 return 'kept';
             }
             let cleared = true;
+            let restored = true;
             try {
                 await songbook.clearAccount(owner);
             } catch {
-                // The revocation already happened and cannot be undone, so this is still a
-                // sign-out: the session is gone, and claiming otherwise would put the shell back
-                // into an account the server has stopped honouring — and show the "sign in again,
-                // everything you saved is still on this device" banner about an account whose
-                // records really ARE still here, which is the one reading this must never produce.
-                // What is owed is the sentence below, and only a fresh sign-in can reach these
-                // stores to try again.
                 cleared = false;
+                /**
+                 * **The invariant, and how it is met.** The revocation already happened and cannot
+                 * be undone, so this IS a sign-out: the session is gone, and re-attaching would put
+                 * the shell back into an account the server has stopped honouring. What must never
+                 * follow is the shell telling this musician to "sign in again to keep syncing"
+                 * about an account they deliberately left — or, for #1271, one that no longer
+                 * exists at all. That reading is now prevented where it is actually produced, in
+                 * the BANNER COPY (`heldAccountBanner` in `lib/account/messages.ts`, #1351 patch
+                 * N1): `expired` keeps that sentence, `guest` and `deleted` get their own.
+                 *
+                 * Which frees the FENCE to do the other job. It is only settled once the records
+                 * are really gone: left pointing at nobody, `meta.active` would claim this device
+                 * holds no account while every one of `owner`'s songs, queued Saves and drafts is
+                 * still on the disk — and since the sign-out surface is derived from exactly that
+                 * pointer, there would be nothing left to ask for the clear with. Putting the owner
+                 * back keeps the retry reachable and does not weaken anything: the generation it
+                 * mints is a THIRD one, and the fence compares generations by equality, so a reply
+                 * captured under the original scope is still refused.
+                 *
+                 * Retried once (#1351 patch N2) rather than abandoned on a single rejection, since
+                 * a blocked or momentarily unavailable store is the likeliest reason to be here at
+                 * all. Whether it worked decides which sentence is owed, so it is answered rather
+                 * than swallowed: a control that is not on screen must not be named.
+                 */
+                restored = await songbook.switchAccount(owner).then(
+                    () => true,
+                    () =>
+                        songbook.switchAccount(owner).then(
+                            () => true,
+                            () => false,
+                        ),
+                );
             }
             // The queue this sentence was about is gone with the account. `detach` deliberately
             // preserves a failure — a session that expired still owes an explanation — but a
@@ -1523,7 +1694,12 @@ export function createSyncLoop(
             publish({
                 failure: cleared
                     ? null
-                    : { reason: 'server', message: SIGN_OUT_MESSAGES.notCleared },
+                    : {
+                          reason: 'server',
+                          message: restored
+                              ? SIGN_OUT_MESSAGES.notCleared
+                              : SIGN_OUT_MESSAGES.notClearedStranded,
+                      },
             });
             return 'signed-out';
         },

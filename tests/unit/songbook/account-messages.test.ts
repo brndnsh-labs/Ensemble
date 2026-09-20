@@ -4,6 +4,7 @@ import {
     ACCOUNT_MESSAGES,
     failureFromApi,
     failureFromClaim,
+    heldAccountBanner,
 } from '../../../prototypes/v2/lib/account/messages.js';
 
 /**
@@ -149,5 +150,55 @@ describe('failureFromClaim', () => {
             expect(message).not.toContain('418');
             expect(message).not.toMatch(/_/);
         }
+    });
+});
+
+/**
+ * The held-account banner's three sentences (#1351 patch N1).
+ *
+ * One sentence said in all three states is a lie in two of them, which is the whole reason this is
+ * a function rather than a string in the shell: with the fence restored after a failed clear
+ * (patch R2), the same banner now renders for a deliberate sign-out and for a DELETED account, and
+ * "sign in again to keep syncing" is exactly the reading `forgetDeletedAccount` forbids.
+ */
+describe('heldAccountBanner', () => {
+    it('keeps #1269\u2019s sentence, and only it, for a session that lapsed in this page load', () => {
+        const expired = heldAccountBanner('expired');
+        expect(expired.sentence).toBe(
+            'Sign in again to keep syncing. Everything you saved is still on this device.',
+        );
+        // "again" is true here and nowhere else: this page load really did have a session.
+        expect(expired.signIn).toBe('Sign in again');
+    });
+
+    it('states the fact for a device that just holds an account, without claiming a lapse', () => {
+        const guest = heldAccountBanner('guest');
+        // Reached by a reload and by a sign-out whose clear failed. Telling somebody who
+        // deliberately left to "sign in again to keep syncing" reads as though they never did.
+        expect(guest.sentence).toBe(
+            'This device still has an account songbook on it and nobody is signed in. Sign in to use it, or sign out on this device to remove it.',
+        );
+        expect(guest.sentence).not.toContain('again');
+        expect(guest.sentence).not.toContain('Everything you saved');
+        // Both answers are offered, and the label does not claim a session this load never saw.
+        expect(guest.signIn).toBe('Sign in');
+    });
+
+    it('offers no sign-in at all once this tab has deleted the account', () => {
+        const deleted = heldAccountBanner('deleted');
+        expect(deleted.sentence).toBe(
+            'Your account was deleted, but its songs could not be removed from this device yet.',
+        );
+        // The invariant, as a test: there is no account left to sign in to, so a control saying
+        // otherwise would be the one reading this must never produce, with something to click on.
+        expect(deleted.signIn).toBeNull();
+        expect(deleted.sentence).not.toContain('Sign in');
+    });
+
+    it('never says the same thing twice across the three states', () => {
+        const sentences = (['expired', 'guest', 'deleted'] as const).map(
+            (state) => heldAccountBanner(state).sentence,
+        );
+        expect(new Set(sentences).size).toBe(3);
     });
 });

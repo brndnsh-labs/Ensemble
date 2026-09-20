@@ -8,15 +8,18 @@ import type { InstrumentVoice } from '@engine/types';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
     computeAdoptCandidates,
+    forgetAdoptionDecision,
     hasDecidedAdoption,
     libraryDownloaded,
 } from '../lib/account/adopt-guest';
+import { heldAccountBanner } from '../lib/account/messages';
 import {
     AccountMismatchError,
     accountSync,
     belongsToAnotherAccount,
     type CloudDeleteResult,
     OWNER_MESSAGES,
+    SIGN_OUT_MESSAGES,
     type SignOutPreflight,
 } from '../lib/account/sync-loop';
 import { arrangementOf, blankSong, convertedCopy, extendedScore } from '../lib/documents';
@@ -58,7 +61,7 @@ import { ConflictBanner } from './account/conflict';
 import { DeleteSongDialog } from './account/delete-song';
 import { SyncStatus, useAccountLibrary } from './account/library';
 import { type AccountDialogMode, SignInDialog } from './account/sign-in';
-import { SignOutDialog } from './account/sign-out';
+import { SignOutDialog, type SignOutMode } from './account/sign-out';
 import { useAccountSession, useAccountsEnabled } from './account/use-account-session';
 import { ChartSheet } from './chart-sheet';
 import { EditPanel } from './edit-panel';
@@ -150,21 +153,50 @@ function withLocalDrafts(
 }
 
 /**
- * The sign-out step's two reads, in the order the step needs them (#1299).
+ * The sign-out step's reads, in the order the step needs them (#1299, #1351).
  *
  * The retained drafts are fetched HERE, with the plan, rather than when Export is pressed: that
  * button writes one file per at-risk song inside a single user gesture, and an await between two
  * downloads is how a browser's per-gesture cap starts dropping them. Module-level so the effect
  * that calls it does not take a new function reference as a hook dependency every render.
+ *
+ * The library comes back too, rather than being read off `accountSongs` at export time. An expired
+ * session's step (#1351) has no `accountSongs` at all — the loop detaches, the shell's library
+ * state goes null with it, and the songbook on screen is the guest one — so the one list that can
+ * serve both steps is the one read here, from the account this device HOLDS.
+ *
+ * `owner` names that account for the expired step; the ordinary one names nothing and lets the
+ * attached scope answer, exactly as #1269 always has.
  */
 async function readSignOutPlan(
     volatile: Map<string, ChartDocument>,
-): Promise<{ plan: SignOutPreflight; drafts: Map<string, ChartDocument> }> {
-    const plan = await accountSync.signOutPreflight();
+    owner: string | null,
+): Promise<{
+    plan: SignOutPreflight;
+    drafts: Map<string, ChartDocument>;
+    songs: ChartDocument[];
+}> {
+    const plan = await accountSync.signOutPreflight(owner);
     return {
         plan: withLocalDrafts(plan, volatile),
-        drafts: await accountSync.retainedDrafts(plan.atRisk),
+        drafts: await accountSync.retainedDrafts(plan.atRisk, owner),
+        songs: libraryDocuments(await accountSync.listLibrary(owner)),
     };
+}
+
+/**
+ * Which account this device HOLDS, from storage (#1351 patch R1) — `meta.active`, through the
+ * loop rather than by reaching into the repository.
+ *
+ * Module-level so both readers below share one expression: the effect that watches the
+ * transitions which can change it, and the clear, which has just changed it.
+ *
+ * An unreadable store answers null, which hides the sign-out offer rather than showing one that
+ * cannot name what it would clear — the conservative direction, and the same one `heldScope`
+ * takes when it refuses.
+ */
+function heldAccount(): Promise<string | null> {
+    return accountSync.heldOwner().catch(() => null);
 }
 
 /** Read the live engine values the Feel sheet needs but `ChartDocument` doesn't carry. */
@@ -231,6 +263,32 @@ export default function Ensemble() {
      * one" — which is the only transition the effect below acts on.
      */
     const attachedOwner = useRef<string | null>(null);
+    /**
+     * Which account this device HOLDS on disk, or null (#1351, storage-derived per patch R1).
+     *
+     * A STORAGE fact, read through `heldAccount()`, never a mirror of anything in memory. That is
+     * the whole correction: an earlier draft followed the loop's published owner, which made the
+     * sign-out offer depend on the session state — and `expired` only exists in the page load
+     * where a live session lapsed (`session.ts` moves a `signedIn` session to `expired`, and a
+     * cold `unknown` straight to `guest`). So a RELOAD of an expired device landed on `guest` with
+     * every one of that account's rows still here and nothing on screen able to name them, which
+     * is exactly the sequence this story exists for: the device changes hands, and it is restarted
+     * in between.
+     *
+     * Written in two places, one expression: the effect below, on every transition that can change
+     * it, and the sign-out cleanup, which has just changed it and re-reads rather than assuming —
+     * a clear that failed after the fence moved puts the owner back (patch R2), and the offer has
+     * to come back with it or the retry is unreachable.
+     */
+    const [heldOwner, setHeldOwner] = useState<string | null>(null);
+    /**
+     * The owner a DELETION ran for in this tab, when its local clear did not finish (#1351 patch
+     * N1). In-memory on purpose: it is the one thing storage cannot tell us apart — `meta.active`
+     * naming an account looks identical whether that account still exists or was deleted a second
+     * ago — and a reload legitimately falls back to the generic held-account sentence, which stays
+     * true. What it buys is that this tab never offers to sign in to an account it just deleted.
+     */
+    const [deletedOwner, setDeletedOwner] = useState<string | null>(null);
     const [recoveryHealthy, setRecoveryHealthy] = useState(true);
     // #1266 — whether the LAST explicit Save failed locally. `status.ts` ranks that above an
     // older successful revision, so it cannot be inferred from `saved` and needs its own fact.
@@ -309,8 +367,31 @@ export default function Ensemble() {
     const [keepBothFailure, setKeepBothFailure] = useState<string | null>(null);
     // #1269 — the sign-out preflight, and what it found. `null` while the read is still out: the
     // step says "checking" rather than "nothing at stake", which would be a claim.
-    const [signOutOpen, setSignOutOpen] = useState(false);
+    // Null when no step is open; otherwise which of the two it is (#1351) — one fact rather than
+    // an open flag and a mode that could disagree about which question is on screen.
+    const [signOutStep, setSignOutStep] = useState<SignOutMode | null>(null);
     const [signOutPlan, setSignOutPlan] = useState<SignOutPreflight | null>(null);
+    /**
+     * The account library the open sign-out step exports FROM, read with its plan (#1351).
+     *
+     * Not `accountSongs`: an expired session has none — the loop detached, so the shell's library
+     * state is null and the songbook on screen is the guest one — and the ordinary step is better
+     * off with this too, since it is read at the moment the step opens rather than whenever the
+     * library list last happened to refresh.
+     */
+    const [signOutSongs, setSignOutSongs] = useState<ChartDocument[] | null>(null);
+    /**
+     * The sentence the OPEN step produced, rendered inside its own dialog (#1351 patch R3/R12).
+     *
+     * A `<dialog>` opened with `showModal()` makes the rest of the tree inert, so `run()`'s error
+     * banner — which is where a thrown sign-out refusal used to land — is behind it and cannot be
+     * read or dismissed. Both refusals this step can produce go here instead: a confirm refused
+     * because another tab signed in as somebody else, and the PREFLIGHT refused for the same
+     * reason, which otherwise left the step on "Checking…" forever with nothing said.
+     *
+     * Cleared by whichever control opens a step, so a stale answer never greets a fresh question.
+     */
+    const [signOutStepFailure, setSignOutStepFailure] = useState<string | null>(null);
     // #1268 — copy this device's guest songs into the account: opened automatically once per
     // (device, owner) after a sign-in that finds candidates and has not been answered yet, and
     // manually from the account page's "Add this device's songs" button at any later time.
@@ -327,6 +408,41 @@ export default function Ensemble() {
     // stand: the loop hands it to the download's `isActive` so a remote update can never be
     // swapped in underneath whoever is playing.
     const signedIn = accountsOn && account.session.status === 'signedIn';
+    /**
+     * #1269 — this device WAS signed in and the server no longer agrees, in THIS page load. Still
+     * what the sync chip reads: it is a fact about the session, and "sign in again to upload it"
+     * is only true while the queue's own explanation is on screen beside it.
+     */
+    const expiredSession = accountsOn && account.session.status === 'expired';
+    /**
+     * This device HOLDS an account and has no live session for it (#1351 patch R1) — the banner's
+     * condition, and the one state in which "Sign out on this device" exists.
+     *
+     * Two routes into it, and the honest condition covers both because it asks storage rather than
+     * the session: the session lapsed in this page load (`expired`), or it lapsed and the page was
+     * reloaded, which lands on `guest` with `meta.active` unchanged. `unknown` is excluded, not
+     * treated as guest — before the first session read this device does not know whether it has a
+     * live session, and offering to clear the account on that basis would be a guess.
+     *
+     * A plain guest device that has never signed in holds nothing, so `heldOwner` is null and this
+     * is false without the session state ever mattering.
+     */
+    const heldWithoutSession =
+        accountsOn &&
+        heldOwner !== null &&
+        (account.session.status === 'expired' || account.session.status === 'guest');
+    /**
+     * Which of the three things that banner is about (#1351 patch N1) — because ONE sentence said
+     * in all three states is a lie in two of them. `deleted` outranks the session state: this tab
+     * watched the account go, and "sign in again" must never be offered for it.
+     */
+    const banner = heldAccountBanner(
+        heldOwner !== null && heldOwner === deletedOwner
+            ? 'deleted'
+            : account.session.status === 'expired'
+              ? 'expired'
+              : 'guest',
+    );
     const sync = useAccountLibrary(accountsOn, account.session, current?.id ?? null);
     /**
      * Does the chart on the stand belong to an account this device is NOT attached to (#1311)?
@@ -678,7 +794,12 @@ export default function Ensemble() {
         }
         let alive = true;
         accountSync
-            .listLibrary()
+            // Named (#1351 patch R6): `listLibrary` resolves through `heldScope`, which answers
+            // from `meta.active` when nothing is attached, so an unnamed read is a storage read
+            // with no owner to check it against. This effect is keyed on the loop's own published
+            // owner, so naming it can only ever agree — until it does not, and then it is refused
+            // rather than rendered as somebody else's library.
+            .listLibrary(sync.owner)
             .then((library) => {
                 if (alive) {
                     setAccountSongs(libraryDocuments(library));
@@ -776,31 +897,72 @@ export default function Ensemble() {
             deleteDialogRef.current?.close();
         }
     }, [deleteOpen, inAccount]);
-    // #1269 — the sign-out preflight. `signedIn` is a dependency, not just a guard: a session that
-    // expires underneath this step makes its own question moot (there is no session left to
-    // revoke), and a flag left true would spring the step open again on the next sign-in.
+    /**
+     * #1351 patch R1 — read which account this device HOLDS, from storage.
+     *
+     * Deliberately off the guest first-paint path, on three counts: `accountsOn` is a per-device
+     * opt-in that is false for every ordinary visitor, `ready` means the guest songbook is already
+     * up, and `settled` means the first session read has already answered. Nothing here is ever
+     * awaited by startup or by playback, and a device that never opted in never opens the account
+     * database at all.
+     *
+     * `unknown` is excluded rather than read: the answer would be fine, but acting on it is not —
+     * see `heldWithoutSession`.
+     *
+     * `sync.owner` is not read in the body: it is the loop's "I attached or detached" signal, and
+     * `attach` is what moves `meta.active` to a new owner — re-running this read is exactly why
+     * the effect depends on it. The only other thing that moves the pointer is the clear, which
+     * writes `heldOwner` itself rather than going round through a counter.
+     */
+    // biome-ignore lint/correctness/useExhaustiveDependencies: deliberate re-run trigger.
     useEffect(() => {
-        if (!signedIn) {
-            setSignOutOpen(false);
+        if (!accountsOn || !ready || !account.settled || account.session.status === 'unknown') {
             return;
         }
-        if (!signOutOpen) {
+        let alive = true;
+        void heldAccount().then((owner) => {
+            if (alive) {
+                setHeldOwner(owner);
+            }
+        });
+        return () => {
+            alive = false;
+        };
+    }, [accountsOn, ready, account.settled, account.session.status, sync.owner]);
+    // #1269 — the sign-out preflight. The session state is a dependency, not just a guard, and
+    // each step watches the state that gives it a question to ask: the ordinary one is moot the
+    // moment the session it would revoke is gone, and the device one (#1351) the moment this
+    // device stops holding an account with no session — a fresh sign-in, or its own clear. A flag
+    // left set would spring either open again.
+    useEffect(() => {
+        const moot =
+            (signOutStep === 'session' && !signedIn) ||
+            (signOutStep === 'device' && !heldWithoutSession);
+        if (signOutStep === null || moot) {
+            if (moot) {
+                setSignOutStep(null);
+            }
             signOutDialogRef.current?.close();
             return;
         }
         signOutDialogRef.current?.showModal();
-    }, [signOutOpen, signedIn]);
-    // The preflight read is its own effect, keyed on `sync.owner` rather than `signedIn`: the loop
-    // publishes an owner only once it actually has a scope, so this cannot race the attach and be
-    // left permanently on "checking" for a step opened the moment after signing in. Re-read on
+    }, [signOutStep, signedIn, heldWithoutSession]);
+    // The preflight read is its own effect, keyed on the owner the step is about rather than on
+    // the session state: for the ordinary step that is the loop's published owner, which exists
+    // only once it actually has a scope, so this cannot race the attach and be left permanently on
+    // "checking" for a step opened the moment after signing in. For the expired step (#1351) the
+    // loop has no owner to publish and the account this device HOLDS is the answer. Re-read on
     // every open rather than cached — a Save queued since the last time is the work it names.
     useEffect(() => {
-        if (!signOutOpen || sync.owner === null) {
+        const owner = signOutStep === 'device' ? heldOwner : sync.owner;
+        if (signOutStep === null || owner === null) {
             return;
         }
         let alive = true;
-        readSignOutPlan(volatileDrafts.current)
-            .then(({ plan, drafts }) => {
+        // Named to the loop only for the expired step, which is the one that cannot derive it.
+        // The ordinary step names nothing and lets the attached scope answer, as #1269 always has.
+        readSignOutPlan(volatileDrafts.current, signOutStep === 'device' ? owner : null)
+            .then(({ plan, drafts, songs }) => {
                 if (alive) {
                     // Folded in, never assigned over (#1299 patch review P3): this read covers
                     // only the ids it asked about, and replacing the map would drop what this tab
@@ -808,17 +970,29 @@ export default function Ensemble() {
                     for (const [id, held] of drafts) {
                         accountDrafts.current.set(id, held);
                     }
+                    setSignOutSongs(songs);
                     setSignOutPlan(plan);
                 }
             })
-            .catch(() => {
+            .catch((error: unknown) => {
+                if (!alive) {
+                    return;
+                }
+                if (error instanceof AccountMismatchError) {
+                    // Another tab signed in as somebody else between this step opening and its
+                    // read (#1351 patch R12). Caught BY TYPE, not by matching a sentence, and
+                    // said INSIDE the dialog — swallowed, this left the step on "Checking…" with
+                    // no explanation and a permanently disabled button.
+                    setSignOutStepFailure(SIGN_OUT_MESSAGES.elsewhere);
+                    return;
+                }
                 // An unreadable store is not evidence that nothing is at stake, so the step stays
                 // on "checking" — which leaves the destructive button disabled.
             });
         return () => {
             alive = false;
         };
-    }, [signOutOpen, sync.owner]);
+    }, [signOutStep, heldOwner, sync.owner]);
     useEffect(() => {
         if (adoptOpen) {
             adoptDialogRef.current?.showModal();
@@ -1133,7 +1307,7 @@ export default function Ensemble() {
      * account chart, and that is exactly the moment a draft must not be lost: the account store is
      * local, this device still holds the account, and the guest namespace is the one place this
      * text may not go. `accountSync.recover` reaches the held account for precisely this case
-     * (`retentionScope`), and rejects only when the device is genuinely signed out — which leaves
+     * (`heldScope`), and rejects only when the device is genuinely signed out — which leaves
      * no account chart on the stand to be asking.
      *
      * Fire-and-forget, unlike the synchronous guest write: an IndexedDB write cannot be finished
@@ -1150,7 +1324,7 @@ export default function Ensemble() {
      * answer a cloud delete `retained` — forever, because nothing but a Save ever clears it.
      *
      * An account chart whose account is not the attached one is retained in this TAB and nowhere
-     * else (#1311). The loop refuses that write anyway (`retentionScope`), and the fallback below
+     * else (#1311). The loop refuses that write anyway (`heldScope`), and the fallback below
      * would catch it — but the fallback's sentence would be a storage failure's, and nothing has
      * failed here: this is a refusal with a reason, said in its own words and without a pointless
      * round trip to a store that is going to say no. The text stays in memory, which is where the
@@ -1492,9 +1666,34 @@ export default function Ensemble() {
      */
     async function refreshSongs(): Promise<ChartDocument[]> {
         if (signedIn) {
-            const documents = libraryDocuments(await accountSync.listLibrary());
-            setAccountSongs(documents);
-            return documents;
+            // Named with the account the SESSION reports (#1351 patch R6), for the reason
+            // `liveStand` reads the session rather than `sync.owner`: this branch is gated on a
+            // session fact while `listLibrary` reads a storage one, and `attach` runs from a
+            // passive effect that can lag `meta.active`. In that window an unnamed read would hand
+            // back the account this device still HOLDS — A's library, rendered as B's. Named, the
+            // loop refuses it, and the caller's error handling says so instead.
+            const owner = account.session.status === 'signedIn' ? account.session.owner : null;
+            try {
+                const documents = libraryDocuments(await accountSync.listLibrary(owner));
+                setAccountSongs(documents);
+                return documents;
+            } catch (failure) {
+                if (!(failure instanceof AccountMismatchError)) {
+                    throw failure;
+                }
+                // NOT READY YET, not an error (#1351 patch N3). `signedIn` flips the instant the
+                // session names an owner and `attach` runs from a passive effect one render later,
+                // so in that window `meta.active` still names the previous account and the named
+                // read is refused. That is the fence working; it is not something to tell a
+                // musician about, and `OWNER_MESSAGES.mismatch` — a sentence about a CHART on the
+                // stand — would be doubly wrong in front of a library listing.
+                //
+                // So the account list is left exactly as it is (null = still loading), and the
+                // `sync.owner`-keyed effect above re-reads it the moment the attach settles. No
+                // banner and no retry loop: this is a read, and something else is already going to
+                // do it.
+                return accountSongs ?? [];
+            }
         }
         const fresh = await repository.list();
         setGuestSongs(fresh);
@@ -1798,6 +1997,14 @@ export default function Ensemble() {
      * never confirmed, so the account is still attached, the step stays open, and the sentence the
      * hook captured is what the musician reads.
      *
+     * The `'device'` step (#1351) answers the same question for a device that HOLDS an account
+     * with no live session, and everything below it is shared: the same ordered local half through
+     * the same `accountSync.signOut`, with `revoke` pre-resolved because the session is already
+     * dead, and the same cleanup. Only the way the server side is settled differs, and only the
+     * outcome differs on the way out — there is no `'kept'` for it, because nothing was asked of a
+     * server that could have refused. Its refusals are reported INSIDE the step (patch R3), since
+     * the dialog is modal and `run()`'s banner is inert behind it.
+     *
      * The recovery slots go last and by id, and since #1299 they are belt and braces: an account
      * chart's unsaved text is in that account's database, which `clearAccount` has just emptied.
      * What this still reaches is a slot left under an account id by a build from before that — the
@@ -1808,13 +2015,45 @@ export default function Ensemble() {
      */
     function signOutOfAccount() {
         const documentIds = signOutPlan?.documentIds ?? [];
+        // Captured before the awaits: the step can unmount underneath them — an expired session
+        // becomes a guest one the moment `markSignedOut` lands — and the cleanup below still has
+        // to know which question was answered.
+        const step = signOutStep;
+        const owner = heldOwner;
         void run(async () => {
             runtime.stop();
-            if ((await account.signOut()) === 'kept') {
+            if (step === 'device') {
+                // #1351 — no logout round trip and no network at all: the session is already
+                // dead. Everything else is #1269's ordered local half, unchanged.
+                //
+                // A throw here means NOTHING happened — the fence never moved and every row is
+                // still on the disk (patch R2) — so the step stays open with the sentence in it
+                // and none of the cleanup below runs. Rendered inside the dialog rather than
+                // through `run()`, whose banner is in the inert tree behind a modal (patch R3).
+                try {
+                    if (owner === null) {
+                        // Unreachable: the control that sets this step is not rendered without an
+                        // account to name. Said out loud rather than returned silently — a
+                        // destructive confirm that quietly did nothing is the worst answer here.
+                        throw new Error(SIGN_OUT_MESSAGES.elsewhere);
+                    }
+                    await account.signOutOnThisDevice(owner);
+                } catch (failure) {
+                    setSignOutStepFailure(
+                        failure instanceof Error ? failure.message : String(failure),
+                    );
+                    return;
+                }
+            } else if ((await account.signOut()) === 'kept') {
                 return;
             }
-            setSignOutOpen(false);
+            // Re-read rather than assumed (#1351 patch R1/R2): normally this device now holds
+            // nothing, but a clear that failed after the fence moved has put the owner back, and
+            // the offer has to come back with it or there is no way left to try again.
+            setHeldOwner(await heldAccount());
+            setSignOutStep(null);
             setSignOutPlan(null);
+            setSignOutSongs(null);
             // Unconditional: `saved` is an account chart's committed baseline, and nothing of that
             // account may outlive the sign-out. (The header carrying Sign out is hidden while a
             // chart is open, so in practice `currentStore` is already null by the time this runs —
@@ -1835,14 +2074,18 @@ export default function Ensemble() {
                     /* Recovery is a convenience; a stale entry must not fail the sign-out. */
                 }
             }
-            // Read directly rather than through `refreshSongs`: `signedIn` is still true in this
-            // closure's render, and that path would ask a loop that no longer has an account.
-            setGuestSongs(await repository.list());
             // Read live rather than from the `sync` snapshot this render closed over: the loop
-            // publishes this during the await above. A wipe that failed after a confirmed
+            // publishes this during the sign-out above. A wipe that failed after a confirmed
             // revocation is still a sign-out — but the songs really are still here, so the
             // cheerful sentence would be a lie and the reason has to reach the musician.
             const failure = accountSync.getSnapshot().failure;
+            // The "already asked about copying your guest songs" answer (`hasDecidedAdoption`) is
+            // deliberately KEPT across a sign-out: #1268's decline is per device and permanent, and
+            // the same musician signing back in must not be asked again. Only an account DELETION
+            // forgets it (`forgetDeletedAccount`) — that owner can never sign in here again.
+            // Read directly rather than through `refreshSongs`: `signedIn` is still true in this
+            // closure's render, and that path would ask a loop that no longer has an account.
+            setGuestSongs(await repository.list());
             if (failure) {
                 setError(failure.message);
                 return;
@@ -1888,8 +2131,14 @@ export default function Ensemble() {
      */
     async function forgetDeletedAccount() {
         const documentIds = (accountSongs ?? []).map((song) => song.id);
+        const owner = heldOwner;
         runtime.stop();
+        // Remembered BEFORE the await, and whatever it does (#1351 patch N1): from here on this
+        // tab must never offer to sign in to `owner`, and the one case that matters is the one
+        // where the call below leaves its records behind.
+        setDeletedOwner(owner);
         await account.forgetDeletedAccount();
+        setHeldOwner(await heldAccount());
         setSaved(null);
         if (currentStore.current?.store === 'account') {
             setCurrent(null);
@@ -1906,11 +2155,19 @@ export default function Ensemble() {
                 /* Recovery is a convenience; a stale entry must not fail the deletion. */
             }
         }
-        setGuestSongs(await repository.list());
         // Read live rather than from the `sync` snapshot this render closed over, exactly as
         // `signOutOfAccount` does: a wipe that failed after the account was already deleted is
         // still a deletion, but the songs really are still here and the reason has to be said.
         const failure = accountSync.getSnapshot().failure;
+        if (owner !== null && failure === null) {
+            // #1351 patch R11 — the same `localStorage` key the two sign-out paths sweep, and the
+            // clearest case for it: the account does not exist any more, so its per-device answer
+            // about copying guest songs is a dangling owner id and nothing else. Gated on the
+            // clear having landed, like the sign-out path's (patch N5).
+            forgetAdoptionDecision(owner);
+            adoptOffered.current = null;
+        }
+        setGuestSongs(await repository.list());
         if (failure) {
             setError(failure.message);
             return;
@@ -2310,7 +2567,7 @@ export default function Ensemble() {
      * that produces it would make the sentence unreachable.
      */
     const syncStatus =
-        accountsOn && current && (signedIn || account.session.status === 'expired') ? (
+        accountsOn && current && (signedIn || expiredSession) ? (
             <SyncStatus
                 savedRevision={saved ? saved.revision : null}
                 editing={dirty ? 'dirty' : 'clean'}
@@ -2373,7 +2630,9 @@ export default function Ensemble() {
                             onOpenAccount={() => setAccountPageOpen(true)}
                             onSignOut={() => {
                                 setSignOutPlan(null);
-                                setSignOutOpen(true);
+                                setSignOutSongs(null);
+                                setSignOutStepFailure(null);
+                                setSignOutStep('session');
                             }}
                         />
                     )}
@@ -2393,12 +2652,40 @@ export default function Ensemble() {
              * the guest one with no explanation anywhere. `role="status"`, not `alert`: nothing
              * was lost, and the sentence says so.
              */}
-            {accountsOn && account.session.status === 'expired' && (
+            {heldWithoutSession && (
                 <div className="error-banner" role="status" data-testid="account-expired-banner">
-                    <span>
-                        Sign in again to keep syncing. Everything you saved is still on this device.
-                    </span>
-                    <button onClick={() => setAccountDialog('signIn')}>Sign in again</button>
+                    <span>{banner.sentence}</span>
+                    {/*
+                     * Absent after a deletion this tab ran (#1351 patch N1): there is no account
+                     * left to sign in to, and a button saying otherwise is the one reading
+                     * `forgetDeletedAccount` exists to prevent, with something to click on.
+                     */}
+                    {banner.signIn !== null && (
+                        <button onClick={() => setAccountDialog('signIn')}>{banner.signIn}</button>
+                    )}
+                    {/*
+                     * #1351 — the other way out, and the only one that removes this account's data
+                     * from a device that is changing hands. `signOut()` needs a live scope and a
+                     * logout round trip, and a device with no session has neither; this runs the
+                     * same preflight and the same local clear with the revocation already settled.
+                     *
+                     * It is inside the banner rather than beside it because the two belong to one
+                     * question — this device holds an account nobody is signed in to, so keep it
+                     * or clear it — and because with a chart open the site header is hidden, which
+                     * makes the banner the only place either answer can be reached from.
+                     */}
+                    <button
+                        data-testid="account-expired-sign-out"
+                        disabled={busy}
+                        onClick={() => {
+                            setSignOutPlan(null);
+                            setSignOutSongs(null);
+                            setSignOutStepFailure(null);
+                            setSignOutStep('device');
+                        }}
+                    >
+                        Sign out on this device
+                    </button>
                 </div>
             )}
             {/*
@@ -2977,26 +3264,36 @@ export default function Ensemble() {
                     onClose={() => setAdoptOpen(false)}
                 />
             )}
-            {accountsOn && signedIn && (
+            {accountsOn && (signedIn || heldWithoutSession) && (
                 <SignOutDialog
                     dialogRef={signOutDialogRef}
+                    mode={signOutStep ?? 'session'}
                     online={account.online}
                     busy={busy || account.signingOut}
                     preflight={signOutPlan}
+                    // Each step shows only its OWN sentence (#1351 patch R9). `account.signOutFailure`
+                    // belongs to a refused logout, which is a fact about the session step; rendering
+                    // it inside the device step would explain a request that step never made.
                     failure={
-                        account.signOutFailure !== null &&
-                        account.signOutFailure.kind !== 'cancelled'
-                            ? account.signOutFailure.message
-                            : null
+                        signOutStep === 'device'
+                            ? signOutStepFailure
+                            : (signOutStepFailure ??
+                              (account.signOutFailure !== null &&
+                              account.signOutFailure.kind !== 'cancelled'
+                                  ? account.signOutFailure.message
+                                  : null))
                     }
-                    songsReady={accountSongs !== null}
+                    // The library this step read with its plan, not the songbook's (#1351): an
+                    // expired session has no `accountSongs` at all, and the export has to write
+                    // exactly the songs the preflight just warned about.
+                    songsReady={signOutSongs !== null}
                     onExport={() =>
                         void run(() => {
                             // Only the songs holding work the account has not got. The rest of the
                             // library is already in the cloud and comes back on the next sign-in,
                             // so writing it out too would bury the files that matter.
                             for (const id of signOutPlan?.atRisk ?? []) {
-                                const song = accountSongs?.find((held) => held.id === id);
+                                const song = signOutSongs?.find((held) => held.id === id);
                                 if (!song) {
                                     continue;
                                 }
@@ -3006,19 +3303,25 @@ export default function Ensemble() {
                             }
                         })
                     }
+                    // Never reachable from the expired step: the button is not rendered there,
+                    // because a pass needs the session that has just gone.
                     onSyncNow={() =>
                         void run(async () => {
                             await accountSync.run();
-                            const { plan, drafts } = await readSignOutPlan(volatileDrafts.current);
+                            const { plan, drafts, songs } = await readSignOutPlan(
+                                volatileDrafts.current,
+                                null,
+                            );
                             // Folded in, for the reason the sign-out read states.
                             for (const [id, held] of drafts) {
                                 accountDrafts.current.set(id, held);
                             }
+                            setSignOutSongs(songs);
                             setSignOutPlan(plan);
                         })
                     }
                     onConfirm={signOutOfAccount}
-                    onClose={() => setSignOutOpen(false)}
+                    onClose={() => setSignOutStep(null)}
                 />
             )}
             {inAccount && current && (

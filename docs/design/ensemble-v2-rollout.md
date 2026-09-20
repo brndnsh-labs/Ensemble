@@ -62,7 +62,11 @@ a further product decision.
      manifest and diffs it against local records. No server watermark, cursor expiry or
      cursor-reset handling. Sized for the 2,000-document per-owner cap.
    - **S2 — sign-out needs a connection.** No persisted offline logout barrier. Offline, sign-out
-     is disabled with a reason and export stays available.
+     is disabled with a reason and export stays available. The requirement is about REVOKING a
+     session: a device that cannot reach the server cannot honestly claim it did. It therefore
+     does not reach "Sign out on this device" (DECISION 2026-09-19, Brandon, on #1269; shipped as
+     #1351), the step offered when this device HOLDS an account with no live session — there is no
+     logout to be dishonest about, so that path sends nothing and works offline.
    - **S3 — one account per browser profile.** No account switcher; switching is sign out, sign
      in. The owner/generation fence in `prototypes/v2/lib/sync/` stays.
    - **S4 — one new client dependency** (`@simplewebauthn/browser`). Plain `fetch`; no query,
