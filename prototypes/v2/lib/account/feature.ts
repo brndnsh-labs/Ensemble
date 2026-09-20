@@ -16,6 +16,8 @@
  * must leave the app playable, which for this flag means "off".
  */
 
+import { hasV1SharePayload } from '../v1-link';
+
 const ACCOUNTS_FLAG = 'ensemble-v2-preview:accounts';
 const ACCOUNTS_PARAM = 'accounts';
 
@@ -56,17 +58,36 @@ export function setAccountsEnabled(enabled: boolean): void {
 /**
  * What `syncAccountsFlag` should do with a `?accounts=` request, given the URL's hash too.
  *
- * Share payloads live in the hash (`ensemble.tsx`'s `decodeChartLink`), so `/v2/?accounts=on#
- * <share>` is link-injectable: a stranger who only meant to open a shared song would otherwise
- * have this device's account UI flipped on permanently. A share link must never carry a
- * feature-flag side effect, so the request is ignored outright — not merely left unpersisted —
- * whenever the hash is non-empty, whatever it asked for.
+ * A share link must never carry a feature-flag side effect: a stranger who only meant to open
+ * a shared song would otherwise have this device's account UI flipped on permanently. So the
+ * request is ignored outright — not merely left unpersisted — whenever the URL is a share link,
+ * whatever it asked for. There are two shapes of one, and both are refused:
+ *
+ * - a v2 payload, which lives in the hash (`ensemble.tsx`'s `decodeChartLink`) — any non-empty
+ *   hash, since a `#chart=` that fails to decode is still somebody's attempt at a share link;
+ * - an old v1 payload (#1279), which is a QUERY-string link with no hash at all, so the hash
+ *   test above cannot see it — `hasV1SharePayload` is what recognises `/v2/?s=…&accounts=on`.
+ *
+ * Refusing to APPLY it is only half: the shell also strips the parameter when it consumes a
+ * share link (`stripAccountsParam` below), so a reload of the tidied URL cannot apply it either.
  */
 export function accountsFlagRequest(search: string, hash: string): AccountsFlagRequest {
-    if (hash !== '') {
+    if (hash !== '' || hasV1SharePayload(search)) {
         return null;
     }
     return accountsFlagFromSearch(search);
+}
+
+/**
+ * The query string without the account flag, for a caller that is rewriting the URL for its own
+ * reasons — the shell, consuming a share link. Lives here because this module owns the parameter
+ * name; `syncAccountsFlag` below keeps its own whole-URL form, which has a hash to preserve.
+ */
+export function stripAccountsParam(search: string): string {
+    const params = new URLSearchParams(search);
+    params.delete(ACCOUNTS_PARAM);
+    const rest = params.toString();
+    return rest ? `?${rest}` : '';
 }
 
 /**

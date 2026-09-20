@@ -4,6 +4,7 @@ import {
     accountsFlagFromSearch,
     accountsFlagRequest,
     setAccountsEnabled,
+    stripAccountsParam,
 } from '../../../prototypes/v2/lib/account/feature.js';
 
 /**
@@ -73,6 +74,27 @@ describe('accountsFlagRequest', () => {
         // /v2/?accounts=on#<share> must not opt a stranger's device in just for opening a link.
         expect(accountsFlagRequest('?accounts=on', '#abc123')).toBeNull();
         expect(accountsFlagRequest('?accounts=off', '#abc123')).toBeNull();
+    });
+
+    it('ignores it for an OLD v1 share link too, which has no hash at all (#1279)', () => {
+        // The hash test above cannot see a v1 link: `/v2/?s=<chart>&accounts=on` is a share
+        // link entirely in the query string, and it must not flip the flag either.
+        expect(accountsFlagRequest('?s=abc&accounts=on', '')).toBeNull();
+        expect(accountsFlagRequest('?accounts=on&s=abc', '')).toBeNull();
+        expect(accountsFlagRequest('?prog=I%20%7C%20IV&accounts=on', '')).toBeNull();
+        expect(accountsFlagRequest('?s=abc&accounts=off', '')).toBeNull();
+        // A URL that merely carries v1's descriptive parameters is not a share link, so an
+        // ordinary opt-in is still honoured.
+        expect(accountsFlagRequest('?key=C&bpm=120&accounts=on', '')).toBe('on');
+    });
+});
+
+describe('stripAccountsParam', () => {
+    it('removes only the flag, so a consumed share link cannot re-apply it on reload', () => {
+        expect(stripAccountsParam('?accounts=on')).toBe('');
+        expect(stripAccountsParam('?accounts=on&utm_source=email')).toBe('?utm_source=email');
+        expect(stripAccountsParam('?utm_source=email')).toBe('?utm_source=email');
+        expect(stripAccountsParam('')).toBe('');
     });
 });
 
