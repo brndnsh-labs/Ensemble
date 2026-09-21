@@ -275,7 +275,7 @@ fixture for this specific export, not general import or by-ear compatibility.
 | D.C./D.S., coda, Fine | Native global traversal and conservative unambiguous import implemented | Al-Nth-ending destinations, jumps inside repeats, ambiguous import repeat policy and physical-device audition. |
 | N.C., holds, alternate chords, fermatas | Authored events represented; playback pending | Per-lane meaning, editing and faithful import mapping. |
 | Other rhythmic notation, rests and pushes | Inventory and represent without guessing equivalence | Current protocol/app fixtures and explicit lane semantics. |
-| Meter/key changes | Native bar editing, sticky contexts and supported-meter playback tested | Real-device and audible acceptance; source import mapping. |
+| Meter/key changes | Native bar editing, sticky contexts and supported-meter playback tested; the song's own meter is set from the Edit panel (#1371), re-dividing equal-length bars and blocking — never rounding — on a bar whose written lengths cannot follow | Real-device and audible acceptance; source import mapping; a section-level key/meter surface. |
 | Unsupported meters or off-grid timing | Block, explain location | Never substitute 4/4 or round durations. |
 | Long charts | No fixed page limit | Synthetic 64/128-bar layouts and explicit input/expansion bounds. |
 | Playlist HTML | Bounded supported-envelope selection/diagnostics implemented | Additional real playlist envelopes; no silent first-song-only import. |
