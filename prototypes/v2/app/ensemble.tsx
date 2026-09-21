@@ -51,6 +51,7 @@ import {
     v1ImportLedger,
     v1SessionMark,
 } from '../lib/session';
+import { withSongMeter } from '../lib/song-meter';
 import { allSoundsAvailableOffline, installAllSounds, soundsAvailableOffline } from '../lib/sounds';
 import { start } from '../lib/starters';
 import type { SavedSong } from '../lib/sync/protocol';
@@ -2822,6 +2823,22 @@ export default function Ensemble() {
             setSectionId(extended.sectionId);
         });
     }
+    function changeSongMeter(meter: string) {
+        void run(() => {
+            // Pending bar edits are committed first, by the editor's own rules, so the change is
+            // made to the one validated candidate rather than beside unchecked typing.
+            const next = updateChart();
+            if (next.schemaVersion !== 2) {
+                return;
+            }
+            const result = withSongMeter(next.chart.score, meter);
+            if (result.kind === 'blocked') {
+                setMeasureId(result.measureId);
+                throw new Error(result.message);
+            }
+            applyScore(result.score);
+        });
+    }
     /**
      * Write one chart to a file on this device. Extracted from `exportSong` for #1269's sign-out
      * preflight, which exports songs from the LIBRARY rather than the stand — the header (and its
@@ -3461,6 +3478,7 @@ export default function Ensemble() {
                             buffers={buffers}
                             text={text}
                             onTitle={(title) => draft({ ...current, title })}
+                            onSongMeter={changeSongMeter}
                             onSelectMeasure={setMeasureId}
                             onPendingChange={(pending) => {
                                 pendingText.current = pending;

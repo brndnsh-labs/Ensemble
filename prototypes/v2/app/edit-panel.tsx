@@ -1,3 +1,4 @@
+import { TIME_SIGNATURES } from '@engine/config';
 import type { SemanticScore } from '@engine/songbook/score-types';
 import { type RefObject, useRef } from 'react';
 import { arrangementOf } from '../lib/documents';
@@ -17,6 +18,8 @@ interface EditPanelProps {
     buffers: Map<string, string>;
     text: string;
     onTitle: (title: string) => void;
+    /** The song's own meter (`score.meter`), not a bar's "Meter from this bar" override. */
+    onSongMeter: (meter: string) => void;
     onSelectMeasure: (id: string) => void;
     onPendingChange: (pending: boolean) => void;
     onApply: (score: SemanticScore) => void;
@@ -40,6 +43,7 @@ export function EditPanel({
     buffers,
     text,
     onTitle,
+    onSongMeter,
     onSelectMeasure,
     onPendingChange,
     onApply,
@@ -71,6 +75,28 @@ export function EditPanel({
             />
             {current.schemaVersion === 2 ? (
                 <>
+                    <label className="panel-label" htmlFor="song-meter">
+                        Song meter
+                    </label>
+                    <select
+                        id="song-meter"
+                        disabled={busy}
+                        value={current.chart.score.meter}
+                        onChange={(e) => onSongMeter(e.target.value)}
+                    >
+                        {[
+                            ...new Set([
+                                ...Object.keys(TIME_SIGNATURES),
+                                current.chart.score.meter,
+                            ]),
+                        ].map((meter) => (
+                            <option key={meter}>{meter}</option>
+                        ))}
+                    </select>
+                    <p className="preview-note">
+                        Chords keep their share of each bar. A section or bar with its own meter
+                        keeps it.
+                    </p>
                     <MeasureEditor
                         key={current.id}
                         ref={measureEditorRef}
