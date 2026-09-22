@@ -453,7 +453,10 @@
         "unreviewable",
         "pointerdown",
         "touchend",
-        "focusout"
+        "focusout",
+        "mattpocock",
+        "wayfinder",
+        "Wayfinding"
     ],
     "ignorePaths": [
         "node_modules",

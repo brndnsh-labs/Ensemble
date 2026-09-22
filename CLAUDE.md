@@ -234,6 +234,31 @@ Scheduled work is tracked in **GitHub issues** on `brndnsh-labs/Ensemble` (publi
 
 **Autonomy posture (DOCTRINE §5/§6):** the pipeline runs **full-auto** — well-specified, gate-verifiable, non-destructive stories build → branch → PR → **auto-merge to `main`** (CI-gated, via `gh pr merge --auto --squash` — GitHub holds the merge until the required `checks` + `e2e-tests` contexts pass; no client-side polling) without a per-step nod. It **stops and surfaces** on a judgment call: a **synth or by-ear** story (the listening gate is a hard human stop → `Needs-ear`), a destructive data op (persisted sessions / share-URL schema / preset data / state migration), a state-or-worker-contract design call, a P0 finding, or a genuinely ambiguous choice. A merge to `main` **is** a prod deploy: `main` is continuously deployed to `ensemble.brndn.zip` by the CI `deploy` job once `checks` + `e2e-tests` pass on the merged commit (DOCTRINE §6). Because `Needs-ear`/synth work is a *pre-merge* stop, nothing un-auditioned ships. `scripts/deploy.sh prod` remains as the manual break-glass path (CI down / forced redeploy); rollback is roll-forward via `git revert` → PR.
 
+## Agent skills
+
+The general-purpose engineering skills (the `mattpocock-skills` Claude Code plugin, plus
+user-level copies for Codex, OpenCode, Pi and Copilot) read their repo config from
+`docs/agents/`. They sit alongside the work pipeline above: they shape the work (grilling, TDD,
+bug diagnosis, ticket slicing, review), while the pipeline owns delivery and is the only writer
+of `status:in-progress` and `status:in-review`. Where the two disagree, DOCTRINE wins.
+
+### Issue tracker
+
+GitHub issues on `brndnsh-labs/Ensemble`, in Why / Touches / Acceptance shape. See
+`docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+No separate triage vocabulary. The five triage roles map onto `status:*`, and `ready-for-agent`
+becomes `status:ready` only for deterministic, gate-provable work. See
+`docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context, with no `CONTEXT.md` glossary and no ADR folder. The glossary is *Naming /
+Canonicalization* above, and decisions are dated entries in `docs/design/`. See
+`docs/agents/domain.md`.
+
 ## Self-Building Manual
 
 `public/MANUAL.md` combines hand-written guides with auto-generated tables. Placeholders like `{{GENRE_TABLE}}` and `{{BASS_STYLES}}` are populated by `manual-metadata.ts` — adding a new style to config files updates these automatically. If you add a major new feature, add a "Recipe" or "Pro-Tip" to the Markdown guide. Maintain the "Style Gallery" deep links for new signature genres.
