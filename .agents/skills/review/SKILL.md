@@ -2,7 +2,7 @@
 name: review
 description: Review the current uncommitted Ensemble diff. Inspects git status + diff --stat to route reviewers — an inline correctness pass for any non-trivial change, plus `/security-review` whenever the diff touches an always-brake surface (Track `synth` and genuinely-subjective musical work (no critique-test oracle for the idiom, the Needs-ear stop), destructive data ops (drops/rewrites persisted sessions, share-URL schema, preset data, or a state-slice migration that breaks saved state), the state/worker contract (a `@direct-mutation` outside the sanctioned categories, a half-synced worker field)), and optionally a second-model angle on a meaty diff. Presents the reviewer plan before running. Does NOT change Status — review happens within status:in-progress. Use after /implement, before /done.
 ---
-<!-- cycle:rendered template=skills/review.md.tmpl hash=f08afa70fabd — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/review.md.tmpl hash=d937f3bb6bda — managed by the-cycle; edit the template, not this file -->
 
 # /review — review the uncommitted tree
 
@@ -33,7 +33,7 @@ story stays `status:in-progress` through review and patch.
 
    | If the diff touches... | Run |
    | :- | :- |
-   | Any non-trivial code change | the **inline correctness pass** — the orchestrator reviews the diff itself, across the angles a heavyweight reviewer would cover (logic, edges, error paths, contracts, invariants). Match depth to risk. Tests **alongside** prod code stay supporting cast — review the behavior change; the prod diff is the subject. |
+   | Any non-trivial code change | the **inline correctness pass** — the orchestrator reviews the diff itself, across the angles a heavyweight reviewer would cover (logic, edges, error paths, contracts, invariants). Match depth to risk. Tests **alongside** prod code stay supporting cast — review the behavior change; the prod diff is the subject. **Plus the spec axis** (below), reported separately. |
    | **Track `synth` and genuinely-subjective musical work (no critique-test oracle for the idiom, the Needs-ear stop)** | **`/security-review`** *in addition* — non-optional here (§5). Reason about this flow's specific threat model, not just generic categories. |
    | **destructive data ops (drops/rewrites persisted sessions, share-URL schema, preset data, or a state-slice migration that breaks saved state)** | **`/security-review`** *in addition* — non-optional here (§5). Reason about this flow's specific threat model, not just generic categories. |
    | **the state/worker contract (a `@direct-mutation` outside the sanctioned categories, a half-synced worker field)** | **`/security-review`** *in addition* — non-optional here (§5). Reason about this flow's specific threat model, not just generic categories. |
@@ -100,6 +100,23 @@ story stays `status:in-progress` through review and patch.
      a finding can be right in diagnosis and wrong in the arithmetic.
    - **A reviewer that errored or timed out is a *missing* result, not a clean one.** Say so.
 
+   ### Spec axis (every non-trivial diff, kept separate)
+
+   The correctness pass asks *"is this code right?"*; the spec axis asks *"is this the code the
+   issue asked for?"* A diff can pass one and fail the other, and folding them together lets the
+   clean axis mask the failing one. Read the issue's `Acceptance:` and `Touches:` — and its
+   comments, where the real ask often lives — then report against them:
+   - **Missing or partial** — an acceptance criterion the diff doesn't meet, or meets halfway.
+   - **Unasked-for** — behavior the issue never requested (scope creep). `Touches:` is a hint, not
+     the contract; judge by behavior, not by file list.
+   - **Looks implemented, looks wrong** — a criterion the diff addresses in a way that won't
+     actually satisfy it.
+
+   Quote the acceptance line each finding is measured against, and tag the finding `[spec]` in the
+   consolidated list so it keeps its own severity read — never rerank spec findings against
+   correctness findings. No issue in context (drift work, a bare `/review`): report "no spec
+   available" and skip the axis; never reconstruct an acceptance line from the diff itself.
+
    ### Second-model angle (cheap, orthogonal)
 
    A reviewer with a **different model than the implementer** shares fewer blind spots — a
@@ -162,8 +179,9 @@ story stays `status:in-progress` through review and patch.
 6. **Run them immediately** in the same turn — no "Run them?" wait.
 7. **Present the result.** In normal mode, assign every actionable finding a stable in-context ID
    (`F1`, `F2`, …) and include severity (P0/P1/P2) + `file:line` + a **verbatim quote** of the
-   offending line. In finding-closure mode, report every original ID as `fixed`, `remaining`, or
-   `escalated`, plus any new finding. Then give the matching recommendation:
+   offending line, with `[spec]` on any the spec axis raised. In finding-closure mode,
+   report every original ID as `fixed`, `remaining`, or `escalated`, plus any new finding. Then
+   give the matching recommendation:
 
    ```
    ### Recommendation

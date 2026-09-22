@@ -1,8 +1,8 @@
 ---
 name: intake
-description: The front door to the backlog — turn a plain-English idea into an actionable Ensemble issue. Interviews Brandon ONE question at a time until the issue is genuinely implementable, then drafts it, classifies it, and files it. Plan-first — always shows the shaped issue before writing. Shares /scout's filing mechanics (DOCTRINE §10). Usage `/intake <the idea>` (or bare, and it'll ask).
+description: The front door to the backlog — turn a plain-English idea into an actionable Ensemble issue. Interviews Brandon in frontier rounds — every question askable now, each led by a recommended answer — until the issue is genuinely implementable, then drafts it, classifies it, and files it. Plan-first — always shows the shaped issue before writing. Shares /scout's filing mechanics (DOCTRINE §10). Usage `/intake <the idea>` (or bare, and it'll ask).
 ---
-<!-- cycle:rendered template=skills/intake.md.tmpl hash=fe863719fbfa — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/intake.md.tmpl hash=bd4b2999f81c — managed by the-cycle; edit the template, not this file -->
 
 # /intake — turn an idea into an actionable issue
 
@@ -23,21 +23,39 @@ authority.
 idea isn't there yet, **interview it up to that bar** before filing. A vague issue is worse than no
 issue: it defers the thinking to a moment with *less* context than right now.
 
-## The one rule that makes this skill itself: interview ONE question at a time
+## The one rule that makes this skill itself: interview in frontier rounds
 
 Brandon will describe the idea in good faith; your job is sharpening it to actionable —
 proposing the shape, filling obvious gaps yourself, asking only where the answer genuinely changes
-the issue. So:
+the issue. Treat the open questions as a small **design tree**: each answer settles a branch and
+may expose the questions that hang off it. The **frontier** is every question you can ask *now*
+without guessing at an answer you haven't heard yet. So:
 
-- Ask **one focused question, then wait.** No batched multi-question forms.
-- **Reflect each answer back** in a sentence, so drift gets caught early.
-- Ask only about what's **genuinely missing for the issue to be actionable** — infer the rest.
-- **Lead with a recommendation** on every judgment-call question. *"I'd scope this to the
-  operator-side fix, not both stacks — sound right?"* beats *"what's the scope?"*
-- **Stop the moment it's actionable.** Three crisp exchanges is great; ten is a slog.
+- **Ask the whole frontier in one round, then wait.** Number each question and lead it with your
+  recommended answer, so a round can be accepted in a word. A question whose answer depends on
+  another still open in this round belongs to the *next* round, not this one.
+- **Recompute after every round.** Settled answers push the frontier outward. **Reflect each
+  answer back** in a sentence as you do, so drift gets caught early.
+- **Facts are yours to find; decisions are Brandon's.** Never ask for anything you could
+  look up in the repo or the tracker — go look, and ask only the decision that's left.
+- Ask only about what's **genuinely missing for the issue to be actionable** — infer the rest. A
+  frontier of one question is common and fine; a frontier of five says the idea wants splitting
+  (see Edge cases).
+- **Stop the moment it's actionable.** One or two rounds is great; five is a slog.
 
-Use `AskUserQuestion` only for a genuinely discrete single choice (2–4
-options, recommendation first) — never to fire several at once.
+Round format, in chat:
+
+```
+❓ **Q1 — <question title>**: <the question; options inline when it's a pick>
+➡️ <your recommended answer>
+
+❓ **Q2 — <question title>**: …
+➡️ …
+```
+
+Use `AskUserQuestion` for a round whose questions are all genuinely discrete
+picks (2–4 options each, recommendation first); a round with any free-text question goes in chat in
+the format above.
 
 ## Workflow
 
@@ -48,8 +66,8 @@ options, recommendation first) — never to fire several at once.
    a likely twin exists, surface it — *"We already have #N for this — extend that, or is yours
    different?"* Extending is often the right move; never file a duplicate.
 
-3. **Interview to actionable — one question at a time.** Ask about the highest-value *gap* first,
-   skipping anything already clear:
+3. **Interview to actionable — in frontier rounds.** The usual gaps, roughly in the order they
+   become askable; skip anything already clear:
    - **The symptom / why** — what's actually going wrong or missing, concretely. This usually
      arrives up front; reflect it back rather than re-asking.
    - **Acceptance — the load-bearing one.** What does "done" look like, verifiably? If that's
@@ -77,7 +95,8 @@ options, recommendation first) — never to fire several at once.
 
 ## Batch mode
 
-Given several ideas at once, interview them **one at a time** to actionable, draft them all,
+Given several ideas at once, interview them **one idea at a time** (each in its own rounds) to
+actionable, draft them all,
 show the set together, then file with a **single batched field write** (§7).
 
 ## Guardrails
