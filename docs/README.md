@@ -34,6 +34,7 @@ This folder groups the living documentation for Ensemble.
 - [`docs/design/ensemble-v2-rollout.md`](design/ensemble-v2-rollout.md) — DECISION 2026-09-15: v2 becomes the site; immutable images on docker04, core-parity bar, hard cut of v1, five phased milestones.
 - [`public/MANUAL.md`](../public/MANUAL.md) — in-app manual.
 - [`tests/README.md`](../tests/README.md) — test-suite conventions.
+- [`docs/agents/`](agents/) — repo config read by the general-purpose engineering skills: [`issue-tracker.md`](agents/issue-tracker.md), [`triage-labels.md`](agents/triage-labels.md) (triage roles mapped onto `status:*`), [`domain.md`](agents/domain.md) (where the glossary and decisions live).
 - [`docs/FLAKY_TESTS.md`](FLAKY_TESTS.md) — registry of known-flaky tests, the four flake classes (unseeded-statistical / ordering-dependent / e2e-timing / slow-legitimate), and their fixes. Diagnose new flakes with the `/flake` skill.
 
 ## Historical references
