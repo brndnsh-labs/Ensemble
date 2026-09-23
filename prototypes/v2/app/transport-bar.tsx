@@ -10,7 +10,11 @@ interface TransportBarProps {
     playbackActive: boolean;
     onPlayToggle: () => void;
     onTempo: (bpm: number) => void;
-    onKey: (key: string) => void;
+    /**
+     * The song's key AND its own major/minor (#1375), from one select: a separate Mode control
+     * wrapped the transport onto a second row on a phone. Mode is never a section/bar override.
+     */
+    onKey: (key: string, isMinor: boolean) => void;
     onGenre: (genre: string) => void;
     onFeel: () => void;
     onToggleLane: (lane: Lane) => void;
@@ -53,13 +57,25 @@ export function TransportBar({
                     id="song-key"
                     className="setting-select"
                     disabled={busy}
-                    value={arrangementOf(current).key}
-                    onChange={(event) => onKey(event.target.value)}
+                    value={arrangementOf(current).key + (arrangementOf(current).isMinor ? 'm' : '')}
+                    onChange={(event) => {
+                        // No KEY_ORDER name ends in "m", so the suffix is unambiguous.
+                        const value = event.target.value;
+                        const isMinor = value.endsWith('m');
+                        onKey(isMinor ? value.slice(0, -1) : value, isMinor);
+                    }}
                 >
+                    {/* Majors, then minors. No <optgroup>: WebKit sizes the select to its
+                        widest label, and "Minor" alone pushed the transport onto a second row on
+                        a phone. */}
                     {KEY_ORDER.map((key) => (
                         <option key={key} value={key}>
                             {key}
-                            {arrangementOf(current).isMinor ? 'm' : ''}
+                        </option>
+                    ))}
+                    {KEY_ORDER.map((key) => (
+                        <option key={`${key}m`} value={`${key}m`}>
+                            {key}m
                         </option>
                     ))}
                 </select>

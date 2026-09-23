@@ -294,3 +294,44 @@ test('semantic revision conflicts keep both takes, and unsupported imports never
     expect(await documents(second)).toEqual(beforeImport);
     await expect(second.locator('.bar').first().locator('.chord')).toHaveText(['F', 'G7']);
 });
+
+test('minor in the Key select writes score.isMinor only, and Save keeps it (#1375)', async ({
+    page,
+}) => {
+    await page.goto(appUrl());
+    await page.getByRole('button', { name: '＋ New song', exact: true }).click();
+    await editorRevealed(page);
+    const key = page.getByLabel('Key', { exact: true });
+
+    await key.selectOption('Cm');
+
+    await expect(key).toHaveValue('Cm');
+    await expect(page.locator('.measure-editor-context')).toHaveText('C minor · 4/4');
+    // Chord names are not rewritten, and the key stays C — no relative-key swap.
+    await expect(page.locator('.chord')).toHaveText(['C', 'G', 'Am', 'F']);
+
+    // Key and mode together, in one change.
+    await key.selectOption('D');
+    await expect(key).toHaveValue('D');
+    await expect(page.locator('.measure-editor-context')).toHaveText('D major · 4/4');
+    await expect(page.locator('.chord')).toHaveText(['D', 'A', 'Bm', 'G']);
+    await key.selectOption('Dm');
+
+    // A section that states its own mode keeps it through a song-level change.
+    await page.getByText('Section settings · A').click();
+    await page.getByLabel('Section mode').selectOption('major');
+    await expect(page.locator('.measure-editor-context')).toHaveText('D major · 4/4');
+    await key.selectOption('D');
+    await key.selectOption('Dm');
+    await expect(page.getByLabel('Section mode')).toHaveValue('major');
+
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
+    const saved = (await documents(page)).find((document) => document.title === 'Untitled song');
+    if (saved?.schemaVersion !== 2) {
+        throw new Error('Expected the new song as a semantic document');
+    }
+    expect(saved.chart.score.isMinor).toBe(true);
+    expect(saved.chart.score.key).toBe('D');
+    expect(saved.chart.score.sections[0].isMinor).toBe(false);
+});
