@@ -112,7 +112,6 @@ describe('Security: Hydration & Storage Resilience', () => {
         state.arranger.grouping = null;
         state.arranger.notation = 'roman';
         state.playback.bpm = 100;
-        state.playback.rampBpmTarget = 0;
         state.playback.bandIntensity = 0.5;
         state.playback.complexity = 0.3;
         state.groove.measures = 1;

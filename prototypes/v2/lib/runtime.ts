@@ -121,7 +121,7 @@ export function captureContent(): ChartContent {
             lastChordPreset: a.lastChordPreset,
         },
         performance: {
-            bpm: p.rampBpmTarget > 0 ? p.rampBpmTarget : p.bpm,
+            bpm: p.bpm,
             complexity: p.complexity,
             seed: a.seed,
             randomizeSeed: a.randomizeSeed,
