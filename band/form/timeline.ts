@@ -26,6 +26,8 @@ export interface ChordSpan {
     /** Null = N.C.: the pitched lanes rest. */
     chord: ChordFacts | null;
     fermata: boolean;
+    /** A written hold under a fermata: the chord before it keeps ringing, nothing re-strikes. */
+    tied: boolean;
 }
 
 /** A chord span as one bar sees it. `attack` is false when the span began in an earlier bar. */
@@ -165,7 +167,13 @@ export function compileTimeline(score: SemanticScore): Timeline {
                         : event.kind === 'hold'
                           ? (spans.at(-1)?.chord ?? null)
                           : null;
-                spans.push({ start: at, end: at + length, chord, fermata });
+                spans.push({
+                    start: at,
+                    end: at + length,
+                    chord,
+                    fermata,
+                    tied: event.kind === 'hold',
+                });
             }
             if (fermata) {
                 stretches.push({ start: at, end: at + length, factor: FERMATA_STRETCH });
@@ -181,6 +189,8 @@ export function compileTimeline(score: SemanticScore): Timeline {
         visit.barCount++;
     }
 
+    impliedTensions(spans);
+
     // Slice global spans into each bar's view.
     let cursor = 0;
     for (const bar of bars) {
@@ -194,7 +204,7 @@ export function compileTimeline(score: SemanticScore): Timeline {
                 ...span,
                 start: Math.max(span.start, bar.start),
                 end: Math.min(span.end, end),
-                attack: span.start >= bar.start,
+                attack: span.start >= bar.start && !span.tied,
             });
         }
     }
@@ -210,6 +220,37 @@ export function compileTimeline(score: SemanticScore): Timeline {
     }
 
     return { bars, visits, spans, ticks: tick, stretches };
+}
+
+const MINOR_FAMILIES = new Set(['minor', 'half-diminished', 'diminished']);
+
+/**
+ * A dominant that resolves down a fifth to a minor-family chord (V7→i, A7→Dm7) implies
+ * the minor key's b9 and b13: it takes phrygian dominant as its scale and voicings prefer
+ * those tensions. Only for dominants the chart leaves unaltered — written tensions win.
+ */
+function impliedTensions(spans: ChordSpan[]): void {
+    const chords = spans.filter((s) => s.chord);
+    chords.forEach((span, i) => {
+        const chord = span.chord!;
+        const next = (chords[i + 1] ?? chords[0])?.chord;
+        if (
+            chord.family !== 'dominant' ||
+            chord.third === null ||
+            chord.tensions.length > 0 ||
+            chord.fifth !== 7 ||
+            !next ||
+            next.root !== (chord.root + 5) % 12 ||
+            !MINOR_FAMILIES.has(next.family)
+        ) {
+            return;
+        }
+        span.chord = {
+            ...chord,
+            scale: [0, 1, 4, 5, 7, 8, 10],
+            implied: { ninth: 1, thirteenth: 8 },
+        };
+    });
 }
 
 /** The chord sounding at a tick (N.C. → null). */

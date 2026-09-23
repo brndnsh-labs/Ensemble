@@ -21,6 +21,10 @@ import {
     restoreGains,
     syncBusReverbSend,
 } from '@engine/engine/engine';
+import {
+    startPlatformAudioAndWakeLock,
+    stopPlatformAudioAndWakeLock,
+} from '@engine/engine/platform-orchestrator';
 import { scheduler } from '@engine/engine/scheduler-core';
 import { isSoloistMonophonicMode } from '@engine/engine/soloist-mode-policy';
 import { transposeChordText } from '@engine/engine/transpose';
@@ -129,7 +133,7 @@ let bandScore: { key: string; score: SemanticScore } | null = null;
 let playhead: ReturnType<typeof setInterval> | null = null;
 
 function bandHost(): BandHost {
-    band ??= new BandHost({ state: getState });
+    band ??= new BandHost({ state: getState, silence: () => void killAllNotes(getState()) });
     return band;
 }
 
@@ -171,6 +175,7 @@ function bandSettings(): BandSettings {
         lanes: { drums: groove.enabled, bass: bass.enabled, keys: chords.enabled },
         intensity: playback.autoIntensity ? null : playback.bandIntensity,
         swing: groove.swing,
+        swingGrid: groove.swingSub === '16th' ? 16 : 8,
         humanize: groove.humanize,
         seed: bandSeed,
     };
@@ -188,11 +193,18 @@ function startBand(): void {
     const state = getState();
     const { arranger, playback } = state;
     host.setScore(scoreForBand());
-    // The same take-to-take rule as the old engine: a fresh seed per play unless locked.
-    bandSeed =
-        arranger.randomizeSeed || !arranger.seed
-            ? Math.floor(Math.random() * 0xffffff).toString(16)
-            : String(arranger.seed);
+    // The same take-to-take rule as the old engine: a fresh seed per play unless locked —
+    // and the fresh one is recorded, so locking it later reproduces the take you heard.
+    if (arranger.randomizeSeed || !arranger.seed) {
+        dispatch(
+            ACTIONS.SET_SONG_SEED,
+            Math.floor(Math.random() * 0xffffff)
+                .toString(16)
+                .padStart(6, '0')
+                .toUpperCase(),
+        );
+    }
+    bandSeed = String(getState().arranger.seed);
     if (!playback.chartLocked) {
         dispatch(ACTIONS.SET_CHART_LOCKED, true);
     }
@@ -200,6 +212,7 @@ function startBand(): void {
         void playback.audio.resume();
     }
     restoreGains(state);
+    startPlatformAudioAndWakeLock();
     host.start(bandSettings(), playback.bpm, (playback.startStep || 0) * STEP_TICKS, bandLoop());
     param('playback', 'isPlaying', true);
     playhead ??= setInterval(followPlayhead, 50);
@@ -216,6 +229,7 @@ function stopBand(): void {
         param('playback', 'isPlaying', false);
     }
     dispatch(ACTIONS.SET_START_STEP, 0);
+    stopPlatformAudioAndWakeLock();
     void killAllNotes(getState());
 }
 
@@ -1113,7 +1127,7 @@ export function exportMidi(filename: string): Promise<void> {
         const host = bandHost();
         host.setScore(scoreForBand());
         bandSeed ||= String(getState().arranger.seed || 'ensemble');
-        const { events, timeline } = host.renderPasses(bandSettings(), 1);
+        const { events, timeline } = host.render(bandSettings());
         const bytes = toMidi(events, timeline, { bpm: getState().playback.bpm, title: filename });
         const name = `${filename.replace(/[^a-zA-Z0-9\s\-_()]/g, '').trim() || 'ensemble'}.mid`;
         downloadExportResult({

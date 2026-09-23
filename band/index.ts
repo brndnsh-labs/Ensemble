@@ -3,7 +3,7 @@
  * from here; nothing outside `band/` reaches into its modules.
  */
 
-export type { BarPlan } from './arrange/plan.js';
+export type { BarPlan, PassWindow } from './arrange/plan.js';
 export type {
     BandEvent,
     BandSettings,

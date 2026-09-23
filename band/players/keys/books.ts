@@ -39,6 +39,8 @@ interface KeysBook {
     ): Hit[];
     /** Chance that the last hit before a barline anticipates the next chord. */
     push: Record<EnergyTier, number>;
+    /** A hit an eighth before a mid-bar chord change plays the new chord (bossa). */
+    pushInBar?: boolean;
 }
 
 function keysIdiom(book: KeysBook): PitchedIdiom {
@@ -76,7 +78,8 @@ function keysIdiom(book: KeysBook): PitchedIdiom {
             let pushed = false;
             const planned: { step: number; length: number; velocity: number; chord: ChordFacts }[] =
                 [];
-            spanSteps(bar).forEach(({ span, from, to }, index) => {
+            const spans = spanSteps(bar);
+            spans.forEach(({ span, from, to }, index) => {
                 const chord = span.chord;
                 if (!chord) {
                     return;
@@ -113,6 +116,40 @@ function keysIdiom(book: KeysBook): PitchedIdiom {
                     planned.push({ step: hit.step, length, velocity: hit.velocity, chord: target });
                 }
             });
+            spans.forEach(({ span, from }, index) => {
+                if (!span.chord || index === 0) {
+                    return;
+                }
+                // Anticipate a mid-bar change: the hit an eighth before it plays the new chord.
+                if (book.pushInBar) {
+                    for (const hit of planned) {
+                        if (hit.step >= from - TIE_STEPS && hit.step < from) {
+                            hit.chord = span.chord;
+                            hit.length = Math.max(hit.length, from - hit.step + TIE_STEPS);
+                        }
+                    }
+                }
+            });
+            // Every chord the chart writes is struck at least once — a comping figure may
+            // skip beats, but never a chord.
+            spans.forEach(({ span, from, to }, index) => {
+                const chord = span.chord;
+                const tiedIn = index === 0 && (memory.pushed || !span.attack);
+                if (!chord || tiedIn || span.fermata) {
+                    return;
+                }
+                const struck = planned.some(
+                    (h) => h.chord === chord && h.step >= from - TIE_STEPS && h.step < to,
+                );
+                if (!struck) {
+                    planned.push({
+                        step: from,
+                        length: Math.min(4, to - from),
+                        velocity: 80,
+                        chord,
+                    });
+                }
+            });
             planned.sort((a, b) => a.step - b.step);
             planned.forEach((hit, i) => {
                 // A new strike cuts the chord before it: one hand, one chord at a time.
@@ -130,7 +167,9 @@ function keysIdiom(book: KeysBook): PitchedIdiom {
 export const rockKeys = keysIdiom({
     name: 'rock keys',
     kind: 'close',
-    push: { low: 0, mid: 0.2, high: 0.3 },
+    // In rock a push is an ensemble hit (kick, bass and keys together); keys pushing alone
+    // put the next chord over the old bass note. Off until the plan can push the band.
+    push: { low: 0, mid: 0, high: 0 },
     rhythm(ctx, { from, to, attack }, tier) {
         const hits: Hit[] = [];
         if (tier === 'low') {
@@ -167,6 +206,14 @@ const COMP_CELLS: readonly [number[], number][] = [
     [[6, 14], 2],
 ];
 
+// Two-beat spans (two chords in a bar) get half-bar figures: on the chord, on its "and",
+// or both — never a four-beat figure that would never strike the chord.
+const SHORT_COMP_CELLS: readonly [number[], number][] = [
+    [[0], 3],
+    [[2], 2],
+    [[0, 6], 1],
+];
+
 export const jazzKeys = keysIdiom({
     name: 'jazz comp',
     kind: 'rootless',
@@ -177,7 +224,9 @@ export const jazzKeys = keysIdiom({
         }
         const length = to - from;
         const cell = rng.weighted(
-            COMP_CELLS.filter(([c]) => c.every((s) => s < length) || c[0] < length),
+            length <= 8
+                ? SHORT_COMP_CELLS
+                : COMP_CELLS.filter(([c]) => c.every((s) => s < length) || c[0] < length),
         );
         const hits: Hit[] = [];
         for (const offset of cell) {
@@ -211,8 +260,10 @@ export const funkKeys = keysIdiom({
     name: 'funk stabs',
     kind: 'stab',
     push: { low: 0, mid: 0.15, high: 0.25 },
-    rhythm(ctx, { from, to }, tier, rng) {
+    rhythm(ctx, { from, to }, tier) {
         const line = ctx.rng('stabs', 'section').pick(FUNK_STABS);
+        const riffSteps = [...line].flatMap((c, i) => (c === 'x' ? [i] : []));
+        const dropped = ctx.rng('thin', 'section').pick(riffSteps);
         const hits: Hit[] = [];
         for (let s = from; s < to; s++) {
             if (line[s] !== 'x') {
@@ -222,7 +273,9 @@ export const funkKeys = keysIdiom({
             if (tier === 'low' && s % 4 !== 2) {
                 continue;
             }
-            if (tier === 'mid' && rng.chance(0.2)) {
+            // Mid energy drops the same stab every bar of the section — a thinner riff, not a
+            // stuttering one.
+            if (tier === 'mid' && s === dropped) {
                 continue;
             }
             hits.push({ step: s, length: 0.9, velocity: s % 4 === 2 ? 98 : 88 });
@@ -251,6 +304,7 @@ const BOSSA_FIGURES: readonly [number[], number[]][] = [
 export const bossaKeys = keysIdiom({
     name: 'bossa comp',
     kind: 'drop2',
+    pushInBar: true,
     push: { low: 0.6, mid: 0.7, high: 0.75 },
     rhythm(ctx, { from, to }, tier) {
         const figure = ctx.rng('figure', 'section').pick(BOSSA_FIGURES);

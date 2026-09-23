@@ -23,9 +23,9 @@ export const STYLES: Record<StyleId, Style> = {
     jazz: {
         id: 'jazz',
         name: 'Jazz',
-        // Medium swing (offbeat at ~62% of the beat, not a hard triplet) and the rhythm
-        // section leaning back of the ride — the relaxed pull of the old engine's +8 ms.
-        feel: { swing: 72, swingGrid: 8, lean: { bass: 5, keys: 8 }, humanize: 40 },
+        // Medium swing (offbeat at ~62% of the beat, not a hard triplet). The walking bass
+        // sits on top of the ride (a hair ahead drives the time); the comping lays back.
+        feel: { swing: 72, swingGrid: 8, lean: { bass: -2, keys: 8 }, humanize: 40 },
         drums: jazzDrums,
         bass: walkingBass,
         keys: jazzKeys,

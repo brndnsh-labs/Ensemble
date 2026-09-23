@@ -16,7 +16,6 @@ export interface BarContext {
     plan: BarPlan;
     /** The bar after this one in performance order (wrapping when the song loops). */
     next: { bar: Bar; plan: BarPlan } | null;
-    prev: { bar: Bar; plan: BarPlan } | null;
     /** What the lanes before this one already played in this bar, on the straight grid. */
     heard: { drums: DrumHit[]; bass: PitchedNote[] };
     /**

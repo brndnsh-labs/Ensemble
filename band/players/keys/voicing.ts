@@ -16,10 +16,10 @@ const has = (chord: ChordFacts, n: number) => chord.intervals.some((i) => mod12(
 
 /** A written alteration of a tension wins over the default natural one. */
 function ninth(chord: ChordFacts): number {
-    return has(chord, 1) ? 1 : has(chord, 3) && chord.third === 4 ? 3 : 2;
+    return has(chord, 1) ? 1 : has(chord, 3) && chord.third === 4 ? 3 : (chord.implied?.ninth ?? 2);
 }
 function thirteenth(chord: ChordFacts): number {
-    return has(chord, 8) && chord.fifth !== 8 ? 8 : 9;
+    return has(chord, 8) && chord.fifth !== 8 ? 8 : (chord.implied?.thirteenth ?? 9);
 }
 
 /** The tones (semitones above the root, < 12) a voicing kind plays for a chord. */
@@ -51,19 +51,14 @@ function voicingTones(chord: ChordFacts, kind: VoicingKind): number[] {
             if (chord.family === 'half-diminished') {
                 return [3, 5, 6, 10]; // b3 11 b5 b7: the root would sit a b9 from nothing
             }
+            // A written #11 (or b5) takes the place of the 5th/13th, so it is always heard.
+            const sharpEleven = has(chord, 6);
             const upper =
                 chord.family === 'dominant'
                     ? // Dominants: 9 and 13 (or their written alterations) in place of root and 5th.
-                      [
-                          written.includes(8)
-                              ? 8
-                              : has(chord, 6) && chord.fifth !== 7
-                                ? 6
-                                : thirteenth(chord),
-                          ninth(chord),
-                      ]
+                      [written.includes(8) ? 8 : sharpEleven ? 6 : thirteenth(chord), ninth(chord)]
                     : [
-                          written.some((t) => t === 9) ? 9 : fifth,
+                          sharpEleven ? 6 : written.includes(9) ? 9 : fifth,
                           written.includes(5) ? 5 : ninth(chord),
                       ];
             return [...new Set([third ?? 7, colour, ...upper])];
@@ -144,7 +139,17 @@ function cost(v: number[], prev: number[] | null, chord: ChordFacts): number {
     }
     // Hand shape: no muddy thirds down low, no minor-9th rubs, no minor-2nd clusters on
     // chords that don't ask for them.
-    const tense = chord.family === 'dominant' && chord.tensions.length > 0;
+    // Dominants carry their colour in semitones (b7 against 13, 3 against b9/#9, the
+    // altered tensions) — the rubs are the sound. Everything else avoids them.
+    const tense = chord.family === 'dominant';
+    // …except a #9 *below* the 3rd, which is a cluster, not the "Hendrix" 3–b7–#9.
+    if (chord.family === 'dominant' && chord.third === 4) {
+        const sharpNine = v.find((m) => mod12(m - chord.root) === 3);
+        const third = v.find((m) => mod12(m - chord.root) === 4);
+        if (sharpNine !== undefined && third !== undefined && sharpNine < third) {
+            c += 20;
+        }
+    }
     for (let i = 0; i < v.length; i++) {
         for (let j = i + 1; j < v.length; j++) {
             const gap = v[j] - v[i];

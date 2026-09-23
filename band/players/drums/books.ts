@@ -71,7 +71,9 @@ export const rockDrums = drumIdiom({
 // ---------------------------------------------------------------- jazz
 // The ride carries the time ("spang-spang-a-lang", swung by the feel pass); hi-hat foot
 // on 2 and 4; the kick "feathers" quarter notes under the band; the snare comps sparsely.
-const JAZZ_COMP_SPOTS = [2, 6, 7, 10, 14, 15];
+// Swung-eighth offbeats and beat 3 only: the "a" sixteenths would land between triplet
+// positions once the feel pass swings them, and read as flams.
+const JAZZ_COMP_SPOTS = [2, 6, 8, 10, 14];
 
 export const jazzDrums = drumIdiom({
     name: 'jazz ride',
@@ -140,7 +142,9 @@ export const funkDrums = drumIdiom({
         const ghosts = tier === 'low' ? '' : ctx.rng('ghost', 'section').pick(FUNK_GHOSTS);
         const backbeat = '....X.......X...';
         const snare = [...backbeat].map((c, i) => (c !== '.' ? c : (ghosts[i] ?? '.'))).join('');
-        const openBar = ctx.rng('open').chance(tier === 'high' ? 0.5 : 0.2);
+        // Whether this section opens the hat on the "and" of 4 is the section's choice, kept
+        // every bar (and always at high energy).
+        const openBar = tier === 'high' || ctx.rng('open', 'section').chance(0.35);
         return {
             hat:
                 tier === 'low'

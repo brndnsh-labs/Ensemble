@@ -39,6 +39,7 @@ function warp(offset: number, pair: number, ratio: number): number {
 
 export interface FeelSettings {
     swing: number | null;
+    swingGrid?: 8 | 16 | null;
     humanize: number | null;
     seed: string;
 }
@@ -50,7 +51,7 @@ export function applyFeel(
     settings: FeelSettings,
 ): BandEvent[] {
     const ratio = swingRatio(settings.swing ?? feel.swing);
-    const pair = feel.swingGrid === 8 ? PPQ : PPQ / 2;
+    const pair = (settings.swingGrid ?? feel.swingGrid) === 8 ? PPQ : PPQ / 2;
     const human = (settings.humanize ?? feel.humanize) / 100;
     return events.map((event) => {
         const bar = timeline.bars[event.bar];

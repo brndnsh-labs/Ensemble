@@ -67,6 +67,8 @@ export interface BandSettings {
     intensity: number | null;
     /** 0–100 shuffle amount (100 = triplet swing); `null` uses the style's own feel. */
     swing: number | null;
+    /** Which subdivision swings (8ths or 16ths); `null` uses the style's own grid. */
+    swingGrid: 8 | 16 | null;
     /** 0–100 human timing/velocity variation; `null` uses the style's own amount. */
     humanize: number | null;
     /** Free-form seed text; the same seed always plays the same performance. */
@@ -78,6 +80,7 @@ export const DEFAULT_SETTINGS: BandSettings = {
     lanes: { drums: true, bass: true, keys: true },
     intensity: null,
     swing: null,
+    swingGrid: null,
     humanize: null,
     seed: 'ensemble',
 };

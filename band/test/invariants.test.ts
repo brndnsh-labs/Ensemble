@@ -123,14 +123,18 @@ function checkPass(
     }
     for (const [tick, notes] of clusters) {
         const bar = timeline.bars[notes[0].bar];
-        const here = bar.spans.find((s) => s.start <= tick && tick < s.end)?.chord;
+        const index = bar.spans.findIndex((s) => s.start <= tick && tick < s.end);
+        const here = bar.spans[index]?.chord;
+        // An anticipation may play the next chord early: the next one in the bar, or the
+        // next bar's first (wrapping at the end of the song).
+        const nextInBar = bar.spans[index + 1]?.chord;
         const next =
             timeline.bars[notes[0].bar + 1]?.spans[0]?.chord ?? timeline.bars[0].spans[0]?.chord;
         const pcs = new Set(notes.map((n) => mod12(n.midi)));
         const carries = (c: typeof here) =>
             !!c && c.guides.every((g) => pcs.has(mod12(c.root + g)));
         expect(
-            carries(here) || carries(next),
+            carries(here) || carries(nextInBar) || carries(next),
             `${where} keys guide tones @${tick} ${here?.symbol}`,
         ).toBe(true);
     }

@@ -2,11 +2,12 @@
  * The live host for the band engine (`?engine=next`). It turns `performPass` output into
  * sound through today's voices and sample packs, on the audio clock:
  *
- *   - Playback is a queue of *segments*: one pass of the song (or one lap of a practice
- *     loop) each, with the audio time it starts at. Events are in song ticks, so a tempo
+ *   - Playback is a queue of *segments*. Each is one window of bars in performance order: a
+ *     pass of the song, the rest of the song after "play from here", or one lap of a
+ *     practice loop. Each segment knows the audio time its first bar starts, so a tempo
  *     change only re-anchors the clock; nothing is regenerated.
- *   - A change to the band (style, intensity, lanes, swing…) regenerates the current pass
- *     and takes the new events from the next barline on.
+ *   - A change to the band (style, intensity, lanes, swing…) regenerates from the next
+ *     barline, resuming from the engine's memory snapshot at that bar.
  *   - A 25 ms timer schedules everything that starts within the next 150 ms.
  *
  * It never writes engine state; the runtime owns every dispatch.
@@ -16,6 +17,7 @@ import {
     type BandSettings,
     compileTimeline,
     type PassMemory,
+    type PassWindow,
     performPass,
     secondsAt,
     type Timeline,
@@ -54,7 +56,8 @@ const BASS_MUTE = 0.85;
 
 interface Segment {
     pass: number;
-    /** Song-tick window this segment plays. */
+    window: PassWindow;
+    /** Song-tick range the window covers. */
     from: number;
     to: number;
     /** Audio time of song tick `from`. */
@@ -64,35 +67,51 @@ interface Segment {
     cursor: number;
     /** Keys chord sizes by tick, for the voice's per-note gain. */
     chordSizes: Map<number, number>;
-}
-
-interface PassCache {
-    events: BandEvent[];
+    /** Engine memory before each bar, and after the last one. */
     memoryBefore: PassMemory | undefined;
+    snapshots: PassMemory[];
     memoryAfter: PassMemory;
+    /** The last pulse tick the metronome clicked in this segment. */
+    clicked: number;
 }
 
 export interface HostOptions {
     state: () => EnsembleState;
+    /** Cut every sounding note (a restart must not ring over itself). */
+    silence: () => void;
+}
+
+export interface Loop {
+    from: number;
+    to: number;
 }
 
 function hz(midi: number): number {
     return 440 * 2 ** ((midi - 69) / 12);
 }
 
+function chordSizes(events: BandEvent[]): Map<number, number> {
+    const sizes = new Map<number, number>();
+    for (const e of events) {
+        if (e.lane === 'keys') {
+            sizes.set(e.tick, (sizes.get(e.tick) ?? 0) + 1);
+        }
+    }
+    return sizes;
+}
+
 export class BandHost {
+    private readonly options: HostOptions;
     private timeline: Timeline | null = null;
-    private score: SemanticScore | null = null;
+    private scoreKey = '';
     private settings: BandSettings | null = null;
     private bpm = 120;
     private segments: Segment[] = [];
-    private passes = new Map<number, PassCache>();
-    private loop: { from: number; to: number } | null = null;
+    private loop: Loop | null = null;
+    /** Where the segment after the current one starts, when that isn't the default. */
+    private resumeBar: number | null = null;
     private timer: ReturnType<typeof setInterval> | null = null;
     private nextPass = 0;
-    private metronomeUntil = 0;
-
-    private readonly options: HostOptions;
 
     constructor(options: HostOptions) {
         this.options = options;
@@ -106,52 +125,43 @@ export class BandHost {
         return (this.options.state().playback.audio as AudioContext | null) ?? null;
     }
 
-    /** Compile a chart. Cheap; call whenever the score changes. */
+    /** Compile a chart. Only a change of content (not of object identity) restarts the band. */
     setScore(score: SemanticScore): void {
-        if (score === this.score) {
+        const key = JSON.stringify(score);
+        if (key === this.scoreKey) {
             return;
         }
-        this.score = score;
+        this.scoreKey = key;
         this.timeline = compileTimeline(score);
-        this.passes.clear();
-        if (this.playing) {
+        if (this.playing && this.settings) {
             // The form changed under the band: restart the song cleanly.
-            const settings = this.settings!;
-            this.stop();
-            this.start(settings, this.bpm, 0, this.loop);
+            this.start(this.settings, this.bpm, 0, this.loop);
         }
     }
 
-    start(
-        settings: BandSettings,
-        bpm: number,
-        fromTick = 0,
-        loop: { from: number; to: number } | null = null,
-    ): void {
+    start(settings: BandSettings, bpm: number, fromTick = 0, loop: Loop | null = null): void {
         const audio = this.audio;
         if (!this.timeline || !audio) {
             throw new Error('The band has no chart or no audio yet.');
         }
-        this.stop();
+        const restarting = this.playing;
+        this.halt();
+        if (restarting) {
+            this.options.silence();
+        }
         this.settings = settings;
         this.bpm = bpm;
         this.loop = loop;
-        this.passes.clear();
-        this.segments = [];
         this.nextPass = 0;
-        this.metronomeUntil = 0;
-        const from = loop ? loop.from : fromTick;
-        this.append(from, audio.currentTime + 0.1);
+        this.resumeBar = null;
+        const window = loop ? this.loopWindow(loop) : this.songWindow(this.barAt(fromTick));
+        this.append(window, audio.currentTime + 0.1, undefined);
         this.timer = setInterval(() => this.pump(), TIMER_MS);
         this.pump();
     }
 
     stop(): void {
-        if (this.timer) {
-            clearInterval(this.timer);
-            this.timer = null;
-        }
-        this.segments = [];
+        this.halt();
     }
 
     /** New band settings: regenerate, and take the new music from the next barline. */
@@ -165,58 +175,84 @@ export class BandHost {
         if (!this.playing || !audio || !timeline) {
             return;
         }
-        const keepMemory = new Map([...this.passes].map(([p, c]) => [p, c.memoryBefore]));
-        this.passes.clear();
         const horizon = audio.currentTime + LOOKAHEAD_S;
-        for (const segment of this.segments) {
-            const cutoff = this.nextBarline(segment, horizon);
-            if (cutoff === null) {
-                continue;
-            }
-            const fresh = this.generate(segment.pass, keepMemory.get(segment.pass));
-            const kept = segment.events
-                .slice(0, segment.cursor)
-                .concat(segment.events.slice(segment.cursor).filter((e) => e.tick < cutoff));
-            const added = fresh.filter(
-                (e) => e.tick >= cutoff && e.tick >= segment.from && e.tick < segment.to,
-            );
-            segment.events = kept.concat(added).sort((a, b) => a.tick - b.tick);
-            segment.cursor = Math.min(segment.cursor, segment.events.length);
-            segment.chordSizes = chordSizes(segment.events);
+        const current = this.current(horizon);
+        if (!current) {
+            return;
         }
+        const index = this.segments.indexOf(current);
+        // Everything after the current segment is regenerated lazily with the new settings.
+        this.segments.length = index + 1;
+        const cutoffBar = this.barAt(this.tickAt(current, horizon), true);
+        if (cutoffBar >= current.window.to) {
+            return;
+        }
+        // Resume from the engine's own memory at that barline, so the new bars follow on
+        // from the bars actually played (voicing, bass register, a pushed chord).
+        const tail = performPass(timeline, settings, {
+            pass: current.pass,
+            looping: true,
+            memory: current.snapshots[cutoffBar],
+            window: { ...current.window, from: cutoffBar },
+        });
+        const cutoff = timeline.bars[cutoffBar].start;
+        current.events = current.events.filter((e) => e.tick < cutoff).concat(tail.events);
+        current.cursor = current.events.findIndex(
+            (e) => this.timeOf(current, e.tick) + e.offsetMs / 1000 > horizon,
+        );
+        if (current.cursor < 0) {
+            current.cursor = current.events.length;
+        }
+        current.chordSizes = chordSizes(current.events);
+        for (let bar = cutoffBar; bar < current.window.to; bar++) {
+            current.snapshots[bar] = tail.snapshots[bar];
+        }
+        current.memoryAfter = tail.memory;
     }
 
     /** Re-anchor the clock at the current position; the music keeps its place in the bar. */
     setTempo(bpm: number): void {
         const audio = this.audio;
-        const timeline = this.timeline;
-        if (bpm === this.bpm || !audio || !timeline || !this.playing) {
+        if (bpm === this.bpm || !audio || !this.timeline || !this.playing) {
             this.bpm = bpm;
             return;
         }
         const now = audio.currentTime;
-        const current = this.segments.find((s) => this.endTime(s) > now) ?? this.segments[0];
+        // Drop finished segments first: at a new tempo their (recomputed) ends would move.
+        this.segments = this.segments.filter((s) => this.endTime(s) > now);
+        const current = this.segments.find((s) => s.start <= now) ?? this.segments[0];
         if (!current) {
             this.bpm = bpm;
             return;
         }
-        const tick = this.tickAt(current, now);
+        const tick = now > current.start ? this.tickAt(current, now) : current.from;
+        const lead = now > current.start ? 0 : current.start - now;
         this.bpm = bpm;
-        current.start =
-            now - (secondsAt(timeline, tick, bpm) - secondsAt(timeline, current.from, bpm));
-        const index = this.segments.indexOf(current);
-        for (let i = index + 1; i < this.segments.length; i++) {
+        current.start = now + lead - (this.secondsTo(tick) - this.secondsTo(current.from));
+        for (let i = 1; i < this.segments.length; i++) {
             this.segments[i].start = this.endTime(this.segments[i - 1]);
         }
     }
 
-    setLoop(loop: { from: number; to: number } | null): void {
+    setLoop(loop: Loop | null): void {
         if (JSON.stringify(loop) === JSON.stringify(this.loop)) {
             return;
         }
+        const audio = this.audio;
         this.loop = loop;
-        if (this.playing && this.settings) {
-            this.start(this.settings, this.bpm, loop ? loop.from : 0, loop);
+        if (!this.playing || !this.settings || !audio) {
+            return;
+        }
+        if (loop) {
+            this.start(this.settings, this.bpm, loop.from, loop);
+            return;
+        }
+        // Leaving a loop: finish the lap that is playing, then carry on through the song.
+        const current = this.current(audio.currentTime);
+        if (current) {
+            this.segments.length = this.segments.indexOf(current) + 1;
+            this.resumeBar =
+                current.window.to < this.timeline!.bars.length ? current.window.to : null;
         }
     }
 
@@ -231,88 +267,89 @@ export class BandHost {
         return segment ? this.tickAt(segment, now) : null;
     }
 
-    /** One pass of the whole song, for export. */
-    renderPasses(
-        settings: BandSettings,
-        passes: number,
-    ): { events: BandEvent[]; timeline: Timeline } {
+    /** The whole song, once through with an ending, for export. */
+    render(settings: BandSettings): { events: BandEvent[]; timeline: Timeline } {
         if (!this.timeline) {
             throw new Error('No chart loaded.');
         }
-        const all: BandEvent[] = [];
-        let memory: PassMemory | undefined;
-        for (let pass = 0; pass < passes; pass++) {
-            const result = performPass(this.timeline, settings, {
-                pass,
-                looping: pass < passes - 1,
-                memory,
-            });
-            memory = result.memory;
-            const offset = pass * this.timeline.ticks;
-            all.push(...result.events.map((e) => ({ ...e, tick: e.tick + offset })));
-        }
-        return { events: all, timeline: this.timeline };
+        const { events } = performPass(this.timeline, settings, { pass: 0, looping: false });
+        return { events, timeline: this.timeline };
     }
 
     // ------------------------------------------------------------ internals
 
-    private generate(pass: number, memory?: PassMemory): BandEvent[] {
-        const cached = this.passes.get(pass);
-        if (cached) {
-            return cached.events;
+    private halt(): void {
+        if (this.timer) {
+            clearInterval(this.timer);
+            this.timer = null;
         }
-        const before = memory ?? this.passes.get(pass - 1)?.memoryAfter;
-        const result = performPass(this.timeline!, this.settings!, {
-            pass,
-            looping: true,
-            memory: before,
-        });
-        this.passes.set(pass, {
-            events: result.events,
-            memoryBefore: before,
-            memoryAfter: result.memory,
-        });
-        // Keep the cache small: only the passes around the playhead matter.
-        for (const key of this.passes.keys()) {
-            if (key < pass - 2) {
-                this.passes.delete(key);
-            }
-        }
-        return result.events;
+        this.segments = [];
     }
 
-    private append(from: number, start: number): void {
+    private barAt(tick: number, after = false): number {
+        const bars = this.timeline!.bars;
+        const index = bars.findIndex((b) =>
+            after ? b.start >= tick : b.start + b.meter.barTicks > tick,
+        );
+        return index < 0 ? bars.length : index;
+    }
+
+    private songWindow(fromBar: number): PassWindow {
+        return {
+            from: Math.min(fromBar, this.timeline!.bars.length - 1),
+            to: this.timeline!.bars.length,
+            wrapTo: 0,
+        };
+    }
+
+    private loopWindow(loop: Loop): PassWindow {
+        const from = this.barAt(loop.from);
+        const to = Math.max(from + 1, this.barAt(loop.to, true));
+        return { from, to, wrapTo: from };
+    }
+
+    private append(window: PassWindow, start: number, memory: PassMemory | undefined): void {
         const timeline = this.timeline!;
         const pass = this.nextPass++;
-        const to = this.loop ? this.loop.to : timeline.ticks;
-        const events = this.generate(pass).filter((e) => e.tick >= from && e.tick < to);
+        const result = performPass(timeline, this.settings!, {
+            pass,
+            looping: true,
+            memory,
+            window,
+        });
+        const from = timeline.bars[window.from].start;
+        const last = timeline.bars[window.to - 1];
         this.segments.push({
             pass,
+            window,
             from,
-            to,
+            to: last.start + last.meter.barTicks,
             start,
-            events,
+            events: result.events,
             cursor: 0,
-            chordSizes: chordSizes(events),
+            chordSizes: chordSizes(result.events),
+            memoryBefore: memory,
+            snapshots: result.snapshots,
+            memoryAfter: result.memory,
+            clicked: -1,
         });
+    }
+
+    private secondsTo(tick: number): number {
+        return secondsAt(this.timeline!, tick, this.bpm);
     }
 
     private endTime(segment: Segment): number {
-        const timeline = this.timeline!;
-        return (
-            segment.start +
-            secondsAt(timeline, segment.to, this.bpm) -
-            secondsAt(timeline, segment.from, this.bpm)
-        );
+        return segment.start + this.secondsTo(segment.to) - this.secondsTo(segment.from);
     }
 
     private timeOf(segment: Segment, tick: number): number {
-        const timeline = this.timeline!;
-        return (
-            segment.start +
-            secondsAt(timeline, tick, this.bpm) -
-            secondsAt(timeline, segment.from, this.bpm)
-        );
+        return segment.start + this.secondsTo(tick) - this.secondsTo(segment.from);
+    }
+
+    /** The segment playing at `time` (or the first one still to come). */
+    private current(time: number): Segment | undefined {
+        return this.segments.find((s) => this.endTime(s) > time);
     }
 
     /** Inverse of `timeOf` (bisection: fermata stretches make it piecewise). */
@@ -330,17 +367,6 @@ export class BandHost {
         return lo;
     }
 
-    /** The first barline at or after `time` within a segment, or null if it is past it. */
-    private nextBarline(segment: Segment, time: number): number | null {
-        const timeline = this.timeline!;
-        if (this.endTime(segment) <= time) {
-            return null;
-        }
-        const tick = time <= segment.start ? segment.from : this.tickAt(segment, time);
-        const bar = timeline.bars.find((b) => b.start >= tick && b.start >= segment.from);
-        return bar ? bar.start : segment.to;
-    }
-
     private pump(): void {
         const audio = this.audio;
         if (!audio) {
@@ -351,7 +377,11 @@ export class BandHost {
         // Keep a segment queued ahead of the playhead.
         const last = this.segments[this.segments.length - 1];
         if (last && this.endTime(last) < now + PREPARE_S) {
-            this.append(this.loop ? this.loop.from : 0, this.endTime(last));
+            const window = this.loop
+                ? this.loopWindow(this.loop)
+                : this.songWindow(this.resumeBar ?? 0);
+            this.resumeBar = null;
+            this.append(window, this.endTime(last), last.memoryAfter);
         }
         // Drop segments that finished.
         while (this.segments.length > 1 && this.endTime(this.segments[0]) < now - 1) {
@@ -371,8 +401,8 @@ export class BandHost {
                 }
                 this.sound(state, segment, event, Math.max(time, now));
             }
+            this.metronome(state, segment, now, horizon);
         }
-        this.metronome(state, now, horizon);
     }
 
     private sound(state: EnsembleState, segment: Segment, event: BandEvent, time: number): void {
@@ -402,52 +432,38 @@ export class BandHost {
     }
 
     /** The click: a beep on each pulse, accented on the downbeat. Same voice as the old engine. */
-    private metronome(state: EnsembleState, now: number, horizon: number): void {
+    private metronome(state: EnsembleState, segment: Segment, now: number, horizon: number): void {
         const audio = this.audio;
         const timeline = this.timeline;
         if (!state.playback.metronome || !audio || !timeline) {
             return;
         }
-        for (const segment of this.segments) {
-            for (const bar of timeline.bars) {
-                if (bar.start < segment.from || bar.start >= segment.to) {
-                    continue;
+        for (let b = segment.window.from; b < segment.window.to; b++) {
+            const bar = timeline.bars[b];
+            bar.meter.pulses.forEach((offset, i) => {
+                const tick = bar.start + offset;
+                const time = this.timeOf(segment, tick);
+                // De-duplicate by position, not time: a tempo change moves the times.
+                if (tick <= segment.clicked || time > horizon || time < now) {
+                    return;
                 }
-                bar.meter.pulses.forEach((offset, i) => {
-                    const time = this.timeOf(segment, bar.start + offset);
-                    if (time <= this.metronomeUntil || time > horizon || time < now) {
-                        return;
-                    }
-                    this.metronomeUntil = time;
-                    const freq = i === 0 ? 1000 : bar.meter.roles[i] === 'strong' ? 800 : 600;
-                    const osc = audio.createOscillator();
-                    const gain = audio.createGain();
-                    osc.connect(gain);
-                    const graph = state.playback.audioGraph as {
-                        master?: { gain: AudioNode };
-                    } | null;
-                    gain.connect(graph?.master?.gain ?? audio.destination);
-                    osc.frequency.setValueAtTime(freq, time);
-                    gain.gain.setValueAtTime(0.15, time);
-                    gain.gain.exponentialRampToValueAtTime(0.001, time + 0.05);
-                    osc.start(time);
-                    osc.stop(time + 0.05);
-                    osc.onended = () => {
-                        gain.disconnect();
-                        osc.disconnect();
-                    };
-                });
-            }
+                segment.clicked = tick;
+                const freq = i === 0 ? 1000 : bar.meter.roles[i] === 'strong' ? 800 : 600;
+                const osc = audio.createOscillator();
+                const gain = audio.createGain();
+                osc.connect(gain);
+                const graph = state.playback.audioGraph as { master?: { gain: AudioNode } } | null;
+                gain.connect(graph?.master?.gain ?? audio.destination);
+                osc.frequency.setValueAtTime(freq, time);
+                gain.gain.setValueAtTime(0.15, time);
+                gain.gain.exponentialRampToValueAtTime(0.001, time + 0.05);
+                osc.start(time);
+                osc.stop(time + 0.05);
+                osc.onended = () => {
+                    gain.disconnect();
+                    osc.disconnect();
+                };
+            });
         }
     }
-}
-
-function chordSizes(events: BandEvent[]): Map<number, number> {
-    const sizes = new Map<number, number>();
-    for (const e of events) {
-        if (e.lane === 'keys') {
-            sizes.set(e.tick, (sizes.get(e.tick) ?? 0) + 1);
-        }
-    }
-    return sizes;
 }

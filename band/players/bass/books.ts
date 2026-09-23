@@ -5,12 +5,13 @@
  * pitch through `ChordFacts`, never the symbol text.
  */
 import { energyTier } from '../../arrange/plan.js';
+import type { Rng } from '../../core/random.js';
 import type { PitchedNote } from '../../core/types.js';
 import type { BarSpan } from '../../form/timeline.js';
 import type { PitchedIdiom } from '../../styles/types.js';
 import type { ChordFacts } from '../../theory/chord.js';
 import { mod12 } from '../../theory/pitch.js';
-import { dyn, pulses, spanSteps } from '../grid.js';
+import { barSteps, dyn, pulses, spanSteps } from '../grid.js';
 import {
     approach,
     BASS,
@@ -21,6 +22,7 @@ import {
     nextChord,
     pickApproach,
     place,
+    sectionPlace,
 } from './line.js';
 
 interface LineMemory {
@@ -58,7 +60,7 @@ export const rockBass: PitchedIdiom = {
             if (!span.chord) {
                 return;
             }
-            const root = place(bassPc(span.chord), last);
+            const root = sectionPlace(ctx, bassPc(span.chord));
             // Rhythm: kick-locked at low energy; driving eighths above it.
             let steps: number[];
             if (tier === 'low') {
@@ -75,16 +77,13 @@ export const rockBass: PitchedIdiom = {
             steps.sort((a, b) => a - b);
             const target = targetAfter(spans, i, next, root);
             const rng = ctx.rng(`line${i}`);
+            const pops = new Set(ctx.rng('pops', 'section').pick([[], [6], [14], [6, 14], [10]]));
             steps.forEach((step, k) => {
                 const isLast = k === steps.length - 1;
                 let midi = root;
-                // Octave pops on the offbeat eighths at high energy (15%).
-                if (
-                    tier === 'high' &&
-                    step % 4 === 2 &&
-                    rng.chance(0.15) &&
-                    root + 12 <= BASS_SLOT_HI
-                ) {
+                // Octave pops at high energy, on offbeat eighths the section chose once, so
+                // the part repeats rather than flickering bar to bar.
+                if (tier === 'high' && pops.has(step % 16) && root + 12 <= BASS_SLOT_HI) {
                     midi = root + 12;
                 }
                 // Lead into a chord change with its last eighth (35% mid/high, 20% low).
@@ -107,6 +106,36 @@ export const rockBass: PitchedIdiom = {
         return { events, memory: { last } };
     },
 };
+
+/**
+ * An approach into `target` that neither repeats `avoid` (the note before it) nor is the
+ * target itself — so an approach always moves, and always resolves.
+ */
+function chooseApproach(
+    rng: Rng,
+    target: number,
+    chord: ChordFacts,
+    avoid: number | null,
+    near: number = avoid ?? target,
+): number {
+    for (let tries = 0; tries < 4; tries++) {
+        const kind = pickApproach(rng, true);
+        let note = approach(target, chord, kind);
+        // The fifth-above approach can come from below instead (a fourth under the target):
+        // take whichever octave sits nearer the line, so it never leaps an octave to get there.
+        if (kind === 'dominant') {
+            const under = target - 5;
+            if (under >= BASS.lo && Math.abs(under - near) < Math.abs(note - near)) {
+                note = under;
+            }
+        }
+        if (note !== avoid && note !== target) {
+            return note;
+        }
+    }
+    const below = approach(target, chord, 'chromatic-below');
+    return below !== avoid ? below : approach(target, chord, 'chromatic-above');
+}
 
 // ---------------------------------------------------------------- walking
 /**
@@ -149,35 +178,101 @@ export const walkingBass: PitchedIdiom = {
                 return;
             }
             const rng = ctx.rng(`walk${i}`);
-            const arrival = place(bassPc(chord), last);
-            const target = targetAfter(spans, i, next, arrival);
+            const rootPc = bassPc(chord);
+            const followingChord =
+                spans[i + 1]?.span.chord ?? (i === spans.length - 1 ? next : null);
             const chordPcs = new Set(chord.intervals.map((n) => mod12(chord.root + n)));
             const scalePcs = new Set(chord.scale.map((n) => mod12(chord.root + n)));
-            const line: number[] = [];
-            steps.forEach((_, k) => {
-                const prev = line[k - 1] ?? last;
-                if (k === 0 && span.attack) {
-                    // Arrive on the chord's bass; one time in ten on the 3rd for motion,
-                    // never under a slash chord (its bass note is the point).
-                    const third = chord.third;
-                    const useThird = chord.bass === chord.root && third !== null && rng.chance(0.1);
-                    line.push(useThird ? place(mod12(chord.root + third), prev) : arrival);
-                    return;
+
+            // 1. The arrival: the chord's bass. One time in ten the 3rd, for motion — but never
+            //    after an approach that pointed at the root (it must resolve), never at the
+            //    top of a section, and never under a slash chord (its bass note is the point).
+            let first: number;
+            if (span.attack || last === null) {
+                const arrival = place(rootPc, last);
+                const approached = last !== null && Math.abs(last - arrival) <= 2;
+                const third = chord.third;
+                const useThird =
+                    chord.bass === chord.root &&
+                    third !== null &&
+                    !approached &&
+                    bar.barInVisit > 0 &&
+                    rng.chance(0.1);
+                first = useThird ? place(mod12(chord.root + third), last) : arrival;
+            } else {
+                first = last;
+            }
+
+            // 2. Two-feel: root, then the fifth on 3 — with a quarter-note approach on 4
+            //    (35%) splitting the half note when a change follows.
+            if (twoFeel) {
+                const fifth = place(mod12(chord.root + (chord.fifth ?? 7)), first);
+                const notes: [number, number][] = [];
+                notes.push([steps[0], first]);
+                if (steps.length > 1) {
+                    notes.push([
+                        steps[1],
+                        fifth === first
+                            ? place(mod12(chord.root + (chord.third ?? 7)), first)
+                            : fifth,
+                    ]);
                 }
-                if (k === steps.length - 1 && target !== null && steps.length > 1) {
-                    line.push(approach(target, chord, pickApproach(rng, true)));
-                    return;
+                const tail = notes[notes.length - 1];
+                if (followingChord && to - tail[0] >= 8 && rng.chance(0.35)) {
+                    const target = place(bassPc(followingChord), tail[1]);
+                    notes.push([to - 4, chooseApproach(rng, target, chord, tail[1])]);
                 }
-                // Middle of the line: move toward where the approach will need to be.
-                const goal = target ?? arrival;
-                const from = prev ?? arrival;
-                const direction = Math.sign(goal - from) || (from > BASS.home ? -1 : 1);
-                const strong = steps[k] % 8 === 0;
+                notes.forEach(([step, midi], k) => {
+                    const length = (notes[k + 1]?.[0] ?? to) - step;
+                    events.push(
+                        bassNote(
+                            bar,
+                            step,
+                            midi,
+                            length * 0.92,
+                            dyn(k === 0 ? 96 : 86, plan.energy),
+                        ),
+                    );
+                });
+                last = notes[notes.length - 1][1];
+                return;
+            }
+
+            // 3. Four-feel: pick the approach into the next chord first (only on a note no
+            //    longer than a beat — a held note is never a passing tone), then walk the
+            //    middle toward it without repeating a pitch.
+            const line: number[] = [first];
+            const lastLength = to - steps[steps.length - 1];
+            let approachNote: number | null = null;
+            if (followingChord && steps.length > 1 && lastLength <= 4) {
+                const target = place(bassPc(followingChord), first);
+                approachNote = chooseApproach(
+                    rng,
+                    target,
+                    chord,
+                    steps.length === 2 ? first : null,
+                );
+            }
+            const middleCount = steps.length - 1 - (approachNote === null ? 0 : 1);
+            for (let k = 0; k < middleCount; k++) {
+                const prev = line[line.length - 1];
+                const goal = approachNote ?? first;
+                const isLastMiddle = k === middleCount - 1 && approachNote !== null;
+                const direction = Math.sign(goal - prev) || (prev > BASS.home ? -1 : 1);
+                const strong = steps[k + 1] % 8 === 0;
                 const options: [number, number][] = [];
                 for (let d = 1; d <= 5; d++) {
                     for (const sign of [direction, -direction]) {
-                        const m = from + sign * d;
-                        if (m < BASS.lo || m > BASS.hi) {
+                        const m = prev + sign * d;
+                        if (m < BASS.lo || m > BASS.hi || m === approachNote) {
+                            continue;
+                        }
+                        // The note before the approach sits a step or a third from it.
+                        if (
+                            isLastMiddle &&
+                            approachNote !== null &&
+                            Math.abs(m - approachNote) > 4
+                        ) {
                             continue;
                         }
                         const pc = mod12(m);
@@ -185,15 +280,28 @@ export const walkingBass: PitchedIdiom = {
                         if (!isChord && !scalePcs.has(pc)) {
                             continue;
                         }
-                        // Chord tones on strong beats; steps preferred over leaps; toward the goal.
+                        // Chord tones on strong beats; steps over leaps; toward the goal.
                         let w = (isChord ? (strong ? 3 : 1.6) : strong ? 0.5 : 1.4) / d;
                         w *= sign === direction ? 2 : 0.6;
                         options.push([m, w]);
                     }
                 }
-                line.push(options.length ? rng.weighted(options) : arrival);
-            });
+                const fallback = place(mod12(chord.root + (chord.fifth ?? 7)), prev);
+                line.push(
+                    options.length
+                        ? rng.weighted(options)
+                        : fallback === prev
+                          ? prev + (direction || 1) * 2
+                          : fallback,
+                );
+            }
+            if (approachNote !== null) {
+                line.push(approachNote);
+            }
             steps.forEach((step, k) => {
+                if (k >= line.length) {
+                    return;
+                }
                 const length = (steps[k + 1] ?? to) - step;
                 // Walking accents are even; the arrival beat is a touch stronger.
                 const velocity = k === 0 && span.attack ? 98 : step % 8 === 4 ? 90 : 86;
@@ -201,7 +309,7 @@ export const walkingBass: PitchedIdiom = {
                     bassNote(bar, step, line[k], length * 0.92, dyn(velocity, plan.energy)),
                 );
             });
-            last = line[line.length - 1];
+            last = line[Math.min(line.length, steps.length) - 1];
         });
         return { events, memory: { last } };
     },
@@ -260,7 +368,7 @@ export const funkBass: PitchedIdiom = {
             if (!chord) {
                 return;
             }
-            const root = place(bassPc(chord), last);
+            const root = sectionPlace(ctx, bassPc(chord));
             const codes = new Map<number, string>();
             for (let s = from; s < to; s++) {
                 const c = line[s] ?? '.';
@@ -339,24 +447,34 @@ export const bossaBass: PitchedIdiom = {
             if (!chord) {
                 return;
             }
-            const root = place(bassPc(chord), last);
+            const root = sectionPlace(ctx, bassPc(chord));
             // The fifth sits below the root when the root is high, so the line stays low.
-            const fifth =
-                root + (chord.fifth ?? 7) > BASS.hi
-                    ? root - (12 - (chord.fifth ?? 7))
-                    : root + (chord.fifth ?? 7);
+            const up = root + (chord.fifth ?? 7);
+            const fifth = up > BASS.hi ? up - 12 : up;
             const steps = grid.filter((s) => s >= from && s < to);
             if (span.attack && !steps.includes(from)) {
                 steps.unshift(from);
             }
-            const target = targetAfter(spans, i, next, root);
+            const following = spans[i + 1]?.span.chord ?? (i === spans.length - 1 ? next : null);
             const rng = ctx.rng(`bossa${i}`);
             steps.forEach((step, k) => {
                 const isArrival = k === 0 && span.attack;
-                let midi = isArrival || (step - from) % 8 === 0 ? root : fifth;
-                // The last pickup before a change can lead in chromatically (25%).
-                if (k === steps.length - 1 && !isArrival && target !== null && rng.chance(0.25)) {
-                    midi = approach(target, chord, 'chromatic-below');
+                const isLast = k === steps.length - 1;
+                // The figure is root, fifth, fifth, root: 1 (root), &2 (fifth), 3 (fifth
+                // again, unless a new chord arrives there), and the &4 pickup, which leads
+                // to the next bar's root — the chord it anticipates, or this root again.
+                let midi = isArrival ? root : fifth;
+                if (isLast && step === to - 2 && to === barSteps(bar) && !isArrival) {
+                    midi =
+                        following && following.bass !== chord.bass
+                            ? rng.chance(0.3)
+                                ? approach(
+                                      sectionPlace(ctx, bassPc(following)),
+                                      chord,
+                                      'chromatic-below',
+                                  )
+                                : sectionPlace(ctx, bassPc(following))
+                            : root;
                 }
                 const length = ((steps[k + 1] ?? to) - step) * 0.9;
                 const velocity = isArrival || step % 8 === 0 ? 96 : 78;

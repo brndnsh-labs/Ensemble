@@ -16,7 +16,7 @@ export interface BarPlan {
     lanes: Record<Lane, boolean>;
     /** The drummer's job at the end of this bar. */
     fill: Fill;
-    /** Crash (and lift) on this bar's downbeat: a new section, or after a fill. */
+    /** Crash on this bar's downbeat: a new section, or the downbeat after a phrase fill. */
     crash: boolean;
     /** The final bar of a performance that does not loop: play a held ending. */
     ending: boolean;
@@ -52,25 +52,47 @@ export function energyTier(energy: number): EnergyTier {
     return energy < 0.42 ? 'low' : energy < 0.7 ? 'mid' : 'high';
 }
 
+/** Which bars a pass plays, in order, and where it goes after the last one. */
+export interface PassWindow {
+    /** First bar index played. */
+    from: number;
+    /** One past the last bar index played. */
+    to: number;
+    /** The bar that follows the window when the performance loops (a practice loop wraps to
+     * its own start; a play-from-here pass wraps to the top of the song). */
+    wrapTo: number;
+}
+
+export function fullWindow(timeline: Timeline): PassWindow {
+    return { from: 0, to: timeline.bars.length, wrapTo: 0 };
+}
+
+/**
+ * Plans for the bars in `window`, indexed by bar index (bars outside it are absent).
+ * `next` is resolved in performance order, so a practice loop's last bar leads back to the
+ * loop's first bar rather than on to the next section.
+ */
 export function planBars(
     timeline: Timeline,
     settings: BandSettings,
-    { pass, looping }: { pass: number; looping: boolean },
+    { pass, looping, window }: { pass: number; looping: boolean; window: PassWindow },
 ): BarPlan[] {
     const { bars } = timeline;
     // A song that loops earns a little more each time round — capped, so the fourth chorus
     // is fuller than the first but the band never runs away from the player.
     const passLift = Math.min(pass, 3) * 0.03;
-    return bars.map((bar, i) => {
+    const plans: BarPlan[] = [];
+    for (let i = window.from; i < window.to; i++) {
+        const bar = bars[i];
+        const isLast = i === window.to - 1;
+        const next = isLast ? (looping ? bars[window.wrapTo] : null) : bars[i + 1];
         const section = sectionEnergy(bar);
         // A manual intensity sets the level; the form still shapes around it at half depth.
         let energy =
             settings.intensity === null
                 ? section
                 : settings.intensity + (section - DEFAULT_ENERGY) * 0.5;
-        const next = bars[i + 1] ?? (looping ? bars[0] : null);
         const visitEnd = bar.barInVisit === bar.visit.barCount - 1;
-        const lastPhrase = bar.phrase.index > 0 && bar.phrase.bar === bar.phrase.length - 1;
         // Build into a bigger section over the last bar before it.
         if (visitEnd && next && sectionEnergy(next) > section + 0.05) {
             energy += 0.06;
@@ -81,21 +103,24 @@ export function planBars(
         for (const lane of ['drums', 'bass', 'keys'] as const) {
             lanes[lane] = settings.lanes[lane] && bar.visit.lanes[lane] !== false;
         }
-        const ending = !looping && i === bars.length - 1;
+        const ending = !looping && isLast;
         let fill: Fill = 'none';
         if (!ending) {
-            if (visitEnd && !(next && bar.visit.seamless)) {
+            if ((visitEnd || (isLast && looping)) && !(next && bar.visit.seamless && !isLast)) {
+                // The end of a section — or of a practice loop's lap — gets the big fill.
                 fill = 'section';
-            } else if (
-                bar.phrase.bar === bar.phrase.length - 1 &&
-                (bar.phrase.index % 2 === 1 || lastPhrase)
-            ) {
+            } else if (bar.phrase.bar === bar.phrase.length - 1 && bar.phrase.index % 2 === 1) {
+                // Every other phrase ends with a small one (bars 8, 16…), not every phrase.
                 fill = 'phrase';
             }
         }
-        const prev = bars[i - 1] ?? (looping && pass > 0 ? bars[bars.length - 1] : null);
-        const crash =
-            (bar.barInVisit === 0 && (i > 0 || pass > 0) && !bar.visit.seamless) || ending;
-        return { energy, lanes, fill, crash: crash && prev !== null, ending };
-    });
+        const first = i === window.from && pass === 0;
+        const prevPlan = plans[i - 1];
+        const arrival = bar.barInVisit === 0 && !bar.visit.seamless && !first;
+        // A crash marks an arrival: a new section, or the downbeat after a phrase fill once
+        // the band is past quiet energy.
+        const afterFill = prevPlan?.fill === 'phrase' && energy >= 0.5;
+        plans[i] = { energy, lanes, fill, crash: arrival || afterFill || ending, ending };
+    }
+    return plans;
 }

@@ -122,15 +122,31 @@ export function toMidi(
             lane.out.push({ tick: 0, order: 0, data: [0xc0 | lane.channel, lane.program] });
         }
     }
-    for (const e of events) {
-        const lane = lanes[e.lane];
-        const start = Math.max(0, e.tick + msToTicks(e.offsetMs));
-        const note = e.lane === 'drums' ? GM_DRUMS[e.piece] : e.midi;
+    // Onsets first (with micro-timing baked in), so each note can end no later than the next
+    // strike of the same pitch in its lane — humanize can pull a re-strike ahead of the
+    // written end, and a late note-off would otherwise cut the new note short.
+    const notes = events
+        .map((e) => ({
+            e,
+            start: Math.max(0, e.tick + msToTicks(e.offsetMs)),
+            note: e.lane === 'drums' ? GM_DRUMS[e.piece] : e.midi,
+        }))
+        .sort((a, b) => a.start - b.start);
+    const nextStrike = new Map<string, number>();
+    const ends: number[] = [];
+    for (let i = notes.length - 1; i >= 0; i--) {
+        const { e, start, note } = notes[i];
+        const key = `${e.lane}:${note}`;
         const length = e.lane === 'drums' ? DRUM_LENGTH : Math.max(1, e.dur);
+        ends[i] = Math.max(start + 1, Math.min(start + length, nextStrike.get(key) ?? Infinity));
+        nextStrike.set(key, start);
+    }
+    notes.forEach(({ e, start, note }, i) => {
+        const lane = lanes[e.lane];
         lane.out.push({ tick: start, order: 2, data: [0x90 | lane.channel, note, e.velocity] });
         // Note-offs sort before note-ons at the same tick, so a re-strike is never swallowed.
-        lane.out.push({ tick: start + length, order: 1, data: [0x80 | lane.channel, note, 0] });
-    }
+        lane.out.push({ tick: ends[i], order: 1, data: [0x80 | lane.channel, note, 0] });
+    });
     const chunks = [
         header(3 + 1),
         track(conductor),

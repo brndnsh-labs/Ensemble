@@ -27,14 +27,14 @@ interface Take {
     events: BandEvent[];
 }
 
-function perform(style: StyleId): Take[] {
+function perform(style: StyleId, intensity: number | null = null): Take[] {
     const takes: Take[] = [];
     for (const chart of CHARTS) {
         const timeline = compileTimeline(FIXTURES[chart]);
         for (const seed of SEEDS) {
             let memory: PassMemory | undefined;
             for (let pass = 0; pass < 2; pass++) {
-                const settings = { ...DEFAULT_SETTINGS, style, seed, swing: 0 };
+                const settings = { ...DEFAULT_SETTINGS, style, seed, swing: 0, intensity };
                 const result = performPass(timeline, settings, { pass, looping: true, memory });
                 memory = result.memory;
                 takes.push({ timeline, events: result.events });
@@ -201,20 +201,55 @@ const METRICS: Record<string, Metric> = {
         return ratio(notes, beats);
     },
     /** Of the notes one beat before a chord change, the share a half step from the arrival. */
+    /** At each real chord change, the share where the note before is a half step from the arrival. */
     bassChromaticApproach: (takes) => {
         let n = 0;
         let hit = 0;
-        for (const { events } of takes) {
-            const bass = events.filter((e): e is PitchedNote => e.lane === 'bass');
-            for (let i = 1; i < bass.length; i++) {
-                const prev = bass[i - 1];
-                const arrival = bass[i];
-                const changes = arrival.tick % 480 === 0 && prev.tick >= arrival.tick - 480;
-                if (!changes || prev.midi === arrival.midi) {
+        for (const { timeline: t, events } of takes) {
+            const bass = events.filter((e): e is PitchedNote => e.lane === 'bass' && !e.muted);
+            for (const [k, span] of t.spans.entries()) {
+                const before = t.spans[k - 1]?.chord;
+                if (!span.chord || !before || before.bass === span.chord.bass) {
+                    continue;
+                }
+                const i = bass.findIndex((e) => Math.abs(e.tick - span.start) < 1);
+                if (i < 1) {
                     continue;
                 }
                 n++;
-                hit += Math.abs(arrival.midi - prev.midi) === 1 ? 1 : 0;
+                hit += Math.abs(bass[i].midi - bass[i - 1].midi) === 1 ? 1 : 0;
+            }
+        }
+        return ratio(hit, n);
+    },
+    /** Share of consecutive bass notes that repeat a pitch (a walking line keeps moving). */
+    bassRepeatedNotes: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { events } of takes) {
+            const bass = events.filter((e): e is PitchedNote => e.lane === 'bass' && !e.muted);
+            for (let i = 1; i < bass.length; i++) {
+                n++;
+                hit += bass[i].midi === bass[i - 1].midi ? 1 : 0;
+            }
+        }
+        return ratio(hit, n);
+    },
+    /** Share of bass notes lasting two beats or more that are chord tones (no held passing tones). */
+    bassHeldNotesAreChordTones: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { timeline: t, events } of takes) {
+            for (const e of events) {
+                if (e.lane !== 'bass' || e.dur < 800) {
+                    continue;
+                }
+                const chord = t.spans.find((s) => s.start <= e.tick && e.tick < s.end)?.chord;
+                if (!chord) {
+                    continue;
+                }
+                n++;
+                hit += chord.intervals.some((i) => mod12(chord.root + i) === mod12(e.midi)) ? 1 : 0;
             }
         }
         return ratio(hit, n);
@@ -356,7 +391,8 @@ const CLAIMS: Record<StyleId, Claim[]> = {
         ['hatPedal24', 0.9, 1, 'hi-hat foot on 2 and 4'],
         ['bassNotesPerBeat', 0.85, 1.05, 'a walking line: one note per beat'],
         ['bassArrivesOnBass', 0.75, 1, 'the walk lands on the chord (a 3rd now and then)'],
-        ['bassChromaticApproach', 0.25, 0.8, 'half-step approaches lead into changes'],
+        ['bassChromaticApproach', 0.3, 0.8, 'half-step approaches lead into changes'],
+        ['bassRepeatedNotes', 0, 0.02, 'the walk keeps moving: no repeated pitches'],
         ['bassMeanLeap', 1.5, 4.5, 'mostly stepwise, not arpeggio leaps'],
         ['keysOffbeatShare', 0.4, 1, 'comping pushes on the "and"s'],
         ['keysColour', 0.6, 1, 'rootless voicings carry 9ths and 13ths'],
@@ -381,6 +417,28 @@ const CLAIMS: Record<StyleId, Claim[]> = {
         ['keysTopVoiceMotion', 0, 3.5, 'smooth voice leading'],
     ],
 };
+
+// A second jazz take at low energy, where the walk relaxes into a two-feel.
+const LOW_CLAIMS: Partial<Record<StyleId, Claim[]>> = {
+    jazz: [
+        ['bassNotesPerBeat', 0.45, 0.75, 'two-feel: half notes, with an occasional approach on 4'],
+        [
+            'bassHeldNotesAreChordTones',
+            0.97,
+            1,
+            'a held half note is a chord tone, never a passing tone',
+        ],
+    ],
+};
+
+describe.each(Object.keys(LOW_CLAIMS) as StyleId[])('%s critique at low energy', (style) => {
+    const takes = perform(style, 0.2);
+    it.each(LOW_CLAIMS[style] ?? [])('%s in [%d, %d] — %s', (metric, min, max) => {
+        const value = METRICS[metric](takes);
+        expect(value, `${style} ${metric} = ${value.toFixed(3)}`).toBeGreaterThanOrEqual(min);
+        expect(value, `${style} ${metric} = ${value.toFixed(3)}`).toBeLessThanOrEqual(max);
+    });
+});
 
 describe.each(Object.keys(CLAIMS) as StyleId[])('%s critique', (style) => {
     const takes = perform(style);

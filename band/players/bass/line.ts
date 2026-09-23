@@ -22,6 +22,15 @@ export function place(pc: number, prev: number | null): number {
     return nearestMidi(pc, Math.round(anchor), BASS.lo, BASS.hi);
 }
 
+/**
+ * Place a root for an ostinato line (rock, funk, bossa): in one register for the whole
+ * section, so a riff keeps its octave from bar to bar instead of drifting with the last note.
+ */
+export function sectionPlace(ctx: BarContext, pc: number): number {
+    const anchor = BASS.home - 2 + ctx.rng('register', 'section').int(5);
+    return nearestMidi(pc, anchor, BASS.lo, BASS.hi);
+}
+
 export type ApproachKind = 'chromatic-below' | 'chromatic-above' | 'dominant' | 'scale';
 
 /**

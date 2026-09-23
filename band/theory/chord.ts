@@ -42,6 +42,12 @@ export interface ChordFacts {
     tensions: number[];
     /** The chord scale for passing tones and approaches, semitones above the root (< 12). */
     scale: number[];
+    /**
+     * Tensions the harmony implies but the chart doesn't write, for voicings to prefer over
+     * the natural ones — a dominant resolving to a minor chord takes b9 and b13 (see
+     * `timeline.ts`).
+     */
+    implied?: { ninth: number; thirteenth: number };
 }
 
 // Degree spellings → semitones above the root.
@@ -261,12 +267,17 @@ function chordScale(
 ) {
     const pcs = new Set(intervals.map(mod12));
     const has = (n: number) => pcs.has(n);
+    const degree = mod12(root - key.tonic);
     switch (d.family) {
-        case 'major':
+        case 'major': {
             if (d.fifth === 8) {
                 return [0, 2, 4, 6, 8, 9, 11]; // lydian augmented
             }
-            return has(6) ? [0, 2, 4, 6, 7, 9, 11] : [0, 2, 4, 5, 7, 9, 11];
+            // IV in a major key and bVI in a minor key are lydian: the natural 4 over them
+            // would contradict the key's own leading tone or tonic.
+            const lydian = has(6) || degree === (key.minor ? 8 : 5);
+            return lydian ? [0, 2, 4, 6, 7, 9, 11] : [0, 2, 4, 5, 7, 9, 11];
+        }
         case 'dominant':
             if (d.third === null) {
                 // Sus: mixolydian without the 3rd, taking any written b9/b13 (7b9sus = phrygian).
@@ -295,7 +306,15 @@ function chordScale(
             if (d.seventh === 11) {
                 return [0, 2, 3, 5, 7, 9, 11]; // melodic minor
             }
-            if (has(8) || (d.seventh === null && !d.sixth && key.minor && root === key.tonic)) {
+            if (d.sixth) {
+                return [0, 2, 3, 5, 7, 9, 10]; // a written 6th is dorian's
+            }
+            // The key decides the mode: iii is phrygian and vi aeolian in major; i, v are
+            // aeolian in minor. ii (major) and iv (minor) — and anything chromatic — dorian.
+            if (degree === (key.minor ? -1 : 4)) {
+                return [0, 1, 3, 5, 7, 8, 10]; // phrygian
+            }
+            if (has(8) || (key.minor ? degree === 0 || degree === 7 : degree === 9)) {
                 return [0, 2, 3, 5, 7, 8, 10]; // aeolian
             }
             return [0, 2, 3, 5, 7, 9, 10]; // dorian
