@@ -814,21 +814,21 @@ export function transpose(delta: number): void {
 /**
  * The song's own major/minor (#1375) — `score.isMinor` only, never a section or bar override.
  * Chord names are not rewritten, and the key stays where it is: unlike v1's relative-key toggle,
- * v2's key is the score's own, so a musician who wants A minor picks A, then Minor.
+ * v2's key is the score's own, so a musician who wants A minor picks A, then Minor. Measure-based
+ * charts only, like the Edit panel's Song meter that sits beside it.
  */
 export function setMode(isMinor: boolean): void {
-    if (currentScore) {
-        if (currentScore.isMinor === isMinor) {
-            return;
-        }
-        const wasPlaying = getState().playback.isPlaying;
-        editScore({ ...clone(currentScore), isMinor });
-        if (wasPlaying) {
-            dispatch(ACTIONS.TOGGLE_PLAY);
-        }
+    if (!currentScore) {
+        throw new Error('Open a measure-based chart first.');
+    }
+    if (currentScore.isMinor === isMinor) {
         return;
     }
-    dispatch(ACTIONS.SET_IS_MINOR, isMinor);
+    const wasPlaying = getState().playback.isPlaying;
+    editScore({ ...clone(currentScore), isMinor });
+    if (wasPlaying) {
+        dispatch(ACTIONS.TOGGLE_PLAY);
+    }
 }
 export function editScore(score: SemanticScore): void {
     prepareScorePlayback(score);

@@ -21,6 +21,8 @@ interface EditPanelProps {
     onTitle: (title: string) => void;
     /** The song's own meter (`score.meter`), not a bar's "Meter from this bar" override. */
     onSongMeter: (meter: string) => void;
+    /** The song's own major/minor (`score.isMinor`, #1375), never a section or bar override. */
+    onSongMode: (isMinor: boolean) => void;
     onSelectMeasure: (id: string) => void;
     onPendingChange: (pending: boolean) => void;
     onApply: (score: SemanticScore) => void;
@@ -49,6 +51,7 @@ export function EditPanel({
     text,
     onTitle,
     onSongMeter,
+    onSongMode,
     onSelectMeasure,
     onPendingChange,
     onApply,
@@ -103,6 +106,22 @@ export function EditPanel({
                     <p className="preview-note">
                         Chords keep their share of each bar. A section or bar with its own meter
                         keeps it.
+                    </p>
+                    <label className="panel-label" htmlFor="song-mode">
+                        Song mode
+                    </label>
+                    <select
+                        id="song-mode"
+                        disabled={busy}
+                        value={current.chart.score.isMinor ? 'minor' : 'major'}
+                        onChange={(e) => onSongMode(e.target.value === 'minor')}
+                    >
+                        <option value="major">Major</option>
+                        <option value="minor">Minor</option>
+                    </select>
+                    <p className="preview-note">
+                        Chord names stay as written, and so does the key: for A minor, pick A, then
+                        Minor. A section or bar with its own mode keeps it.
                     </p>
                     <MeasureEditor
                         key={current.id}

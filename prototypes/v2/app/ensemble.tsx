@@ -3361,20 +3361,15 @@ export default function Ensemble() {
                         }}
                         onFeel={() => setFeelMenu(true)}
                         onTempo={(value) => change(() => runtime.setTempo(value))}
-                        onKey={(key, isMinor) =>
-                            change(() => {
-                                // One run for both halves: a second `change()` would be dropped
-                                // while the first is still working.
-                                const from = arrangementOf(current);
-                                if (key !== from.key) {
+                        onKey={(key) =>
+                            change(
+                                () =>
                                     runtime.transpose(
-                                        KEY_ORDER.indexOf(key) - KEY_ORDER.indexOf(from.key),
-                                    );
-                                }
-                                if (isMinor !== from.isMinor) {
-                                    runtime.setMode(isMinor);
-                                }
-                            }, true)
+                                        KEY_ORDER.indexOf(key) -
+                                            KEY_ORDER.indexOf(arrangementOf(current).key),
+                                    ),
+                                true,
+                            )
                         }
                         onGenre={(genre) =>
                             change(() => runtime.setGenre(genre, setSoundProgress), true)
@@ -3531,6 +3526,7 @@ export default function Ensemble() {
                             text={text}
                             onTitle={(title) => draft({ ...current, title })}
                             onSongMeter={changeSongMeter}
+                            onSongMode={(isMinor) => change(() => runtime.setMode(isMinor), true)}
                             onSelectMeasure={setMeasureId}
                             onPendingChange={(pending) => {
                                 pendingText.current = pending;
