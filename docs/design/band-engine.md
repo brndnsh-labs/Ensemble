@@ -81,16 +81,23 @@ schedules everything due in the next 150 ms on a 25 ms timer.
 - **Tempo** re-anchors the clock.
 - **Style, intensity, lanes, swing and humanize** regenerate the pass from the next barline.
 - **A staged genre** is committed at once.
-- **The chart pointer** follows `songTick()` into `arranger.stepMap`.
+- **The chart pointer** follows `songTick()` to the written event under it (`slotAt`).
 
 A pass is generated on the main thread (about 5–7 ms for 32 bars on a desktop), two seconds
 before it is needed.
 
+**The chart sheet** draws a score from the score and its timeline (`prototypes/v2/lib/band-chart.ts`),
+not from the old engine's plan, so any chart the timeline compiles opens, edits and plays:
+holds show as `/`, N.C. as `N.C.`, a fermata sits over its chord, and off-grid lengths keep
+their exact widths. The old engine is given no plan for such a score, so its `arranger` maps
+derive empty and its worker idles. Every path that lets a chart onto the stand (open, edit,
+import, the guided form) asks `checkPlayable` in `lib/engine-mode.ts`: on the band engine
+that is `validateSemanticScore` plus `compileTimeline`, and on the old engine it is still
+`prepareScorePlayback`. A measure-less (v1) chart is still drawn from the old maps.
+
 Not yet on the host:
 - audio (WAV) export (MIDI export is)
 - hiding the soloist/harmony controls
-- charts the old adapter still rejects at load, because the chart sheet still draws from the
-  old `arranger` maps
 
 Genres outside v0 play their nearest v0 style (`STYLE_FOR_GENRE` in `runtime.ts`).
 

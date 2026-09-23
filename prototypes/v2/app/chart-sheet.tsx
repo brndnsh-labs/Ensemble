@@ -1,9 +1,8 @@
-import type { LeadSheetMeasure, LeadSheetSectionBlock } from '@engine/song/lead-sheet-model';
 import type { SemanticScore } from '@engine/songbook/score-types';
 import type { ChartNotation } from '@engine/songbook/types';
-import type { EnsembleState } from '@engine/types';
 import { useRef } from 'react';
 import { arrangementOf } from '../lib/documents';
+import type { ChartBlock, ChartChord, ChartMeasure } from '../lib/lead-sheet';
 import type { ChartDocument } from '../lib/runtime';
 import { directionLabel } from '../lib/score-labels';
 
@@ -17,7 +16,7 @@ type WrittenBar = WrittenSection['measures'][number];
  * same shared field `ChordVisualizer.tsx` reads in v1 — so switching notation is a
  * pure read-time choice, never a re-analysis of the chord.
  */
-function chordSymbol(chord: LeadSheetMeasure['chords'][number], notation: ChartNotation): string {
+function chordSymbol(chord: ChartChord, notation: ChartNotation): string {
     const disp = chord.display?.[notation];
     if (!disp) {
         return chord.absName;
@@ -25,12 +24,36 @@ function chordSymbol(chord: LeadSheetMeasure['chords'][number], notation: ChartN
     return `${disp.root}${disp.suffix}${disp.bass ? `/${disp.bass}` : ''}`;
 }
 
+/**
+ * How a written event reads on the stand. A hold is the slash the bar editor takes for it (the
+ * chord before it rings on), N.C. is printed as charts print it, and a fermata sits over the
+ * symbol it holds. Only the band engine can open charts with these (`lib/band-chart.ts`).
+ */
+function eventText(chord: ChartChord, notation: ChartNotation): string {
+    return chord.kind === 'hold'
+        ? '/'
+        : chord.kind === 'no-chord'
+          ? 'N.C.'
+          : chordSymbol(chord, notation);
+}
+
+function eventLabel(chord: ChartChord): string {
+    const what =
+        chord.kind === 'hold'
+            ? 'Hold the chord before'
+            : chord.kind === 'no-chord'
+              ? 'No chord'
+              : `Audition ${chord.absName}`;
+    return chord.fermata ? `${what}, with a fermata` : what;
+}
+
 interface ChartSheetProps {
     current: ChartDocument;
-    blocks: LeadSheetSectionBlock[];
+    blocks: ChartBlock[];
     /** Display index of the sounding chord, or null while stopped. */
     displayActive: number | null;
-    activeEvent: EnsembleState['arranger']['stepMap'][number] | null;
+    /** The performed event under the playhead, in steps. */
+    activeEvent: { start: number; end: number } | null;
     writtenBars: Map<string, WrittenBar>;
     writtenSections: Map<string, WrittenSection>;
     loopedSectionId: string | null;
@@ -40,8 +63,8 @@ interface ChartSheetProps {
     playbackActive: boolean;
     totalBars: number;
     onToggleLoop: (sectionId: string | undefined) => void;
-    onEditSection: (block: LeadSheetSectionBlock) => void;
-    onEditBar: (measure: LeadSheetMeasure) => void;
+    onEditSection: (block: ChartBlock) => void;
+    onEditBar: (measure: ChartMeasure) => void;
     onAudition: (globalIndex: number) => void;
 }
 
@@ -304,7 +327,7 @@ export function ChartSheet({
                                         .filter((_, index) => !measureRepeat || index === 0)
                                         .map((c) => (
                                             <button
-                                                className="chord chord-button"
+                                                className={`chord chord-button${c.kind && c.kind !== 'chord' ? ` ${c.kind}` : ''}${c.fermata ? ' has-fermata' : ''}`}
                                                 aria-current={
                                                     (
                                                         measureRepeat
@@ -350,11 +373,17 @@ export function ChartSheet({
                                                         : undefined
                                                 }
                                                 key={c.globalIndex}
-                                                disabled={playing || busy || c.globalIndex < 0}
+                                                disabled={
+                                                    playing ||
+                                                    busy ||
+                                                    c.globalIndex < 0 ||
+                                                    // A hold or N.C. has no chord of its own to audition.
+                                                    (!!c.kind && c.kind !== 'chord')
+                                                }
                                                 aria-label={
                                                     measureRepeat
                                                         ? `Repeated bar: ${measure.chords.map((event) => event.absName).join(', ')}`
-                                                        : `Audition ${c.absName}`
+                                                        : eventLabel(c)
                                                 }
                                                 title={
                                                     measureRepeat
@@ -365,13 +394,18 @@ export function ChartSheet({
                                                 }
                                                 onClick={() => onAudition(c.globalIndex)}
                                             >
+                                                {c.fermata && !measureRepeat && (
+                                                    <span className="fermata" aria-hidden="true">
+                                                        𝄐
+                                                    </span>
+                                                )}
                                                 {measureRepeat
                                                     ? measureRepeat.display === 'one-bar'
                                                         ? '%'
                                                         : measureRepeat.display === 'two-bar-start'
                                                           ? '𝄎 1'
                                                           : '𝄎 2'
-                                                    : chordSymbol(c, notation)}
+                                                    : eventText(c, notation)}
                                             </button>
                                         ))}
                                     {notes

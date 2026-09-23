@@ -2195,6 +2195,33 @@ dialog textarea {
     text-decoration-thickness: 2px;
     text-underline-offset: 5px;
 }
+/* A hold's slash and N.C. are read, not played: quieter than a chord, and never auditioned. */
+.chord-button.hold,
+.chord-button.no-chord {
+    color: var(--muted);
+}
+.chord-button.no-chord {
+    font-size: 0.7em;
+    letter-spacing: 0;
+}
+.chord-button.hold[aria-current="true"],
+.chord-button.no-chord[aria-current="true"] {
+    color: var(--accent);
+}
+/* The fermata sits over the symbol it holds, as it is printed on a chart. */
+.chord-button.has-fermata {
+    position: relative;
+}
+.fermata {
+    position: absolute;
+    top: -0.55em;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: "Noto Music", Bravura, "Segoe UI Symbol", "Apple Symbols", serif;
+    font-size: 0.6em;
+    line-height: 1;
+    letter-spacing: 0;
+}
 .section-edit {
     font-size: 11px;
     color: var(--accent);

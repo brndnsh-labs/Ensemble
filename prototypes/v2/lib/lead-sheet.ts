@@ -3,7 +3,44 @@ import type {
     LeadSheetSectionBlock,
 } from '../../../public/song/lead-sheet-model';
 import type { SemanticScore } from '../../../public/songbook/score-types';
-import type { ArrangerState } from '../../../public/types';
+import type { ArrangerState, FormattedChordNames } from '../../../public/types';
+
+/**
+ * What the chart sheet draws for one written event. The old engine's `LeadSheetChord` satisfies
+ * it as-is; the band engine's display (`band-chart.ts`) builds it from the score and timeline
+ * without pretending to be an old-engine `Chord` (no voicing, no step-grid parse).
+ */
+export interface ChartChord {
+    /** Display identity, and what a tap auditions. Negative = a bar the form never reaches. */
+    globalIndex: number;
+    /** Sixteenth steps (fractional for off-grid lengths); the width is `end - start`. */
+    start: number;
+    end: number;
+    measureId?: string;
+    sectionId?: string;
+    key: string;
+    keyIsMinor?: boolean;
+    timeSignature: string;
+    absName: string;
+    display?: FormattedChordNames;
+    /** Absent on the old engine, which can only ever show chords. */
+    kind?: 'chord' | 'hold' | 'no-chord';
+    fermata?: boolean;
+}
+
+export interface ChartMeasure {
+    chords: ChartChord[];
+    sectionId?: string;
+    sectionLabel?: string;
+    startsSection: boolean;
+    isSeamlessStart: boolean;
+}
+
+export interface ChartBlock {
+    id?: string;
+    label?: string;
+    measures: ChartMeasure[];
+}
 
 /** Written order stays stable; chord lengths/voicings come from the exact performed map. */
 export function scoreLeadSheet(
@@ -57,9 +94,20 @@ export function scoreLeadSheet(
             });
         }
     }
+    return writtenBlocks(score, (id) => firstVisits.get(id) ?? unplayed.get(id));
+}
+
+/**
+ * Lay the written bars out in written order, one block per section (a seamless section joins
+ * the block before it). Shared by both engines' displays.
+ */
+export function writtenBlocks<M extends ChartMeasure>(
+    score: SemanticScore,
+    measureOf: (barId: string) => M | undefined,
+): { id: string; label: string; measures: M[] }[] {
     // Do not order the page by first encounter: an authored ending can serve passes
     // 2 and 3 while the physically later branch serves pass 1.
-    const blocks: LeadSheetSectionBlock[] = [];
+    const blocks: { id: string; label: string; measures: M[] }[] = [];
     for (const section of score.sections) {
         const block = (section.seamless && blocks.at(-1)) || {
             id: section.id,
@@ -70,7 +118,7 @@ export function scoreLeadSheet(
             blocks.push(block);
         }
         for (const [index, bar] of section.measures.entries()) {
-            const visit = firstVisits.get(bar.id) ?? unplayed.get(bar.id);
+            const visit = measureOf(bar.id);
             if (!visit) {
                 throw new Error('The written chart contains an unreachable measure.');
             }
