@@ -158,7 +158,12 @@ Global Key transposes the entire score. Song meter (Edit panel) sets the song's 
 equal-length bars re-divide, a section or bar with its own meter keeps it, and a bar whose
 written lengths cannot follow blocks the change and is opened for you — nothing is rounded.
 Add bar appends to the selected section; Add section
-starts in the global key/meter. Save includes pending measures even with the editor hidden.
+starts in the global key/meter. **− Bar** removes the selected bar (a key/meter change it wrote
+passes to the next bar, so the rest of the section sounds the same; a section's only bar takes
+the section with it) and **− Section** removes the section holding it (#1373). Both refuse,
+changing nothing, when it would remove the chart's last bar or section, music another bar
+repeats, half of a two-bar repeat, or a bar carrying repeat/navigation marks — remove the marks
+or the whole section instead. Save includes pending measures even with the editor hidden.
 
 Under **Repeats and endings**, select an existing bar range with two clicks/taps or Tab and
 Enter (or use From/Through), then **Repeat these bars** and choose the total plays, default 2.
