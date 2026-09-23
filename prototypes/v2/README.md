@@ -46,10 +46,12 @@ npm run build --prefix prototypes/v2
 npm run test:e2e --prefix prototypes/v2
 ```
 
-Those three commands build and check the `/v2` release. `ENSEMBLE_V2_BASE` moves the whole app
-to another base in one value (#1354) — `ENSEMBLE_V2_BASE=/` builds and tests the site-root
-variant the phase-5 cutover will ship, and `scripts/serve.mjs`, the Playwright fixtures and the
-generated service worker all follow it. It is unset in every deployment path today.
+Those three commands build and check the app at the default `/v2` base. `ENSEMBLE_V2_BASE`
+moves the whole app to another base in one value (#1354), and `scripts/serve.mjs`, the
+Playwright fixtures and the generated service worker all follow it. The site is the
+`ENSEMBLE_V2_BASE=/` build, and CI's `v2-suite` builds and tests exactly that (#1400) — set it
+on both the build and the test command to reproduce CI, including the root-only
+`root-handover.chromium.spec.ts`, which skips at `/v2`.
 
 For UI development, `npm run dev --prefix prototypes/v2`, then visit `http://localhost:3100/v2/`.
 Sound-pack assets and their integrity index are assembled by the build script: use the built
@@ -274,9 +276,9 @@ a tag, verified through the host's public `/build.json` (`sourceRevision` = the 
 - **Rollback** — release the previous tag (`../../hosting/README.md`), or `git revert` → PR.
 
 `/v2/*` is an edge redirect to the same path at the root, except `/v2/sw.js`, which is a real
-file that forwards the beta's windows (#1355). The default build base is still `/v2` — that is
-what `v2-suite` tests; `.github/workflows/v2-root-base.yml` and `web-image` prove the shipped
-`/` build.
+file that forwards the beta's windows (#1355). The default build base is still `/v2`, but CI's
+`v2-suite` builds and tests the shipped `/` build (#1400); `.github/workflows/v2-root-image.yml`
+smoke-tests its image on a PR and `web-image` after the merge.
 
 Compatibility caveat: manual-only preview builds before Follow feel support reject documents
 with `autoSound: true`. Do not roll a browser's songbook back to those builds after saving Follow
