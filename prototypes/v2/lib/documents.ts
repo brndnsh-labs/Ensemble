@@ -270,7 +270,8 @@ export type SectionChange =
     | { repeat: number }
     | { key: string | null }
     | { isMinor: boolean | null }
-    | { meter: string | null };
+    | { meter: string | null }
+    | { grouping: number[] | null };
 
 export type SectionChangeResult =
     | { kind: 'ok'; score: SemanticScore }
@@ -318,6 +319,13 @@ export function withSectionSettings(
             delete section.key;
         } else {
             section.key = change.key;
+        }
+    } else if ('grouping' in change) {
+        // Offered only from `groupingsFor` the section's meter; the codec re-checks the sum.
+        if (change.grouping === null) {
+            delete section.grouping;
+        } else {
+            section.grouping = [...change.grouping];
         }
     } else if (change.isMinor === null) {
         delete section.isMinor;

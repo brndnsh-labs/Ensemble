@@ -294,3 +294,37 @@ test('semantic revision conflicts keep both takes, and unsupported imports never
     expect(await documents(second)).toEqual(beforeImport);
     await expect(second.locator('.bar').first().locator('.chord')).toHaveText(['F', 'G7']);
 });
+
+test('a 5/4 bar takes a 2+3 grouping, Save keeps it, and a meter change clears it (#1376)', async ({
+    page,
+}) => {
+    await page.goto(appUrl());
+    await page.getByRole('button', { name: '＋ New song', exact: true }).click();
+    await editorRevealed(page);
+    await page.getByText('Key or meter change', { exact: true }).click();
+    // 4/4 has one natural grouping, so there is nothing to choose.
+    await expect(page.getByLabel('Beat grouping from this bar')).toHaveCount(0);
+
+    await page.getByLabel('Song meter').selectOption('5/4');
+    const grouping = page.getByLabel('Beat grouping from this bar');
+    await expect(grouping.locator('option')).toHaveText(['Continue (3+2)', '3+2', '2+3']);
+    await grouping.selectOption('2+3');
+    await page.getByRole('button', { name: 'Update chart', exact: true }).click();
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
+    const saved = (await documents(page)).find((document) => document.schemaVersion === 2);
+    if (saved?.schemaVersion !== 2) {
+        throw new Error('Expected semantic document');
+    }
+    expect(saved.chart.score.sections[0].measures[0].grouping).toEqual([2, 3]);
+
+    // The existing rule: a meter change resets a grouping written for the old meter.
+    await page.getByLabel('Song meter').selectOption('4/4');
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
+    const resaved = (await documents(page)).find((document) => document.id === saved.id);
+    if (resaved?.schemaVersion !== 2) {
+        throw new Error('Expected semantic document');
+    }
+    expect(resaved.chart.score.sections[0].measures[0]).not.toHaveProperty('grouping');
+});

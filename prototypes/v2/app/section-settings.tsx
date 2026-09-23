@@ -3,6 +3,7 @@ import { resolveScoreContext } from '@engine/songbook/score-context';
 import type { ScoreSection, SemanticScore } from '@engine/songbook/score-types';
 import { useState } from 'react';
 import { SECTION_NAME_MAX, type SectionChange } from '../lib/documents';
+import { defaultGrouping, groupingsFor, groupingText, parseGrouping } from '../lib/grouping';
 
 const KEYS = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
 
@@ -59,6 +60,20 @@ export function SectionSettings({ score, section, disabled, onChange }: SectionS
 
 function SectionSelects({ score, section, disabled, onChange }: SectionSettingsProps) {
     const song = resolveScoreContext(score, {});
+    const effective = resolveScoreContext(score, section);
+    // #1376 — the section's beat grouping, where its meter has more than one idiomatic split.
+    // "Song's" is what the section inherits: the song's grouping, unless the section writes its
+    // own meter, which resets grouping to that meter's default.
+    const groupings = groupingsFor(effective.meter);
+    if (
+        groupings.length &&
+        section.grouping &&
+        !groupings.some((g) => groupingText(g) === groupingText(section.grouping ?? []))
+    ) {
+        groupings.push(section.grouping);
+    }
+    const inheritedGrouping =
+        (section.meter === undefined ? song.grouping : null) ?? defaultGrouping(effective.meter);
     const meters = [...new Set([...Object.keys(TIME_SIGNATURES), section.meter ?? song.meter])];
     const keys = [...new Set([...KEYS, section.key ?? song.key])];
     return (
@@ -105,6 +120,27 @@ function SectionSelects({ score, section, disabled, onChange }: SectionSettingsP
                     ))}
                 </select>
             </label>
+            {groupings.length > 0 && (
+                <label>
+                    Section beat grouping
+                    <select
+                        value={section.grouping ? groupingText(section.grouping) : ''}
+                        disabled={disabled}
+                        onChange={(event) =>
+                            onChange({
+                                grouping: event.target.value
+                                    ? parseGrouping(event.target.value)
+                                    : null,
+                            })
+                        }
+                    >
+                        <option value="">Song's ({groupingText(inheritedGrouping ?? [])})</option>
+                        {groupings.map((grouping) => (
+                            <option key={groupingText(grouping)}>{groupingText(grouping)}</option>
+                        ))}
+                    </select>
+                </label>
+            )}
         </>
     );
 }
