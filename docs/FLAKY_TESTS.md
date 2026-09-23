@@ -26,6 +26,15 @@ flake (measure its fail-rate, classify it, and append an entry here).
 
 ## Registry
 
+### 🟢 `prototypes/v2/checks/semantic-chart.spec.ts` — "semantic revision conflicts keep both takes, and unsupported imports never create a partial song"
+
+- **Class:** e2e-timing — but the race is in the **app**, not the test.
+- **Symptom:** `v2-suite (rest, laptop)` on PR #1401 (a CI-only diff): `exportCurrent` clicks "Song actions" right after "Save a copy", the click succeeds, and "Export file" never becomes visible (`page.waitForEvent('download')` → 45s timeout). Reproduced locally 1 in 60 with `--repeat-each=60 --workers=10`.
+- **Root cause:** `dialog.close()` *queues* its `close` event rather than firing it. Save a copy's `setMenu(false)` closes the song menu; the "Song actions" click reopens it (`setMenu(true)` → `showModal()`) before that queued task runs; the stale event then reaches the OPEN dialog, whose `onClose={() => setMenu(false)}` shuts it again. The trace shows exactly that: menu open at the click, closed after the save, open again after "Song actions", then closed. Every shell dialog wired `onClose` the same way, so a fast musician could hit it too.
+- **Fix (2026-09-23, #1402):** `whenClosed()` (`prototypes/v2/app/dialog-close.ts`) wraps every `<dialog onClose>`, so a `close` event counts only when the dialog is actually closed. Deterministic regression test in `usability.spec.ts` (a synthetic `close` at the open menu; fails without the guard). 240/240 clean on the stress repro afterwards.
+- **Suspected same cause:** the webkit-phone `foundation.spec.ts` "manual sounds save, revert, export/import and play sampled audio after offline reload" failures on #1394/#1397 (Revert to saved closes the menu, then "Song actions" → Export). Not reproduced locally; confirm on their next CI runs.
+- **Last seen:** 2026-09-23 (PR #1401).
+
 ### 🟢 `tests/standards/rock-bass-critique.test.ts` — "chromatic leading tones on beat-4 push-points"
 
 - **Class:** unseeded-statistical

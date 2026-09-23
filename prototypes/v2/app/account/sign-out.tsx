@@ -2,6 +2,7 @@
 
 import type { RefObject } from 'react';
 import type { SignOutPreflight } from '../../lib/account/sync-loop';
+import { whenClosed } from '../dialog-close';
 
 /**
  * The sign-out preflight (#1269) — the step that names what leaving costs before it costs it.
@@ -114,7 +115,7 @@ export function SignOutDialog({
                 }
                 onClose();
             }}
-            onClose={onClose}
+            onClose={whenClosed(onClose)}
         >
             <h2 id="sign-out-title">
                 {device ? 'Sign out on this device?' : 'Sign out of your account?'}

@@ -10,6 +10,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { ChartDocument } from '../lib/runtime';
 import { allSoundsSizeMB, packsForInstrument } from '../lib/sounds';
 import { type Lane, lanes } from './band-lanes';
+import { whenClosed } from './dialog-close';
 
 /** The one style-picker list each style-bearing lane has (#1275). Groove/drums
  * has no `style` field on `ChartGroove` and no entry in `instrument-styles.ts` —
@@ -130,7 +131,7 @@ export function SoundsPanel({
             className="sound-panel"
             ref={dialogRef}
             aria-labelledby="sounds-title"
-            onClose={onClose}
+            onClose={whenClosed(onClose)}
         >
             <div className="sounds-heading">
                 <div>
