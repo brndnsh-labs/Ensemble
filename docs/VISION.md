@@ -2,87 +2,77 @@
 
 ## What is Ensemble?
 
-Ensemble is a backing band in your browser. Pick a chord chart, pick a genre, and play — any instrument, any style, on demand. No app to install, no account to create, no subscription.
+Ensemble is a backing band on your music stand. Open a chart, pick a style, and play — any instrument, any genre, on demand. It runs from a single URL, installs as an app, and keeps playing offline. It is free and open source, with no subscription.
+
+You never need an account to play. An optional account keeps your songbook synced and backed up across your devices; that is all it is for.
+
+The v2 product brief, [`docs/design/ensemble-v2.md`](design/ensemble-v2.md), holds the agreed user journeys and interface direction in detail. This page is the short version and the priorities.
 
 ## Who is Ensemble for?
 
-Ensemble is for musicians who want to practice, compose, teach, or perform — whether they're alone or playing with others who need a drummer, a bassist, or a keys player to complete the sound.
+Musicians who want to practice, write, teach, or perform — alone, or with people who need a drummer, a bassist, or a keys player to complete the sound.
 
-**Personas:**
+**Personas, in priority order:**
 
-- **The practicing musician** mutes their instrument and plays along with the band.
-- **The songwriter** opens the editor, types in chords, and hears an arrangement immediately.
-- **The producer** uses a template or generates a song structure to quickly sketch an idea, then exports to MIDI to take the bones of a project into their DAW.
-- **The music teacher** charts a song and sends a link to a student.
-- **The student** opens a prepared audition scene and taps Play once; the band starts.
-- **The live performer** configures Ensemble to fill the seats that humans aren't — a drummer, a keys player, a bassist — and plays alongside it in the room.
+1. **The practicing musician** mutes their own instrument and plays along. When personas conflict, this one wins.
+2. **The songwriter** types or taps in chords and hears an arrangement immediately. **The producer** sketches a chart the same way and exports MIDI to take the bones into a DAW.
+3. **The music teacher** charts a song and sends a link. **The student** opens it and hears the chart — no account, no install.
+4. **The live performer** has Ensemble fill the seats that humans aren't and plays alongside it in the room. This persona has the least product coverage today: live control is an intensity slider, and MIDI-in play-along did not survive into v2.
 
 ## What makes Ensemble different?
 
-Unlike AI music generators that produce audio from statistical patterns, Ensemble follows real musical rules. It understands chord quality, voice leading, scale modes, rhythm section conventions, and song form. The result is a band that plays your chart — not an approximation of what music statistically sounds like.
+Unlike AI music generators that produce audio from statistical patterns, Ensemble follows real musical rules. It understands chord quality, voice leading, scale modes, rhythm-section conventions and song form. The result is a band that plays *your* chart — not an approximation of what music statistically sounds like.
 
-Every session is shareable as a URL. A teacher can chart a song and send a link. The recipient opens a prepared audition scene and taps Play once; the band starts. No account, no install, no subscription required on either end. A chord progression, genre, tempo, and arrangement encode cleanly into a URL without a backend.
-
-Ensemble is free and open source, with no account required and no subscription. It runs as a PWA from a single URL and works offline after the first load.
+**Sharing is a marquee feature.** A teacher sends a link; the student opens that exact chart on the stand. The link carries a frozen snapshot, so later edits by the author never change what the student hears, and neither end needs an account. Keeping a shared chart makes an independent copy. Old v1 share links still open, best-effort.
 
 ## What Ensemble is not
 
-Ensemble is not AI-generated audio. The codebase is AI-assisted and agents are first-class contributors — but the output is a rule-based musical engine, not a statistical model. Ensemble is also not a subscription, not large sample libraries, not heavy dependencies, and not a backend.
+Ensemble is not AI-generated audio. The codebase is AI-assisted and agents are first-class contributors — but the output is a rule-based musical engine, not a statistical model. It is also not a subscription, not a service you depend on to play, and not a classroom-management, collaborative-editing or community-catalog platform.
 
 ## Product principles
 
-**The chart is the center.** Every UI decision departs from and returns to the chart. Controls, settings, and tools exist to serve it — not the other way around.
+**The chart is the center.** Every UI decision departs from and returns to the chart. During playback the chart is a music stand; controls, settings and tools exist to serve it.
 
-**Zero friction by default.** A visitor lands on the page and sees a basic I | V | vi | IV progression with the band ready to play. They hit play and hear something musical immediately. Configuration is available but never required.
+**Zero friction by default.** A first visit lands on the songbook with starter charts ready; one tap puts a chart on the stand with the band ready to play. Configuration is available but never required, and no account is ever asked for in order to play.
 
-**Time is sacred; defaults are metronomic.** Ensemble is a fancy metronome at its core — the practicing musician has to be able to lock to a reference that does not move, so tempo and groove stay steady by default. Expressive and live-performance features (tempo breathing, band-leader gestures) ship **opt-in and off by default**; nothing may make the default tempo or groove drift. When personas conflict, priority runs: **practicing musician → songwriter / teacher-student sharing → live performer.** Instrument-identity features (gestures, pads, MIDI-triggered form control) advance only via the probe-first plan banked on #937 (was Forgejo #1019) — never as a speculative build.
+**Time is sacred; defaults are metronomic.** Ensemble is a fancy metronome at its core — the practicing musician has to be able to lock to a reference that does not move, so tempo and groove stay steady by default. Expressive and live-performance features (tempo breathing, band-leader gestures) ship **opt-in and off by default**; nothing may make the default tempo or groove drift. Instrument-identity features (gestures, pads, MIDI-triggered form control) advance only via the probe-first plan banked on #937 — never as a speculative build.
 
-**No accounts, no subscriptions, no lock-in.** Ensemble is a URL. It works offline. Sessions are shareable without asking anything of the recipient.
+**Offline-first; the server is optional.** The stand is a static app that works fully offline once installed. One small account API adds sync and backup; losing it never stops the band.
+
+**No lock-in.** Guest play is first-class. Charts import (iReal Pro, v1 data) and export (MIDI, audio) without an account, and an account holder's songbook is theirs to take elsewhere.
+
+**Private charts stay private.** Analytics are aggregate and allow-listed; chart contents, titles and identities never cross that boundary (#1389).
 
 **The engine is precious.** The musical logic is the hardest part and the core differentiator. It is not refactored casually or extended without understanding what it already does.
 
-**Deployment stays simple.** Ensemble is static files on a server. Any change that complicates that story needs a very strong justification.
-
-**Agents are first-class contributors.** The codebase is documented, typed, and tested in ways that make it legible to AI tools. That's not an accident — it's a design requirement.
+**Agents are first-class contributors.** The codebase is documented, typed and tested in ways that make it legible to AI tools. That is a design requirement, not an accident.
 
 **Synthesis quality is an ongoing investment, not a solved problem.** If something doesn't sound good, it's worth fixing rather than shipping.
 
 ## UI direction
 
-The four-workspace model (Arranger, Studio, Perform, Visuals) is replaced by a single chart-first surface. The chart is always visible and always playable. Controls radiate outward from it — essential ones always visible, deeper ones accessible without leaving the chart.
+One app, the music stand (`prototypes/v2/app/`): a songbook home (recent songs, starters, new/import), the chart sheet, the transport, an edit panel and a sounds panel. Tempo, genre, instrument mutes and the transport are primary; key is one obvious action away; loop and start-from belong at the section they act on. Editing keeps the chart's spatial structure, and editing controls step aside during playback.
 
-The layout is responsive, designed primarily for desktop and tablet, and degrades gracefully to phone. Tablet is the sweet spot: readable at arm's length, touch-friendly, portable enough for a music stand or a rehearsal room.
+Designed for laptop, tablet and phone alike. Tablet is the sweet spot: readable at arm's length on a music stand, touch-friendly, portable to a rehearsal room. Whole measures and readable chord symbols survive every width.
 
-## Current state and next steps
+## What's next
 
-*Last updated: July 2026*
+*Last updated: 2026-09-23. The GitHub tracker is the source of truth; this is the priority order.*
 
-### What's working well
-- Dead simple deployment: static files, nginx, PWA
-- Near instant load times even on poor connections
-- Plain text chord chart editing
-- Sophisticated musical engine: voice leading, modal theory, genre-aware groove, motivic soloist
-- URL-based sharing with no backend required
-- Mature dev dependencies and toolchain (Biome, Vitest, Playwright, Vite)
-- Large test suite
+1. **Finish v2 editing.** Every score field needs a writer: major/minor (#1375), beat grouping (#1376), one section-settings surface (#1374), removing a bar or section (#1373). Milestone "V2 — parity".
+2. **Close out the cutover.** Retire the v1 runtime once the flip has held (#1384); verify two-device and cold-start behaviour on real phones (#1273); privacy-preserving analytics (#1389); audition links that carry intensity, part mutes and autoplay (#1382).
+3. **Musical depth.** Generalize the engine's musical improvements and surface instrument capabilities (#1164), including the auxiliary percussion lanes that exist in the engine but no genre triggers; the parked harmony and bass design calls (#1148, #1149, #1161, #1162); the by-ear listening sweep (#534).
+4. **The live performer, last.** The band-leader gesture probe (#937) and tempo breathing (#936), both opt-in by the principle above.
 
-### What needs work
-- The sharing feature deserves more prominence as a marquee feature — make the existing opt-in one-tap audition link more prominent in the Share UI.
-- The engine outgrew the surface: the **live-performer** persona still has the least product coverage — live band control is one intensity slider, pending the #937 (was Forgejo #1019) conductor-lens probe decision. (Section looping / start-from-section, MIDI-in play-along, and the practice tempo ramp — Forgejo #1016/#1017/#1021, closed on ship and so left in the read-only `Ensemble-archive` repo rather than migrated — all shipped in the July 2026 sweep, so the practicing-musician gap is largely closed.)
+## Key decisions
 
-### Open work
-- **Band That Listens (July 2026 sweep)** — make the band listen to itself: the soloist rides `bandIntensity` and coordination transitions, a band-wide per-genre pocket palette, within-phrase velocity envelopes (GitHub milestone "Band That Listens"). Question→answer phrasing **shipped** (Forgejo #1009 diatonic ballads, #1051 blues + the two-frame tension pin — closed on ship, in `Ensemble-archive`; Forgejo #1053 escalating questions remains a banked follow-on that did not carry over — no live issue, re-file on the GitHub tracker if still wanted) and the comper now answers into the question's breath (Forgejo #1157, likewise archived). Arrangement-by-subtraction, tempo breathing, and late-pass reharm stay parked as needs-decision designs.
-- **Audio identity refresh** — add new soloist sounds; revisit chords/bass/harmony synthesis if a future audit turns up a new outlier. Use the existing rendered/symbolic audit flow rather than reopening a global mix sweep.
-- **Surface the auxiliary percussion** (was Forgejo #1007, closed in the read-only `Ensemble-archive` rather than migrated — no live GitHub issue; tracked below as Epic 7 S5) — `Shaker`, `Clave`, `Conga`, `Bongo`, `Perc`, `Guiro` exist as real lanes in `groove.ts` state and have full synth voices, but no genre or surfaced preset triggers them, so they are effectively unreachable from the UI (only `Conga` appears, sparsely, via the Bossa Nova preset). The `World/Latin` drum presets are likewise unsurfaced — no genre or preset triggers them from the UI. Fix is a drum-grid affordance and/or surfacing those presets / a Latin genre. Surfaced during the synth-audit Epic 4 listening gates — see `docs/synth-audit/epic-4-drums.md` Notes. **Now also tracked as Epic 7 S5** in `docs/synth-audit/epic-7-mix-architecture.md` after the Epic 7 S3a 5 kHz re-measurement showed the funk drum stem sits 11× below Chic at the air probe — wiring the existing aux-percussion lanes closes the air gap and the UI gap in one move.
-- **Naming conventions cleanup** — standardize canonical names across code, docs, tests, configs, and persisted surfaces so one concept has one internal key and a documented alias map. Build a naming inventory first; centralize alias resolution in the owning config or normalization helper; update persistence/share/hydration surfaces together so old links keep working. See `CLAUDE.md` → "Naming / Canonicalization" and `docs/guides/REFERENCE_TUNING.md` for tuning examples and alias lessons.
-
-### Key decisions made
-- Chart-first single surface replaces the four-workspace model
-- Default I | V | vi | IV progression with the band ready to play on load
-- Responsive layout optimized for desktop and tablet, graceful degradation to phone
-- TypeScript migration completed incrementally in May 2026
-- Musical engine is untouched to start — it is the core differentiator
-- Synthesis quality improvement is a named phase, not an afterthought
-- Sharing via URL is treated as a marquee feature, not a hidden one
-- Metronomic by default; expressive timing and live-performance control are **opt-in, off by default** (per the #936 ruling, was Forgejo #1010) — this protects the practicing-musician persona, who cannot lock to a reference that moves
-- The live-performer / "instrument" identity (band-leader gestures) is deliberately parked behind a probe-first plan (#937, was Forgejo #1019), not built speculatively
+- **v2 is the product (2026-09-22, #1357).** A hard cut from v1: the music stand serves the site root, and v1's UI shell is deleted (#1358). v1 browser data is reachable only through v2's import.
+- **Accounts are optional and exist for the songbook** — passkey sign-in, explicit Save, whole-library offline download. Playing and sharing never require one.
+- **Offline-first static app plus one small API**, released as container images; `main` is continuously deployed.
+- **Semantic charts with an honest import boundary** (#1171): imports preview what they keep and explain what they can't represent.
+- Chart-first single surface; the chart is a music stand during playback.
+- The musical engine is the differentiator and is kept, not rewritten — v2 compiles `public/` as its library.
+- Metronomic by default; expressive timing and live-performance control are **opt-in, off by default** (the #936 ruling), protecting the practicing musician.
+- The live-performer / "instrument" identity is parked behind a probe-first plan (#937), not built speculatively.
+- Sharing is a marquee feature, not a hidden one.
+- Free and open source, no subscription.
