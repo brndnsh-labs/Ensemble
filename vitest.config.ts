@@ -8,6 +8,7 @@ export default defineConfig({
             // so a unit test can import a v2 `lib/` module whose own imports reach back into the
             // shared engine. Inert for `public/` and `tests/`, which never spell it.
             '@engine': fileURLToPath(new URL('./public', import.meta.url)),
+            '@band': fileURLToPath(new URL('./band', import.meta.url)),
         },
     },
     test: {

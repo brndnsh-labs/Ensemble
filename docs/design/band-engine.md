@@ -72,6 +72,28 @@ borrows another family's idiom. Shared machinery does everything that isn't the 
 Idioms write whole-bar patterns for 4/4 and pulse cells for other meters. Every meter the codec
 accepts plays; only 4/4 is idiomatic in v0.
 
+## The live host (`prototypes/v2/lib/band-host.ts`)
+
+`?engine=next` routes the runtime's play, stop and resume paths through `startBand`/`stopBand`
+instead of `TOGGLE_PLAY`, so the old worker never starts and its callbacks are ignored. The
+host keeps a queue of *segments*, one pass of the song or one lap of a practice loop each, and
+schedules everything due in the next 150 ms on a 25 ms timer.
+- **Tempo** re-anchors the clock.
+- **Style, intensity, lanes, swing and humanize** regenerate the pass from the next barline.
+- **A staged genre** is committed at once.
+- **The chart pointer** follows `songTick()` into `arranger.stepMap`.
+
+A pass is generated on the main thread (about 5–7 ms for 32 bars on a desktop), two seconds
+before it is needed.
+
+Not yet on the host:
+- audio (WAV) export (MIDI export is)
+- hiding the soloist/harmony controls
+- charts the old adapter still rejects at load, because the chart sheet still draws from the
+  old `arranger` maps
+
+Genres outside v0 play their nearest v0 style (`STYLE_FOR_GENRE` in `runtime.ts`).
+
 ## Tests: two harnesses
 
 - `band/test/invariants.test.ts` checks every style × fixture chart × 8 seeds, looping and

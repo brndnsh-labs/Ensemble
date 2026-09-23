@@ -1,3 +1,4 @@
+import { type BandSettings, PPQ, type StyleId, toMidi } from '@band/index';
 import { transposeKey } from '@engine/controllers/arranger-controller';
 import {
     flushBuffers,
@@ -13,7 +14,13 @@ import { autoVoiceForGenre } from '@engine/data/genre-sound-map';
 import { GENRE_NAMES, SMART_GENRES } from '@engine/data/smart-genres';
 import { registerScorePlaybackRenderer, validateProgression } from '@engine/engine/chords-engine';
 import { analyzeFormUI } from '@engine/engine/conductor';
-import { initAudio, playNote, restoreGains, syncBusReverbSend } from '@engine/engine/engine';
+import {
+    initAudio,
+    killAllNotes,
+    playNote,
+    restoreGains,
+    syncBusReverbSend,
+} from '@engine/engine/engine';
 import { scheduler } from '@engine/engine/scheduler-core';
 import { isSoloistMonophonicMode } from '@engine/engine/soloist-mode-policy';
 import { transposeChordText } from '@engine/engine/transpose';
@@ -25,6 +32,7 @@ import {
     type StemInstrument,
 } from '@engine/export/audio-export';
 import { exportToMidi } from '@engine/export/midi-export';
+import { proposeLegacyScoreConversion } from '@engine/songbook/legacy-score';
 import {
     prepareScorePlayback,
     renderScorePlayback,
@@ -53,6 +61,7 @@ import {
 } from '@engine/types';
 import { transposeKeyName } from '@engine/utils';
 import { initWorker, syncWorker } from '@engine/worker-client';
+import { BandHost } from './band-host';
 import { type ChartDocument, type DocumentContent, validateDocument } from './documents';
 import { masterVolumePreference, rememberMasterVolume } from './session';
 import { initializeSounds, prepareSound, prepareSounds, validateVoice } from './sounds';
@@ -85,6 +94,192 @@ const AUTO_LANES = ['groove', 'bass', 'chords', 'harmony', 'soloist'] as const;
 const STAGED_FEEL_TIMEOUT_MS = 12_000;
 // Authored source belongs to the host document, never to generated runtime state.
 let currentScore: SemanticScore | null = null;
+
+// ---------------------------------------------------------------- the band engine
+// `?engine=next` plays the new band engine (`band/`, docs/design/band-engine.md) in place of
+// the worker/scheduler generator, through the same voices, buses and sound packs. Everything
+// else — charts, the songbook, the mixer, the Feel sheet — is shared. Read once per page.
+const ENGINE_NEXT =
+    typeof window !== 'undefined' &&
+    new URLSearchParams(window.location.search).get('engine') === 'next';
+/** One sixteenth in band ticks: the old engine's step, so step maps convert exactly. */
+const STEP_TICKS = PPQ / 4;
+/**
+ * The genres the band engine plays natively, and the nearest one standing in for each of the
+ * rest until they are ported (v0 scope: the rhythm section in four styles).
+ */
+const STYLE_FOR_GENRE: Record<string, StyleId> = {
+    Rock: 'rock',
+    Jazz: 'jazz',
+    Funk: 'funk',
+    Bossa: 'bossa',
+    Blues: 'jazz',
+    'Neo-Soul': 'funk',
+    Disco: 'funk',
+    'Hip Hop': 'funk',
+    Reggae: 'rock',
+    Acoustic: 'rock',
+    Country: 'rock',
+    Metal: 'rock',
+    'Ska-Punk': 'rock',
+};
+let band: BandHost | null = null;
+let bandSeed = '';
+let bandScore: { key: string; score: SemanticScore } | null = null;
+let playhead: ReturnType<typeof setInterval> | null = null;
+
+function bandHost(): BandHost {
+    band ??= new BandHost({ state: getState });
+    return band;
+}
+
+/** The chart as a semantic score; a measure-less (v1) chart converts on the fly. */
+function scoreForBand(): SemanticScore {
+    if (currentScore) {
+        return currentScore;
+    }
+    const content = captureContent();
+    const key = JSON.stringify(content.arrangement);
+    if (bandScore?.key === key) {
+        return bandScore.score;
+    }
+    const now = new Date(0).toISOString();
+    const proposal = proposeLegacyScoreConversion(
+        JSON.stringify({
+            schemaVersion: 1,
+            id: 'live',
+            title: 'live',
+            createdAt: now,
+            updatedAt: now,
+            revision: 0,
+            chart: content,
+        }),
+    );
+    if (proposal.kind !== 'candidate') {
+        throw new Error(
+            'This chart cannot play on the new engine yet. Convert it to measures first.',
+        );
+    }
+    bandScore = { key, score: proposal.value.chart.score };
+    return bandScore.score;
+}
+
+function bandSettings(): BandSettings {
+    const { groove, bass, chords, playback } = getState();
+    return {
+        style: STYLE_FOR_GENRE[groove.lastSmartGenre] ?? 'rock',
+        lanes: { drums: groove.enabled, bass: bass.enabled, keys: chords.enabled },
+        intensity: playback.autoIntensity ? null : playback.bandIntensity,
+        swing: groove.swing,
+        humanize: groove.humanize,
+        seed: bandSeed,
+    };
+}
+
+function bandLoop(): { from: number; to: number } | null {
+    const { playback } = getState();
+    return playback.loopStartStep >= 0 && playback.loopEndStep > playback.loopStartStep
+        ? { from: playback.loopStartStep * STEP_TICKS, to: playback.loopEndStep * STEP_TICKS }
+        : null;
+}
+
+function startBand(): void {
+    const host = bandHost();
+    const state = getState();
+    const { arranger, playback } = state;
+    host.setScore(scoreForBand());
+    // The same take-to-take rule as the old engine: a fresh seed per play unless locked.
+    bandSeed =
+        arranger.randomizeSeed || !arranger.seed
+            ? Math.floor(Math.random() * 0xffffff).toString(16)
+            : String(arranger.seed);
+    if (!playback.chartLocked) {
+        dispatch(ACTIONS.SET_CHART_LOCKED, true);
+    }
+    if (playback.audio?.state === 'suspended') {
+        void playback.audio.resume();
+    }
+    restoreGains(state);
+    host.start(bandSettings(), playback.bpm, (playback.startStep || 0) * STEP_TICKS, bandLoop());
+    param('playback', 'isPlaying', true);
+    playhead ??= setInterval(followPlayhead, 50);
+}
+
+function stopBand(): void {
+    band?.stop();
+    if (playhead) {
+        clearInterval(playhead);
+        playhead = null;
+    }
+    param('chords', 'lastActiveChordIndex', null);
+    if (getState().playback.isPlaying) {
+        param('playback', 'isPlaying', false);
+    }
+    dispatch(ACTIONS.SET_START_STEP, 0);
+    void killAllNotes(getState());
+}
+
+/** Publish the sounding chord for the chart sheet, as the old scheduler did. */
+function followPlayhead(): void {
+    const tick = band?.songTick();
+    if (tick == null) {
+        return;
+    }
+    const step = Math.floor(tick / STEP_TICKS);
+    const { arranger, chords } = getState();
+    const index = arranger.stepMap.findIndex((entry) => entry.start <= step && step < entry.end);
+    if (index >= 0 && index !== chords.lastActiveChordIndex) {
+        param('chords', 'lastActiveChordIndex', index);
+    }
+}
+
+/** Keep the band in step with every change the app makes to the shared state. */
+function syncBand(): void {
+    const host = band;
+    const { playback, groove } = getState();
+    if (groove.pendingGenreFeel) {
+        // The band takes a new feel at its next barline by itself; commit the staged
+        // genre now so the app's view of it (and setGenre's wait) settles at once.
+        const payload = groove.pendingGenreFeel as {
+            feel?: string;
+            swing?: number;
+            sub?: string;
+            drum?: string;
+        };
+        param('groove', 'pendingGenreFeel', null);
+        if (payload.feel) {
+            param('groove', 'genreFeel', payload.feel);
+        }
+        if (payload.swing !== undefined) {
+            param('groove', 'swing', payload.swing);
+        }
+        if (payload.sub === '8th' || payload.sub === '16th') {
+            param('groove', 'swingSub', payload.sub);
+        }
+        if (payload.drum) {
+            void loadDrumPreset(payload.drum);
+        }
+    }
+    if (!host?.playing) {
+        return;
+    }
+    if (!playback.isPlaying) {
+        stopBand();
+        return;
+    }
+    host.setTempo(playback.bpm);
+    host.setLoop(bandLoop());
+    host.update(bandSettings());
+}
+
+/** Start the transport on whichever engine this page plays. */
+function startPlayback(): void {
+    if (ENGINE_NEXT) {
+        startBand();
+    } else {
+        dispatch(ACTIONS.TOGGLE_PLAY);
+    }
+}
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
 const param = (module: string, name: string, value: unknown) =>
     dispatch(ACTIONS.SET_PARAM, { module, param: name, value });
@@ -265,9 +460,19 @@ export function initialize(): Promise<void> {
         registerScorePlaybackRenderer(renderScorePlayback);
         boot = (async () => {
             initializeSounds();
+            // Under `?engine=next` the old generator still answers flushes, but nothing it
+            // produces may reach the scheduler: the band host owns the audio.
             initWorker(
-                () => scheduler(getState(), dispatch),
-                (notes, _sent, _duration, resolution) => receiveNotes(notes, resolution),
+                () => {
+                    if (!ENGINE_NEXT) {
+                        scheduler(getState(), dispatch);
+                    }
+                },
+                (notes, _sent, _duration, resolution) => {
+                    if (!ENGINE_NEXT) {
+                        receiveNotes(notes, resolution);
+                    }
+                },
             );
             await loadDrumPreset('Basic Rock');
             // Guest startup must not download audio without an install/selection gesture.
@@ -282,6 +487,9 @@ export function initialize(): Promise<void> {
                 // The async genre effect is awaited explicitly by setGenre below.
                 if (action.type !== ACTIONS.SET_GENRE_FEEL) {
                     handleEffects(action, state, context);
+                }
+                if (ENGINE_NEXT) {
+                    syncBand();
                 }
             });
             // #1276 — `playback.masterVolume` is `preferences`-owned (never part of a
@@ -322,6 +530,14 @@ export function stop(): void {
     playIntent++;
     // #1211 — Stop always releases an armed/live practice loop; the drill is a
     // performance-mode overlay on the transport, not a setting that survives it.
+    if (ENGINE_NEXT) {
+        // Stop the band before clearing the loop, so the loop change can't restart it.
+        if (band?.playing || getState().playback.isPlaying) {
+            stopBand();
+        }
+        clearPracticeLoop();
+        return;
+    }
     clearPracticeLoop();
     if (getState().playback.isPlaying) {
         dispatch(ACTIONS.TOGGLE_PLAY);
@@ -385,7 +601,7 @@ export async function toggle(progress: (text: string) => void): Promise<void> {
     if (intent !== playIntent) {
         return;
     }
-    dispatch(ACTIONS.TOGGLE_PLAY);
+    startPlayback();
 }
 
 export async function setVoice(
@@ -761,7 +977,7 @@ export async function setGenre(
                 );
             }
             if (resumeIntent === playIntent) {
-                dispatch(ACTIONS.TOGGLE_PLAY);
+                startPlayback();
             }
         }
         throw error;
@@ -805,7 +1021,7 @@ export function transpose(delta: number): void {
         const wasPlaying = getState().playback.isPlaying;
         editScore(score);
         if (wasPlaying) {
-            dispatch(ACTIONS.TOGGLE_PLAY);
+            startPlayback();
         }
         return;
     }
@@ -827,7 +1043,7 @@ export function setMode(isMinor: boolean): void {
     const wasPlaying = getState().playback.isPlaying;
     editScore({ ...clone(currentScore), isMinor });
     if (wasPlaying) {
-        dispatch(ACTIONS.TOGGLE_PLAY);
+        startPlayback();
     }
 }
 export function editScore(score: SemanticScore): void {
@@ -893,6 +1109,21 @@ export function audition(index: number): void {
  * call while the band is playing.
  */
 export function exportMidi(filename: string): Promise<void> {
+    if (ENGINE_NEXT) {
+        const host = bandHost();
+        host.setScore(scoreForBand());
+        bandSeed ||= String(getState().arranger.seed || 'ensemble');
+        const { events, timeline } = host.renderPasses(bandSettings(), 1);
+        const bytes = toMidi(events, timeline, { bpm: getState().playback.bpm, title: filename });
+        const name = `${filename.replace(/[^a-zA-Z0-9\s\-_()]/g, '').trim() || 'ensemble'}.mid`;
+        downloadExportResult({
+            blob: new Blob([bytes], { type: 'audio/midi' }),
+            durationSeconds: 0,
+            sampleRate: 0,
+            filename: name,
+        });
+        return Promise.resolve();
+    }
     return exportToMidi({ filename });
 }
 
@@ -934,6 +1165,11 @@ export async function exportAudio(
     progress: (text: string) => void,
     instruments: StemInstrument[] = STEM_INSTRUMENTS,
 ): Promise<void> {
+    if (ENGINE_NEXT) {
+        throw new Error(
+            'Audio export is not on the new engine yet. Open the page without ?engine=next to export audio.',
+        );
+    }
     const intent = ++exportIntent;
     await prepareSounds(captureContent(), progress);
     if (intent !== exportIntent) {

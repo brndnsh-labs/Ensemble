@@ -27,6 +27,7 @@ export default {
     },
     webpack(config, { webpack }) {
         config.resolve.alias['@engine'] = path.resolve(directory, '../../public');
+        config.resolve.alias['@band'] = path.resolve(directory, '../../band');
         config.resolve.alias.deepsignal$ = path.resolve(
             directory,
             '../../node_modules/deepsignal/dist/deepsignal.mjs',

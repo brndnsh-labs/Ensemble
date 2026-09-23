@@ -8,7 +8,8 @@
             // `vitest.config.ts` gives the runner. A test that imports a v2 `lib/` module reaches
             // whatever that module imports, and without this those resolve to `any` — which does
             // not fail here, it just quietly stops checking them.
-            "@engine/*": ["./public/*"]
+            "@engine/*": ["./public/*"],
+            "@band/*": ["./band/*"]
         }
     },
     "include": ["public/**/*.ts", "band/**/*.ts", "env.d.ts", "tests/**/*.ts"],

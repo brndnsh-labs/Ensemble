@@ -80,7 +80,7 @@ export function toMidi(
     events: BandEvent[],
     timeline: Timeline,
     { bpm, title = 'Ensemble' }: MidiOptions,
-): Uint8Array {
+): Uint8Array<ArrayBuffer> {
     const msToTicks = (ms: number) => (ms / 1000) * (bpm / 60) * PPQ;
     // Conductor track: tempo, meters, stretches.
     const conductor: Timed[] = [{ tick: 0, order: 0, data: text(0x03, title) }];
