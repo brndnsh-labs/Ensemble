@@ -9,7 +9,7 @@ import type { RefObject } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import type { ChartDocument } from '../lib/runtime';
 import { allSoundsSizeMB, packsForInstrument } from '../lib/sounds';
-import { type Lane, lanes } from './band-lanes';
+import { type Lane, visibleLanes } from './band-lanes';
 import { whenClosed } from './dialog-close';
 
 /** The one style-picker list each style-bearing lane has (#1275). Groove/drums
@@ -177,7 +177,7 @@ export function SoundsPanel({
                 <span>Or choose each instrument:</span>
             </div>
             <div className="sound-choices">
-                {lanes.map(([lane, label]) => {
+                {visibleLanes.map(([lane, label]) => {
                     const band = current.chart.band[lane];
                     const styleOptions = STYLE_OPTIONS[lane];
                     return (

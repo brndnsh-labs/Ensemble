@@ -90,6 +90,46 @@ function hz(midi: number): number {
     return 440 * 2 ** ((midi - 69) / 12);
 }
 
+/**
+ * Turns one `BandEvent` into sound through today's voices and sample packs — the single
+ * place both the live host (`BandHost.sound` below) and the offline WAV/stem export
+ * (`prototypes/v2/lib/band-export.ts`) call, so an exported mix matches what was heard live.
+ * `durationSeconds` and `chordSize` are the two things a caller can't derive from the event
+ * alone: a drum hit has no written length, and a keys note's per-voice gain depends on how
+ * many other keys notes share its tick (both callers compute these from their own tick→time
+ * map, which is the one thing that legitimately differs between live segments and an offline
+ * pass).
+ */
+export function playBandEvent(
+    state: EnsembleState,
+    event: BandEvent,
+    time: number,
+    durationSeconds: number,
+    chordSize: number,
+): void {
+    if (event.lane === 'drums') {
+        // The drum voices take roughly 0–1.2 (an accent sits a little over 1).
+        playDrumSound(state, DRUM_NAMES[event.piece], time, (event.velocity / 127) * 1.2);
+        return;
+    }
+    if (event.lane === 'bass') {
+        playBassNote(
+            state,
+            hz(event.midi),
+            time,
+            durationSeconds,
+            (event.velocity / 127) * 1.1,
+            event.muted ? BASS_MUTE : 0,
+        );
+        return;
+    }
+    playNote(state, hz(event.midi), time, durationSeconds, {
+        vol: (event.velocity / 127) * 0.8,
+        instrument: (state.chords as { instrument?: string }).instrument || 'Piano',
+        numVoices: chordSize,
+    });
+}
+
 function chordSizes(events: BandEvent[]): Map<number, number> {
     const sizes = new Map<number, number>();
     for (const e of events) {
@@ -406,29 +446,11 @@ export class BandHost {
     }
 
     private sound(state: EnsembleState, segment: Segment, event: BandEvent, time: number): void {
-        if (event.lane === 'drums') {
-            // The drum voices take roughly 0–1.2 (an accent sits a little over 1).
-            playDrumSound(state, DRUM_NAMES[event.piece], time, (event.velocity / 127) * 1.2);
-            return;
-        }
-        const seconds =
-            this.timeOf(segment, event.tick + event.dur) - this.timeOf(segment, event.tick);
-        if (event.lane === 'bass') {
-            playBassNote(
-                state,
-                hz(event.midi),
-                time,
-                seconds,
-                (event.velocity / 127) * 1.1,
-                event.muted ? BASS_MUTE : 0,
-            );
-            return;
-        }
-        playNote(state, hz(event.midi), time, seconds, {
-            vol: (event.velocity / 127) * 0.8,
-            instrument: (state.chords as { instrument?: string }).instrument || 'Piano',
-            numVoices: segment.chordSizes.get(event.tick) ?? 1,
-        });
+        const durationSeconds =
+            event.lane === 'drums'
+                ? 0
+                : this.timeOf(segment, event.tick + event.dur) - this.timeOf(segment, event.tick);
+        playBandEvent(state, event, time, durationSeconds, segment.chordSizes.get(event.tick) ?? 1);
     }
 
     /** The click: a beep on each pulse, accented on the downbeat. Same voice as the old engine. */

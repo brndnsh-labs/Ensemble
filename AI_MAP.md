@@ -52,7 +52,8 @@ The ground-up replacement for the generative engine; see `docs/design/band-engin
 | `band/sinks/midi.ts` | BandEvent[] → Standard MIDI File. | `toMidi` |
 | `band/test/` | Fixture charts, the invariant suite, the critique claims. | `FIXTURES` |
 | `scripts/band-render.ts` | `npm run band:render` — `.mid` + text grid from node. | CLI |
-| `prototypes/v2/lib/band-host.ts` | Live host for `?engine=next`: segments on the audio clock, regenerate-at-barline, voice adapter onto today's synth/sample voices, metronome. Driven only by `runtime.ts`. | `BandHost` |
+| `prototypes/v2/lib/band-host.ts` | Live host for `?engine=next`: segments on the audio clock, regenerate-at-barline, voice adapter (`playBandEvent`) onto today's synth/sample voices, metronome. Driven only by `runtime.ts`. | `BandHost`, `playBandEvent` |
+| `prototypes/v2/lib/band-export.ts` | Offline WAV/stem export for `?engine=next`: `band-host.ts`'s `playBandEvent` against an `OfflineAudioContext`, so an export matches live playback. Stems are drums/bass/keys only. | `renderBandMixToWav`, `renderBandStemsToWav` |
 
 ## State Management (Domain Slices)
 

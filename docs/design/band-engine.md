@@ -86,9 +86,13 @@ schedules everything due in the next 150 ms on a 25 ms timer.
 A pass is generated on the main thread (about 5–7 ms for 32 bars on a desktop), two seconds
 before it is needed.
 
+Audio (WAV/stem) export and the soloist/harmony control hiding both landed: `lib/band-export.ts`
+renders `BandHost.render()`'s events offline through `playBandEvent` — the same voice mapping
+`BandHost` schedules live with — and `app/band-lanes.ts`'s `visibleLanes` (gated on
+`runtime.ts`'s exported `ENGINE_NEXT`) drops soloist/harmony from every lane-driven control
+(transport mute chips, the Sounds panel). A stem export renders drums/bass/keys only.
+
 Not yet on the host:
-- audio (WAV) export (MIDI export is)
-- hiding the soloist/harmony controls
 - charts the old adapter still rejects at load, because the chart sheet still draws from the
   old `arranger` maps
 

@@ -272,7 +272,9 @@ export function downloadExportResult(result: AudioExportResult): AudioExportResu
     return result;
 }
 
-function sanitizeFilename(input: string): string {
+/** Shared with the band engine's offline WAV/stem render (`prototypes/v2/lib/band-export.ts`),
+ * so a next-mode export filename is sanitized identically to the old engine's. */
+export function sanitizeFilename(input: string): string {
     const cleaned = input
         .replace(/[^a-zA-Z0-9\s\-_()]/g, '')
         .substring(0, 64)
