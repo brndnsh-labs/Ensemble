@@ -10,6 +10,7 @@ import {
     passkeysSupported,
     signIn,
 } from '../../lib/account/passkeys';
+import { whenClosed } from '../dialog-close';
 import { AccountFailureNotice } from './account-failure';
 import { RecoverFlow } from './recover';
 import { RecoveryCodeStep } from './recovery-code-step';
@@ -211,7 +212,7 @@ export function SignInDialog({
             className="modal-box account-dialog"
             aria-labelledby="account-dialog-title"
             onCancel={onClose}
-            onClose={onClose}
+            onClose={whenClosed(onClose)}
         >
             {!supported ? (
                 <>
