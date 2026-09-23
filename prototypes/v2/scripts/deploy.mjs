@@ -11,11 +11,11 @@ import { promisify } from 'node:util';
 // hosting/static/nginx.conf serves `location /v2/` from `/site/v2` in both
 // environments). Static-only: no database, no API, no root-app change.
 //
-// Targets are fixed here on purpose — no arbitrary host/path argument. Prod is
-// published by the CI `deploy` job after the root release, over the same scoped
-// `ensemble-admin` alias and deploy key that job materializes; the workstation
-// alias of that name is not that account, so a manual prod run fails to connect
-// rather than publishing from a laptop.
+// Targets are fixed here on purpose — no arbitrary host/path argument. The `prod` target used
+// the scoped `ensemble-admin` alias and deploy key the CI `deploy` job materialized; since the
+// cutover (#1357) that job publishes no files at all, and the preflight below refuses an origin
+// already served by the `ensemble-web` image — so `prod` is now unreachable in both directions
+// and goes with #1358. `test` is still the workstation audition path for the /v2 runtime.
 const run = promisify(execFile);
 const targets = {
     test: {

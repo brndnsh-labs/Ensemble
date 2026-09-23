@@ -68,7 +68,9 @@ jobs:
         run: npm run ci
 
       # The gate already built the production bundle. Seal and retain those exact
-      # bytes; the deploy job must never rebuild them (or use the E2E bridge build).
+      # bytes. Since the cutover (#1357) nothing in this workflow consumes the artifact —
+      # `ensemble-web` is what production serves — so it is kept only as evidence of what
+      # this commit's v1 build was, until #1358 deletes v1 and this step with it.
       - name: Seal production static artifact
         run: node scripts/static-artifact.mjs seal dist production
 
@@ -163,12 +165,18 @@ jobs:
           path: playwright-report/
           retention-days: 30
 
-  # The v2 music stand (prototypes/v2, Next static export) ships to production
-  # at /v2 on the same merge as the root app, so it is gated the same way: build
-  # + its own Playwright suite here, and the exact `out/` bytes are retained for
-  # the deploy job (never rebuilt there). Runs on every PR, not only v2-touching
+  # The v2 music stand (prototypes/v2, Next static export): build + its own Playwright
+  # suite, and the required gate for this app. Runs on every PR, not only v2-touching
   # ones — the export compiles public/ through webpack, so any engine change can
   # break it. Starts alongside `checks`, not after it (#1223).
+  #
+  # It builds at the DEFAULT base (`/v2`). Since the cutover (#1357) that is no longer a
+  # base anything is published at — production serves the `ENSEMBLE_V2_BASE=/` build inside
+  # `ensemble-web` — so what this proves is the app and the shared `public/` code. The SHIPPED
+  # base is proven before a merge by `.github/workflows/v2-root-base.yml`, whose path filter was
+  # broadened to `prototypes/v2/**` + `public/**` + `hosting/web/**` for exactly that reason
+  # (patch P2-2), and after a merge by `web-image` below. Pointing this suite at `/` instead,
+  # and retiring that workflow, is the tidy end state and belongs with #1358.
   #
   # SHARDED across two runners. The suite is wait-bound, not CPU-bound: measured
   # 2026-09-16 on a 4-core box, 100 tests take 245s on three workers and still
@@ -257,8 +265,9 @@ jobs:
           V2_SHARD: ${{ matrix.shard }}
 
       # Every shard builds the export; exactly one uploads it, because two jobs
-      # cannot publish the same artifact name. The deploy job downloads this
-      # name, so it must keep matching `ensemble-v2-static-<sha>` exactly.
+      # cannot publish the same artifact name. Nothing downloads it since the cutover
+      # (#1357) retired the `/v2` publish — retained as this commit's beta-base evidence
+      # until #1358 removes it.
       - uses: actions/upload-artifact@v7
         if: matrix.shard == 'heavy'
         with:
@@ -302,7 +311,15 @@ jobs:
   api-image:
     runs-on: ubuntu-latest
     needs: checks
-    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    # `!inputs.hosting_probe` (#1357 patch P3-2): a read-only probe dispatched from `main`
+    # must not build and PUSH `:sha-<commit>` and `:main` for a commit nobody asked to
+    # release. `inputs` is null on a push, and a null property is falsy, so this changes
+    # nothing for the merge path. `deploy` below accepts these jobs as skipped when, and
+    # only when, the run is that probe.
+    if: >-
+      github.ref == 'refs/heads/main'
+      && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+      && !inputs.hosting_probe
     timeout-minutes: 15
     permissions:
       contents: read
@@ -383,12 +400,14 @@ jobs:
 
   # Publish the v2 music stand as an immutable static image on every merge to main —
   # decision 1 of docs/design/ensemble-v2-rollout.md (#1356), the other half of the pair
-  # `api-image` above already ships. Only the TEST host consumes it (`web-release` below);
-  # production is still published by the rsync/symlink path in the `deploy` job, and `deploy`
-  # deliberately does NOT `needs:` this job, so a red image build cannot hold up today's
-  # release. The required contexts
-  # (`checks`, `e2e-tests`, `v2-checks`) are untouched for the same reason — this publishes an
-  # artifact for the cutover to switch to, it does not gate a merge.
+  # `api-image` above already ships. Since the cutover (#1357) this image IS the site: the
+  # `deploy` job below releases it to production, so it `needs:` this one and a red image
+  # build stops the release outright. That inverts #1356's "must not hold up today's release"
+  # — there is no other release any more.
+  #
+  # The required contexts (`checks`, `e2e-tests`, `v2-checks`) are still untouched: this runs on
+  # the main push only, after the merge, and a merge is gated by what proves the code, not by
+  # what publishes it.
   #
   # `needs: v2-checks` is the analogue of `api-image`'s `needs: checks`: the suite that
   # actually exercises this app has to be green before its bytes are published under a tag a
@@ -398,7 +417,15 @@ jobs:
   web-image:
     runs-on: ubuntu-latest
     needs: v2-checks
-    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    # `!inputs.hosting_probe` (#1357 patch P3-2): a read-only probe dispatched from `main`
+    # must not build and PUSH `:sha-<commit>` and `:main` for a commit nobody asked to
+    # release. `inputs` is null on a push, and a null property is falsy, so this changes
+    # nothing for the merge path. `deploy` below accepts these jobs as skipped when, and
+    # only when, the run is that probe.
+    if: >-
+      github.ref == 'refs/heads/main'
+      && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+      && !inputs.hosting_probe
     timeout-minutes: 20
     permissions:
       contents: read
@@ -480,62 +507,102 @@ jobs:
 
   # Continuous deployment: main IS live. A push to main only happens via a green PR
   # merge, so reaching this job means the full gate already passed on this exact
-  # commit — deploy it. `workflow_dispatch` on main is a manual break-glass redeploy
+  # commit — release it. `workflow_dispatch` on main is a manual break-glass re-release
   # (no new commit).
+  #
+  # Since the cutover (#1357) a release is a TAG, not a file transfer. The two rsync
+  # publishes this job used to run — the v1 root app and the `/v2` export — are gone, with
+  # the artifact downloads, the `static-artifact.mjs verify` step, the Node setup and the
+  # `ensemble-deploy` SSH config that existed only to serve them. They had to go in the same
+  # change that points production at the image: both scripts now REFUSE up front when their
+  # origin serves a root `/build.json` (the "routed to the ensemble-web image" preflight in
+  # `scripts/deploy.sh` and `prototypes/v2/scripts/deploy.mjs`), so leaving the steps here
+  # would fail every merge. #1358 deletes the scripts themselves.
+  #
+  # `web-release` (#1356) is folded in here for the same reason. With the static publish gone
+  # the two jobs were the same job — one tailnet join, one scoped key, one forced command —
+  # and keeping them apart would have cost two tailnet joins and two key installs per merge,
+  # plus the "deploy deliberately does not need web-image" caveat the cutover voids. One job
+  # also means ONE serialization group covering both services, which is what the box's
+  # per-stack lock wants anyway.
+  #
+  # RELEASE ORDER: prod first, then test — the API loop's existing order, now carrying the
+  # web image too. Test-first is the tempting canary and it is the wrong trade here. The
+  # canary already ran: `web-image` pulls the pushed tag back out of the registry and runs the
+  # whole `hosting/web/smoke.mjs` contract against a container started under the stack's own
+  # flags, before anything is released anywhere. What a test-host release would add over that
+  # is "compose can bring this tag up", which is the same code path on both stacks and whose
+  # failure modes are already non-destructive — an absent tag fails before the container is
+  # touched, an unhealthy one is put back on the previous tag. Against that small gain,
+  # test-first lets a staging host withhold the product's release, and hosting/README.md
+  # explicitly allows an operator to point that host's Caddy elsewhere for a v1 audition.
+  # Production does not queue behind staging.
+  #
+  # Within a stack: api, then web. Server before client, so the new stand never meets the
+  # older API; it is one commit either way, and the two recreates are seconds apart.
+  #
+  # "Released" means the PUBLIC ORIGIN serves this commit (#1219's lesson: a release that
+  # reports success while nothing changed), so each host's own `/build.json` is checked after
+  # its release and a merge cannot report success without it.
   #
   # NETWORK: prod is a LAN backend with nothing exposed directly to the internet,
   # so a GitHub-hosted runner cannot reach it directly. It joins the tailnet as an
   # ephemeral, tag:ci node instead — see homelab-maintenance `tailscale/README.md`.
-  # The tailnet policy grants tag:ci SSH to docker04's scoped static-file account;
-  # CI never gets Docker or sudo access. The old LXC hosts (115/116) were retired
-  # and deleted from Proxmox 2026-09-13 — docker04 is the only production target.
+  # The tailnet policy grants tag:ci SSH to docker04's scoped accounts; CI never gets
+  # Docker or sudo access. The old LXC hosts (115/116) were retired and deleted from
+  # Proxmox 2026-09-13 — docker04 is the only production target.
   #
   # Fork PRs cannot reach any of this: secrets are withheld from fork-PR runs, and
   # this job doesn't run on `pull_request` at all. An explicitly dispatched probe
-  # may run on a reviewed branch, but cannot execute the deployment step.
+  # may run on a reviewed branch, but cannot execute the release step.
   deploy:
     runs-on: ubuntu-latest
-    needs: [checks, e2e-tests, v2-checks, api-image]
-    # `api-image` is skipped on a non-main hosting probe, and a skipped `needs`
-    # would skip this job too; spell out that the three gates must have passed
-    # and the image job must have passed or been skipped for that reason only.
+    needs: [checks, e2e-tests, v2-checks, api-image, web-image]
+    # A skipped `needs` would skip this job too, so each image job's acceptable results are
+    # spelled out. `skipped` is acceptable IFF this run is the hosting probe — which since
+    # patch P3-2 is the one case that skips them, on any ref, because a read-only probe must
+    # not push image tags. The five reachable cases:
+    #
+    #   main push                    images run   -> success required, release runs
+    #   main dispatch (no probe)     images run   -> success required, release runs
+    #   main dispatch + probe        images skipped -> allowed, probe steps only
+    #   non-main dispatch + probe    images skipped -> allowed, probe steps only
+    #   pull_request                 images skipped -> last clause false, this job skips
+    #
+    # The old `github.ref != 'refs/heads/main'` allowance is gone: it could only ever be
+    # reached together with `hosting_probe` (the last clause refuses a non-main dispatch
+    # without it), and after P3-2 it would have been wrong anyway — a main-ref probe now
+    # skips the image jobs too.
     if: >-
       !cancelled()
       && needs.checks.result == 'success'
       && needs.e2e-tests.result == 'success'
       && needs.v2-checks.result == 'success'
-      && (needs.api-image.result == 'success' || (needs.api-image.result == 'skipped' && github.ref != 'refs/heads/main'))
+      && (needs.api-image.result == 'success' || (needs.api-image.result == 'skipped' && inputs.hosting_probe))
+      && (needs.web-image.result == 'success' || (needs.web-image.result == 'skipped' && inputs.hosting_probe))
       && ((github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')) || (github.event_name == 'workflow_dispatch' && inputs.hosting_probe))
-    timeout-minutes: 10
+    # The honest worst case, added up rather than guessed: the box-side per-stack lock waits up
+    # to 4 min, there are four healthcheck waits, and each of the two origin checks retries ten
+    # times at up to 10s of curl plus a 6s sleep — ~2.7 min apiece. Tailscale and the key install
+    # are another minute. 20 did not cover that.
+    timeout-minutes: 30
     env:
       PROD_DEPLOY_HOST: ${{ vars.PROD_DEPLOY_DOCKER_HOST }}
-      DEPLOY_SSH_USER: ensemble-deploy
-    # Serialize deploys across ALL runs. On the old self-hosted setup this came free
-    # from having exactly one runner; hosted runners really do run in parallel, so it
-    # has to be stated. Never cancel-in-progress — an interrupted rsync is a
-    # half-deployed site.
+    # Serialize releases across ALL runs, so they land in merge order. Without this, merge
+    # B's job can overtake merge A's and leave the hosts on A — with both jobs green, since
+    # each verifies only its own sha. Hosted runners really do run in parallel, so it has to
+    # be stated. Never cancel-in-progress: an interrupted release is a stack half-way
+    # between two tags.
+    # GitHub keeps at most one PENDING run per group, so a third merge arriving while the
+    # first is still releasing replaces the second in the queue — which is right, not a loss:
+    # the newer commit contains the older one, so releasing it releases both.
     concurrency:
       group: deploy-prod
       cancel-in-progress: false
+    # No checkout and no Node: every step below is ssh and curl. The release names a tag the
+    # image jobs already published; nothing in this job reads the repository.
     steps:
-      - uses: actions/checkout@v7
-
-      - name: Use Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version-file: '.nvmrc'
-          cache: 'npm'
-
-      - name: Download the gated production artifact
-        uses: actions/download-artifact@v8
-        with:
-          name: ensemble-static-${{ github.sha }}
-          path: dist/
-
-      - name: Verify artifact bytes and checkout provenance
-        run: node scripts/static-artifact.mjs verify dist prod
-
-      - name: Validate the deploy target
+      - name: Validate the release target
         run: |
           [[ "$PROD_DEPLOY_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*$ ]] \
             || { echo '::error::Missing or invalid PROD_DEPLOY_DOCKER_HOST variable'; exit 1; }
@@ -556,175 +623,25 @@ jobs:
       #                     all — a confusing failure that looks like a firewall.
       #   --accept-dns=false  Keeps the runner on GitHub's resolver. Otherwise it
       #                     inherits pi-hole through the subnet router, which makes
-      #                     npm installs depend on the LAN's DNS and makes deploy.sh's
-      #                     post-deploy check resolve ensemble.brndn.zip split-horizon
+      #                     npm installs depend on the LAN's DNS and makes the origin
+      #                     checks below resolve ensemble.brndn.zip split-horizon
       #                     instead of over the public path a real visitor takes.
       - name: Accept subnet routes, keep GitHub's DNS
         run: sudo tailscale set --accept-routes --accept-dns=false
 
-      # Fail here with a clear message rather than 10 minutes later as an opaque
-      # rsync timeout, if the tailnet path or the policy grant is wrong.
-      - name: Verify the deploy target is reachable
+      # Fail here with a clear message rather than minutes later as an opaque ssh
+      # timeout, if the tailnet path or the policy grant is wrong.
+      - name: Verify the release target is reachable
         run: |
           tailscale status --peers=false
           timeout 20 bash -c "until </dev/tcp/$PROD_DEPLOY_HOST/22; do sleep 1; done" \
             || { echo "::error::Cannot reach $PROD_DEPLOY_HOST:22 over the tailnet — check the tag:ci grant in the tailnet policy."; exit 1; }
 
-      # Materialize the `ensemble-admin` ssh alias that deploy.sh targets, from
-      # the dedicated CI deploy key (a scoped keypair — not the laptop's key).
-      # Secrets go through env, never interpolated into the command line.
-      - name: Configure deploy SSH
-        env:
-          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
-        run: |
-          mkdir -p ~/.ssh && chmod 700 ~/.ssh
-          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/ci_deploy_key
-          chmod 600 ~/.ssh/ci_deploy_key
-          {
-            echo "Host ensemble-admin"
-            echo "  HostName $PROD_DEPLOY_HOST"
-            echo "  User $DEPLOY_SSH_USER"
-            echo "  IdentityFile ~/.ssh/ci_deploy_key"
-            echo "  IdentitiesOnly yes"
-            echo "  StrictHostKeyChecking accept-new"
-          } >> ~/.ssh/config
-
-      # The API release goes through a SECOND, separately scoped account (#1219):
-      # `ensemble-release`, whose key is a forced command that accepts only
-      # `release <stack> api sha-<sha>` and sudoes into one root-owned script on
-      # docker04 (homelab-maintenance docker/ensemble/release/). CI still holds
-      # no shell, no docker socket and no sudo of its own.
-      - name: Configure API release SSH
-        env:
-          API_RELEASE_SSH_KEY: ${{ secrets.API_RELEASE_SSH_KEY }}
-        run: |
-          [[ -n "$API_RELEASE_SSH_KEY" ]] || { echo '::error::Missing API_RELEASE_SSH_KEY secret'; exit 1; }
-          printf '%s\n' "$API_RELEASE_SSH_KEY" > ~/.ssh/ci_release_key
-          chmod 600 ~/.ssh/ci_release_key
-          {
-            echo "Host ensemble-release"
-            echo "  HostName $PROD_DEPLOY_HOST"
-            echo "  User ensemble-release"
-            echo "  IdentityFile ~/.ssh/ci_release_key"
-            echo "  IdentitiesOnly yes"
-            echo "  StrictHostKeyChecking accept-new"
-          } >> ~/.ssh/config
-
-      - name: Probe docker04 without deploying
-        if: inputs.hosting_probe
-        run: |
-          ssh ensemble-admin 'bash -s' <<'REMOTE'
-          set -euo pipefail
-          [[ $(id -un) = ensemble-deploy && $(id -Gn) = ensemble-deploy ]]
-          [[ $(cat /srv/ensemble-prod/www/.ensemble-static-root) = ensemble-static-v1 ]]
-          test -w /srv/ensemble-prod/www
-          test ! -w /srv/ensemble-test/www
-          test ! -w /srv/ensemble-prod/nginx.conf
-          test ! -w /var/run/docker.sock
-          cd /srv/ensemble-prod/www/current
-          sha256sum --check --strict --quiet .ensemble-checksums
-          REMOTE
-
-      - name: Probe the API release account without releasing
-        if: inputs.hosting_probe
-        run: |
-          set -euo pipefail
-          refused() { ! ssh -o BatchMode=yes ensemble-release "$@" >/dev/null 2>&1; }
-          refused 'id'                                   # no shell
-          refused 'release breakscope api sha-'"$GITHUB_SHA"   # foreign stack
-          refused 'release ensemble api latest'          # floating tag
-          refused 'release ensemble api sha-abc'         # short tag
-          refused 'release ensemble static sha-'"$GITHUB_SHA"  # wrong service
-          refused 'release ensembletest web latest'      # web is accepted (#1356), a floating tag is not
-          echo 'ensemble-release refuses every malformed command'
-          for port in 8090 8091 2375 2376; do
-            if timeout 3 bash -c 'exec 3<>/dev/tcp/$1/$2' _ "$PROD_DEPLOY_HOST" "$port" 2>/dev/null; then
-              echo "::error::CI unexpectedly reached backend port $port"; exit 1
-            fi
-          done
-
-      - name: Deploy to prod
-        if: ${{ github.ref == 'refs/heads/main' && !inputs.hosting_probe }}
-        run: ./scripts/deploy.sh prod --artifact dist
-
-      # Second release on the same merge: the v2 music stand at /v2. Same scoped
-      # account and key; its own immutable release dir + symlink swap under the
-      # prod static root, verified over the public origin. The root app was
-      # already activated above and must be byte-identical afterwards.
-      - name: Download the gated v2 artifact
-        if: ${{ github.ref == 'refs/heads/main' && !inputs.hosting_probe }}
-        uses: actions/download-artifact@v8
-        with:
-          name: ensemble-v2-static-${{ github.sha }}
-          path: prototypes/v2/out/
-
-      - name: Deploy the v2 music stand to prod
-        if: ${{ github.ref == 'refs/heads/main' && !inputs.hosting_probe }}
-        run: node scripts/deploy.mjs prod
-        working-directory: prototypes/v2
-
-      # Roll the image this exact commit built (api-image above) into prod, then
-      # test (test follows main until a branch-audition need appears). The script
-      # on the box waits for the healthcheck and rolls back on failure, so a red
-      # step here means the API is still serving the previous tag.
-      - name: Release the account API
-        if: ${{ github.ref == 'refs/heads/main' && !inputs.hosting_probe }}
-        run: |
-          set -euo pipefail
-          for stack in ensemble ensembletest; do
-            ssh -o BatchMode=yes ensemble-release "release $stack api sha-$GITHUB_SHA"
-          done
-
-  # Roll the image `web-image` just published into the TEST stack (#1356) — the staging
-  # host serves the v2 stand at `/` from it, ahead of the prod flip (#1357, which adds
-  # `ensemble` to this loop and nothing else). Its own job, not a step in `deploy`:
-  # `deploy` deliberately does not wait on `web-image`, and nothing here may hold up or
-  # fail today's production release. `needs: deploy` only orders this after the API
-  # release of the same merge; the box serializes releases per stack regardless
-  # (homelab-maintenance docker/ensemble/release/ensemble-release takes a lock).
-  #
-  # Same scoped account and key as the API release: a forced command that accepts only
-  # `release <stack> <api|web> sha-<sha>`. The script waits for the container's
-  # healthcheck and otherwise recreates it at the previous tag (on a first release, at the
-  # rendered default), so a red job means the test host is NOT serving this commit's image
-  # — including when the tag does not exist, which fails before the container is touched.
-  web-release:
-    runs-on: ubuntu-latest
-    needs: [web-image, deploy]
-    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && !inputs.hosting_probe))
-    # The box-side lock wait (4 min) plus two health waits is the honest worst case.
-    timeout-minutes: 15
-    # Releases land in merge order. Without this, merge B's job can overtake merge A's and
-    # leave the host on A — with both jobs green, since each verifies only its own sha.
-    # A newer pending run replacing an older pending one is exactly right here.
-    concurrency:
-      group: web-release
-      cancel-in-progress: false
-    env:
-      PROD_DEPLOY_HOST: ${{ vars.PROD_DEPLOY_DOCKER_HOST }}
-    steps:
-      - name: Validate the release target
-        run: |
-          [[ "$PROD_DEPLOY_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*$ ]] \
-            || { echo '::error::Missing or invalid PROD_DEPLOY_DOCKER_HOST variable'; exit 1; }
-
-      - name: Connect to Tailscale
-        uses: tailscale/github-action@v4
-        with:
-          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
-          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
-          tags: tag:ci
-          use-cache: 'true'
-
-      # See the `deploy` job for why both flags are spelled out.
-      - name: Accept subnet routes, keep GitHub's DNS
-        run: sudo tailscale set --accept-routes --accept-dns=false
-
-      - name: Verify the release target is reachable
-        run: |
-          timeout 20 bash -c "until </dev/tcp/$PROD_DEPLOY_HOST/22; do sleep 1; done" \
-            || { echo "::error::Cannot reach $PROD_DEPLOY_HOST:22 over the tailnet — check the tag:ci grant in the tailnet policy."; exit 1; }
-
+      # Every release goes through ONE scoped account (#1219): `ensemble-release`, whose key
+      # is a forced command that accepts only `release <stack> <api|web> sha-<sha>` and sudoes
+      # into one root-owned script on docker04 (homelab-maintenance docker/ensemble/release/).
+      # CI holds no shell, no docker socket and no sudo of its own. Secrets go through env,
+      # never interpolated into the command line.
       - name: Configure release SSH
         env:
           API_RELEASE_SSH_KEY: ${{ secrets.API_RELEASE_SSH_KEY }}
@@ -742,23 +659,70 @@ jobs:
             echo "  StrictHostKeyChecking accept-new"
           } >> ~/.ssh/config
 
-      - name: Release the web image to the test stack
+      # A `workflow_dispatch` probe exercises the release account NEGATIVELY instead of
+      # releasing: shell, foreign stack, floating tag, short tag and wrong service must all
+      # be refused, and CI must not be able to reach a backend port directly.
+      - name: Probe the release account without releasing
+        if: inputs.hosting_probe
         run: |
           set -euo pipefail
-          ssh -o BatchMode=yes ensemble-release "release ensembletest web sha-$GITHUB_SHA"
-
-      # "Released" has to mean the image is what the public origin serves (#1219's lesson:
-      # a release that reports success while nothing changed). The image's /build.json
-      # names the commit it was built from; the origin must answer with this one.
-      - name: Verify the test host serves this commit's image
-        run: |
-          set -euo pipefail
-          for attempt in $(seq 1 10); do
-            body=$(curl -fsS --max-time 10 -H 'Cache-Control: no-cache' "https://ensembletest.brndn.zip/build.json?release=$GITHUB_SHA" || true)
-            if grep -Eq "\"sourceRevision\":[[:space:]]*\"$GITHUB_SHA\"" <<<"$body"; then
-              echo "ensembletest serves $GITHUB_SHA"; exit 0
+          refused() { ! ssh -o BatchMode=yes ensemble-release "$@" >/dev/null 2>&1; }
+          refused 'id'                                   # no shell
+          refused 'release breakscope api sha-'"$GITHUB_SHA"   # foreign stack
+          refused 'release ensemble api latest'          # floating tag
+          refused 'release ensemble api sha-abc'         # short tag
+          refused 'release ensemble static sha-'"$GITHUB_SHA"  # wrong service
+          refused 'release ensembletest web latest'      # web is accepted (#1356), a floating tag is not
+          echo 'ensemble-release refuses every malformed command'
+          for port in 8090 8091 2375 2376; do
+            if timeout 3 bash -c 'exec 3<>/dev/tcp/$1/$2' _ "$PROD_DEPLOY_HOST" "$port" 2>/dev/null; then
+              echo "::error::CI unexpectedly reached backend port $port"; exit 1
             fi
-            sleep 6
           done
-          echo "::error::ensembletest.brndn.zip/build.json does not name $GITHUB_SHA: $body" >&2
-          exit 1
+
+      # Roll the images this exact commit built (`api-image` and `web-image` above) into prod,
+      # then test. The script on the box waits for each healthcheck and otherwise recreates the
+      # service at the previous tag — on a first release, at the rendered default — so a red
+      # step here means that host is still serving what it served before, including when the
+      # tag does not exist at all, which fails before the container is touched.
+      - name: Release this commit to prod, then test
+        if: ${{ github.ref == 'refs/heads/main' && !inputs.hosting_probe }}
+        run: |
+          set -euo pipefail
+          release() {
+            ssh -o BatchMode=yes ensemble-release "release $1 $2 sha-$GITHUB_SHA"
+          }
+          # The image's /build.json names the commit it was built from; the ORIGIN must
+          # answer with this one, through the public path a visitor takes.
+          #
+          # No `-f`: it makes curl exit non-zero AND discard the body, so a 502 from the edge
+          # or a 404 from a mis-pointed Caddy handle used to report as an empty string — the
+          # two failures this check is most likely to actually catch, and the two it said
+          # least about. `-w` appends the status on its own line instead, and both halves are
+          # printed. stderr is dropped rather than merged: an interleaved curl message would
+          # land after the status line and take the status's place in the split below, and a
+          # transport failure already reports itself as `000`.
+          serving() {
+            local origin="$1" reply='' status='' body=''
+            for _ in $(seq 1 10); do
+              reply=$(curl -sS --max-time 10 -H 'Cache-Control: no-cache' \
+                -w $'\n%{http_code}' "$origin/build.json?release=$GITHUB_SHA" 2>/dev/null) \
+                || reply=$'\n000'
+              status=${reply##*$'\n'}
+              body=${reply%$'\n'*}
+              if [[ $status == 2* ]] \
+                && grep -Eq "\"sourceRevision\":[[:space:]]*\"$GITHUB_SHA\"" <<<"$body"; then
+                echo "$origin serves $GITHUB_SHA"
+                return 0
+              fi
+              sleep 6
+            done
+            echo "::error::$origin/build.json did not name $GITHUB_SHA (last HTTP ${status:-none}): ${body:0:400}" >&2
+            return 1
+          }
+          release ensemble api
+          release ensemble web
+          serving https://ensemble.brndn.zip
+          release ensembletest api
+          release ensembletest web
+          serving https://ensembletest.brndn.zip

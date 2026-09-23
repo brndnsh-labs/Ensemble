@@ -24,7 +24,7 @@ function render(environment: string, env: Record<string, string | undefined>) {
 describe.skipIf(!hasCompose)('hosting/static/render.mjs', () => {
     it.each([
         ['test', 'ensembletest', '8092', '8094', 'open'],
-        ['prod', 'ensemble', '8093', '8095', 'closed'],
+        ['prod', 'ensemble', '8093', '8095', 'open'],
     ])(
         '%s keeps both tag interpolations and the on-box env file',
         (environment, stack, port, webPort, registration) => {
