@@ -30,8 +30,8 @@ default (#1357); `?accounts=off` is the per-device way out, offered back on the 
 **A device that has never held an account still asks the server nothing** — not the session
 read, and so not the account database either (`deviceMayHoldAccount` in `lib/account/feature.ts`,
 which records why: on WebKit that one request, failing during an offline load, took the GUEST
-songbook with it). Prod registration is an on-box policy value, not a repository one. The v1 source and its CI jobs are deleted by #1358, after
-the flip has held. The plan is [the rollout](../../docs/design/ensemble-v2-rollout.md).
+songbook with it). Prod registration is an on-box policy value, not a repository one. The v1 source, its build
+and its CI jobs were deleted in #1358; `public/` remains as the engine library this app imports. The plan is [the rollout](../../docs/design/ensemble-v2-rollout.md).
 
 Human gates are unchanged: a device or listening gate is still a hard stop, and a merged commit
 does not clear one. Record the commit SHA, checks and remaining gate so another agent does not
@@ -159,10 +159,10 @@ isolation/integration; shared fixtures, configs and the large app component are 
 Suggested prompt once a child is filed and ready:
 
 > Work on Ensemble v2 issue #NUMBER. Read CLAUDE.md and prototypes/v2/CLAUDE.md, then the
-> issue and its dependencies. Branch from main and run the normal cycle. If the story touches
-> `public/`, treat it as live production code; if it is confined to `prototypes/`, merging it
-> still releases nothing to users. Stay within acceptance criteria, stop for unresolved
-> decisions and human gates, and leave a test/commit receipt.
+> issue and its dependencies. Branch from main and run the normal cycle. A merge releases this
+> app to production, whether the story touches `public/` or only `prototypes/`. Stay within
+> acceptance criteria, stop for unresolved decisions and human gates, and leave a test/commit
+> receipt.
 
 The broader design parents are not single implementation tasks. Pick a ready child; never run
 an unattended cycle across the entire account or full-iReal umbrella.
