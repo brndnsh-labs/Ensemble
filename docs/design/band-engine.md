@@ -92,8 +92,18 @@ physical: its range, its strum speed, whether it sustains.
   doubled. A muted scratch deadens the grip the hand is holding.
 - **Strum is time, so it lives in `feel/`**: a stroked chord rolls low→high (down) or high→low
   (up) at the instrument's `strumMs`, and takes tier-3 placement as one gesture.
-- **A guitar that is the bass.** The bossa guitarist's thumb plays root and fifth only when the
-  bass lane is off: the band's `heard`/plan data decides who owns the bottom.
+- **Who owns the bottom.** With a bass in the band, grips stay above C3 — except the chord's bass
+  note itself: the swing shell (`rootBottom`, one muted string skipped: `8x89xx`) puts its root
+  on the low strings, doubling the walking bass on purpose. With the bass lane off, a book's
+  `alone` shape takes over: rock plays full root-position chords, and the bossa grip carries
+  the root on its bottom string while the thumb fills root/fifth between plucks.
+- **Idiom physics.** Open strings are off where the idiom mutes by releasing the fretting hand
+  (the swing chunk, the funk scratch). A funk chank is staccato. A scratch after an
+  anticipation deadens the grip already held, never the old one. An upstroke catches the top
+  three strings. The organ holds each chord to the next strike, across barlines, until an N.C.
+- **Voicing laws for every instrument.** A written b13, #11 or 13 takes the 5th's seat; 7#9
+  plays 3-b7-#9; half-diminished always sounds its b5. Close intervals obey low-interval limits
+  (a minor 3rd no lower than C3, a major 3rd no lower than Bb2, …).
 
 Idioms write whole-bar patterns for 4/4 and pulse cells for other meters. Every meter the codec
 accepts plays; only 4/4 is idiomatic in v0.

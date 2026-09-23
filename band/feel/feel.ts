@@ -81,17 +81,34 @@ export function applyFeel(
     const pair = (settings.swingGrid ?? feel.swingGrid) === 8 ? PPQ : PPQ / 2;
     const human = (settings.humanize ?? feel.humanize) / 100;
     const strumMs = settings.strumMs ?? 0;
+    // Swing an absolute tick within the bar it falls in — a note's end can land in the next
+    // bar, whose meter may swing differently (or not at all).
+    const starts = timeline.bars.map((b) => b.start);
+    const swingAt = (t: number) => {
+        let lo = 0;
+        let hi = starts.length - 1;
+        while (lo < hi) {
+            const mid = (lo + hi + 1) >> 1;
+            if (starts[mid] <= t) {
+                lo = mid;
+            } else {
+                hi = mid - 1;
+            }
+        }
+        const bar = timeline.bars[lo];
+        return bar.meter.quarterPulse && ratio !== 0.5 && t < bar.start + bar.meter.barTicks
+            ? bar.start + warp(t - bar.start, pair, ratio)
+            : t;
+    };
     const strum = strumMs ? strumOrder(events) : null;
     return events.map((event) => {
         const bar = timeline.bars[event.bar];
         let { tick } = event;
         let dur = event.lane === 'drums' ? 0 : event.dur;
-        if (bar.meter.quarterPulse && ratio !== 0.5) {
-            const offset = tick - bar.start;
-            const swung = bar.start + warp(offset, pair, ratio);
+        if (ratio !== 0.5) {
+            const swung = swingAt(tick);
             if (dur) {
-                const end = warp(offset + dur, pair, ratio) + bar.start;
-                dur = Math.max(1, end - swung);
+                dur = Math.max(1, swingAt(tick + dur) - swung);
             }
             tick = swung;
         }

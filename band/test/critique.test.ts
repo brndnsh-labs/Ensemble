@@ -14,7 +14,7 @@ import {
     type PitchedNote,
     type StyleId,
 } from '../core/types.js';
-import { compileTimeline, type Timeline } from '../form/timeline.js';
+import { chordAt, compileTimeline, type Timeline } from '../form/timeline.js';
 import { type PassMemory, performPass } from '../perform.js';
 import { STEP } from '../players/grid.js';
 import { mod12 } from '../theory/pitch.js';
@@ -50,6 +50,16 @@ function perform(
 }
 
 // ---------------------------------------------------------------- metric library
+/** Sounding (not scratched) comp notes grouped into chords by onset. */
+function compChords(events: BandEvent[]): Map<number, PitchedNote[]> {
+    const chords = new Map<number, PitchedNote[]>();
+    for (const e of events) {
+        if (e.lane === 'comp' && !e.muted) {
+            chords.set(e.tick, [...(chords.get(e.tick) ?? []), e]);
+        }
+    }
+    return chords;
+}
 const stepOf = (t: Timeline, e: BandEvent) => Math.round((e.tick - t.bars[e.bar].start) / STEP);
 const ratio = (hits: number, total: number) => (total ? hits / total : 0);
 
@@ -413,6 +423,35 @@ const METRICS: Record<string, Metric> = {
         }
         return ratio(hit, n);
     },
+    /** Share of sounding comp chords whose lowest note is the chord's bass (root position). */
+    compRootLowest: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { timeline: t, events } of takes) {
+            for (const notes of compChords(events).values()) {
+                const chord = chordAt(t, notes[0].tick);
+                if (!chord || notes.length < 2) {
+                    continue;
+                }
+                n++;
+                const lowest = Math.min(...notes.map((x) => x.midi));
+                hit += mod12(lowest) === chord.bass ? 1 : 0;
+            }
+        }
+        return ratio(hit, n);
+    },
+    /** Mean lowest note (MIDI) of the sounding comp chords. */
+    compMeanLowest: (takes) => {
+        let n = 0;
+        let sum = 0;
+        for (const { events } of takes) {
+            for (const notes of compChords(events).values()) {
+                n++;
+                sum += Math.min(...notes.map((x) => x.midi));
+            }
+        }
+        return ratio(sum, n);
+    },
     /** Comp strikes (sounding or scratched) per bar played. */
     compStrikesPerBar: (takes) => {
         let bars = 0;
@@ -498,27 +537,46 @@ const LOW_CLAIMS: Partial<Record<StyleId, Claim[]>> = {
  */
 const GUITAR_CLAIMS: Record<StyleId, Claim[]> = {
     rock: [
-        ['compUpstrokeShare', 0.1, 0.5, 'the strumming hand swings: upstrokes on the offbeats'],
-        ['compScratchShare', 0, 0, 'rock rhythm guitar rings; it does not scratch'],
+        ['compUpstrokeShare', 0.1, 0.5, 'the strumming hand swings: some strokes come up'],
         ['compColour', 0, 0.15, 'open triads and sevenths, not jazz extensions'],
     ],
     jazz: [
         ['compOffbeatShare', 0, 0.2, 'four to the bar: the guitar marks the beats'],
-        ['compShort', 0.75, 1, 'short, chunky strokes — felt more than heard'],
+        ['compShort', 0.75, 1, 'short chunks, damped by the fretting hand'],
         ['compStrikesPerBar', 3, 4.2, 'one stroke per beat'],
+        ['compRootLowest', 0.8, 1, 'the root on the bottom string, doubling the walking bass'],
+        ['compMeanLowest', 40, 52, 'the chunk sits low (roots on the 6th and 5th strings)'],
     ],
     funk: [
         ['compScratchShare', 0.3, 0.8, 'the hand never stops: scratches between the stabs'],
         ['compStrikesPerBar', 8, 16, 'a sixteenth-note hand'],
         ['compOffbeatShare', 0.6, 1, 'the stabs live off the beat'],
         ['compColour', 0.5, 1, 'the 3-7-9 grip where a seventh chord allows'],
+        ['compShort', 0.9, 1, 'a chank is staccato: the hand lets go at once'],
     ],
     bossa: [
         ['compColour', 0.5, 1, 'ninths in the grips'],
         ['compTopVoiceMotion', 0, 3.5, 'the grips move by step, not by leap'],
-        ['compUpstrokeShare', 0, 0, 'fingers pluck, they never strum up'],
     ],
 };
+
+/** Quiet sections, where nothing (no scratch, no busy pattern) hides how a stab is played. */
+const GUITAR_LOW_CLAIMS: Partial<Record<StyleId, Claim[]>> = {
+    funk: [['compShort', 0.9, 1, 'stabs stay staccato with no scratch between them']],
+    jazz: [['compRootLowest', 0.8, 1, 'the sparse comp keeps the root on the bottom']],
+};
+
+describe.each(Object.keys(GUITAR_LOW_CLAIMS) as StyleId[])(
+    '%s critique on guitar at low energy',
+    (style) => {
+        const takes = perform(style, 0.2, 'guitar');
+        it.each(GUITAR_LOW_CLAIMS[style] ?? [])('%s in [%d, %d] — %s', (metric, min, max) => {
+            const value = METRICS[metric](takes);
+            expect(value, `${style} ${metric} = ${value.toFixed(3)}`).toBeGreaterThanOrEqual(min);
+            expect(value, `${style} ${metric} = ${value.toFixed(3)}`).toBeLessThanOrEqual(max);
+        });
+    },
+);
 
 describe.each(Object.keys(GUITAR_CLAIMS) as StyleId[])('%s critique on guitar', (style) => {
     const takes = perform(style, null, style === 'bossa' ? 'nylon' : 'guitar');

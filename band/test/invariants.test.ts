@@ -12,7 +12,7 @@ import {
     type PitchedNote,
 } from '../core/types.js';
 import { MAX_CHARACTER_MS } from '../feel/feel.js';
-import { compileTimeline, type Timeline } from '../form/timeline.js';
+import { chordAt, compileTimeline, type Timeline } from '../form/timeline.js';
 import { performPass } from '../perform.js';
 import { isPlayable } from '../players/comp/fretboard.js';
 import { COMP_INSTRUMENTS } from '../players/comp/instruments.js';
@@ -29,7 +29,10 @@ const BASS_REGISTER = [23, 57] as const;
  * a finger-plucked guitar). Rhodes and clav play the keyboard book exactly as the piano does.
  */
 const INSTRUMENTS: CompInstrument[] = ['piano', 'organ', 'guitar', 'nylon'];
-/** With a bassist in the band, a guitar grip stays off the low strings. */
+/**
+ * With a bassist in the band, a guitar stays off the low strings — except for the chord's
+ * bass note itself (the swing shell's root, doubling the walking bass on purpose).
+ */
 const GUITAR_FLOOR_WITH_BASS = 48;
 
 describe.each(STYLE_IDS)('%s invariants', (styleId) => {
@@ -37,8 +40,13 @@ describe.each(STYLE_IDS)('%s invariants', (styleId) => {
     for (const [name, score] of Object.entries(FIXTURES)) {
         const timeline = compileTimeline(score);
         for (const comp of INSTRUMENTS) {
-            for (const looping of [true, false]) {
-                it(`${name} on ${comp}${looping ? ' (looping)' : ' (ending)'}`, () => {
+            // Guitars also play without a bassist: the grips come down, the bossa thumb plays.
+            const bassless = COMP_INSTRUMENTS[comp].family === 'guitar' ? [false, true] : [false];
+            for (const [looping, noBass] of [true, false].flatMap((l) =>
+                bassless.map((b) => [l, b] as const),
+            )) {
+                const label = `${name} on ${comp}${noBass ? ' without bass' : ''}`;
+                it(`${label}${looping ? ' (looping)' : ' (ending)'}`, () => {
                     const problems: string[] = [];
                     for (const seed of SEEDS) {
                         const settings: BandSettings = {
@@ -46,13 +54,21 @@ describe.each(STYLE_IDS)('%s invariants', (styleId) => {
                             style: styleId,
                             comp,
                             seed,
+                            lanes: { drums: true, bass: !noBass, comp: true },
                         };
                         const first = performPass(timeline, settings, { pass: 0, looping });
                         const again = performPass(timeline, settings, { pass: 0, looping });
                         if (JSON.stringify(again.events) !== JSON.stringify(first.events)) {
                             problems.push(`${seed}: not deterministic`);
                         }
-                        checkPass(timeline, first.events, style.feel.lean, comp, seed, problems);
+                        checkPass(
+                            timeline,
+                            first.events,
+                            style.feel.lean,
+                            settings,
+                            seed,
+                            problems,
+                        );
                         // The second time round continues from the first pass's memory.
                         const second = performPass(timeline, settings, {
                             pass: 1,
@@ -63,7 +79,7 @@ describe.each(STYLE_IDS)('%s invariants', (styleId) => {
                             timeline,
                             second.events,
                             style.feel.lean,
-                            comp,
+                            settings,
                             `${seed}/pass1`,
                             problems,
                         );
@@ -84,7 +100,7 @@ function checkPass(
     timeline: Timeline,
     events: BandEvent[],
     lean: Record<'bass' | 'comp', number>,
-    comp: CompInstrument,
+    settings: BandSettings,
     where: string,
     problems: string[],
 ) {
@@ -93,7 +109,7 @@ function checkPass(
     if (!events.length) {
         problems.push(`${where}: silent`);
     }
-    const instrument = COMP_INSTRUMENTS[comp];
+    const instrument = COMP_INSTRUMENTS[settings.comp];
     const strummed = strumRanks(events);
     const lastPitch = new Map<string, PitchedNote>();
     for (const e of events) {
@@ -122,7 +138,9 @@ function checkPass(
         if (
             e.lane === 'comp' &&
             instrument.family === 'guitar' &&
-            e.midi < GUITAR_FLOOR_WITH_BASS
+            settings.lanes.bass &&
+            e.midi < GUITAR_FLOOR_WITH_BASS &&
+            mod12(e.midi) !== chordAt(timeline, e.tick)?.bass
         ) {
             fail(e, `guitar ${e.midi} in the bass's register`);
         }
@@ -175,12 +193,14 @@ function checkPass(
         const pcs = new Set(notes.map((n) => mod12(n.midi)));
         const carries = (c: typeof here) =>
             !!c && c.guides.every((g) => pcs.has(mod12(c.root + g)));
-        // A single note is a bossa thumb (the bass role), not a chord.
-        if (notes.length > 1 && !(carries(here) || carries(nextInBar) || carries(next))) {
+        // A single note is a bossa thumb (the bass role), not a chord; an upstroke catches
+        // only the top strings — the downstroke before it carried the chord.
+        const up = notes[0].stroke === 'up';
+        if (notes.length > 1 && !up && !(carries(here) || carries(nextInBar) || carries(next))) {
             fail(notes[0], `comp chord lacks the guide tones of ${here?.symbol}`);
         }
-        // Every guitar chord is one a hand can fret.
-        const grip = notes.filter((n) => n.midi >= GUITAR_FLOOR_WITH_BASS).map((n) => n.midi);
+        // Every guitar chord — thumb and fingers together — is one a hand can fret.
+        const grip = notes.map((n) => n.midi);
         if (instrument.family === 'guitar' && grip.length > 1 && !isPlayable(grip)) {
             fail(notes[0], `unplayable grip ${grip.join(',')}`);
         }

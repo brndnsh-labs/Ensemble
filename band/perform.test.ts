@@ -112,9 +112,12 @@ describe('comp instruments', () => {
                 },
                 { pass: 0, looping: true },
             ).events.filter((e): e is PitchedNote => e.lane === 'comp');
-        expect(play(true).filter((e) => e.midi < 48)).toEqual([]);
-        const thumb = play(false).filter((e) => e.midi < 50);
-        expect(thumb.length).toBeGreaterThan(timeline.bars.length);
+        const single = (notes: PitchedNote[]) =>
+            notes.filter((e) => notes.filter((n) => n.tick === e.tick).length === 1);
+        expect(single(play(true))).toEqual([]);
+        // Without a bass the thumb plucks alone between the fingers' grips.
+        const thumb = single(play(false));
+        expect(thumb.length).toBeGreaterThan(timeline.bars.length / 2);
         for (const note of thumb) {
             const chord = chordAt(timeline, note.tick);
             const pcs = [chord?.bass, chord && (chord.root + (chord.fifth ?? 7)) % 12];

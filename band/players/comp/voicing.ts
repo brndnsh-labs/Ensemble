@@ -13,6 +13,11 @@ export interface Slot {
     lo: number;
     hi: number;
     top: number;
+    /**
+     * How strongly the top voice is pulled to `top` (default 0.35). A funk guitarist stays in
+     * one position on the neck; smooth voice leading alone would let the grips drift away.
+     */
+    pull?: number;
 }
 
 /** The keyboard comp's register slot. */
@@ -30,6 +35,25 @@ function thirteenth(chord: ChordFacts): number {
     return has(chord, 8) && chord.fifth !== 8 ? 8 : (chord.implied?.thirteenth ?? 9);
 }
 
+/**
+ * What sits in the 5th's seat of a four-note voicing: a written b13, #11 (or a dominant's
+ * 13) replaces the plain 5th, because that colour is what the chart asks to hear. An altered
+ * dominant has no 5th at all.
+ */
+function fifthSeat(chord: ChordFacts): number {
+    const written = chord.tensions;
+    if (written.includes(8)) {
+        return 8;
+    }
+    if (written.includes(6)) {
+        return 6;
+    }
+    if (chord.family === 'dominant' && written.includes(9)) {
+        return 9;
+    }
+    return chord.fifth ?? 7;
+}
+
 /** The tones (semitones above the root, < 12) a voicing kind plays for a chord. */
 export function voicingTones(chord: ChordFacts, kind: VoicingKind): number[] {
     const third = chord.third ?? (has(chord, 5) ? 5 : has(chord, 2) ? 2 : null);
@@ -44,7 +68,10 @@ export function voicingTones(chord: ChordFacts, kind: VoicingKind): number[] {
     }
     switch (kind) {
         case 'close': {
-            const tones = [0, third ?? 7, fifth];
+            if (chord.family === 'dominant' && chord.third === 4 && written.includes(3)) {
+                return [0, 4, 10, 3]; // the "Hendrix" 7#9: root, 3rd, b7, #9 on top
+            }
+            const tones = [0, third ?? 7, colour !== null ? fifthSeat(chord) : fifth];
             if (colour !== null) {
                 tones.push(colour);
             } else if (written.length) {
@@ -75,6 +102,9 @@ export function voicingTones(chord: ChordFacts, kind: VoicingKind): number[] {
             if (colour === null) {
                 return [...new Set([0, third ?? 7, fifth])];
             }
+            if (chord.family === 'half-diminished') {
+                return [3, 6, 10]; // b3 b5 b7: the b5 is what makes it half-diminished
+            }
             // Three notes: guide tones plus one colour on top (the "E9" funk chord).
             const top =
                 chord.family === 'dominant'
@@ -86,17 +116,25 @@ export function voicingTones(chord: ChordFacts, kind: VoicingKind): number[] {
         }
         case 'shell': {
             // The swing guitarist's three-note chord: root, 3rd and 7th (or 6th) — the
-            // harmony's skeleton, all a four-to-the-bar rhythm guitar needs.
+            // harmony's skeleton, all a four-to-the-bar rhythm guitar needs. Half-diminished
+            // adds its b5 (R-b5-b7-b3, x3434x), the tone that tells it from a minor 7th.
+            if (chord.family === 'half-diminished') {
+                return [0, 3, 6, 10];
+            }
             return [...new Set([0, third ?? 7, colour ?? fifth])];
         }
         case 'drop2': {
             if (colour === null) {
+                // A plain triad is coloured the bossa way: a 6/9 (major or minor).
+                if (chord.family === 'major' || chord.family === 'minor') {
+                    return [...new Set([third ?? 7, fifth, 9, 2])];
+                }
                 return [...new Set([0, third ?? 7, fifth, written[0] ?? 0])];
             }
             // Bossa colour: the 9th (or a written b9/#9) replaces the root; a half-diminished
             // chord keeps its root, since its 9th is a minor 9th above it.
             const top = chord.family === 'half-diminished' ? 0 : ninth(chord);
-            return [...new Set([third ?? 7, fifth, colour, top])];
+            return [...new Set([third ?? 7, fifthSeat(chord), colour, top])];
         }
     }
 }
@@ -131,6 +169,21 @@ function candidates(tones: number[], kind: VoicingKind): number[][] {
     return out;
 }
 
+/** Lowest note (MIDI) for the lower voice of each interval, in semitones. */
+const LOW_INTERVAL_LIMIT: Record<number, number> = {
+    1: 52, // m2: E3
+    2: 51, // M2: Eb3
+    3: 48, // m3: C3
+    4: 46, // M3: Bb2
+    5: 46, // P4: Bb2
+    6: 47, // tritone: B2
+    7: 34, // P5: Bb1
+    8: 43, // m6: G2
+    9: 41, // M6: F2
+    10: 41, // m7: F2
+    11: 41, // M7: F2
+};
+
 /** How good a placement is (lower is better): register, voice leading, and clashes. */
 export function cost(v: number[], prev: number[] | null, chord: ChordFacts, slot: Slot): number {
     let c = 0;
@@ -141,7 +194,7 @@ export function cost(v: number[], prev: number[] | null, chord: ChordFacts, slot
             c += 40;
         }
     }
-    c += Math.abs(top - slot.top) * 0.35;
+    c += Math.abs(top - slot.top) * (slot.pull ?? 0.35);
     // Voice leading: the smallest total movement from the last chord.
     if (prev?.length) {
         const n = Math.min(prev.length, v.length);
@@ -175,8 +228,13 @@ export function cost(v: number[], prev: number[] | null, chord: ChordFacts, slot
             }
         }
     }
-    if (v.length > 1 && v[0] < 57 && v[1] - v[0] < 5) {
-        c += 10;
+    // Low interval limits: a close interval low down is mud. Each interval has a floor below
+    // which its lower note shouldn't sit (the arranger's table, for the two lowest voices up).
+    for (let i = 0; i + 1 < v.length; i++) {
+        const limit = LOW_INTERVAL_LIMIT[v[i + 1] - v[i]];
+        if (limit !== undefined && v[i] < limit) {
+            c += 10;
+        }
     }
     return c;
 }

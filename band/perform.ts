@@ -101,13 +101,40 @@ export function performPass(
         }
     }
 
-    const held = holdFermatas(events, timeline, plans);
+    const fermatas = holdFermatas(events, timeline, plans);
+    const held = instrument.legato ? sustain(fermatas, timeline) : fermatas;
     const felt = applyFeel(held, timeline, style.feel, {
         ...settings,
         strumMs: instrument.strumMs,
     });
     felt.sort((a, b) => a.tick - b.tick || laneOrder(a) - laneOrder(b));
     return { events: felt, memory, snapshots };
+}
+
+/**
+ * A sustaining instrument (the organ) holds every chord until the next one is struck, across
+ * barlines too — the idioms play one bar at a time, so this is done once over the pass. It
+ * lets go at an N.C., which is a rest for the whole band.
+ */
+function sustain(events: BandEvent[], timeline: Timeline): BandEvent[] {
+    const strikes = [
+        ...new Set(events.filter((e) => e.lane === 'comp' && !e.muted).map((e) => e.tick)),
+    ].sort((a, b) => a - b);
+    const until = new Map<number, number>();
+    strikes.forEach((tick, i) => {
+        const next = strikes[i + 1];
+        if (next === undefined) {
+            return;
+        }
+        const rest = timeline.spans.find((s) => !s.chord && s.start > tick && s.start < next);
+        until.set(tick, rest ? rest.start : next);
+    });
+    return events.map((e) => {
+        const end = e.lane === 'comp' && !e.muted ? until.get(e.tick) : undefined;
+        return end !== undefined && e.lane === 'comp' && end - e.tick > e.dur
+            ? { ...e, dur: end - e.tick }
+            : e;
+    });
 }
 
 const laneOrder = (e: BandEvent) => (e.lane === 'drums' ? 0 : e.lane === 'bass' ? 1 : 2);

@@ -5,9 +5,10 @@
  * chord's tones on a set of adjacent strings, within a four-fret reach. Then the one that
  * moves least from the previous chord wins, costed the same way as a keyboard voicing.
  *
- * Band rule: the guitar leaves the low strings to the bass player. Grips stay at or above
- * the slot's floor, so a strummed chord never muddies the bass line. A bossa thumb that
- * plays the bass *because* no bassist is there is the idiom's own choice, not a grip.
+ * Band rule: the guitar leaves the low strings to the bass player — grips stay at or above
+ * the slot's floor, so a strummed chord never muddies the bass line. The one exception is
+ * the bass note itself: the swing shell's root sits on the low strings on purpose, doubling
+ * the walking bass (`rootBottom`). With no bassist, a book may bring its grips down.
  */
 import type { ChordFacts } from '../../theory/chord.js';
 import { mod12 } from '../../theory/pitch.js';
@@ -21,23 +22,67 @@ const MAX_FRET = 15;
 const REACH = 3;
 
 export interface GripShape {
-    /** How many adjacent strings the grip uses. */
+    /** How many strings the grip sounds. */
     strings: number;
     /** Where the grips may sit; the top voice aims for `slot.top`. */
     slot: Slot;
+    /**
+     * The chord's bass note is the grip's lowest note — the swing shell's root on the low
+     * strings, doubling the walking bass an octave up, is what makes it felt.
+     */
+    rootBottom?: boolean;
+    /** One string inside the grip may be skipped (muted by the fretting hand): 8x89xx. */
+    skip?: boolean;
+    /**
+     * Open strings allowed. Off where the idiom mutes by releasing the fretting hand (the
+     * swing chunk, the funk scratch) — an open string would ring on through the release.
+     */
+    open?: boolean;
 }
 
-/** Grips of `pcs` on `size` adjacent strings, covering every tone, lowest note ≥ floor. */
-function gripsOn(pcs: number[], size: number, floor: number, doubles: Set<number>): number[][] {
-    const out = new Map<string, number[]>();
+interface Search {
+    pcs: number[];
+    size: number;
+    floor: number;
+    doubles: Set<number>;
+    bottom: number | null;
+    skip: boolean;
+    open: boolean;
+}
+
+/** The string sets a grip may use: adjacent strings, or (with `skip`) one gap inside. */
+function stringSets(size: number, skip: boolean): number[][] {
+    const sets: number[][] = [];
     for (let first = 0; first + size <= STRINGS.length; first++) {
-        const strings = STRINGS.slice(first, first + size);
+        sets.push(Array.from({ length: size }, (_, i) => first + i));
+    }
+    if (skip) {
+        for (let first = 0; first + size + 1 <= STRINGS.length; first++) {
+            for (let gap = 1; gap < size; gap++) {
+                sets.push(
+                    Array.from({ length: size + 1 }, (_, i) => first + i).filter(
+                        (i) => i !== first + gap,
+                    ),
+                );
+            }
+        }
+    }
+    return sets;
+}
+
+/** Grips of the chord tones on a string set, covering every tone, lowest note ≥ floor. */
+function gripsOn({ pcs, size, floor, doubles, bottom, skip, open }: Search): number[][] {
+    const out = new Map<string, number[]>();
+    for (const set of stringSets(size, skip)) {
+        const strings = set.map((i) => STRINGS[i]);
         for (let base = 1; base + REACH <= MAX_FRET; base++) {
             // Each string: open, or a fret inside the hand's reach, sounding a chord tone.
-            const options = strings.map((open) =>
-                [0, ...Array.from({ length: REACH + 1 }, (_, i) => base + i)]
-                    .map((fret) => open + fret)
-                    .filter((m) => pcs.includes(mod12(m))),
+            const frets = [
+                ...(open ? [0] : []),
+                ...Array.from({ length: REACH + 1 }, (_, i) => base + i),
+            ];
+            const options = strings.map((string) =>
+                frets.map((fret) => string + fret).filter((m) => pcs.includes(mod12(m))),
             );
             const walk = (i: number, chosen: number[]) => {
                 if (i === options.length) {
@@ -62,7 +107,10 @@ function gripsOn(pcs: number[], size: number, floor: number, doubles: Set<number
         }
     }
     return [...out.values()].filter(
-        (g) => g[0] >= floor && pcs.every((pc) => g.some((m) => mod12(m) === pc)),
+        (g) =>
+            g[0] >= floor &&
+            (bottom === null || mod12(g[0]) === bottom) &&
+            pcs.every((pc) => g.some((m) => mod12(m) === pc)),
     );
 }
 
@@ -78,16 +126,34 @@ export function grip(
 ): number[] {
     const tones = voicingTones(chord, kind);
     const pcs = [...new Set(tones.map((n) => mod12(chord.root + n)))];
+    // A root-position shape puts the chord's bass under it (and needs it among the tones).
+    const bottom = shape.rootBottom ? chord.bass : null;
+    if (bottom !== null && !pcs.includes(bottom)) {
+        pcs.push(bottom);
+    }
     // A grip with more strings than tones doubles the root or fifth: a fuller strum.
     const size = Math.max(pcs.length, Math.min(shape.strings, pcs.length + 1));
     const doubles = new Set([chord.root, mod12(chord.root + (chord.fifth ?? 7))]);
-    const key = `${pcs.join('.')}|${size}|${shape.slot.lo}|${[...doubles].join('.')}`;
+    const search: Search = {
+        pcs,
+        size,
+        floor: shape.slot.lo,
+        doubles,
+        bottom,
+        skip: !!shape.skip,
+        open: shape.open ?? true,
+    };
+    const key = JSON.stringify({ ...search, doubles: [...doubles] });
     let found = cache.get(key);
     if (!found) {
-        found = gripsOn(pcs, size, shape.slot.lo, doubles);
-        // A chord too dense for the shape still gets played: drop to exactly its tones.
+        found = gripsOn(search);
+        // A chord too dense for the shape still gets played: drop to exactly its tones, then
+        // let go of the root-position rule before giving up on the chord.
         if (!found.length && size > pcs.length) {
-            found = gripsOn(pcs, pcs.length, shape.slot.lo, doubles);
+            found = gripsOn({ ...search, size: pcs.length });
+        }
+        if (!found.length && bottom !== null) {
+            found = gripsOn({ ...search, size: Math.max(pcs.length, size), bottom: null });
         }
         cache.set(key, found);
     }
