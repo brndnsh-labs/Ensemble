@@ -24,7 +24,14 @@ import {
     SIGN_OUT_MESSAGES,
     type SignOutPreflight,
 } from '../lib/account/sync-loop';
-import { arrangementOf, blankSong, convertedCopy, extendedScore } from '../lib/documents';
+import {
+    arrangementOf,
+    blankSong,
+    convertedCopy,
+    extendedScore,
+    withoutMeasure,
+    withoutSection,
+} from '../lib/documents';
 import { validateEditorText } from '../lib/editor';
 import {
     describeV1Outcome,
@@ -2823,6 +2830,27 @@ export default function Ensemble() {
             setSectionId(extended.sectionId);
         });
     }
+    function shrinkScore(wholeSection: boolean) {
+        void run(() => {
+            const next = updateChart();
+            if (next.schemaVersion !== 2) {
+                return;
+            }
+            // The editor's selection names the bar; its section is found from the score, since
+            // `sectionId` follows the v1 text editor and may be stale for a measure chart.
+            const score = next.chart.score;
+            const holding = score.sections.find((s) => s.measures.some((m) => m.id === measureId));
+            const result = wholeSection
+                ? withoutSection(score, holding?.id ?? '')
+                : withoutMeasure(score, measureId);
+            if (result.kind === 'blocked') {
+                throw new Error(result.message);
+            }
+            applyScore(result.score);
+            setMeasureId(result.measureId);
+            setSectionId(result.sectionId);
+        });
+    }
     function changeSongMeter(meter: string) {
         void run(() => {
             // Pending bar edits are committed first, by the editor's own rules, so the change is
@@ -3498,6 +3526,7 @@ export default function Ensemble() {
                                 applyScore(score);
                             }}
                             onExtend={extendScore}
+                            onRemove={shrinkScore}
                             onUpgrade={upgradeEditor}
                             onSelectSection={(id) => selectSection(current, id)}
                             onEditText={editText}

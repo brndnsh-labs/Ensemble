@@ -3,7 +3,7 @@ import { validateChartDocumentV2 } from '@engine/songbook/document-v2';
 import { proposeLegacyScoreConversion } from '@engine/songbook/legacy-score';
 import { resolveScoreContext } from '@engine/songbook/score-context';
 import { scoreMeter } from '@engine/songbook/score-duration';
-import type { ChartDocumentV2, SemanticScore } from '@engine/songbook/score-types';
+import type { ChartDocumentV2, ScoreMeasure, SemanticScore } from '@engine/songbook/score-types';
 import type { ChartContent, ChartDocument as LegacyDocument } from '@engine/songbook/types';
 
 export type ChartDocument = LegacyDocument | ChartDocumentV2;
@@ -137,4 +137,125 @@ export function extendedScore(source: SemanticScore, measureId: string, newSecti
         },
     });
     return { score, measureId: id, sectionId: section.id };
+}
+
+export type RemovalResult =
+    | { kind: 'ok'; score: SemanticScore; measureId: string; sectionId: string }
+    /** Nothing was changed; `message` says what the musician has to change first. */
+    | { kind: 'blocked'; message: string };
+
+/** The first bar outside `removed` whose content repeats a bar inside it, as "A · bar 3". */
+function repeatOfRemoved(score: SemanticScore, removed: Set<string>): string | undefined {
+    for (const section of score.sections) {
+        for (const [index, measure] of section.measures.entries()) {
+            if (
+                !removed.has(measure.id) &&
+                measure.content.kind === 'repeat' &&
+                removed.has(measure.content.measureId)
+            ) {
+                return `${section.label} · bar ${index + 1}`;
+            }
+        }
+    }
+    return undefined;
+}
+
+function repeatRefusal(score: SemanticScore, removed: ScoreMeasure[]): string | undefined {
+    const repeatedBy = repeatOfRemoved(score, new Set(removed.map((m) => m.id)));
+    return repeatedBy ? `${repeatedBy} repeats this music. Change that bar first.` : undefined;
+}
+
+/**
+ * Removes one bar. A bar that WROTE a key, mode, meter or grouping change hands it to the next
+ * bar in its section (context never crosses a section boundary), so everything after it keeps
+ * sounding as it did — unless that bar writes the same field itself. A written meter resets
+ * grouping, so a handed-down grouping would re-divide a meter the next bar chose: it is only
+ * handed over when the next bar writes no meter of its own.
+ *
+ * The only bar of a section takes the section with it; the only bar of the chart is refused.
+ */
+export function withoutMeasure(source: SemanticScore, measureId: string): RemovalResult {
+    const sectionIndex = source.sections.findIndex((s) =>
+        s.measures.some((m) => m.id === measureId),
+    );
+    if (sectionIndex < 0) {
+        return { kind: 'blocked', message: 'Select a bar to remove.' };
+    }
+    const section = source.sections[sectionIndex];
+    if (section.measures.length === 1) {
+        return source.sections.length === 1
+            ? {
+                  kind: 'blocked',
+                  message: 'A chart needs at least one bar. Change its chords instead.',
+              }
+            : withoutSection(source, section.id);
+    }
+    const index = section.measures.findIndex((m) => m.id === measureId);
+    const target = section.measures[index];
+    const blocked = repeatRefusal(source, [target]);
+    if (blocked) {
+        return { kind: 'blocked', message: blocked };
+    }
+    // Repeats pair up within a section, a repeat-start may be implicit and an ending-end is
+    // optional (`score-form.ts`), so dropping one marked bar can leave a form that still
+    // validates but plays differently — a lost repeat-start silently repeats from the top of
+    // the section. Refusing any marked bar is stricter than "still plays"; a refusal changes
+    // nothing. A whole section can go with its marks: sections are independent forms, and the
+    // codec rejects a jump left pointing at a removed segno/coda/fine.
+    if (target.content.kind === 'repeat' && target.content.display !== 'one-bar') {
+        return {
+            kind: 'blocked',
+            message: 'This bar is half of a two-bar repeat. Change it to chords first.',
+        };
+    }
+    if (target.start?.length || target.end?.length) {
+        return {
+            kind: 'blocked',
+            message:
+                'This bar carries repeat or navigation marks. Remove them first, or remove the whole section.',
+        };
+    }
+    const score = structuredClone(source);
+    const measures = score.sections[sectionIndex].measures;
+    const [removed] = measures.splice(index, 1);
+    const next = measures[index];
+    if (next) {
+        const nextWroteMeter = next.meter !== undefined;
+        for (const field of ['key', 'isMinor', 'meter'] as const) {
+            if (removed[field] !== undefined && next[field] === undefined) {
+                Object.assign(next, { [field]: removed[field] });
+            }
+        }
+        if (removed.grouping !== undefined && next.grouping === undefined && !nextWroteMeter) {
+            next.grouping = removed.grouping;
+        }
+    }
+    // The previous bar, or the next one when the first bar went.
+    const selected = measures[Math.max(0, index - 1)];
+    return { kind: 'ok', score, measureId: selected.id, sectionId: section.id };
+}
+
+/** Removes a whole section. The last section of a chart is refused. */
+export function withoutSection(source: SemanticScore, sectionId: string): RemovalResult {
+    const index = source.sections.findIndex((s) => s.id === sectionId);
+    if (index < 0) {
+        return { kind: 'blocked', message: 'Select a bar in the section to remove.' };
+    }
+    if (source.sections.length === 1) {
+        return {
+            kind: 'blocked',
+            message: 'A chart needs at least one section. Change its bars instead.',
+        };
+    }
+    const blocked = repeatRefusal(source, source.sections[index].measures);
+    if (blocked) {
+        return { kind: 'blocked', message: blocked };
+    }
+    const score = structuredClone(source);
+    score.sections.splice(index, 1);
+    // The previous section's last bar, or the next section's first when the first section went.
+    const selected = index > 0 ? score.sections[index - 1] : score.sections[0];
+    const measure =
+        index > 0 ? selected.measures[selected.measures.length - 1] : selected.measures[0];
+    return { kind: 'ok', score, measureId: measure.id, sectionId: selected.id };
 }

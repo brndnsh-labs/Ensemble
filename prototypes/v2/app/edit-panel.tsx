@@ -25,6 +25,8 @@ interface EditPanelProps {
     onApply: (score: SemanticScore) => void;
     onApplyForm: (score: SemanticScore) => void;
     onExtend: (newSection: boolean) => void;
+    /** Removes the selected bar, or the whole section holding it (#1373). */
+    onRemove: (wholeSection: boolean) => void;
     onUpgrade: () => void;
     onSelectSection: (id: string) => void;
     onEditText: (value: string) => void;
@@ -49,6 +51,7 @@ export function EditPanel({
     onApply,
     onApplyForm,
     onExtend,
+    onRemove,
     onUpgrade,
     onSelectSection,
     onEditText,
@@ -114,6 +117,12 @@ export function EditPanel({
                         </button>
                         <button className="btn" disabled={busy} onClick={() => onExtend(true)}>
                             ＋ Section
+                        </button>
+                        <button className="btn" disabled={busy} onClick={() => onRemove(false)}>
+                            − Bar
+                        </button>
+                        <button className="btn" disabled={busy} onClick={() => onRemove(true)}>
+                            − Section
                         </button>
                     </div>
                     <p className="preview-note">
