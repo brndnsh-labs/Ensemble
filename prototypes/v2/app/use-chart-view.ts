@@ -1,19 +1,27 @@
 import { TIME_SIGNATURES } from '@engine/config';
 import { buildLeadSheetSections } from '@engine/song/lead-sheet-model';
 import { useMemo } from 'react';
-import { scoreDisplayIndices, scoreLeadSheet } from '../lib/lead-sheet';
+import { type ChartBlock, scoreDisplayIndices, scoreLeadSheet } from '../lib/lead-sheet';
 import type { ChartDocument } from '../lib/runtime';
 import * as runtime from '../lib/runtime';
 
 /**
  * What the chart sheet draws for the open song: the engine's arranged progression laid out as
  * lead-sheet blocks, the written bars/sections behind them, and where playback is right now.
- * `active` is the engine's sounding chord index, or null while stopped.
+ * `active` is the engine's sounding chord index, or null while stopped. On the band engine a
+ * score is drawn from its timeline instead (`lib/band-chart.ts`), and `active` is a slot there.
  */
 export function useChartView(current: ChartDocument | null, active: number | null) {
-    const blocks = useMemo(() => {
+    const band = useMemo(
+        () => (current?.schemaVersion === 2 ? runtime.bandChartView() : null),
+        [current],
+    );
+    const blocks = useMemo((): ChartBlock[] => {
         if (!current) {
             return [];
+        }
+        if (band) {
+            return band.blocks;
         }
         const a = runtime.state().arranger;
         if (current.schemaVersion === 2) {
@@ -29,13 +37,23 @@ export function useChartView(current: ChartDocument | null, active: number | nul
             );
         }
         return buildLeadSheetSections(a.progression, a.sections, TIME_SIGNATURES[a.timeSignature]);
-    }, [current]);
+    }, [current, band]);
     const displayIndices = useMemo(
-        () => (current?.schemaVersion === 2 ? scoreDisplayIndices(runtime.state().arranger) : []),
-        [current],
+        () =>
+            band
+                ? band.slots.map((slot) => slot.display)
+                : current?.schemaVersion === 2
+                  ? scoreDisplayIndices(runtime.state().arranger)
+                  : [],
+        [current, band],
     );
     const displayActive = active === null ? null : (displayIndices[active] ?? active);
-    const activeEvent = active === null ? null : runtime.state().arranger.stepMap[active];
+    const activeEvent =
+        active === null
+            ? null
+            : band
+              ? (band.slots[active] ?? null)
+              : runtime.state().arranger.stepMap[active];
     const totalBars = blocks.reduce((n, b) => n + b.measures.length, 0);
     const writtenBars = useMemo(
         () =>

@@ -119,20 +119,25 @@ schedules everything due in the next 150 ms on a 25 ms timer.
   the next barline. The comp instrument follows the chords lane's sound (`COMP_FOR_VOICE` in
   `runtime.ts`); in next mode a native genre's Auto sound is its style's `prefers`.
 - **A staged genre** is committed at once.
-- **The chart pointer** follows `songTick()` into `arranger.stepMap`.
+- **The chart pointer** follows `songTick()` to the written event under it (`slotAt`).
 
 A pass is generated on the main thread (about 5–7 ms for 32 bars on a desktop), two seconds
 before it is needed.
 
-Audio (WAV/stem) export and the soloist/harmony control hiding both landed: `lib/band-export.ts`
-renders `BandHost.render()`'s events offline through `playBandEvent` — the same voice mapping
-`BandHost` schedules live with — and `app/band-lanes.ts`'s `visibleLanes` (gated on
-`runtime.ts`'s exported `ENGINE_NEXT`) drops soloist/harmony from every lane-driven control
-(transport mute chips, the Sounds panel). A stem export renders drums, bass and chords (the comp) only.
+Audio (WAV/stem) export renders `BandHost.render()`'s events offline (`lib/band-export.ts`)
+through `playBandEvent`, the same voice mapping `BandHost` schedules live with, feel offsets
+included. A stem export renders drums, bass and chords (the comp) only. `app/band-lanes.ts`'s
+`visibleLanes` drops soloist/harmony from every lane-driven control (transport mute chips, the
+Sounds panel).
 
-Not yet on the host:
-- charts the old adapter still rejects at load, because the chart sheet still draws from the
-  old `arranger` maps
+**The chart sheet** draws a score from the score and its timeline (`prototypes/v2/lib/band-chart.ts`),
+not from the old engine's plan, so any chart the timeline compiles opens, edits and plays:
+holds show as `/`, N.C. as `N.C.`, a fermata sits over its chord, and off-grid lengths keep
+their exact widths. The old engine is given no plan for such a score, so its `arranger` maps
+derive empty and its worker idles. Every path that lets a chart onto the stand (open, edit,
+import, the guided form) asks `checkPlayable` in `lib/engine-mode.ts`: on the band engine
+that is `validateSemanticScore` plus `compileTimeline`, and on the old engine it is still
+`prepareScorePlayback`. A measure-less (v1) chart is still drawn from the old maps.
 
 Genres outside v0 play their nearest v0 style (`STYLE_FOR_GENRE` in `runtime.ts`).
 

@@ -1,8 +1,8 @@
 'use client';
 
-import { prepareScorePlayback } from '@engine/songbook/score-playback';
 import type { SemanticScore } from '@engine/songbook/score-types';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { checkPlayable } from '../lib/engine-mode';
 import {
     type BarRange,
     changeGuidedForm,
@@ -60,7 +60,7 @@ export function GuidedForm({
         try {
             const candidate = changeGuidedForm(score, sectionId, remove ? null : group, previous);
             // The route alone cannot establish supported chord/timing/reference playback.
-            prepareScorePlayback(candidate);
+            checkPlayable(candidate);
             return { candidate, route: guidedRoute(candidate), error: '' };
         } catch (reason) {
             return {

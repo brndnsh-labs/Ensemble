@@ -21,3 +21,7 @@ export type { PassMemory, PassResult } from './perform.js';
 export { performPass } from './perform.js';
 export { toMidi } from './sinks/midi.js';
 export { STYLE_IDS, STYLES } from './styles/index.js';
+export type { ChordFacts } from './theory/chord.js';
+export { parseChord } from './theory/chord.js';
+export type { KeyContext } from './theory/pitch.js';
+export { notePc } from './theory/pitch.js';

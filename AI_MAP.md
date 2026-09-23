@@ -54,7 +54,9 @@ The ground-up replacement for the generative engine; see `docs/design/band-engin
 | `band/test/` | Fixture charts, the invariant suite, the critique claims. | `FIXTURES` |
 | `scripts/band-render.ts` | `npm run band:render` — `.mid` + text grid from node. | CLI |
 | `prototypes/v2/lib/band-host.ts` | Live host for `?engine=next`: segments on the audio clock, regenerate-at-barline, voice adapter (`playBandEvent`) onto today's synth/sample voices, metronome. Driven only by `runtime.ts`. | `BandHost`, `playBandEvent` |
-| `prototypes/v2/lib/band-export.ts` | Offline WAV/stem export for `?engine=next`: `band-host.ts`'s `playBandEvent` against an `OfflineAudioContext`, so an export matches live playback. Stems are drums/bass/keys only. | `renderBandMixToWav`, `renderBandStemsToWav` |
+| `prototypes/v2/lib/band-export.ts` | Offline WAV/stem export for `?engine=next`: `band-host.ts`'s `playBandEvent` against an `OfflineAudioContext`, so an export matches live playback. Stems are drums/bass/chords (the comp) only. | `renderBandMixToWav`, `renderBandStemsToWav` |
+| `prototypes/v2/lib/band-chart.ts` | The chart sheet's view of a score on `?engine=next`, from the score + band timeline: every written event (holds, N.C., fermatas, off-grid lengths), its performed slots, section loop windows, chord names in all three notations. | `bandChart`, `slotAt`, `chordNames` |
+| `prototypes/v2/lib/engine-mode.ts` | The `?engine=next` flag and `checkPlayable`, the one capability check every open/edit/import path asks (band: valid + timeline compiles; old engine: `prepareScorePlayback`). | `ENGINE_NEXT`, `checkPlayable` |
 
 ## State Management (Domain Slices)
 

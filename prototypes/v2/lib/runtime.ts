@@ -1,6 +1,7 @@
 import {
     type BandSettings,
     type CompInstrument,
+    compileTimeline,
     PPQ,
     STYLE_IDS,
     STYLES,
@@ -72,11 +73,18 @@ import {
     type InstrumentVoice,
     type SwingSub,
 } from '@engine/types';
-import { transposeKeyName } from '@engine/utils';
+import { getFrequency, transposeKeyName } from '@engine/utils';
 import { initWorker, syncWorker } from '@engine/worker-client';
+import { auditionMidis, type BandChart, bandChart, sectionSteps, slotAt } from './band-chart';
 import { renderBandMixToWav, renderBandStemsToWav } from './band-export';
 import { BandHost } from './band-host';
-import { type ChartDocument, type DocumentContent, validateDocument } from './documents';
+import {
+    type ChartDocument,
+    type DocumentContent,
+    scoreArrangementView,
+    validateDocument,
+} from './documents';
+import { checkPlayable, ENGINE_NEXT } from './engine-mode';
 import { masterVolumePreference, rememberMasterVolume } from './session';
 import { initializeSounds, prepareSound, prepareSounds, validateVoice } from './sounds';
 
@@ -112,10 +120,8 @@ let currentScore: SemanticScore | null = null;
 // ---------------------------------------------------------------- the band engine
 // `?engine=next` plays the new band engine (`band/`, docs/design/band-engine.md) in place of
 // the worker/scheduler generator, through the same voices, buses and sound packs. Everything
-// else — charts, the songbook, the mixer, the Feel sheet — is shared. Read once per page.
-export const ENGINE_NEXT =
-    typeof window !== 'undefined' &&
-    new URLSearchParams(window.location.search).get('engine') === 'next';
+// else — the songbook, the mixer, the Feel sheet — is shared. `ENGINE_NEXT` lives in
+// `engine-mode.ts` so the app's import and editing checks read the same flag.
 /** One sixteenth in band ticks: the old engine's step, so step maps convert exactly. */
 const STEP_TICKS = PPQ / 4;
 /**
@@ -164,6 +170,12 @@ let band: BandHost | null = null;
 let bandSeed = '';
 let bandScore: { key: string; score: SemanticScore } | null = null;
 let playhead: ReturnType<typeof setInterval> | null = null;
+/**
+ * The chart sheet's view of the open score on the band engine, read from the score and its
+ * timeline (`band-chart.ts`). Null on the old engine, and for a measure-less chart, which the
+ * old engine's maps still draw.
+ */
+let bandView: BandChart | null = null;
 
 function bandHost(): BandHost {
     band ??= new BandHost({ state: getState, silence: () => void killAllNotes(getState()) });
@@ -267,15 +279,20 @@ function stopBand(): void {
     void killAllNotes(getState());
 }
 
-/** Publish the sounding chord for the chart sheet, as the old scheduler did. */
+/** Publish the written event under the playhead for the chart sheet, as the old scheduler did. */
 function followPlayhead(): void {
     const tick = band?.songTick();
     if (tick == null) {
         return;
     }
-    const step = Math.floor(tick / STEP_TICKS);
     const { arranger, chords } = getState();
-    const index = arranger.stepMap.findIndex((entry) => entry.start <= step && step < entry.end);
+    let index: number;
+    if (bandView) {
+        index = slotAt(bandView, tick);
+    } else {
+        const step = Math.floor(tick / STEP_TICKS);
+        index = arranger.stepMap.findIndex((entry) => entry.start <= step && step < entry.end);
+    }
     if (index >= 0 && index !== chords.lastActiveChordIndex) {
         param('chords', 'lastActiveChordIndex', index);
     }
@@ -415,7 +432,9 @@ export function captureContent(): ChartContent {
 
 function rebuild(): void {
     validateProgression(getState(), dispatch);
-    if (!getState().arranger.progression.length) {
+    // A score on the band engine installs no plan for the old engine, so it derives nothing
+    // from it (empty maps, an idle worker): that is expected, not an unplayable chart.
+    if (!bandView && !getState().arranger.progression.length) {
         throw new Error('The chart has no playable chords. Check your chord text.');
     }
     analyzeFormUI(getState().arranger);
@@ -608,6 +627,15 @@ export function stop(): void {
  * stale id from a chart that changed shape after this render.
  */
 export function loopSection(sectionId: string): boolean {
+    if (bandView) {
+        // The old engine's section map is empty for a band-engine score; the timeline has it.
+        const bounds = sectionSteps(bandView, sectionId);
+        if (!bounds) {
+            return false;
+        }
+        dispatch(ACTIONS.SET_PRACTICE_LOOP, bounds);
+        return true;
+    }
     if (!getSectionStepBounds(sectionId)) {
         return false;
     }
@@ -631,6 +659,14 @@ export function loopedSection(): string | null {
     const { playback, arranger } = getState();
     if (playback.loopStartStep < 0) {
         return null;
+    }
+    if (bandView) {
+        const view = bandView;
+        const match = view.sections.find(({ id }) => {
+            const bounds = sectionSteps(view, id);
+            return bounds?.start === playback.loopStartStep && bounds.end === playback.loopEndStep;
+        });
+        return match?.id ?? null;
     }
     const ids = new Set(arranger.sectionMap.map((entry) => entry.id));
     for (const id of ids) {
@@ -850,11 +886,20 @@ export async function applyGenreSounds(progress: (text: string) => void): Promis
 
 function apply(content: DocumentContent): void {
     const score = 'score' in content ? clone(content.score) : null;
-    const plan = score ? prepareScorePlayback(score) : null;
+    // The band engine draws a score from its own timeline and never builds the old engine's
+    // plan, which would refuse holds, N.C., fermatas and off-grid lengths. With no plan the
+    // old engine's maps derive empty (`rebuild`), so nothing stale answers for this chart.
+    const view = ENGINE_NEXT && score ? bandChart(score, compileTimeline(score)) : null;
+    const plan = score && !view ? prepareScorePlayback(score) : null;
     const arrangement =
-        score && plan ? scoreArrangement(score, plan) : (content as ChartContent).arrangement;
+        score && view
+            ? scoreArrangementView(score)
+            : score && plan
+              ? scoreArrangement(score, plan)
+              : (content as ChartContent).arrangement;
     param('arranger', 'scorePlan', plan);
     currentScore = score;
+    bandView = view;
     for (const [key, value] of Object.entries(arrangement)) {
         param('arranger', key, value);
     }
@@ -891,7 +936,7 @@ function apply(content: DocumentContent): void {
 export function load(document: ChartDocument): void {
     const checked = validateDocument(document);
     if (checked.schemaVersion === 2) {
-        prepareScorePlayback(checked.chart.score);
+        checkPlayable(checked.chart.score);
     }
     stop();
     const previous = captureSessionContent();
@@ -1109,7 +1154,7 @@ export function setMode(isMinor: boolean): void {
     }
 }
 export function editScore(score: SemanticScore): void {
-    prepareScorePlayback(score);
+    checkPlayable(score);
     const before = captureSessionContent();
     stop();
     loading = true;
@@ -1149,11 +1194,19 @@ export function audition(index: number): void {
     }
     initAudio(getState());
     const state = getState();
-    const chord = state.arranger.progression[index];
-    if (!chord || !state.playback.audio) {
+    let freqs: number[] | undefined;
+    if (bandView) {
+        // Band-engine chords are named and voiced by the band's chord authority; a hold or
+        // N.C. has nothing of its own to sound.
+        const chord = bandView.chords[index]?.chord;
+        freqs = chord ? auditionMidis(chord).map(getFrequency) : undefined;
+    } else {
+        freqs = state.arranger.progression[index]?.freqs;
+    }
+    if (!freqs || !state.playback.audio) {
         return;
     }
-    for (const frequency of chord.freqs) {
+    for (const frequency of freqs) {
         playNote(state, frequency, state.playback.audio.currentTime, 0.65, {
             vol: 0.12,
             instrument: 'Piano',
@@ -1315,4 +1368,9 @@ export async function exportAudio(
 
 export function state(): EnsembleState {
     return getState();
+}
+
+/** The band engine's view of the open score, or null when the old engine's maps draw it. */
+export function bandChartView(): BandChart | null {
+    return bandView;
 }

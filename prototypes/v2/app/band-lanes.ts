@@ -1,4 +1,4 @@
-import { ENGINE_NEXT } from '../lib/runtime';
+import { ENGINE_NEXT } from '../lib/engine-mode';
 
 export const lanes = [
     ['groove', 'Drums'],
