@@ -13,6 +13,6 @@
             "*": ["./node_modules/*", "./public/*"]
         }
     },
-    "include": ["public/**/*.ts", "env.d.ts"],
-    "exclude": ["node_modules", "dist", "tests", "scripts"]
+    "include": ["public/**/*.ts", "band/**/*.ts", "env.d.ts"],
+    "exclude": ["node_modules", "dist", "tests", "scripts", "band/**/*.test.ts", "band/test"]
 }

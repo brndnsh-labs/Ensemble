@@ -4,12 +4,14 @@
         ".": {
             "entry": [
                 "public/logic-worker.ts",
+                "band/index.ts",
+                "band/**/*.test.ts",
                 "scripts/**/*.ts",
                 "tests/**/*.{test,spec}.ts",
                 "tests/bench/**/*.ts",
                 "tests/scripts/**/*.ts"
             ],
-            "project": ["public/**/*.ts", "scripts/**/*.ts", "tests/**/*.ts"],
+            "project": ["public/**/*.ts", "band/**/*.ts", "scripts/**/*.ts", "tests/**/*.ts"],
             "ignore": ["public/engine/grooves/*.ts"]
         },
         "prototypes/v2": {

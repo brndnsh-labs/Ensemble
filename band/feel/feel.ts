@@ -1,0 +1,89 @@
+/**
+ * The timing law as code (see `docs/design/timing-model.md`). Players write on a straight
+ * grid; this pass alone moves notes in time, in three tiers:
+ *
+ *   1. Grid   — swing is grid *geometry*: an offbeat moves within its beat, tempo unchanged.
+ *   2. Lean   — one per-lane constant: bass and keys against the drums. Drums never lean,
+ *               so the lean is audible (a shift applied to everyone is just latency).
+ *   3. Character — seeded human placement keyed on (bar position, lane, voice), so a lane's
+ *               push at a given sixteenth repeats every bar and reads as a settled pocket
+ *               rather than per-note noise; velocity varies per hit.
+ */
+import { hashKey, rng } from '../core/random.js';
+import { type BandEvent, PPQ } from '../core/types.js';
+import type { Timeline } from '../form/timeline.js';
+import type { Feel } from '../styles/types.js';
+
+/** Largest tier-3 placement offset at humanize 100, in ms. */
+export const MAX_CHARACTER_MS = 9;
+/** Largest velocity variation at humanize 100. */
+const MAX_VELOCITY_JITTER = 10;
+
+/** Swing 0–100 → where the offbeat lands as a fraction of its pair (0.5 straight, ⅔ triplet). */
+export function swingRatio(swing: number): number {
+    return 0.5 + (Math.min(100, Math.max(0, swing)) / 100) * (1 / 6);
+}
+
+/** Warp a within-beat tick position for swung pairs of length `pair` ticks. */
+function warp(offset: number, pair: number, ratio: number): number {
+    const inPair = offset % pair;
+    const base = offset - inPair;
+    const half = pair / 2;
+    return (
+        base +
+        (inPair < half
+            ? (inPair / half) * ratio * pair
+            : ratio * pair + ((inPair - half) / half) * (1 - ratio) * pair)
+    );
+}
+
+export interface FeelSettings {
+    swing: number | null;
+    humanize: number | null;
+    seed: string;
+}
+
+export function applyFeel(
+    events: BandEvent[],
+    timeline: Timeline,
+    feel: Feel,
+    settings: FeelSettings,
+): BandEvent[] {
+    const ratio = swingRatio(settings.swing ?? feel.swing);
+    const pair = feel.swingGrid === 8 ? PPQ : PPQ / 2;
+    const human = (settings.humanize ?? feel.humanize) / 100;
+    return events.map((event) => {
+        const bar = timeline.bars[event.bar];
+        let { tick } = event;
+        let dur = event.lane === 'drums' ? 0 : event.dur;
+        if (bar.meter.quarterPulse && ratio !== 0.5) {
+            const offset = tick - bar.start;
+            const swung = bar.start + warp(offset, pair, ratio);
+            if (dur) {
+                const end = warp(offset + dur, pair, ratio) + bar.start;
+                dur = Math.max(1, end - swung);
+            }
+            tick = swung;
+        }
+        const voice = event.lane === 'drums' ? event.piece : event.lane === 'bass' ? 0 : event.midi;
+        const position = Math.round(event.tick - bar.start);
+        // Tier 3: placement keyed on bar position, not bar index (settled, repeating).
+        const place = rng(settings.seed, 'place', event.lane, voice, position).bipolar();
+        const lean = event.lane === 'drums' ? 0 : feel.lean[event.lane];
+        const offsetMs = event.offsetMs + lean + place * MAX_CHARACTER_MS * human;
+        const jitter = rng(
+            hashKey(settings.seed),
+            'vel',
+            event.lane,
+            voice,
+            event.bar,
+            position,
+        ).bipolar();
+        const velocity = Math.round(
+            Math.min(127, Math.max(1, event.velocity + jitter * MAX_VELOCITY_JITTER * human)),
+        );
+        return event.lane === 'drums'
+            ? { ...event, tick, offsetMs, velocity }
+            : { ...event, tick, dur, offsetMs, velocity };
+    });
+}

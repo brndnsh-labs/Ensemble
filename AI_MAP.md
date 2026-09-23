@@ -35,6 +35,24 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/render-bridge.ts` | Puts engine internals on `window.ensemble` for the listening-gate tools (`mix:report` and the scripts built on it). Installed by the v2 runtime only in a `NEXT_PUBLIC_RENDER_BRIDGE=1` build. | `installRenderBridge` |
 | `public/telemetry.ts` | Production-only, privacy-safe Umami analytics boundary. | `initializeTelemetry`, `track` |
 
+## Band Engine (`band/`, v0 — behind `?engine=next`)
+
+The ground-up replacement for the generative engine; see `docs/design/band-engine.md` and `band/CLAUDE.md`.
+
+| Path | Responsibility | Key Exports / Symbols |
+| :--- | :--- | :--- |
+| `band/index.ts` | Public surface for hosts. | `compileTimeline`, `performPass`, `toMidi`, `STYLES` |
+| `band/perform.ts` | The engine: one pass of the song, lanes in order, then feel. | `performPass` |
+| `band/form/timeline.ts` | SemanticScore → performed bars in ticks (form, holds, N.C., fermatas, meters, phrases). | `compileTimeline`, `secondsAt` |
+| `band/theory/chord.ts` | The one chord authority: symbol → `ChordFacts` (tones, family, guides, scale). | `parseChord`, `chordPcs` |
+| `band/arrange/plan.ts` | Per-bar energy, lanes, fills, crashes, ending. | `planBars`, `energyTier` |
+| `band/feel/feel.ts` | The timing law: swing geometry, lane lean, seeded character. | `applyFeel` |
+| `band/styles/index.ts` | Style registry: feel + one idiom per lane. | `STYLES` |
+| `band/players/` | Idioms: `drums/books.ts`, `bass/books.ts`, `keys/books.ts` (+ `kit.ts`, `line.ts`, `voicing.ts`). | `rockDrums`, `walkingBass`, `jazzKeys`, … |
+| `band/sinks/midi.ts` | BandEvent[] → Standard MIDI File. | `toMidi` |
+| `band/test/` | Fixture charts, the invariant suite, the critique claims. | `FIXTURES` |
+| `scripts/band-render.ts` | `npm run band:render` — `.mid` + text grid from node. | CLI |
+
 ## State Management (Domain Slices)
 
 | Path | Domain Responsibility | Initial State |

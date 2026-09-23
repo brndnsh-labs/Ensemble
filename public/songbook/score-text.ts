@@ -149,6 +149,8 @@ const QUALITIES = new Set([
     'alt',
     '6/9',
 ]);
+/** The accepted quality spellings — read by the band engine's chord-parity test. */
+export const SCORE_CHORD_QUALITIES: ReadonlySet<string> = QUALITIES;
 const ROOT = /^(?:[#b]?(?:III|II|IV|I|VII|VI|V|iii|ii|iv|i|vii|vi|v)|[#b]?[1-7]|[A-Ga-g][#b]?)/;
 
 /** Whole-token recognition only. Unknown qualities must not become plausible major chords. */
