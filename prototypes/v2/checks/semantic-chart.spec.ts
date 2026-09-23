@@ -295,6 +295,41 @@ test('semantic revision conflicts keep both takes, and unsupported imports never
     await expect(second.locator('.bar').first().locator('.chord')).toHaveText(['F', 'G7']);
 });
 
+test('Song mode writes score.isMinor only, and Save keeps it (#1375)', async ({ page }) => {
+    await page.goto(appUrl());
+    await page.getByRole('button', { name: '＋ New song', exact: true }).click();
+    await editorRevealed(page);
+    const mode = page.getByLabel('Song mode');
+
+    await mode.selectOption('minor');
+
+    await expect(page.locator('.measure-editor-context')).toHaveText('C minor · 4/4');
+    // The transport's Key select already names a minor key with its "m".
+    await expect(page.getByLabel('Key', { exact: true }).locator('option:checked')).toHaveText(
+        'Cm',
+    );
+    // Chord names are not rewritten, and the key stays C — no relative-key swap.
+    await expect(page.locator('.chord')).toHaveText(['C', 'G', 'Am', 'F']);
+
+    // A section that states its own mode keeps it through a song-level change.
+    await page.getByText('Section settings · A').click();
+    await page.getByLabel('Section mode').selectOption('major');
+    await expect(page.locator('.measure-editor-context')).toHaveText('C major · 4/4');
+    await mode.selectOption('major');
+    await mode.selectOption('minor');
+    await expect(page.getByLabel('Section mode')).toHaveValue('major');
+
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
+    const saved = (await documents(page)).find((document) => document.title === 'Untitled song');
+    if (saved?.schemaVersion !== 2) {
+        throw new Error('Expected the new song as a semantic document');
+    }
+    expect(saved.chart.score.isMinor).toBe(true);
+    expect(saved.chart.score.key).toBe('C');
+    expect(saved.chart.score.sections[0].isMinor).toBe(false);
+});
+
 test('a 5/4 bar takes a 2+3 grouping, Save keeps it, and a meter change clears it (#1376)', async ({
     page,
 }) => {
