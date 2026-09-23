@@ -29,8 +29,8 @@ import { playHarmonyNote } from '../../public/engine/synth-harmonies.js';
  * Management). The by-ear audition remains the owner's hard listening gate.
  *
  * Runs in Vitest browser mode (headless Chromium) for a real `OfflineAudioContext`
- * — a fast offline render, not a UI smoke test. Relocated from Playwright in #1096
- * so the e2e suite could move to a static `vite preview` build.
+ * — a fast offline render, not a UI smoke test. It never renders the app, so it
+ * lives here rather than in the app's Playwright suite (moved out of it in #1096).
  */
 const realRandom = Math.random;
 afterEach(() => {

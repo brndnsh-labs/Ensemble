@@ -7,7 +7,7 @@ import { defineConfig } from 'vitest/config';
 // `.ts` off the dev server purely to get a browser AudioContext; they never
 // rendered the app, so they don't belong in the e2e suite. Here they run as
 // plain unit tests in a headless Chromium (reused from the Playwright install),
-// which lets the Playwright suite move to a static `vite preview` build (#1096).
+// which keeps the app's Playwright suite about the app (#1096).
 //
 // Kept as a SEPARATE config + `npm run test:browser` (not folded into the main
 // node-mode `npm test`) so the common unit run stays fast and doesn't launch a
@@ -15,8 +15,7 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
     // Our source lives in `public/`, which Vite would otherwise treat as a
     // static-assets dir and emit "served at the root path" noise for every
-    // engine module. We serve no static assets here, so disable it (matches
-    // `vite.config.ts`).
+    // engine module. We serve no static assets here, so disable it.
     publicDir: false,
     test: {
         include: ['tests/browser/**/*.test.ts'],

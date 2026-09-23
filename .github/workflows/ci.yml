@@ -242,19 +242,6 @@ jobs:
         env:
           V2_SHARD: ${{ matrix.shard }}
 
-      # Every shard builds the export; exactly one uploads it, because two jobs
-      # cannot publish the same artifact name. Nothing downloads it since the cutover
-      # (#1357) retired the `/v2` publish — retained as this commit's beta-base evidence
-      # until #1358 removes it.
-      - uses: actions/upload-artifact@v7
-        if: matrix.shard == 'heavy'
-        with:
-          name: ensemble-v2-static-${{ github.sha }}
-          path: prototypes/v2/out/
-          include-hidden-files: true
-          if-no-files-found: error
-          retention-days: 7
-
       - uses: actions/upload-artifact@v7
         if: failure()
         with:

@@ -249,9 +249,10 @@ function migrateTheme(savedState: any): { palette: Palette; mode: ThemeMode } {
  * unchecked at runtime (it is `JSON.parse` on untrusted input), so this is an
  * ASSERTION about the wire format, not a validation of it — every field below is
  * still guarded before it reaches a slice. What the type buys is the other
- * direction: the writer in `export/sharing.ts` is annotated with the same interface,
- * so a reader that validates against a keyspace the writer never emits is now a
- * compile error rather than a bug that ships and survives for months (#1257).
+ * direction: v1's writer was annotated with the same interface, so a reader that
+ * validated against a keyspace the writer never emitted was a compile error rather
+ * than a bug that shipped and survived for months (#1257). That writer went with the
+ * v1 shell (#1358); old links still carry its payload.
  */
 function decompressBandSettings(str: string): SharedBandPayload | null {
     try {

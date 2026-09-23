@@ -67,9 +67,10 @@ export function isChordDensity(value: unknown): value is ChordDensity {
 }
 
 /**
- * The `?bnd=` share-URL wire payload — the base64'd JSON `compressBandSettings`
- * (`export/sharing.ts`) emits and `decompressBandSettings` (`state/state-hydration.ts`)
- * reads back. Keys are deliberately terse; the URL carries them on every share link.
+ * The `?bnd=` share-URL wire payload — the base64'd JSON v1's `compressBandSettings`
+ * emitted (its writer went with the v1 shell, #1358) and `decompressBandSettings`
+ * (`state/state-hydration.ts`) reads back. Keys are deliberately terse; the URL carried
+ * them on every share link.
  *
  * WHY THIS EXISTS (#1264). `decompressBandSettings` used to return `any`, so every
  * `band.*` read was untyped and `Object.assign(slice, {...})` accepted it even where
@@ -1139,8 +1140,8 @@ export interface AudioGraph {
     readonly drums: InstrumentBus;
 }
 
-/** Curated color-palette identities. Each has a light + dark variant in
- *  `public/css/variables.css`, selected via `<html data-palette>`. */
+/** Curated color-palette identities. v1 gave each a light + dark variant in its
+ *  stylesheet (deleted in #1358); the v2 stand has its own Day/Stage theme. */
 export type Palette =
     | 'after-hours'
     | 'midnight'
