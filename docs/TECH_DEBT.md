@@ -44,7 +44,7 @@ original audit record and must not be picked up as current work.
 **Historical suggested fix (do not implement):** Introduce `ACTIONS.SET_PROGRESSION` with payload `{ progression, totalSteps, stepMap, measureMap, sectionMap }` (atomic — these five fields are derived together; any partial update would corrupt the scheduler). Add a case to `arrangerReducer`. Refactor `validateProgression` to compute and return the bundle rather than mutate. Refactor `updateProgressionCache` to be pure (return the cache fields). The three callers dispatch. Delete `PROG_VALIDATED` since the reducer write will trigger Preact via deepSignal naturally. Drop the `@direct-mutation` marker.
 
 **Historical scope estimate:**
-- 7 source files (`chords-engine`, `state/arranger`, `types`, `main`, `state-effects`, `arranger-controller`, `e2e-tools`).
+- 7 source files at the time: `chords-engine`, `state/arranger`, `types`, `state-effects`, `arranger-controller`, plus v1's entry point and its test-hook module, both deleted in #1358 (the hooks live on as `render-bridge`).
 - 1 unit test (`tests/unit/state-integrity.test.ts`) updates its notify-only catalog.
 - **~30 test files** call `validateProgression(getState())` with no dispatch argument and rely on the direct mutation. The standards-compliance suite alone calls it 16 times (`tests/standards/standards-compliance.test.ts:132, 146, 370, 501, 556, 598, 663, 687, 704, 733, 773, 815, 870, 911, 960, 1014`). Each needs either dispatch wiring or a test-harness shim that internalizes dispatch on `validateProgression`'s behalf.
 - Circular-import risk if `validateProgression` tries to import `dispatch` from `state.ts` directly (`state-effects.ts` already imports from `chords-engine.ts`).

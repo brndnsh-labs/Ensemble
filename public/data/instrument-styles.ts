@@ -43,8 +43,8 @@ export const BASS_STYLES: StyleEntry[] = [
 ];
 
 // #628: the one soloist voice per canonical genre (the 13). The manual soloist
-// picker is gone, so this list now serves two consumers: the auto-generated
-// MANUAL.md style table and share-URL hydration validation (state-hydration.ts).
+// picker is gone, and so is the v1 manual's generated style table (#1358), so this list
+// now serves share-URL hydration validation (state-hydration.ts).
 // Ids match the voices the 13 genres actually resolve to via smart-genres.ts
 // `.soloist`; the retired `shred`/`minimal` phantom profiles are gone.
 export const SOLOIST_STYLES: StyleEntry[] = [

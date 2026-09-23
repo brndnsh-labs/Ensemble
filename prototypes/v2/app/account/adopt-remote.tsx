@@ -1,6 +1,7 @@
 'use client';
 
 import type { RefObject } from 'react';
+import { whenClosed } from '../dialog-close';
 
 /**
  * The confirm step for taking the account's newer version of the open song (#1310).
@@ -68,7 +69,7 @@ export function AdoptRemoteDialog({
                 }
                 onClose();
             }}
-            onClose={onClose}
+            onClose={whenClosed(onClose)}
         >
             <h2 id="adopt-remote-title">Use your account’s version of “{title}”?</h2>
             <p>

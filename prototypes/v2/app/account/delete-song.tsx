@@ -1,6 +1,7 @@
 'use client';
 
 import type { RefObject } from 'react';
+import { whenClosed } from '../dialog-close';
 
 /**
  * The confirm step for deleting one song from the cloud (#1270).
@@ -71,7 +72,7 @@ export function DeleteSongDialog({
                 }
                 onClose();
             }}
-            onClose={onClose}
+            onClose={whenClosed(onClose)}
         >
             <h2 id="delete-song-title">Delete “{title}” from your account?</h2>
             <p>

@@ -4,6 +4,7 @@ import type { RefObject } from 'react';
 import { useEffect, useState } from 'react';
 import { arrangementOf } from '../lib/documents';
 import type { ChartDocument } from '../lib/runtime';
+import { whenClosed } from './dialog-close';
 
 /**
  * Compound meters already notate the shuffle feel in the written rhythm, so Swing
@@ -135,7 +136,7 @@ export function FeelSheet({
             className="feel-panel"
             ref={dialogRef}
             aria-labelledby="feel-title"
-            onClose={onClose}
+            onClose={whenClosed(onClose)}
         >
             <div className="feel-heading">
                 <div>

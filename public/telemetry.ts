@@ -131,8 +131,8 @@ export function initializeTelemetry(): void {
     }
     initialized = true;
 
-    // `build:e2e` also uses Vite's production mode, so the canonical hostname
-    // check is the second half of the no-dev/no-test contract.
+    // A test or preview build can also report production mode, so the canonical
+    // hostname check is the second half of the no-dev/no-test contract.
     if (import.meta.env.MODE !== 'production' || location.hostname !== ENSEMBLE_HOST) {
         return;
     }

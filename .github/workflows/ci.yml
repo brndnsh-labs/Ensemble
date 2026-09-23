@@ -148,44 +148,51 @@ jobs:
   # ones — the export compiles public/ through webpack, so any engine change can
   # break it. Starts alongside `checks`, not after it (#1223).
   #
-  # It builds at the DEFAULT base (`/v2`). Since the cutover (#1357) that is no longer a
-  # base anything is published at — production serves the `ENSEMBLE_V2_BASE=/` build inside
-  # `ensemble-web` — so what this proves is the app and the shared `public/` code. The SHIPPED
-  # base is proven before a merge by `.github/workflows/v2-root-base.yml`, whose path filter was
-  # broadened to `prototypes/v2/**` + `public/**` + `hosting/web/**` for exactly that reason
-  # (patch P2-2), and after a merge by `web-image` below. Pointing this suite at `/` instead,
-  # and retiring that workflow, is the tidy end state and belongs with #1358.
+  # It builds at `/`, the base production serves (#1400). The default `/v2` base is what a
+  # local `npm run build` still produces, but nothing publishes it since the cutover (#1357),
+  # and a separate root-base workflow used to re-run this whole suite at `/` beside it — twice
+  # the minutes, with the shipped base outside the required gate. Now the root-only specs
+  # (`root-handover.chromium.spec.ts`) run here, and `v2-root-image.yml` keeps only the image
+  # smoke test.
   #
-  # SHARDED across two runners. The suite is wait-bound, not CPU-bound: measured
+  # SHARDED by duration × browser. The suite is wait-bound, not CPU-bound: measured
   # 2026-09-16 on a 4-core box, 100 tests take 245s on three workers and still
   # 185s on six, because the playback tests spend their time waiting on real
   # laps. Adding workers to one runner barely helps and is what starves the tab
-  # enough to drop a chord from the chart (#1240).
+  # enough to drop a chord from the chart (#1240) — so more runners, not more workers.
   #
-  # Sharding only pays off WITH `fullyParallel` in playwright.config.ts, which
-  # this change turns on. Playwright shards by group, and without it a
-  # file+project is one indivisible group: the first attempt here split 50/50 by
-  # test count and ran 1.5m against 4.0m, because `foundation.spec.ts` is 42% of
-  # the suite's seconds and landed whole on one shard. That is measured CI, not
-  # a projection — it made the job SLOWER than not sharding.
+  # Sharding only pays off WITH `fullyParallel` in playwright.config.ts. Playwright
+  # shards by group, and without it a file+project is one indivisible group: the
+  # first attempt here split 50/50 by test count and ran 1.5m against 4.0m, because
+  # `foundation.spec.ts` is 42% of the suite's seconds and landed whole on one shard.
   #
-  # Expect roughly a 4m job to become ~3.5m. The ceiling is `checks` at ~3.7m,
-  # so this takes v2 off the critical path rather than shortening it much
-  # further; more shards buy almost nothing against that floor.
+  # `heavy`/`rest` alone drifted: every new spec lands on `rest`, which went from ~265s
+  # to 430–550s in a week while `heavy` held at ~290s (#1400). Splitting each by project
+  # halves both, and a leg installs only its own browser's system packages (WebKit's are
+  # the slow apt step). The floor is `checks` at ~3.5m; more legs buy little below it.
   #
-  # The REQUIRED context is the `v2-checks` aggregate below, not these shards, so
-  # the shard count can change without touching branch protection.
+  # The REQUIRED context is the `v2-checks` aggregate below, not these legs, so
+  # the matrix can change without touching branch protection.
   v2-suite:
-    name: v2-suite (${{ matrix.shard }})
+    name: v2-suite (${{ matrix.shard }}, ${{ matrix.project }})
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      # Read by the build AND by checks/fixtures.ts, so the suite drives the base it built.
+      ENSEMBLE_V2_BASE: /
     strategy:
-      # Both shards always run: a red shard 1 must not hide a red shard 2.
+      # Every leg always runs: a red leg must not hide another.
       fail-fast: false
       matrix:
         # Duration-balanced, not Playwright's count-based `--shard` — see
         # playwright.config.ts for the measurement that forced this.
         shard: [heavy, rest]
+        project: [laptop, webkit-phone]
+        include:
+          - project: laptop
+            browser: chromium
+          - project: webkit-phone
+            browser: webkit
     steps:
       - uses: actions/checkout@v7
 
@@ -215,50 +222,60 @@ jobs:
         run: echo "PLAYWRIGHT_VERSION=$(npx playwright --version | cut -d' ' -f2)" >> $GITHUB_ENV
         working-directory: prototypes/v2
 
+      # One cache per browser: a leg that installed only Chromium must not save a cache
+      # that a WebKit leg then restores as a hit.
       - name: Cache Playwright Browsers
         id: playwright-cache
         uses: actions/cache@v5
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-v2-${{ env.PLAYWRIGHT_VERSION }}
+          key: ${{ runner.os }}-playwright-v2-${{ matrix.browser }}-${{ env.PLAYWRIGHT_VERSION }}
 
-      - name: Install Playwright browsers + system deps
+      - name: Install Playwright browser + system deps
         if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps chromium webkit
+        run: npx playwright install --with-deps ${{ matrix.browser }}
         working-directory: prototypes/v2
 
-      - name: Install Playwright system deps (browsers came from cache)
+      - name: Install Playwright system deps (browser came from cache)
         if: steps.playwright-cache.outputs.cache-hit == 'true'
-        run: npx playwright install-deps chromium webkit
+        run: npx playwright install-deps ${{ matrix.browser }}
         working-directory: prototypes/v2
 
       # Typechecks public/ again, exports the app, then scripts/offline.mjs copies
       # the sound packs beside it and writes build.json (fingerprint + HEAD).
-      - name: Build the v2 static export
+      - name: Build the v2 static export at basePath /
         run: npm run build --prefix prototypes/v2
 
+      # A failed build leaves whatever `out/` held before it, and the suite would happily pass
+      # against that — so the build's exit code is the gate, and this proves the artifact on
+      # disk really is the root one before any test runs.
+      - name: Assert the artifact is the root build
+        run: |
+          # `set -e` ignores a command inverted with `!`, so each negative is an explicit `if`.
+          set -euo pipefail
+          test -f prototypes/v2/out/index.html
+          grep -q '"/_next/static/' prototypes/v2/out/index.html
+          if grep -q '/v2/_next/' prototypes/v2/out/index.html; then
+            echo '::error::index.html still references /v2/_next'; exit 1
+          fi
+          if grep -q '"/v2/' prototypes/v2/out/build.json; then
+            echo '::error::build.json is still keyed under /v2/'; exit 1
+          fi
+          grep -q 'const SCOPE = "/";' prototypes/v2/out/sw.js
+          # The cutover's own artifacts (#1355): the web manifest v1's installed PWA updates
+          # into, and the tombstone that retires the beta's `/v2/` worker.
+          test -f prototypes/v2/out/manifest.json
+          test -f prototypes/v2/out/v2/sw.js
+
       - name: Run the v2 Playwright suite
-        run: npm run test:e2e --prefix prototypes/v2
+        run: npm run test:e2e --prefix prototypes/v2 -- --project=${{ matrix.project }}
         env:
           V2_SHARD: ${{ matrix.shard }}
-
-      # Every shard builds the export; exactly one uploads it, because two jobs
-      # cannot publish the same artifact name. Nothing downloads it since the cutover
-      # (#1357) retired the `/v2` publish — retained as this commit's beta-base evidence
-      # until #1358 removes it.
-      - uses: actions/upload-artifact@v7
-        if: matrix.shard == 'heavy'
-        with:
-          name: ensemble-v2-static-${{ github.sha }}
-          path: prototypes/v2/out/
-          include-hidden-files: true
-          if-no-files-found: error
-          retention-days: 7
 
       - uses: actions/upload-artifact@v7
         if: failure()
         with:
-          name: v2-playwright-failures-${{ matrix.shard }}
+          name: v2-playwright-failures-${{ matrix.shard }}-${{ matrix.project }}
           path: prototypes/v2/test-results/
           retention-days: 7
 
