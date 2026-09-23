@@ -2,7 +2,8 @@
  * Render the band engine to `.mid` (and optionally a text piano roll) from node.
  *
  *   npm run band:render -- --chart=blues --style=jazz --bpm=140 [--seed=x] [--passes=2]
- *                          [--intensity=0.8] [--out=tmp/band] [--print=8]
+ *                          [--intensity=0.8] [--comp=guitar] [--off=bass] [--out=tmp/band]
+ *                          [--print=8]
  *
  * `--chart=all --style=all` renders every fixture in every style. `--print=N` prints the
  * first N bars as a grid, for reading a groove without a DAW.
@@ -12,6 +13,7 @@ import path from 'node:path';
 import process from 'node:process';
 import {
     type BandEvent,
+    type CompInstrument,
     compileTimeline,
     DEFAULT_SETTINGS,
     type PassMemory,
@@ -71,14 +73,15 @@ function printBars(timeline: Timeline, events: BandEvent[], count: number) {
             }
             console.log(`  ${piece.padEnd(8)} ${row.join('')}`);
         }
-        for (const lane of ['bass', 'keys'] as const) {
+        for (const lane of ['bass', 'comp'] as const) {
             const notes = inBar.filter((e) => e.lane === lane);
             const byStep = new Map<number, string[]>();
             for (const n of notes) {
                 if (n.lane === 'drums') {
                     continue;
                 }
-                const name = `${NOTE[n.midi % 12]}${Math.floor(n.midi / 12) - 1}${n.muted ? '×' : ''}`;
+                const mark = n.muted ? '×' : n.stroke === 'up' ? '↑' : '';
+                const name = `${NOTE[n.midi % 12]}${Math.floor(n.midi / 12) - 1}${mark}`;
                 byStep.set(cell(n), [...(byStep.get(cell(n)) ?? []), name]);
             }
             const text = [...byStep].map(([s, names]) => `${s}:${names.join('+')}`).join(' ');
@@ -99,6 +102,12 @@ for (const chart of charts) {
             style,
             seed: args.seed ?? 'ensemble',
             intensity: args.intensity ? Number(args.intensity) : null,
+            comp: (args.comp ?? 'piano') as CompInstrument,
+            lanes: {
+                drums: !args.off?.includes('drums'),
+                bass: !args.off?.includes('bass'),
+                comp: !args.off?.includes('comp'),
+            },
         };
         const all: BandEvent[] = [];
         let memory: PassMemory | undefined;
@@ -115,7 +124,10 @@ for (const chart of charts) {
         }
         const extended = { ...timeline, ticks: timeline.ticks * passes };
         const file = path.join(out, `${chart}-${style}.mid`);
-        writeFileSync(file, toMidi(all, extended, { bpm, title: `${chart} (${style})` }));
+        writeFileSync(
+            file,
+            toMidi(all, extended, { bpm, title: `${chart} (${style})`, comp: settings.comp }),
+        );
         console.log(`${file}  ${all.length} events`);
         if (args.print) {
             printBars(timeline, all, Number(args.print));

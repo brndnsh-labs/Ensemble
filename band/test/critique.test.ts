@@ -8,6 +8,7 @@
  */
 import {
     type BandEvent,
+    type CompInstrument,
     DEFAULT_SETTINGS,
     type DrumHit,
     type PitchedNote,
@@ -27,14 +28,18 @@ interface Take {
     events: BandEvent[];
 }
 
-function perform(style: StyleId, intensity: number | null = null): Take[] {
+function perform(
+    style: StyleId,
+    intensity: number | null = null,
+    comp: CompInstrument = 'piano',
+): Take[] {
     const takes: Take[] = [];
     for (const chart of CHARTS) {
         const timeline = compileTimeline(FIXTURES[chart]);
         for (const seed of SEEDS) {
             let memory: PassMemory | undefined;
             for (let pass = 0; pass < 2; pass++) {
-                const settings = { ...DEFAULT_SETTINGS, style, seed, swing: 0, intensity };
+                const settings = { ...DEFAULT_SETTINGS, style, comp, seed, swing: 0, intensity };
                 const result = performPass(timeline, settings, { pass, looping: true, memory });
                 memory = result.memory;
                 takes.push({ timeline, events: result.events });
@@ -298,12 +303,14 @@ const METRICS: Record<string, Metric> = {
         }
         return ratio(hit, n);
     },
-    keysOffbeatShare: (takes) => {
+    compOffbeatShare: (takes) => {
         let n = 0;
         let hit = 0;
         for (const { timeline: t, events } of takes) {
             const onsets = new Set(
-                events.filter((e) => e.lane === 'keys').map((e) => `${e.bar}:${stepOf(t, e)}`),
+                events
+                    .filter((e) => e.lane === 'comp' && !e.muted)
+                    .map((e) => `${e.bar}:${stepOf(t, e)}`),
             );
             for (const o of onsets) {
                 n++;
@@ -312,14 +319,14 @@ const METRICS: Record<string, Metric> = {
         }
         return ratio(hit, n);
     },
-    /** Mean movement of the top voice between consecutive keys chords, in semitones. */
-    keysTopVoiceMotion: (takes) => {
+    /** Mean movement of the top voice between consecutive comp chords, in semitones. */
+    compTopVoiceMotion: (takes) => {
         let n = 0;
         let sum = 0;
         for (const { events } of takes) {
             const tops = new Map<number, number>();
             for (const e of events) {
-                if (e.lane === 'keys') {
+                if (e.lane === 'comp' && !e.muted) {
                     tops.set(e.tick, Math.max(tops.get(e.tick) ?? 0, e.midi));
                 }
             }
@@ -331,14 +338,14 @@ const METRICS: Record<string, Metric> = {
         }
         return ratio(sum, n);
     },
-    /** Share of keys chords no longer than an eighth note. */
-    keysShort: (takes) => {
+    /** Share of comp chords no longer than an eighth note. */
+    compShort: (takes) => {
         let n = 0;
         let hit = 0;
         for (const { events } of takes) {
             const seen = new Set<number>();
             for (const e of events) {
-                if (e.lane === 'keys' && !seen.has(e.tick)) {
+                if (e.lane === 'comp' && !e.muted && !seen.has(e.tick)) {
                     seen.add(e.tick);
                     n++;
                     hit += e.dur <= 240 ? 1 : 0;
@@ -347,14 +354,14 @@ const METRICS: Record<string, Metric> = {
         }
         return ratio(hit, n);
     },
-    /** Share of keys chords that carry a colour tone (9th or 13th above the root). */
-    keysColour: (takes) => {
+    /** Share of comp chords that carry a colour tone (9th or 13th above the root). */
+    compColour: (takes) => {
         let n = 0;
         let hit = 0;
         for (const { timeline: t, events } of takes) {
             const clusters = new Map<number, PitchedNote[]>();
             for (const e of events) {
-                if (e.lane === 'keys') {
+                if (e.lane === 'comp' && !e.muted) {
                     clusters.set(e.tick, [...(clusters.get(e.tick) ?? []), e]);
                 }
             }
@@ -370,6 +377,60 @@ const METRICS: Record<string, Metric> = {
         }
         return ratio(hit, n);
     },
+    /** Share of comp onsets (per strike, not per note) that are muted scratches. */
+    compScratchShare: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { events } of takes) {
+            const strikes = new Map<number, boolean>();
+            for (const e of events) {
+                if (e.lane === 'comp') {
+                    strikes.set(e.tick, !!e.muted);
+                }
+            }
+            for (const muted of strikes.values()) {
+                n++;
+                hit += muted ? 1 : 0;
+            }
+        }
+        return ratio(hit, n);
+    },
+    /** Share of sounding comp strikes that are upstrokes. */
+    compUpstrokeShare: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { events } of takes) {
+            const strikes = new Map<number, string | undefined>();
+            for (const e of events) {
+                if (e.lane === 'comp' && !e.muted) {
+                    strikes.set(e.tick, e.stroke);
+                }
+            }
+            for (const stroke of strikes.values()) {
+                n++;
+                hit += stroke === 'up' ? 1 : 0;
+            }
+        }
+        return ratio(hit, n);
+    },
+    /** Comp strikes (sounding or scratched) per bar played. */
+    compStrikesPerBar: (takes) => {
+        let bars = 0;
+        let strikes = 0;
+        for (const { events } of takes) {
+            const played = new Set<number>();
+            const onsets = new Set<number>();
+            for (const e of events) {
+                played.add(e.bar);
+                if (e.lane === 'comp') {
+                    onsets.add(e.tick);
+                }
+            }
+            bars += played.size;
+            strikes += onsets.size;
+        }
+        return ratio(strikes, bars);
+    },
 };
 
 // ---------------------------------------------------------------- the claims
@@ -383,8 +444,8 @@ const CLAIMS: Record<StyleId, Claim[]> = {
         ['bassArrivesOnBass', 0.9, 1, 'rock bass states the root (or slash note) on every change'],
         ['bassNotesPerBeat', 1.2, 2.2, 'driving eighths at normal energy'],
         ['bassSixteenthSyncopation', 0, 0.05, 'no sixteenth syncopation in a rock bass'],
-        ['keysOffbeatShare', 0, 0.35, 'keys sit on the beat'],
-        ['keysColour', 0, 0.15, 'triads and sevenths, not jazz extensions'],
+        ['compOffbeatShare', 0, 0.35, 'the comp sits on the beat'],
+        ['compColour', 0, 0.15, 'triads and sevenths, not jazz extensions'],
     ],
     jazz: [
         ['rideOnBeats', 0.9, 1, 'the ride carries the time on every beat'],
@@ -394,9 +455,9 @@ const CLAIMS: Record<StyleId, Claim[]> = {
         ['bassChromaticApproach', 0.3, 0.8, 'half-step approaches lead into changes'],
         ['bassRepeatedNotes', 0, 0.02, 'the walk keeps moving: no repeated pitches'],
         ['bassMeanLeap', 1.5, 4.5, 'mostly stepwise, not arpeggio leaps'],
-        ['keysOffbeatShare', 0.4, 1, 'comping pushes on the "and"s'],
-        ['keysColour', 0.6, 1, 'rootless voicings carry 9ths and 13ths'],
-        ['keysTopVoiceMotion', 0, 3.5, 'smooth voice leading'],
+        ['compOffbeatShare', 0.4, 1, 'comping pushes on the "and"s'],
+        ['compColour', 0.6, 1, 'rootless voicings carry 9ths and 13ths'],
+        ['compTopVoiceMotion', 0, 3.5, 'smooth voice leading'],
     ],
     funk: [
         ['snareBackbeat', 0.9, 1, 'the backbeat is hit hard'],
@@ -405,16 +466,16 @@ const CLAIMS: Record<StyleId, Claim[]> = {
         ['kickConsistency', 0.75, 1, 'the groove repeats'],
         ['bassSixteenthSyncopation', 0.1, 0.6, 'sixteenth-note syncopation in the bass'],
         ['bassKickUnison', 0.35, 1, 'bass and kick lock together'],
-        ['keysOffbeatShare', 0.6, 1, 'stabs live off the beat'],
-        ['keysShort', 0.9, 1, 'stabs are short'],
+        ['compOffbeatShare', 0.6, 1, 'stabs live off the beat'],
+        ['compShort', 0.9, 1, 'stabs are short'],
     ],
     bossa: [
         ['claveRim', 0.9, 1, 'the cross-stick plays the bossa clave'],
         ['kickOnOne', 0.95, 1, 'the surdo on one'],
         ['bassKickUnison', 0.7, 1, 'the bass doubles the surdo rhythm'],
         ['bassArrivesOnBass', 0.9, 1, 'root on the arrival'],
-        ['keysColour', 0.5, 1, 'ninths on the comp'],
-        ['keysTopVoiceMotion', 0, 3.5, 'smooth voice leading'],
+        ['compColour', 0.5, 1, 'ninths on the comp'],
+        ['compTopVoiceMotion', 0, 3.5, 'smooth voice leading'],
     ],
 };
 
@@ -430,6 +491,48 @@ const LOW_CLAIMS: Partial<Record<StyleId, Claim[]>> = {
         ],
     ],
 };
+
+/**
+ * The same styles with a guitar on the comp: the harmony stays the style's, the hand is the
+ * guitarist's. Bossa is heard on its own nylon; the rest on a picked electric.
+ */
+const GUITAR_CLAIMS: Record<StyleId, Claim[]> = {
+    rock: [
+        ['compUpstrokeShare', 0.1, 0.5, 'the strumming hand swings: upstrokes on the offbeats'],
+        ['compScratchShare', 0, 0, 'rock rhythm guitar rings; it does not scratch'],
+        ['compColour', 0, 0.15, 'open triads and sevenths, not jazz extensions'],
+    ],
+    jazz: [
+        ['compOffbeatShare', 0, 0.2, 'four to the bar: the guitar marks the beats'],
+        ['compShort', 0.75, 1, 'short, chunky strokes — felt more than heard'],
+        ['compStrikesPerBar', 3, 4.2, 'one stroke per beat'],
+    ],
+    funk: [
+        ['compScratchShare', 0.3, 0.8, 'the hand never stops: scratches between the stabs'],
+        ['compStrikesPerBar', 8, 16, 'a sixteenth-note hand'],
+        ['compOffbeatShare', 0.6, 1, 'the stabs live off the beat'],
+        ['compColour', 0.5, 1, 'the 3-7-9 grip where a seventh chord allows'],
+    ],
+    bossa: [
+        ['compColour', 0.5, 1, 'ninths in the grips'],
+        ['compTopVoiceMotion', 0, 3.5, 'the grips move by step, not by leap'],
+        ['compUpstrokeShare', 0, 0, 'fingers pluck, they never strum up'],
+    ],
+};
+
+describe.each(Object.keys(GUITAR_CLAIMS) as StyleId[])('%s critique on guitar', (style) => {
+    const takes = perform(style, null, style === 'bossa' ? 'nylon' : 'guitar');
+    const report: string[] = [];
+    it.each(GUITAR_CLAIMS[style])('%s in [%d, %d] — %s', (metric, min, max) => {
+        const value = METRICS[metric](takes);
+        report.push(`${metric.padEnd(26)} ${value.toFixed(3)}  [${min}, ${max}]`);
+        expect(value, `${style} ${metric} = ${value.toFixed(3)}`).toBeGreaterThanOrEqual(min);
+        expect(value, `${style} ${metric} = ${value.toFixed(3)}`).toBeLessThanOrEqual(max);
+    });
+    afterAll(() => {
+        console.log(`\n${style} on guitar\n  ${report.join('\n  ')}`);
+    });
+});
 
 describe.each(Object.keys(LOW_CLAIMS) as StyleId[])('%s critique at low energy', (style) => {
     const takes = perform(style, 0.2);

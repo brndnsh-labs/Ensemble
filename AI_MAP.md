@@ -47,8 +47,9 @@ The ground-up replacement for the generative engine; see `docs/design/band-engin
 | `band/theory/chord.ts` | The one chord authority: symbol → `ChordFacts` (tones, family, guides, scale). | `parseChord`, `chordPcs` |
 | `band/arrange/plan.ts` | Per-bar energy, lanes, fills, crashes, ending. | `planBars`, `energyTier` |
 | `band/feel/feel.ts` | The timing law: swing geometry, lane lean, seeded character. | `applyFeel` |
-| `band/styles/index.ts` | Style registry: feel + one idiom per lane. | `STYLES` |
-| `band/players/` | Idioms: `drums/books.ts`, `bass/books.ts`, `keys/books.ts` (+ `kit.ts`, `line.ts`, `voicing.ts`). | `rockDrums`, `walkingBass`, `jazzKeys`, … |
+| `band/styles/index.ts` | Style registry: feel + one idiom per lane (comp: one per instrument family). | `STYLES` |
+| `band/players/` | Idioms: `drums/books.ts`, `bass/books.ts`, `comp/books.ts` (+ `kit.ts`, `line.ts`). | `rockDrums`, `walkingBass`, `jazzKeys`, `funkGuitar`, … |
+| `band/players/comp/` | The comp: instruments (range, strum, sustain), keyboard voicings, fretboard grips. | `COMP_INSTRUMENTS`, `voice`, `grip`, `isPlayable` |
 | `band/sinks/midi.ts` | BandEvent[] → Standard MIDI File. | `toMidi` |
 | `band/test/` | Fixture charts, the invariant suite, the critique claims. | `FIXTURES` |
 | `scripts/band-render.ts` | `npm run band:render` — `.mid` + text grid from node. | CLI |

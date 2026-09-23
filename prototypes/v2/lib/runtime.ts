@@ -1,4 +1,12 @@
-import { type BandSettings, PPQ, type StyleId, toMidi } from '@band/index';
+import {
+    type BandSettings,
+    type CompInstrument,
+    PPQ,
+    STYLE_IDS,
+    STYLES,
+    type StyleId,
+    toMidi,
+} from '@band/index';
 import { transposeKey } from '@engine/controllers/arranger-controller';
 import {
     flushBuffers,
@@ -21,6 +29,7 @@ import {
     restoreGains,
     syncBusReverbSend,
 } from '@engine/engine/engine';
+import { isPackInstalled } from '@engine/engine/instrument-registry';
 import {
     startPlatformAudioAndWakeLock,
     stopPlatformAudioAndWakeLock,
@@ -127,6 +136,29 @@ const STYLE_FOR_GENRE: Record<string, StyleId> = {
     Metal: 'rock',
     'Ska-Punk': 'rock',
 };
+/** The chords-lane sound for each comp instrument (what the band's Auto sound selects). */
+const VOICE_FOR_COMP: Record<CompInstrument, InstrumentVoice> = {
+    piano: 'pack:grand',
+    rhodes: 'pack:rhodes',
+    organ: 'pack:hammond-organ',
+    clav: 'pack:clavinet',
+    guitar: 'pack:electric-guitar-clean',
+    nylon: 'pack:nylon-guitar',
+};
+/**
+ * How the band plays the sound on the chords lane: a guitar sound gets guitar grips and
+ * strums, the organ holds, the rest are keyboards. Any other sound (the synth) is a piano.
+ */
+const COMP_FOR_VOICE: Record<string, CompInstrument> = Object.assign(Object.create(null), {
+    ...Object.fromEntries(Object.entries(VOICE_FOR_COMP).map(([comp, voice]) => [voice, comp])),
+    'pack:electric-guitar-rhythm': 'guitar',
+    'pack:electric-guitar-driven': 'guitar',
+});
+/** In next mode, a genre the band plays natively picks its own comp instrument's sound. */
+function bandAutoComp(genre: string | undefined): InstrumentVoice | null {
+    const style = STYLE_IDS.find((id) => STYLES[id].name === genre);
+    return ENGINE_NEXT && style ? VOICE_FOR_COMP[STYLES[style].prefers] : null;
+}
 let band: BandHost | null = null;
 let bandSeed = '';
 let bandScore: { key: string; score: SemanticScore } | null = null;
@@ -172,7 +204,8 @@ function bandSettings(): BandSettings {
     const { groove, bass, chords, playback } = getState();
     return {
         style: STYLE_FOR_GENRE[groove.lastSmartGenre] ?? 'rock',
-        lanes: { drums: groove.enabled, bass: bass.enabled, keys: chords.enabled },
+        lanes: { drums: groove.enabled, bass: bass.enabled, comp: chords.enabled },
+        comp: COMP_FOR_VOICE[chords.voice] ?? 'piano',
         intensity: playback.autoIntensity ? null : playback.bandIntensity,
         swing: groove.swing,
         swingGrid: groove.swingSub === '16th' ? 16 : 8,
@@ -273,6 +306,15 @@ function syncBand(): void {
         if (payload.drum) {
             void loadDrumPreset(payload.drum);
         }
+    }
+    // The genre-change effect in `public/` picks the old engine's Auto sound; on the band,
+    // a native genre's own comp instrument wins (bossa is heard on nylon). Only an installed
+    // pack is taken — the explicit genre change (`setGenre`) installs it beforehand.
+    const { chords } = getState();
+    const auto = bandAutoComp(groove.lastSmartGenre);
+    if (auto && chords.autoSound && chords.voice !== auto && isPackInstalled(auto.slice(5))) {
+        dispatch(ACTIONS.SET_INSTRUMENT_VOICE, { module: 'chords', voice: auto, auto: true });
+        return; // that dispatch syncs the band again
     }
     if (!host?.playing) {
         return;
@@ -771,6 +813,11 @@ export function recommendedVoice(
     chordStyle?: string,
 ): InstrumentVoice {
     const state = getState();
+    const bandVoice =
+        module === 'chords' ? bandAutoComp(genre ?? state.groove.lastSmartGenre) : null;
+    if (bandVoice) {
+        return bandVoice;
+    }
     // Resolve the intended mapping, not a temporary synth fallback based on RAM.
     // Every caller prepares these files before committing the choice or playing.
     return autoVoiceForGenre(

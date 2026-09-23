@@ -2,7 +2,7 @@
  * The engine: `(timeline, settings, pass) → BandEvent[]`. One pure function; live playback,
  * MIDI export and audio export all consume what it returns, so they cannot disagree.
  *
- * Per bar, lanes play in a fixed order — drums, then bass, then keys — and each later lane
+ * Per bar, lanes play in a fixed order — drums, then bass, then comp — and each later lane
  * hears what the earlier ones played (`heard`). That is the whole coordination model: data
  * flowing one way, not a blackboard every lane writes.
  */
@@ -11,6 +11,7 @@ import { rng } from './core/random.js';
 import type { BandEvent, BandSettings, DrumHit, Lane, PitchedNote } from './core/types.js';
 import { applyFeel } from './feel/feel.js';
 import type { Timeline } from './form/timeline.js';
+import { COMP_INSTRUMENTS } from './players/comp/instruments.js';
 import { STYLES } from './styles/index.js';
 import type { BarContext } from './styles/types.js';
 import { nearestMidi } from './theory/pitch.js';
@@ -44,11 +45,13 @@ export function performPass(
     options: PassOptions,
 ): PassResult {
     const style = STYLES[settings.style];
+    const instrument = COMP_INSTRUMENTS[settings.comp];
+    const comp = style.comp[instrument.family];
     const window = options.window ?? fullWindow(timeline);
     const plans = planBars(timeline, settings, { ...options, window });
     const memory: PassMemory = options.memory
         ? { ...options.memory }
-        : { drums: style.drums.init(), bass: style.bass.init(), keys: style.keys.init() };
+        : { drums: style.drums.init(), bass: style.bass.init(), comp: comp.init() };
     const { bars } = timeline;
     const events: BandEvent[] = [];
     const snapshots: PassMemory[] = [];
@@ -73,6 +76,7 @@ export function performPass(
             plan,
             next: nextIndex >= 0 ? { bar: bars[nextIndex], plan: nextPlan } : null,
             heard,
+            instrument,
             rng: (purpose, scope = 'bar') =>
                 scope === 'section'
                     ? rng(settings.seed, style.id, lane, 'section', bar.visit.sectionIndex, purpose)
@@ -90,15 +94,18 @@ export function performPass(
             heard.bass = out.events as PitchedNote[];
             events.push(...out.events);
         }
-        if (plan.lanes.keys) {
-            const out = style.keys.play(context('keys'), memory.keys);
-            memory.keys = out.memory;
+        if (plan.lanes.comp) {
+            const out = comp.play(context('comp'), memory.comp);
+            memory.comp = out.memory;
             events.push(...out.events);
         }
     }
 
     const held = holdFermatas(events, timeline, plans);
-    const felt = applyFeel(held, timeline, style.feel, settings);
+    const felt = applyFeel(held, timeline, style.feel, {
+        ...settings,
+        strumMs: instrument.strumMs,
+    });
     felt.sort((a, b) => a.tick - b.tick || laneOrder(a) - laneOrder(b));
     return { events: felt, memory, snapshots };
 }
@@ -107,7 +114,7 @@ const laneOrder = (e: BandEvent) => (e.lane === 'drums' ? 0 : e.lane === 'bass' 
 
 /**
  * A fermata is a held chord, not a slow groove: whatever the idioms played inside a fermata
- * span is replaced by one crash-and-kick, one held bass note and the keys' first chord, all
+ * span is replaced by one crash-and-kick, one held bass note and the comp's first chord, all
  * ringing to the end of the (stretched) span. A fermata on a hold ties over: nothing new is
  * struck, and the notes already sounding are extended through it.
  */
@@ -130,23 +137,23 @@ function holdFermatas(
         if (!plan) {
             continue; // outside this pass's window
         }
-        const keysAtStart = out.filter((e) => e.lane === 'keys' && e.tick === span.start);
+        const compAtStart = out.filter((e) => e.lane === 'comp' && e.tick === span.start);
         const before = out.filter((e) => e.tick < span.start);
         out = out.filter((e) => !inside(e));
         if (span.tied) {
-            // Extend the last bass note and the last keys chord through the fermata.
+            // Extend the last bass note and the last comp chord through the fermata.
             let bassTick = -1;
-            let keysTick = -1;
+            let compTick = -1;
             for (const e of before) {
                 if (e.lane === 'bass') {
                     bassTick = Math.max(bassTick, e.tick);
-                } else if (e.lane === 'keys') {
-                    keysTick = Math.max(keysTick, e.tick);
+                } else if (e.lane === 'comp' && !e.muted) {
+                    compTick = Math.max(compTick, e.tick);
                 }
             }
             out = out.map((e) =>
                 (e.lane === 'bass' && e.tick === bassTick) ||
-                (e.lane === 'keys' && e.tick === keysTick)
+                (e.lane === 'comp' && !e.muted && e.tick === compTick)
                     ? { ...e, dur: span.end - e.tick }
                     : e,
             );
@@ -191,7 +198,7 @@ function holdFermatas(
                 bar: barIndex,
             });
         }
-        out.push(...keysAtStart.map((e) => ({ ...e, dur: length })));
+        out.push(...compAtStart.map((e) => ({ ...e, dur: length })));
     }
     return out;
 }

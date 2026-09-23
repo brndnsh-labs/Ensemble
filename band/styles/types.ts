@@ -1,13 +1,15 @@
 /**
  * Styles and idioms. An *idiom* is one way of playing one instrument (a walking bass, a
- * backbeat, a Charleston comp). A *style* is a genre: a feel plus one idiom per lane.
+ * backbeat, a Charleston comp). A *style* is a genre: a feel plus one idiom per lane (and,
+ * for the comp, one per instrument family: a bossa guitar and a bossa piano differ).
  * Idioms are shared vocabulary, so a new style is usually a new combination, and an
  * "influence" (rock with a Motown bass) is a style that borrows another family's idiom.
  */
 import type { BarPlan } from '../arrange/plan.js';
 import type { Rng } from '../core/random.js';
-import type { DrumHit, Lane, PitchedNote, StyleId } from '../core/types.js';
+import type { CompInstrument, DrumHit, Lane, PitchedNote, StyleId } from '../core/types.js';
 import type { Bar, Timeline } from '../form/timeline.js';
+import type { CompProfile } from '../players/comp/instruments.js';
 
 /** Everything an idiom may know when it plays one bar. All of it is read-only. */
 export interface BarContext {
@@ -18,6 +20,8 @@ export interface BarContext {
     next: { bar: Bar; plan: BarPlan } | null;
     /** What the lanes before this one already played in this bar, on the straight grid. */
     heard: { drums: DrumHit[]; bass: PitchedNote[] };
+    /** The comp lane's instrument (what is physical about it: range, strum, sustain). */
+    instrument: CompProfile;
     /**
      * A seeded stream for one decision. Keyed on the musical position, so a decision is
      * stable no matter what was generated before it. `scope: 'section'` keys on the
@@ -56,5 +60,8 @@ export interface Style {
     feel: Feel;
     drums: DrumIdiom;
     bass: PitchedIdiom;
-    keys: PitchedIdiom;
+    /** One comping book per instrument family; the settings' instrument picks between them. */
+    comp: { keyboard: PitchedIdiom; guitar: PitchedIdiom };
+    /** The comp instrument the genre is heard on by default (the app's Auto sound). */
+    prefers: CompInstrument;
 }

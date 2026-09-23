@@ -1,16 +1,24 @@
 /**
- * Voicings: which notes of a chord the keys play, and where. A voicing *kind* picks the
- * tones (a close triad, a rootless jazz voicing, a funk stab, a bossa drop-2); `voice()`
- * then places them, choosing the inversion that moves least from the previous chord, stays
- * in the keys register, and avoids the clashes a player's hand would avoid.
+ * Voicings: which notes of a chord the comp plays, and where. A voicing *kind* picks the
+ * tones (a close triad, a rootless jazz voicing, a funk stab, a bossa drop-2, a guitar
+ * shell); `voice()` then places them for two hands on a keyboard — and `fretboard.ts`'s
+ * `grip()` for a guitar — choosing the placement that moves least from the previous chord,
+ * sits in the instrument's register, and avoids the clashes a player would avoid.
  */
 import type { ChordFacts } from '../../theory/chord.js';
 import { mod12 } from '../../theory/pitch.js';
 
-/** The keys register slot (MIDI). Voicings live inside it; the top voice aims for `top`. */
-const KEYS = { lo: 52, hi: 84, top: 72 } as const;
+/** Where a voicing may sit (MIDI), and where its top voice aims. */
+export interface Slot {
+    lo: number;
+    hi: number;
+    top: number;
+}
 
-export type VoicingKind = 'close' | 'rootless' | 'stab' | 'drop2';
+/** The keyboard comp's register slot. */
+const KEYS: Slot = { lo: 52, hi: 84, top: 72 };
+
+export type VoicingKind = 'close' | 'rootless' | 'stab' | 'drop2' | 'shell';
 
 const has = (chord: ChordFacts, n: number) => chord.intervals.some((i) => mod12(i) === n);
 
@@ -23,7 +31,7 @@ function thirteenth(chord: ChordFacts): number {
 }
 
 /** The tones (semitones above the root, < 12) a voicing kind plays for a chord. */
-function voicingTones(chord: ChordFacts, kind: VoicingKind): number[] {
+export function voicingTones(chord: ChordFacts, kind: VoicingKind): number[] {
     const third = chord.third ?? (has(chord, 5) ? 5 : has(chord, 2) ? 2 : null);
     const fifth = chord.fifth ?? 7;
     const colour = chord.seventh ?? (chord.sixth ? 9 : null);
@@ -76,6 +84,11 @@ function voicingTones(chord: ChordFacts, kind: VoicingKind): number[] {
                     : ninth(chord);
             return [...new Set([third ?? 7, colour, top])];
         }
+        case 'shell': {
+            // The swing guitarist's three-note chord: root, 3rd and 7th (or 6th) — the
+            // harmony's skeleton, all a four-to-the-bar rhythm guitar needs.
+            return [...new Set([0, third ?? 7, colour ?? fifth])];
+        }
         case 'drop2': {
             if (colour === null) {
                 return [...new Set([0, third ?? 7, fifth, written[0] ?? 0])];
@@ -118,16 +131,17 @@ function candidates(tones: number[], kind: VoicingKind): number[][] {
     return out;
 }
 
-function cost(v: number[], prev: number[] | null, chord: ChordFacts): number {
+/** How good a placement is (lower is better): register, voice leading, and clashes. */
+export function cost(v: number[], prev: number[] | null, chord: ChordFacts, slot: Slot): number {
     let c = 0;
     const top = v[v.length - 1];
     // Register: out of the slot is forbidden in effect; the top voice aims for the sweet spot.
     for (const m of v) {
-        if (m < 52 || m > 84) {
+        if (m < slot.lo || m > slot.hi) {
             c += 40;
         }
     }
-    c += Math.abs(top - KEYS.top) * 0.35;
+    c += Math.abs(top - slot.top) * 0.35;
     // Voice leading: the smallest total movement from the last chord.
     if (prev?.length) {
         const n = Math.min(prev.length, v.length);
@@ -173,7 +187,7 @@ export function voice(chord: ChordFacts, kind: VoicingKind, prev: number[] | nul
     let best: number[] | null = null;
     let bestCost = Infinity;
     for (const v of candidates(pcs, kind)) {
-        const c = cost(v, prev, chord);
+        const c = cost(v, prev, chord, KEYS);
         if (c < bestCost) {
             best = v;
             bestCost = c;

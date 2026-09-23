@@ -8,6 +8,10 @@
  *   3. Character — seeded human placement keyed on (bar position, lane, voice), so a lane's
  *               push at a given sixteenth repeats every bar and reads as a settled pocket
  *               rather than per-note noise; velocity varies per hit.
+ *
+ * A strum is articulation, not feel, but it is still *time*, so it lives here too: a stroked
+ * chord rolls across its strings (low→high down, high→low up) at the instrument's speed, and
+ * takes its tier-3 placement as one gesture, so the roll is never scrambled.
  */
 import { hashKey, rng } from '../core/random.js';
 import { type BandEvent, PPQ } from '../core/types.js';
@@ -42,6 +46,29 @@ export interface FeelSettings {
     swingGrid?: 8 | 16 | null;
     humanize: number | null;
     seed: string;
+    /** Milliseconds between adjacent strings of a stroked chord (0: no roll). */
+    strumMs?: number;
+}
+
+/** Each stroked comp note's place in its strum (0 = the first string hit). */
+function strumOrder(events: BandEvent[]): Map<BandEvent, number> {
+    const chords = new Map<number, BandEvent[]>();
+    for (const e of events) {
+        if (e.lane === 'comp' && e.stroke) {
+            const chord = chords.get(e.tick) ?? [];
+            chord.push(e);
+            chords.set(e.tick, chord);
+        }
+    }
+    const order = new Map<BandEvent, number>();
+    for (const chord of chords.values()) {
+        const up = chord[0].lane === 'comp' && chord[0].stroke === 'up';
+        const sorted = [...chord].sort(
+            (a, b) => (a.lane === 'drums' ? 0 : a.midi) - (b.lane === 'drums' ? 0 : b.midi),
+        );
+        (up ? sorted.reverse() : sorted).forEach((e, i) => order.set(e, i));
+    }
+    return order;
 }
 
 export function applyFeel(
@@ -53,6 +80,8 @@ export function applyFeel(
     const ratio = swingRatio(settings.swing ?? feel.swing);
     const pair = (settings.swingGrid ?? feel.swingGrid) === 8 ? PPQ : PPQ / 2;
     const human = (settings.humanize ?? feel.humanize) / 100;
+    const strumMs = settings.strumMs ?? 0;
+    const strum = strumMs ? strumOrder(events) : null;
     return events.map((event) => {
         const bar = timeline.bars[event.bar];
         let { tick } = event;
@@ -66,12 +95,21 @@ export function applyFeel(
             }
             tick = swung;
         }
-        const voice = event.lane === 'drums' ? event.piece : event.lane === 'bass' ? 0 : event.midi;
+        const rank = strum?.get(event);
+        const voice =
+            event.lane === 'drums'
+                ? event.piece
+                : event.lane === 'bass'
+                  ? 0
+                  : rank !== undefined
+                    ? 'strum'
+                    : event.midi;
         const position = Math.round(event.tick - bar.start);
         // Tier 3: placement keyed on bar position, not bar index (settled, repeating).
         const place = rng(settings.seed, 'place', event.lane, voice, position).bipolar();
         const lean = event.lane === 'drums' ? 0 : feel.lean[event.lane];
-        const offsetMs = event.offsetMs + lean + place * MAX_CHARACTER_MS * human;
+        const offsetMs =
+            event.offsetMs + lean + place * MAX_CHARACTER_MS * human + (rank ?? 0) * strumMs;
         const jitter = rng(
             hashKey(settings.seed),
             'vel',

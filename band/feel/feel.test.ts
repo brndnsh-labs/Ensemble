@@ -5,7 +5,7 @@ import { applyFeel, swingRatio } from './feel.js';
 
 const timeline = compileTimeline(score([{ label: 'A', bars: 'C | C' }]));
 const waltz = compileTimeline(score([{ label: 'A', bars: 'C | C', meter: '6/8' }]));
-const feel = { swing: 0, swingGrid: 8 as const, lean: { bass: 5, keys: -3 }, humanize: 0 };
+const feel = { swing: 0, swingGrid: 8 as const, lean: { bass: 5, comp: -3 }, humanize: 0 };
 const hit = (tick: number): DrumHit => ({
     lane: 'drums',
     piece: 'hat',
@@ -79,5 +79,43 @@ describe('feel', () => {
         );
         expect(a.offsetMs).toBeCloseTo(b.offsetMs);
         expect(a.offsetMs).not.toBe(0);
+    });
+
+    it('rolls a strummed chord low→high down, high→low up, as one gesture', () => {
+        const chord = (tick: number, stroke: 'down' | 'up') =>
+            [64, 52, 59, 55].map(
+                (midi): PitchedNote => ({
+                    lane: 'comp',
+                    midi,
+                    tick,
+                    dur: 240,
+                    velocity: 90,
+                    offsetMs: 0,
+                    bar: 0,
+                    stroke,
+                }),
+            );
+        const felt = applyFeel([...chord(0, 'down'), ...chord(240, 'up')], timeline, feel, {
+            swing: 0,
+            humanize: 100,
+            seed: 's',
+            strumMs: 6,
+        });
+        const roll = (tick: number) =>
+            felt
+                .filter((e) => e.tick === tick)
+                .map((e) => [e.lane === 'comp' ? e.midi : 0, e.offsetMs] as const)
+                .sort((a, b) => a[1] - b[1])
+                .map(([midi]) => midi);
+        expect(roll(0)).toEqual([52, 55, 59, 64]);
+        expect(roll(240)).toEqual([64, 59, 55, 52]);
+        // One gesture: humanize moves the whole strum, so every string is 6 ms apart.
+        const offsets = felt
+            .filter((e) => e.tick === 0)
+            .map((e) => e.offsetMs)
+            .sort((a, b) => a - b);
+        for (let i = 1; i < offsets.length; i++) {
+            expect(offsets[i] - offsets[i - 1]).toBeCloseTo(6);
+        }
     });
 });

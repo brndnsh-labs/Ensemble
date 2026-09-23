@@ -7,6 +7,7 @@ export type { BarPlan, PassWindow } from './arrange/plan.js';
 export type {
     BandEvent,
     BandSettings,
+    CompInstrument,
     DrumHit,
     DrumPiece,
     Lane,

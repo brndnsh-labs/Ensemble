@@ -100,7 +100,7 @@ export function planBars(
         energy = clamp01(energy + passLift);
 
         const lanes = {} as Record<Lane, boolean>;
-        for (const lane of ['drums', 'bass', 'keys'] as const) {
+        for (const lane of ['drums', 'bass', 'comp'] as const) {
             lanes[lane] = settings.lanes[lane] && bar.visit.lanes[lane] !== false;
         }
         const ending = !looping && isLast;

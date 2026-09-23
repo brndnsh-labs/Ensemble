@@ -4,8 +4,9 @@
  * Micro-timing (lean + character) is baked into tick positions at the given tempo; bar
  * meters and fermata stretches are written as meta events so a DAW's grid lines up.
  */
-import { type BandEvent, type DrumPiece, PPQ } from '../core/types.js';
+import { type BandEvent, type CompInstrument, type DrumPiece, PPQ } from '../core/types.js';
 import type { Timeline } from '../form/timeline.js';
+import { COMP_INSTRUMENTS } from '../players/comp/instruments.js';
 
 /** General MIDI percussion keys. */
 const GM_DRUMS: Record<DrumPiece, number> = {
@@ -74,12 +75,14 @@ function text(type: number, value: string): number[] {
 export interface MidiOptions {
     bpm: number;
     title?: string;
+    /** The comp lane's instrument, for its General MIDI program. */
+    comp?: CompInstrument;
 }
 
 export function toMidi(
     events: BandEvent[],
     timeline: Timeline,
-    { bpm, title = 'Ensemble' }: MidiOptions,
+    { bpm, title = 'Ensemble', comp = 'piano' }: MidiOptions,
 ): Uint8Array<ArrayBuffer> {
     const msToTicks = (ms: number) => (ms / 1000) * (bpm / 60) * PPQ;
     // Conductor track: tempo, meters, stretches.
@@ -109,12 +112,12 @@ export function toMidi(
         }
     }
     const lanes: Record<
-        'drums' | 'bass' | 'keys',
+        'drums' | 'bass' | 'comp',
         { channel: number; program: number; name: string; out: Timed[] }
     > = {
         drums: { channel: 9, program: 0, name: 'Drums', out: [] },
         bass: { channel: 0, program: 33, name: 'Bass', out: [] },
-        keys: { channel: 1, program: 4, name: 'Keys', out: [] },
+        comp: { channel: 1, program: COMP_INSTRUMENTS[comp].program, name: 'Comp', out: [] },
     };
     for (const lane of Object.values(lanes)) {
         lane.out.push({ tick: 0, order: 0, data: text(0x03, lane.name) });

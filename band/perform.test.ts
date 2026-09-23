@@ -1,5 +1,5 @@
-import { DEFAULT_SETTINGS, PPQ } from './core/types.js';
-import { compileTimeline } from './form/timeline.js';
+import { DEFAULT_SETTINGS, type PitchedNote, PPQ } from './core/types.js';
+import { chordAt, compileTimeline } from './form/timeline.js';
 import { performPass } from './perform.js';
 import { FIXTURES, score } from './test/scores.js';
 
@@ -31,9 +31,9 @@ describe('performPass windows', () => {
                 },
             );
             const pushed = events.filter(
-                (e) => e.lane === 'keys' && e.bar === 7 && e.tick >= 7 * BAR + 14 * 120,
+                (e) => e.lane === 'comp' && e.bar === 7 && e.tick >= 7 * BAR + 14 * 120,
             );
-            const pcs = new Set(pushed.map((e) => (e.lane === 'keys' ? e.midi % 12 : -1)));
+            const pcs = new Set(pushed.map((e) => (e.lane === 'comp' ? e.midi % 12 : -1)));
             // Gm7 would bring a Bb (10); Dm's anticipation never does.
             expect(pcs.has(10), `seed ${seed}`).toBe(false);
         }
@@ -57,16 +57,23 @@ describe('fermatas', () => {
         const timeline = compileTimeline(
             score([{ label: 'A', bars: 'C | F | G7 | C', fermataBars: [3] }]),
         );
-        for (const style of ['rock', 'jazz', 'funk', 'bossa'] as const) {
+        for (const [style, comp] of [
+            ['rock', 'piano'],
+            ['jazz', 'piano'],
+            ['funk', 'piano'],
+            ['bossa', 'piano'],
+            ['funk', 'guitar'],
+            ['bossa', 'nylon'],
+        ] as const) {
             const { events } = performPass(
                 timeline,
-                { ...DEFAULT_SETTINGS, style, seed: 'f' },
+                { ...DEFAULT_SETTINGS, style, comp, seed: 'f' },
                 { pass: 0, looping: true },
             );
             const last = events.filter((e) => e.bar === 3);
             const drums = last.filter((e) => e.lane === 'drums');
             const bass = last.filter((e) => e.lane === 'bass');
-            const onsets = new Set(last.filter((e) => e.lane === 'keys').map((e) => e.tick));
+            const onsets = new Set(last.filter((e) => e.lane === 'comp').map((e) => e.tick));
             expect(drums.map((e) => (e.lane === 'drums' ? e.piece : '')).sort(), style).toEqual([
                 'crash',
                 'kick',
@@ -86,5 +93,52 @@ describe('fermatas', () => {
         expect(events.filter((e) => e.bar === 1)).toEqual([]);
         const rings = events.filter((e) => e.lane !== 'drums' && e.tick + e.dur >= 2 * BAR - 1);
         expect(rings.length).toBeGreaterThan(0);
+    });
+});
+
+describe('comp instruments', () => {
+    const timeline = compileTimeline(FIXTURES.bossa);
+
+    it("a bossa guitarist's thumb plays the bass only when there is no bassist", () => {
+        const play = (bass: boolean) =>
+            performPass(
+                timeline,
+                {
+                    ...DEFAULT_SETTINGS,
+                    style: 'bossa',
+                    comp: 'nylon',
+                    seed: 't',
+                    lanes: { drums: true, bass, comp: true },
+                },
+                { pass: 0, looping: true },
+            ).events.filter((e): e is PitchedNote => e.lane === 'comp');
+        expect(play(true).filter((e) => e.midi < 48)).toEqual([]);
+        const thumb = play(false).filter((e) => e.midi < 50);
+        expect(thumb.length).toBeGreaterThan(timeline.bars.length);
+        for (const note of thumb) {
+            const chord = chordAt(timeline, note.tick);
+            const pcs = [chord?.bass, chord && (chord.root + (chord.fifth ?? 7)) % 12];
+            expect(pcs, `thumb ${note.midi} @${note.tick}`).toContain(note.midi % 12);
+        }
+    });
+
+    it('an organ holds each chord until the next strike', () => {
+        for (const style of ['rock', 'jazz', 'funk', 'bossa'] as const) {
+            const comp = performPass(
+                timeline,
+                { ...DEFAULT_SETTINGS, style, comp: 'organ', seed: 'o' },
+                { pass: 0, looping: true },
+            ).events.filter((e): e is PitchedNote => e.lane === 'comp');
+            const strikes = [...new Set(comp.map((e) => e.tick))];
+            for (let i = 0; i + 1 < strikes.length; i++) {
+                const ends = comp.filter((e) => e.tick === strikes[i]).map((e) => e.tick + e.dur);
+                // Within a bar, the pad sounds right up to the next chord.
+                if (Math.floor(strikes[i] / BAR) === Math.floor(strikes[i + 1] / BAR)) {
+                    expect(Math.min(...ends), `${style} @${strikes[i]}`).toBeGreaterThanOrEqual(
+                        strikes[i + 1] - 1,
+                    );
+                }
+            }
+        }
     });
 });

@@ -93,7 +93,7 @@ function hz(midi: number): number {
 function chordSizes(events: BandEvent[]): Map<number, number> {
     const sizes = new Map<number, number>();
     for (const e of events) {
-        if (e.lane === 'keys') {
+        if (e.lane === 'comp') {
             sizes.set(e.tick, (sizes.get(e.tick) ?? 0) + 1);
         }
     }
@@ -424,7 +424,10 @@ export class BandHost {
             );
             return;
         }
-        playNote(state, hz(event.midi), time, seconds, {
+        // A guitar scratch: the strings deadened under the hand — a click with a trace of
+        // pitch, so it is cut to a few tens of milliseconds whatever its written length.
+        playNote(state, hz(event.midi), time, event.muted ? Math.min(seconds, 0.03) : seconds, {
+            muted: event.muted,
             vol: (event.velocity / 127) * 0.8,
             instrument: (state.chords as { instrument?: string }).instrument || 'Piano',
             numVoices: segment.chordSizes.get(event.tick) ?? 1,

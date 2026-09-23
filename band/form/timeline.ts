@@ -76,7 +76,7 @@ function durationTicks([n, d]: Readonly<ScoreDuration>): number {
     return Math.round((n * PPQ) / d);
 }
 
-const SECTION_LANES: Record<string, Lane> = { groove: 'drums', bass: 'bass', chords: 'keys' };
+const SECTION_LANES: Record<string, Lane> = { groove: 'drums', bass: 'bass', chords: 'comp' };
 
 function phraseLayout(barCount: number): number[] {
     // Four-bar phrases; a short tail joins the last phrase (a 6-bar section is 6, not 4+2).

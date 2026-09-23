@@ -8,6 +8,8 @@ shape and its laws. Rules that bind every change here:
   outside dependency. Randomness goes through `ctx.rng(purpose, scope)`.
 - **Timing moves only in `feel/feel.ts`.** Players write on the straight sixteenth grid.
 - **Chord meaning comes only from `theory/chord.ts`.** Never parse a symbol in a player.
+- **A guitar chord is found on the fretboard, never placed on a keyboard** (`players/comp/
+  fretboard.ts`). The invariant suite rejects any grip a hand can't fret.
 - **A new style gets the invariant suite automatically.** Also add its claims to
   `test/critique.test.ts`, then render it (`npm run band:render -- --style=<id> --print=8`)
   and read the grid before asking for an ear check.
