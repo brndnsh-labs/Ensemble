@@ -5,6 +5,7 @@ import { resolveScoreContext } from '@engine/songbook/score-context';
 import { scoreMeter } from '@engine/songbook/score-duration';
 import type { ChartDocumentV2, ScoreMeasure, SemanticScore } from '@engine/songbook/score-types';
 import type { ChartContent, ChartDocument as LegacyDocument } from '@engine/songbook/types';
+import { withSectionMeter } from './song-meter';
 
 export type ChartDocument = LegacyDocument | ChartDocumentV2;
 export type DocumentContent = ChartDocument['chart'];
@@ -258,4 +259,70 @@ export function withoutSection(source: SemanticScore, sectionId: string): Remova
     const measure =
         index > 0 ? selected.measures[selected.measures.length - 1] : selected.measures[0];
     return { kind: 'ok', score, measureId: measure.id, sectionId: selected.id };
+}
+
+/** The longest section name the settings accept — the codec allows 100; the stand's badge fits this. */
+export const SECTION_NAME_MAX = 24;
+
+/** One section-settings edit (#1374). `null` returns an override to the song's own value. */
+export type SectionChange =
+    | { label: string }
+    | { repeat: number }
+    | { key: string | null }
+    | { isMinor: boolean | null }
+    | { meter: string | null };
+
+export type SectionChangeResult =
+    | { kind: 'ok'; score: SemanticScore }
+    /** Nothing was changed. `measureId`, when present, is the bar that needs a decision. */
+    | { kind: 'blocked'; message: string; measureId?: string };
+
+/**
+ * Applies one section-settings edit and returns a changed copy. A meter change re-fits the
+ * section's bars by `withSongMeter`'s rule (`withSectionMeter`); key and mode never rewrite chord
+ * names, the same rule as the bar editor. Bars that wrote their own override keep it.
+ */
+export function withSectionSettings(
+    source: SemanticScore,
+    sectionId: string,
+    change: SectionChange,
+): SectionChangeResult {
+    const index = source.sections.findIndex((s) => s.id === sectionId);
+    if (index < 0) {
+        return { kind: 'blocked', message: 'Select a bar in the section to change.' };
+    }
+    if ('meter' in change) {
+        return withSectionMeter(source, sectionId, change.meter);
+    }
+    const score = structuredClone(source);
+    const section = score.sections[index];
+    if ('label' in change) {
+        const label = change.label.trim();
+        if (!label || label.length > SECTION_NAME_MAX) {
+            return {
+                kind: 'blocked',
+                message: `A section name needs 1 to ${SECTION_NAME_MAX} characters. Nothing was changed.`,
+            };
+        }
+        section.label = label;
+    } else if ('repeat' in change) {
+        if (!Number.isInteger(change.repeat) || change.repeat < 1 || change.repeat > 64) {
+            return {
+                kind: 'blocked',
+                message: 'A section plays 1 to 64 times. Nothing was changed.',
+            };
+        }
+        section.repeat = change.repeat;
+    } else if ('key' in change) {
+        if (change.key === null) {
+            delete section.key;
+        } else {
+            section.key = change.key;
+        }
+    } else if (change.isMinor === null) {
+        delete section.isMinor;
+    } else {
+        section.isMinor = change.isMinor;
+    }
+    return { kind: 'ok', score };
 }

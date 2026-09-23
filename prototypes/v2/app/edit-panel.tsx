@@ -1,9 +1,10 @@
 import { TIME_SIGNATURES } from '@engine/config';
 import type { SemanticScore } from '@engine/songbook/score-types';
 import { type RefObject, useRef } from 'react';
-import { arrangementOf } from '../lib/documents';
+import { arrangementOf, type SectionChange } from '../lib/documents';
 import type { ChartDocument } from '../lib/runtime';
 import { MeasureEditor, type MeasureEditorHandle } from './measure-editor';
+import { SectionSettings } from './section-settings';
 
 interface EditPanelProps {
     /** Owned by the shell, whose reveal effect focuses and scrolls to this panel. */
@@ -25,6 +26,8 @@ interface EditPanelProps {
     onApply: (score: SemanticScore) => void;
     onApplyForm: (score: SemanticScore) => void;
     onExtend: (newSection: boolean) => void;
+    /** One edit to the section holding the selected bar (#1374). */
+    onSectionChange: (sectionId: string, change: SectionChange) => void;
     /** Removes the selected bar, or the whole section holding it (#1373). */
     onRemove: (wholeSection: boolean) => void;
     onUpgrade: () => void;
@@ -51,6 +54,7 @@ export function EditPanel({
     onApply,
     onApplyForm,
     onExtend,
+    onSectionChange,
     onRemove,
     onUpgrade,
     onSelectSection,
@@ -111,6 +115,21 @@ export function EditPanel({
                         onApply={onApply}
                         onApplyForm={onApplyForm}
                     />
+                    {(() => {
+                        const score = current.chart.score;
+                        const section =
+                            score.sections.find((s) =>
+                                s.measures.some((m) => m.id === measureId),
+                            ) ?? score.sections[0];
+                        return (
+                            <SectionSettings
+                                score={score}
+                                section={section}
+                                disabled={busy}
+                                onChange={(change) => onSectionChange(section.id, change)}
+                            />
+                        );
+                    })()}
                     <div className="dialog-actions">
                         <button className="btn" disabled={busy} onClick={() => onExtend(false)}>
                             ＋ Bar

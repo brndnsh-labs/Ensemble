@@ -6,18 +6,19 @@
 import { validateSemanticScore } from '@engine/songbook/score-codec';
 import type { ScoreMeasure, SemanticScore } from '@engine/songbook/score-types';
 import { describe, expect, it } from 'vitest';
-import { withoutMeasure, withoutSection } from './documents';
+import { withoutMeasure, withoutSection, withSectionSettings } from './documents';
 
 const bar = (id: string, extra: Partial<ScoreMeasure> = {}, beats = 4): ScoreMeasure => ({
     id,
     content: { kind: 'events', events: [{ kind: 'chord', symbol: 'C', duration: [beats, 1] }] },
     ...extra,
 });
-const section = (id: string, measures: ScoreMeasure[]) => ({
+const section = (id: string, measures: ScoreMeasure[], extra = {}) => ({
     id,
     label: id.toUpperCase(),
     repeat: 1,
     measures,
+    ...extra,
 });
 const song = (sections: SemanticScore['sections']): SemanticScore => ({
     notation: 'name',
@@ -247,5 +248,69 @@ describe('withoutSection', () => {
             section('b', [bar('b1')]),
         ]);
         expect(ok(withoutSection(source, 'a')).score.sections).toHaveLength(1);
+    });
+});
+
+/** #1374 — one section-settings edit at a time; a refusal changes nothing. */
+describe('withSectionSettings', () => {
+    const chart = () =>
+        song([section('a', [bar('a1')]), section('b', [bar('b1', { key: 'E' }), bar('b2')])]);
+    const apply = (change: Parameters<typeof withSectionSettings>[2]) => {
+        const result = withSectionSettings(chart(), 'b', change);
+        if (result.kind !== 'ok') {
+            throw new Error(result.message);
+        }
+        expect(validateSemanticScore(result.score).kind).toBe('ok');
+        return result.score.sections[1];
+    };
+
+    it('names a section, trimmed', () => {
+        expect(apply({ label: '  Bridge ' }).label).toBe('Bridge');
+    });
+
+    it('refuses an empty or over-long name', () => {
+        for (const label of ['   ', 'x'.repeat(25)]) {
+            expect(withSectionSettings(chart(), 'b', { label })).toMatchObject({
+                kind: 'blocked',
+            });
+        }
+        expect(apply({ label: 'x'.repeat(24) }).label).toHaveLength(24);
+    });
+
+    it('sets how many times it plays, 1 to 64', () => {
+        expect(apply({ repeat: 2 }).repeat).toBe(2);
+        expect(apply({ repeat: 64 }).repeat).toBe(64);
+        for (const repeat of [0, 65, 1.5, Number.NaN]) {
+            expect(withSectionSettings(chart(), 'b', { repeat })).toMatchObject({
+                kind: 'blocked',
+            });
+        }
+    });
+
+    it('writes and clears key and mode overrides without touching a bar that wrote its own', () => {
+        const keyed = apply({ key: 'A' });
+        expect(keyed.key).toBe('A');
+        expect(keyed.measures[0].key).toBe('E');
+        expect(apply({ isMinor: true }).isMinor).toBe(true);
+        const cleared = withSectionSettings(
+            song([section('a', [bar('a1')], { key: 'A', isMinor: true })]),
+            'a',
+            { key: null },
+        );
+        expect(cleared.kind === 'ok' && cleared.score.sections[0]).toEqual(
+            expect.not.objectContaining({ key: expect.anything() }),
+        );
+        expect(cleared.kind === 'ok' && cleared.score.sections[0].isMinor).toBe(true);
+    });
+
+    it('routes a meter change through the section re-fit', () => {
+        const next = apply({ meter: '3/4' });
+        expect(next.meter).toBe('3/4');
+        expect(
+            next.measures.map((m) => m.content.kind === 'events' && m.content.events[0].duration),
+        ).toEqual([
+            [3, 1],
+            [3, 1],
+        ]);
     });
 });

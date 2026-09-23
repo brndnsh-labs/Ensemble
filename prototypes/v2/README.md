@@ -163,7 +163,11 @@ passes to the next bar, so the rest of the section sounds the same; a section's 
 the section with it) and **− Section** removes the section holding it (#1373). Both refuse,
 changing nothing, when it would remove the chart's last bar or section, music another bar
 repeats, half of a two-bar repeat, or a bar carrying repeat/navigation marks — remove the marks
-or the whole section instead. Save includes pending measures even with the editor hidden.
+or the whole section instead. **Section settings** (Edit panel, for the section holding the
+selected bar, #1374) names the section (1–24 characters), sets how many times it plays (1–64),
+and gives it its own key, mode or meter or returns each to the song's. A section meter change
+re-fits that section's bars by Song meter's rule and resets its beat grouping; a bar with its own
+override keeps it. Save includes pending measures even with the editor hidden.
 
 Under **Repeats and endings**, select an existing bar range with two clicks/taps or Tab and
 Enter (or use From/Through), then **Repeat these bars** and choose the total plays, default 2.
