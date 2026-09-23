@@ -303,6 +303,18 @@ describe('withSectionSettings', () => {
         expect(cleared.kind === 'ok' && cleared.score.sections[0].isMinor).toBe(true);
     });
 
+    it('writes and clears a section grouping (#1376)', () => {
+        const fives = song([section('a', [bar('a1', {}, 5)], { meter: '5/4' })]);
+        const set = withSectionSettings(fives, 'a', { grouping: [2, 3] });
+        expect(set.kind === 'ok' && validateSemanticScore(set.score).kind).toBe('ok');
+        expect(set.kind === 'ok' && set.score.sections[0].grouping).toEqual([2, 3]);
+        const cleared =
+            set.kind === 'ok' && withSectionSettings(set.score, 'a', { grouping: null });
+        expect(cleared && cleared.kind === 'ok' && cleared.score.sections[0]).not.toHaveProperty(
+            'grouping',
+        );
+    });
+
     it('routes a meter change through the section re-fit', () => {
         const next = apply({ meter: '3/4' });
         expect(next.meter).toBe('3/4');

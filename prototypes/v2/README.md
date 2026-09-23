@@ -154,6 +154,9 @@ legacy meaning/timing cannot be converted exactly stay in the original editor wi
 Select a bar, type chords and optionally choose each chord's length. For example, `C Dm G7`
 in 4/4 needs an explicit timing choice: choose lengths 2, 1, 1 or type `C:2 Dm:1 G7:1`.
 Key or meter change applies from that bar through the section; it does not transpose chord names.
+Where the bar's meter has more than one idiomatic split (5, 7, 8, 9, 10, 11 or 12 counts —
+`lib/grouping.ts`), **Beat grouping from this bar** picks one, such as 2+3 in 5/4; Section
+settings offers the same at section scope (#1376). Any meter change resets it.
 Global Key transposes the entire score. Song mode (Edit panel, beside Song meter) sets the song's own major/minor (#1375) without rewriting chord names or moving the key: A minor is A, then Minor, not a relative-key swap to C. Song meter (Edit panel) sets the song's own meter:
 equal-length bars re-divide, a section or bar with its own meter keeps it, and a bar whose
 written lengths cannot follow blocks the change and is opened for you — nothing is rounded.
