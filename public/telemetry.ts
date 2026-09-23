@@ -111,7 +111,7 @@ function classifyDevice(): 'mobile' | 'tablet' | 'desktop' {
     return 'desktop';
 }
 
-export function isStyleGallerySlug(slug: string | null): slug is string {
+function isStyleGallerySlug(slug: string | null): slug is string {
     return slug !== null && STYLE_GALLERY_SLUGS.has(slug);
 }
 

@@ -4,15 +4,17 @@
         ".": {
             "entry": [
                 "public/logic-worker.ts",
-                "public/visualizer-worker.ts",
-                "public/sw.ts",
                 "scripts/**/*.ts",
-                "tests/**/*.{test,spec}.{ts,tsx}",
+                "tests/**/*.{test,spec}.ts",
                 "tests/bench/**/*.ts",
                 "tests/scripts/**/*.ts"
             ],
-            "project": ["public/**/*.{ts,tsx}", "scripts/**/*.ts", "tests/**/*.{ts,tsx}"],
+            "project": ["public/**/*.ts", "scripts/**/*.ts", "tests/**/*.ts"],
             "ignore": ["public/engine/grooves/*.ts"]
+        },
+        "prototypes/v2": {
+            "entry": ["app/**/*.{ts,tsx}", "lib/**/*.ts", "scripts/*.mjs", "checks/**/*.ts"],
+            "project": ["app/**/*.{ts,tsx}", "lib/**/*.ts", "scripts/*.mjs", "checks/**/*.ts"]
         },
         "prototypes/v2-api": {
             "entry": ["src/db/index.ts", "src/auth/index.ts", "test/**/*.test.ts"],

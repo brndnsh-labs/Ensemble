@@ -34,18 +34,6 @@ export function showToast(arg: string | ToastOptions) {
     });
 }
 
-export function invokeToastAction(toastId: string, label: string): void {
-    const actions = toastActionRegistry.get(toastId);
-    const fn = actions?.get(label);
-    if (fn) {
-        // Run before clearing so the callback can dispatch its own toast / state
-        // without racing the expiry path.
-        fn();
-        toastActionRegistry.delete(toastId);
-        dispatch(ACTIONS.TOAST_EXPIRED, toastId);
-    }
-}
-
 export function clearToastActions(toastId: string): void {
     toastActionRegistry.delete(toastId);
 }

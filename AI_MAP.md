@@ -6,10 +6,11 @@ This map provides a quick reference for AI agents to understand the responsibili
 
 - Start here when you need file ownership, entrypoints, or likely edit locations.
 - Use `CLAUDE.md` for operational rules, architecture, and safety conventions. (`AGENTS.md` is a pointer to it.)
-- Nested `CLAUDE.md` files (`public/CLAUDE.md`, `public/engine/CLAUDE.md`, `public/engine/grooves/CLAUDE.md`, `public/components/CLAUDE.md`, `tests/CLAUDE.md`) hold directory-scoped load-bearing invariants and traps — sharper than this map or the root file, auto-loaded by tooling that walks the directory tree. Read the one for a directory before editing in it.
+- Nested `CLAUDE.md` files (`public/CLAUDE.md`, `public/engine/CLAUDE.md`, `public/engine/grooves/CLAUDE.md`, `tests/CLAUDE.md`) hold directory-scoped load-bearing invariants and traps — sharper than this map or the root file, auto-loaded by tooling that walks the directory tree. Read the one for a directory before editing in it.
 - Use `docs/README.md` for the docs index.
-- V2 application work starts at `prototypes/v2/CLAUDE.md`: scoped source map, provider-neutral
-  handoff and delivery rules. Its React shell is separate from the Preact host below.
+- The app is `prototypes/v2/` (React, Next static export); its source map, handoff and delivery
+  rules start at `prototypes/v2/CLAUDE.md`. Since #1358 everything under `public/` below is the
+  library that app compiles through the `@engine/*` alias — there is no second UI host.
 - The v2 account API is a separate standalone Node service at `prototypes/v2-api/` (sibling of
   `prototypes/v2/`, not a subdirectory) — see `prototypes/v2-api/README.md`. `node:sqlite`
   schema/migrations as of #1187; WebAuthn registration/login ceremony modules (`src/auth/`) as
@@ -24,37 +25,31 @@ This map provides a quick reference for AI agents to understand the responsibili
 
 | Path | Responsibility | Key Exports / Symbols |
 | :--- | :--- | :--- |
-| `public/main.ts` | App entry point, worker init, global events. | `init` |
+| `prototypes/v2/lib/runtime.ts` | The app's one engine host: worker init, dispatch subscriber (`syncWorker` + `handleEffects`), chart load/rebuild, transport. The only v2 file that calls `dispatch`/`getState`. | `initialize`, `toggle`, `stop` |
 | `public/logic-worker.ts` | Main generative thread & orchestration. | `fillBuffers`, `processMessage` |
-| `public/visualizer-worker.ts` | Background rendering thread for 60fps visuals. | `engine.render` |
-| `public/visualizer/visualizer-engine.ts` | `VisualizerEngine` class instantiated inside the worker; owns all Canvas rendering. (Worker-internal — only imported by `visualizer-worker.ts`.) | `VisualizerEngine` |
-| `public/sw.ts` | Service worker — Workbox `precacheAndRoute(self.__WB_MANIFEST)`. | `activate`, `message` |
 | `public/state.ts` | Central Redux-like state store. | `getState`, `dispatch`, `subscribe` |
 | `public/types.ts` | Global Action constants and shared types. | `ACTIONS` |
-| `public/ui-types.ts` | Shared UI component prop definitions. | `SelectOption` |
-| `public/breakpoints.ts` | Shared viewport breakpoint constants for the compact/narrow UI experience. | `COMPACT_MQ` |
-| `public/ui-bridge.ts` | Preact <-> Engine synchronization hook. | `useEnsembleState` |
-| `public/controllers/app-controller.ts` | Theme/palette DOM application and BPM updates with in-flight scheduler rescheduling. | `resolveMode`, `applyThemeToDom`, `setPalette`, `setMode`, `setBpm` |
+| `public/controllers/app-controller.ts` | BPM updates with in-flight scheduler rescheduling (called from `state-effects.ts`), plus v1's palette/mode setters (no app caller since #1358). | `setBpm`, `setPalette`, `setMode` |
 | `public/worker-client.ts` | Main-thread orchestrator for the live logic worker plus one-shot MIDI export workers. | `initWorker`, `startWorker`, `syncWorker`, `flushWorker`, `requestBuffer`, `startExport` |
 | `public/midi-export-worker.ts` | One-shot MIDI export worker entry; owns a fresh module realm and detached generation state for each export. | worker message handler |
-| `public/e2e-tools.ts` | Boot-time install of `window.ensemble` for E2E tests and scripts. | `installE2EGlobals` |
+| `public/render-bridge.ts` | Puts engine internals on `window.ensemble` for the listening-gate tools (`mix:report` and the scripts built on it). Installed by the v2 runtime only in a `NEXT_PUBLIC_RENDER_BRIDGE=1` build. | `installRenderBridge` |
 | `public/telemetry.ts` | Production-only, privacy-safe Umami analytics boundary. | `initializeTelemetry`, `track` |
 
 ## State Management (Domain Slices)
 
 | Path | Domain Responsibility | Initial State |
 | :--- | :--- | :--- |
-| `public/state/playback.ts` | BPM, transport, volume, and visual state. | `playback` |
+| `public/state/playback.ts` | BPM, transport, and volume. | `playback` |
 | `public/state/arranger.ts` | Chords, sections, time signature, and key. | `arranger` |
 | `public/state/groove.ts` | Genre, intensity, and drum kit selection. | `groove` |
 | `public/state/instruments.ts` | Per-instrument synthesis parameters. | `bass`, `soloist`, `harmony` |
 | `public/state/midi.ts` | WebMIDI routing and local muting state. | `midi` |
-| `public/state/visualizer.ts` | Rendering settings and UI overlays. | `vizState` |
+| `public/state/visualizer.ts` | `vizState.enabled`: whether the scheduler queues visualizer note events (no visualizer ships; `mix:report`'s event capture turns it on). | `vizState` |
 | `public/state/conductor.ts` | Macro-arc, intensity drift, and form iteration state. | `conductor` |
 | `public/state/share-codec.ts` | Share-URL / preset wire format: Unicode-safe Base64 + the minified section payload, plus the section-id generator deserialization mints. Main thread only. | `compressSections`, `decompressSections`, `encodeBase64Unicode`, `generateId` |
 | `public/state/state-effects.ts` | Cross-module state side effects (Inversion of Control). | `handleEffects` |
-| `public/state/state-hydration.ts` | Initial state loading and validation logic. | `hydrateState` |
-| `public/state/persistence.ts` | LocalStorage session saving. | `saveCurrentState`, `debounceSaveState` |
+| `public/state/state-hydration.ts` | v1 session/URL hydration plus the validators v2's v1 import reuses. `hydrateState`/`loadFromUrl` have no app caller since #1358. | `validateSections`, `sanitizeDisplayString`, `hydrateState` |
+| `public/state/persistence.ts` | v1 LocalStorage session saving; the v2 build swaps it for a no-op (`prototypes/v2/lib/legacy-persistence.ts`). | `saveCurrentState`, `debounceSaveState` |
 | `public/state/history.ts` | Session history and undo/redo logic. | `pushHistory`, `undo` |
 
 ## Songbook Document Boundary
@@ -142,7 +137,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/engine/audio-graph-utils.ts` | Leaf Web Audio graph helpers — imports nothing from the engine, so `synth-utils.ts` and `sample-voice.ts` can both use them without an import cycle. | `safeDisconnect`, `createSoftClipCurve`, `clampFreq` |
 | `public/engine/coordination-engine.ts` | Inter-instrument rhythmic yielding. | `createCoordinationContext` |
 | `public/engine/section-overrides.ts` | Per-section intensity + instrument-enabled override lookup. | `sectionAtStep`, `effectiveTargetIntensity`, `isInstrumentActiveAtStep` |
-| `public/engine/voicing-policy.ts` | Shared bass-space and auto-grounding rules for comping voices. | `shouldReserveBassSpace`, `shouldPreferGroundedPracticeVoicing` |
+| `public/engine/voicing-policy.ts` | Shared bass-space and auto-grounding rules for comping voices. | `shouldReserveBassSpace`, `shouldPreferGroundedVoicing` |
 | `public/engine/groove-engine.ts` | Rhythmic drum patterns (strategy routing, motifs, fills). | `getDrumMotif`, `applyGrooveOverrides` |
 | `public/engine/hash-utils.ts` | Canonical deterministic hash + seeded-RNG helpers shared across engines. `scrambleHash` (stateless, seed-tuple-indexed) and `createPRNG` (stateful stream) are deliberately distinct — see `public/engine/CLAUDE.md` §27. | `scrambleHash`, `stringHash33`, `stringHash31`, `createPRNG` |
 | `public/engine/soloist-mode-policy.ts` | Canonical soloist phrasing-mode rules and voice limits. | `resolveSoloistMode`, `getSoloistVoiceLimit` |
@@ -191,39 +186,17 @@ This map provides a quick reference for AI agents to understand the responsibili
 | :--- | :--- | :--- |
 | `public/data/drum-presets.ts` | Drum patterns and expansion logic. | `DRUM_PRESETS` |
 | `public/data/smart-genres.ts` | High-level genre configurations + the genre-naming authority (canon name ↔ feel ↔ groove strategy key). | `SMART_GENRES`, `canonToFeel`, `feelToCanon`, `GROOVE_STRATEGY_BY_GENRE`, `isLatinGrooveFamily` |
-| `public/data/chord-presets.ts` | Library chord progressions. | `CHORD_PRESETS` |
-| `public/data/song-templates.ts` | Full song structure templates. | `SONG_TEMPLATES` |
+| `public/data/chord-presets.ts` | v1's library chord progressions. No app importer since #1358 (tests only). | `CHORD_PRESETS` |
+| `public/data/song-templates.ts` | v1's full song structure templates. No app importer since #1358 (tests only). | `SONG_TEMPLATES` |
 | `public/data/instrument-styles.ts` | UI menu definitions and shared player availability. | `CHORD_STYLES`, `BASS_STYLES`, `getChordPlayerChoices` |
-| `public/data/shortcut-config.ts` | Centralized keyboard shortcuts. | `SHORTCUT_CONFIG` |
-| `public/data/sound-packs.ts` | Catalog of installable sample packs surfaced in the Sounds settings section. | `SOUND_PACKS`, `packsForInstrument` |
+| `public/data/sound-packs.ts` | Catalog of installable sample packs, read by v2's `lib/sounds.ts`. | `SOUND_PACKS`, `packsForInstrument` |
 | `public/data/genre-sound-map.ts` | Genre → instrument sound defaults consumed by Auto-follow mode (#675). | `GENRE_SOUND_MAP`, `autoVoiceForGenre` |
 
-## UI Components (Preact)
+## UI (the v2 app)
 
-| Category | Path | Responsibility |
-| :--- | :--- | :--- |
-| **Containers** | `public/App.tsx` | Root application shell — renders ChartSurface, GlobalShortcuts, Modals, FlashOverlay, and notification layers. |
-| **Containers** | `public/components/FlashOverlay.tsx` | Full-screen "Visual Flash" beat/accent pulse — reads `playback.flashIntensity`, gated on `playback.visualFlash` (#1181). |
-| **Surface** | `public/components/ChartSurface.tsx` | Chart-first single surface. Branches on `playback.chartLocked`: locked → `ChordVisualizer` (read-only), unlocked → `InlineEditor`. Topbar lock toggle pauses playback when unlocking. |
-| **Surface** | `public/components/InlineEditor.tsx` | Inline section-card editor mounted on ChartSurface when unlocked. Hosts the Arranger + slim toolbar (Add Section, Tools menu, inspiration drawer). Replaces the deleted EditorModal. |
-| **Controls** | `public/components/editor/SectionHeaderStrip.tsx` | Per-section direction strip — intensity slider + 5 tri-state instrument dots (D/B/C/H/S). Mounted above each section in both ChordVisualizer (locked) and SectionCard (unlocked). |
-| **Controls** | `public/components/editor/ChordPicker.tsx` | Tap-a-chord popover for locked-mode chart edits. Diatonic + borrowed roots × 8 qualities; emits notation-aware text (`roman`/`nns`/`name`) via `onSelect`. Anchored to the tapped cell, dismisses on Esc / outside-tap. |
-| **Workspaces** | `public/components/InstrumentRail.tsx` | Instrument rows (Drums · Bass · Chords · Harmony · Soloist) plus the Mixer accordion and the band-settings popover — every band-wide control, grouped by musical function: Genre · Feel (swing + base, humanize) · Energy (auto intensity, intensity) · Color (harmonic color). |
-| **Visuals** | `public/components/VisualizerOverlay.tsx` | Full-screen visualizer portal rendered on demand. Mounts into `document.body` via `createPortal`. |
-| **Shared** | `public/components/UIControls.tsx` | Reusable UI toolkit. |
-| **Shared** | `public/components/use-modal-a11y.ts` | `useModalA11y(ref, isOpen, onClose, ariaLabel?)` — applies `role="dialog"` + `aria-modal`, Esc-to-close, focus trap, and focus restoration to a modal container. |
-| **Orchestration** | `public/components/Modals.tsx` | Lazy-loading modal orchestrator. |
-| **Inspiration** | `public/components/SurpriseMe.tsx` | Single 🎲 entry point hosting three flows — Roll (instant random `generateSong`), Templates (`SONG_TEMPLATES`), Library (`PresetLibrary` replace/append). Replaces the prior GenerateSongModal + LibraryModal + LibraryDrawer trio. |
-| **Orchestration** | `public/components/AuditionOverlay.tsx` | One-button "▶ Play" landing shown when the app is opened from an audition permalink (`?autoplay=1`); satisfies the browser autoplay gesture and starts the hydrated scene. |
-| **Logic Views** | `public/components/Arranger.tsx` | Arranger editor surface (section-card list); mounted by `InlineEditor` when the chart is unlocked. |
-| **Logic Views** | `public/components/ChordVisualizer.tsx` | Continuous lead-sheet renderer for arranger playback, density tiers, and maximized reading mode. |
-| **Controls** | `public/components/Transport.tsx` | Playback controls and tempo. |
-| **Icons** | `public/components/Icon.tsx` | Inline-SVG icon component (`<Icon name=… />`); tints via `currentColor`, sizes in em. |
-| **Icons** | `public/components/icons.tsx` | The Ensemble icon set — `IconName` union + 24×24 path registry (controls + instrument glyphs). |
-| **Visuals** | `public/components/Visualizer.tsx` | Canvas rendering container. |
-| **Library** | `public/components/PresetLibrary.tsx` | Chord progression library modal. |
-| **Settings** | `public/components/InstrumentSettings.tsx` | Reusable per-instrument settings surface used from Studio — sound source for every lane, plus the lane-local knobs (chords voicing density, soloist phrasing). Band-wide controls live in `InstrumentRail.tsx`'s band-settings popover, not here. |
-| **Others** | `public/components/` | Functional modals and settings panels. |
+`prototypes/v2/app/` holds every surface (songbook, chart sheet, transport, edit panel, sounds
+panel, account pages) and `prototypes/v2/lib/` the runtime bridge, songbook repository and
+account sync. Per-surface ownership is the navigation table in `prototypes/v2/CLAUDE.md`.
 
 ## High-Level Controllers & Integration
 
@@ -231,36 +204,29 @@ This map provides a quick reference for AI agents to understand the responsibili
 | :--- | :--- |
 | `public/controllers/arranger-controller.ts` | High-level song structure manipulation. |
 | `public/controllers/instrument-controller.ts` | Per-instrument state and preset routing. |
-| `public/controllers/performance-controller.ts` | Real-time keyboard performance logic. |
+| `public/controllers/performance-controller.ts` | Real-time performance triggers (drum hits, solo notes); reached from `midi-controller.ts`'s MIDI input. |
 | `public/controllers/practice-controller.ts` | Section practice — start-from-here / loop-a-section entry points (#1016). |
 | `public/controllers/midi-controller.ts` | WebMIDI bridging and DAW sync. |
 | `public/export/midi-export.ts` | Main-thread MIDI file triggers. |
-| `public/export/audio-export.ts` | In-browser audio render: clones live state, drives `OfflineAudioContext` through the same engine path as playback, encodes to WAV. Powers the Share modal's "Download .wav". |
+| `public/export/audio-export.ts` | In-browser audio render: clones live state, drives `OfflineAudioContext` through the same engine path as playback, encodes to WAV. Powers v2's audio export. |
 | `public/export/detached-generation-state.ts` | Shared worker-safe/offline-render state clone: preserves generation settings while stripping live handles and runtime buffers. |
-| `public/song/song-generator.ts` | Algorithmic song structure generation. |
-| `public/song/song-generator-seed.ts` | Thin chord-text parser used by the Roll-the-Dice wizard: turns free-form Roman or letter notation into a chord-token array. |
+| `public/song/song-generator.ts` | Algorithmic song structure generation (v1's Roll). No app importer since #1358 (tests only). |
+| `public/song/song-generator-seed.ts` | Thin chord-text parser from v1's Roll-the-Dice wizard: free-form Roman or letter notation into a chord-token array. No app importer since #1358 (tests only). |
 | `public/song/lead-sheet-model.ts` | Shared lead-sheet shaping for 4-measure row packing, section markers, and density selection. |
 | `public/platform.ts` | Browser hacks (WakeLock, Audio Unlock). |
-| `public/export/sharing.ts` | URL-based song sharing. | `generateShareUrl`, `shareProgression` |
 | `public/utils.ts` | Worker-safe musical/math primitives: pitch conversion + the step/meter timing core. No DOM, no Web Audio, no persistence. | `getFrequency`, `getStepInfo` |
 | `public/sanitize.ts` | Main-thread string sanitization and display formatting (HTML escaping, dangerous-char stripping, ♯/♭ glyphs). | `escapeHTML`, `stripDangerousChars`, `formatUnicodeSymbols` |
-| `public/data/manual-metadata.ts` | Generates the Self-Building Manual's auto-populated tables (`{{GENRE_TABLE}}`, `{{BASS_STYLES}}`, …) from the live config files. | `injectManualMetadata`, `generateGenreTable` |
-| `public/visualizer/visualizer-events.ts` | Canonical visual event contract and track metadata for the Visuals workspace. | `VISUALIZER_TRACK_ORDER`, `queueVisualizerNoteEvent` |
-| `public/visualizer/visualizer-proxy.ts` | Main-thread bridge to visualizer worker. |
+| `public/visualizer/visualizer-events.ts` | Note-event contract the scheduler queues when `vizState.enabled`; kept for `mix:report`'s event capture. | `queueVisualizerNoteEvent`, `VisualizerQueuedEvent` |
 
 ## Infrastructure & Lifecycle (Internal)
 
 | Path | Responsibility |
 | :--- | :--- |
-| `public/ui-root.tsx` | Preact application entry point and hydration. |
-| `public/pwa.ts` | PWA install prompt management. |
-| `public/pack-nudge.ts` | One-time "install a sound pack" onboarding nudge. | `maybeShowPackInstallNudge` |
-| `public/ui.ts` | Lazy Proxy-based DOM access layer. |
+| `public/ui.ts` | Toast and flash dispatch helpers (`showToast`, `triggerFlash`) plus the toast-action registry. |
 | `public/worker-types.ts` | Shared message type definitions for workers. |
 | `public/config.ts` | Global timing and musical constants. |
 | `public/meter.ts` | Validated effective-meter resolution for authored rhythmic grouping. |
 | `public/constants.ts` | Global visual and UI state constants. |
-| `public/visualizer/visualizer-utils.ts` | Shared canvas math and drawing utilities. |
 
 ## Documentation, Parsing & Testing
 
@@ -271,12 +237,11 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `docs/guides/PERFORMANCE_GUIDELINES.md` | Hot-loop performance notes for audio and scheduler code. |
 | `docs/guides/musical-engine-patterns.md` | Reusable recipes for generative-engine work (5 smells, coordination, loop-awareness, final-stage multiplier discipline, seeded determinism). |
 | `docs/guides/bundle-hygiene.md` | Reusable recipes for bundle-size + dead-code work (budgets-as-baselines, statically-DCE'd expectations, pre-flight grep tripwire, knip blind spots, code-splitting discipline). |
-| `public/MANUAL.md` | User-facing guide with auto-generated tables. |
 | `public/song/form-analysis.ts` | Song section and structure detection. |
 | `.github/CONTRIBUTING.md` | Contributor workflow and validation checklist. |
 | `.github/SECURITY.md` | Private vulnerability reporting guidance. |
 | `.github/CODE_OF_CONDUCT.md` | Community behavior standards. |
-| `tests/` | Unit, Integration, and E2E test suites. |
+| `tests/` | Vitest unit, integration, critique (`standards/`) and browser-mode suites. The app's Playwright suite is `prototypes/v2/checks/`. |
 | `CLAUDE.md` | Primary operational guide and architectural rules. |
 | `AGENTS.md` | Pointer to `CLAUDE.md` for AGENTS.md-aware tools. |
 | `AI_MAP.md` | Codebase navigation (this file). |

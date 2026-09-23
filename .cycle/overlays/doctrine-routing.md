@@ -5,8 +5,8 @@ of Done and the reviewer set:
 | --- | --- | --- | --- |
 | **musical** | a critique test in `tests/standards/` (statistical ranges, an automated oracle) | `music-theory-reviewer` | auto-merge on green; audible-but-theory-provable work ships `verify-by-ear` (§5); only genuinely-subjective feel is a `status:needs-ear` hard stop |
 | **synth** | a human listen on the deployed test build — `/done` deploys the branch to test and runs the verdict check-in right there, no automated oracle | `synth-graph-reviewer` (graph hygiene only, not "does it sound good") | **always `status:needs-ear`** at the merge gate — "Works" merges immediately, "Haven't checked" parks it |
-| **bundle** | a measured KB delta (`npm run build`/size check) **and** the full suite green (behavior-preserving) | `bundle-hygiene-reviewer` | auto-merge on green |
-| **ui** | e2e smoke + `npm run typecheck` green, no new generative behavior/synth voice/bundle-shrink claim | `state-discipline-reviewer` if it touches state, else `/code-review` | auto-merge on green; pair with `verify-by-ear` if it routes audible voices (routing an already-approved voice isn't itself a synth hard stop) |
+| **bundle** | a measured KB delta (the v2 export, `prototypes/v2/out/_next/static/`) **and** the full suite green (behavior-preserving) | `bundle-hygiene-reviewer` | auto-merge on green |
+| **ui** | the v2 suite + `npm run typecheck` green, no new generative behavior/synth voice/bundle-shrink claim | `state-discipline-reviewer` if it touches state, else `/code-review` | auto-merge on green; pair with `verify-by-ear` if it routes audible voices (routing an already-approved voice isn't itself a synth hard stop) |
 
 **Executors** (`agent/*`, sanity-checked against what the issue touches):
 - `musical-engine-implementer` — generative engine behavior (`public/engine/**`,

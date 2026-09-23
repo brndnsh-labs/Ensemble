@@ -1,6 +1,10 @@
-# tests/ — Vitest (unit/critique), Vitest browser mode, Playwright e2e
+# tests/ — Vitest (unit/critique), Vitest browser mode
 
-Load-bearing traps for writing/reviewing tests in this repo. For the 5 canonical critique-test
+Load-bearing traps for writing/reviewing tests in this repo. There is no Playwright suite here
+any more (#1358 deleted v1's e2e suite): functional UI testing is the v2 suite in
+`prototypes/v2/checks/`, run with `npm run build --prefix prototypes/v2` then
+`npm run test:e2e --prefix prototypes/v2` and gated in CI by `v2-checks` — see
+`prototypes/v2/CLAUDE.md` § Verification. For the 5 canonical critique-test
 smells (tautology, sub-baseline threshold, mislabel, log-vs-assert mismatch, harness-silencing)
 and proven patterns (loop-awareness, final-stage multiplier, seeded mulberry32), see
 `docs/guides/musical-engine-patterns.md` — this file is sharper traps not covered there.
@@ -123,24 +127,19 @@ and proven patterns (loop-awareness, final-stage multiplier, seeded mulberry32),
   keeping dead scaffolding green. Deleting a confirmed orphan cascades — knip will re-flag whatever
   it was the sole consumer of; resolve that in the same pass.
 
-## Playwright / e2e
+## Playwright
 
 - **`@playwright/test` is CommonJS; under this repo's `"type": "module"`, only the default import
-  survives its loader at runtime.** `import { chromium } from '@playwright/test'` throws
-  `SyntaxError: Named export 'chromium' not found` at load time on `node`/CI (silent under some
-  test runners, so it can present as "flaky on this box, fine on that one"); `import * as pkg`
-  typechecks but leaves `pkg.chromium` undefined at runtime. The only working form:
-  `import pkg from '@playwright/test'; const { chromium } = pkg;`. Specs dodge the type mismatch
-  with `// @ts-nocheck`; any file in typecheck scope that isn't `@ts-nocheck` needs
-  `as unknown as typeof import('@playwright/test')`.
-- **The e2e suite runs against a prebuilt `vite preview` bundle, not the dev server** —
-  `playwright.config.ts` `webServer.command` is `npm run build:e2e && npx vite preview`. This
-  killed the historical cold-compile hydration-timeout flake class (no on-demand `.ts` transform
-  under `fullyParallel` workers); do not "fix" a hydration flake by reverting to `npm run dev` as
-  `webServer` — some diagnostic specs (`reverb-stability.spec.ts`) `page.evaluate`-import raw
-  source paths that only resolve against a dev server, so a full reversion isn't free either. All
-  specs route hydration waits through `gotoHydrated`/`HYDRATION_TIMEOUT`
-  (`tests/e2e/helpers/nav.ts`) — tune the timeout there, not per-spec.
+  survives Node's loader at runtime.** Today that means the root-package scripts that drive a
+  browser (`scripts/mix-report.ts` under `tsx`); `prototypes/v2` is a separate package without
+  `"type": "module"`, and its specs import by name. In a root script,
+  `import { chromium } from '@playwright/test'` throws `SyntaxError: Named export 'chromium' not
+  found` at load time and `import * as pkg` leaves `pkg.chromium` undefined; the working form is
+  `import pkg from '@playwright/test'; const { chromium } = pkg;`, which is what `mix-report.ts`
+  does.
+
+## Flakes
+
 - **`docs/FLAKY_TESTS.md` + the `/flake` skill are the canonical flake workflow** — four classes:
   unseeded-statistical (fix: `installSeededRandom()`), ordering-dependent (fix: the leaking file's
   missing `afterEach`/`restoreAllMocks`), e2e-timing, and slow-legitimate (a production-faithful

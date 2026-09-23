@@ -47,8 +47,6 @@
  *     is small (5%) and the absolute clamp at 0.1 still guards.
  */
 
-import { secondsPerStepFor } from '../utils.js';
-
 const ARC_CURVES: Record<number, readonly number[]> = {
     1: [1.0],
     2: [0.9, 1.25],
@@ -95,51 +93,4 @@ export function loopArcMultiplier(loopIndex: number, loopLimit: number): number 
     }
     const t = i / (N - 2);
     return FALLBACK_HEAD + (PEAK - FALLBACK_HEAD) * t;
-}
-
-/**
- * Resolve a session into a concrete whole-loop count regardless of whether the
- * user chose "loops" or "minutes" mode in Settings.
- *
- * why: timer mode was always intended to be a *fuzzy* duration — "play for
- * ~3 minutes" meant "round to the nearest whole loop that fits." Without this
- * helper, the engine treated timer and loop modes as fundamentally different
- * paths: timer mode bypassed the macro-arc entirely (`loopLimit > 1` gate in
- * conductor.ts) and ended at the elapsed-minute cutoff, often mid-bar. After
- * routing through this helper, both modes converge on a loop-count and the
- * macro-arc fires for time-bounded sessions too.
- *
- * Returns 0 when neither mode supplies usable data — engines should fall back
- * to "free-form jam" (no arc, no end condition) in that case.
- */
-export function getEffectiveLoopLimit(
-    loopLimit: number,
-    sessionTimer: number,
-    bpm: number,
-    totalSteps: number,
-): number {
-    // Explicit loop count always wins.
-    if (Number.isFinite(loopLimit) && loopLimit > 0) {
-        return Math.floor(loopLimit);
-    }
-    // Timer-mode resolution requires a known chart length + tempo.
-    if (
-        !Number.isFinite(sessionTimer) ||
-        sessionTimer <= 0 ||
-        !Number.isFinite(bpm) ||
-        bpm <= 0 ||
-        !Number.isFinite(totalSteps) ||
-        totalSteps <= 0
-    ) {
-        return 0;
-    }
-    // BPM is quarter-notes/min for every meter, so loop length resolves the
-    // same way regardless of time signature.
-    const secPerStep = secondsPerStepFor(bpm);
-    const secPerLoop = totalSteps * secPerStep;
-    if (secPerLoop <= 0) {
-        return 0;
-    }
-    const totalSec = sessionTimer * 60;
-    return Math.max(1, Math.round(totalSec / secPerLoop));
 }

@@ -8,6 +8,13 @@ All three commands operate on the same `OfflineAudioContext` pipeline
 already used by `npm run mix:report`. None of them replace the ear; they
 only shorten the loop around it.
 
+`mix:report` renders inside the app itself: unless `--no-build`, it builds `prototypes/v2` at
+`ENSEMBLE_V2_BASE=/` with `NEXT_PUBLIC_RENDER_BRIDGE=1` (`next build --webpack`
++ `scripts/offline.mjs`), serves `prototypes/v2/out`, and drives the engine
+through `window.ensemble` (`public/render-bridge.ts`). That build overwrites
+the same `out/` the v2 Playwright suite serves, so rebuild before trusting
+that suite after a mix report.
+
 ## `npm run mix:report -- --write-wav=<dir>`
 
 Renders each scene/stem/seed combination to a 16-bit stereo PCM file
@@ -84,26 +91,30 @@ npm run --silent mix:diff -- before.json after.json
 
 ## `npm run --silent audition-link -- --scene=<id> [--seed=<seed>]`
 
-Builds a URL that, when opened in a browser pointing at the app,
-hydrates the named scene and shows a single "▶ Play" overlay. One
-click satisfies the browser's autoplay gesture requirement and starts
-playback of the already-set-up scene. This collapses the listening
-pass from "context-switch to the app, pick the genre, pick the key,
-set the BPM, pick a chord progression, hit play" to "click link, hit
-play."
+Builds a URL that opens the named scene in the app — chart, key, meter,
+tempo and genre already set — so a listening pass is "click link, press
+play" instead of "open the app, pick the genre, the key, the BPM, type
+the progression, press play."
 
 ```bash
 npm run --silent audition-link -- --scene=jazz-ride --seed=ALPHA
-# → http://localhost:5173/?prog=Dm7+%7C+G7+...&autoplay=1
+# → http://localhost:3100/v2/?prog=Dm7+%7C+G7+...
 ```
 
+The default base is the v2 dev server (`npm run dev --prefix prototypes/v2`)
+at its default `/v2` base; for the site use `--base-url=https://ensemble.brndn.zip/`.
 Available scenes are the same four shipped with `mix:report`:
-`rock-backbeat`, `blues-shuffle`, `jazz-ride`, `funk-pocket`. Override
-the base URL with `--base-url=https://your-deploy/`.
+`rock-backbeat`, `blues-shuffle`, `jazz-ride`, `funk-pocket`.
 
-The URL pin uses top-level `?seed=` so audition links don't have to
-round-trip through the base64 `bnd` payload that the in-app share
-modal produces.
+**What the app reads (#1358).** Since the cutover the link is opened by
+v2's old-link reader (`prototypes/v2/lib/v1-link.ts`, #1279), which takes
+`prog`, `key`, `ts`, `bpm` and `genre` and opens them as an unsaved
+shared chart. Everything else the script can emit is **ignored** and the
+script says so on stderr: `int`, the `bnd` part payload (so `--on`/`--off`
+and `--density`) and `autoplay` — the listener presses play, and the band
+plays with the genre's own parts and intensity. `?seed=` is inert too
+(v2 re-rolls it on play). Until v2 reads those fields, a line that depends
+on a part switch or intensity has to say so and be set up by hand.
 
 ### Ad-hoc scenarios — a link per listen-checklist line
 
@@ -113,23 +124,18 @@ Post the links as an issue/PR comment next to the line they audition:
 
 ```bash
 npm run --silent audition-link -- --base-url=https://ensemble.brndn.zip/ \
-    --prog="C | C+ | C6 | C7" --genre=Jazz --density=rich
+    --prog="C | C+ | C6 | C7" --genre=Jazz
 npm run --silent audition-link -- --base-url=https://ensemble.brndn.zip/ \
-    --prog="Cm | Cmb6 | Cm6 | Cmb6" --genre=Neo-Soul --on=soloist --off=harmony
+    --prog="Cm | Cmb6 | Cm6 | Cmb6" --genre=Neo-Soul --ts=6/8 --bpm=90
 ```
 
-Flags: `--genre` (one of the 13, validated — hydration silently drops an
-unknown one), `--key`, `--ts` (e.g. `6/8`), `--bpm` (omit to leave tempo to the app), `--int`
-(band intensity 0–1, default 0.35), `--density=thin|standard|rich`,
-`--on=` / `--off=` with any of `soloist,bass,chords,harmony`. **The
-soloist is off by default**, so a line about the soloist needs
-`--on=soloist`. Drums can't be switched from a link: the `bnd` groove
-block also carries swing, so emitting it would pin swing to a number and
-override the genre's feel. Only the blocks a link switches are emitted,
-each as the part's full default config — hydration applies a block
-wholesale, so a bare `{e:0}` would reset that part's octave.
+Flags the app reads: `--genre` (one of the 13, validated), `--key`,
+`--ts` (e.g. `6/8`), `--bpm` (omit to leave tempo to the app). Flags it
+currently ignores: `--int`, `--density=thin|standard|rich`, and
+`--on=`/`--off=` with any of `soloist,bass,chords,harmony`.
 `tests/scripts/audition-link-roundtrip.test.ts` feeds generated links
-through the real `loadFromUrl`.
+through v1's `loadFromUrl`, which is no longer the app's reader; nothing
+yet round-trips them through `lib/v1-link.ts`.
 
 ## `npm run mix:analyze -- <file> [<file> ...]`
 

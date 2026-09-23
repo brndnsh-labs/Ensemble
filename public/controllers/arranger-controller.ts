@@ -1,15 +1,8 @@
 import { KEY_ORDER } from '../config.js';
-import {
-    mutateProgression,
-    transformRelativeProgression,
-    validateProgression,
-} from '../engine/chords-engine.js';
-import { transposeChordText } from '../engine/transpose.js';
-
-export { mutateProgression };
-
+import { transformRelativeProgression, validateProgression } from '../engine/chords-engine.js';
 import { analyzeFormUI } from '../engine/conductor.js';
 import { restoreGains } from '../engine/engine.js';
+import { transposeChordText } from '../engine/transpose.js';
 import { pushHistory } from '../state/history.js';
 import { saveCurrentState } from '../state/persistence.js';
 import { compressSections, generateId } from '../state/share-codec.js';
@@ -59,7 +52,7 @@ export function validateAndAnalyze(): void {
     });
 }
 
-export function clearChordPresetHighlight(): void {
+function clearChordPresetHighlight(): void {
     // DOM manipulation is no longer needed; PresetLibrary.jsx tracks isDirty state
     // Keeping this function as a no-op to maintain API compatibility
 }
@@ -212,48 +205,6 @@ export function addSection(): void {
                 repeat: 1,
             },
         ],
-    });
-    dispatch(ACTIONS.SET_PARAM, { module: 'arranger', param: 'isDirty', value: true });
-    clearChordPresetHighlight();
-    refreshArrangerUI();
-}
-
-/**
- * Append a batch of pre-built sections to the current arrangement (e.g. inserted
- * from the library drawer). Mirrors `addSection`'s post-update side effects so
- * the worker's `sectionMap`/`stepMap`/`progression` are re-validated and the
- * persistence + audio buffers get refreshed.
- */
-export function appendSections(
-    toAppend: ReadonlyArray<{
-        label?: string;
-        value: string;
-        key?: string;
-        isMinor?: boolean;
-        timeSignature?: string;
-        repeat?: number;
-        seamless?: boolean;
-    }>,
-): void {
-    if (!toAppend || toAppend.length === 0) {
-        return;
-    }
-    const { arranger } = getState();
-    const next = toAppend.map((s) => ({
-        id: generateId(),
-        label: s.label || `Section ${arranger.sections.length + 1}`,
-        value: s.value,
-        ...(s.key ? { key: s.key } : {}),
-        ...(typeof s.isMinor === 'boolean' ? { isMinor: s.isMinor } : {}),
-        ...(s.timeSignature ? { timeSignature: s.timeSignature } : {}),
-        ...(s.repeat ? { repeat: s.repeat } : {}),
-        ...(s.seamless ? { seamless: s.seamless } : {}),
-    }));
-    pushHistory();
-    dispatch(ACTIONS.SET_PARAM, {
-        module: 'arranger',
-        param: 'sections',
-        value: [...arranger.sections, ...next],
     });
     dispatch(ACTIONS.SET_PARAM, { module: 'arranger', param: 'isDirty', value: true });
     clearChordPresetHighlight();

@@ -3,6 +3,7 @@
     "language": "en,en-GB",
     "useGitignore": true,
     "words": [
+        "journalctl",
         "AABA",
         "Ableton",
         "Abmaj",

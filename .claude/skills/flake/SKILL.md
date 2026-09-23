@@ -2,7 +2,7 @@
 name: flake
 description: Diagnose one flaky Ensemble test. Runs it in isolation N times to measure an empirical fail rate, but decides on VARIANCE not pass-count — byte-identical output across runs means it isn't a flake at all. Classifies against four causes, applies the canonical fix for that class, and registers it. Never seeds or skips to hide a real bug. One flake per invocation. Usage `/flake <test>`.
 ---
-<!-- cycle:rendered template=skills/flake.md.tmpl hash=083be1268a44 — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/flake.md.tmpl hash=9e25bc494f7f — managed by the-cycle; edit the template, not this file -->
 
 # /flake — diagnose one flaky test
 
@@ -113,6 +113,7 @@ variance across runs is the only reliable tell.
 - **ordering-dependent** → find the leaking file (ran earlier, left a spy/mock/signal
   dirty); add the missing `afterEach(() => vi.restoreAllMocks())` or convert to
   `installSeededRandom` (restores both sides). Confirm by re-running the batch.
-- **e2e-timing** → timeout: ensure the spec uses the `gotoHydrated` helper and the
-  `globalSetup` warm-up is intact (don't introduce `vite preview`). Import crash:
-  default-import `@playwright/test` only.
+- **e2e-timing** → these live in the v2 suite (`prototypes/v2/checks/`). Rebuild the export
+  first: the suite serves whatever is in `prototypes/v2/out/`, and `mix:report` overwrites it
+  with a render-bridge build. Import crash in a root-package script: default-import
+  `@playwright/test` only (`tests/CLAUDE.md`).

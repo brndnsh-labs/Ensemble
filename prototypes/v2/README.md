@@ -1,12 +1,11 @@
-# Ensemble v2 foundation preview
+# Ensemble — the music stand
 
-Isolated Next.js/React shell using Ensemble's existing browser engine and canonical chart codec.
-This is a working checkpoint, not a production replacement. See [the product brief](../../docs/design/ensemble-v2.md).
-Tracker: milestone 15; #1170 (preview), #1171 (chart/import), #1172 (account/sync/hosting), #1174 (sounds/focused stand), #1175 (editing usability), #1177 (account-local outbox).
+Next.js/React app using Ensemble's browser engine (`../../public/`, via the `@engine` alias) and
+canonical chart codec. **Since the cutover (#1357, 2026-09-22) this is the app:**
+`https://ensemble.brndn.zip/` serves this export at the site root, with accounts on by default.
+See [the product brief](../../docs/design/ensemble-v2.md) and the rollout plan
+(`../../docs/design/ensemble-v2-rollout.md`).
 Fresh Claude/Codex/other-agent sessions start with [the v2 handoff](CLAUDE.md).
-Merged to `main` on 2026-09-12 via PR #1173. Since #1207 (2026-09-15) every merge to `main`
-also publishes this export to production at `https://ensemble.brndn.zip/v2/`, beside the v1 app
-at `/` — see [Deployment](#deployment). Accounts, sync and the account API are still not deployed.
 
 ## Account storage foundation (#1177)
 
@@ -249,46 +248,23 @@ coexistence/production migration has not shipped. Prefer a corrective release an
 
 ## Deployment
 
-**Since the cutover (#1357) production is not published by this script.** `ensemble.brndn.zip/`
-serves this app at the site root from the `ensemble-web` image — the same export built with
-`ENSEMBLE_V2_BASE=/` — and a release is a container tag bump by the CI `deploy` job, verified
-through the host's public `/build.json`. `/v2/*` is an edge redirect to the same path at the
-root. Everything below describes the `/v2` runtime that is still installed on both hosts for a
-manual audition; both scripts refuse an origin already served by the image, and #1358 retires
-them.
+Both hosts serve the **`ensemble-web`** image: this export built with `ENSEMBLE_V2_BASE=/`,
+on unprivileged nginx (`../../hosting/web/`), beside the `ensemble-api` container. A release is
+a tag, verified through the host's public `/build.json` (`sourceRevision` = the commit):
 
-`node scripts/deploy.mjs <test|prod>` (from this directory, after a successful build) publishes
-`out/` as an immutable release beside the root app and atomically switches the `v2` symlink:
-`/srv/ensemble-test/www/.v2-previews/<artifact SHA256>-<unique deploy ID>/` on test,
-`/srv/ensemble-prod/www/.v2-releases/<…>/` on production. The shared nginx config serves
-`/v2/` from that symlink in both environments. The script verifies every exported asset, the
-service worker and manifest through HTTPS and checks that the existing root app's HTML did not
-change. `build.json` fingerprints output bytes and the offline recipe, not just HEAD: a dirty
-audition build cannot masquerade as a clean commit, and the prod target additionally refuses
-any build whose `sourceRevision` is not a clean checked-out HEAD.
+- **Production** — every merge to `main`: the CI `deploy` job releases the merged commit's
+  tags to `ensemble.brndn.zip`, then `ensembletest.brndn.zip`. The required `v2-checks`
+  context (build + this suite) gates the merge; `web-image` builds and smoke-tests the image.
+- **Test audition** — `../../scripts/deploy-test.sh [branch]` releases a pushed branch's image
+  to `ensembletest.brndn.zip`, dispatching CI to build it first if needed. The next merge puts
+  the test host back on `main`.
+- **Rollback** — release the previous tag (`../../hosting/README.md`), or `git revert` → PR.
 
-- **Test** is a workstation audition: `node scripts/deploy.mjs test` over `docker04-admin`. It
-  publishes to the `/v2` runtime on :8090, which the hostname no longer routes to — point that
-  host's Caddy handle back at it first (`hosting/README.md`), and back afterwards.
-- **Production** was CI only, through the `deploy` job and the scoped `ensemble-deploy`
-  account. That step is gone: the job releases the `ensemble-web` tag instead, and `deploy.mjs
-  prod` would refuse the origin anyway. The required `v2-checks` context (build + this suite)
-  still gates the merge.
-
-Rollback means repointing the `v2` symlink to the previous verified release using the same
-temporary-symlink/rename operation. No database migration occurs. Old releases are retained;
-this script never deletes them. The root publisher never touches these paths, and this script
-never touches `current` or `.releases/`. Deploying this app moves no user data: v1 and v2
-storage stay separate.
+`/v2/*` is an edge redirect to the same path at the root, except `/v2/sw.js`, which is a real
+file that forwards the beta's windows (#1355). The default build base is still `/v2` — that is
+what `v2-suite` tests; `.github/workflows/v2-root-base.yml` and `web-image` prove the shipped
+`/` build.
 
 Compatibility caveat: manual-only preview builds before Follow feel support reject documents
 with `autoSound: true`. Do not roll a browser's songbook back to those builds after saving Follow
-feel setups; export first and prefer a corrective preview release. Existing manual saves and the
-canonical document schema are unchanged.
-
-The Caddy rule sets `Cache-Control: no-store` for `/v2/*` on both hostnames (homelab-maintenance
-commit `5ca32d7` for test; the prod block mirrors it since #1207). The old Cloudflare worker entry was purged on 2026-09-08;
-the canonical worker now returns `BYPASS`. Explicit app/sound Cache Storage remains functional.
-The deploy verifier still refuses success if the canonical URL serves an older worker even when
-a cache-busted probe matches. If caching regresses, investigate the scoped edge policy and purge
-only the affected preview URLs; never change production or purge the entire zone to work around it.
+feel setups; export first and prefer a corrective release.

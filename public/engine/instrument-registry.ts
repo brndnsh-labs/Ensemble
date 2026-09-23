@@ -165,8 +165,10 @@ export function getPackBufferVariants(packId: string, key: string): readonly Aud
  * (the persistent source of truth survives reloads; decoded buffers do not).
  * A *sync* mirror of that cache so the genre auto-follow effect (#675) can gate
  * "is this pack installed?" without async Cache API I/O on every genre change.
- * Seeded once at bootstrap from the real cache via {@link seedInstalledPacks},
- * and kept in step by the Sounds UI on install/remove ({@link markPackInstalled}).
+ * Only {@link markPackInstalled} fills it. v1 seeded it at bootstrap from the real cache
+ * and its Sounds UI kept it in step; both went with the v1 shell (#1358), and the v2 stand
+ * manages its sounds through its own cache (`prototypes/v2/lib/sounds.ts`), so in v2 the
+ * `isPackLoaded` arm of {@link isPackInstalled} is what answers.
  */
 const installedPacks = new Set<string>();
 
@@ -179,30 +181,12 @@ export function isPackInstalled(packId: string): boolean {
     return installedPacks.has(packId) || isPackLoaded(packId);
 }
 
-/**
- * Whether the user has *any* sound pack installed. Reads the sync installed-set
- * mirror (seeded at bootstrap from the SW cache), so it's reliable once
- * {@link seedInstalledPacks} has run. Drives the one-time "install a pack" nudge
- * (#684) — a fresh synth-only user has zero installed, so the set is empty.
- */
-export function hasAnyPackInstalled(): boolean {
-    return installedPacks.size > 0;
-}
-
 /** Mark a pack installed/uninstalled — the Sounds UI calls this on install/remove. */
 export function markPackInstalled(packId: string, installed: boolean): void {
     if (installed) {
         installedPacks.add(packId);
     } else {
         installedPacks.delete(packId);
-    }
-}
-
-/** Replace the installed-set wholesale — the bootstrap cache-seed (#675). */
-export function seedInstalledPacks(packIds: readonly string[]): void {
-    installedPacks.clear();
-    for (const id of packIds) {
-        installedPacks.add(id);
     }
 }
 

@@ -18,11 +18,6 @@ describe('Playback Reducer', () => {
         expect(playback.bandIntensity).toBe(0.35);
     });
 
-    it('should set update available', () => {
-        playbackReducer({ type: ACTIONS.SET_UPDATE_AVAILABLE, payload: true });
-        expect(playback.updateAvailable).toBe(true);
-    });
-
     it('should set BPM with clamping', () => {
         playbackReducer({ type: ACTIONS.SET_BPM, payload: 300 });
         expect(playback.bpm).toBe(240);
@@ -49,12 +44,6 @@ describe('Playback Reducer', () => {
 
         playbackReducer({ type: ACTIONS.SET_METRONOME, payload: true });
         expect(playback.metronome).toBe(true);
-
-        playbackReducer({ type: ACTIONS.SET_PRESET_SETTINGS_MODE, payload: true });
-        expect(playback.applyPresetSettings).toBe(true);
-
-        playbackReducer({ type: ACTIONS.SET_SONG_MODE, payload: false });
-        expect(playback.songMode).toBe(false);
 
         playbackReducer({ type: ACTIONS.SET_SESSION_TIMER, payload: 10 });
         expect(playback.sessionTimer).toBe(10);
@@ -250,20 +239,6 @@ describe('Playback Reducer', () => {
         expect(result).toBe(false);
     });
 
-    it('should handle emergency lookahead doubling', () => {
-        mutablePlayback.scheduleAheadTime = 0.2;
-        playbackReducer({ type: ACTIONS.TRIGGER_EMERGENCY_LOOKAHEAD, payload: undefined });
-        expect(playback.scheduleAheadTime).toBe(0.4);
-
-        // Should not double again if already >= 0.4
-        playbackReducer({ type: ACTIONS.TRIGGER_EMERGENCY_LOOKAHEAD, payload: undefined });
-        expect(playback.scheduleAheadTime).toBe(0.4);
-
-        // Should reset after 10s
-        vi.advanceTimersByTime(10000);
-        expect(playback.scheduleAheadTime).toBe(0.2);
-    });
-
     it('should show toasts and auto-remove them', () => {
         playbackReducer({
             type: ACTIONS.SHOW_TOAST,
@@ -378,7 +353,6 @@ describe('Playback Reducer', () => {
                 visualFlash: true,
                 toasts: [],
                 flashIntensity: 0.1,
-                updateAvailable: true,
                 resolutionTriggered: true,
                 isScheduling: true,
                 modals: { settings: true },

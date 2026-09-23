@@ -17,7 +17,14 @@ export default {
     outputFileTracingRoot: path.resolve(directory, '../..'),
     reactStrictMode: true,
     experimental: { externalDir: true },
-    env: { NEXT_PUBLIC_SOURCE_REV: revision, NEXT_PUBLIC_BASE_PATH: basePath },
+    env: {
+        NEXT_PUBLIC_SOURCE_REV: revision,
+        NEXT_PUBLIC_BASE_PATH: basePath,
+        // Always DEFINED, so Next inlines it and webpack drops the render-bridge branch (and its
+        // chunk) from every build that doesn't ask for it; an unset NEXT_PUBLIC_* would stay a
+        // runtime lookup and ship the bridge unreachable. `scripts/mix-report.ts` sets it (#1358).
+        NEXT_PUBLIC_RENDER_BRIDGE: process.env.NEXT_PUBLIC_RENDER_BRIDGE === '1' ? '1' : '',
+    },
     webpack(config, { webpack }) {
         config.resolve.alias['@engine'] = path.resolve(directory, '../../public');
         config.resolve.alias.deepsignal$ = path.resolve(
@@ -45,8 +52,6 @@ export default {
         config.plugins.push(
             new webpack.DefinePlugin({
                 'import.meta.env': JSON.stringify({ MODE: 'test', DEV: false }),
-                __APP_VERSION__: JSON.stringify('v2-preview'),
-                __BUILD_REV__: JSON.stringify(revision),
             }),
         );
         return config;

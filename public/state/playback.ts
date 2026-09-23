@@ -62,7 +62,6 @@ export const playback = deepSignal<GlobalContext>({
     qualityColors: true, // color chord symbols by harmonic quality on the chart
     toasts: [],
     flashIntensity: 0,
-    updateAvailable: false,
     resolutionTriggered: false,
     isScheduling: false,
     chartLocked: true,
@@ -76,7 +75,6 @@ export const playback = deepSignal<GlobalContext>({
         // autoplay gesture requirement and starts the rendered scene.
         audition: false,
     },
-    settingsTab: 'playback',
 });
 
 export function playbackReducer(action: Action): boolean {
@@ -98,16 +96,12 @@ export function playbackReducer(action: Action): boolean {
             p.conductorVelocity = 1.0;
             p.conductorDensity = null;
             p.conductorHarmonyComplexity = null;
-            p.updateAvailable = false;
             // #1259 — hydrated fields that RESET_STATE used to skip. `masterVolume` is
             // the one with teeth: it is clamped to [0,1], so a persisted `0` survived
             // the fallback and booted the app **silent** — a silent app on top of a
             // deliberately silent recovery is the worst case to debug.
             p.songMode = true;
             p.masterVolume = 0.4;
-            return true;
-        case ACTIONS.SET_UPDATE_AVAILABLE:
-            p.updateAvailable = !!action.payload;
             return true;
         case ACTIONS.TOGGLE_PLAY:
             p.isPlaying = !p.isPlaying;
@@ -159,9 +153,6 @@ export function playbackReducer(action: Action): boolean {
                 return true;
             }
             return false;
-        case ACTIONS.SET_SETTINGS_TAB:
-            p.settingsTab = String(action.payload);
-            return true;
         case ACTIONS.SET_CHART_LOCKED:
             p.chartLocked = !!action.payload;
             return true;
@@ -192,12 +183,6 @@ export function playbackReducer(action: Action): boolean {
             return true;
         case ACTIONS.SET_METRONOME:
             p.metronome = action.payload;
-            return true;
-        case ACTIONS.SET_PRESET_SETTINGS_MODE:
-            p.applyPresetSettings = action.payload;
-            return true;
-        case ACTIONS.SET_SONG_MODE:
-            p.songMode = !!action.payload;
             return true;
         case ACTIONS.SET_SESSION_TIMER:
             p.sessionTimer = action.payload;
@@ -261,18 +246,6 @@ export function playbackReducer(action: Action): boolean {
                         Math.min(0.95, action.payload.startPct as number),
                     );
                 }
-            }
-            return true;
-        case ACTIONS.TRIGGER_EMERGENCY_LOOKAHEAD:
-            if (p.scheduleAheadTime < 0.4) {
-                p.scheduleAheadTime = p.scheduleAheadTime * 2.0;
-                console.warn(
-                    `[Performance] Emergency Lookahead Triggered: ${p.scheduleAheadTime}s`,
-                );
-                setTimeout(() => {
-                    p.scheduleAheadTime = 0.2;
-                    console.warn('[Performance] Lookahead reset to normal.');
-                }, 10000);
             }
             return true;
         case ACTIONS.UPDATE_CONDUCTOR_DECISION:

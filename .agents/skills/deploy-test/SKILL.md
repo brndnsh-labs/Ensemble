@@ -2,7 +2,7 @@
 name: deploy-test
 description: Deploy Ensemble to the test environment — low ceremony, for previewing a branch or an uncommitted tree before it merges. Runs the deploy, verifies the right build actually landed, and derives a per-change check-in list from what shipped. Usage `/deploy-test`.
 ---
-<!-- cycle:rendered template=skills/deploy-test.md.tmpl hash=3fb321ef2854 — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/deploy-test.md.tmpl hash=5cbd3f3f410c — managed by the-cycle; edit the template, not this file -->
 
 # /deploy-test — put it on the test box
 
@@ -15,67 +15,63 @@ by-eye work gets checked *before* it merges.
 
 ## Topology
 
-- **Test** — `ensembletest.brndn.zip`: edge **Caddy** terminates TLS, reverse-proxies to
-  **nginx**, which serves the app as **static files**. No app server, no DB — nginx serves
-  the new files the instant rsync finishes, nothing to restart. Since **2026-09-10** that
-  nginx is a **container on `docker04`** (`/opt/docker/ensembletest`, host port `8090`),
-  serving the bind mount `/srv/ensemble-test/www/`; SSH alias **`docker04-admin`**. It
-  moved so the coming v2 account API can sit behind this same origin without
-  hand-installed dependencies. Private, low-ceremony — the pre-merge audition box.
-- **Prod** — `ensemble.brndn.zip`: since **2026-09-13** also a container on
-  **`docker04`** (`/srv/ensemble-prod/www/`), the same shared atomic release runtime
-  as test. The old nginx LXC was retired and deleted from Proxmox on cutover day —
-  a container-specific test result now generalizes to prod again. CI deploys through
-  a scoped, non-sudo, non-Docker **`ensemble-deploy`** account (distinct from
-  `docker04-admin`'s full-admin `claude` account that test/operator commands use);
-  SSH alias **`ensemble-admin`**, materialized per-run by CI and expected in your
-  own `~/.ssh/config` for a manual run. **Continuously deployed** — a green PR merge
-  (branch-protected) triggers the CI `deploy` job, which ships automatically.
-  `/deploy-prod` is the manual break-glass path (CI down, or forcing a known-good
-  build), not the normal route.
-- Both: `scripts/deploy.sh <test|prod>` builds (`vite build --mode <test|production>`),
-  prints the **Built REV** + footprint + the delta vs. the live site, `rsync --delete`s,
-  then **re-verifies the live asset hash itself** — the script's own exit code already
-  confirms the deploy. Prod additionally **refuses a dirty tree**.
+- **Both hosts** run on **`docker04`** (SSH alias **`docker04-admin`** for operator commands):
+  edge **Caddy** terminates TLS and routes `/api/*` to the `<stack>-api` container and
+  everything else to `<stack>-web`, the **`ensemble-web`** image — the v2 music stand's
+  static export built at `/`, served by unprivileged nginx that owns its own cache and
+  framing policy. Stacks live in `/opt/docker/<stack>/`; the released tags are the
+  `ENSEMBLE_WEB_TAG=` / `ENSEMBLE_API_TAG=` lines in that directory's `.env`.
+- **Test** — `ensembletest.brndn.zip` (web on host port `8094`). Private, low-ceremony —
+  the pre-merge audition box.
+- **Prod** — `ensemble.brndn.zip` (web on `8095`), since the 2026-09-22 cutover (#1357).
+  **Continuously deployed** — a green PR merge (branch-protected) triggers the CI `deploy`
+  job, which releases the merged commit to prod and then test. `/deploy-prod` is the
+  manual break-glass path, not the normal route.
+- **Releases** go through one scoped account, `ensemble-release`, whose key is a forced
+  command accepting only `release <ensembletest|ensemble> <web|api> sha-<40 hex>`. CI holds
+  that key; from a workstation the same script runs as
+  `ssh docker04-admin 'sudo -n /usr/local/bin/ensemble-release <stack> web sha-<sha>'`.
+- **Test deploys:** `scripts/deploy-test.sh [branch]` — needs the branch pushed and a clean
+  tree. If `ensemble-web:sha-<sha>` doesn't exist it dispatches CI on the branch (the
+  `web-image` job builds it after the `v2-checks` gate; `deploy` never releases a branch
+  build), then releases the tag to ensembletest and checks `/build.json`. Budget ~15 min
+  when a build is needed. An uncommitted tree can't be auditioned — commit and push it.
+- **Prod break-glass:** re-run CI on `main` (`gh api -X POST
+  repos/brndnsh-labs/Ensemble/actions/workflows/ci.yml/dispatches -f ref=main`); its
+  `deploy` job releases `main`'s tags exactly as a merge does.
 
 ## Verify
 
-**Free, and it's the whole trick:** `vite.config.ts`'s `computeBuildRev` bakes the
-revision into every asset filename (`index.<REV>.js`), so the live `index.html` names
-the exact build — REV is the clean commit SHA on prod, or `<head>-<sig>` (hash of the
-uncommitted diff) on a dirty test build, so an audition build is stamped honestly.
-**There is no stored deploy ref** — the running site is the only source of truth; both
-before (to print the real delta) and after (to verify the right bundle landed) reads go
-straight to the live asset hash, e.g.:
+**Free, and it's the whole trick:** every image serves `/build.json`, whose
+`sourceRevision` is the full SHA it was built from. **There is no stored deploy ref** — the
+running site is the only source of truth:
 ```sh
-curl -s https://<test|prod-host>/ | grep -oE '\.[0-9a-f]{7,}(-[0-9a-f]+)?\.js' | head -1
+curl -s https://<ensembletest|ensemble>.brndn.zip/build.json | grep sourceRevision
 ```
-Prod's independent pass additionally checks edge=200 and a changed-surface spot-check
-(use a real static marker like `<title>Ensemble` or `rel="manifest"` — the app mounts
-client-side, there's no static `<div id="app">` to grep).
+Prod's independent pass additionally checks edge=200 on `/`, `/api/auth/session` = 401 (the
+API is still routed), and a changed-surface spot-check.
 
 ## Rollback
 
-No DB, no migration, so rollback is always **redeploy the previous good commit**:
+Rollback is **release the previous good tag** — no rebuild, since every merged commit's
+image stays in the registry:
 ```sh
-git checkout <prev-good-sha>   # the deploy's 📦 "Currently live" line
-./scripts/deploy.sh prod       # rebuilds + rsyncs the old bundle over the web root
-git checkout main
+ssh docker04-admin 'sudo -n /usr/local/bin/ensemble-release ensemble web sha-<prev-good-sha>'
 ```
-`git revert` → PR → green → the CI `deploy` job redeploys is the normal path; a manual
-`workflow_dispatch` on `main` redeploys current `main` with no new commit.
+`git revert` → PR → green → the CI `deploy` job releases it is the normal path; that also
+keeps `main` and prod in agreement, which a hand-released old tag does not.
 
-**Troubleshooting:** a stale asset hash with a reported-successful rsync is an
-edge/browser cache, not a real failure (`curl -H 'Cache-Control: no-cache'` to
-re-check — hashed assets are immutable, `index.html` should be no-cache). Edge ≠ 200 is
-the Caddy→nginx edge, not the build — there's no app process to crash. rsync/ssh
-failures are the SSH alias/key; the build succeeded locally, nothing shipped.
+**Troubleshooting:** a stale `sourceRevision` after a reported-successful release is an
+edge/browser cache (`curl -H 'Cache-Control: no-cache'`; `/build.json` is `no-store`).
+Edge ≠ 200 with a healthy container is Caddy→`docker04` routing or the firewall
+(`firewall/304.fw` in homelab-maintenance). A release that fails its health wait leaves
+the previous tag running; `journalctl -t ensemble-release` on `docker04` has the reason.
 
 ## Workflow
 
 1. **Sanity.** `git status -sb` — know whether you're shipping a clean branch or a dirty tree.
    Both are legitimate here; say which.
-2. **Deploy.** `./scripts/deploy.sh test` — stream the output rather than waiting silently, so a failure is
+2. **Deploy.** `./scripts/deploy-test.sh` — stream the output rather than waiting silently, so a failure is
    visible where it happens.
 3. **Verify the right build actually landed.** Don't infer success from a zero exit code — confirm
    the deployed artifact is the one you just built. If the build stamps a revision into the served

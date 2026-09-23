@@ -1316,21 +1316,12 @@ export interface GlobalContext {
     readonly toasts: Array<{ id: string; message: string; actions?: string[] }>;
     /** Current intensity of the screen flash effect. */
     readonly flashIntensity: number;
-    /** Whether a PWA update is pending. */
-    readonly updateAvailable: boolean;
     /** Whether the resolution ending sequence has been triggered. */
     readonly resolutionTriggered: boolean;
     /** Whether the scheduler is currently active. */
     readonly isScheduling: boolean;
     /** Visibility state for various UI modals. */
     readonly modals: ModalsState;
-    /**
-     * Active tab in the Settings overlay (`playback` | `packs` | `appearance` |
-     * `midi` | `about`). Lifted out of Settings-local state so any opener can
-     * deep-link a tab — e.g. the pack-install nudge (#684) opens straight to
-     * `packs`.
-     */
-    readonly settingsTab: string;
     /** Number of loops before stopping (0 = infinite). */
     readonly loopLimit: number;
     /** Current loop iteration counter. */
@@ -1441,15 +1432,6 @@ export interface ActionPayloadSetInstrumentVoice {
 export interface ActionPayloadSetModalOpen {
     modal: keyof ModalsState;
     open: boolean;
-}
-
-export interface ActionPayloadLoadTemplate {
-    sections: Section[];
-    isMinor?: boolean;
-    /** Optional one-shot key override. When set, replaces `arranger.key` atomically. */
-    key?: string;
-    /** Optional one-shot time-signature override. */
-    timeSignature?: string;
 }
 
 export interface ActionPayloadSetGenreFeel {
@@ -1610,13 +1592,10 @@ export interface ActionPayloadMap {
     SET_AUTO_INTENSITY: boolean;
     UPDATE_CONDUCTOR_DECISION: ActionPayloadUpdateConductorDecision;
     UPDATE_CONDUCTOR_STATE: ActionPayloadUpdateConductorState;
-    TRIGGER_EMERGENCY_LOOKAHEAD: undefined;
     RESET_SESSION: undefined;
     SHOW_TOAST: ActionPayloadShowToast | string;
     TRIGGER_FLASH?: number;
-    SET_UPDATE_AVAILABLE: boolean;
     SET_MODAL_OPEN: ActionPayloadSetModalOpen;
-    SET_SETTINGS_TAB: string;
     SET_CHART_LOCKED: boolean;
     TOGGLE_PLAY: undefined;
     SET_BPM: number | string;
@@ -1627,7 +1606,6 @@ export interface ActionPayloadMap {
     SET_SOLOIST_MODE: string;
     SET_SOLOIST_AUTO_MODE: boolean;
     SET_SONG_SEED: string;
-    SET_SEED_RANDOMIZE: boolean;
     SET_INSTRUMENT_VOICE: ActionPayloadSetInstrumentVoice;
     UPDATE_SB: ActionPayloadUpdateSB;
     SET_SWING: number;
@@ -1640,7 +1618,6 @@ export interface ActionPayloadMap {
     TRIGGER_FILL: ActionPayloadTriggerFill;
     UPDATE_HB: ActionPayloadUpdateHB;
     UPDATE_GB: ActionPayloadUpdateGB;
-    SET_ARRANGEMENT: Section[];
     SET_SECTIONS: Section[];
     ADD_SECTION: Section;
     REMOVE_SECTION: string;
@@ -1649,12 +1626,9 @@ export interface ActionPayloadMap {
     SET_TIME_SIGNATURE: string;
     SET_GROUPING: number[] | null;
     SET_IS_MINOR: boolean;
-    LOAD_TEMPLATE: ActionPayloadLoadTemplate;
     SET_METRONOME: boolean;
-    SET_PRESET_SETTINGS_MODE: boolean;
     SET_NOTATION: string;
     SET_SESSION_TIMER: number;
-    SET_SONG_MODE: boolean;
     SET_ENDING_PENDING: boolean;
     /** Section-practice: seed the step the next play begins from (#1016). */
     SET_START_STEP: number;
@@ -1711,13 +1685,10 @@ export const ACTIONS = {
     SET_AUTO_INTENSITY: 'SET_AUTO_INTENSITY',
     UPDATE_CONDUCTOR_DECISION: 'UPDATE_CONDUCTOR_DECISION',
     UPDATE_CONDUCTOR_STATE: 'UPDATE_CONDUCTOR_STATE',
-    TRIGGER_EMERGENCY_LOOKAHEAD: 'TRIGGER_EMERGENCY_LOOKAHEAD',
     RESET_SESSION: 'RESET_SESSION',
     SHOW_TOAST: 'SHOW_TOAST',
     TRIGGER_FLASH: 'TRIGGER_FLASH',
-    SET_UPDATE_AVAILABLE: 'SET_UPDATE_AVAILABLE',
     SET_MODAL_OPEN: 'SET_MODAL_OPEN',
-    SET_SETTINGS_TAB: 'SET_SETTINGS_TAB',
     SET_CHART_LOCKED: 'SET_CHART_LOCKED',
     TOGGLE_PLAY: 'TOGGLE_PLAY',
     SET_BPM: 'SET_BPM',
@@ -1730,7 +1701,6 @@ export const ACTIONS = {
     SET_SOLOIST_MODE: 'SET_SOLOIST_MODE',
     SET_SOLOIST_AUTO_MODE: 'SET_SOLOIST_AUTO_MODE',
     SET_SONG_SEED: 'SET_SONG_SEED',
-    SET_SEED_RANDOMIZE: 'SET_SEED_RANDOMIZE',
     SET_INSTRUMENT_VOICE: 'SET_INSTRUMENT_VOICE',
     UPDATE_SB: 'UPDATE_SB',
 
@@ -1747,7 +1717,6 @@ export const ACTIONS = {
     UPDATE_GB: 'UPDATE_GB',
 
     // --- Options / Arranger ---
-    SET_ARRANGEMENT: 'SET_ARRANGEMENT',
     SET_SECTIONS: 'SET_SECTIONS',
     ADD_SECTION: 'ADD_SECTION',
     REMOVE_SECTION: 'REMOVE_SECTION',
@@ -1756,12 +1725,9 @@ export const ACTIONS = {
     SET_TIME_SIGNATURE: 'SET_TIME_SIGNATURE',
     SET_GROUPING: 'SET_GROUPING',
     SET_IS_MINOR: 'SET_IS_MINOR',
-    LOAD_TEMPLATE: 'LOAD_TEMPLATE',
     SET_METRONOME: 'SET_METRONOME',
-    SET_PRESET_SETTINGS_MODE: 'SET_PRESET_SETTINGS_MODE',
     SET_NOTATION: 'SET_NOTATION',
     SET_SESSION_TIMER: 'SET_SESSION_TIMER',
-    SET_SONG_MODE: 'SET_SONG_MODE',
     SET_ENDING_PENDING: 'SET_ENDING_PENDING',
     SET_START_STEP: 'SET_START_STEP',
     SET_PRACTICE_LOOP: 'SET_PRACTICE_LOOP',
@@ -1784,19 +1750,13 @@ export const ACTIONS = {
 } as const satisfies { readonly [K in keyof ActionPayloadMap]-?: K };
 
 /**
- * E2E + preview helpers installed on `window` by `installE2EGlobals()` and
- * `main.ts`. Augmented globally so callers can read the fields without
- * `window as any` casts.
+ * The offline-render bridge `installRenderBridge()` puts on `window` (render-bridge.ts).
+ * Augmented globally so callers can read the fields without `window as any` casts.
  */
 declare global {
-    // Build-time stamps injected by Vite `define` (see vite.config.ts). Replaced
-    // with string literals at build; consumed via public/config.ts.
-    const __APP_VERSION__: string;
-    const __BUILD_REV__: string;
-
     interface Window {
         // The signatures here mirror the runtime helpers installed by
-        // installE2EGlobals(). The dispatch surface stays on the same canonical
+        // installRenderBridge(). The dispatch surface stays on the same canonical
         // action contract as production callers; Playwright specs may remain
         // runtime-oriented, but typed app/devtools consumers cannot escape it.
         ensemble?: {
@@ -1817,6 +1777,5 @@ declare global {
             getPackZones: (packId: string) => unknown[] | null;
             isPackLoaded: (packId: string) => boolean;
         };
-        previewChord?: (index: number) => void;
     }
 }

@@ -107,7 +107,6 @@ const CORE_DIRECTORIES = [
     'public',
     'public/engine',
     'public/state',
-    'public/components',
     'public/data',
     'public/song', // #1178 phase 1
     'public/export', // #1178 phase 1
@@ -117,17 +116,7 @@ const CORE_DIRECTORIES = [
 ];
 
 const IGNORE_EXTENSIONS = ['.png', '.svg', '.jpg', '.jpeg', '.webp'];
-const IGNORE_FILES = [
-    '.DS_Store',
-    'node_modules',
-    '.git',
-    'index.html',
-    'manifest.json',
-    'pwa.ts',
-    'sw.ts',
-    'styles.css',
-    'icon.svg',
-];
+const IGNORE_FILES = ['.DS_Store', 'node_modules', '.git', 'manifest.json', 'icon.svg'];
 
 const VALID_BARE_LINKS = new Set([
     'README.md',
@@ -136,7 +125,6 @@ const VALID_BARE_LINKS = new Set([
     'AI_MAP.md',
     'package.json',
     'package-lock.json',
-    'playwright.config.ts',
 ]);
 
 const VALID_LINK_PREFIXES = [
@@ -151,7 +139,6 @@ const VALID_LINK_PREFIXES = [
     'scripts/',
 ];
 
-const PLAYWRIGHT_DOCS = ['CLAUDE.md'];
 const REGISTER_DOCS = [
     'CLAUDE.md',
     'docs/guides/WORKER_CONTRACT.md',
@@ -170,10 +157,6 @@ function readText(filePath) {
  * @param {string} configContent
  * @returns {string[]}
  */
-function extractPlaywrightProjects(configContent) {
-    return [...configContent.matchAll(/name:\s*'([^']+)'/g)].map((match) => match[1]);
-}
-
 /**
  * @param {string} engineContent
  * @returns {{
@@ -307,34 +290,6 @@ function allowsDocRelativeLinks(docDir) {
  */
 function docLinkExists(cleanPath, docDir) {
     return fs.existsSync(cleanPath) || fs.existsSync(path.resolve(docDir, cleanPath));
-}
-
-function validatePlaywrightProjectDocs() {
-    let hasError = false;
-    const projects = extractPlaywrightProjects(readText('playwright.config.ts'));
-
-    for (const docPath of PLAYWRIGHT_DOCS) {
-        const content = readText(docPath);
-
-        for (const project of projects) {
-            if (!content.includes(project)) {
-                console.error(`❌ [${docPath}] Missing Playwright project reference: ${project}`);
-                hasError = true;
-            }
-        }
-
-        if (projects.includes('Mobile Chrome') && !content.includes('@mobile')) {
-            console.error(`❌ [${docPath}] Missing @mobile tag guidance for Mobile Chrome.`);
-            hasError = true;
-        }
-
-        if (projects.includes('Mobile Safari') && !content.includes('@ipad')) {
-            console.error(`❌ [${docPath}] Missing @ipad tag guidance for Mobile Safari.`);
-            hasError = true;
-        }
-    }
-
-    return hasError;
 }
 
 function validateRegisterSlottingDocs() {
@@ -491,7 +446,6 @@ function validateDocs() {
 
     console.log('🔍 Phase 3: Checking Semantic Drift...');
 
-    hasError = validatePlaywrightProjectDocs() || hasError;
     hasError = validateRegisterSlottingDocs() || hasError;
 
     if (hasError) {

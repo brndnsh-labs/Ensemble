@@ -2,7 +2,7 @@
 name: patch
 description: Address /review findings on the uncommitted Ensemble diff. Reads the most-recent review output from context, triages (fix-now is the DEFAULT for any finding about this diff — P0/P1/bounded-P2; escalate to Brandon if it needs a decision or is too big), presents a fix plan, then patches inline — no agent spawn, the orchestrator already holds the diff + findings. Re-runs the gates after. Use after /review, before /done. Plan-first.
 ---
-<!-- cycle:rendered template=skills/patch.md.tmpl hash=afbab551069d — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/patch.md.tmpl hash=b340c6db7a60 — managed by the-cycle; edit the template, not this file -->
 
 # /patch — address reviewer findings
 
@@ -38,11 +38,11 @@ stays in progress.
    comment at any non-obvious fix site.
 5. **Re-run gates** (§4):
    ```
-   npm run typecheck     # tsc over public/**/*.{ts,tsx}
+   npm run typecheck     # tsc over public/ and scripts/ (npm run typecheck:tests covers tests/)
    npm run lint          # Biome lint + format check
    npm test              # mutation check + Biome + docs lint + Vitest (node/happy-dom)
    npm run test:browser  # Vitest browser-mode audio guards (real OfflineAudioContext, headless Chromium)
-   npm run test:e2e      # Playwright vs a `vite preview` build (Desktop Chrome, Mobile Chrome, Mobile Safari)
+   npm run build --prefix prototypes/v2 && npm run test:e2e --prefix prototypes/v2   # the app's Playwright suite (laptop + webkit-phone) against the built export
    ```
    If a Fix-now patch fails a gate, stop and surface — don't pile on.
 6. **Report:** an outcome table with one row per original finding ID: `fixed`, `remaining`, or

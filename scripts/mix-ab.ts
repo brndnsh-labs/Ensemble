@@ -870,9 +870,12 @@ function restoreRef(original: RefDescriptor): void {
 /**
  * Drive one headless render at whatever ref is currently checked out.
  *
- * `--no-build` is deliberately NOT passed. `mix:report` renders the built bundle in
- * `dist/`, so reusing a bundle built at the other ref would render ref A's code and
- * label it ref B — the exact error the whole tool exists to rule out.
+ * `--no-build` is deliberately NOT passed. `mix:report` renders the bundle it builds
+ * (`prototypes/v2/out` since #1358, v1's `dist/` before it), so reusing a bundle built at
+ * the other ref would render ref A's code and label it ref B — the exact error the whole
+ * tool exists to rule out. A ref from before #1358 builds v1 with Vite, whose plugins
+ * this tree's lockfile no longer installs: comparing across that boundary needs the older
+ * ref's `node_modules`.
  *
  * `--write-events` is passed unconditionally. On a ref older than 795baf1b the flag
  * simply does not exist; that harness ignores it, renders the WAVs anyway, and

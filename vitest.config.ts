@@ -1,9 +1,7 @@
 import { fileURLToPath } from 'node:url';
-import preact from '@preact/preset-vite';
 import { configDefaults, defineConfig } from 'vitest/config';
 
 export default defineConfig({
-    plugins: [preact()],
     resolve: {
         alias: {
             // The same alias `prototypes/v2/tsconfig.json` and `next.config.mjs` give the preview,
@@ -23,19 +21,11 @@ export default defineConfig({
         coverage: {
             provider: 'v8',
             reporter: ['text', 'json', 'html'],
-            include: ['public/**/*.{ts,tsx}'],
-            exclude: [
-                'public/components/**',
-                'public/data/**',
-                'public/sw.ts',
-                'public/main.ts',
-                'public/ui-root.tsx',
-                'public/App.tsx',
-            ],
+            include: ['public/**/*.ts'],
+            exclude: ['public/data/**'],
         },
         exclude: [
             ...configDefaults.exclude,
-            'tests/e2e/**',
             'tests/browser/**',
             'tests/bench/**',
             // The isolated Next preview owns a separate Playwright runner.

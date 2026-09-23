@@ -87,23 +87,6 @@ export function arrangerReducer(action: Action): boolean {
         case ACTIONS.SET_KEY:
             a.key = action.payload;
             return true;
-        case ACTIONS.LOAD_TEMPLATE:
-            a.sections = action.payload.sections;
-            if (action.payload.isMinor !== undefined) {
-                a.isMinor = action.payload.isMinor;
-            }
-            if (action.payload.key !== undefined) {
-                a.key = action.payload.key;
-            }
-            if (action.payload.timeSignature !== undefined) {
-                a.timeSignature = action.payload.timeSignature;
-                a.grouping = null;
-            }
-            a.isDirty = true;
-            return true;
-        case ACTIONS.SET_ARRANGEMENT:
-            a.sections = action.payload;
-            return true;
         case ACTIONS.SET_SECTIONS:
             a.sections = action.payload;
             a.isDirty = true;
@@ -116,9 +99,6 @@ export function arrangerReducer(action: Action): boolean {
             // side. See `normalizeSongSeed` in sanitize.ts for why one write-side
             // bound replaced three disagreeing read-side ones.
             a.seed = normalizeSongSeed(action.payload);
-            return true;
-        case ACTIONS.SET_SEED_RANDOMIZE:
-            a.randomizeSeed = !!action.payload;
             return true;
     }
     return false;

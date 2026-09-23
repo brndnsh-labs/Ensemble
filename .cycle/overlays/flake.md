@@ -34,6 +34,7 @@ variance across runs is the only reliable tell.
 - **ordering-dependent** → find the leaking file (ran earlier, left a spy/mock/signal
   dirty); add the missing `afterEach(() => vi.restoreAllMocks())` or convert to
   `installSeededRandom` (restores both sides). Confirm by re-running the batch.
-- **e2e-timing** → timeout: ensure the spec uses the `gotoHydrated` helper and the
-  `globalSetup` warm-up is intact (don't introduce `vite preview`). Import crash:
-  default-import `@playwright/test` only.
+- **e2e-timing** → these live in the v2 suite (`prototypes/v2/checks/`). Rebuild the export
+  first: the suite serves whatever is in `prototypes/v2/out/`, and `mix:report` overwrites it
+  with a render-bridge build. Import crash in a root-package script: default-import
+  `@playwright/test` only (`tests/CLAUDE.md`).

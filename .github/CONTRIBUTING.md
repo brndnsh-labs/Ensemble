@@ -13,7 +13,7 @@ Thanks for helping improve the project.
 1. Create a branch for your work.
 2. Keep changes focused and avoid mixing unrelated cleanup with behavior changes.
 3. Run `npm run validate` before opening a pull request.
-4. If you changed UI behavior, also run `npm run test:e2e`.
+4. If you changed UI behavior, also run `npm run build --prefix prototypes/v2 && npm run test:e2e --prefix prototypes/v2`.
 
 ## Good pull requests
 

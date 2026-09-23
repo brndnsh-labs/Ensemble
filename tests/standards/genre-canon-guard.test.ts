@@ -4,7 +4,7 @@ import { GENRE_NAMES } from '../../public/data/smart-genres.js';
 
 // #544 — the supported-genre canon. The 13 genres below are the column axis of
 // the instrument×genre matrix and the EXACT set the UI exposes: the genre picker
-// (`InstrumentRail.tsx`) and Surprise Me both render straight over `GENRE_NAMES`
+// (`prototypes/v2/app/transport-bar.tsx`) renders straight over `GENRE_NAMES`
 // (= Object.keys(GENRE_OVERRIDES)), so there is no config-vs-UI drift by
 // construction. This guard pins the set so a new genre can't silently leak in
 // (or an existing one vanish) without a deliberate update here — the

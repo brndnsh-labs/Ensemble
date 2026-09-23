@@ -168,7 +168,7 @@ function getChordMidiNotes(chord: { freqs: number[] }): number[] {
  * both would only surface as `maybeWarnUnknownSound`'s runtime console warn.
  *
  * Why the drums lane isn't widened to fit GM percussion: the lane renders
- * midi 35–59 (`VISUALIZER_TRACKS.drums`), so hand percussion above that
+ * midi 35–59 (the v1 visualizer's drums lane, deleted in #1358), so hand percussion above that
  * (`Bongo` 60, `Conga` 63, `Perc`/`AgogoHigh` 67, `Shaker` 70, `Guiro` 74,
  * `Clave` 75) clamps to the top row and shares it. That's deliberate: GM's
  * percussion key map is frequency-ordered only up to ~59 — kick 36 → snare 38

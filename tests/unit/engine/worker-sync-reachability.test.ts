@@ -219,7 +219,10 @@ const WORKER_SYNC_MANIFEST: Record<
     'playback.conductorVelocity': { delta: 'UPDATE_CONDUCTOR_DECISION' },
     // #1064 — live worker-side read (harmonies.ts `finalizeHarmonyNotes`).
     'playback.conductorHarmonyComplexity': { delta: 'UPDATE_CONDUCTOR_DECISION' },
-    'playback.songMode': { delta: 'SET_SONG_MODE' },
+    'playback.songMode': {
+        snapshotOnly:
+            'written only by hydration and RESET_STATE since SET_SONG_MODE lost its v1 writer (#1358)',
+    },
     'playback.isEndingPending': { delta: 'SET_ENDING_PENDING' },
     'playback.currentLoopCount': { delta: 'LOOP_BOUNDARY' },
     'playback.loopStartStep': { delta: 'SET_PRACTICE_LOOP' },

@@ -13,7 +13,14 @@ import { getEffectiveMeterAtStep } from './meter.js';
 import { dispatch, getState } from './state.js';
 import { ACTIONS } from './types.js';
 
-export function installE2EGlobals(): void {
+/**
+ * The offline-render bridge: engine internals on `window.ensemble` for the listening-gate
+ * tools (`scripts/mix-report.ts` and the scripts that drive it — `mix:ab`, `mix:verify`,
+ * `plant-defects`). The v2 runtime installs it only in a build made with
+ * `NEXT_PUBLIC_RENDER_BRIDGE=1`, which `mix:report` makes for itself; a production build
+ * never sets the flag, so the branch and this module are compiled out of it.
+ */
+export function installRenderBridge(): void {
     if (typeof window === 'undefined') {
         return;
     }

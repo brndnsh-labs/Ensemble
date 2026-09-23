@@ -1,5 +1,7 @@
 # public/ — state, worker bridge, controllers
 
+Since #1358 `public/` is a library, not an app: the v2 music stand (`prototypes/v2`) compiles it
+through the `@engine/*` alias, and `prototypes/v2/lib/runtime.ts` is its one main-thread host.
 The main-thread plumbing layer: `state.ts` + the `state/*.ts` family — the `deepSignal`
 slices plus the non-slice plumbing that sits beside them (`state/state-effects.ts`,
 `state/state-hydration.ts`, `state/history.ts`, `state/persistence.ts`,
@@ -22,12 +24,13 @@ existing document field from an engine/conductor path.
 ## Worker sync
 
 1. **A `syncWorker(ACTION, payload)` call is only real if `ACTION` has a `case` in the
-   delta `switch` in `worker-client.ts`.** Actions with no case (`SET_ARRANGEMENT`,
-   `SET_TIME_SIGNATURE`, `SET_GROUPING`) fall through to an empty `data` object and the
+   delta `switch` in `worker-client.ts`.** Actions with no case (`SET_TIME_SIGNATURE`,
+   `SET_GROUPING`) fall through to an empty `data` object and the
    `Object.keys(data).length > 0` guard means **nothing is posted** — a subscriber-forwarded
-   `syncWorker('SET_TIME_SIGNATURE', …)` in `main.ts`'s dispatch-forwarding is a silent
-   no-op. That's why `refreshArrangerUI()` (`arranger-controller.ts`) ends with a **bare**
-   `syncWorker()` — no action arg — which ships a full `getSyncState()` snapshot. That call
+   `syncWorker('SET_TIME_SIGNATURE', …)` in the v2 runtime's dispatch subscriber
+   (`initialize()` in `prototypes/v2/lib/runtime.ts`) is a silent no-op. That's why `refreshArrangerUI()` (`arranger-controller.ts`) ends with a **bare**
+   `syncWorker()` — no action arg — which ships a full `getSyncState()` snapshot (so does the
+   v2 runtime's `rebuild()`). That call
    is load-bearing, not redundant belt-and-suspenders: delete it (or "dedupe" it against the
    subscriber) and the worker keeps generating over the old progression/meter until stop→play.
    Before touching any `syncWorker` call site, grep the action's `case` in the switch first —
@@ -103,15 +106,13 @@ existing document field from an engine/conductor path.
    it's the conductor's ramp dispatches to watch for, not the tick.
 
 8. **Audio-up side effects belong on `initAudio()` (`engine.ts`), not on the
-   `ACTIONS.INIT_AUDIO` dispatch.** `dispatch(ACTIONS.INIT_AUDIO)` fires from exactly one place
-   (`PacksSettings.tsx`'s `ensureAudio()`, opening the Sounds panel) and is handled by exactly
-   one `state-effects.ts` case. Every other way audio comes up — the play path
-   (`scheduler-core.ts`), preview (`main.ts`), performance mode, audio recovery — calls
-   `initAudio(state)` directly and never touches that dispatch. Anything that must run
+   `ACTIONS.INIT_AUDIO` dispatch.** Since #1358 nothing dispatches `ACTIONS.INIT_AUDIO` at all
+   (v1's Sounds panel was its only dispatcher); only its `state-effects.ts` case remains. Every
+   way audio comes up — the scheduler (`scheduler-core.ts`), the v2 runtime's `toggle()` and
+   `audition()` — calls `initAudio(state)` directly. Anything that must run
    "whenever audio is live" (e.g. pack loading, #666) has to hook `initAudio()` itself, gated
    `if (!usingOfflineContext && playback.audio)` so offline render/export contexts are excluded
-   — wiring it only into the `INIT_AUDIO` case means it silently never runs unless the user
-   happens to open Settings first.
+   — wiring it into the `INIT_AUDIO` case means it never runs.
 
 ## Practice loop / step framing (`section-overrides.ts`, `practice-controller.ts`)
 
@@ -137,36 +138,25 @@ existing document field from an engine/conductor path.
     cross-context reference. When adding a live-handle field, grep an existing one on that slice
    to enumerate every reset site and add the new field at each.
 
-## Persistence / versioning
+## Build identity and build-time flags
 
-11. **App version display is build-time, not hand-maintained.** `config.ts`'s `APP_VERSION`
-    reads `typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev'` — a Vite `define`
-    injects the real CalVer + git-REV literal at build time; the `typeof` guard exists because
-    Vitest doesn't apply Vite's `define`, and a bare reference to the global would throw across
-    the whole suite (`config.ts` is imported repo-wide). Don't hand-bump a version constant here.
+11. **There is no version constant in `public/`.** `APP_VERSION`/`BUILD_REV` and their
+    `__APP_VERSION__`/`__BUILD_REV__` defines went with v1 (#1358). The deployed build is named
+    by the v2 export's `/build.json` (`sourceRevision`, written by
+    `prototypes/v2/scripts/offline.mjs`), which is what the CI `deploy` job asserts on each host.
 
-12. **The build REV is dirty-aware** (`vite.config.ts` `computeBuildRev()`): a clean tree
-    stamps the bare short SHA; a dirty tree stamps `<head>-<sig>` where `<sig>` hashes
-    `git diff HEAD` + the porcelain list, so a redeploy of uncommitted work is distinguishable
-    from the last one. When verifying a test/prod deploy landed, check the **printed Built
-    REV** the deploy script echoes back out of `dist/index.html`, not bare `git rev-parse HEAD`
-    — the latter only matches a clean tree.
-
-## Gating dev-only code
-
-13. **Gate main-thread code that must not ship to prod on `import.meta.env.DEV`, not
-    `import.meta.env.MODE`.** `npm run build` runs `vite build --mode test`, so `MODE === 'test'`
-    in the *production* bundle too — a `MODE`-gated branch ships live. `DEV` is `true` under the
-    Playwright e2e dev server and `false` under `vite build`, so a `DEV`-gated branch (e.g.
-    `installE2EGlobals()` in `main.ts`) is fully tree-shaken out of the prod bundle, imports
-    included. Before gating out an existing branch as "dev-only," grep every consumer of what it
-    installs — a prod code path that reaches through the same global (e.g.
-    `window.ensemble?.dispatch`) would go silently dead if you cut the branch without giving prod
-    its own direct import.
+12. **`import.meta.env` does not distinguish dev from prod in this layer.** The v2 build defines
+    it as the constant `{ MODE: 'test', DEV: false }` (`prototypes/v2/next.config.mjs`), and
+    Vitest supplies its own. Gate code that must not ship on a `NEXT_PUBLIC_*` flag instead,
+    read from the v2 host where Next inlines it — the precedent is `NEXT_PUBLIC_RENDER_BRIDGE`,
+    which `lib/runtime.ts` checks before dynamically importing `render-bridge.ts`, so a
+    production build drops the branch and the module. Before gating out an existing branch,
+    grep every consumer of what it installs (e.g. `window.ensemble`), or a prod path reaching
+    through the same global goes silently dead.
 
 ## Product-identity constraint on this layer
 
-14. **Ensemble is "a fancy metronome at its core"** — stable, predictable time is a load-bearing
+13. **Ensemble is "a fancy metronome at its core"** — stable, predictable time is a load-bearing
     product promise (the practicing-musician persona mutes their own instrument and plays along;
     it cannot lock to a reference that moves). Any change that destabilizes tempo/timing by
     default — anywhere in this layer's transport/BPM path (`app-controller.ts` `setBpm`,
@@ -178,9 +168,10 @@ existing document field from an engine/conductor path.
 
 ## Config-semantics changes
 
-15. **Changing what a config value *means*** (units, scaling, denomination — e.g. the BPM-unit
+14. **Changing what a config value *means*** (units, scaling, denomination — e.g. the BPM-unit
     change for compound meters) **must migrate authored data in the same commit, not just code.**
-    Grep `data/` and any `presets.ts`/`fixtures.ts`/`defaults.ts` for the changed field; a
+    Grep `data/`, `prototypes/v2/lib/starters.ts` and any `presets.ts`/`fixtures.ts`/`defaults.ts`
+    for the changed field; a
     built-in preset's numeric value was tuned under the *old* interpretation and critique tests
     won't catch a stale one (they drive their own BPM). This bit the compound-meter S1 migration
     for a full ~10 hours of downstream work before it was heard: code was migrated everywhere,
