@@ -917,7 +917,8 @@ html [hidden] {
     height: 23px;
     display: grid;
     place-content: center;
-    padding: 0;
+    /* A named section (#1374) reads as a tag; a lone letter still sits in the 24px square. */
+    padding: 0 4px;
     cursor: pointer;
     /* #1211 — long-press target. `manipulation`, NOT `none`: the chart is scrolled
        with a thumb and this badge sits at the top-left of every section, so opting

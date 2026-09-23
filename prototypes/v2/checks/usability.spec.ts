@@ -99,6 +99,25 @@ test('export and Save a copy include typed text but do not overwrite the origina
 // it did that by comparing the parser's canonical spelling back to the typed text. Once the
 // parser learned to normalise case, parentheses, Δ and the in-quality slash (#1320-#1324),
 // that string comparison rejected exactly the spellings it had just learned to read.
+test('a queued close event cannot shut a dialog that has already been reopened (#1402)', async ({
+    page,
+}) => {
+    await page.goto(appUrl());
+    await page.getByRole('button', { name: blue }).click();
+    await page.getByRole('button', { name: 'Song actions' }).click();
+    await expect(page.getByRole('button', { name: 'Export file', exact: true })).toBeVisible();
+    // `close()` queues its `close` event. When an action closes the menu and "Song actions"
+    // reopens it before that task runs, the stale event arrives at an OPEN dialog — this is it.
+    await page.evaluate(() =>
+        document.querySelector('dialog.modal-box')?.dispatchEvent(new Event('close')),
+    );
+    await page.waitForTimeout(100);
+    await expect(page.getByRole('button', { name: 'Export file', exact: true })).toBeVisible();
+    // A real close still reports.
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('button', { name: 'Export file', exact: true })).toBeHidden();
+});
+
 test('the editor accepts every spelling the playback parser understands', async ({ page }) => {
     await openEditor(page);
     const supported = [

@@ -8,6 +8,7 @@ import { parseChordBar, printChordBar } from '@engine/songbook/score-text';
 import type { ScoreContext, ScoreMeasure, SemanticScore } from '@engine/songbook/score-types';
 import { type Ref, useEffect, useId, useImperativeHandle, useRef, useState } from 'react';
 import { applyMeasureForm, type FormDraft, readMeasureForm } from '../lib/form-editing';
+import { defaultGrouping, groupingsFor, groupingText, parseGrouping } from '../lib/grouping';
 import { FormControls } from './form-controls';
 import { GuidedForm } from './guided-form';
 import './measure-editor.css';
@@ -309,6 +310,22 @@ export function MeasureEditor({
         ),
     ];
     const meters = [...new Set([...Object.keys(TIME_SIGNATURES), meter])];
+    // #1376 — offered only where the bar's meter has more than one idiomatic split. What
+    // "Continue" plays: the grouping this bar inherits, unless it writes a meter, which resets
+    // grouping to the meter's own default.
+    const written = draft.context.grouping;
+    const groupings = groupingsFor(meter);
+    // An imported grouping the table does not list is still shown, never silently swapped.
+    if (
+        groupings.length &&
+        written &&
+        !groupings.some((g) => groupingText(g) === groupingText(written))
+    ) {
+        groupings.push(written);
+    }
+    const continuedGrouping =
+        (draft.context.meter === undefined ? selected.inherited.grouping : null) ??
+        defaultGrouping(meter);
 
     return (
         <div className="measure-editor">
@@ -533,6 +550,40 @@ export function MeasureEditor({
                                     ))}
                                 </select>
                             </label>
+                            {groupings.length > 0 && (
+                                <label>
+                                    Beat grouping from this bar
+                                    <select
+                                        aria-label="Beat grouping from this bar"
+                                        value={
+                                            draft.context.grouping
+                                                ? groupingText(draft.context.grouping)
+                                                : ''
+                                        }
+                                        disabled={disabled}
+                                        onChange={(event) => {
+                                            const context = { ...draft.context };
+                                            if (event.target.value) {
+                                                context.grouping = parseGrouping(
+                                                    event.target.value,
+                                                );
+                                            } else {
+                                                delete context.grouping;
+                                            }
+                                            updateDraft({ ...draft, context });
+                                        }}
+                                    >
+                                        <option value="">
+                                            Continue ({groupingText(continuedGrouping ?? [])})
+                                        </option>
+                                        {groupings.map((grouping) => (
+                                            <option key={groupingText(grouping)}>
+                                                {groupingText(grouping)}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </label>
+                            )}
                         </div>
                         <p className="measure-editor-hint">
                             A meter change resets custom beat grouping. Every affected bar must

@@ -29,8 +29,10 @@ import {
     blankSong,
     convertedCopy,
     extendedScore,
+    type SectionChange,
     withoutMeasure,
     withoutSection,
+    withSectionSettings,
 } from '../lib/documents';
 import { validateEditorText } from '../lib/editor';
 import {
@@ -2851,6 +2853,23 @@ export default function Ensemble() {
             setSectionId(result.sectionId);
         });
     }
+    function changeSection(id: string, change: SectionChange) {
+        void run(() => {
+            // Pending bar edits are committed first, as for every other chart edit.
+            const next = updateChart();
+            if (next.schemaVersion !== 2) {
+                return;
+            }
+            const result = withSectionSettings(next.chart.score, id, change);
+            if (result.kind === 'blocked') {
+                if (result.measureId) {
+                    setMeasureId(result.measureId);
+                }
+                throw new Error(result.message);
+            }
+            applyScore(result.score);
+        });
+    }
     function changeSongMeter(meter: string) {
         void run(() => {
             // Pending bar edits are committed first, by the editor's own rules, so the change is
@@ -3527,6 +3546,7 @@ export default function Ensemble() {
                             }}
                             onExtend={extendScore}
                             onRemove={shrinkScore}
+                            onSectionChange={changeSection}
                             onUpgrade={upgradeEditor}
                             onSelectSection={(id) => selectSection(current, id)}
                             onEditText={editText}

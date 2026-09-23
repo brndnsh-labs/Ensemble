@@ -1,5 +1,5 @@
 {
-    "baselineBytes": 1717881,
+    "baselineBytes": 1719265,
     "ceilingBytes": 2150000,
-    "measured": "2026-09-23, main at 2c3e3643 plus #1373/#1374 (28 files), ENSEMBLE_V2_BASE unset"
+    "measured": "2026-09-23, main at f59de0a3 (28 files), ENSEMBLE_V2_BASE=/ — the build CI's v2-suite makes (#1400)"
 }

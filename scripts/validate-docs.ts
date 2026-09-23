@@ -15,7 +15,8 @@ import path from 'node:path';
 // path here misleads at exactly the point it is most trusted — and until #1303
 // none of them were scanned at all. That gap cost a real pointer: the
 // impulse-response bisection harness moved to `tests/browser/` in #1097 while
-// `public/engine/CLAUDE.md` kept sending readers to `tests/e2e/`.
+// `public/engine/CLAUDE.md` kept sending readers to the old `tests/e2e/` tree
+// (itself deleted with v1 in #1358).
 //
 // Both sets are DISCOVERED, not listed. A hand-maintained list is the exact
 // failure this gate just suffered — `DOCS_TO_SCAN` was never extended when
@@ -389,7 +390,7 @@ function validateDocs() {
      * Files directly inside `dir`, plus (when `recurse`) files nested inside its
      * subdirectories. `public` itself stays shallow — its subdirectories are each
      * already their own CORE_DIRECTORIES entry, so recursing it too would just
-     * re-walk them (and pull in non-code dirs like `public/css`, `public/packs`).
+     * re-walk them (and pull in non-code dirs like `public/packs`).
      * @param {string} dir
      * @param {boolean} recurse
      * @returns {string[]}
@@ -421,16 +422,8 @@ function validateDocs() {
                 continue;
             }
 
-            // Check if this file is mentioned in AI_MAP.md
-            // Support either direct file mapping or directory-level mapping for
-            // components — but only for files directly in public/components/,
-            // not its subdirectories (e.g. public/components/editor/), so a new
-            // subdirectory file must still be individually mapped or fall to the
-            // grooves-style warn-only path below.
-            const isMapped =
-                aiMapContent.includes(`\`${fullPath}\``) ||
-                (path.dirname(fullPath) === 'public/components' &&
-                    aiMapContent.includes('`public/components/`'));
+            // Check if this file is mentioned in AI_MAP.md.
+            const isMapped = aiMapContent.includes(`\`${fullPath}\``);
 
             if (!isMapped) {
                 console.warn(`⚠️  Shadow File: \`${fullPath}\` is not mapped in AI_MAP.md`);

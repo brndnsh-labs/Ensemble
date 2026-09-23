@@ -14,6 +14,7 @@ import {
     revokeOtherSessions,
     revokePasskey,
 } from '../../lib/account/passkeys';
+import { whenClosed } from '../dialog-close';
 import { AccountFailureNotice } from './account-failure';
 import { DeleteAccountStep } from './delete-account';
 import { RecoveryCodeStep } from './recovery-code-step';
@@ -379,7 +380,7 @@ export function AccountPage({
             className="modal-box account-page"
             aria-labelledby="account-page-title"
             onCancel={onClose}
-            onClose={onClose}
+            onClose={whenClosed(onClose)}
         >
             {section === 'replaceCode' && code !== '' ? (
                 <RecoveryCodeStep

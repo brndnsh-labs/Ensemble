@@ -1,42 +1,55 @@
 # Security Model & Audit Baseline
 
-Threat model and standing security checklist for Ensemble. Written 2026-05-30 as a general best-practices audit (not tied to a specific change). Future `/security-review` runs on a diff should check changes against the surface map and standing rules below.
+Threat model and standing security checklist for Ensemble. Rewritten 2026-09-23 (#1386) on the v2 music stand and its account API, after the cutover (#1357) and the deletion of the v1 app (#1358); the 2026-05-30 baseline described that deleted app. Future `/security-review` runs on a diff should check changes against the surface map and standing rules below.
 
-## Threat model: this is a static client-side PWA
+## Threat model: an offline-first static app plus one small account API
 
-Ensemble has **no application backend**. It is a Vite-built static bundle deployed by `rsync` to a web root (`scripts/deploy-{prod,test}.sh`). There is no Ensemble server process, database, authentication, session, or server-held secret. Consequently the classic server-side threat classes are **out of scope by construction** for the app: SQL/command injection, SSRF, auth bypass, IDOR, server-side secret leakage.
+Ensemble is two deployable parts on one origin (`ensemble.brndn.zip`), both released as container images on `docker04` (DOCTRINE §6):
 
-The real attack surface is **client-side**: untrusted input reaching a dangerous browser sink, supply-chain, and the PWA/deploy pipeline. Network egress is limited to same-origin static assets (including `fetch('MANUAL.md')`) plus production-only aggregate telemetry to the self-hosted Umami service at `umami.brndn.zip`. The telemetry boundary disables automatic collection, allow-lists event fields, and strips URL queries, fragments, and referrers so arrangement contents do not leave the browser.
+- **The stand** (`prototypes/v2/`): a Next.js static export served by unprivileged nginx (`hosting/web/`), installable and fully playable offline. It compiles the engine library in `public/`. Guest use sends nothing to any server.
+- **The account API** (`prototypes/v2-api/`, behind `/api/*`): a Node service with its own `node:sqlite` database — passkey sign-in, sessions, recovery codes, and explicit-Save sync of a user's songbook. Accounts are optional; losing the API never stops the band.
+
+So the server-side classes are **in scope for the API only**: authentication and session handling, authorization (one account reading or writing another's songs), injection into SQLite, request forgery, abuse and resource exhaustion. The stand's attack surface stays client-side: untrusted input (share links, imported files, v1 browser data) reaching a dangerous sink, the service worker's cache and scope, and supply chain.
+
+Network egress from the stand is same-origin only: static assets, sound packs, and `/api/*` for a signed-in account. **Analytics are currently off** — nothing has been sent since the cutover; #1389 re-introduces privacy-preserving Umami with an allow-listed event set.
 
 ## Attack-surface map
 
-| Surface | Files | Status |
+| Surface | Defending code | Status |
 | :- | :- | :- |
-| Share-URL / persisted-state deserialization | `state-hydration.ts`, `export/sharing.ts`, `state/share-codec.ts` (`compress/decompressSections`) | **Well defended.** Allowlists + `clamp()` + length caps + schema validation on every field; 100KB payload cap against memory exhaustion. |
-| The one HTML-injection sink | `components/ManualModal.tsx` (`dangerouslySetInnerHTML`), `data/manual-metadata.ts` | **Defended (defense-in-depth).** Input is same-origin static (`MANUAL.md` + repo config), not user-controlled at runtime; `escapeHTML` runs before markdown transforms; link schemes blocked. See F1/F2. |
-| Content-Security-Policy | `public/index.html` `<meta>` | **Strong but `<meta>`-only.** Scripts and connections are same-origin except the explicit `umami.brndn.zip` telemetry origin; `object-src 'none'`, `base-uri 'self'`. Cannot carry `frame-ancestors`/HSTS — see F5. |
-| Production telemetry | `telemetry.ts`, event call sites | **Aggregate and allow-listed.** Canonical production-host gate, no automatic tracking, no query/referrer egress, bounded pre-load queue, and failure is non-blocking. Umami availability and hardening remain an infrastructure responsibility. |
-| Service worker (PWA cache) | `public/sw.ts` | **Clean.** Workbox precache + `cleanupOutdatedCaches`; standard `SKIP_WAITING`/`clients.claim`. |
-| Web MIDI | `midi-controller.ts` | Low risk — permission-gated, local devices, no data egress. |
-| Supply chain | `package.json`, `package-lock.json` | **Small & clean.** 3 runtime deps (preact, @preact/signals, deepsignal); `npm audit` = 0 vulnerabilities. Dependabot + weekly `npm update` (`/dep-update`). |
-| CI / deploy | `.github/workflows/ci.yml`, `scripts/deploy-*.sh` | Deploy is **local rsync** — no deploy creds in CI. Hardening items F3/F4/F6. |
+| Account API — passkey ceremonies, sessions, step-up re-auth | `prototypes/v2-api/src/auth/` (`registration.ts`, `login.ts`, `session.ts`, `fresh-auth.ts`, `request-guard.ts`), `src/http/` (`same-origin.ts`, `cookies.ts`, `headers.ts`) | **Reviewed** in the stories that built it (#1188–#1190; see `prototypes/v2-api/README.md`). Single canonical origin and RP ID, fail-closed same-origin guard (`Sec-Fetch-Site`/`Origin`/`Referer`, never `hono/csrf`), `HttpOnly` `SameSite=Strict` `__Host-` cookies, 32-byte session tokens stored only as SHA-256, absolute 30-day expiry, fixation defense, collapsed `401` error taxonomy, runtime shape guard before any bind parameter. |
+| Account API — recovery codes | `src/auth/recovery.ts`, `recovery-material.ts` | **Reviewed** (#1191). Single-use codes behind a restricted recovery-only session that cannot read the library. |
+| Account API — library, Save, delete, account deletion | `src/http/app.ts` and the library/save/delete modules (README §§ #1202, #1259, #1260, #1271) | **Reviewed** per story. Owner-scoped queries, idempotent owner-bound receipts, body limits on every mutation (64 KB; Save and delete carry their own bounds), JSON-only mutation routes, fresh-auth gate on account deletion. |
+| Account API — abuse and capacity | `src/http/rate-limit-guard.ts`, `src/auth/rate-limit.ts`, `DEFAULT_REGISTRATION_CAP` (`src/auth/registration.ts`) | **Partly open.** Transport rate limit (300/min) and ceremony limits are in place; registration is capped at 25 accounts (#1272). The on-host disk alert that was the other half of #1272 is not built yet (plan on #1272). |
+| `#chart=` share links | `public/songbook/chart-link.ts` (`decodeChartLink`), the shared-link effect in `prototypes/v2/app/ensemble.tsx` | **Defended.** Size-bounded decode (200,000 encoded characters), then the canonical document validators (`validateChartDocument`/`validateChartDocumentV2`); a bad payload is an error message, never a throw into the UI. Opens as an unsaved draft; nothing is written. |
+| Old v1 `?s=` share links | `prototypes/v2/lib/v1-link.ts`, `public/state/share-codec.ts` (decode only) | **Defended, one open hardening item:** #1132 (`normalizeKey` prototype lookup, and `section.key` skipping the key-membership check on this path). Harmless at today's call sites. |
+| v1 browser-data import | `prototypes/v2/lib/import-v1.ts` | **Defended.** Read-only `getItem` view of `ensemble_*`; v1's own normalizers, then the canonical codec; never writes back to a v1 key. **Not separately security-reviewed.** |
+| iReal Pro and chart-file import | `prototypes/v2/lib/import-document.ts`, `app/import-dialog.tsx`, `public/songbook/` parsers | Parsed into the semantic score and validated before use; the original text is kept verbatim as data (`importSource`), never interpreted as markup. **Not separately security-reviewed.** |
+| HTML sinks in the stand | React's default escaping; the one `dangerouslySetInnerHTML` is `app/layout.tsx`'s constant theme script | **Clean.** No user-derived value reaches an HTML sink. |
+| Response headers | `hosting/web/nginx.conf` (`nosniff`, `Referrer-Policy`, `frame-ancestors 'none'`), edge Caddy (HSTS), API `src/http/headers.ts` | **Gap: no script/connect CSP.** The stand ships no `Content-Security-Policy` beyond `frame-ancestors`, and `nginx.conf`'s comment wrongly says the app's own `<meta>` CSP covers it — that meta tag left with v1's `index.html`. Filed as #1395 (F8). |
+| Service worker and offline cache | `prototypes/v2/scripts/offline.mjs` (generated worker), the `/v2/sw.js` tombstone | **Reviewed** in #1355, including the open-redirect fix (origin re-check on the tombstone's forward). The worker excludes `/api` explicitly and never caches private API responses or personalized HTML. |
+| Account-local storage | `prototypes/v2/lib/sync/` (IndexedDB), `lib/account/` | Local owner/generation fence, **not** authentication (`AccountScope`); authorization comes only from the verified server session. Sign-out clears local account data once the server confirms revocation. |
+| Web MIDI | `public/controllers/midi-controller.ts` | **Not exposed in v2** — the stand never calls it. (MIDI *export* is a file download.) |
+| Supply chain | `package.json` (preact, @preact/signals, deepsignal), `prototypes/v2/package.json` (next, react, react-dom, @simplewebauthn/browser), `prototypes/v2-api/package.json` (hono, @hono/node-server, @simplewebauthn/server) | Small. Locked installs (`npm ci`) everywhere in CI; `/dep-update` is the maintenance path. |
+| CI and release | `.github/workflows/ci.yml`, the `ensemble-release` forced-command account (homelab-maintenance) | Workflow-level `permissions:` with per-job widening only where an image is pushed; images pushed to GHCR; a release is one forced command accepting only `release <stack> <web|api> sha-<40 hex>`, reached over the tailnet — no general shell and no root. |
 
-## Findings (2026-05-30)
+## Findings
 
-No high-severity issues. The codebase is security-conscious. Items below are hardening / defense-in-depth.
+**Closed since the 2026-05-30 baseline:** F1 and F2 (the `ManualModal` markdown sink and its metadata injection) were deleted with the v1 UI (#1358). F3 (`npm ci`), F4 (`permissions:`), F5 (headers from the web server) and F6 (deploy as root → forced-command release account) are done.
 
-- **F1 (Low) — `simpleMarkdown` link href emits the unvalidated value.** `ManualModal.tsx:37-45` validates `cleanUrl` (lowercased, control-chars stripped) against `javascript:`/`data:`/`vbscript:`, but emits the raw `url` in the `href`. Mitigated today (link text is `escapeHTML`'d before the regex, and `MANUAL.md` is not user-controlled), but the validate-one-value / emit-another mismatch is fragile if the manual ever becomes user-supplied. Fix: emit the validated value.
-- **F2 (Low) — metadata injected after escaping.** `injectManualMetadata` runs *after* `simpleMarkdown` (intentional ordering, documented in-code), so its HTML tables bypass `escapeHTML`. Safe only because the metadata derives from repo config (genre/style names). If any injected value ever derives from user input, it becomes an injection point.
-- **F3 (Hardening) — CI uses `npm install`, not `npm ci`.** `ci.yml` re-resolves deps and can drift from the lockfile. `npm ci` gives reproducible, lockfile-pinned installs and fails on drift.
-- **F4 (Hardening) — no `permissions:` block in the workflow.** `GITHUB_TOKEN` defaults broader than needed. Add `permissions: { contents: read }` at the top of `ci.yml`.
-- **F5 (Hardening) — CSP is `<meta>`-only.** `frame-ancestors` (clickjacking), HSTS, and `X-Content-Type-Options: nosniff` cannot be delivered via `<meta>` — they require HTTP response headers from the static host (nginx/apache). Document and configure these at the web-server layer; this is the single biggest best-practices gap for a deployed web app.
-- **F6 (Hardening) — deploy runs as `root@`.** `deploy-*.sh` rsync over SSH as root. A dedicated deploy user scoped to the web root reduces blast radius. (SSH creds are correctly *not* in the repo.)
-- **F7 (Optional) — GitHub Actions pinned to major-version tags.** SHA-pinning third-party actions is the supply-chain-hardening ideal; lower priority for first-party `actions/*`.
+**Open:**
+
+- **F7 (Optional) — GitHub Actions pinned to major-version tags.** Unchanged: SHA-pinning third-party actions (`docker/*`, `tailscale/github-action`) is the supply-chain ideal; lower priority for first-party `actions/*`.
+- **F8 (Hardening) — the stand ships no script/connect CSP.** Filed as #1395. A CSP is the second line behind React's escaping; adding one must account for Next's inline bootstrap scripts, the constant theme script, the workers and #1389's analytics origin.
+- **#1132** — the v1-link key hardening above.
+- **#1272** — the disk alert above.
 
 ## Standing rules for future changes (check on every diff)
 
-1. **Any new URL param / persisted field** must be validated before it reaches state: allowlist enums, `clamp()` numbers, cap string length, `stripDangerousChars`/`escapeHTML` free text. Never `dispatch` a raw decoded value. (Pattern: `state-hydration.ts`.)
-2. **No new `dangerouslySetInnerHTML`** without an escaping/sanitizing step on the input and a note on why the input is trusted. Prefer Preact's default text escaping.
-3. **No new network egress** (`fetch`, `WebSocket`, `sendBeacon`) without an explicit reason — it widens `connect-src` and the privacy surface. Update the CSP if added.
-4. **No secrets in the repo or CI** — deploy credentials stay in local SSH config.
-5. **Keep `npm audit` clean** — `/dep-update` is the maintenance path.
+1. **Any new URL fragment/param, imported format or persisted field** is validated before it reaches state or storage: route it through the canonical codecs (`public/songbook/`), allowlist enums, bound numbers and lengths. Never `dispatch` or save a raw decoded value.
+2. **No new `dangerouslySetInnerHTML`** without a note on why its input is trusted; prefer React's default escaping. No user-derived value in an HTML sink, ever.
+3. **No new network egress** (`fetch`, `WebSocket`, `sendBeacon`, a third-party script) without an explicit reason; update the CSP once F8 lands. Chart contents, titles and account identifiers never leave the device except to the user's own account API.
+4. **API changes keep the guards:** same-origin and JSON-only on every mutation, owner-scoped queries, the collapsed error taxonomy, and a fresh-auth check on anything destructive to an account. Auth, ownership or concurrency changes get an independent correctness and security review (`prototypes/v2/CLAUDE.md` § Verification).
+5. **The service worker never caches** `/api/*`, a private response, or personalized HTML.
+6. **No secrets in the repo or CI logs**; the release key stays a forced command.
+7. **Keep `npm audit` clean** in all three packages — `/dep-update` is the maintenance path.

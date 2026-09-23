@@ -100,8 +100,9 @@ playback restriction must not retroactively invalidate untouched legacy songs.
   operate on the same validated candidate, never independent saved representations.
 - Save includes pending text, as it does now. Invalid text is retained with a measure-specific
   explanation. Switching editing modes must not discard invalid buffers or silently fix them.
-- Section names, repeat counts and key/meter overrides get one section settings surface.
-  Preserve the reserved conductor gestures; do not overload playback section taps.
+- Section names, repeat counts and key/mode/meter overrides get one section settings surface
+  (shipped #1374, in the Edit panel — `app/section-settings.tsx`). Preserve the reserved
+  conductor gestures; do not overload playback section taps.
 
 ## Legacy-code evidence (unchanged v1 path)
 

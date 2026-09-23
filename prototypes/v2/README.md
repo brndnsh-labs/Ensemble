@@ -7,28 +7,29 @@ See [the product brief](../../docs/design/ensemble-v2.md) and the rollout plan
 (`../../docs/design/ensemble-v2-rollout.md`).
 Fresh Claude/Codex/other-agent sessions start with [the v2 handoff](CLAUDE.md).
 
-## Account storage foundation (#1177)
+## Accounts and the account-local store (#1177 onward)
 
-`lib/sync/` is the isolated account-local repository and explicit Save outbox. It is not
-connected to the preview UI or an authenticated server yet. The existing guest repository,
-starter creation, recovery keys and app bootstrap are unchanged; opening the preview does
-not create this account database. Passkeys/recovery, real transport, library downloads and
-account UI are subsequent slices of [the sync contract](../../docs/design/ensemble-v2-sync.md).
+Accounts are on by default since the cutover (#1357); `?accounts=off` opts a device out. Sign-in
+is a passkey, with a downloadable recovery code, against the account API in `../v2-api/`.
+`lib/sync/` is the account-local IndexedDB repository and explicit Save outbox; `lib/account/`
+wires it to the session, the sync loop and the account UI in `app/account/`. The guest songbook
+is a separate store and is never uploaded implicitly, and a device that has never held an
+account asks the server nothing (`deviceMayHoldAccount`). [CLAUDE.md](CLAUDE.md)'s navigation
+table lists each flow — Save, Keep both, adopting a remote update, delete, sign-out, account
+deletion — and [the sync contract](../../docs/design/ensemble-v2-sync.md) is the design.
 
-The host supplies an account scope after a future authenticated transition. Saves compare local
-revisions and commit the frozen snapshot plus queue entry in one IndexedDB transaction. Each
-writer's unsaved recovery is separate. `sendNext` sends only the queue head through an injected
-transport; retries reuse exact request bytes, acknowledgements update only sync metadata, and
-conflicts preserve both versions and pause that song's queue. Multiple senders may retry the
-same frozen head, so the future server MUST enforce owner-bound idempotency and revisions.
-An account scope is routing context, not proof of authentication or protection from same-origin
-script access to browser storage. `switchAccount(null)` fences access but does not implement
-secure sign-out, remote session revocation, or private-cache deletion.
+Saves compare local revisions and commit the frozen snapshot plus queue entry in one IndexedDB
+transaction. Each writer's unsaved recovery is separate. `sendNext` sends only the queue head;
+retries reuse exact request bytes, acknowledgements update only sync metadata, and conflicts
+preserve both versions and pause that song's queue. Multiple senders may retry the same frozen
+head, and the server enforces owner-bound idempotency and revisions. An account scope is routing
+context, not proof of authentication or protection from same-origin script access to browser
+storage: `switchAccount(null)` only fences access, and sign-out proper — server revocation, then
+clearing the device's account data — is `signOut` in `lib/account/sync-loop.ts` (#1269).
 
-Queues currently bound pending explicit Saves to 64 per song. At the limit, Save fails without
-changing the prior document or queue; the host must retain the editor/recovery and offer export.
-Completed local receipts retain only a request digest and revision, not another full chart copy.
-The foundation deliberately has no conflict-resolution, remote-import or deletion entrypoint.
+Queues bound pending explicit Saves to 64 per song. At the limit, Save fails without changing
+the prior document or queue; the host retains the editor/recovery and offers export. Completed
+local receipts retain only a request digest and revision, not another full chart copy.
 
 From the repository root, `npm run test:sync` verifies native IndexedDB behavior in Chromium
 and WebKit, including aborted transactions, competing connections, lost responses, owner
@@ -45,10 +46,12 @@ npm run build --prefix prototypes/v2
 npm run test:e2e --prefix prototypes/v2
 ```
 
-Those three commands build and check the `/v2` release. `ENSEMBLE_V2_BASE` moves the whole app
-to another base in one value (#1354) — `ENSEMBLE_V2_BASE=/` builds and tests the site-root
-variant the phase-5 cutover will ship, and `scripts/serve.mjs`, the Playwright fixtures and the
-generated service worker all follow it. It is unset in every deployment path today.
+Those three commands build and check the app at the default `/v2` base. `ENSEMBLE_V2_BASE`
+moves the whole app to another base in one value (#1354), and `scripts/serve.mjs`, the
+Playwright fixtures and the generated service worker all follow it. The site is the
+`ENSEMBLE_V2_BASE=/` build, and CI's `v2-suite` builds and tests exactly that (#1400) — set it
+on both the build and the test command to reproduce CI, including the root-only
+`root-handover.chromium.spec.ts`, which skips at `/v2`.
 
 For UI development, `npm run dev --prefix prototypes/v2`, then visit `http://localhost:3100/v2/`.
 Sound-pack assets and their integrity index are assembled by the build script: use the built
@@ -154,6 +157,9 @@ legacy meaning/timing cannot be converted exactly stay in the original editor wi
 Select a bar, type chords and optionally choose each chord's length. For example, `C Dm G7`
 in 4/4 needs an explicit timing choice: choose lengths 2, 1, 1 or type `C:2 Dm:1 G7:1`.
 Key or meter change applies from that bar through the section; it does not transpose chord names.
+Where the bar's meter has more than one idiomatic split (5, 7, 8, 9, 10, 11 or 12 counts —
+`lib/grouping.ts`), **Beat grouping from this bar** picks one, such as 2+3 in 5/4; Section
+settings offers the same at section scope (#1376). Any meter change resets it.
 Global Key transposes the entire score. Song meter (Edit panel) sets the song's own meter:
 equal-length bars re-divide, a section or bar with its own meter keeps it, and a bar whose
 written lengths cannot follow blocks the change and is opened for you — nothing is rounded.
@@ -163,7 +169,11 @@ passes to the next bar, so the rest of the section sounds the same; a section's 
 the section with it) and **− Section** removes the section holding it (#1373). Both refuse,
 changing nothing, when it would remove the chart's last bar or section, music another bar
 repeats, half of a two-bar repeat, or a bar carrying repeat/navigation marks — remove the marks
-or the whole section instead. Save includes pending measures even with the editor hidden.
+or the whole section instead. **Section settings** (Edit panel, for the section holding the
+selected bar, #1374) names the section (1–24 characters), sets how many times it plays (1–64),
+and gives it its own key, mode or meter or returns each to the song's. A section meter change
+re-fits that section's bars by Song meter's rule and resets its beat grouping; a bar with its own
+override keeps it. Save includes pending measures even with the editor hidden.
 
 Under **Repeats and endings**, select an existing bar range with two clicks/taps or Tab and
 Enter (or use From/Through), then **Repeat these bars** and choose the total plays, default 2.
@@ -266,9 +276,9 @@ a tag, verified through the host's public `/build.json` (`sourceRevision` = the 
 - **Rollback** — release the previous tag (`../../hosting/README.md`), or `git revert` → PR.
 
 `/v2/*` is an edge redirect to the same path at the root, except `/v2/sw.js`, which is a real
-file that forwards the beta's windows (#1355). The default build base is still `/v2` — that is
-what `v2-suite` tests; `.github/workflows/v2-root-base.yml` and `web-image` prove the shipped
-`/` build.
+file that forwards the beta's windows (#1355). The default build base is still `/v2`, but CI's
+`v2-suite` builds and tests the shipped `/` build (#1400); `.github/workflows/v2-root-image.yml`
+smoke-tests its image on a PR and `web-image` after the merge.
 
 Compatibility caveat: manual-only preview builds before Follow feel support reject documents
 with `autoSound: true`. Do not roll a browser's songbook back to those builds after saving Follow

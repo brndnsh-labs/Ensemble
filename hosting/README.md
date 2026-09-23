@@ -151,16 +151,14 @@ the base image has no such module and this config does not add one.
 CI builds it in two places. `web-image` in `ci.yml` runs on a merge to `main`, beside
 `api-image`, and on a `workflow_dispatch` of any ref (`scripts/deploy-test.sh`'s branch
 audition, #1358): it builds the root export, pushes `:sha-<commit>` — plus `:main` on `main`
-only — pulls the sha tag back and runs the smoke script against it. `v2-root-image` in `v2-root-base.yml` is the PR-time
+only — pulls the sha tag back and runs the smoke script against it. `v2-root-image.yml` is the PR-time
 proof that needs no registry — same build, `load: true` instead of `push`, same smoke script —
 so a rule as easy to get wrong as the `/v2/sw.js` carve-out is provable on the pull request that
 writes it. Neither one touches the required contexts. **Since the cutover (#1357) `deploy` does
 `needs:` `web-image`**, which is the inverse of #1356's rule and for the same reason it was
 written: this image is now the release, so a red build must stop it rather than be stepped
-around. `v2-root-base.yml`'s path filter was broadened in the same change — from the base-path
-machinery alone to `prototypes/v2/**`, `public/**`, `hosting/web/**` and the workflow file —
-because `/` is now the base production serves, and `v2-suite` still builds `/v2`: without that,
-most pull requests would have had no pre-merge proof of the shipped base at all.
+around. Since #1400 the root build's Playwright suite is part of the required `v2-suite`
+itself, which builds at `/`; the PR-time workflow keeps only the image smoke test.
 `ensemble-web` is a public package, like
 `ensemble-api`: docker04 pulls anonymously. (The image is pushed with `provenance: false`, so an
 anonymous manifest probe has to send `Accept: application/vnd.oci.image.manifest.v1+json` — a

@@ -1,6 +1,7 @@
 import type { RefObject } from 'react';
 import type * as repository from '../lib/repository';
 import type { ChartDocument } from '../lib/runtime';
+import { whenClosed } from './dialog-close';
 import { downloadImportSource } from './import-dialog';
 
 type Recovery = ReturnType<typeof repository.recoveriesFor>[number];
@@ -75,7 +76,12 @@ export function SongMenu({
     onDeleteFromAccount,
 }: SongMenuProps) {
     return (
-        <dialog ref={dialogRef} className="modal-box" onCancel={onClose} onClose={onClose}>
+        <dialog
+            ref={dialogRef}
+            className="modal-box"
+            onCancel={onClose}
+            onClose={whenClosed(onClose)}
+        >
             <h2>Keep a good take.</h2>
             <p>
                 Saved setups and recovered drafts stay on this device. Export a file to move a song

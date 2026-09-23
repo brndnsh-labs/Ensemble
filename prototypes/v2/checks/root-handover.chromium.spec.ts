@@ -5,9 +5,9 @@ import { BASE, expect, test } from './fixtures';
  * What happens to a browser that has been here before, when the stand takes the site root
  * (#1355, rollout phase 5).
  *
- * These specs need an export built with `ENSEMBLE_V2_BASE=/`, which is the `v2-root-base`
- * workflow's build and not the one the ordinary suite runs, so at `/v2` they skip with a reason
- * rather than pretending to cover the cutover. Chromium only, deliberately: every assertion here
+ * These specs need an export built with `ENSEMBLE_V2_BASE=/` — CI's `v2-suite` build (#1400),
+ * but not a local default build — so at `/v2` they skip with a reason rather than pretending to
+ * cover the cutover. Chromium only, deliberately: every assertion here
  * turns on service-worker lifecycle — a conditional `skipWaiting`, `clients.claim`,
  * `WindowClient.navigate`, `registration.unregister` — plus a real offline transition, and
  * WebKit's emulation of the last of those is already known-broken in `foundation.spec.ts`.
@@ -17,10 +17,7 @@ import { BASE, expect, test } from './fixtures';
  * waiting policy, which are the two things the handover reads. `?reload=0` drops the v1 page's
  * own `controllerchange` reload, which is the only shape that can observe the worker's belt.
  */
-test.skip(
-    () => BASE !== '',
-    'Root-build only: rebuild with ENSEMBLE_V2_BASE=/ (the v2-root-base workflow does).',
-);
+test.skip(() => BASE !== '', 'Root-build only: build and test with ENSEMBLE_V2_BASE=/ (CI does).');
 
 /** A key exactly as `lib/sounds.ts` writes one, under the base the cutover moves away from. */
 const OLD_SOUND_KEY = `/v2/packs/grand/manifest.json?asset=${'b'.repeat(64)}`;
