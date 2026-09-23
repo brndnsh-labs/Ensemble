@@ -237,6 +237,13 @@ jobs:
       - name: Build the v2 static export
         run: npm run build --prefix prototypes/v2
 
+      # The bundle-size tripwire (#1388): one ceiling on the export's total JavaScript,
+      # ~25% over its baseline, so it fails only on an accident such as an eager import.
+      # One shard is enough; both build the same export.
+      - name: Check the export's JavaScript against its ceiling
+        if: matrix.shard == 'heavy'
+        run: npm run check:bundle --prefix prototypes/v2
+
       - name: Run the v2 Playwright suite
         run: npm run test:e2e --prefix prototypes/v2
         env:
