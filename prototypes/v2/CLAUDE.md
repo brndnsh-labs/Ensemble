@@ -69,7 +69,7 @@ gate evidence. Do not copy old test totals or preview SHAs into a new claim of v
   it never silently uploads it. A later cloud acknowledgement cannot overwrite newer editing.
 - Portable v1/v2 charts contain musical intent, not account/session/retry metadata. Preserve
   originals on conversion/import; unknown or corrupt data is not an empty-library success.
-- The account-local database/outbox exists but is not yet wired to authentication or the UI
+- The account-local database/outbox (`lib/sync/`) is wired to passkey sign-in and the UI
   (#1261 onward). Account code goes in `app/account/` and `lib/account/`; plain `fetch`, and
   `@simplewebauthn/browser` is the only new client dependency.
   `AccountScope` is a local fence, **not authentication**. Production authorization must come
