@@ -74,6 +74,7 @@ import {
 } from '@engine/types';
 import { transposeKeyName } from '@engine/utils';
 import { initWorker, syncWorker } from '@engine/worker-client';
+import { renderBandMixToWav, renderBandStemsToWav } from './band-export';
 import { BandHost } from './band-host';
 import { type ChartDocument, type DocumentContent, validateDocument } from './documents';
 import { masterVolumePreference, rememberMasterVolume } from './session';
@@ -112,7 +113,7 @@ let currentScore: SemanticScore | null = null;
 // `?engine=next` plays the new band engine (`band/`, docs/design/band-engine.md) in place of
 // the worker/scheduler generator, through the same voices, buses and sound packs. Everything
 // else — charts, the songbook, the mixer, the Feel sheet — is shared. Read once per page.
-const ENGINE_NEXT =
+export const ENGINE_NEXT =
     typeof window !== 'undefined' &&
     new URLSearchParams(window.location.search).get('engine') === 'next';
 /** One sixteenth in band ticks: the old engine's step, so step maps convert exactly. */
@@ -1196,11 +1197,17 @@ export function cancelExportAudio(): void {
 
 /**
  * Downloads a WAV mix, or one WAV per stem, of the current arrangement
- * (#1278). Delegates to the shared `renderCurrentSessionToWav`/
+ * (#1278). On the old engine, delegates to the shared `renderCurrentSessionToWav`/
  * `renderStemsToWav` (public/export/audio-export.ts) — the same detached-clone
  * offline render v1's `ShareModal` uses (`cloneStateForRender`), so the live
  * scheduler/state tree is never written during the render; nothing here
- * dispatches.
+ * dispatches. Under `?engine=next`, `band-export.ts`'s `renderBandMixToWav`/
+ * `renderBandStemsToWav` render `BandHost.render()`'s event stream instead —
+ * same detached-clone-plus-`OfflineAudioContext` mechanics, and the same
+ * `playBandEvent` voice mapping the live band host schedules with, so an
+ * exported next-mode mix matches what was heard live. Stems there are
+ * drums/bass/chords (the comp) only: `soloist`/`harmony` have no band lane to render, and
+ * `renderBandStemsToWav` drops them rather than erroring.
  *
  * Sampled voices must be installed before the render can use them —
  * `resolveInstrumentSource` (instrument-registry.ts) silently resolves an
@@ -1226,14 +1233,53 @@ export async function exportAudio(
     progress: (text: string) => void,
     instruments: StemInstrument[] = STEM_INSTRUMENTS,
 ): Promise<void> {
-    if (ENGINE_NEXT) {
-        throw new Error(
-            'Audio export is not on the new engine yet. Open the page without ?engine=next to export audio.',
-        );
-    }
     const intent = ++exportIntent;
     await prepareSounds(captureContent(), progress);
     if (intent !== exportIntent) {
+        return;
+    }
+    if (ENGINE_NEXT) {
+        const host = bandHost();
+        host.setScore(scoreForBand());
+        bandSeed ||= String(getState().arranger.seed || 'ensemble');
+        const bpm = getState().playback.bpm;
+        if (kind === 'mix') {
+            progress('Rendering mix…');
+            const { events, timeline } = host.render(bandSettings());
+            const result = await renderBandMixToWav(events, timeline, bpm, { filename });
+            if (intent !== exportIntent) {
+                return;
+            }
+            downloadExportResult(result);
+            return;
+        }
+        // A stem always renders its lane even if it's muted live (the old engine's own stem
+        // contract — see `renderStemsToWav`'s doc comment), so force every lane on for the one
+        // pass every stem below is sliced from, rather than muting/soloing per-stem state.
+        const { events, timeline } = host.render({
+            ...bandSettings(),
+            lanes: { drums: true, bass: true, comp: true },
+        });
+        try {
+            const results = await renderBandStemsToWav(events, timeline, bpm, instruments, {
+                filename,
+                onStemProgress: ({ instrument, index, total }) => {
+                    if (intent !== exportIntent) {
+                        throw new ExportCancelled();
+                    }
+                    progress(`Rendering ${instrument} (${index + 1}/${total})…`);
+                },
+            });
+            if (intent === exportIntent) {
+                for (const result of results) {
+                    downloadExportResult(result);
+                }
+            }
+        } catch (error) {
+            if (!(error instanceof ExportCancelled)) {
+                throw error;
+            }
+        }
         return;
     }
     if (kind === 'mix') {
