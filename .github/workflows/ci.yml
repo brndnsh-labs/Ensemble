@@ -60,10 +60,16 @@ jobs:
           cache: 'npm'
           cache-dependency-path: |
             package-lock.json
+            prototypes/v2/package-lock.json
             prototypes/v2-api/package-lock.json
 
       - name: Install dependencies
         run: npm ci
+
+      # knip analyses `prototypes/v2` as a workspace (#1358): without its node_modules the Next
+      # plugin can't load, so `react-dom` reads as unused and `next` as an unlisted binary.
+      - name: Install v2 dependencies
+        run: npm ci --prefix prototypes/v2
 
       - name: Run the full gate (npm run ci)
         run: npm run ci
