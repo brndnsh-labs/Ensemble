@@ -45,13 +45,6 @@
  * `midi-reducer.test.ts`, `visualizer-reducer.test.ts`) — that split is intentional, but
  * don't read a green run here as "the defaults are right".
  *
- * "The persisted session" also excludes transport transients. `persistence.ts` writes
- * `bpm` as `rampBpmTarget > 0 ? rampBpmTarget : bpm`, and `RESET_STATE` deliberately does
- * not clear `rampBpmTarget` (see the note in `playback-reducer.test.ts`) — so one persisted
- * key has an input outside the inverse. Moot in production, where a reset only ever runs at
- * boot with the target at 0, and the tripwire below would catch it if it ever mattered: a
- * non-zero target makes `poisoned['bpm'] === fresh['bpm']`.
- *
  * It also only covers the persist→reset direction. The sibling invariant — every
  * persisted key is actually *read back* by `hydrateSavedState()` — is not enforced here;
  * diffing the two by hand is what turned up `midi.harmonyOctave` being saved on every

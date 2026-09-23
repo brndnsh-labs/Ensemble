@@ -98,10 +98,7 @@ describe('State Integrity Audit', () => {
                 'DRUM_PRESET_LOADED',
             ];
 
-            // #1379 — the tempo ramp lost its only UI with the v1 shell (#1358); the engine
-            // still honours it until that issue ports it to v2 or deletes it.
-            const awaitingDispatcher = ['SET_PRACTICE_RAMP'];
-            if (!isDispatched && !exceptions.includes(key) && !awaitingDispatcher.includes(key)) {
+            if (!isDispatched && !exceptions.includes(key)) {
                 unusedInDispatch.push(key);
             }
             if (!isHandled && !exceptions.includes(key)) {

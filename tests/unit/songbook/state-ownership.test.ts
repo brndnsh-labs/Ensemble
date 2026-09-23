@@ -19,7 +19,6 @@ const { captured, mockState } = vi.hoisted(() => ({
             randomizeSeed: true,
         },
         playback: {
-            rampBpmTarget: 0,
             bpm: 100,
             palette: 'after-hours',
             mode: 'auto',
