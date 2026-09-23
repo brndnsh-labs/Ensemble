@@ -35,7 +35,6 @@ function countText(length: Readonly<ScoreDuration>, unit: number): string {
  * than saving a chart that will not play.
  */
 export function withSongMeter(source: SemanticScore, meter: string): SongMeterResult {
-    const target = scoreMeter(meter);
     if (source.meter === meter) {
         return { kind: 'ok', score: source };
     }
@@ -45,56 +44,102 @@ export function withSongMeter(source: SemanticScore, meter: string): SongMeterRe
     // (3+3+2 in 8/8) is not a statement about the new one.
     score.grouping = null;
     for (const [sectionIndex, section] of score.sections.entries()) {
-        let before = resolveScoreContext(source, source.sections[sectionIndex]);
         // A grouping written WITHOUT a meter divides the meter it inherited. Where that is the
         // one being replaced it goes the way the song's own did — the codec refuses a grouping
         // that does not add up to its bar, so keeping it would refuse the whole change.
         if (section.meter === undefined) {
             delete section.grouping;
         }
-        let after = resolveScoreContext(score, section);
-        for (const [measureIndex, measure] of section.measures.entries()) {
-            before = resolveScoreContext(before, measure);
-            if (
-                measure.meter === undefined &&
-                before.meter !== resolveScoreContext(after, measure).meter
-            ) {
-                delete measure.grouping;
-            }
-            after = resolveScoreContext(after, measure);
-            if (measure.content.kind !== 'events' || before.meter === after.meter) {
-                continue;
-            }
-            const length = scoreMeter(after.meter).length;
-            const events = measure.content.events;
-            const total = events.reduce<ScoreDuration>(
-                (sum, event) => addScoreDurations(sum, event.duration),
-                scoreDuration(0),
-            );
-            // 6/8 ↔ 3/4: the written lengths already fill the new bar exactly.
-            if (same(total, length)) {
-                continue;
-            }
-            const label = `${section.label} · bar ${measureIndex + 1}`;
-            if (!events.every((event) => same(event.duration, events[0].duration))) {
-                return {
-                    kind: 'blocked',
-                    measureId: measure.id,
-                    message: `${label}: its chord lengths add up to ${countText(total, target.unit)}, and a ${meter} bar holds ${target.counts}. Set this bar's lengths for ${meter} (or give it its own meter) and try again. Nothing was changed.`,
-                };
-            }
-            const share = scoreDuration(length[0], length[1] * events.length);
-            if (durationToSteps(share) === null) {
-                return {
-                    kind: 'blocked',
-                    measureId: measure.id,
-                    message: `${label}: ${events.length} equal chords fall between playback steps in ${meter}. Set this bar's lengths first and try again. Nothing was changed.`,
-                };
-            }
-            measure.content.events = events.map(
-                (event): ScoreEvent => ({ ...event, duration: [...share] }),
-            );
+        const blocked = refitSection(source, score, sectionIndex);
+        if (blocked) {
+            return blocked;
         }
     }
     return { kind: 'ok', score };
+}
+
+/**
+ * One section's own meter (#1374): `meter` writes the section's override, `null` returns it to
+ * the song's. The section's grouping goes either way — it divided the meter being replaced — and
+ * its bars are re-fit by exactly `withSongMeter`'s rule: bars that wrote their own meter keep it,
+ * equal lengths re-divide, exact fills stay, anything else blocks. Never rounds.
+ */
+export function withSectionMeter(
+    source: SemanticScore,
+    sectionId: string,
+    meter: string | null,
+): SongMeterResult {
+    const sectionIndex = source.sections.findIndex((s) => s.id === sectionId);
+    const current = source.sections[sectionIndex];
+    if (!current || (current.meter ?? null) === meter) {
+        return { kind: 'ok', score: source };
+    }
+    const score = structuredClone(source);
+    const section = score.sections[sectionIndex];
+    if (meter === null) {
+        delete section.meter;
+    } else {
+        section.meter = meter;
+    }
+    delete section.grouping;
+    return refitSection(source, score, sectionIndex) ?? { kind: 'ok', score };
+}
+
+/**
+ * Re-fits, in place, every bar of `score.sections[sectionIndex]` whose effective meter differs
+ * from the same bar in `source`. Returns the first bar that cannot follow, or nothing.
+ */
+function refitSection(
+    source: SemanticScore,
+    score: SemanticScore,
+    sectionIndex: number,
+): Extract<SongMeterResult, { kind: 'blocked' }> | undefined {
+    const section = score.sections[sectionIndex];
+    let before = resolveScoreContext(source, source.sections[sectionIndex]);
+    let after = resolveScoreContext(score, section);
+    for (const [measureIndex, measure] of section.measures.entries()) {
+        before = resolveScoreContext(before, measure);
+        if (
+            measure.meter === undefined &&
+            before.meter !== resolveScoreContext(after, measure).meter
+        ) {
+            delete measure.grouping;
+        }
+        after = resolveScoreContext(after, measure);
+        if (measure.content.kind !== 'events' || before.meter === after.meter) {
+            continue;
+        }
+        const meter = after.meter;
+        const target = scoreMeter(meter);
+        const length = target.length;
+        const events = measure.content.events;
+        const total = events.reduce<ScoreDuration>(
+            (sum, event) => addScoreDurations(sum, event.duration),
+            scoreDuration(0),
+        );
+        // 6/8 ↔ 3/4: the written lengths already fill the new bar exactly.
+        if (same(total, length)) {
+            continue;
+        }
+        const label = `${section.label} · bar ${measureIndex + 1}`;
+        if (!events.every((event) => same(event.duration, events[0].duration))) {
+            return {
+                kind: 'blocked',
+                measureId: measure.id,
+                message: `${label}: its chord lengths add up to ${countText(total, target.unit)}, and a ${meter} bar holds ${target.counts}. Set this bar's lengths for ${meter} (or give it its own meter) and try again. Nothing was changed.`,
+            };
+        }
+        const share = scoreDuration(length[0], length[1] * events.length);
+        if (durationToSteps(share) === null) {
+            return {
+                kind: 'blocked',
+                measureId: measure.id,
+                message: `${label}: ${events.length} equal chords fall between playback steps in ${meter}. Set this bar's lengths first and try again. Nothing was changed.`,
+            };
+        }
+        measure.content.events = events.map(
+            (event): ScoreEvent => ({ ...event, duration: [...share] }),
+        );
+    }
+    return undefined;
 }
