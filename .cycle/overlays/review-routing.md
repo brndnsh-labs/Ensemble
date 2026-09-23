@@ -9,10 +9,10 @@
    | :- | :- | :- |
    | Generative engines — `public/engine/{bass-engine,soloist-*,accompaniment,chords-engine,harmonies,arc,fills}.ts`, `public/engine/grooves/**`, `coordination-engine.ts` — or `tests/standards/**` | **`music-theory-reviewer`** | Whether the musical intent is actually *expressed* by the code. Catches "programmer's math": statistically clean, musically wrong. |
    | `public/engine/synth-*.ts`, `engine.ts` `initAudio()`, `reverb.ts`, `synth-utils.ts`, the audio-graph wiring in `scheduler-core.ts` | **`synth-graph-reviewer`** | Web Audio graph hygiene only — NaN/0 into an `AudioParam`, nodes created but never disconnected, `exponentialRamp` from/to zero, feedback stability, per-note allocation in a hot path. **Not** "does it sound good" — that's the `status:needs-ear` gate. |
-   | `public/state/**`, a new `ACTIONS.*`, a new `// @direct-mutation` marker, or any `signal.x = y` outside a reducer | **`state-discipline-reviewer`** | Dispatch discipline; `@direct-mutation` used outside the four sanctioned categories in CLAUDE.md; non-atomic dispatch chains; reactivity lost in a `useEnsembleState` selector. |
+   | `public/state/**`, `prototypes/v2/lib/runtime.ts`, a new `ACTIONS.*`, a new `// @direct-mutation` marker, or any `signal.x = y` outside a reducer | **`state-discipline-reviewer`** | Dispatch discipline; `@direct-mutation` used outside the four sanctioned categories in CLAUDE.md; non-atomic dispatch chains; v2 UI reaching engine state outside `lib/runtime.ts`. |
    | `worker-client.ts`, `logic-worker.ts`, `getSyncState()`/`syncWorker()`, `WORKER_SYNC_MANIFEST`, a worker-mirrored slice (`arranger`, `chords`, `bass`, `soloist`, `harmony`, `groove`, `playback`), or a new `WORKER_MSG.*` | **`worker-contract-reviewer`** | The half-update: a field that exists on the main thread but never crosses; that rides the initial snapshot but has no delta case; or that the worker silently drops. |
-   | Any diff whose *claim* is fewer bytes or "dead code removal / no behavior change", whatever the path | **`bundle-hygiene-reviewer`** | Reachable code deleted under a "dead" claim; behavior change disguised as cleanup; tree-shaking defeated. It does **not** measure — `npm run build:size` owns the numbers. |
-   | `public/components/**`, `public/css/**`, `App.tsx` | the **inline pass**, against `public/components/CLAUDE.md` | Overlay/popover a11y, portal containing-block traps, CSS specificity, design tokens. A green `@mobile` Playwright run does **not** cover WebKit touch behavior — that project is Blink. Say when a finding needs `verify-on-device`. |
+   | Any diff whose *claim* is fewer bytes or "dead code removal / no behavior change", whatever the path | **`bundle-hygiene-reviewer`** | Reachable code deleted under a "dead" claim; behavior change disguised as cleanup; tree-shaking defeated. It does **not** measure — the orchestrator measures the v2 export (`prototypes/v2/out/_next/static/`). |
+   | `prototypes/v2/app/**` (UI and CSS) | the **inline pass**, against `prototypes/v2/CLAUDE.md` | The per-surface boundaries in its navigation table (the shell owns the `<dialog>` refs and all state; surfaces are presentational), dialog a11y, CSS. The `webkit-phone` Playwright project is emulated WebKit, not a phone — say when a finding needs `verify-on-device`. |
    | A `tests/standards/**` file that *is* the deliverable | the **test-quality lens**, sharpened to the **five critique smells** below | — |
    | Anything else | the inline correctness pass alone | — |
 
@@ -35,12 +35,12 @@
    that directory — **read them rather than reasoning from memory**, and if a finding contradicts
    one, the file wins:
 
-   - `public/components/CLAUDE.md` — the UI layer: `useModalA11y`'s modal-vs-popover contract,
-     `createPortal` over live chart content, CSS specificity traps, design tokens.
+   - `prototypes/v2/CLAUDE.md` — the app: delivery, trust boundaries, per-surface ownership,
+     verification gates.
    - `public/CLAUDE.md` — worker sync, effects/reactivity, practice-loop step framing,
-     persistence/versioning, dev-only gating.
+     build identity and build-time flags.
    - `public/engine/CLAUDE.md`, `public/engine/grooves/CLAUDE.md` — generative engine internals.
-   - `tests/CLAUDE.md` — critique-harness shape, determinism/seeding, mocking, e2e.
+   - `tests/CLAUDE.md` — critique-harness shape, determinism/seeding, mocking, Playwright imports.
 
    ### Weighing a finding from these reviewers
 

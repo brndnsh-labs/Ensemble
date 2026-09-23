@@ -1,4 +1,4 @@
-<!-- cycle:rendered template=DOCTRINE.md.tmpl hash=4c226553da65 — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=DOCTRINE.md.tmpl hash=cd0cf4306100 — managed by the-cycle; edit the template, not this file -->
 # Pipeline doctrine (shared)
 
 Single source of truth for the rules the Ensemble work-loop skills share. A skill that says
@@ -110,8 +110,8 @@ of Done and the reviewer set:
 | --- | --- | --- | --- |
 | **musical** | a critique test in `tests/standards/` (statistical ranges, an automated oracle) | `music-theory-reviewer` | auto-merge on green; audible-but-theory-provable work ships `verify-by-ear` (§5); only genuinely-subjective feel is a `status:needs-ear` hard stop |
 | **synth** | a human listen on the deployed test build — `/done` deploys the branch to test and runs the verdict check-in right there, no automated oracle | `synth-graph-reviewer` (graph hygiene only, not "does it sound good") | **always `status:needs-ear`** at the merge gate — "Works" merges immediately, "Haven't checked" parks it |
-| **bundle** | a measured KB delta (`npm run build`/size check) **and** the full suite green (behavior-preserving) | `bundle-hygiene-reviewer` | auto-merge on green |
-| **ui** | e2e smoke + `npm run typecheck` green, no new generative behavior/synth voice/bundle-shrink claim | `state-discipline-reviewer` if it touches state, else `/code-review` | auto-merge on green; pair with `verify-by-ear` if it routes audible voices (routing an already-approved voice isn't itself a synth hard stop) |
+| **bundle** | a measured KB delta (the v2 export, `prototypes/v2/out/_next/static/`) **and** the full suite green (behavior-preserving) | `bundle-hygiene-reviewer` | auto-merge on green |
+| **ui** | the v2 suite + `npm run typecheck` green, no new generative behavior/synth voice/bundle-shrink claim | `state-discipline-reviewer` if it touches state, else `/code-review` | auto-merge on green; pair with `verify-by-ear` if it routes audible voices (routing an already-approved voice isn't itself a synth hard stop) |
 
 **Executors** (`agent/*`, sanity-checked against what the issue touches):
 - `musical-engine-implementer` — generative engine behavior (`public/engine/**`,
@@ -147,21 +147,21 @@ gates **yourself** before trusting it — a spawned "all green" has failed in a 
 Local, before handing to `/review` or `/done` (never proceed over a red gate):
 
 ```
-npm run typecheck     # tsc over public/**/*.{ts,tsx}
+npm run typecheck     # tsc over public/ and scripts/ (npm run typecheck:tests covers tests/)
 npm run lint          # Biome lint + format check
 npm test              # mutation check + Biome + docs lint + Vitest (node/happy-dom)
 npm run test:browser  # Vitest browser-mode audio guards (real OfflineAudioContext, headless Chromium)
-npm run test:e2e      # Playwright vs a `vite preview` build (Desktop Chrome, Mobile Chrome, Mobile Safari)
+npm run build --prefix prototypes/v2 && npm run test:e2e --prefix prototypes/v2   # the app's Playwright suite (laptop + webkit-phone) against the built export
 ```
 
-`npm test`, `npm run test:browser`, `npm run test:e2e` are three separate runners
-(node · browser-audio · e2e); `npm run ci` covers only the first. `npm run validate`
-(typecheck + knip + jscpd + format + `npm test`) is the full sweep — run it before a
-`/done` that touches more than one file. CI runs `npm test` + `npm run test:e2e` in
-parallel; both must be green to merge.
+`npm test`, `npm run test:browser` and the v2 suite (`npm run test:e2e --prefix
+prototypes/v2`) are three separate runners (node · browser-audio · the app's Playwright);
+`npm run ci` covers only the first. `npm run validate` (format + jscpd + `npm run ci`:
+typecheck, typecheck:tests, knip, `npm test`) is the full sweep — run it before a `/done`
+that touches more than one file. CI runs `checks`, `e2e-tests` (browser-mode audio guards +
+`test:sync`) and `v2-checks` in parallel; all three must be green to merge.
 
-**Two CI gates `validate` does NOT cover — run them locally before `/done`:**
-- `npm run typecheck:tests` — the root typecheck skips `tests/`; CI's `checks` job does not.
+**The CI gate `validate` does NOT cover — run it locally before `/done`:**
 - **The v2 suite, for any diff under `public/`** (not just `prototypes/v2/`): the v2 export
   compiles `public/` and its checks drive the shared controllers, codecs and engine, and
   `v2-checks` is a required context. `npm run build --prefix prototypes/v2` then
@@ -182,9 +182,9 @@ exits 127 on every one — "never ran", which a piped `tail` reports as a pass.
 **Repo-specific gotchas the gates enforce:**
 - A new `public/engine/*.ts` file must be registered in `AI_MAP.md` or the pre-commit
   docs-lint hook blocks the commit — add the row during `/done` staging.
-- `// @direct-mutation` is only sanctioned in the three categories in `CLAUDE.md`
-  (real-time hot paths, init-only, pre-mount). Everywhere else routes through
-  `dispatch` — `state-discipline-reviewer` enforces it.
+- `// @direct-mutation` is only sanctioned in the four categories in `CLAUDE.md`
+  (real-time hot paths, init-only, pre-mount, detached render clone). Everywhere else
+  routes through `dispatch` — `state-discipline-reviewer` enforces it.
 
 ## §5 Judgment calls & autonomy
 
@@ -253,11 +253,11 @@ emits a **verification receipt** instead of a separate narrative report:
 **Files:** <changed files, exhaustive>
 **Diff fingerprint:** <first 12 hex chars of sha256(`git diff -- <files>`)>
 **Gates:**
-- `npm run typecheck     # tsc over public/**/*.{ts,tsx}` — <PASS/FAIL>
+- `npm run typecheck     # tsc over public/ and scripts/ (npm run typecheck:tests covers tests/)` — <PASS/FAIL>
 - `npm run lint          # Biome lint + format check` — <PASS/FAIL>
 - `npm test              # mutation check + Biome + docs lint + Vitest (node/happy-dom)` — <PASS/FAIL>
 - `npm run test:browser  # Vitest browser-mode audio guards (real OfflineAudioContext, headless Chromium)` — <PASS/FAIL>
-- `npm run test:e2e      # Playwright vs a `vite preview` build (Desktop Chrome, Mobile Chrome, Mobile Safari)` — <PASS/FAIL>
+- `npm run build --prefix prototypes/v2 && npm run test:e2e --prefix prototypes/v2   # the app's Playwright suite (laptop + webkit-phone) against the built export` — <PASS/FAIL>
 ```
 
 `/review` and `/done` may **consume** that receipt — skipping the reads and re-derivations it
@@ -364,31 +364,34 @@ judgment-call PR stays open. Red or unexplained CI stops delivery. Never weaken 
 bypass a harness denial, or claim an open PR landed. After a confirmed merge, sync and prune.
 Exact mechanics: `.agents/skills/DELIVERY.md`; DOCTRINE remains authoritative.
 
-**Static-file app, CD: `main` IS live.** `vite build` → `rsync --delete dist/` to
-`/var/www/html/` on the box — no app server, no DB, no migrations, no restart; nginx
-serves the new files the instant rsync finishes. `scripts/deploy.sh <test|prod>` owns
-the mechanics for both.
+**Container-image app, CD: `main` IS live.** Both hosts serve the `ensemble-web` image — the
+v2 music stand's static export on unprivileged nginx — beside the `ensemble-api` container,
+on `docker04`. A release is a **tag**, not a file transfer: `release <stack> <web|api>
+sha-<40 hex>` through the forced-command `ensemble-release` account, which rewrites the
+stack's `.env` and waits for the container to be healthy. No migration step beyond the API's
+own, nothing to rsync.
 
-**Prod is continuous.** A push to `main` only happens via a green PR merge (branch-
-protected, required CI contexts `checks` + `e2e-tests`), so the CI `deploy`
-job ships every merge to `ensemble.brndn.zip` automatically — including unattended
-overnight `/burndown`/`/nightly` merges. `/deploy-prod` is now the manual break-glass
-path (CI down, or forcing a known-good build), not the normal route.
+**Prod is continuous.** A push to `main` only happens via a green PR merge (branch-protected,
+required CI contexts `checks` + `e2e-tests` + `v2-checks`), and the CI `deploy` job releases
+every merged commit's tags to `ensemble.brndn.zip` and then `ensembletest.brndn.zip` —
+including unattended overnight `/burndown`/`/nightly` merges. `/deploy-prod` is the manual
+break-glass path (re-run CI on `main`), not the normal route.
 
 **Environments:**
-- **test** (`ensembletest.brndn.zip`) — the pre-merge audition box; deploy a branch here
-  to hear/preview before merging, especially `status:needs-ear` work. Low ceremony, private.
+- **test** (`ensembletest.brndn.zip`) — the pre-merge audition box. `scripts/deploy-test.sh`
+  builds a pushed branch's image in CI (if its tag doesn't exist yet) and releases it there,
+  especially for `status:needs-ear` work. Low ceremony, private. The next merge to `main`
+  puts it back on `main`.
 - **prod** (`ensemble.brndn.zip`) — the public origin; CD on merge, or the gated manual
   `/deploy-prod` break-glass path.
 
-**Verification is free, and it's the whole trick:** `vite.config.ts`'s `computeBuildRev`
-bakes the revision into every asset filename (`index.<REV>.js`), so the live `index.html`
-names the exact build. There is **no stored deploy ref** — the running site is the only
-source of truth; `scripts/deploy.sh` curls it before (to print the real delta) and after
-(to verify the right bundle landed).
+**Verification is free, and it's the whole trick:** every image serves `/build.json`, whose
+`sourceRevision` is the full commit SHA it was built from. There is **no stored deploy ref** —
+the running site is the only source of truth, and both the CI `deploy` job and
+`scripts/deploy-test.sh` curl it after a release.
 
-**Rollback = roll forward:** no DB, no migration, so `git revert` → PR → green → the CI
-deploy job redeploys (or a manual `workflow_dispatch` on `main`, no new commit).
+**Rollback = roll forward:** `git revert` → PR → green → the CI `deploy` job releases it. An
+immediate rollback is the previous tag through the same release command on the box.
 
 ## §7 Tracker mechanics
 

@@ -2,7 +2,7 @@
 name: scout
 description: Discovery-driven finder for Ensemble — fans out read-only agents across security · performance · hygiene · context · a11y lenses, verifies each finding against the real code, dedupes against open issues, and files the worth-keeping candidates as actionable issues. Read-only over code: it FINDS and FILES, it never fixes, branches, or merges. Usage `/scout` (all lenses, tightly capped) or `/scout <lens>` (one focused lens, higher cap).
 ---
-<!-- cycle:rendered template=skills/scout.md.tmpl hash=509286cedd51 — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/scout.md.tmpl hash=56bfd01d541f — managed by the-cycle; edit the template, not this file -->
 
 # /scout — find Ensemble's next work, on demand
 
@@ -45,12 +45,13 @@ Run **all lenses in one capped sweep** by default; pass a lens name for a focuse
 
 ### `a11y` — accessibility
 A music tool used **hands-on-instrument, eyes-on-a-chart** — a11y is core UX, not a checkbox.
-- **Look for:** icon-only controls with no accessible name (the transport play/stop, the instrument
-  mute/solo rail, the 🌈 visualizer button), focus lost after the visualizer overlay / popovers close,
+- **Look for:** icon-only controls with no accessible name (the transport play/stop, the
+  per-instrument mutes), focus lost after a `<dialog>` (sounds panel, song menu, import) closes,
   non-keyboard-operable controls, tab-order ≠ visual order, insufficient contrast, missing
-  `:focus-visible`, motion ignoring `prefers-reduced-motion`, canvas/visualizer with no text
-  alternative, controls (Time/Key/Seed popovers) with no label.
-- **Where:** `public/components/**`, the `ChartSurface` topbar/rail, the visualizer overlay.
+  `:focus-visible`, motion ignoring `prefers-reduced-motion`, form controls (key, meter, tempo,
+  genre) with no label.
+- **Where:** `prototypes/v2/app/**` — the transport bar, chart sheet, edit panel, sounds panel
+  and song menu.
 - **Class 1 — deterministic (the burndown subset):** an unambiguously-right native fix — a missing
   `aria-label` on an icon button, `<span role="button">`→`<button>`, a missing `type="button"`, a
   hand-rolled Enter/Space handler a native element gives free. → **`burndown` + `verify-on-device`**,
@@ -92,8 +93,9 @@ dropout. **The split that decides everything — which side of the audio path is
   design; Model `balanced` for a narrow musical claim with a critique-test oracle.
 - **Off-audio-path + build-measurable** → **`burndown`-eligible**, and this is exactly the **bundle
   Track** — file it `track:bundle`, `lens:bundle-hygiene`. Drop an unused dep, lazy-load a
-  route/overlay, code-split a heavy component, memoize a *verified*-hot render. `npm run build` /
-  the size check **is** the proof and it never touches the audio floor. Pure ones (drop a dep) →
+  route/overlay, code-split a heavy component, memoize a *verified*-hot render. The measured v2
+  export (`prototypes/v2/out/_next/static/`) **is** the proof and it never touches the audio
+  floor. Pure ones (drop a dep) →
   `burndown`; tradeoff ones (a lazy-load adds a loading state) → `status:needs-decision`-with-fix.
 - **Classify:** audio-path → `track:synth`/`musical`, Model `frontier` for synth/worker lifecycle
   or design calls and `balanced` for critique-test-verifiable musical structure, caveat or

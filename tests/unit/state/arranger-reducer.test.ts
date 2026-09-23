@@ -23,25 +23,9 @@ describe('Arranger Reducer', () => {
         expect(arranger.notation).toBe('nns');
     });
 
-    it('should update arrangement sections', () => {
-        const newSections = [
-            { id: '1', label: 'Verse', value: 'I' },
-            { id: '2', label: 'Chorus', value: 'IV' },
-        ];
-        arrangerReducer({ type: ACTIONS.SET_ARRANGEMENT, payload: newSections });
-        expect(arranger.sections).toEqual(newSections);
-    });
-
     it('clears authored grouping whenever an action changes the meter', () => {
         mutableArranger.grouping = [2, 3];
         arrangerReducer({ type: ACTIONS.SET_TIME_SIGNATURE, payload: '7/8' });
-        expect(arranger.grouping).toBeNull();
-
-        mutableArranger.grouping = [2, 2, 3];
-        arrangerReducer({
-            type: ACTIONS.LOAD_TEMPLATE,
-            payload: { sections: [], timeSignature: '5/4' },
-        });
         expect(arranger.grouping).toBeNull();
 
         mutableArranger.grouping = [3, 2];

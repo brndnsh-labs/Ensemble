@@ -4,8 +4,6 @@
         "lib": ["ES2022", "DOM", "DOM.Iterable"],
         "module": "ESNext",
         "moduleResolution": "Bundler",
-        "jsx": "react-jsx",
-        "jsxImportSource": "preact",
         "noEmit": true,
         "strict": true,
         "erasableSyntaxOnly": true,
@@ -15,6 +13,6 @@
             "*": ["./node_modules/*", "./public/*"]
         }
     },
-    "include": ["public/**/*.ts", "public/**/*.tsx", "env.d.ts"],
+    "include": ["public/**/*.ts", "env.d.ts"],
     "exclude": ["node_modules", "dist", "tests", "scripts"]
 }

@@ -19,8 +19,6 @@ import { ACTIONS } from '../types.js';
 import { getStepsPerMeasure } from '../utils.js';
 import { flushWorker, syncWorker } from '../worker-client.js';
 
-export function setInstrumentControllerRefs(_scheduler: any): void {}
-
 export function switchMeasure(idx: number): void {
     const { groove } = getState();
     if (groove.currentMeasure === idx) {

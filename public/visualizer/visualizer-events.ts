@@ -1,23 +1,5 @@
 export type VisualizerTrackId = 'drums' | 'bass' | 'chords' | 'harmony' | 'soloist';
 
-export interface VisualizerTrackMeta {
-    id: VisualizerTrackId;
-    label: string;
-    cssVar: string;
-    fallback: string;
-    legendClass: string;
-    midiMin: number;
-    midiMax: number;
-}
-
-export interface VisualizerLegendSwatch {
-    id: string;
-    label: string;
-    cssVar: string;
-    fallback: string;
-    legendClass: string;
-}
-
 export interface VisualizerNoteEvent {
     type: 'note';
     track: VisualizerTrackId;
@@ -76,97 +58,9 @@ export type VisualizerQueuedEvent =
     | VisualizerStepEvent
     | VisualizerFillEvent;
 
-export const VISUALIZER_TRACK_ORDER = ['drums', 'bass', 'chords', 'harmony', 'soloist'] as const;
-
-export const VISUALIZER_TRACKS: Record<VisualizerTrackId, VisualizerTrackMeta> = Object.freeze({
-    drums: Object.freeze({
-        id: 'drums',
-        label: 'Drums',
-        cssVar: '--groove-color',
-        fallback: '#b8a98a',
-        legendClass: 'swatch-drums',
-        midiMin: 35,
-        midiMax: 59,
-    }),
-    bass: Object.freeze({
-        id: 'bass',
-        label: 'Bass',
-        cssVar: '--success-color',
-        fallback: '#9ab33a',
-        legendClass: 'swatch-bass',
-        midiMin: 23,
-        midiMax: 55,
-    }),
-    chords: Object.freeze({
-        id: 'chords',
-        label: 'Chords',
-        // Chords keep their blue identity — the brass accent is the app's, not
-        // the chords lane's, so this must NOT track --accent-color.
-        cssVar: '--chords-color',
-        fallback: '#4a9fd4',
-        legendClass: 'swatch-chords',
-        midiMin: 48,
-        midiMax: 84,
-    }),
-    harmony: Object.freeze({
-        id: 'harmony',
-        label: 'Harmony',
-        cssVar: '--harmony-color',
-        fallback: '#8b86d6',
-        legendClass: 'swatch-harmony',
-        midiMin: 52,
-        midiMax: 90,
-    }),
-    soloist: Object.freeze({
-        id: 'soloist',
-        label: 'Soloist',
-        cssVar: '--soloist-color',
-        fallback: '#e0568f',
-        legendClass: 'swatch-soloist',
-        midiMin: 60,
-        midiMax: 96,
-    }),
-});
-
-export const VISUALIZER_CHORD_SWATCHES: readonly VisualizerLegendSwatch[] = Object.freeze([
-    Object.freeze({
-        id: 'root',
-        label: 'Root',
-        cssVar: '--chords-color',
-        fallback: '#4a9fd4',
-        legendClass: 'swatch-root',
-    }),
-    Object.freeze({
-        id: 'guide',
-        label: 'Guide',
-        cssVar: '--green',
-        fallback: '#9ab33a',
-        legendClass: 'swatch-third',
-    }),
-    Object.freeze({
-        id: 'fifth',
-        label: 'Fifth',
-        cssVar: '--orange',
-        fallback: '#e07a3c',
-        legendClass: 'swatch-fifth',
-    }),
-    Object.freeze({
-        id: 'color',
-        label: 'Color',
-        cssVar: '--magenta',
-        fallback: '#e0568f',
-        legendClass: 'swatch-seventh',
-    }),
-]);
+const VISUALIZER_TRACK_ORDER = ['drums', 'bass', 'chords', 'harmony', 'soloist'] as const;
 
 const VISUALIZER_TRACK_IDS = new Set<string>(VISUALIZER_TRACK_ORDER);
-
-export function resolveVisualizerTrack(track: unknown): VisualizerTrackId | null {
-    if (!VISUALIZER_TRACK_IDS.has(track as string)) {
-        return null;
-    }
-    return track as VisualizerTrackId;
-}
 
 function assertValidTime(time: number, eventType: string): void {
     if (typeof time !== 'number' || Number.isNaN(time)) {

@@ -35,24 +35,24 @@ releases it: the CI `deploy` job publishes no files at all any more — it relea
   `e2e-tests`. There is no longer a v1 app beside it for it to regress; it is the release.
 - A story touching **`public/**`** is live production code on that same merge — the shared
   songbook codecs, engine hooks and state slices very much included, since the v2 export
-  compiles `public/`, so `v2-checks` must stay green. What is no longer live is v1's own UI
-  shell: nothing serves it, and #1358 deletes it.
+  compiles `public/`, so `v2-checks` must stay green. v1's own UI shell is gone (#1358).
 - **The cutover is a hard cut.** No `/v1/` grace path. v1's browser data is reachable only
   through v2's import (#1274), and an old `?s=` share link opens best-effort (#1279). The plan
   and its decisions are [`docs/design/ensemble-v2-rollout.md`](docs/design/ensemble-v2-rollout.md)
   (DECISION 2026-09-15): API online → document API → accounts in the product → core parity →
   hard cut.
 
-The original application's Preact/component conventions below still apply to `public/`. The
-isolated v2 shell uses its existing React components; do not migrate either UI as a side effect
-of a story. Engine/state/worker safeguards apply to both hosts.
+**One app.** Since #1358 `public/` is not an app: it is the engine/state/songbook library that
+`prototypes/v2` imports through the `@engine/*` alias (`prototypes/v2/next.config.mjs`). The only
+UI is `prototypes/v2/app/` (React, Next static export); don't add UI to `public/`. The
+engine/state/worker rules below are about `public/` and bind every caller of it.
 
 ## Mandatory Checklist (before any change)
 
 1. **State writes** flow through `dispatch(ACTIONS.TYPE, payload)`. Never mutate state objects directly outside reducers (exception: `// @direct-mutation` in performance-critical engine code). A `document`/`preferences`-owned field (`public/songbook/state-ownership.ts`) is written **only** by user intent — a UI dispatch or hydration; a runtime system's modulation of it lives in a paired `runtime-derived` sibling field, composed at read time — see `docs/design/write-ownership.md`.
-2. **UI updates** belong in `public/components/`. Use Preact functional components and `useEnsembleState()` for reactivity.
-3. **Tests:** `npm test` (unit/integration) AND `npm run test:e2e` (Playwright) before concluding.
-4. **Refactors:** grep the whole repo (`public/`, `tests/`, `scripts/`, `docs/`, `.github/`) for usages before renaming or moving anything. Update all imports in the same pass.
+2. **UI updates** belong in `prototypes/v2/app/`. A component never calls `dispatch`/`getState` itself: the engine is reached through `prototypes/v2/lib/runtime.ts`, which is the only v2 file that does.
+3. **Tests:** `npm test` (unit/integration) AND the v2 suite (`npm run build --prefix prototypes/v2`, then `npm run test:e2e --prefix prototypes/v2`) before concluding — for a `public/` change too, since the v2 export compiles it.
+4. **Refactors:** grep the whole repo (`public/`, `prototypes/`, `tests/`, `scripts/`, `docs/`, `.github/`) for usages before renaming or moving anything. Update all imports in the same pass.
 5. **Typecheck** is green at the end of every task (`npm run typecheck`).
 
 ## Strictly npm-based
@@ -62,18 +62,22 @@ of a story. Engine/state/worker safeguards apply to both hosts.
 ## Commands
 
 ```bash
-npm run dev          # Vite dev server on http://localhost:5173 with HMR
-npm run build        # production bundle into dist/ via Vite (mode=test)
-npm run lint         # Biome lint + format check
-npm run format       # Biome write fixes
-npm run lint:docs    # repo-specific docs validation
-npm run typecheck    # tsc over public/**/*.{ts,tsx}
-npm test             # mutation check + Biome + docs lint + Vitest (node/happy-dom)
-npm run test:vitest  # Vitest only — fast targeted iteration, not the full gate
-npm run test:browser # Vitest browser-mode audio guards (real OfflineAudioContext, headless Chromium)
-npm run test:e2e     # run Playwright against a `vite preview` build of the shipped bundle
-npm run validate     # typecheck + knip + jscpd + format + npm test
-npm run depcheck     # circular-import gate (Biome noImportCycles) — RUNTIME cycles only
+npm run lint             # Biome lint + format check
+npm run format           # Biome write fixes
+npm run lint:docs        # repo-specific docs validation
+npm run typecheck        # tsc over public/ and scripts/
+npm run typecheck:tests  # tsc over tests/ (its own CI gate — typecheck skips tests/)
+npm test                 # mutation check + Biome + docs lint + Vitest (node/happy-dom)
+npm run test:vitest      # Vitest only — fast targeted iteration, not the full gate
+npm run test:browser     # Vitest browser-mode audio guards (real OfflineAudioContext, headless Chromium)
+npm run test:sync        # v2 account storage contract in real IndexedDB (Chromium + WebKit)
+npm run validate         # format + jscpd + `npm run ci` (typecheck, typecheck:tests, knip, npm test)
+npm run depcheck         # circular-import gate (Biome noImportCycles) — RUNTIME cycles only
+
+# The app (prototypes/v2), from the repo root:
+npm run dev --prefix prototypes/v2       # Next dev server on http://localhost:3100/v2/
+npm run build --prefix prototypes/v2     # root + v2 typecheck, next build, offline.mjs → prototypes/v2/out
+npm run test:e2e --prefix prototypes/v2  # v2 Playwright suite against the BUILT export (build first)
 ```
 
 `npm run depcheck` is the focused circular-import check (`biome lint --only=suspicious/noImportCycles`). The same configured rule runs as part of `npm run lint` and therefore `npm test`; CI does not run the focused command a second time. It catches **runtime cycles only** — `import type` edges are invisible to it, and that is a deliberate 2026-07-24 call (#1234), not an oversight. A type-only cycle erases at compile time and cannot cause the load-order bug this gate exists to prevent. (Verified by mutation test in #1191: a planted runtime cycle exits 1 with 3 diagnostics; a planted type-only cycle exits 0, uncaught.) Biome has no config surface to include type edges, and every TS-aware alternative (madge, dpdm, skott, dependency-cruiser) routes through the TypeScript compiler API and hits the TS7 wall. Don't assume type cycles are covered; don't hand-roll a resolver to catch them.
@@ -81,18 +85,19 @@ npm run depcheck     # circular-import gate (Biome noImportCycles) — RUNTIME c
 Targeted tests:
 
 ```bash
-npm run test:vitest -- visualizer                   # Vitest filename/name filter
+npm run test:vitest -- worker-client                # Vitest filename/name filter
 npm run test:vitest -- standards/                   # critique-only Vitest files
 npm run test:vitest -- tests/standards/funk-bass-critique.test.ts
 npx vitest run tests/unit/engine/worker-client.test.ts -t "specific test name"
 
-npx playwright test tests/e2e/chart-surface.spec.ts
-npx playwright test tests/e2e/arranger-mobile.spec.ts --project="Mobile Chrome"
-npx playwright test -g "@ipad" --project="Mobile Safari"
-npx playwright test -g "@mobile"
+# v2 Playwright — from prototypes/v2, after a build; projects are `laptop` and `webkit-phone`
+(cd prototypes/v2 && npx playwright test checks/semantic-playback.spec.ts --project=laptop)
 ```
 
-Local-dev note: `npm run dev` runs Vite's dev server with HMR on port 5173. The build pipeline lives in `vite.config.ts`; deploy scripts are thin wrappers around `vite build` + `rsync`.
+Local-dev note: the v2 dev server serves the default `/v2` base (`ENSEMBLE_V2_BASE` unset;
+production builds at `/`). Offline install and sound-pack downloads only work against the built
+export, served by `node scripts/serve.mjs` in `prototypes/v2/` — see `prototypes/v2/README.md`.
+There is no local deploy script: a merge to `main` is the release (see above).
 
 Agent-environment note: hosted agent sessions are headless unless audio/display access has been
 explicitly verified. Never claim a by-ear check from local execution. For an audible review, use
@@ -101,17 +106,17 @@ deterministic evidence, not a substitute for the `Needs-ear` gate.
 
 ## Architecture
 
-Ensemble is a browser-based "virtual band" PWA: a Preact UI, deep-signal state slices, a real-time logic worker for generative note creation, and a separate OffscreenCanvas worker for visuals.
+Ensemble is a browser-based "virtual band" PWA. One app, two layers: the music stand in `prototypes/v2/` (React, Next static export — the only UI) and the library it compiles from `public/` — deep-signal state slices, a real-time logic worker for generative note creation, the Web Audio engine, and the songbook codecs.
 
-### Bootstrap (`public/main.ts`)
+### Runtime bootstrap (`prototypes/v2/lib/runtime.ts`)
 
-Orchestration entrypoint. Hydrates persisted/URL state **before** mounting the Preact tree, then initializes the logic worker and subscribes state changes so `syncWorker()` and `handleEffects()` run on every dispatch. Hydration-before-mount order is intentional.
+One runtime per page, independent of React mounts. `initialize()` starts the logic worker (`initWorker`), loads the default drum preset, subscribes to dispatches so `syncWorker(action.type, payload)` and `handleEffects()` run on every one, then `rebuild()`s: `validateProgression` → `analyzeFormUI` → a full `syncWorker()` → `flushBuffers()`. The React shell (`prototypes/v2/app/ensemble.tsx`) owns documents and hands the runtime authored content; it never writes engine state. v1's `hydrateState()` is not part of this path — v2 opens charts from its own songbook, and `public/state/persistence.ts` is swapped for a no-op at compile time (the `NormalModuleReplacementPlugin` in `prototypes/v2/next.config.mjs` → `lib/legacy-persistence.ts`).
 
-### State (`public/state/`, `public/ui-bridge.ts`, `public/state/state-effects.ts`)
+### State (`public/state.ts`, `public/state/`)
 
 - Domain slices: `playback`, `arranger`, `groove`, `chords`, `bass`, `soloist`, `harmony`, `midi`, `vizState`, `conductor` — each a `deepSignal`.
 - **All writes go through `dispatch(ACTIONS.TYPE, payload)`.** Never mutate state directly in components or controllers.
-- `useEnsembleState()` in `public/ui-bridge.ts` — reading a property inside the selector establishes reactivity.
+- Hosts read with `getState()` and listen with `subscribe()` (`public/state.ts`). In v2 only `lib/runtime.ts` does either; React state lives in the shell, not in the slices.
 - `public/state/state-effects.ts` owns cross-module side effects kept deliberately outside reducers.
 - **Write-ownership invariant** (`docs/design/write-ownership.md`): a `document`- or `preferences`-owned field (per `public/songbook/state-ownership.ts`'s `STATE_OWNERSHIP_MANIFEST`, which governs persistence) is written only by user intent, never by a runtime system (conductor, trade block, worker). Runtime modulation of one lands on a paired `runtime-derived` sibling field (e.g. `playback.conductorVelocity`, `soloist.tradeSilenced`) and is composed at the read site. This is the ownership-domain analogue of `docs/design/timing-model.md`'s one-authority-per-domain law for timing.
 #### `@direct-mutation` policy
@@ -120,7 +125,7 @@ Orchestration entrypoint. Hydrates persisted/URL state **before** mounting the P
 
 - **Sanctioned (real-time hot paths):** `public/engine/scheduler-core.ts` and the `synth-*.ts` family — direct audio param writes for scheduling and synthesis. Also `public/controllers/app-controller.ts`'s BPM reschedule (`nextNoteTime`/`unswungNextNoteTime`) and `public/controllers/instrument-controller.ts`'s `flushBuffer()` voice-continuity writes, which are the same real-time class outside the engine dir.
 - **Sanctioned exception (init-only):** `public/engine/engine.ts` `initAudio()`, `public/engine/audio-recovery.ts` — one-shot audio-graph setup that runs before any dispatch subscriber exists.
-- **Sanctioned exception (pre-mount only):** `public/state/state-hydration.ts` — runs before Preact mounts, so no reactive listeners are attached yet.
+- **Sanctioned exception (pre-mount only):** `public/state/state-hydration.ts`'s `hydrateState`/`loadFromUrl` — written to run before any reactive listener is attached. Since #1358 no app code calls them (v2 opens charts from its own songbook and imports only this file's validators), so extend them only with a live caller in hand.
 - **Sanctioned exception (detached render clone):** `public/export/audio-export.ts`'s `cloneStateForRender` output and `scripts/mix-report.ts`'s inline clone. These write a throwaway copy of the state tree for an offline render — dispatching would write the *live* slices and corrupt the running app mid-export. `public/engine/chords-engine.ts`'s `validateProgression` belongs here too: it writes `arranger.progression` on **its passed-in `state`**, which is the live tree on the main path and a detached clone on the export path, so a dispatch there would silently corrupt live state during an offline stem render.
 - **Everything else routes through reducers.** Any site not in the four categories above must dispatch.
 
@@ -135,26 +140,21 @@ Enforced by `npm run check-mutations` over `public/**/*.{ts,tsx}` — it catches
 - `public/midi-export-worker.ts` — owns one detached MIDI export in a fresh module-worker realm.
 - `public/engine/scheduler-core.ts` — real-time scheduler consuming worker buffers; timing is based on `playback.audio.currentTime`, not UI clocks.
 - Musical engines: `soloist-phrase-first.ts`, `bass-engine.ts`, `accompaniment.ts`, `chords-engine.ts`, `harmonies.ts`, `grooves/` (13 genre strategies).
+- `public/render-bridge.ts` — `installRenderBridge()` puts engine internals on `window.ensemble` for the listening-gate tools (`scripts/mix-report.ts` and the `mix:ab`/`mix:verify`/`plant-defects` scripts built on it). The v2 runtime installs it only in a build made with `NEXT_PUBLIC_RENDER_BRIDGE=1`, which `mix:report` makes for itself; a production build compiles it out.
 
-### Visualizer Pipeline (separate OffscreenCanvas worker)
+There is no visualizer any more. `vizState` and `public/visualizer/visualizer-events.ts` survive only because `scheduler-core.ts` queues note events through them, which `mix:report`'s event capture reads (it enables `vizState` in its render clone).
 
-- `public/visualizer/visualizer-proxy.ts` — main-thread wrapper.
-- `public/visualizer-worker.ts` — `VisualizerEngine` with `OffscreenCanvas`.
-- Clock sync is message-based; the worker interpolates time locally.
+### UI (`prototypes/v2/app/`)
 
-### UI (`public/components/`, `public/App.tsx`)
-
-Single chart-first surface (`ChartSurface`): the chord chart is always visible, with transport and key/time controls in a topbar, the instrument rail always accessible along one edge, and a 🌈 button that opens a full-screen visualizer overlay. There are no workspace tabs. New UI work should follow this model — controls radiate outward from the chart rather than living in separate navigable views.
-
-**Reserved surfaces:** the **section-label tap** and a **one-line sticky slot at the chart's edge** are earmarked for the banked #937 conductor lens (was Forgejo #1019; "lead, don't play" — see the #937 issue thread). Don't spend them on ad-hoc affordances, and don't further overload the section headers; new section-header gestures must be designed against that banked contract (mode-owned tap, queued-pill horizon), not added piecemeal.
+The music stand: songbook home, chart sheet, transport, edit panel and sounds panel. Ownership and boundaries per surface are in `prototypes/v2/CLAUDE.md`'s navigation table — read it before a UI story.
 
 ### Data / Config split
 
 - UI metadata (menus, categories): `public/data/instrument-styles.ts`
 - Generative behavior: `public/engine/bass-styles.ts`, `public/engine/chords-styles.ts`, `public/engine/grooves/`
-- `public/styles.css` is an import manifest only — put feature CSS in `public/css/`.
+- Styles live beside the components in `prototypes/v2/app/` (`style.css` plus per-surface `.css` files). `public/` holds no CSS.
 
-**Layering (documented, deliberately not gated).** UI components should reach the engine through data/config modules and state, not by importing generative engine internals; engine modules should receive state via parameters or specific slices rather than importing the global state manager. Both were once `dependency-cruiser` rules, but at `severity: 'warn'` they never failed a build, and a 2026-07-24 measurement found only 8 sites — 7 of which are legitimate registry/policy lookups that merely live under `engine/` (`instrument-registry`, `soloist-mode-policy`, `pack-runtime`, `sample-voice`, `arc`, `note-spelling`) plus `scheduler-core.ts`'s sanctioned real-time state import. Enforcing the rule as written would flag mostly-correct code, so it stays prose (#1232). **If you ever want a real gate, narrow "engine" to generative modules first** — that redefinition is the actual work, not the checker.
+**Layering (documented, deliberately not gated).** The UI should reach the engine through `prototypes/v2/lib/runtime.ts`, data/config modules and state, not by importing generative engine internals; engine modules should receive state via parameters or specific slices rather than importing the global state manager. Both were once `dependency-cruiser` rules, but at `severity: 'warn'` they never failed a build, and a 2026-07-24 measurement found only 8 sites — 7 of which are legitimate registry/policy lookups that merely live under `engine/` (`instrument-registry`, `soloist-mode-policy`, `pack-runtime`, `sample-voice`, `arc`, `note-spelling`) plus `scheduler-core.ts`'s sanctioned real-time state import. Enforcing the rule as written would flag mostly-correct code, so it stays prose (#1232). **If you ever want a real gate, narrow "engine" to generative modules first** — that redefinition is the actual work, not the checker.
 
 ## Musical Logic & Generative Standards
 
@@ -187,10 +187,10 @@ Source of truth: `public/engine/coordination-engine.ts`. Always pass `Coordinati
 
 ### Naming / Canonicalization
 
-- **Supported-genre canon (the 13):** `Rock`, `Jazz`, `Funk`, `Disco`, `Hip Hop`, `Blues`, `Neo-Soul`, `Reggae`, `Acoustic`, `Bossa`, `Country`, `Metal`, `Ska-Punk`. This is the matrix's column axis and the **exact set the UI exposes** — the genre picker (`InstrumentRail.tsx`) and Surprise Me render straight over `GENRE_NAMES` (= `Object.keys(GENRE_OVERRIDES)` in `public/data/smart-genres.ts`), so there's no config-vs-UI drift. Pinned by `tests/standards/genre-canon-guard.test.ts`. **Don't add a 14th genre or resurrect a retired one without updating the canon + that guard.** The phantom routing keys (`Shred`, `Latin`, `Afrobeat`, `Soul`) that once lingered in engine routing maps have all been retired (verified 2026-07-23); `tests/standards/genre-feel-canon-guard.test.ts` keeps them out. Don't reintroduce them. Note `Minimal` is a live **drum-preset** name (`public/data/drum-presets.ts`), not a genre key — the two namespaces are different.
+- **Supported-genre canon (the 13):** `Rock`, `Jazz`, `Funk`, `Disco`, `Hip Hop`, `Blues`, `Neo-Soul`, `Reggae`, `Acoustic`, `Bossa`, `Country`, `Metal`, `Ska-Punk`. This is the matrix's column axis and the **exact set the UI exposes** — the genre picker (`prototypes/v2/app/transport-bar.tsx`, via `lib/runtime.ts`'s re-export) renders straight over `GENRE_NAMES` (= `Object.keys(GENRE_OVERRIDES)` in `public/data/smart-genres.ts`), so there's no config-vs-UI drift. Pinned by `tests/standards/genre-canon-guard.test.ts`. **Don't add a 14th genre or resurrect a retired one without updating the canon + that guard.** The phantom routing keys (`Shred`, `Latin`, `Afrobeat`, `Soul`) that once lingered in engine routing maps have all been retired (verified 2026-07-23); `tests/standards/genre-feel-canon-guard.test.ts` keeps them out. Don't reintroduce them. Note `Minimal` is a live **drum-preset** name (`public/data/drum-presets.ts`), not a genre key — the two namespaces are different.
 - One canonical internal name per concept. UI labels can be friendlier, but state keys, config keys, persisted payloads, and code paths normalize to the canonical form.
 - Aliases live near the data/config that owns the concept — don't scatter alias checks across components, tests, docs, and controllers.
-- Before any rename: grep the entire repo (`public/`, `tests/`, `scripts/`, `docs/`, `.github/`) for every usage. Update code, tests, persistence, sharing, docs, and allowlists in the same pass.
+- Before any rename: grep the entire repo (`public/`, `prototypes/`, `tests/`, `scripts/`, `docs/`, `.github/`) for every usage. Update code, tests, persistence, sharing, docs, and allowlists in the same pass.
 - Preserve compatibility shims when a rename touches saved sessions, share URLs, or presets.
 - Split labels from logic: display labels in UI/data layer, behavior keys in engine/config layer. A pretty label should not silently become a runtime enum unless that is the intended canonical key.
 - Known alias family: `Neo-Soul`/`Neo` — the live pairing, in `GENRE_OVERRIDES` (`public/data/smart-genres.ts`). Add new aliases to that same map instead of creating one-off fixes. **`Rock`/`Shred` is NOT a live alias** — `Shred` is a retired phantom key (see the canon bullet above) with no alias map anywhere in `public/`; don't resurrect the pairing.
@@ -209,15 +209,13 @@ The **Definition of Done** for musicality. When you modify a musical engine (bas
 
 `describe`, `it`, `expect` are global. Use `vi.mock()` to isolate dependencies (especially global state or browser APIs). If you intentionally change musical behavior, update test expectations — do not leave tests failing.
 
-### Playwright (e2e)
+### Playwright (e2e) — the v2 suite
 
-Functional smoke tests only — no pixel snapshots. Three projects: **Desktop Chrome**, **Mobile Chrome** (`@mobile`, 390×844), **Mobile Safari** (`@ipad`). Use `@mobile`/`@ipad` tags to scope tests. `data-e2e-mode="true"` is injected to disable heavy animations. Prefer `data-testid="unique-id"` selectors over volatile CSS classes.
-
-The suite runs against a **`vite preview` build** of the shipped bundle (built with `VITE_E2E_BRIDGE=1` so the `window.ensemble` test bridge survives tree-shaking — see `public/main.ts`), **not** the dev server — so it exercises the minified, `DEV === false` artifact we actually deploy, and there is no on-demand compile to flake on.
+The only Playwright suite is the app's: `prototypes/v2/checks/`, config in `prototypes/v2/playwright.config.ts`, run by the required `v2-checks` CI context. Two projects: **`laptop`** (Desktop Chrome) and **`webkit-phone`** (iPhone 13, WebKit); `*.chromium.spec.ts` specs (passkeys via a CDP virtual authenticator) are Chromium-only. It runs against the **built static export** (`checks/fixtures.ts` starts a preview server per worker), not the dev server — build first, or it tests a stale export. Functional checks, no pixel snapshots. `prototypes/v2/CLAUDE.md` § Verification has the full gate list.
 
 ### Vitest browser mode (`tests/browser/`)
 
-The few engine tests that need a **real `OfflineAudioContext`** (reverb-tail decay, harmony click-free) run here — headless Chromium via `@vitest/browser-playwright`, config in `vitest.browser.config.ts`, command `npm run test:browser`. Node-mode `npm test` (happy-dom) has no Web Audio, so these can't live there. Not folded into `npm run ci` (the `checks` job installs no browser); the CI **e2e** job runs them.
+The few engine tests that need a **real `OfflineAudioContext`** (reverb-tail decay, harmony click-free) run here — headless Chromium via `@vitest/browser-playwright`, config in `vitest.browser.config.ts`, command `npm run test:browser`. Node-mode `npm test` (happy-dom) has no Web Audio, so these can't live there. Not folded into `npm run ci` (the `checks` job installs no browser); the CI `e2e-tests` job runs them, with `npm run test:sync`.
 
 ### Biome
 
@@ -233,7 +231,7 @@ Scheduled work is tracked in **GitHub issues** on `brndnsh-labs/Ensemble` (publi
 
 **Issue numbers `#N` are continuous up to #935.** Ensemble started on GitHub, moved to Forgejo in 2026-07 — where the counter *continued* rather than restarting — and came back on 2026-08-04 via a repo transfer that kept all 224 issues and 710 PRs at their original numbers. So a bare `#N` in an old commit or doc resolves correctly for **N ≤ 935**. Only the Forgejo-only window (#936–#1355) is renumbered; that map lives in homelab-maintenance `migration-maps/Ensemble-issue-map.tsv`. Only the **8 issues still open** at migration carried over to GitHub — those are the map's rows. Everything **closed** in that window stayed behind, readable in the read-only archive repo `git.brndn.zip/brandon/Ensemble-archive` (private + archived; `brandon/Ensemble` itself is now a pull mirror with its issue tracker disabled, so look in `-archive`, not there). So an unmapped `#N` in 936–1355 is archive provenance, not a live GitHub link.
 
-**Autonomy posture (DOCTRINE §5/§6):** the pipeline runs **full-auto** — well-specified, gate-verifiable, non-destructive stories build → branch → PR → **auto-merge to `main`** (CI-gated, via `gh pr merge --auto --squash` — GitHub holds the merge until the required `checks` + `e2e-tests` contexts pass; no client-side polling) without a per-step nod. It **stops and surfaces** on a judgment call: a **synth or by-ear** story (the listening gate is a hard human stop → `Needs-ear`), a destructive data op (persisted sessions / share-URL schema / preset data / state migration), a state-or-worker-contract design call, a P0 finding, or a genuinely ambiguous choice. A merge to `main` **is** a prod deploy: `main` is continuously deployed to `ensemble.brndn.zip` by the CI `deploy` job once `checks` + `e2e-tests` pass on the merged commit (DOCTRINE §6). Because `Needs-ear`/synth work is a *pre-merge* stop, nothing un-auditioned ships. Since the cutover (#1357) a deploy is a container-tag release, so the break-glass path is a re-run of that job (`workflow_dispatch` on `main`) and an immediate rollback is the previous `ensemble-web` tag on the box; `scripts/deploy.sh prod` is **not** it any more — it refuses an origin served by the image. The normal correction is still roll-forward via `git revert` → PR.
+**Autonomy posture (DOCTRINE §5/§6):** the pipeline runs **full-auto** — well-specified, gate-verifiable, non-destructive stories build → branch → PR → **auto-merge to `main`** (CI-gated, via `gh pr merge --auto --squash` — GitHub holds the merge until the required `checks`, `e2e-tests` and `v2-checks` contexts pass; no client-side polling) without a per-step nod. It **stops and surfaces** on a judgment call: a **synth or by-ear** story (the listening gate is a hard human stop → `Needs-ear`), a destructive data op (persisted sessions / share-URL schema / preset data / state migration), a state-or-worker-contract design call, a P0 finding, or a genuinely ambiguous choice. A merge to `main` **is** a prod deploy: `main` is continuously deployed to `ensemble.brndn.zip` by the CI `deploy` job once those three contexts and the two image builds pass on the merged commit (DOCTRINE §6). Because `Needs-ear`/synth work is a *pre-merge* stop, nothing un-auditioned ships. Since the cutover (#1357) a deploy is a container-tag release, so the break-glass path is a re-run of that job (`workflow_dispatch` on `main`) and an immediate rollback is the previous `ensemble-web` tag on the box. The normal correction is still roll-forward via `git revert` → PR.
 
 ## Agent skills
 
@@ -259,10 +257,6 @@ becomes `status:ready` only for deterministic, gate-provable work. See
 Single-context, with no `CONTEXT.md` glossary and no ADR folder. The glossary is *Naming /
 Canonicalization* above, and decisions are dated entries in `docs/design/`. See
 `docs/agents/domain.md`.
-
-## Self-Building Manual
-
-`public/MANUAL.md` combines hand-written guides with auto-generated tables. Placeholders like `{{GENRE_TABLE}}` and `{{BASS_STYLES}}` are populated by `manual-metadata.ts` — adding a new style to config files updates these automatically. If you add a major new feature, add a "Recipe" or "Pro-Tip" to the Markdown guide. Maintain the "Style Gallery" deep links for new signature genres.
 
 ## Misc Conventions
 

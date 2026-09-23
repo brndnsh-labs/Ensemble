@@ -9,17 +9,14 @@ This directory contains the automated tests for the Ensemble application, powere
     *   *Environment:* `happy-dom` (simulates browser APIs like `window`, `document`, `Canvas`).
 *   **`integration/`**: Tests that verify the interaction between multiple modules or the full system lifecycle.
     *   *Examples:* "Song Creation to Playback" flows, Worker synchronization.
-*   **`perf/`**: Performance benchmarks and stress tests.
-    *   *Examples:* Measuring render loop times or high-frequency calculation overhead.
 *   **`standards/`**: Musical validity checks.
     *   *Examples:* Ensuring generated bass lines adhere to genre rules (e.g., Reggae "One Drop") over thousands of measures.
     *   *Critique Tests:* Advanced statistical analysis of musical authenticity (e.g., Jazz Charleston frequency, Soloist melodic smoothness). See [Critique Guidelines](./standards/CRITIQUE_GUIDELINES.md) for details.
-*   **`e2e/`**: Functional Smoke tests powered by [Playwright](https://playwright.dev/).
-    *   *Examples:* Mobile header title visibility, Modal opening/closing, Performance Modal interaction.
-    *   *Decision Matrix:*
-        *   **Use Vitest** for structural logic, component state changes, and accessibility (A11y).
-        *   **Use Playwright** for functional user flows, cross-browser behavior, and verifying that elements are visible and interactive.
-        *   **Note:** We avoid pixel-perfect visual regression (snapshots) to prevent CI flakiness across different OS environments.
+*   **`browser/`**: Vitest browser mode (real Chromium, and WebKit for the sync suite) for what
+    needs a real `OfflineAudioContext` or IndexedDB — `npm run test:browser`, `npm run test:sync`.
+*   **End-to-end UI tests** live with the app: `prototypes/v2/checks/` (Playwright), gated in CI
+    by `v2-checks`. We avoid pixel-perfect visual regression (snapshots) to prevent CI flakiness
+    across different OS environments.
 
 ## Running Tests
 
@@ -28,18 +25,18 @@ This directory contains the automated tests for the Ensemble application, powere
 npm test
 ```
 
-### Run Functional E2E Suite (Playwright)
+### Run the app's end-to-end suite (Playwright)
 ```bash
-# Requires local build (started automatically via npm run build:quiet)
-npm run test:e2e
+npm run build --prefix prototypes/v2
+npm run test:e2e --prefix prototypes/v2
 ```
 
 ### Run Specific Tests
 You can filter by filename or test name using the `--` argument:
 
 ```bash
-# Run only visualizer tests
-npm test -- visualizer
+# Run only worker-client tests
+npm run test:vitest -- worker-client
 
 # Run only standards tests
 npm test -- standards/

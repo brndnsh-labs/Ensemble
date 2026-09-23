@@ -3,6 +3,6 @@
     "compilerOptions": {
         "types": ["node"]
     },
-    "include": ["scripts/**/*.ts", "env.d.ts", "vite.config.ts"],
+    "include": ["scripts/**/*.ts", "env.d.ts"],
     "exclude": ["node_modules", "dist"]
 }

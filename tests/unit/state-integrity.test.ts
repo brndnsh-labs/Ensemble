@@ -31,7 +31,11 @@ function getFiles(dir, files = []) {
     return files;
 }
 
-const allFiles = getFiles(PUBLIC_DIR);
+// The v2 music stand is the only UI host (#1358), so it is where most dispatches live.
+const V2_DIRS = ['app', 'lib'].map((dir) => path.resolve(__dirname, '../../prototypes/v2', dir));
+const allFiles = [PUBLIC_DIR, ...V2_DIRS]
+    .flatMap((dir) => getFiles(dir))
+    .filter((f) => !/\.(test|spec)\.tsx?$/.test(f));
 const fileContents = allFiles.map((f) => ({ path: f, content: fs.readFileSync(f, 'utf8') }));
 
 // "Is this a state slice?" is a CONTENT question, not a directory one: `public/state/`
@@ -94,7 +98,10 @@ describe('State Integrity Audit', () => {
                 'DRUM_PRESET_LOADED',
             ];
 
-            if (!isDispatched && !exceptions.includes(key)) {
+            // #1379 — the tempo ramp lost its only UI with the v1 shell (#1358); the engine
+            // still honours it until that issue ports it to v2 or deletes it.
+            const awaitingDispatcher = ['SET_PRACTICE_RAMP'];
+            if (!isDispatched && !exceptions.includes(key) && !awaitingDispatcher.includes(key)) {
                 unusedInDispatch.push(key);
             }
             if (!isHandled && !exceptions.includes(key)) {

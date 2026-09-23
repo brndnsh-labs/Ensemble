@@ -91,11 +91,11 @@
     "lint": "npm run lint",
     "test": "npm test",
     "commands": [
-      "npm run typecheck     # tsc over public/**/*.{ts,tsx}",
+      "npm run typecheck     # tsc over public/ and scripts/ (npm run typecheck:tests covers tests/)",
       "npm run lint          # Biome lint + format check",
       "npm test              # mutation check + Biome + docs lint + Vitest (node/happy-dom)",
       "npm run test:browser  # Vitest browser-mode audio guards (real OfflineAudioContext, headless Chromium)",
-      "npm run test:e2e      # Playwright vs a `vite preview` build (Desktop Chrome, Mobile Chrome, Mobile Safari)"
+      "npm run build --prefix prototypes/v2 && npm run test:e2e --prefix prototypes/v2   # the app's Playwright suite (laptop + webkit-phone) against the built export"
     ]
   },
   "deps": {
@@ -127,7 +127,11 @@
     "coauthor": "Claude Opus 5 <noreply@anthropic.com>"
   },
   "deploy": {
-    "test": "./scripts/deploy.sh test",
-    "prod": "./scripts/deploy.sh prod"
+    // Since the cutover (#1357) a release is an `ensemble-web` image tag. Test: build the
+    // pushed branch's image in CI if needed and release it to ensembletest (#1358). Prod:
+    // re-run CI on main, whose `deploy` job releases main's tags to prod then test — the
+    // break-glass path when a merge's own deploy did not land.
+    "test": "./scripts/deploy-test.sh",
+    "prod": "gh api -X POST repos/brndnsh-labs/Ensemble/actions/workflows/ci.yml/dispatches -f ref=main"
   }
 }

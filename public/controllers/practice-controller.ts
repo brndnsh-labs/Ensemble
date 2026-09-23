@@ -57,20 +57,6 @@ export function getSectionStepBounds(sectionId: string): SectionStepBounds | nul
 }
 
 /**
- * Start (or restart) playback from the top of `sectionId`, playing through the
- * rest of the form normally — no loop. Clears any active practice loop.
- */
-export function startSectionFromHere(sectionId: string): void {
-    const bounds = getSectionStepBounds(sectionId);
-    if (!bounds) {
-        return;
-    }
-    dispatch(ACTIONS.SET_PRACTICE_LOOP, null);
-    dispatch(ACTIONS.SET_START_STEP, bounds.start);
-    startOrRestart();
-}
-
-/**
  * Arm a section-practice loop on `sectionId`: playback, once started, begins at
  * its first step and folds back at its end until the loop is cleared. Song-mode
  * form progression / ending is suspended for the duration (see the scheduler's
@@ -98,34 +84,4 @@ export function loopSection(sectionId: string): void {
  */
 export function clearPracticeLoop(): void {
     dispatch(ACTIONS.SET_PRACTICE_LOOP, null);
-}
-
-/**
- * Configure the practice tempo ramp (#1021) — the woodshed drill where the
- * looped section starts at `startPct` of your set tempo and climbs `perLoop` BPM
- * each pass back up to it. Pass any subset; the reducer merges and clamps. The
- * goal tempo is captured from the live BPM at play-start (not here); this only
- * arms the ramp and sets the two knobs. Disarmed automatically when the loop is
- * cleared or playback stops.
- */
-export function setPracticeRamp(config: {
-    enabled?: boolean;
-    perLoop?: number;
-    startPct?: number;
-}): void {
-    dispatch(ACTIONS.SET_PRACTICE_RAMP, config);
-}
-
-/**
- * Begin playback if stopped. The section popover that drives these actions is
- * stopped-only (the direction strip collapses during play), so in practice this
- * always starts from a stopped transport — `startPlayback` then seeds `step`
- * from the `startStep` we just dispatched. Guarded so a redundant call while
- * already playing is a no-op rather than a stop.
- */
-function startOrRestart(): void {
-    const { playback } = getState();
-    if (!playback.isPlaying) {
-        dispatch(ACTIONS.TOGGLE_PLAY);
-    }
 }

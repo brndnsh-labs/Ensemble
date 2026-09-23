@@ -389,7 +389,6 @@ describe('Worker Client', () => {
                 'TOGGLE_PLAY',
                 'ARRANGER_UPDATE',
                 'SET_ENDING_PENDING',
-                'SET_SONG_MODE',
             ];
 
             for (const action of actions) {
@@ -411,7 +410,7 @@ describe('Worker Client', () => {
             }
         });
 
-        it('should push isEndingPending and songMode deltas (#993)', () => {
+        it('should push the isEndingPending delta (#993)', () => {
             // The worker reads isEndingPending for ending-anticipation gestures
             // (harmony thickening, drum final-measure flourish) — before #993 these
             // two actions fell through the switch with no delta case, so the
@@ -423,17 +422,6 @@ describe('Worker Client', () => {
                     type: WORKER_MSG.SYNC_STATE,
                     data: expect.objectContaining({
                         playback: { isEndingPending: true },
-                    }),
-                }),
-            );
-
-            mockPostMessage.mockClear();
-            syncWorker('SET_SONG_MODE');
-            expect(mockPostMessage).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    type: WORKER_MSG.SYNC_STATE,
-                    data: expect.objectContaining({
-                        playback: { songMode: false },
                     }),
                 }),
             );

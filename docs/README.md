@@ -19,7 +19,7 @@ This folder groups the living documentation for Ensemble.
 - [`docs/design/ensemble-v2.md`](design/ensemble-v2.md) — approved home, local-first songbook and music-stand direction; isolated preview and later account/import boundaries.
 - [`docs/design/ensemble-v2-charts.md`](design/ensemble-v2-charts.md) — semantic-chart/full iReal compatibility direction, additive codec, live measure editor/conservative import, and remaining compatibility boundaries.
 - [`docs/design/ensemble-v2-sync.md`](design/ensemble-v2-sync.md) — approved recovery direction, implemented account-local outbox, staged cloud/offline acceptance and hosting decisions (#1172).
-- [`hosting/README.md`](../hosting/README.md) — shared test/production static runtime, verified build-once artifacts, atomic publishing and gated hosting transition; separate account API packaging.
+- [`hosting/README.md`](../hosting/README.md) — the shared test/production stack on docker04: the `ensemble-web` and `ensemble-api` images, release-by-tag from CI, the cutover's edge config, and the static runtime kept as v1's rollback until it is cleaned up.
 - [`prototypes/v2/CLAUDE.md`](../prototypes/v2/CLAUDE.md) — cross-provider v2 handoff, delivery rules, test gates and ownership boundaries.
 - [`docs/design/ensemble-v2-next-batch.md`](design/ensemble-v2-next-batch.md) — next bounded cycle batch; approval/filing state is explicit in the document.
 - [`docs/design/ensemble-v2-guided-form.md`](design/ensemble-v2-guided-form.md) — guided repeat/ending authoring, compiler-derived previews and advanced-form preservation (#1176).
@@ -32,7 +32,6 @@ This folder groups the living documentation for Ensemble.
 - [`docs/design/ensemble-v2-auth-threat-model.md`](design/ensemble-v2-auth-threat-model.md) — account authentication controls, residual risks and the outstanding proxy verification gate (#1192).
 - [`docs/design/ensemble-v2-document-authorization-review.md`](design/ensemble-v2-document-authorization-review.md) — stage-3 exit gate (#1204): independent authorization/IDOR review of the owner-bound document API, its exit receipt and residual risks.
 - [`docs/design/ensemble-v2-rollout.md`](design/ensemble-v2-rollout.md) — DECISION 2026-09-15: v2 becomes the site; immutable images on docker04, core-parity bar, hard cut of v1, five phased milestones.
-- [`public/MANUAL.md`](../public/MANUAL.md) — in-app manual.
 - [`tests/README.md`](../tests/README.md) — test-suite conventions.
 - [`docs/agents/`](agents/) — repo config read by the general-purpose engineering skills: [`issue-tracker.md`](agents/issue-tracker.md), [`triage-labels.md`](agents/triage-labels.md) (triage roles mapped onto `status:*`), [`domain.md`](agents/domain.md) (where the glossary and decisions live).
 - [`docs/FLAKY_TESTS.md`](FLAKY_TESTS.md) — registry of known-flaky tests, the four flake classes (unseeded-statistical / ordering-dependent / e2e-timing / slow-legitimate), and their fixes. Diagnose new flakes with the `/flake` skill.

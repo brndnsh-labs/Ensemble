@@ -3,26 +3,6 @@ import type { Mutable, Palette, ThemeMode } from '../types.js';
 import { ACTIONS } from '../types.js';
 import { syncWorker } from '../worker-client.js';
 
-/** Resolve a light/dark preference to a concrete mode. 'auto' follows the OS. */
-export function resolveMode(mode: ThemeMode): 'light' | 'dark' {
-    if (mode === 'auto') {
-        return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    }
-    return mode;
-}
-
-/** Write the resolved palette + light/dark mode to `<html>`. Single source of
- *  truth shared by the pre-mount paint (main.ts) and the reactive App-level
- *  effect (which also wires the prefers-color-scheme listener while
- *  mode === 'auto'). */
-export function applyThemeToDom(palette: Palette, mode: ThemeMode): void {
-    const resolved = resolveMode(mode);
-    const root = document.documentElement;
-    root.setAttribute('data-palette', palette);
-    root.setAttribute('data-mode', resolved);
-    root.style.colorScheme = resolved;
-}
-
 /** Choose the color-palette identity. The App-level resolver picks up the
  *  state change and rewrites `<html data-palette>`. */
 export function setPalette(palette: Palette): void {

@@ -11,10 +11,10 @@ it describes is now live.
 run the `ensemble-web` image — the v2 stand built at `ENSEMBLE_V2_BASE=/` — and a release is a
 tag bump, not a file transfer. The bind-mounted runtime is still installed and still holds its
 last release, which is what makes pointing a host's Caddy handle back at it a one-line audition
-path; it is no longer in the merge path, and `scripts/deploy.sh` and
-`prototypes/v2/scripts/deploy.mjs` both refuse an origin that serves a root `/build.json`, so
-neither can publish over a host on the image by accident. #1358 deletes v1 and that layout with
-it. Read the static sections below as the runtime that is still there, not as the site.
+path. #1358 deleted v1 and every script that published to this layout (`scripts/deploy.sh`,
+`static-artifact.mjs`, `publish-static.sh`, `prototypes/v2/scripts/deploy.mjs`); the containers
+and their last releases stay up only as the Caddy rollback until they are retired. Read the
+static sections below as that frozen runtime, not as the site.
 
 ## One static layout
 
@@ -33,7 +33,7 @@ sees atomic symlink changes instead of Docker pinning one release's inode.
   .ensemble-static-root       provisioning marker: ensemble-static-v1
   .releases/<revision>-<uuid>/ complete, checksum-verified static artifacts
   current -> .releases/...    atomic activation
-  .v2-previews/...            test: v2 audition releases (prototypes/v2/scripts/deploy.mjs test)
+  .v2-previews/...            test: v2 audition releases (from the deleted `deploy.mjs test`)
   .v2-releases/...            prod: v2 releases — last written before the #1357 cutover; CI
                               publishes none of this any more
   v2 -> .v2-{previews,releases}/...  atomic activation of the v2 music stand at /v2/
@@ -148,9 +148,10 @@ HSTS, which is deliberately not set here — it belongs to Caddy and is ignored 
 anyway. `Referrer-Policy` is an addition of this config's own, not an F5 item. No brotli either —
 the base image has no such module and this config does not add one.
 
-CI builds it in two places. `web-image` in `ci.yml` runs on a merge to `main` only, beside
-`api-image`: it builds the root export, pushes `:sha-<commit>` and `:main`, pulls the sha tag
-back and runs the smoke script against it. `v2-root-image` in `v2-root-base.yml` is the PR-time
+CI builds it in two places. `web-image` in `ci.yml` runs on a merge to `main`, beside
+`api-image`, and on a `workflow_dispatch` of any ref (`scripts/deploy-test.sh`'s branch
+audition, #1358): it builds the root export, pushes `:sha-<commit>` — plus `:main` on `main`
+only — pulls the sha tag back and runs the smoke script against it. `v2-root-image` in `v2-root-base.yml` is the PR-time
 proof that needs no registry — same build, `load: true` instead of `push`, same smoke script —
 so a rule as easy to get wrong as the `/v2/sw.js` carve-out is provable on the pull request that
 writes it. Neither one touches the required contexts. **Since the cutover (#1357) `deploy` does
@@ -216,9 +217,10 @@ or unhealthy tag is non-destructive on either host, and a staging host — which
 explicitly allowed to point elsewhere, see below — must not be able to withhold the product's
 release. Within a stack, api before web: server before client.
 
-`scripts/deploy.sh test` and `deploy.mjs test` still publish to the bind-mounted test runtime on
-:8090, which keeps running but is not what either hostname routes to: a v1 audition means
-pointing that host's Caddy back at :8090 first, and pointing it back afterwards.
+A branch audition is a release too: `scripts/deploy-test.sh [branch]` makes sure
+`ensemble-web:sha-<sha>` exists (dispatching CI to build it if not) and runs `release
+ensembletest web sha-<sha>` as the operator, then checks the test host's `/build.json`. The next
+merge's `deploy` puts the test host back on `main`.
 
 ### The #1357 flip checklist
 
@@ -288,45 +290,14 @@ never an SPA fallback. Service workers are no-store and mutable entry points no-
 Old releases are retained for rollback; no automatic deletion/retention job is introduced.
 Retention is not a guarantee that old tabs can lazy-load old chunks through the current root.
 
-## Build once, verify, publish
+## Build once, verify, publish (retired)
 
-The ordinary production build emits `.ensemble-build.json` from Vite's resolved configuration,
-including mode, source revision and whether the E2E bridge was enabled. Sealing cannot relabel
-an earlier test/debug build. CI still seals the output of `npm run ci` and uploads it under the
-exact commit SHA, but since the cutover (#1357) nothing downloads it: the `deploy` job publishes
-no files at all, needs neither Node nor rsync, and the sealed artifact is retained purely as
-evidence of what this commit's v1 build was until #1358 deletes v1. The commands below are the
-manual test-runtime path.
-
-```sh
-# Build/seal once; a dirty audition artifact is allowed only on test.
-npm run build:size
-node scripts/static-artifact.mjs seal dist production
-node scripts/static-artifact.mjs verify dist test
-
-# Test now uses the new layout by default:
-./scripts/deploy.sh test --artifact dist
-# Or build and publish an audition in one command:
-./scripts/deploy.sh test
-```
-
-Verification checks the checkout SHA, every artifact byte, unexpected files, symlinks, reserved
-paths and transfer checksum list. Uploads use unique directories. The host checks SHA256 before
-activation and uses a lock plus compare-and-swap: a concurrent loser fails rather than
-overwriting the winning release. Canonical public HTML/revision and service-worker bytes/cache
-policy still gate success. A failed transfer leaves the current release untouched; failure
-after activation is reported as failure, retains evidence, and does not silently roll back.
-
-Both environments default to atomic publishing (production since the 2026-09-13 cutover).
-Legacy publishing refuses any root containing the new layout's marker, releases directory or
-current symlink, so an old command cannot erase rollbacks. The pre-cutover non-atomic prod
-transport (`scripts/deploy.sh`'s legacy rsync branch, the `PROD_DEPLOY_PROFILE` CI selector) has
-been removed from the codebase — there is only the one path now.
-
-Rollback is a verified activation of the previous retained release using
-`scripts/publish-static.sh activate ROOT PREVIOUS_RELEASE CURRENT_TARGET` through the same
-scoped SSH account. Reverify public HTML and canonical worker; record the rollback and follow
-with the corrective source change. Never downgrade browser data schemas incidentally.
+The v1 static-artifact pipeline this section described — `npm run build:size`, sealing with
+`scripts/static-artifact.mjs`, publishing with `scripts/deploy.sh` and activating with
+`scripts/publish-static.sh` — was deleted with v1 in #1358. The retained releases under
+`/srv/ensemble-{test,prod}/www/.releases/` are still served by the static containers on
+:8090/:8091, which is what makes the Caddy line a rollback; nothing publishes there any more.
+Every release is now an image tag (above).
 
 ## API is a separate service and a separate release
 

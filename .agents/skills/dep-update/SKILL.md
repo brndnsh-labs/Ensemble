@@ -2,7 +2,7 @@
 name: dep-update
 description: Routine dependency hygiene for Ensemble — survey what's outdated, plan the bump, update, run the gates, and land one dependency-metadata commit. Distinguishes a stale test expectation from a real regression. Never uses `audit fix --force`; never auto-pushes. Plan-first. Usage `/dep-update` (or `/dep-update <package>`).
 ---
-<!-- cycle:rendered template=skills/dep-update.md.tmpl hash=63e3633b4dce — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/dep-update.md.tmpl hash=d25a32aacd52 — managed by the-cycle; edit the template, not this file -->
 
 # /dep-update — dependency hygiene
 
@@ -36,11 +36,11 @@ Goal: keep dependencies current without turning a routine bump into an outage.
    the tradeoff.
 7. **Run the gates** (§4):
    ```
-   npm run typecheck     # tsc over public/**/*.{ts,tsx}
+   npm run typecheck     # tsc over public/ and scripts/ (npm run typecheck:tests covers tests/)
    npm run lint          # Biome lint + format check
    npm test              # mutation check + Biome + docs lint + Vitest (node/happy-dom)
    npm run test:browser  # Vitest browser-mode audio guards (real OfflineAudioContext, headless Chromium)
-   npm run test:e2e      # Playwright vs a `vite preview` build (Desktop Chrome, Mobile Chrome, Mobile Safari)
+   npm run build --prefix prototypes/v2 && npm run test:e2e --prefix prototypes/v2   # the app's Playwright suite (laptop + webkit-phone) against the built export
    ```
    **A red gate here is one of two things, and they need opposite responses:**
    - **A stale expectation** — the dependency legitimately changed its output, and the test

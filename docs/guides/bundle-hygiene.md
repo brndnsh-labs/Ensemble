@@ -9,12 +9,12 @@ If you're picking up bundle work (audit, ad-hoc shrink, suspicious chunk growth,
 - `docs/archive/BUNDLE_AUDIT.md` — completed audit chapter (history, story-by-story status). Frozen.
 - `.claude/skills/cycle/SKILL.md` — per-story workflow (implement → review → patch → done); Track `bundle` gates it on the measured KB delta.
 - `.claude/agents/bundle-hygiene-reviewer.md` — reviewer subagent that polices each diff.
-- `.size-limit.js` — current budgets and the Vite-emitted initial JavaScript graph (baselines, not targets — see below).
-- `package.json` — `npm run build:size` (size-limit), `npm run knip` (unused exports), `npm run build` (emits `stats.html` at the repo root).
+- `npm run knip` — unused exports.
+- The shipped bundle is the v2 static export: `npm run build --prefix prototypes/v2`, then measure `prototypes/v2/out/_next/static/` before and after. v1's `.size-limit.js` budgets, `npm run build:size` and the Vite `stats.html` went with v1 in #1358; nothing replaces them yet.
 
 ## Budgets are baselines, not targets
 
-The limits in `.size-limit.js` are historical baselines. The initial-JavaScript budget follows the entry and exact `modulepreload` graph emitted into `dist/index.html`, without charging lazy chunks to startup. These budgets are useful as a regression tripwire (*"this chunk used to fit; what just changed?"*) but **not** a finish line.
+There is no budget gate today (v1's `size-limit` budgets were deleted with v1 in #1358). If one is added for the v2 export, treat its limits the way v1's were treated: as historical baselines, a regression tripwire (*"this chunk used to fit; what just changed?"*), **not** a finish line.
 
 The operative goal is **smaller is better when behavior is unchanged**, not "must hit budget." Don't promote risky structural changes just to close a budget gap. A speculative refactor that breaks audio-graph timing to save 8 KB is a bad trade.
 
@@ -22,7 +22,7 @@ Corollary: if you find a shrink that's both safe and easy, ship it even if the c
 
 ## Statically-provable dead code is already DCE'd
 
-If you delete a function with no callers, or simplify `if (false) { ... }`, Rollup already removed it at minify time. The KB delta against the pre-change baseline will be ≈ 0.
+If you delete a function with no callers, or simplify `if (false) { ... }`, the bundler already removed it at minify time. The KB delta against the pre-change baseline will be ≈ 0.
 
 **This is expected, not a failure.** The win in those stories is:
 
@@ -66,7 +66,7 @@ Workflow: knip finding → grep for the symbol name AND any string literal that 
 
 ## Import-trace bundle work
 
-When tracing why N KB of a chunk is in code that should belong somewhere else (worker code in main, modal code in boot), open `stats.html` at the repo root (emitted on every `npm run build`).
+When tracing why N KB of a chunk is in code that should belong somewhere else (worker code in main, modal code in boot), v1 had `stats.html` from its Vite build; the v2 build has no analyzer wired, so trace the import graph by hand (grep the consumers of the symbol) or add one for the job.
 
 Pattern: one small symbol — a 4-element `Set`, a single function — can be the only thing pulling a 40 KB file into the chunk's consumer tree. The fix is rarely a big refactor; it's usually:
 
@@ -88,7 +88,7 @@ When converting a feature import to `import()` (the S3 pattern):
 
 Three layers. Order matters (most-mechanized first):
 
-1. **`size-limit` in `validate` script.** Fails `npm run validate` when any chunk exceeds budget. The single most valuable line in this whole guide — turn this on as soon as the budgets are sane.
+1. **A size budget in `validate`.** v1 had one (`size-limit`, deleted with v1 in #1358); the v2 export has none yet. It is the single most valuable layer here — worth re-adding once v2's chunks settle.
 2. **`bundle-hygiene-reviewer` subagent.** Invoke after any large feature merge or on demand; the agent knows the playbook (measure first, behavioral equivalence, attack biggest module, forbidden moves). The `/review` step of `/cycle` wires this in automatically for Track `bundle`; for ad-hoc work, invoke it manually against the uncommitted diff.
 3. **Optional periodic `/loop` or scheduled agent.** Weekly build + delta report. Only valuable if (1) isn't catching things; revisit after a quarter of (1) being on.
 

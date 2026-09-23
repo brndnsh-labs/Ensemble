@@ -482,9 +482,6 @@ export function syncWorker(action?: WorkerSyncActionName, payload?: unknown): vo
             // delta the anticipation window ran on a stale `false`.
             data.playback = { isEndingPending: playback.isEndingPending };
             break;
-        case 'SET_SONG_MODE':
-            data.playback = { songMode: playback.songMode };
-            break;
         case 'ARRANGER_UPDATE': // Custom action for large structural changes — dead today
             data.arranger = {
                 progression: arranger.progression,

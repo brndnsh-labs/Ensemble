@@ -13,7 +13,7 @@ You do not edit code. You read, grep, reason, and report.
 The logic worker (`public/logic-worker.ts`) runs on a separate thread and maintains a **partial mirror** of the main-thread state — specifically the slices `arranger`, `chords`, `bass`, `soloist`, `harmony`, `groove`, `playback`, and `midi`. The mirror is refreshed via two paths:
 
 1. **Initial / full snapshot.** `getSyncState()` (`public/state.ts`) builds the payload. `syncWorker()` (`public/worker-client.ts`) ships it via `WORKER_MSG.SYNC_STATE`. The worker applies it in the `case WORKER_MSG.SYNC_STATE:` branch (`public/logic-worker.ts`).
-2. **Incremental deltas.** `syncWorker(action, payload)` is called on every dispatch from `public/main.ts` to ship a partial update through the same message type.
+2. **Incremental deltas.** `syncWorker(action, payload)` is called on every dispatch from the host's subscriber — today the one in `initialize()` in `prototypes/v2/lib/runtime.ts`, which also calls `initWorker` and the bare full-snapshot `syncWorker()` in `rebuild()` — to ship a partial update through the same message type.
 
 Source of truth for message constants: `public/worker-types.ts`. Source of truth for the contract shape: `docs/guides/WORKER_CONTRACT.md`.
 
@@ -135,7 +135,6 @@ You don't review:
 - Musical correctness — that's `music-theory-reviewer`.
 - Dispatch flow within the main thread, `@direct-mutation` abuse — that's `state-discipline-reviewer`.
 - Performance of the sync payload size beyond flagging obvious over-sync.
-- Visualizer worker (`public/visualizer-worker.ts`) — different contract, not your domain.
 - UI design, test coverage of the change.
 
 Stay narrow. The value of this agent is one job done sharply: every field the worker reads is wired through all four contract sites.

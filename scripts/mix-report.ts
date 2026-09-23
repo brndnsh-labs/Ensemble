@@ -26,7 +26,11 @@ import {
 } from './mix-report-utils.js';
 
 export const REPO_ROOT = path.resolve(import.meta.dirname, '..');
-const DIST_DIR = path.join(REPO_ROOT, 'dist');
+// The v2 music stand's static export, built with the render bridge (see the build step
+// in `main`). It is the same `out/` the v2 suite serves, so run the suite's own build again
+// before trusting it after a mix report.
+const V2_DIR = path.join(REPO_ROOT, 'prototypes', 'v2');
+const DIST_DIR = path.join(V2_DIR, 'out');
 const HOST = '127.0.0.1';
 const REQUESTED_PORT = Number(process.env.MIX_REPORT_PORT || 0);
 const MIME_TYPES = {
@@ -44,12 +48,12 @@ const MIME_TYPES = {
 };
 
 function runCommand(command, args, options = {}) {
-    const { forwardToStderr = false, env = {} } = options;
+    const { forwardToStderr = false, env = {}, cwd = REPO_ROOT } = options;
     const stdio = forwardToStderr ? ['ignore', 'pipe', 'pipe'] : 'inherit';
 
     return new Promise((resolve, reject) => {
         const child = spawn(command, args, {
-            cwd: REPO_ROOT,
+            cwd,
             stdio,
             env: { ...process.env, ...env },
         });
@@ -353,7 +357,7 @@ async function renderSceneReports({
             await page.goto(baseUrl, { waitUntil: 'networkidle' });
             await page.waitForFunction(
                 () =>
-                    document.documentElement.dataset.hydrated === 'true' &&
+                    document.documentElement.dataset.renderBridge === 'ready' &&
                     Boolean(window.ensemble),
                 undefined,
                 { timeout: 20000 },
@@ -546,11 +550,19 @@ async function renderSceneReports({
                         state.groove.fillActive = false;
                         state.groove.pendingCrash = false;
                         state.groove.lastDrumPreset = scene.drumPreset;
-                        state.chords.style = scene.chordStyle || state.chords.style;
+                        // #1358 — the page is now the v2 stand, which boots with whatever
+                        // chart it opened (a starter's Bossa feel, say), and the clone above
+                        // inherits it. These lane styles and the soloist mode are pinned to
+                        // what v1's fresh boot held, which is what restored byte-identical
+                        // events against the v1 baseline ('guitar' is v1's boot-derived mode,
+                        // NOT the slice default 'monophonic'). Every other field still comes
+                        // from the page: a render is only as reproducible as the stand's boot.
+                        state.chords.style = scene.chordStyle || 'smart';
                         state.chords.density = scene.density || state.chords.density;
-                        state.bass.style = scene.bassStyle || state.bass.style;
-                        state.harmony.style = scene.harmonyStyle || state.harmony.style;
-                        state.soloist.style = scene.soloistStyle || state.soloist.style;
+                        state.bass.style = scene.bassStyle || 'smart';
+                        state.harmony.style = scene.harmonyStyle || 'smart';
+                        state.soloist.style = scene.soloistStyle || 'smart';
+                        state.soloist.mode = 'guitar';
                         state.bass.enabled = Boolean(
                             stem.enabled.bass && (scene.includeBass ?? true),
                         );
@@ -1530,7 +1542,7 @@ async function renderSceneReports({
                                 calibration = {
                                     module,
                                     packId,
-                                    error: `pack "${packId}" failed to load (dist/packs/${packId} present? built?)`,
+                                    error: `pack "${packId}" failed to load (prototypes/v2/out/packs/${packId} present? built?)`,
                                 };
                             } else {
                                 const rows = [];
@@ -1668,15 +1680,22 @@ export async function generateMixReport(argv = process.argv.slice(2)) {
     const { seeds, source } = resolveSeeds(cliOptions, focusInput);
 
     if (!cliOptions.noBuild) {
-        log.write('Building dist for mix analysis...\n');
-        // The offline render drives `window.ensemble`, which `main.ts` gates
-        // behind `import.meta.env.DEV || VITE_E2E_BRIDGE`. A plain `vite build`
-        // (DEV=false) tree-shakes the bridge out, so opt it back in for this
-        // analysis build only — real prod builds never set the flag (#656).
-        await runCommand('npm', ['run', 'build:quiet'], {
-            forwardToStderr: machineReadable,
-            env: { VITE_E2E_BRIDGE: '1' },
-        });
+        log.write('Building the v2 stand for mix analysis...\n');
+        // The offline render drives `window.ensemble`, which the v2 runtime installs only
+        // in a build made with NEXT_PUBLIC_RENDER_BRIDGE=1 — real prod builds never set it
+        // (#656, #1358). Built at the root base so the page and `/packs/` serve from `/`;
+        // `offline.mjs` is what copies the sample packs into the export.
+        const buildEnv = { NEXT_PUBLIC_RENDER_BRIDGE: '1', ENSEMBLE_V2_BASE: '/' };
+        for (const [command, args] of [
+            ['npx', ['next', 'build', '--webpack']],
+            ['node', ['scripts/offline.mjs']],
+        ]) {
+            await runCommand(command, args, {
+                forwardToStderr: machineReadable,
+                env: buildEnv,
+                cwd: V2_DIR,
+            });
+        }
     }
 
     const { sceneRuns, calibration, cohesion, writtenWavPaths, writtenEventPaths } =

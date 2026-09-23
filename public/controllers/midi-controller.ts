@@ -34,7 +34,7 @@ const PLAY_ALONG_SUSTAIN_SECONDS = 4.0;
  * (`inputs`/`selectedInputId`/`inputEnabled`). A thin named wrapper so the
  * input-config call sites read as clear intent.
  */
-export function dispatchMidiInputConfig(payload: ActionPayloadSetMidiConfig): void {
+function dispatchMidiInputConfig(payload: ActionPayloadSetMidiConfig): void {
     dispatch(ACTIONS.SET_MIDI_CONFIG, payload);
 }
 

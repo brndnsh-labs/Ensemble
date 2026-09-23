@@ -2,7 +2,7 @@
 name: cycle
 description: Run the full Ensemble story loop on one issue or a chain — composes /implement → /review → /patch → /done (→ optional /deploy-test), interrupting only on a judgment call. Usage `/cycle #<n>` · `/cycle next` · `/cycle next --until-blocked` · add `--deploy`.
 ---
-<!-- cycle:rendered template=skills/cycle.md.tmpl hash=8340222ba3af — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/cycle.md.tmpl hash=bd93e932d8c3 — managed by the-cycle; edit the template, not this file -->
 
 # /cycle — full loop on one story or a chain
 
@@ -126,10 +126,10 @@ Read the issue's `track:*` label; it sets the loop's tail:
   `music-theory-reviewer` (+ state/worker if those changed). Safe → auto-merge on green.
 - **synth** → DoD is a **human listen on the deployed test build**; reviewer `synth-graph-reviewer`
   (graph hygiene only). Pick these up freely — the loop runs the same as any other Track right up
-  to the gate. `/done` builds + opens the PR, then **deploys the branch to test** (`scripts/deploy.sh
-  test`, no merge needed first) and hands Brandon the checklist + a Works/Something's-off/Haven't-
+  to the gate. `/done` builds + opens the PR, then **deploys the branch to test** (`/deploy-test`,
+  no merge needed first) and hands Brandon the checklist + a Works/Something's-off/Haven't-
   checked verdict prompt right there — **that's the audition**, not a separate local harness step.
   "Works" merges immediately (the verdict *is* the approval); "Haven't checked" parks it (`status:needs-ear`) — re-invoke `/cycle #<n> approved` once he's listened. The merge itself still always
   waits on his ear; nothing here auto-merges unheard.
-- **bundle** → DoD is a **measured KB delta** (`npm run build` / size check) **and** the full suite
+- **bundle** → DoD is a **measured KB delta** (the v2 export, `prototypes/v2/out/_next/static/`) **and** the full suite
   green (behavior-preserving); reviewer `bundle-hygiene-reviewer`. Safe → auto-merge on green.

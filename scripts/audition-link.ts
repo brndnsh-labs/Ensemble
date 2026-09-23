@@ -48,7 +48,16 @@ interface CliArgs {
     off?: Part[];
 }
 
-const DEFAULT_BASE_URL = 'http://localhost:5173/';
+// The v2 stand's dev server (`npm --prefix prototypes/v2 run dev`) at its default `/v2` base.
+// Since the cutover (#1357) the v2 stand opens these links through its old-link reader
+// (`prototypes/v2/lib/v1-link.ts`, #1279), which takes the chart, key, meter, tempo and genre
+// and drops the rest — see `V2_DROPPED`.
+const DEFAULT_BASE_URL = 'http://localhost:3100/v2/';
+
+// Link fields the v2 stand does not read yet: `int`, the part switches (the `bnd` payload) and
+// `autoplay`. The link still carries them, but the audition plays at the chart's own intensity
+// with every part on, and the listener presses play.
+const V2_DROPPED = ['int', 'bnd', 'autoplay'];
 
 function parseParts(flag: string, value: string): Part[] {
     return value
@@ -240,6 +249,10 @@ export function buildAuditionLink(scene: SceneShape, args: CliArgs): string {
         params.set('autoplay', '1');
     }
 
+    const dropped = V2_DROPPED.filter((name) => params.has(name));
+    if (dropped.length > 0) {
+        process.stderr.write(`note: the v2 stand ignores ${dropped.join(', ')} in this link\n`);
+    }
     const base = args.baseUrl.endsWith('/') ? args.baseUrl : `${args.baseUrl}/`;
     return `${base}?${params.toString()}`;
 }

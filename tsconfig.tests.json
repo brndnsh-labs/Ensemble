@@ -11,6 +11,6 @@
             "@engine/*": ["./public/*"]
         }
     },
-    "include": ["public/**/*.ts", "public/**/*.tsx", "env.d.ts", "tests/**/*.ts", "tests/**/*.tsx"],
+    "include": ["public/**/*.ts", "env.d.ts", "tests/**/*.ts"],
     "exclude": ["node_modules", "dist"]
 }

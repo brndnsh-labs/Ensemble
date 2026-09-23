@@ -42,8 +42,9 @@ permissions:
 jobs:
   # The full non-browser gate. `npm run ci` is the single source of truth for
   # what "green" means — typecheck (public/ + tests/), depcheck, knip,
-  # mutation/lint/docs checks, unit tests, production build, and bundle-size
-  # budgets — so `npm run ci` locally predicts this job exactly. Keep this
+  # mutation/lint/docs checks and unit tests — so `npm run ci` locally predicts
+  # this job exactly. It builds nothing: the one build is the v2 export, which
+  # `v2-suite` and `web-image` own. Keep this
   # job's checks == that script; don't add gate steps here that aren't in the
   # script (or vice versa).
   checks:
@@ -66,21 +67,6 @@ jobs:
 
       - name: Run the full gate (npm run ci)
         run: npm run ci
-
-      # The gate already built the production bundle. Seal and retain those exact
-      # bytes. Since the cutover (#1357) nothing in this workflow consumes the artifact —
-      # `ensemble-web` is what production serves — so it is kept only as evidence of what
-      # this commit's v1 build was, until #1358 deletes v1 and this step with it.
-      - name: Seal production static artifact
-        run: node scripts/static-artifact.mjs seal dist production
-
-      - uses: actions/upload-artifact@v7
-        with:
-          name: ensemble-static-${{ github.sha }}
-          path: dist/
-          include-hidden-files: true
-          if-no-files-found: error
-          retention-days: 7
 
       # The v2 account API (#1187) is a standalone sibling package under
       # prototypes/v2-api/ with its own package-lock.json — same --prefix
@@ -125,8 +111,8 @@ jobs:
 
       # `--with-deps` IS needed here, unlike on the old self-hosted runner where the
       # host libraries were installed once by hand. A GitHub-hosted runner is a fresh
-      # VM every run, and the suite includes a Mobile Safari project — that's real
-      # webkit, whose system libraries are NOT preinstalled on ubuntu-latest.
+      # VM every run, and `test:sync` runs in real WebKit, whose system libraries are
+      # NOT preinstalled on ubuntu-latest.
       # The browser binaries cache; the apt-installed libraries cannot, so a cache hit
       # still has to re-run `install-deps`.
       - name: Install Playwright browsers + system deps
@@ -141,29 +127,15 @@ jobs:
       # Vitest browser mode against the same Chromium installed above — they need
       # a real `OfflineAudioContext`, which the node-mode `npm test` (happy-dom)
       # can't provide. Kept here (not in the `checks` job / `npm run ci`) because
-      # only this job installs a browser. Fast (~2s); runs before the e2e suite
-      # so an audio-graph regression fails early.
+      # only this job installs a browser. The job keeps its `e2e-tests` name because
+      # it is a required context; the v1 Playwright suite it once ran was deleted
+      # with the v1 app (#1358) — the UI's end-to-end suite is `v2-suite`.
       - name: Run browser-mode audio guards
         run: npm run test:browser
 
       - name: Verify account storage in Chromium and WebKit
         run: npm run test:sync
 
-      # `npm run test:e2e` builds the production bundle (VITE_E2E_BRIDGE=1) and
-      # serves it via `vite preview` (see playwright.config.ts webServer) — the
-      # suite exercises the real shipped artifact, not the dev server.
-      - name: Run Playwright tests
-        run: npm run test:e2e
-
-      # @v3 was a Forgejo-only pin (that build's artifact API rejected @v4+ with
-      # GHESNotSupportedError). On github.com @v3 is dead — retired 2025-01 — so this
-      # is @v7 now.
-      - uses: actions/upload-artifact@v7
-        if: ${{ !cancelled() }}
-        with:
-          name: playwright-report
-          path: playwright-report/
-          retention-days: 30
 
   # The v2 music stand (prototypes/v2, Next static export): build + its own Playwright
   # suite, and the required gate for this app. Runs on every PR, not only v2-touching
@@ -422,9 +394,16 @@ jobs:
     # release. `inputs` is null on a push, and a null property is falsy, so this changes
     # nothing for the merge path. `deploy` below accepts these jobs as skipped when, and
     # only when, the run is that probe.
+    # A push to main, or a dispatch on ANY ref (#1358): that is how `/deploy-test` gets an
+    # audition build of a branch (`scripts/deploy-test.sh`). A branch build is pushed only
+    # as `sha-<sha>`, never as `:main`, and `deploy` below never releases one — a non-main
+    # dispatch without the probe fails its last clause — so it reaches the test host only
+    # through an explicit `release ensembletest web sha-…`.
     if: >-
-      github.ref == 'refs/heads/main'
-      && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+      (
+        (github.ref == 'refs/heads/main' && github.event_name == 'push')
+        || github.event_name == 'workflow_dispatch'
+      )
       && !inputs.hosting_probe
     timeout-minutes: 20
     permissions:
@@ -483,6 +462,19 @@ jobs:
       # No `cache-from`/`cache-to`: this image is one COPY of a freshly built export over a
       # digest-pinned base, so there is no layer worth caching that pulling the base does not
       # already give — and the export's layer changes on every commit by construction.
+      # A branch build (a `/deploy-test` audition) is pushed ONLY as `sha-<sha>`: the floating
+      # `:main` tag must never point at unreviewed code. Computed here rather than as an
+      # empty-able line in `tags:`, so nothing depends on how the action treats a blank entry.
+      - name: Choose the image tags
+        id: tags
+        run: |
+          {
+            echo 'list<<EOF'
+            echo "$IMAGE:sha-$GITHUB_SHA"
+            if [ "$GITHUB_REF" = refs/heads/main ]; then echo "$IMAGE:main"; fi
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
       - name: Build and push
         uses: docker/build-push-action@v7
         with:
@@ -491,9 +483,7 @@ jobs:
           push: true
           provenance: false
           build-args: REVISION=${{ github.sha }}
-          tags: |
-            ${{ env.IMAGE }}:sha-${{ github.sha }}
-            ${{ env.IMAGE }}:main
+          tags: ${{ steps.tags.outputs.list }}
 
       # Prove the pushed bytes serve: pull the sha tag back from the registry and run the
       # container under the same flags the stack uses. Fails the run (so the tag stays
@@ -513,11 +503,7 @@ jobs:
   # Since the cutover (#1357) a release is a TAG, not a file transfer. The two rsync
   # publishes this job used to run — the v1 root app and the `/v2` export — are gone, with
   # the artifact downloads, the `static-artifact.mjs verify` step, the Node setup and the
-  # `ensemble-deploy` SSH config that existed only to serve them. They had to go in the same
-  # change that points production at the image: both scripts now REFUSE up front when their
-  # origin serves a root `/build.json` (the "routed to the ensemble-web image" preflight in
-  # `scripts/deploy.sh` and `prototypes/v2/scripts/deploy.mjs`), so leaving the steps here
-  # would fail every merge. #1358 deletes the scripts themselves.
+  # `ensemble-deploy` SSH config that existed only to serve them; #1358 deleted the scripts.
   #
   # `web-release` (#1356) is folded in here for the same reason. With the static publish gone
   # the two jobs were the same job — one tailnet join, one scoped key, one forced command —
@@ -560,13 +546,15 @@ jobs:
     needs: [checks, e2e-tests, v2-checks, api-image, web-image]
     # A skipped `needs` would skip this job too, so each image job's acceptable results are
     # spelled out. `skipped` is acceptable IFF this run is the hosting probe — which since
-    # patch P3-2 is the one case that skips them, on any ref, because a read-only probe must
-    # not push image tags. The five reachable cases:
+    # patch P3-2 is the one ALLOWED case that skips them, on any ref, because a read-only probe
+    # must not push image tags. The six reachable cases:
     #
     #   main push                    images run   -> success required, release runs
     #   main dispatch (no probe)     images run   -> success required, release runs
     #   main dispatch + probe        images skipped -> allowed, probe steps only
     #   non-main dispatch + probe    images skipped -> allowed, probe steps only
+    #   non-main dispatch (no probe) web-image runs (a `/deploy-test` build, #1358), api-image
+    #                                skips -> api clause AND last clause false, this job skips
     #   pull_request                 images skipped -> last clause false, this job skips
     #
     # The old `github.ref != 'refs/heads/main'` allowance is gone: it could only ever be

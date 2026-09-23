@@ -305,6 +305,14 @@ export function initialize(): Promise<void> {
                 }
             });
             window.addEventListener('pagehide', stop);
+            // The listening-gate tools (`scripts/mix-report.ts`) render offline through
+            // `window.ensemble`. Next inlines the flag at build time, so a production build
+            // compiles this branch — and the bridge module — out entirely.
+            if (process.env.NEXT_PUBLIC_RENDER_BRIDGE === '1') {
+                const { installRenderBridge } = await import('@engine/render-bridge');
+                installRenderBridge();
+                document.documentElement.dataset.renderBridge = 'ready';
+            }
         })();
     }
     return boot;

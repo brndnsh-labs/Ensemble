@@ -1,98 +1,79 @@
 # Ensemble
 
-Ensemble is a browser-based **virtual band and songwriting toolkit**. Sketch a chord progression, pick a feel, and a full rhythm section — drums, bass, chords, harmony, and an improvising soloist — interprets it in real time, right in the browser.
+Ensemble is a browser-based **virtual band**. Write or import a chord chart, pick a feel, and a full rhythm section — drums, bass, chords, harmony, and an improvising soloist — plays it in real time, right in the browser.
 
-It is a PWA built for fast ideas: everything lives on one **chart-first surface**, so you write, perform, and visualize without ever leaving the page.
+It is built for practice first: mute the part you play and play along with a band that keeps steady time.
 
-**▶ Try it: [ensemble.brndn.zip](https://ensemble.brndn.zip/)**
-
-<p align="center">
-  <img src="docs/assets/readme/hero.png" alt="The Ensemble chart-first surface: a lead sheet with the live transport, key/time controls, and the per-instrument Live mix rail." width="100%" />
-</p>
+**▶ Try it: [ensemble.brndn.zip](https://ensemble.brndn.zip/)** — no install, no account required.
 
 ---
 
 ## I want to know what it is
 
-Ensemble turns a lead sheet into a playing band. The chord chart is always on screen — like a music stand — and every other control radiates out from it.
-
-- **Chart-first surface.** A lead sheet is always visible. It's locked by default (your music stand); tap **✏️ Edit** to rewrite chords and sections, and the lock re-engages when you press play.
-- **Smart genre presets.** Choose a feel (Jazz, Funk, Rock, Bossa, Neo-Soul, Hip-Hop, and more) and the whole band re-voices its drums, bass, comping, and phrasing to match.
-- **Per-instrument Live mix.** A rail along the edge shows the five band members — Drums, Bass, Chords, Harmony, Soloist. Toggle each one, and open per-instrument settings (register, style, drum preset, trading) without covering the chart.
-- **AI soloist with a Dynamic Head.** The soloist generates a seed melody that fits your progression, states it like a "head," then evolves and improvises over successive choruses — coherent rather than random. You can also trade fours with it or take over the lead yourself.
-- **🌈 Visualizer.** A full-screen overlay renders a real-time piano-roll of what every instrument is playing, color-coded by track and chord tone.
-- **Analysis & MIDI.** Audio analysis and melody-to-harmony tooling, plus MIDI export and live routing into a DAW or hardware.
-
-**The surface at a glance:** the **topbar** holds the transport (play/stop, BPM, tap tempo), the key / time-signature / song-seed controls, and quick actions (Library, Edit, Share, 🌈). The **Live mix rail** holds the band. On a phone, the rail collapses into a bottom action bar (🎚️ Mix · 📤 Share · 🌈 Visuals).
-
-A full walkthrough lives in the **in-app Manual** (open the `⋯` menu → **Manual**), and [`public/MANUAL.md`](public/MANUAL.md) includes a **Style Gallery** of one-click deep links to curated presets.
-
-The public instance lives at **[ensemble.brndn.zip](https://ensemble.brndn.zip/)** — no install required.
+- **A songbook.** Starter charts and your own songs, saved on the device. Save is explicit; an unsaved experiment is kept for you and offered back, with Revert to saved.
+- **A music stand.** During playback the chart is the screen. Tempo, genre, meter and per-instrument mutes sit around it; a section can be looped for practice.
+- **Smart genre feels.** Thirteen genres (Jazz, Funk, Rock, Bossa, Neo-Soul, Hip Hop, and more) re-voice the whole band's drums, bass, comping and phrasing.
+- **A soloist with a Dynamic Head.** The soloist writes a seed melody for your progression, states it like a head, then develops it over successive choruses — coherent rather than random.
+- **Real sounds, offline.** Downloadable sample packs per instrument, and an installable app that plays without a connection once its sounds are stored.
+- **Charts in and out.** Bar-by-bar chart editing, iReal Pro import, share links that open without an account, and MIDI and WAV export.
+- **Optional accounts.** A passkey account keeps your songbook on more than one device. Playing never needs one.
 
 ---
 
 ## I want to host it myself
 
-Ensemble is a static PWA — build it once and serve the `dist/` folder from anywhere.
+The app is a Next.js static export in [`prototypes/v2/`](prototypes/v2/README.md) that compiles the engine from `public/`. Build it once and serve the output from any static file server.
 
 **Prerequisites:** Node.js 26+ and npm. This project is **npm-only** — don't use `pnpm`, `yarn`, or `bun`.
 
 ```bash
-npm install
-npm run dev
+npm ci
+npm ci --prefix prototypes/v2
+ENSEMBLE_V2_BASE=/ npm run build --prefix prototypes/v2
 ```
 
-`npm run dev` starts the Vite dev server with hot-module reload on `http://localhost:5173`.
+This writes the site to `prototypes/v2/out/`, including its service worker, the sound packs and a `build.json` naming the commit. Leave `ENSEMBLE_V2_BASE` unset to build for a `/v2/` path instead. For development, `npm run dev --prefix prototypes/v2` serves it at `http://localhost:3100/v2/`.
 
-**Production build:**
-
-```bash
-npm run build
-```
-
-This emits an optimized bundle into `dist/`, including the service worker (via `vite-plugin-pwa`) so the app is installable and works offline. `dist/` is a plain static site — host it on any static file server or CDN.
-
-**Deploy:** `npm run deploy:test` and `npm run deploy:prod` are thin aliases for `scripts/deploy.sh <test|prod>` — a wrapper around `vite build` + `rsync` (see [`scripts/deploy.sh`](scripts/deploy.sh)). Point them at your own host, or copy `dist/` wherever you like.
-
-Serve `/sw.js` with `Cache-Control: no-store`, and revalidate `/`, `/index.html`, and `/manifest.json` with `Cache-Control: no-cache, max-age=0, must-revalidate`. Keep hashed assets and sound packs cacheable. The deploy script verifies both the HTML revision and the exact worker returned by the ordinary `/sw.js` URL, including its cache policy; a stale CDN worker can prevent installed sound packs from surviving reload even when the HTML is current. When introducing this policy, purge any previously cached `/sw.js` entry at the CDN.
+Accounts need the separate API service in [`prototypes/v2-api/`](prototypes/v2-api/README.md) behind `/api/*` on the same origin; without it the app still plays and saves on the device. The production stack — container images, release by tag, cache headers — is described in [`hosting/README.md`](hosting/README.md).
 
 ---
 
 ## I want to contribute
 
 ```bash
-npm test            # mutation check + lint + docs lint + Vitest
-npm run test:e2e    # Playwright smoke suite (Desktop + Mobile)
-npm run typecheck   # tsc over public/ and scripts/
-npm run validate    # full pipeline: format + jscpd + typecheck + knip + npm test + size-limit
+npm test                                  # mutation check + lint + docs lint + Vitest
+npm run typecheck                         # tsc over public/ and scripts/
+npm run validate                          # format + jscpd + typecheck (+ tests/) + knip + npm test
+npm run build --prefix prototypes/v2      # build the app
+npm run test:e2e --prefix prototypes/v2   # the app's Playwright suite (build first)
 ```
 
-Run `npm run validate` before opening a PR. Musical changes should also pass the relevant **critique test** in `tests/standards/` — see [`tests/README.md`](tests/README.md).
-
-**Refreshing the screenshots:** `npm run dev` in one shell, then `npm run screenshots` in another — [`scripts/capture-screenshots.ts`](scripts/capture-screenshots.ts) deep-links a populated scene and writes `docs/assets/readme/hero.png`.
+Run `npm run validate` and the app suite before opening a PR. Musical changes should also pass the relevant **critique test** in `tests/standards/` — see [`tests/README.md`](tests/README.md).
 
 **Analysis & audit tooling:**
 
 - `npm run ensemble:report -- --genre=Jazz --seeds=ALPHA,BETA` — compact multi-seed ensemble audit as JSON.
-- `npm run mix:report -- --jsonl --scene=jazz-ride --seeds=ALPHA,BETA` — rendered-audio metrics as JSONL for a multi-seed scene sweep. `--write-wav=tmp/mix-render` also drops one `.wav` per scene/stem/seed so renders can be auditioned without the live app.
+- `npm run mix:report -- --jsonl --scene=jazz-ride --seeds=ALPHA,BETA` — rendered-audio metrics as JSONL for a multi-seed scene sweep. It builds and serves the app itself. `--write-wav=tmp/mix-render` also drops one `.wav` per scene/stem/seed so renders can be auditioned without the live app.
 - `npm run --silent mix:diff -- before.json after.json` — compares two `mix:report --json` outputs and flags stems whose dynamics or spectral balance moved past a threshold (defaults: ±1.5 dB, ±5% spectral, ±1.5 spikes/sec).
-- `npm run --silent audition-link -- --scene=jazz-ride --seed=ALPHA` — builds an autoplay-ready URL for a named scene; opening it in the running app hydrates the scene behind a one-click "▶ Play" overlay. See [`docs/guides/listening-gate-tools.md`](docs/guides/listening-gate-tools.md).
+- `npm run --silent audition-link -- --scene=jazz-ride --seed=ALPHA` — builds a link that opens a named scene's chart, key, meter, tempo and genre in the app (the v2 dev server by default). See [`docs/guides/listening-gate-tools.md`](docs/guides/listening-gate-tools.md).
 
 **Tech stack:**
 
-- **UI:** Preact
+- **UI:** React on Next.js (static export)
 - **State:** deep-signal domain slices
 - **Audio & generation:** Web Audio + a worker-driven logic engine
-- **Build:** Vite (`vite-plugin-pwa` for the service worker)
-- **Testing:** Vitest + Playwright
+- **Testing:** Vitest (node, happy-dom and browser mode) + Playwright
 
 **Repository layout:**
 
-- `public/` — app source, controllers, engines, components, and styles
-- `tests/` — unit, integration, standards (critique), perf, and e2e coverage
+- `prototypes/v2/` — the app: React UI, runtime bridge, songbook storage, account client, Playwright checks
+- `prototypes/v2-api/` — the account API (standalone Node service)
+- `public/` — the engine library: state slices, worker, synthesis, musical engines, songbook codecs
+- `tests/` — unit, integration, standards (critique), bench and browser-mode coverage
 - `docs/` — docs index, living guides, roadmap, and archived reports
-- `scripts/` — build, deploy, and analysis tooling
-- `.github/` — contributor, security, and PR templates
+- `scripts/` — analysis, listening-gate and validation tooling
+- `hosting/` — the production stack
+- `.github/` — CI, contributor, security, and PR templates
 
 **Start here:**
 
