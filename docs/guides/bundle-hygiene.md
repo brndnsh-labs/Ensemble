@@ -10,11 +10,11 @@ If you're picking up bundle work (audit, ad-hoc shrink, suspicious chunk growth,
 - `.claude/skills/cycle/SKILL.md` — per-story workflow (implement → review → patch → done); Track `bundle` gates it on the measured KB delta.
 - `.claude/agents/bundle-hygiene-reviewer.md` — reviewer subagent that polices each diff.
 - `npm run knip` — unused exports.
-- The shipped bundle is the v2 static export: `npm run build --prefix prototypes/v2`, then measure `prototypes/v2/out/_next/static/` before and after. v1's `.size-limit.js` budgets, `npm run build:size` and the Vite `stats.html` went with v1 in #1358; nothing replaces them yet.
+- The shipped bundle is the v2 static export: `npm run build --prefix prototypes/v2`, then measure `prototypes/v2/out/_next/static/` before and after (`npm run check:bundle --prefix prototypes/v2` prints the JavaScript total). v1's `.size-limit.js` budgets, `npm run build:size` and the Vite `stats.html` went with v1 in #1358; the tripwire below replaces the budget, and nothing replaces the analyzer yet.
 
 ## Budgets are baselines, not targets
 
-There is no budget gate today (v1's `size-limit` budgets were deleted with v1 in #1358). If one is added for the v2 export, treat its limits the way v1's were treated: as historical baselines, a regression tripwire (*"this chunk used to fit; what just changed?"*), **not** a finish line.
+The v2 export has one size check, a **tripwire** (#1388): `prototypes/v2/scripts/bundle-tripwire.mjs`, run by the `v2-suite` CI job after the build (and locally as `npm run check:bundle --prefix prototypes/v2`). It sums the JavaScript under `out/_next/static/` and fails only when the total passes `ceilingBytes` in `prototypes/v2/bundle-tripwire.json`, about 25% over the measured `baselineBytes` (1,717,881 bytes in 28 files on 2026-09-23). There are no per-chunk budgets and no per-PR report on purpose: a loose total stays quiet through ordinary work and trips on the accident it exists for, an eager import or a heavy dependency. When it trips, its message lists the five largest files — **find what grew before raising the ceiling**, and raise it deliberately, in its own commit, with the baseline re-measured the same way. Treat it as v1's `size-limit` budgets were treated: a regression tripwire (*"this used to fit; what just changed?"*), **not** a finish line.
 
 The operative goal is **smaller is better when behavior is unchanged**, not "must hit budget." Don't promote risky structural changes just to close a budget gap. A speculative refactor that breaks audio-graph timing to save 8 KB is a bad trade.
 
@@ -88,7 +88,7 @@ When converting a feature import to `import()` (the S3 pattern):
 
 Three layers. Order matters (most-mechanized first):
 
-1. **A size budget in `validate`.** v1 had one (`size-limit`, deleted with v1 in #1358); the v2 export has none yet. It is the single most valuable layer here — worth re-adding once v2's chunks settle.
+1. **A size tripwire in CI.** v1 had per-chunk budgets (`size-limit`, deleted with v1 in #1358); the v2 export has one loose total (#1388, above). It is the single most valuable layer here; tighten it into per-chunk budgets only if a real regression slips under the total.
 2. **`bundle-hygiene-reviewer` subagent.** Invoke after any large feature merge or on demand; the agent knows the playbook (measure first, behavioral equivalence, attack biggest module, forbidden moves). The `/review` step of `/cycle` wires this in automatically for Track `bundle`; for ad-hoc work, invoke it manually against the uncommitted diff.
 3. **Optional periodic `/loop` or scheduled agent.** Weekly build + delta report. Only valuable if (1) isn't catching things; revisit after a quarter of (1) being on.
 

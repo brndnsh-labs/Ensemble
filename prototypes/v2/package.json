@@ -6,7 +6,8 @@
         "dev": "next dev --webpack -p 3100",
         "build": "npm run typecheck && next build --webpack && node scripts/offline.mjs",
         "typecheck": "npm --prefix ../.. run typecheck && tsc --noEmit",
-        "test:e2e": "playwright test"
+        "test:e2e": "playwright test",
+        "check:bundle": "node scripts/bundle-tripwire.mjs"
     },
     "dependencies": {
         "@simplewebauthn/browser": "14.0.0",

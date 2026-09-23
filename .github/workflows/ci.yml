@@ -267,6 +267,13 @@ jobs:
           test -f prototypes/v2/out/manifest.json
           test -f prototypes/v2/out/v2/sw.js
 
+      # The bundle-size tripwire (#1388): one ceiling on the export's total JavaScript,
+      # ~25% over its baseline, so it fails only on an accident such as an eager import.
+      # One leg is enough; every leg builds the same export.
+      - name: Check the export's JavaScript against its ceiling
+        if: matrix.shard == 'heavy' && matrix.project == 'laptop'
+        run: npm run check:bundle --prefix prototypes/v2
+
       - name: Run the v2 Playwright suite
         run: npm run test:e2e --prefix prototypes/v2 -- --project=${{ matrix.project }}
         env:
