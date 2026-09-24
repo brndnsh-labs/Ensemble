@@ -69,7 +69,15 @@ export type BandEvent = DrumHit | PitchedNote;
 export type CompInstrument = 'piano' | 'rhodes' | 'organ' | 'clav' | 'guitar' | 'nylon';
 
 /** The genres the band plays natively. A new genre is a style file; see `styles/index.ts`. */
-export type StyleId = 'rock' | 'jazz' | 'funk' | 'bossa' | 'reggae' | 'blues' | 'country';
+export type StyleId =
+    | 'rock'
+    | 'jazz'
+    | 'funk'
+    | 'bossa'
+    | 'reggae'
+    | 'blues'
+    | 'country'
+    | 'neosoul';
 
 export interface BandSettings {
     style: StyleId;
