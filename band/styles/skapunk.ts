@@ -16,7 +16,7 @@ import { type BarPlan, type EnergyTier, energyTier } from '../arrange/plan.js';
 import type { Rng } from '../core/random.js';
 import type { PitchedNote } from '../core/types.js';
 import type { Bar } from '../form/timeline.js';
-import { BASS, bassNote, bassPc, nextChord, place } from '../players/bass/line.js';
+import { approach, BASS, bassNote, bassPc, nextChord, place } from '../players/bass/line.js';
 import { compIdiom, type Hit, strums } from '../players/comp/idiom.js';
 import { drumIdiom, type Lines, snareFigure } from '../players/drums/kit.js';
 import { barSteps, dyn, pulses, spanSteps } from '../players/grid.js';
@@ -146,6 +146,18 @@ function songRoot(ctx: BarContext, pc: number): number {
     return nearestMidi(pc, anchor, BASS.lo, BASS.hi);
 }
 
+/**
+ * What the last beat's approach candidate costs, before the path search weighs it against the
+ * line's own shape (`moveCost`, the turn/back penalties). A half step is common in tonal
+ * harmony almost by accident — the nearest scale tone below a target is very often one anyway —
+ * so leaving every candidate equally free still made the walk lean on it for the vast majority
+ * of changes (measured ~0.75-0.85 with `bassChromaticApproach`, still close to the old, fully
+ * forced 1.0). A ska walk uses chromaticism as seasoning, not its default move, so the half
+ * step carries a real premium here: the scale step and the target's fifth are free, and the
+ * walk reaches past them for a half step only when the line's own shape clearly favours it.
+ */
+const APPROACH_COST = { chromatic: 1.6, scale: 0, dominant: 0 } as const;
+
 /** Cost of a move in a walking line: steps are free, thirds cost, a leap past a fourth is out. */
 function moveCost(a: number, b: number): number {
     const d = Math.abs(a - b);
@@ -205,9 +217,22 @@ function walk(
         const options: [number, number, number | null][] = [];
         if (k === count - 1 && targets) {
             for (const t of targets) {
-                for (const m of [t.midi - 1, t.midi + 1]) {
+                // Four ways into the arrival: a half step from below or above (chromatic), the
+                // target's own fifth (a V-I in miniature), or the nearest diatonic scale step —
+                // the search picks whichever actually fits the line's shape, seasoning the walk
+                // with chromaticism rather than forcing it on every change.
+                const candidates: [number, number][] = [
+                    [approach(t.midi, chord, 'chromatic-below'), APPROACH_COST.chromatic],
+                    [approach(t.midi, chord, 'chromatic-above'), APPROACH_COST.chromatic],
+                    [approach(t.midi, chord, 'dominant'), APPROACH_COST.dominant],
+                    [approach(t.midi, chord, 'scale'), APPROACH_COST.scale],
+                ];
+                for (const [m, weight] of candidates) {
                     if (m >= BASS.lo && m <= BASS.hi) {
-                        options.push([m, t.cost, t.midi]);
+                        // A seeded nudge, as the walk's other beats take, so ties between
+                        // equally-cheap approaches vary bar to bar rather than always resolving
+                        // the same way.
+                        options.push([m, t.cost + weight + rng.next() * 0.2, t.midi]);
                     }
                 }
             }
@@ -346,9 +371,12 @@ const skaPunkBass: PitchedIdiom = {
             }
             const strong = steps.map((s, k) => k > 0 && isStrong(s));
             // The walk may aim at any octave of the next root; one away from its default costs
-            // (the line may climb, but it comes home).
+            // (the line may climb, but it comes home). A chord that simply repeats gives the
+            // walk nothing to approach — the line keeps its own shape toward the same root
+            // rather than manufacturing a half-step lead-in into a change that isn't one.
+            const repeat = following ? following.symbol === chord.symbol : false;
             const targets =
-                home === null
+                home === null || repeat
                     ? null
                     : [home - 12, home, home + 12]
                           .filter((t) => t > BASS.lo && t < BASS.hi)
@@ -450,26 +478,32 @@ const skankGuitar = compIdiom({
  * The punk hand: down-picked eighths. Every stroke is a downstroke because the hand now swings
  * in sixteenths — down on each eighth, and the up in between misses the strings — the
  * Ramones-style downpicking that gives punk its even, relentless attack. Palm-muted in the
- * middle of the energy range: the heel of the hand chokes each chord to a sixteenth, keeping
- * its pitch (the engine's `muted` flag is a dead scratch with the pitch gone, which a palm mute
- * isn't, so it is written as a choked strum). A driving band lifts the palm and lets each
- * eighth ring into the next, the beats accented; a quiet chorus strums quarters.
+ * middle of the energy range: the heel of the hand chokes each chord while it still rings a
+ * damped pitch (`palm`, not `muted` — a scratch is a dead click with the pitch gone, which a
+ * palm mute isn't). A driving band lifts the palm and lets each eighth ring into the next, the
+ * beats accented; a quiet chorus strums quarters.
  *
- * Open triads rather than power chords: a power chord drops the 3rd, and the band's harmony
- * (the organ's skank, the chart's 7ths) keeps it — a stripped fifth under a sounding third is a
- * different chord. Four strings, the root or fifth doubled, off the bass's low strings; with no
- * bassist, full root-position chords on five strings, down where a punk guitar lives alone.
+ * Distorted power chords, root-5-8 on the E and A strings, doubling the bass on purpose — the
+ * ska-punk chorus (Bosstones, Less Than Jake, Reel Big Fish, Goldfinger), not a full triad: a
+ * power chord is harmonically neutral, so it never "contradicts" the band's sounding third —
+ * the organ's skank and the chart's 7ths still carry the chord's colour. Same low slot as
+ * metal's rhythm guitar (`kind: 'power'`, the below-C3 floor is the shape rule's power-chord
+ * exception), with or without a bassist: a punk power chord lives down here whether or not the
+ * bass doubles it.
  */
 const punkGuitar = compIdiom({
     name: 'punk downstrokes',
-    kind: 'close',
-    grip: { strings: 4, slot: { lo: 50, hi: 74, top: 64, pull: 0.6 } },
-    alone: { strings: 5, slot: { lo: 40, hi: 76, top: 64 }, rootBottom: true },
+    kind: 'power',
+    grip: { strings: 3, slot: { lo: 40, hi: 64, top: 52, pull: 2 }, rootBottom: true },
     // A push is an ensemble hit; the guitar doesn't jump the band alone.
     push: { low: 0, mid: 0, high: 0 },
     rhythm(ctx, { from, to }, tier) {
         const ring = tier === 'low' ? 3.6 : tier === 'mid' ? 1 : 2;
-        return strums(driveLine(ctx.bar, tier), from, to, 1, ring);
+        const hits = strums(driveLine(ctx.bar, tier), from, to, 1, ring);
+        // Palm-muted in the middle of the energy range: the host (`playBandEvent`) clamps a
+        // `palm` hit's audible length to ~80-130ms regardless of what `ring` writes here, so
+        // the chord is choked at the bridge without losing its pitch the way a scratch would.
+        return tier === 'mid' ? hits.map((h) => ({ ...h, palm: true })) : hits;
     },
 });
 
