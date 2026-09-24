@@ -80,7 +80,8 @@ export type StyleId =
     | 'hiphop'
     | 'disco'
     | 'neosoul'
-    | 'metal';
+    | 'metal'
+    | 'skapunk';
 
 export interface BandSettings {
     style: StyleId;

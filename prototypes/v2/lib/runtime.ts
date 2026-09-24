@@ -141,7 +141,7 @@ const STYLE_FOR_GENRE: Record<string, StyleId> = {
     Acoustic: 'rock',
     Country: 'country',
     Metal: 'metal',
-    'Ska-Punk': 'rock',
+    'Ska-Punk': 'skapunk',
 };
 /** The chords-lane sound for each comp instrument (what the band's Auto sound selects). */
 const VOICE_FOR_COMP: Record<CompInstrument, InstrumentVoice> = {

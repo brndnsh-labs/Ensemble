@@ -17,6 +17,7 @@ import { metal } from './metal.js';
 import { neosoul } from './neosoul.js';
 import { reggae } from './reggae.js';
 import { rock } from './rock.js';
+import { skapunk } from './skapunk.js';
 import type { Feel, Style } from './types.js';
 
 export const STYLES: Record<StyleId, Style> = {
@@ -31,6 +32,7 @@ export const STYLES: Record<StyleId, Style> = {
     disco,
     neosoul,
     metal,
+    skapunk,
 };
 
 export const STYLE_IDS = Object.keys(STYLES) as StyleId[];

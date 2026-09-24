@@ -47,7 +47,7 @@ The ground-up replacement for the generative engine; see `docs/design/band-engin
 | `band/theory/chord.ts` | The one chord authority: symbol → `ChordFacts` (tones, family, guides, scale). | `parseChord`, `chordPcs` |
 | `band/arrange/plan.ts` | Per-bar energy, lanes, fills, crashes, ending. | `planBars`, `energyTier` |
 | `band/feel/feel.ts` | The timing law: swing geometry, lane lean, seeded character. | `applyFeel` |
-| `band/styles/index.ts` | Style registry; each style is one file (`rock.ts`, `jazz.ts`, `funk.ts`, `bossa.ts`, `blues.ts`, `reggae.ts`, `country.ts`, `hiphop.ts`, `disco.ts`, `neosoul.ts`, `metal.ts`): feel + drums, bass and comp (keyboard and guitar) idioms. | `STYLES`, `feelFor` |
+| `band/styles/index.ts` | Style registry; each style is one file (`rock.ts`, `jazz.ts`, `funk.ts`, `bossa.ts`, `blues.ts`, `reggae.ts`, `country.ts`, `hiphop.ts`, `disco.ts`, `neosoul.ts`, `metal.ts`, `skapunk.ts`): feel + drums, bass and comp (keyboard and guitar) idioms. | `STYLES`, `feelFor` |
 | `band/players/` | Shared idiom machinery: `drums/kit.ts`, `bass/line.ts`, `comp/idiom.ts`, `grid.ts`. | `drumIdiom`, `compIdiom`, `strums`, `bassNote` |
 | `band/players/comp/` | The comp: instruments (range, strum, sustain), keyboard voicings, fretboard grips. | `COMP_INSTRUMENTS`, `voice`, `grip`, `isPlayable` |
 | `band/sinks/midi.ts` | BandEvent[] → Standard MIDI File. | `toMidi` |
