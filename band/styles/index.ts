@@ -13,6 +13,7 @@ import { disco } from './disco.js';
 import { funk } from './funk.js';
 import { hiphop } from './hiphop.js';
 import { jazz } from './jazz.js';
+import { neosoul } from './neosoul.js';
 import { reggae } from './reggae.js';
 import { rock } from './rock.js';
 import type { Feel, Style } from './types.js';
@@ -27,6 +28,7 @@ export const STYLES: Record<StyleId, Style> = {
     country,
     hiphop,
     disco,
+    neosoul,
 };
 
 export const STYLE_IDS = Object.keys(STYLES) as StyleId[];
