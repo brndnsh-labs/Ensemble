@@ -24,7 +24,7 @@ import { isPlayable } from '../players/comp/fretboard.js';
 import { compIdiom, type Hit, strums } from '../players/comp/idiom.js';
 import { drumIdiom, type Lines, snareFigure, tomRun } from '../players/drums/kit.js';
 import { at, barSteps, dyn, isCommonTime, pulses, STEP, spanSteps } from '../players/grid.js';
-import type { ChordFacts } from '../theory/chord.js';
+import { type ChordFacts, chordPcs } from '../theory/chord.js';
 import { mod12, nearestMidi } from '../theory/pitch.js';
 import type { BarContext, PitchedIdiom, Style } from './types.js';
 
@@ -137,8 +137,14 @@ function fifthPc(chord: ChordFacts): number {
  * The walk-up (or walk-down): two notes on beats 3 and 4 that step from the root into the
  * next chord's bass — the classic three-note run G-A-B → C. Only for a change a third to a
  * tritone away: a step is already a walk, and anything wider isn't reachable in two steps.
- * Scale tones are preferred, the first one most (the run starts diatonic and may pull into
- * the target chromatically: C-D-D#→E, A-G-F#→F, C-B-Bb→A).
+ * The note right before the target (beat 4) is the one the ear judges — a clash there reads
+ * as a wrong note even when beat 3 was perfectly scalar — so it outweighs beat 3 2-to-1
+ * (B4: the old weighting favoured beat 3 and let A7→Dm's phrygian-dominant scale walk
+ * A-Bb-C into D, a C natural fighting the chord's own C#). A note also counts as "in" when
+ * it's a chord tone even if the scale (built for passing tones, not guide tones) omits it.
+ * Ties go to the earlier-tried gap, which is what keeps A7→Dm's beat 3 a grind on the b3
+ * (A-C-C#→D) rather than forcing the plain 9th (A-B-C#→D) — both are idiomatic; the point is
+ * beat 4 always lands on the chord's own major 3rd, never the clashing natural 3rd of Dm.
  */
 function walk(root: number, target: number, chord: ChordFacts): [number, number] | null {
     const distance = target - root;
@@ -146,7 +152,11 @@ function walk(root: number, target: number, chord: ChordFacts): [number, number]
         return null;
     }
     const dir = Math.sign(distance);
-    const diatonic = (m: number) => chord.scale.includes(mod12(m - chord.root));
+    const chordToneOffsets = new Set(chordPcs(chord).map((pc) => mod12(pc - chord.root)));
+    const diatonic = (m: number) => {
+        const offset = mod12(m - chord.root);
+        return chord.scale.includes(offset) || chordToneOffsets.has(offset);
+    };
     let best: [number, number] | null = null;
     let bestScore = -1;
     for (const last of [1, 2]) {
@@ -157,7 +167,7 @@ function walk(root: number, target: number, chord: ChordFacts): [number, number]
             if ((w3 - root) * dir <= 0) {
                 continue;
             }
-            const score = (diatonic(w3) ? 2 : 0) + (diatonic(w4) ? 1 : 0);
+            const score = (diatonic(w4) ? 2 : 0) + (diatonic(w3) ? 1 : 0);
             if (score > bestScore) {
                 best = [w3, w4];
                 bestScore = score;
@@ -408,9 +418,13 @@ const honkyTonk = compIdiom({
 
 /**
  * The honky-tonk sixth: a plain major triad takes its major 6th a whole step above the 5th
- * (C-E-G-A) — the pedal-steel colour the old engine's country pads carried. Not on a triad
- * resolving down a fifth: the V's 6th is the next chord's 3rd arriving early, and blurs the
- * resolution. The compIdiom voices the triad; this adds one note to it, the same length.
+ * (C-E-G-A) — the pedal-steel colour the old engine's country pads carried. Only on the key's
+ * tonic and subdominant (I and IV): a western-swing band runs I6-IV6-I turnarounds on pedal
+ * steel, but the 6th on V is the next chord's 3rd arriving early and blurs the pull into I,
+ * and the other majors a chart can write (bIII, bVI, bVII) aren't this pocket's tonic-and-
+ * subdominant color chords (T4 — the old rule added the 6th to every plain major triad except
+ * a V resolving down a fifth, which still let it onto IV and a non-resolving V alike). The
+ * compIdiom voices the triad; this adds one note to it, the same length.
  */
 function withSixths(ctx: BarContext, events: PitchedNote[]): PitchedNote[] {
     const [, top] = ctx.instrument.range;
@@ -428,12 +442,8 @@ function withSixths(ctx: BarContext, events: PitchedNote[]): PitchedNote[] {
             chord.seventh === null &&
             !chord.sixth &&
             chord.tensions.length === 0;
-        if (!chord || !plain) {
-            continue;
-        }
-        const index = ctx.bar.spans.findIndex((s) => s.start <= tick && tick < s.end);
-        const after = ctx.bar.spans[index + 1]?.chord ?? ctx.next?.bar.spans[0]?.chord ?? null;
-        if (after && mod12(after.root - chord.root) === 5) {
+        const degree = chord ? mod12(chord.root - ctx.bar.key.tonic) : -1;
+        if (!chord || !plain || (degree !== 0 && degree !== 5)) {
             continue;
         }
         const fifth = notes.find((n) => mod12(n.midi - chord.root) === 7);
@@ -446,8 +456,9 @@ function withSixths(ctx: BarContext, events: PitchedNote[]): PitchedNote[] {
 }
 
 const countryKeys: PitchedIdiom = {
-    name: honkyTonk.name,
-    init: honkyTonk.init,
+    // I6: spread the inner idiom rather than rebuilding `{name, init, play}` by hand, so a
+    // flag `honkyTonk` carries (`percussive`, or one added later) survives the wrapper.
+    ...honkyTonk,
     play(ctx, memory) {
         const out = honkyTonk.play(ctx, memory);
         return { events: withSixths(ctx, out.events), memory: out.memory };
@@ -471,7 +482,8 @@ const boomChick = compIdiom({
     // A strong pull keeps the hand in first position instead of drifting up the neck.
     grip: { strings: 4, slot: { lo: 50, hi: 72, top: 64, pull: 0.8 }, open: true },
     // No `alone` shape: without a bassist the pick plays the boom on the low strings itself
-    // (`countryGuitar` below) and the strum stays on the treble strings, Carter-style.
+    // (`countryGuitar` below) and the strum stays on the treble strings — the bass-strum split
+    // (Luther Perkins' Johnny Cash sound), not the Carter Family's own thumb-picked melody.
     push: { low: 0, mid: 0, high: 0 },
     rhythm(ctx, { from, to, attack }, tier) {
         const alone = !ctx.plan.lanes.bass;
@@ -499,14 +511,17 @@ const boomChick = compIdiom({
 });
 
 /**
- * Carter-style: with no bassist, the guitarist picks the boom — the root on 1, the fifth on 3,
- * on the low strings — and strums the chick on the treble strings between them. The "who owns
- * the bottom" law: the bass lane is off, so the low strings are the guitar's (as the bossa
- * thumb takes them). With a bass in the band, the pick leaves them alone.
+ * The bass-strum guitar (T3 — this is Luther Perkins' Johnny Cash sound, not the Carter
+ * Family's own style, which picks the *melody* on the bass strings): with no bassist, the
+ * guitarist picks the boom — the root on 1, the fifth on 3, on the low strings — and strums
+ * the chick on the treble strings between them. The "who owns the bottom" law: the bass lane
+ * is off, so the low strings are the guitar's (as the bossa thumb takes them). With a bass in
+ * the band, the pick leaves them alone.
  */
 const countryGuitar: PitchedIdiom = {
-    name: boomChick.name,
-    init: boomChick.init,
+    // I6: spread the inner idiom rather than rebuilding `{name, init, play}` by hand, so a
+    // flag `boomChick` carries (`percussive`, or one added later) survives the wrapper.
+    ...boomChick,
     play(ctx, memory) {
         const out = boomChick.play(ctx, memory);
         const { bar, plan } = ctx;
@@ -516,7 +531,9 @@ const countryGuitar: PitchedIdiom = {
         // Where a bass note may sit: the 6th and 5th strings in first position (E2–Eb3).
         const LO = 40;
         const HI = 51;
-        const strikes = [...new Set(out.events.map((e) => e.tick))];
+        // Ticks the walk-up (below) claims for the pick: the strum's own hit there is dropped,
+        // since a hand can't strum and pick a bass run in the same instant.
+        const walkTicks = new Set<number>();
         const booms: PitchedNote[] = [];
         const pick = (tick: number, midi: number, dur: number, velocity: number) =>
             booms.push({
@@ -544,39 +561,88 @@ const countryGuitar: PitchedIdiom = {
             }
         } else {
             const { boom } = beatsOf(ctx);
+            const tier = energyTier(plan.energy);
+            const common = isCommonTime(bar);
+            const next = nextChord(ctx);
+            const spans = spanSteps(bar);
+            const strikes = [...new Set(out.events.map((e) => e.tick))];
             let last: number | null = null;
-            for (const { span, from, to } of spanSteps(bar)) {
+            spans.forEach(({ span, from, to }, i) => {
                 const chord = span.chord;
                 if (!chord || span.fermata) {
-                    continue;
+                    return;
                 }
                 const steps = boom.filter((s) => s >= from && s < to);
                 if (!steps.includes(from)) {
                     steps.unshift(from);
                 }
                 steps.sort((a, b) => a - b);
-                steps.forEach((step, k) => {
-                    const tick = at(bar, step);
-                    // The pick is busy strumming here (a chord's forced arrival strike).
-                    if (strikes.includes(tick)) {
-                        return;
-                    }
-                    // The chord's bass where it arrives, its fifth on the next boom: C then
-                    // the G on the 6th string, G then the open D.
-                    const midi =
+                // The chord's bass where it arrives, its fifth on the next boom: C then
+                // the G on the 6th string, G then the open D.
+                type Note = { step: number; midi: number; velocity: number };
+                const notes: Note[] = steps.map((step, k) => ({
+                    step,
+                    midi:
                         k === 0
                             ? nearestMidi(chord.bass, last ?? 45, LO, HI)
-                            : nearestMidi(fifthPc(chord), last ?? 45, LO, HI);
+                            : nearestMidi(fifthPc(chord), last ?? 45, LO, HI),
+                    velocity: k === 0 ? 88 : 80,
+                }));
+
+                // I3: the walk-up ("G-A-B → C") is the bass-strum guitar's most recognisable
+                // gesture. With the bass lane off, the pick's low strings are the only voice
+                // left to play it, so it reuses `walk()` straight (B4's corrected scoring),
+                // gated exactly like `countryBass`: 4/4, above the ballad, a span with room
+                // for beats 3 and 4, and a change struck on arrival with a different bass note.
+                const following =
+                    spans[i + 1]?.span.chord ?? (i === spans.length - 1 ? next : null);
+                const followingAttacks =
+                    spans[i + 1]?.span.attack ?? ctx.next?.bar.spans[0]?.attack ?? false;
+                if (
+                    tier !== 'low' &&
+                    common &&
+                    from <= 4 &&
+                    to - from >= 12 &&
+                    following &&
+                    followingAttacks &&
+                    following.bass !== chord.bass
+                ) {
+                    const root = notes[0].midi;
+                    const target = nearestMidi(following.bass, root, LO, HI);
+                    const run = walk(root, target, chord);
+                    const chance = tier === 'high' ? 0.65 : 0.45;
+                    if (run && ctx.rng(`guitarWalk${i}`).chance(chance)) {
+                        notes.splice(
+                            notes.filter((n) => n.step < to - 8).length,
+                            notes.length,
+                            { step: to - 8, midi: run[0], velocity: 92 },
+                            { step: to - 4, midi: run[1], velocity: 98 },
+                        );
+                        walkTicks.add(at(bar, to - 8));
+                        walkTicks.add(at(bar, to - 4));
+                    }
+                }
+
+                notes.forEach(({ step, midi, velocity }, k) => {
+                    const tick = at(bar, step);
+                    // The pick is busy strumming here (a chord's forced arrival strike) —
+                    // unless it's the walk's own landing, which silences that strum instead.
+                    if (strikes.includes(tick) && !walkTicks.has(tick)) {
+                        return;
+                    }
                     // It rings until the next bass note or the chord's end.
-                    const until = steps[k + 1] ?? to;
-                    pick(tick, midi, (until - step) * STEP * 0.95, k === 0 ? 88 : 80);
+                    const until = notes[k + 1]?.step ?? to;
+                    pick(tick, midi, (until - step) * STEP * 0.95, velocity);
                     last = midi;
                 });
-            }
+            });
         }
+        // The walk (above) silences the strum's own hit where it lands: the chick makes way
+        // for the bass run rather than sounding under it.
+        const strummed = out.events.filter((e) => !walkTicks.has(e.tick));
         // A plucked string restarts: whichever of a grip note and a bass note of the same
         // pitch comes first stops where the other begins.
-        const all = [...out.events, ...booms].sort((a, b) => a.tick - b.tick);
+        const all = [...strummed, ...booms].sort((a, b) => a.tick - b.tick);
         const events = all.map((e) => {
             const cut = all.find(
                 (o) => o !== e && o.midi === e.midi && o.tick > e.tick && o.tick < e.tick + e.dur,
