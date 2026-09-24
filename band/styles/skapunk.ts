@@ -189,6 +189,7 @@ function walk(
     strong: boolean[],
     targets: Target[] | null,
     rng: Rng,
+    chromatic = true,
 ): { line: number[]; land: number | null } {
     const count = strong.length;
     if (count === 1) {
@@ -228,6 +229,9 @@ function walk(
                     [approach(t.midi, chord, 'scale'), APPROACH_COST.scale],
                 ];
                 for (const [m, weight] of candidates) {
+                    if (!chromatic && weight === APPROACH_COST.chromatic) {
+                        continue;
+                    }
                     if (m >= BASS.lo && m <= BASS.hi) {
                         // A seeded nudge, as the walk's other beats take, so ties between
                         // equally-cheap approaches vary bar to bar rather than always resolving
@@ -371,17 +375,25 @@ const skaPunkBass: PitchedIdiom = {
             }
             const strong = steps.map((s, k) => k > 0 && isStrong(s));
             // The walk may aim at any octave of the next root; one away from its default costs
-            // (the line may climb, but it comes home). A chord that simply repeats gives the
-            // walk nothing to approach — the line keeps its own shape toward the same root
-            // rather than manufacturing a half-step lead-in into a change that isn't one.
+            // (the line may climb, but it comes home). A chord that simply repeats still walks
+            // home to its root, by a scale step or from its fifth — never a manufactured
+            // half-step lead-in into a change that isn't one, and never a free run that leaves
+            // the next downbeat a leap away.
             const repeat = following ? following.symbol === chord.symbol : false;
             const targets =
-                home === null || repeat
+                home === null
                     ? null
                     : [home - 12, home, home + 12]
                           .filter((t) => t > BASS.lo && t < BASS.hi)
                           .map((t) => ({ midi: t, cost: Math.abs(t - home) * 0.25 }));
-            const { line, land: aim } = walk(chord, first, strong, targets, ctx.rng(`walk${i}`));
+            const { line, land: aim } = walk(
+                chord,
+                first,
+                strong,
+                targets,
+                ctx.rng(`walk${i}`),
+                !repeat,
+            );
             line.forEach((midi, k) => {
                 const gap = (steps[k + 1] ?? to) - steps[k];
                 // Bouncy, not legato: a ska line is plucked short; the arrival leans in and the
