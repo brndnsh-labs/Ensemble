@@ -133,7 +133,7 @@ const STYLE_FOR_GENRE: Record<string, StyleId> = {
     Jazz: 'jazz',
     Funk: 'funk',
     Bossa: 'bossa',
-    Blues: 'jazz',
+    Blues: 'blues',
     'Neo-Soul': 'funk',
     Disco: 'funk',
     'Hip Hop': 'funk',
