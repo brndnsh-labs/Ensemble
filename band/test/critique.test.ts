@@ -17,6 +17,7 @@ import {
 import { chordAt, compileTimeline, type Timeline } from '../form/timeline.js';
 import { type PassMemory, performPass } from '../perform.js';
 import { STEP } from '../players/grid.js';
+import { fifthOf } from '../theory/chord.js';
 import { mod12 } from '../theory/pitch.js';
 import { FIXTURES } from './scores.js';
 
@@ -344,7 +345,6 @@ const METRICS: Record<string, Metric> = {
         }
         return ratio(notes, beats);
     },
-    /** Of the notes one beat before a chord change, the share a half step from the arrival. */
     /** At each real chord change, the share where the note before is a half step from the arrival. */
     bassChromaticApproach: (takes) => {
         let n = 0;
@@ -379,6 +379,33 @@ const METRICS: Record<string, Metric> = {
         }
         return ratio(hit, n);
     },
+    /**
+     * The blues shuffle's lope: of the bass notes on a swung "and" (an offbeat eighth), the
+     * share that repeat the pitch of the beat just before it. This is the claim itself — the
+     * lope re-strikes the beat, it never moves on the "and" — not `bassRepeatedNotes`'s much
+     * broader count of any two consecutive notes sharing a pitch anywhere in the line.
+     */
+    bassLopeRepeatsBeat: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { timeline: t, events } of takes) {
+            const bass = onsetsByBar(t, events, 'bass');
+            for (const steps of bass.values()) {
+                for (const [step, notes] of steps) {
+                    if (step % 4 !== 2) {
+                        continue;
+                    }
+                    const beat = steps.get(step - 2);
+                    if (!beat) {
+                        continue;
+                    }
+                    n++;
+                    hit += notes[0].midi === beat[0].midi ? 1 : 0;
+                }
+            }
+        }
+        return ratio(hit, n);
+    },
     /** Share of bass notes lasting two beats or more that are chord tones (no held passing tones). */
     bassHeldNotesAreChordTones: (takes) => {
         let n = 0;
@@ -398,7 +425,11 @@ const METRICS: Record<string, Metric> = {
         }
         return ratio(hit, n);
     },
-    /** Of the bass notes under dominant 7th chords, the share on the major 6th (the boogie's). */
+    /**
+     * Of the bass notes under dominant 7th chords whose scale actually has a natural 6/13
+     * (excluding a secondary dominant resolving to minor, which takes an implied b13 and has
+     * no 6th to rock to — B2), the share on the major 6th (the boogie's).
+     */
     bassSixthOnDominants: (takes) => {
         let n = 0;
         let hit = 0;
@@ -408,7 +439,11 @@ const METRICS: Record<string, Metric> = {
                     continue;
                 }
                 const chord = chordAt(t, e.tick);
-                if (chord?.family !== 'dominant' || chord.seventh !== 10) {
+                if (
+                    chord?.family !== 'dominant' ||
+                    chord.seventh !== 10 ||
+                    !chord.scale.includes(9)
+                ) {
                     continue;
                 }
                 n++;
@@ -764,6 +799,48 @@ const METRICS: Record<string, Metric> = {
         }
         return ratio(hit, n);
     },
+    /**
+     * The Jimmy Reed boogie dyad (guitar alone, no bass): in bars holding one root-position,
+     * plain-5th chord, the share of its beats where the lower note is the root and the upper
+     * is the chord's plain 5th on 1 and 3, its major 6th (or the b7 where the chord's scale
+     * has no 6th — B2) on 2 and 4.
+     */
+    compBoogieDyads: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { timeline: t, events } of takes) {
+            const comp = onsetsByBar(t, events, 'comp');
+            for (const [b, chord] of wholeBarChords(t)) {
+                if (chord.bass !== chord.root || chord.fifth !== 7) {
+                    continue;
+                }
+                const dyadOn = (step: number, upperPcs: Set<number>) => {
+                    const notes = comp.get(b.index)?.get(step);
+                    if (notes?.length !== 2) {
+                        return null;
+                    }
+                    const [lo, hi] = [...notes].sort((x, y) => x.midi - y.midi);
+                    return mod12(lo.midi) === chord.root && upperPcs.has(mod12(hi.midi));
+                };
+                const fifthPcs = new Set([mod12(chord.root + fifthOf(chord))]);
+                const sixthOrB7 = new Set([9, 10].map((iv) => mod12(chord.root + iv)));
+                for (const [step, upperPcs] of [
+                    [0, fifthPcs],
+                    [8, fifthPcs],
+                    [4, sixthOrB7],
+                    [12, sixthOrB7],
+                ] as const) {
+                    const beat = dyadOn(step, upperPcs);
+                    if (beat === null) {
+                        continue;
+                    }
+                    n++;
+                    hit += beat ? 1 : 0;
+                }
+            }
+        }
+        return ratio(hit, n);
+    },
 };
 
 // ---------------------------------------------------------------- the claims
@@ -827,12 +904,18 @@ const CLAIMS: Record<StyleId, Claim[]> = {
         ['cymbalEighths', 0.9, 1, 'the shuffle: the cymbal on every eighth, never a sixteenth'],
         ['kickConsistency', 0.75, 1, 'a section keeps its shuffle'],
         ['bassArrivesOnBass', 0.8, 1, 'the box starts on the root (a 2nd bar turns from the b7)'],
-        ['bassSixthOnDominants', 0.1, 0.35, 'the boogie box rocks through the 6th'],
+        ['bassSixthOnDominants', 0.15, 0.35, 'the boogie box rocks through the 6th'],
         [
-            'bassRepeatedNotes',
-            0.1,
-            0.5,
+            'bassLopeRepeatsBeat',
+            0.95,
+            1,
             'the lope re-strikes the beat; it never moves on the "and"',
+        ],
+        [
+            'bassChromaticApproach',
+            0.15,
+            0.4,
+            'a change resolves by a half step in pitch, not just pitch class (B1)',
         ],
         ['compColour', 0.5, 1, 'rootless 9ths and 13ths over the dominants'],
         ['compOffbeatShare', 0.3, 0.8, 'stabs and pushes on the "and"s'],
@@ -851,7 +934,8 @@ const CLAIMS: Record<StyleId, Claim[]> = {
     ],
 };
 
-// A second jazz take at low energy, where the walk relaxes into a two-feel.
+// A second take at low energy, for the styles whose feel actually changes there — a walk
+// relaxing into a two-feel (jazz, blues), a quiet one drop, a ballad two-beat (country).
 const LOW_CLAIMS: Partial<Record<StyleId, Claim[]>> = {
     reggae: [
         ['kickOnOne', 0, 0.02, 'a quiet one drop never kicks the One'],
@@ -918,12 +1002,24 @@ const GUITAR_CLAIMS: Record<StyleId, Claim[]> = {
     ],
 };
 
-/** The organ, where a style plays it its own way rather than holding pads. */
+/**
+ * The organ: reggae's bubble is its own idiom, chopped rather than held. Blues checks the
+ * opposite claim — that with `prefers: 'piano'` (I1), the organ still plays, but as a held
+ * pad that drops the shuffle piano's struck figure, rather than pumping it.
+ */
 const ORGAN_CLAIMS: Partial<Record<StyleId, Claim[]>> = {
     reggae: [
         ['compOffbeatShare', 0.95, 1, 'the bubble lives between the beats'],
         ['compShort', 0.9, 1, 'the bubble is chopped, never held'],
         ['compStrikesPerBar', 5, 8, 'two taps a beat: the "and" and the "a"'],
+    ],
+    blues: [
+        [
+            'compStrikesPerBar',
+            1,
+            1.6,
+            'a held pad strikes only on a chord change or push, not the shuffle figure',
+        ],
     ],
 };
 
@@ -948,6 +1044,14 @@ const GUITAR_ALONE_CLAIMS: Partial<Record<StyleId, Claim[]>> = {
     country: [
         ['compBoomChick', 0.9, 1, 'Carter-style: the pick plays root on 1, fifth on 3, down low'],
         ['compBackbeatShare', 0.6, 1, 'and strums the chick on 2 and 4'],
+    ],
+    blues: [
+        [
+            'compBoogieDyads',
+            0.8,
+            1,
+            'Jimmy Reed: root under the 5th on 1 and 3, the 6th (or b7) on 2 and 4',
+        ],
     ],
 };
 

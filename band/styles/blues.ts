@@ -90,8 +90,11 @@ const shuffleKit = drumIdiom({
         // heard: four on the floor without stepping on the snare).
         const feather = ctx.rng('feather', 'section').chance(0.6);
         const drive = feather ? `${kick.slice(0, 4)}g${kick.slice(5, 12)}g${kick.slice(13)}` : kick;
-        // Half the high sections move the shuffle to the ride, hat foot on 2 and 4.
-        return ctx.rng('ride', 'section').chance(0.5)
+        // From a section's second visit on, the shuffle moves to the ride, hat foot on 2 and
+        // 4 — the band digs in as the form repeats (a chorus that's already been heard once),
+        // rather than a coin flip with no reason tied to the music. `visit.pass` is the same
+        // for every bar of one visit, so the whole chorus commits together, not bar by bar.
+        return ctx.bar.visit.pass >= 1
             ? { ride: 'x.o.x.o.x.o.x.o.', hatPedal: '....x.......x...', kick: drive, snare }
             : { ...hat('X.o.X.o.X.o.X.o.'), kick: drive, snare };
     },
@@ -140,17 +143,22 @@ const bluesDrums = withLope(shuffleKit);
 
 // ================================================================ bass
 /**
- * The boogie's rocking tone above a chord's 5th: the major 6th on any major or dominant chord
- * (the box is the dominant's, whatever the chord resolves to: a VI7 heading to a minor ii
- * still rocks to its major 6th), the Dorian 6th on a minor chord whose scale has one, and
- * the b6 of an Aeolian minor (the minor boogie). Null where there is no plain 5th to rock
- * from, or no 6th to rock to.
+ * The boogie's rocking tone above a chord's 5th: the major 6th on a major or dominant chord,
+ * the Dorian 6th on a minor chord whose scale has one, and the b6 of an Aeolian minor (the
+ * minor boogie). Null where there is no plain 5th to rock from, or no 6th to rock to.
+ *
+ * The chord's own scale decides, not its written third alone: a secondary dominant resolving
+ * to a minor chord (A7→Dm7) takes phrygian dominant with an implied b13 (`timeline.ts`'s
+ * `impliedTensions`), whose scale has no natural 6/13. Rocking to a major 6th there would
+ * plant an F# against the keys' rootless voicing's F natural — one chord, two authorities.
+ * Where the scale has no 6th, `boogieBox` below already falls back to the chord's own b7
+ * (R-3-5-b7) once this returns null, so the box still resolves, just without the 6th.
  */
 function rockingSixth(chord: ChordFacts): 9 | 8 | null {
     if (fifthOf(chord) !== 7) {
         return null;
     }
-    if (chord.third === 4 || chord.sixth || chord.scale.includes(9)) {
+    if (chord.scale.includes(9)) {
         return 9;
     }
     return chord.third === 3 && chord.scale.includes(8) ? 8 : null;
@@ -243,10 +251,20 @@ const shuffleBass: PitchedIdiom = {
             return { events, memory: { last } };
         }
         const common = isCommonTime(bar);
-        // One register for the section, low enough that the box's b7 stays under the slot's
-        // ceiling (a root no higher than A2).
+        // A section-stable anchor, low enough that the box's b7 stays under the slot's
+        // ceiling (a root no higher than A2) — but a root is placed nearest the *previous*
+        // note (pulled 30% back toward the anchor so the line doesn't drift away over many
+        // bars), not always at the anchor itself. Otherwise the box can climb to its 6th in
+        // one octave and the next bar's root lands nearest the fixed anchor in another,
+        // dropping over an octave between bars with nothing to bridge it.
         const anchor = BASS.home - 2 + ctx.rng('register', 'section').int(5);
-        const boxRoot = (pc: number) => nearestMidi(pc, anchor, BASS.lo, 45);
+        const boxRoot = (pc: number) =>
+            nearestMidi(
+                pc,
+                last === null ? anchor : Math.round(last + (anchor - last) * 0.3),
+                BASS.lo,
+                45,
+            );
         const lopes = new Set(
             tier === 'high'
                 ? [0, 1, 2, 3]
@@ -312,9 +330,14 @@ const shuffleBass: PitchedIdiom = {
                 beats.forEach((step, k) => {
                     let midi = root + degrees[k % degrees.length];
                     // The box's last note before a change that already *is* the next chord's
-                    // bass would sound the arrival a beat early: lead in from a half step under.
+                    // bass would sound the arrival a beat early: lead in from a half step
+                    // under. The approach has to resolve to where the *next bar* actually
+                    // places its root (`boxRoot`, keyed on the same register this bar ends
+                    // in) — approaching from this beat's own box octave and never checking
+                    // where the line lands next resolves the pitch class correctly but can
+                    // still leap an octave or more into the new bar.
                     if (k === beats.length - 1 && change && mod12(midi) === change.bass) {
-                        midi = approach(midi, chord, 'chromatic-below');
+                        midi = approach(boxRoot(change.bass), chord, 'chromatic-below');
                     }
                     const gap = (beats[k + 1] ?? to) - step;
                     const lope = common && lopes.has(step / 4) && gap >= 4;
@@ -390,16 +413,52 @@ function bluesKeysRhythm(
     });
 }
 
-const bluesKeys = compIdiom({
+// Anticipating the next chord on the "and" of 4 (into the IV, the V, the turnaround) is the
+// blues pianist's push; it grows with the band. Both keyboard books below share it.
+const KEYS_PUSH: Record<EnergyTier, number> = { low: 0.3, mid: 0.4, high: 0.5 };
+
+const bluesKeysRootless = compIdiom({
     name: 'blues comp',
     // Rootless: the 3rd and b7 with the 9th and 13th over a dominant — the blues' home chord
     // with its colours, and the bass has the root.
     kind: 'rootless',
-    // Anticipating the next chord on the "and" of 4 (into the IV, the V, the turnaround) is
-    // the blues pianist's push; it grows with the band.
-    push: { low: 0.3, mid: 0.4, high: 0.5 },
+    push: KEYS_PUSH,
     rhythm: (ctx, span, tier) => bluesKeysRhythm(ctx, span, tier),
 });
+
+/**
+ * The boogie piano's right hand: the high-tier "pump" figure (every swung eighth, long-short)
+ * is the straight-eighths boogie itself, not a walking pianist's comping — pumping rootless
+ * jazz 9ths and 13ths there mixes idioms (the same colour a jazz comper plays over a slow
+ * ballad, hammered eighth notes deep). `close` gives it plain triads and 6ths instead, the
+ * boogie hand's own colour. Same rhythm and push as the rootless book; only the voicing kind
+ * changes, so switching between them bar to bar is one field, not a second design.
+ */
+const bluesKeysPump = compIdiom({
+    name: 'blues comp (pump)',
+    kind: 'close',
+    push: KEYS_PUSH,
+    rhythm: (ctx, span, tier) => bluesKeysRhythm(ctx, span, tier),
+});
+
+/**
+ * Whether this bar's high-energy figure is the pump (all eight swung eighths, `KEYS_FIGURES`'s
+ * `figure.length === 8` case) — the same `rng('figure', 'section')` draw `bluesKeysRhythm`
+ * makes, so this can never disagree with which figure actually gets played.
+ */
+function isPumpBar(ctx: BarContext, tier: EnergyTier): boolean {
+    return tier === 'high' && ctx.rng('figure', 'section').weighted(KEYS_FIGURES.high).length === 8;
+}
+
+const bluesKeys: PitchedIdiom = {
+    ...bluesKeysRootless,
+    play(ctx, memory) {
+        const tier = energyTier(ctx.plan.energy);
+        return isPumpBar(ctx, tier)
+            ? bluesKeysPump.play(ctx, memory)
+            : bluesKeysRootless.play(ctx, memory);
+    },
+};
 
 // ---------------------------------------------------------------- guitar
 // Strum lines on the eighth-note pendulum (`-` a muted scratch). With a bass in the band the
@@ -431,7 +490,14 @@ const shuffleGuitar = compIdiom({
                 .map((p) => ({ step: p.step, length: 1.2, velocity: 84, stroke: 'down' as const }));
         }
         if (tier === 'low') {
-            return strums('....x.......x...', from, to, 2, 1.2);
+            // With a bass in the band the chop alone marks 2 and 4. Without one, beats 1 and
+            // 3 would be silent — the guitar is the only harmony playing, so it also has the
+            // bottom: a soft downstroke grounds every beat, still the same chop on 2 and 4.
+            // (This only catches the odd bar the boogie below doesn't: a slash chord or an
+            // altered dominant, where `boogie` steps aside and this book plays the chord.)
+            return ctx.plan.lanes.bass
+                ? strums('....x.......x...', from, to, 2, 1.2)
+                : strums('x...x...x...x...', from, to, 2, 1.2);
         }
         if (tier === 'mid') {
             return strums(ctx.rng('strum', 'section').weighted(GUITAR_MID), from, to, 2, 1.2);
@@ -509,16 +575,21 @@ function boogie(ctx: BarContext, memory: HandMemory, tier: EnergyTier) {
             // 5th on beats 1 and 3 (the b7 on 3 when it reaches), 6th on 2 and 4.
             const upper = beat % 2 === 0 ? (reach && beat === 2 ? 10 : fifth) : sixth;
             const dyad = [root, root + upper];
+            // Low energy plays quarter notes only, softer: root/5th on 1 and 3, the chop
+            // (the rocking tone) on 2 and 4 — a band that's barely playing, not the full
+            // rock. Mid and high add the swung "and" upstroke below.
+            const vel = tier === 'low' ? (beat % 2 === 0 ? 72 : 66) : beat % 2 === 0 ? 92 : 86;
             if (step === from && !tiedIn) {
-                events.push(...shape.map((m) => note(step, m, 1.8, 92, false)));
-            } else if (!(step === 0 && memory.pushed)) {
                 events.push(
-                    ...dyad.map((m) => note(step, m, 1.8, beat % 2 === 0 ? 92 : 86, false)),
+                    ...shape.map((m) => note(step, m, 1.8, tier === 'low' ? 76 : 92, false)),
                 );
+            } else if (!(step === 0 && memory.pushed)) {
+                events.push(...dyad.map((m) => note(step, m, 1.8, vel, false)));
             }
             // The same dyad again on the swung "and", an upstroke (none after an off-beat
-            // arrival: the next beat is already there).
-            if (step % 4 === 0 && step + 2 < to) {
+            // arrival: the next beat is already there, and none at low energy: quarter notes
+            // only, no lope).
+            if (tier !== 'low' && step % 4 === 0 && step + 2 < to) {
                 events.push(...dyad.map((m) => note(step + 2, m, 0.8, 72, true)));
             }
         }
@@ -529,16 +600,16 @@ function boogie(ctx: BarContext, memory: HandMemory, tier: EnergyTier) {
 }
 
 const bluesGuitar: PitchedIdiom = {
-    name: shuffleGuitar.name,
-    init: shuffleGuitar.init,
+    ...shuffleGuitar,
     play(ctx, memory: HandMemory) {
         const tier = energyTier(ctx.plan.energy);
-        // The boogie takes over only where it is the idiom: no bassist, the band moving, a 4/4
-        // bar with no fermata, no slash chord (its bass note is not a boogie root), a plain 5th
-        // to rock from (a diminished or altered chord is played as the chord), not the end.
+        // The boogie takes over only where it is the idiom: no bassist (including at low
+        // energy — the guitar is the band's only bottom then, so it plays it softer rather
+        // than not at all), a 4/4 bar with no fermata, no slash chord (its bass note is not a
+        // boogie root), a plain 5th to rock from (a diminished or altered chord is played as
+        // the chord), not the end.
         const boogieBar =
             !ctx.plan.lanes.bass &&
-            tier !== 'low' &&
             !ctx.plan.ending &&
             isCommonTime(ctx.bar) &&
             ctx.bar.spans.every(
@@ -568,9 +639,10 @@ export const blues: Style = {
     drums: bluesDrums,
     bass: shuffleBass,
     comp: { keyboard: bluesKeys, guitar: bluesGuitar },
-    // The Hammond organ, as the old engine chose. With no soloist yet the comp is the only
-    // voice above the bass: the organ's held rootless 9ths and 13ths fill the space a lead
-    // will take, under a shuffle the drums and bass already carry. The guitar's with-bass
-    // part is chops on 2 and 4, which is thin as a band's only harmony.
-    prefers: 'organ',
+    // Piano: the Chicago shuffle book (Spann, Perkins) is what `bluesKeys` plays — a struck
+    // right hand with a written figure per energy tier. The organ's legato path holds each
+    // chord to the next strike and drops that figure, so an organ default would silence the
+    // very book this style writes. The organ stays available (a held pad under the shuffle,
+    // filling the space a lead will later take), just not the genre's default voice.
+    prefers: 'piano',
 };
