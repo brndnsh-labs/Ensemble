@@ -65,15 +65,26 @@ function doublesTheBass(midi: number, grip: number[], chord: ChordFacts | null |
  */
 const POWER_CHORD_STYLES: ReadonlySet<StyleId> = new Set(['metal', 'skapunk']);
 
-/** Only the chord's root and its fifth (in any octaves), with the root lowest: R-5-8. */
+/**
+ * Only the chord's root and its fifth (in any octaves), with the root lowest: R-5-8. An
+ * augmented fifth (or an altered dominant's b13 in the fifth's seat) has no clean fifth to
+ * voice — root+#5 reads as another chord's root+third — so `voicingTones`' power-chord rule
+ * plays root and octave alone there. That's still the idiom's "no third" statement, just with
+ * an empty fifth's seat, so a root-only octave counts as a power chord for that one case.
+ */
 function isPowerChord(midis: number[], chord: ChordFacts | null | undefined): boolean {
     if (!chord || midis.length < 2) {
         return false;
     }
-    const fifth = mod12(chord.root + fifthOf(chord));
     const lowest = Math.min(...midis);
+    if (mod12(lowest) !== chord.root) {
+        return false;
+    }
+    if (fifthOf(chord) === 8) {
+        return midis.every((m) => mod12(m) === chord.root);
+    }
+    const fifth = mod12(chord.root + fifthOf(chord));
     return (
-        mod12(lowest) === chord.root &&
         midis.some((m) => mod12(m) === fifth) &&
         midis.every((m) => mod12(m) === chord.root || mod12(m) === fifth)
     );

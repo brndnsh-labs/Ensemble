@@ -91,7 +91,12 @@ export function voicingTones(chord: ChordFacts, kind: VoicingKind): number[] {
     const colour = chord.seventh ?? (chord.sixth ? 9 : null);
     const written = chord.tensions;
     if (kind === 'power') {
-        return [0, fifth];
+        // why: an augmented fifth (or an altered dominant's b13 in the fifth's seat) is a
+        // minor 6th above the root — root+#5 reads as another chord's root+third (B7alt's
+        // [0, 8] sounds like G/B), which is exactly the third-beats-against-the-fifth mud the
+        // power chord exists to avoid. There's no clean fifth to voice, so the chug plays the
+        // one-note statement instead: root and its octave, leaving the colour to the melody.
+        return fifth === 8 ? [0] : [0, fifth];
     }
     if (chord.family === 'power') {
         return [0, 7];
@@ -286,7 +291,9 @@ function powerCandidates(chord: ChordFacts): number[][] {
     const out: number[][] = [];
     for (let root = KEYS.lo; root + 12 <= KEYS.hi; root++) {
         if (mod12(root) === chord.root) {
-            out.push([root, root + fifth, root + 12]);
+            // why: matches voicingTones' power-chord rule — an augmented #5 (or an altered
+            // dominant's b13) has no clean fifth to stack, so keys play root and octave alone.
+            out.push(fifth === 8 ? [root, root + 12] : [root, root + fifth, root + 12]);
         }
     }
     return out;

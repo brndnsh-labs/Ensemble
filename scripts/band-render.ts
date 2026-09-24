@@ -81,7 +81,7 @@ function printBars(timeline: Timeline, events: BandEvent[], count: number) {
                 if (n.lane === 'drums') {
                     continue;
                 }
-                const mark = n.muted ? '×' : n.stroke === 'up' ? '↑' : '';
+                const mark = n.muted ? '×' : n.palm ? 'ᵖ' : n.stroke === 'up' ? '↑' : '';
                 const name = `${NOTE[n.midi % 12]}${Math.floor(n.midi / 12) - 1}${mark}`;
                 byStep.set(cell(n), [...(byStep.get(cell(n)) ?? []), name]);
             }
