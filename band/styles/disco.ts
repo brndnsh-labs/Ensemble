@@ -94,21 +94,37 @@ const discoDrums = drumIdiom({
             // The bark: the open hat on the "and" of 4, a snare sixteenth closing it.
             return { hatOpen: 'X.'.slice(-steps), snare: '.X'.slice(-steps) };
         }
+        // The "and" is disco's genre marker as much as the kick (I4): once a fill takes the
+        // stick hand off the open hat, a hi-hat-pedal foot chick keeps its offbeat motion
+        // going, wherever the open hat would otherwise be playing (mid energy and up — a
+        // quiet band's hat is already closed, so there is no "and" motion to preserve). The
+        // bar-absolute "%4===2" grid only reads as the "and" in 4/4 — only 4/4 is idiomatic
+        // in v0 (`docs/design/band-engine.md`), so odd meters keep today's silence.
+        const total = barSteps(ctx.bar);
+        const hatPedal =
+            tier === 'low' || !isCommonTime(ctx.bar)
+                ? undefined
+                : Array.from({ length: steps }, (_, i) =>
+                      (total - steps + i) % 4 === 2 ? 'x' : '.',
+                  ).join('');
         if (tier === 'high') {
             // Toms in sixteenths down the kit (the Philly fill). The run's own kick is dropped:
             // the floor never stops dancing, so the groove's four on the floor plays through
             // the fill (the kit keeps the kick wherever a fill writes none).
             const { kick: _dropped, ...toms } = tomRun(steps, rng, 1);
-            return toms;
+            return { ...toms, ...(hatPedal ? { hatPedal } : {}) };
         }
         if (steps >= 8) {
             // The classic disco roll: eighths on 3, then sixteenths crescendoing into the One.
-            return { snare: `${'.'.repeat(steps - 8)}x.x.xxxX` };
+            return { snare: `${'.'.repeat(steps - 8)}x.x.xxxX`, ...(hatPedal ? { hatPedal } : {}) };
         }
         // A beat of sixteenths building into the One (softer for a quiet band), trimmed to a
         // shorter span in a short bar.
         const build = tier === 'low' ? '.oxX' : 'oxxX';
-        return { snare: build.slice(-steps).padStart(steps, '.') };
+        return {
+            snare: build.slice(-steps).padStart(steps, '.'),
+            ...(hatPedal ? { hatPedal } : {}),
+        };
     },
 });
 
@@ -116,8 +132,9 @@ const discoDrums = drumIdiom({
 /**
  * The octave pump, as sixteenth lines: R the root down low, O its octave, `.` silence. The
  * root lands with the kick on every beat and the octave pops on the "and" between — the
- * Chic / Bee Gees engine room. A section keeps its figure; energy picks which figures a
- * section may choose.
+ * Philly / Salsoul / Hi-NRG engine room ("Don't Leave Me This Way", "Relight My Fire"), not
+ * Chic's: Bernard Edwards played syncopated riffs, never a straight octave pump (T5). A
+ * section keeps its figure; energy picks which figures a section may choose.
  */
 const FIGURES: Record<EnergyTier, readonly [string, number][]> = {
     low: [
@@ -346,7 +363,13 @@ const discoKeys: PitchedIdiom = {
  * only where the line says.
  * - ands: the chop on every "and", with the open hat;
  * - pickup: a light upstroke on the "a" of 1 and 3 answers the chop into the backbeat;
- * - push: a light upstroke on each "e" pushes into the chop on the "and" (a-CHANK).
+ * - push: a light upstroke on each "e" pushes into the chop on the "and" (a-CHANK);
+ * - nile: syncopation off the "and"-only grid (I3) — an accented chop right on the One (the
+ *   hand announces the downbeat instead of leaving it to the kick alone) with a light "a"
+ *   pickup into 3 and back into 1, the "and"s of 2 and 4 kept as anchors so it still locks
+ *   with the open hat. Every other mid-energy section played "ands" alone read as one
+ *   generic chop with no idiomatic character until high energy; this is the line disco
+ *   actually invented (Nile Rodgers), so it belongs at mid energy, not held back for high.
  * Chops fall on even sixteenths, so they are downstrokes; the lighter strokes on odd ones
  * come up — the pendulum sets the direction, never the line.
  */
@@ -354,14 +377,19 @@ const CHUCKS = {
     ands: '--X---X---X---X-',
     pickup: '--Xx--X---Xx--X-',
     push: '-xX--xX--xX--xX-',
+    nile: 'X-----Xx------Xx',
 } as const;
 type Chuck = keyof typeof CHUCKS;
 
 const CHUCK_WEIGHTS: Record<EnergyTier, readonly [Chuck, number][]> = {
     low: [['ands', 1]],
     mid: [
-        ['ands', 2],
-        ['pickup', 1],
+        // A section's hand alternates plain "ands" with the syncopated Nile line 50/50 (I3),
+        // the same section-scoped choice every other tier already makes — some sections play
+        // it straight, others get the idiom's real character, instead of every mid-energy
+        // section sounding identical.
+        ['ands', 1],
+        ['nile', 1],
     ],
     high: [
         ['ands', 1],
@@ -394,8 +422,12 @@ const discoGuitar = compIdiom({
             // A quiet band: the hand eases to eighths, scratching the beat under the chop.
             hits = hits.filter((h) => !h.muted || h.step % 2 === 0);
         } else if (tier === 'high') {
-            // The hand digs in: the scratches get louder, the chops stay well on top.
-            hits = hits.map((h) => (h.muted ? { ...h, velocity: 52 } : h));
+            // The hand digs in: the scratches get louder, but the pendulum's down/up accent
+            // (I3) still holds — the same +8 the old flat bump gave the mid-tier scratch
+            // (44→52), applied to each direction instead of erasing the direction.
+            hits = hits.map((h) =>
+                h.muted ? { ...h, velocity: h.stroke === 'down' ? 58 : 44 } : h,
+            );
         }
         return hits;
     },
