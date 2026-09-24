@@ -1,8 +1,8 @@
 /**
  * Voicings: which notes of a chord the comp plays, and where. A voicing *kind* picks the
  * tones (a close triad, a rootless jazz voicing, a funk stab, a bossa drop-2, a guitar
- * shell); `voice()` then places them for two hands on a keyboard — and `fretboard.ts`'s
- * `grip()` for a guitar — choosing the placement that moves least from the previous chord,
+ * shell, a power chord); `voice()` then places them for two hands on a keyboard — and
+ * `fretboard.ts`'s `grip()` for a guitar — choosing the placement that moves least from the previous chord,
  * sits in the instrument's register, and avoids the clashes a player would avoid.
  */
 import { type ChordFacts, fifthOf } from '../../theory/chord.js';
@@ -23,7 +23,13 @@ export interface Slot {
 /** The keyboard comp's register slot. */
 const KEYS: Slot = { lo: 52, hi: 84, top: 72 };
 
-export type VoicingKind = 'close' | 'rootless' | 'stab' | 'drop2' | 'shell';
+/**
+ * `power`: root and fifth (and octave), whatever the chord's quality — the distorted rhythm
+ * guitar's chord, since a third beating against root and fifth under drive turns to mud.
+ * The fifth is the chord's own (`fifthOf`): a diminished chord gets the tritone power chord,
+ * an augmented one the #5, so the chart's quality still speaks where it lives in the 5th.
+ */
+export type VoicingKind = 'close' | 'rootless' | 'stab' | 'drop2' | 'shell' | 'power';
 
 const has = (chord: ChordFacts, n: number) => chord.intervals.some((i) => mod12(i) === n);
 
@@ -84,6 +90,9 @@ export function voicingTones(chord: ChordFacts, kind: VoicingKind): number[] {
     const fifth = fifthOf(chord);
     const colour = chord.seventh ?? (chord.sixth ? 9 : null);
     const written = chord.tensions;
+    if (kind === 'power') {
+        return [0, fifth];
+    }
     if (chord.family === 'power') {
         return [0, 7];
     }
@@ -268,12 +277,27 @@ export function cost(v: number[], prev: number[] | null, chord: ChordFacts, slot
     return c;
 }
 
+/**
+ * A keyboard power chord: root, fifth and the root's octave, never inverted — a power chord
+ * with its fifth underneath is a fourth, and loses the root the whole sound rests on.
+ */
+function powerCandidates(chord: ChordFacts): number[][] {
+    const fifth = fifthOf(chord);
+    const out: number[][] = [];
+    for (let root = KEYS.lo; root + 12 <= KEYS.hi; root++) {
+        if (mod12(root) === chord.root) {
+            out.push([root, root + fifth, root + 12]);
+        }
+    }
+    return out;
+}
+
 /** Place a chord's voicing near the previous one. Deterministic. */
 export function voice(chord: ChordFacts, kind: VoicingKind, prev: number[] | null): number[] {
     const pcs = voicingTones(chord, kind).map((n) => mod12(chord.root + n));
     let best: number[] | null = null;
     let bestCost = Infinity;
-    for (const v of candidates(pcs, kind)) {
+    for (const v of kind === 'power' ? powerCandidates(chord) : candidates(pcs, kind)) {
         const c = cost(v, prev, chord, KEYS);
         if (c < bestCost) {
             best = v;

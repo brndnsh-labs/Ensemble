@@ -6,9 +6,11 @@
  * moves least from the previous chord wins, costed the same way as a keyboard voicing.
  *
  * Band rule: the guitar leaves the low strings to the bass player — grips stay at or above
- * the slot's floor, so a strummed chord never muddies the bass line. The one exception is
- * the bass note itself: the swing shell's root sits on the low strings on purpose, doubling
- * the walking bass (`rootBottom`). With no bassist, a book may bring its grips down.
+ * the slot's floor, so a strummed chord never muddies the bass line. The exceptions double
+ * the bass on purpose: the swing shell's root sits on the low strings, doubling the walking
+ * bass (`rootBottom`), and a metal book's low slot puts its power chords (`kind: 'power'`,
+ * root-5-8) on the E and A strings, where the riff and the bass are one sound. With no
+ * bassist, a book may bring its grips down.
  */
 import { type ChordFacts, fifthOf } from '../../theory/chord.js';
 import { mod12 } from '../../theory/pitch.js';
@@ -127,7 +129,10 @@ export function grip(
     const tones = voicingTones(chord, kind);
     const pcs = [...new Set(tones.map((n) => mod12(chord.root + n)))];
     // A root-position shape puts the chord's bass under it (and needs it among the tones).
-    const bottom = shape.rootBottom ? chord.bass : null;
+    // A power chord is the exception: its root is its bottom, always — over a slash chord the
+    // slash note is the bassist's, and adding it to the grip would make the distorted triad a
+    // power chord exists to avoid.
+    const bottom = shape.rootBottom ? (kind === 'power' ? chord.root : chord.bass) : null;
     if (bottom !== null && !pcs.includes(bottom)) {
         pcs.push(bottom);
     }
