@@ -4,6 +4,7 @@
  */
 import type { StyleId } from '../../core/types.js';
 import type { StyleClaims } from '../critique/harness.js';
+import { acoustic } from './acoustic.js';
 import { blues } from './blues.js';
 import { bossa } from './bossa.js';
 import { country } from './country.js';
@@ -26,4 +27,5 @@ export const CLAIMS: Record<StyleId, StyleClaims> = {
     neosoul,
     reggae,
     rock,
+    acoustic,
 };

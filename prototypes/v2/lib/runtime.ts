@@ -138,7 +138,7 @@ const STYLE_FOR_GENRE: Record<string, StyleId> = {
     Disco: 'disco',
     'Hip Hop': 'hiphop',
     Reggae: 'reggae',
-    Acoustic: 'rock',
+    Acoustic: 'acoustic',
     Country: 'country',
     Metal: 'rock',
     'Ska-Punk': 'rock',
