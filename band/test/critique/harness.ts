@@ -1139,7 +1139,9 @@ export const METRICS = {
      * authority, so a colour tone the scale lacks (a natural 9 over a phrygian iii7, a major 6th
      * over an aeolian vi) counts against it. The voiced chord is the one whose guide tones the
      * strike carries — the span's own, the next in the bar, or the next bar's first (an
-     * anticipation) — else the span's own.
+     * anticipation) — else the span's own. A partial strike (a double-stop) often carries only
+     * one guide tone, so within an eighth of a change — where `compIdiom` may play the next
+     * chord early — it voices the chord ahead when that chord's scale holds all of it.
      */
     compNotesInScale: (takes) => {
         let n = 0;
@@ -1149,13 +1151,24 @@ export const METRICS = {
                 const bar = t.bars[notes[0].bar];
                 const index = bar.spans.findIndex((s) => s.start <= tick && tick < s.end);
                 const pcs = new Set(notes.map((x) => mod12(x.midi)));
+                const nextBarFirst =
+                    t.bars[bar.index + 1]?.spans[0]?.chord ?? t.bars[0].spans[0]?.chord;
                 const candidates = [
                     bar.spans[index]?.chord,
                     bar.spans[index + 1]?.chord,
-                    t.bars[bar.index + 1]?.spans[0]?.chord ?? t.bars[0].spans[0]?.chord,
+                    nextBarFirst,
                 ];
+                const change = bar.spans[index + 1]?.start ?? bar.start + bar.meter.barTicks;
+                const ahead = bar.spans[index + 1] ? bar.spans[index + 1].chord : nextBarFirst;
+                const early =
+                    change - tick <= 2 * STEP &&
+                    ahead &&
+                    [...pcs].every((pc) => ahead.scale.includes(mod12(pc - ahead.root)))
+                        ? ahead
+                        : null;
                 const chord =
                     candidates.find((c) => c?.guides.every((g) => pcs.has(mod12(c.root + g)))) ??
+                    early ??
                     candidates[0];
                 if (!chord) {
                     continue;

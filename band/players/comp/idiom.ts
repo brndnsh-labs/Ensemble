@@ -37,7 +37,12 @@ interface CompMemory {
 
 export interface CompBook {
     name: string;
-    kind: VoicingKind;
+    /**
+     * The voicing kind, or a choice of kind per chord: a book whose colour depends on what
+     * each chord's scale owns (neo-soul's 6/9 over a triad, rootless over a seventh chord)
+     * decides it chord by chord, so one chord never costs its neighbour its colour.
+     */
+    kind: VoicingKind | ((chord: ChordFacts) => VoicingKind);
     /** Guitar books: the grip shape. Without it, chords are voiced for a keyboard. */
     grip?: GripShape;
     /**
@@ -71,8 +76,10 @@ export function compIdiom(book: CompBook): PitchedIdiom {
         play(ctx, memory: CompMemory) {
             const { bar, plan } = ctx;
             const shape = !plan.lanes.bass && book.alone ? book.alone : book.grip;
+            const kindOf = (chord: ChordFacts) =>
+                typeof book.kind === 'function' ? book.kind(chord) : book.kind;
             const place = (chord: ChordFacts, prev: number[] | null) =>
-                shape ? grip(chord, book.kind, shape, prev) : voice(chord, book.kind, prev);
+                shape ? grip(chord, kindOf(chord), shape, prev) : voice(chord, kindOf(chord), prev);
             const tier = energyTier(plan.energy);
             const total = barSteps(bar);
             const events: PitchedNote[] = [];
