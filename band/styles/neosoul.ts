@@ -11,7 +11,15 @@
  */
 import { type EnergyTier, energyTier } from '../arrange/plan.js';
 import type { DrumHit, PitchedNote } from '../core/types.js';
-import { BASS, bassNote, bassPc, type LineMemory, nextChord } from '../players/bass/line.js';
+import {
+    type ApproachKind,
+    approach,
+    BASS,
+    bassNote,
+    bassPc,
+    type LineMemory,
+    nextChord,
+} from '../players/bass/line.js';
 import { compIdiom, type Hit, strums } from '../players/comp/idiom.js';
 import { type VoicingKind, voicingTones } from '../players/comp/voicing.js';
 import { drumIdiom, type Lines, snareFigure, tomRun } from '../players/drums/kit.js';
@@ -57,14 +65,16 @@ const line16 = (steps: number[], char: string) =>
     Array.from({ length: 16 }, (_, s) => (steps.includes(s) ? char : '.')).join('');
 
 /**
- * The Dilla drag on the grid: in a section that chooses it, the backbeat on 4 lands a
- * sixteenth late, on the second bar of each pair — the loop is two bars long, like a sampled
- * two-bar break, and the late snare is its turnaround. A quiet section (cross-stick) keeps
- * the backbeat straight: the drag needs weight behind it to read as a feel, not a mistake.
- * The same drag the old engine played as a +6–18 ms snare offset, which the band engine
- * cannot give one drum (drums are the clock and never lean), so it lives on the grid.
+ * A displaced snare, not a drag: in a section that chooses it, the backbeat on 4 moves a
+ * whole sixteenth late, to the "e" of 4 (≈165–195 ms at neo-soul tempos), on the second bar of
+ * each pair — the loop is two bars long, like a sampled two-bar break, and the displaced
+ * snare is its turnaround, a written variation in the beat. A quiet section (cross-stick)
+ * keeps the backbeat straight: the displacement needs weight behind it to read as a figure,
+ * not a mistake. It is not the old engine's Dilla drag (a +6–18 ms snare offset, ten times
+ * smaller): drums are the clock and never lean, so a drag on one drum isn't available here,
+ * and this doesn't pretend to be one.
  */
-function lazyFour(ctx: BarContext, tier: EnergyTier): boolean {
+function displacedFour(ctx: BarContext, tier: EnergyTier): boolean {
     return (
         tier !== 'low' && ctx.bar.barInVisit % 2 === 1 && ctx.rng('lazy', 'section').chance(0.35)
     );
@@ -80,7 +90,7 @@ const neoKit = drumIdiom({
         const kick = ctx.rng('kick', 'section').weighted(NEO_KICKS.map(([k, w]) => [k, w[tier]]));
         const ghostSet = ctx.rng('ghost', 'section').pick(NEO_GHOSTS);
         const ghosts = tier === 'low' ? [] : ghostSet[tier];
-        const backbeat = lazyFour(ctx, tier) ? [4, 13] : [4, 12];
+        const backbeat = displacedFour(ctx, tier) ? [4, 13] : [4, 12];
         // The backbeat wins where a ghost would fall on it.
         const snare = Array.from({ length: 16 }, (_, s) =>
             backbeat.includes(s) ? 'X' : ghosts.includes(s) ? 'g' : '.',
@@ -222,23 +232,60 @@ function oddRiff(ctx: BarContext): string {
 }
 
 /**
- * A chromatic approach into `target` — the exact note the next chord will be played on (its
- * root placed the same way this one is) — so it resolves by a half step *in pitch*, not just
- * in pitch class. It comes from the side the line is already on, and only when the line is
- * within a fifth of the target: a bassist leads in from where the hand is, and an approach
- * reached by an octave leap is a jump, not a lead-in. Null when the line is too far away.
+ * How the line leads into a change, when it does. why: Pino slides *up* into a root far more
+ * than he falls onto it from the b9 above, so the half step from below leads (half the
+ * lead-ins); a step of the outgoing chord's own scale into it and the target's fifth (a V→I in
+ * miniature) keep the lead-ins from all being one gesture (a fifth each); the half step from
+ * above, an outside note the ear hears as a b9 of the target, is the rare one (a tenth).
  */
-function approachInto(target: number, prev: number): number | null {
+const NEO_APPROACHES: readonly [ApproachKind, number][] = [
+    ['chromatic-below', 5],
+    ['scale', 2],
+    ['dominant', 2],
+    ['chromatic-above', 1],
+];
+
+/**
+ * A lead-in of `kind` into `target` — the exact note the next chord will be played on (its
+ * root placed the same way this one is) — so a half step resolves by a half step *in pitch*,
+ * not just in pitch class. Only when the line is within a fifth of the target: a bassist leads
+ * in from where the hand is, and an approach reached by an octave leap is a jump, not a
+ * lead-in. A half step that would leave the register, or repeat the note before, comes from
+ * the other side; a scale step that folds out of reach is played as the half step below; the
+ * fifth is taken in the octave nearest the hand. Null when the line is too far away.
+ */
+function approachInto(
+    kind: ApproachKind,
+    target: number,
+    prev: number,
+    chord: ChordFacts,
+): number | null {
     if (Math.abs(prev - target) > 7) {
         return null;
     }
     const below = target - 1;
     const above = target + 1;
-    const fromBelow = prev < target || above > BASS.hi;
-    if (fromBelow && below >= BASS.lo && below !== prev) {
-        return below;
+    const usable = (m: number) => m >= BASS.lo && m <= BASS.hi && m !== prev;
+    const halfStep = (fromBelow: boolean) => {
+        const sides = fromBelow ? [below, above] : [above, below];
+        return sides.find(usable) ?? null;
+    };
+    switch (kind) {
+        case 'chromatic-below':
+            return halfStep(true);
+        case 'chromatic-above':
+            return halfStep(false);
+        case 'scale': {
+            const step = approach(target, chord, 'scale');
+            return Math.abs(step - target) <= 2 ? step : halfStep(true);
+        }
+        case 'dominant': {
+            const fifth = approach(target, chord, 'dominant');
+            const other = fifth > target ? fifth - 12 : fifth + 12;
+            const inRange = [fifth, other].filter((m) => m >= BASS.lo && m <= BASS.hi);
+            return inRange.sort((a, b) => Math.abs(a - prev) - Math.abs(b - prev))[0] ?? null;
+        }
     }
-    return above <= BASS.hi && above !== prev ? above : below >= BASS.lo ? below : null;
 }
 
 const neoBass: PitchedIdiom = {
@@ -263,10 +310,15 @@ const neoBass: PitchedIdiom = {
             : oddRiff(ctx);
         const spans = spanSteps(bar);
         const next = nextChord(ctx);
-        // The last bar of a phrase turns into the next: the line leads into a change there
-        // even when the riff has nothing in its last beat, with a sixteenth pickup (when the
-        // line is near enough to lead in, see `approachInto`).
+        // The last bar of a phrase turns into the next: the line always leads into that
+        // change, even when the riff has nothing in its last beat, with a sixteenth pickup
+        // (when the line is near enough to lead in, see `approachInto`).
         const phraseEnd = bar.phrase.bar === bar.phrase.length - 1;
+        // why: inside a phrase, a lead-in on every change is a mannerism, and it writes over
+        // the riff's own last-beat fifth or seventh. So it is the section's choice (the
+        // bassist's habit for that verse or chorus, as disco's `walks`): half the sections
+        // lead into their changes, the rest let the riff's written ending carry them.
+        const leadsIn = ctx.rng('approach', 'section').chance(0.5);
         spans.forEach(({ span, from, to }, i) => {
             const chord = span.chord;
             if (!chord) {
@@ -293,7 +345,9 @@ const neoBass: PitchedIdiom = {
             }
             const steps = [...codes.keys()].sort((a, b) => a - b);
             const following = spans[i + 1]?.span.chord ?? (i === spans.length - 1 ? next : null);
-            const change = following && following.bass !== chord.bass ? following : null;
+            const turn = phraseEnd && i === spans.length - 1;
+            const change =
+                following && following.bass !== chord.bass && (leadsIn || turn) ? following : null;
             // The approach slot: the riff's last note in the span's final beat (never the
             // arrival itself), or at a phrase end a pickup on the last sixteenth.
             let approachAt: number | null = null;
@@ -306,7 +360,7 @@ const neoBass: PitchedIdiom = {
                     codes.get(tail) !== 'm'
                 ) {
                     approachAt = tail;
-                } else if (phraseEnd && to - 1 > (tail ?? from)) {
+                } else if (turn && to - 1 > (tail ?? from)) {
                     approachAt = to - 1;
                     codes.set(to - 1, 'a');
                     steps.push(to - 1);
@@ -317,7 +371,8 @@ const neoBass: PitchedIdiom = {
                 const code = codes.get(step)!;
                 let midi = riffPitch(code, root, prev, chord);
                 if (step === approachAt && change) {
-                    const lead = approachInto(rootPlace(ctx, bassPc(change)), prev);
+                    const kind = ctx.rng(`approach${i}`).weighted(NEO_APPROACHES);
+                    const lead = approachInto(kind, rootPlace(ctx, bassPc(change)), prev, chord);
                     if (lead !== null) {
                         midi = lead;
                     } else if (code === 'a') {
@@ -371,39 +426,31 @@ const plainTriad = (chord: ChordFacts) =>
     !chord.sixth &&
     chord.tensions.length === 0;
 
-/**
- * The chords one bar's book voices: its own, and the next bar's first (an anticipation plays
- * it early, with this bar's book).
- */
-function barChords(ctx: BarContext): ChordFacts[] {
-    const own = ctx.bar.spans.flatMap((s) => (s.chord ? [s.chord] : []));
-    const ahead = ctx.next?.bar.spans[0]?.chord;
-    return ahead ? [...own, ahead] : own;
-}
-
 type ColourKind = Extract<VoicingKind, 'drop2' | 'rootless' | 'close'>;
 
 /**
- * The voicing kind for a bar, in order of preference: over plain triads the open 6/9 (the
- * `drop2` kind: 3-5-6-9 spread into 4ths and 5ths, E-A-D-G over C — the quartal colour); over
- * seventh chords the rootless 3-7-9-13 (the Rhodes left hand of Poyser and Glasper, with the
- * chart's written 11ths and 13ths seated); and where the scale owns neither colour, the plain
- * close chord. Chosen per bar, so an anticipation is voiced with the kind its bar can afford.
- * Reused kinds, not a new one: between them they already are the neo-soul keyboard's colours.
+ * The voicing kind for one chord, in order of preference: over a plain triad the open 6/9
+ * (the `drop2` kind: 3-5-6-9 spread into 4ths and 5ths, E-A-D-G over C — the quartal colour);
+ * over a seventh chord the rootless 3-7-9-13 (the Rhodes left hand of Poyser and Glasper, with
+ * the chart's written 11ths and 13ths seated); and where the scale owns neither colour, the
+ * plain close chord. Chosen per chord, so a chord whose scale can't afford a colour never
+ * costs its neighbours theirs, and an anticipation is voiced for the chord it plays. Reused
+ * kinds, not a new one: between them they already are the neo-soul keyboard's colours.
  */
-function colourKind(ctx: BarContext, prefer: ColourKind[]): ColourKind {
-    const chords = barChords(ctx);
-    const order: ColourKind[] = chords.every(plainTriad) ? ['drop2', ...prefer] : prefer;
-    return order.find((kind) => chords.every((c) => ownsColour(c, kind))) ?? 'close';
+function colourKind(chord: ChordFacts, prefer: ColourKind[]): ColourKind {
+    const order: ColourKind[] = plainTriad(chord) ? ['drop2', ...prefer] : prefer;
+    return order.find((kind) => ownsColour(chord, kind)) ?? 'close';
 }
 
 /**
  * Keyboard figures, one per section: `x` a strike, `-` holding it, `.` silence. The Rhodes
  * holds its chords — a funk stab lasts under a sixteenth, these ring for beats — and
  * re-strikes them lazily off the beat: on the "a" of 2 dragging into 3, on the "e" of 1
- * letting the bass have the One. A strike in the last eighth may anticipate the next bar's
- * chord (the machinery's push). Energy adds strikes; no hold is shorter than a dotted eighth
- * unless the next strike cuts it.
+ * letting the bass have the One. Where the chord changes mid-bar, a strike in the eighth
+ * before the change plays the new chord and ties over into it (`pushInBar`): the "a" of 2
+ * drags beat 3's chord in early, it never stabs the outgoing chord for a sixteenth. A strike
+ * in the last eighth may anticipate the next bar's chord (the machinery's push). Energy adds
+ * strikes; no hold is shorter than a dotted eighth unless the next strike cuts it.
  *
  * Not yet rolled: a roll is time, so it belongs to the feel pass, which rolls only stroked
  * chords at the instrument's `strumMs` — 0 for every keyboard. A rolled Rhodes needs a
@@ -457,32 +504,19 @@ function keysRhythm(
 // A Rhodes player lays a chord over the barline now and then; more as the band opens up.
 const KEYS_PUSH: Record<EnergyTier, number> = { low: 0.1, mid: 0.25, high: 0.35 };
 
-const keysBook = (kind: ColourKind) =>
-    compIdiom({
-        name: `neo-soul rhodes (${kind})`,
-        kind,
-        push: KEYS_PUSH,
-        rhythm: (ctx, span, tier) => keysRhythm(ctx, span, tier),
-    });
-
-const KEYS_BOOKS: Record<ColourKind, PitchedIdiom> = {
-    drop2: keysBook('drop2'),
-    rootless: keysBook('rootless'),
-    close: keysBook('close'),
-};
-
 /**
- * The Rhodes: one rhythm, voiced per bar with the richest colour the chords' scales allow
- * (see `colourKind`). The books share `compIdiom`'s memory, so voice leading carries across
- * a change of kind.
+ * The Rhodes: one rhythm, each chord voiced with the richest colour its scale allows (see
+ * `colourKind`).
  */
-const neoKeys: PitchedIdiom = {
-    ...KEYS_BOOKS.rootless,
+const neoKeys: PitchedIdiom = compIdiom({
     name: 'neo-soul rhodes',
-    play(ctx, memory) {
-        return KEYS_BOOKS[colourKind(ctx, ['rootless'])].play(ctx, memory);
-    },
-};
+    kind: (chord) => colourKind(chord, ['rootless']),
+    push: KEYS_PUSH,
+    // A lazy re-strike in the eighth before a mid-bar change is the new chord arriving early
+    // and tied over the change: the drag the figures are written for (see `KEYS_FIGURES`).
+    pushInBar: true,
+    rhythm: (ctx, span, tier) => keysRhythm(ctx, span, tier),
+});
 
 // ---------------------------------------------------------------- guitar
 /**
@@ -491,6 +525,9 @@ const neoKeys: PitchedIdiom = {
  * whole grip, an extended chord hit (`X` accented); `d` a double-stop, two strings picked out
  * of the grip the hand is holding — Curtis Mayfield and Ernie Isley hold the chord shape and
  * play pairs from it. No scratches: this guitar is clean and gentle, every stroke sounds.
+ * The whole grip always falls on a down position: an upstroke catches only the top strings,
+ * so a full chord hit on an "e" or "a" would lose its bottom string, often the 3rd. A line
+ * that leaves the bass the One strikes the grip on the "and" of 1.
  */
 const GUITAR_LINES: Record<EnergyTier, readonly [string, number][]> = {
     low: [
@@ -499,13 +536,13 @@ const GUITAR_LINES: Record<EnergyTier, readonly [string, number][]> = {
     ],
     mid: [
         ['x......d..d.....', 3],
-        ['.x....d....d..d.', 2],
+        ['..x...d....d..d.', 2],
         ['x.....d..d...d..', 2],
     ],
     high: [
         ['x..d..d.x..d.d..', 2],
         ['X.....d.d.d...d.', 2],
-        ['.x..d..dx..d..d.', 1],
+        ['..x.d..dx..d..d.', 1],
     ],
 };
 
@@ -520,72 +557,97 @@ function guitarLine(ctx: BarContext, tier: EnergyTier): string {
     return ctx.rng('guitar', 'section').weighted(GUITAR_LINES[tier]);
 }
 
-const guitarBook = (kind: ColourKind) =>
-    compIdiom({
-        name: `neo-soul guitar (${kind})`,
-        kind,
-        // Four strings, clean, in the middle of the neck — off the bass, under the singer.
-        grip: { strings: 4, slot: { lo: 52, hi: 79, top: 69 } },
-        // Without a bassist the grip takes the chord's root on its bottom string.
-        alone: { strings: 5, slot: { lo: 40, hi: 76, top: 67 }, rootBottom: true },
-        push: { low: 0, mid: 0.1, high: 0.2 },
-        rhythm(ctx, { from, to }, tier) {
-            const line = guitarLine(ctx, tier).replaceAll('d', 'x');
-            // A clean grip rings for a beat; the pick is gentle — softer than the strummed
-            // styles' strokes (100/86/72), never a dig.
-            return strums(line, from, to, 1, 4).map((h) => ({
-                ...h,
-                velocity: Math.round(h.velocity * 0.85),
-            }));
-        },
-    });
+/**
+ * The guitar's colour, per chord: the rootless extended grip wherever the chord's scale owns
+ * it — over a triad that is the add9 (3-5-R-9), which any scale owning the keyboard's 6/9 also
+ * owns — else the plain close chord.
+ */
+const guitarKind = (chord: ChordFacts): ColourKind =>
+    ownsColour(chord, 'rootless') ? 'rootless' : 'close';
 
-const GUITAR_BOOKS: Record<Exclude<ColourKind, 'drop2'>, PitchedIdiom> = {
-    rootless: guitarBook('rootless'),
-    close: guitarBook('close'),
-};
+const guitarBook = compIdiom({
+    name: 'neo-soul guitar',
+    kind: guitarKind,
+    // Four strings, clean, in the middle of the neck — off the bass, under the singer.
+    grip: { strings: 4, slot: { lo: 52, hi: 79, top: 69 } },
+    // Without a bassist the grip takes the chord's root on its bottom string.
+    alone: { strings: 5, slot: { lo: 40, hi: 76, top: 67 }, rootBottom: true },
+    push: { low: 0, mid: 0.1, high: 0.2 },
+    // A pair picked just before a mid-bar change belongs to the new chord, tied over it,
+    // rather than the old chord's pair clipped after a sixteenth (as the Rhodes does).
+    pushInBar: true,
+    rhythm(ctx, { from, to }, tier) {
+        const line = guitarLine(ctx, tier).replaceAll('d', 'x');
+        // A clean grip rings for a beat; the pick is gentle — softer than the strummed
+        // styles' strokes (100/86/72), never a dig.
+        return strums(line, from, to, 1, 4).map((h) => ({
+            ...h,
+            velocity: Math.round(h.velocity * 0.85),
+        }));
+    },
+});
+
+/** Soul-guitar double-stop intervals: 3rds and 6ths (a 10th reads as a 3rd). */
+const SWEET = new Set([3, 4, 8, 9]);
 
 /**
- * The double-stop: from the grip struck on a `d` step, the two strings that carry the chord's
- * guide tones — the 3rd and 7th of a seventh chord, or a triad's 3rd with the string next to
- * it (a 3rd or 6th, the soul-guitar pair). The chord is the one the grip was voiced for, in
- * `candidates` order: the next bar's first when the hit could be an anticipation, else the
- * span's own. An upstroke catches only the top strings (`compIdiom` already dropped the low
- * one, often the 3rd), so its pair is the top two strings it caught.
+ * The double-stop: two strings picked out of the grip struck on a `d` step. Curtis Mayfield
+ * and Ernie Isley play 3rds on adjacent strings and 6ths with a string skipped between (the
+ * soul sixths on G and E, D and B), so the pair is chosen from the strings the stroke caught,
+ * adjacent or one apart. It carries a guide tone (the 3rd, or the 7th or 6th) whenever the
+ * strings caught hold one, so the pair still names the chord; among those, a 3rd or 6th
+ * first, then higher on the neck (a double-stop sits on the top strings). A grip with no 3rd
+ * or 6th holding a guide tone falls back to its best guide-tone pair (the 3-7 shell). The
+ * chord is the one the grip was voiced
+ * for: the first of `candidates` whose voicing it spells (its bass note counted, for the
+ * grip that carries it without a bassist).
  */
 function doubleStop(notes: PitchedNote[], candidates: (ChordFacts | null | undefined)[]) {
     const sorted = [...notes].sort((a, b) => a.midi - b.midi);
     if (sorted.length < 3) {
         return notes;
     }
-    if (sorted[0].stroke === 'up') {
-        return sorted.slice(-2);
-    }
-    const pcs = new Set(sorted.map((n) => mod12(n.midi)));
-    const chord = candidates.find((c) => c?.guides.every((g) => pcs.has(mod12(c.root + g))));
+    const spells = (c: ChordFacts) => {
+        const tones = [...voicingTones(c, guitarKind(c)), 0, mod12(c.bass - c.root)];
+        return sorted.every((n) => tones.includes(mod12(n.midi - c.root)));
+    };
+    const chord = candidates.find((c): c is ChordFacts => !!c && spells(c));
     if (!chord) {
         return notes;
     }
-    // The highest string sounding each guide tone (a double-stop sits on the top strings).
-    const top = (interval: number) =>
-        [...sorted].reverse().find((n) => mod12(n.midi - chord.root) === interval);
-    const guides = chord.guides.map(top).filter((n): n is PitchedNote => !!n);
-    if (guides.length >= 2) {
-        return guides.slice(0, 2);
+    const guide = (n: PitchedNote) => chord.guides.includes(mod12(n.midi - chord.root));
+    let best: [PitchedNote, PitchedNote] | null = null;
+    let bestScore = -1;
+    for (let i = 0; i < sorted.length; i++) {
+        for (const j of [i + 1, i + 2]) {
+            const [lo, hi] = [sorted[i], sorted[j]];
+            if (!hi) {
+                continue;
+            }
+            // why: a guide tone outranks everything (8: the pair must name the chord), then
+            // the interval is the idiom (4: a 3rd or 6th), an adjacent-string 3rd is the
+            // commoner hand shape than a skip (0.5), and the top strings break ties (the pair
+            // sits above the rest of the band). Only an upstroke, which caught the top three
+            // strings and may have missed the 3rd, can be left with no guide tone to pick.
+            const score =
+                (guide(lo) || guide(hi) ? 8 : 0) +
+                (SWEET.has(mod12(hi.midi - lo.midi)) ? 4 : 0) +
+                (j === i + 1 ? 0.5 : 0) +
+                i * 0.1;
+            if (score > bestScore) {
+                bestScore = score;
+                best = [lo, hi];
+            }
+        }
     }
-    const [third] = guides;
-    const i = sorted.indexOf(third);
-    const partner = sorted[i + 1] ?? sorted[i - 1];
-    return [third, partner].sort((a, b) => a.midi - b.midi);
+    return best ?? notes;
 }
 
 const neoGuitar: PitchedIdiom = {
-    ...GUITAR_BOOKS.rootless,
-    name: 'neo-soul guitar',
+    ...guitarBook,
     play(ctx, memory) {
         const tier = energyTier(ctx.plan.energy);
-        const kind = colourKind(ctx, ['rootless']) === 'rootless' ? 'rootless' : 'close';
-        const out = GUITAR_BOOKS[kind].play(ctx, memory);
+        const out = guitarBook.play(ctx, memory);
         const { bar, plan } = ctx;
         if (plan.ending || bar.spans.some((s) => s.fermata)) {
             return out;
@@ -605,11 +667,17 @@ const neoGuitar: PitchedIdiom = {
             }
             const index = bar.spans.findIndex((s) => s.start <= tick && tick < s.end);
             const here = bar.spans[index]?.chord;
-            // `compIdiom` anticipates only from the last span's final eighth.
-            const early = index === bar.spans.length - 1 && step >= total - 2;
-            events.push(
-                ...doubleStop(notes, early ? [ctx.next?.bar.spans[0]?.chord, here] : [here]),
-            );
+            // The chord the hit may play early: `compIdiom` pushes from the eighth before a
+            // mid-bar change (`pushInBar`) and may anticipate from the last span's final eighth.
+            const following = bar.spans[index + 1];
+            const ahead = following
+                ? following.start - tick <= 2 * STEP
+                    ? following.chord
+                    : null
+                : step >= total - 2
+                  ? ctx.next?.bar.spans[0]?.chord
+                  : null;
+            events.push(...doubleStop(notes, [ahead, here]));
         }
         return { events, memory: out.memory };
     },

@@ -229,8 +229,14 @@ function checkPass(
         const next =
             timeline.bars[notes[0].bar + 1]?.spans[0]?.chord ?? timeline.bars[0].spans[0]?.chord;
         const pcs = new Set(notes.map((n) => mod12(n.midi)));
-        const carries = (c: typeof here) =>
-            !!c && c.guides.every((g) => pcs.has(mod12(c.root + g)));
+        // A picked pair is a double-stop — two strings of the grip the hand holds (the soul
+        // guitar's 3rds and 6ths), a line over the chord rather than the chord itself — so it
+        // names its chord with one guide tone, not all of them.
+        const pair = notes.length === 2 && !!notes[0].stroke;
+        const carries = (c: typeof here) => {
+            const held = c?.guides.filter((g) => pcs.has(mod12(c.root + g))) ?? [];
+            return !!c && (pair ? held.length > 0 : held.length === c.guides.length);
+        };
         // A single note is a bossa thumb (the bass role), not a chord; an upstroke catches
         // only the top strings — the downstroke before it carried the chord.
         const up = notes[0].stroke === 'up';
