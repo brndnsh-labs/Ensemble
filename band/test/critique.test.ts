@@ -764,6 +764,86 @@ const METRICS: Record<string, Metric> = {
         }
         return ratio(hit, n);
     },
+    /**
+     * Reggae organ bubble: of the 4/4 beats with a chord sounding, the share with the full
+     * e-&-a cell — a felt touch on the "e", another on the "a", and something on the "and"
+     * between them. Checks the actual three-hit motion (T1), not just a generic offbeat share
+     * that a two-hit "and plus a" figure would also pass.
+     */
+    compEAndAMotion: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { timeline: t, events } of takes) {
+            const comp = onsetsByBar(t, events, 'comp');
+            for (const b of t.bars) {
+                if (b.meter.name !== '4/4') {
+                    continue;
+                }
+                const onsets = comp.get(b.index);
+                for (const beat of [0, 4, 8, 12]) {
+                    const chord = chordAt(t, b.start + beat * STEP);
+                    if (!chord) {
+                        continue;
+                    }
+                    n++;
+                    const has = (s: number) => !!onsets?.get(s)?.length;
+                    hit += has(beat + 1) && has(beat + 2) && has(beat + 3) ? 1 : 0;
+                }
+            }
+        }
+        return ratio(hit, n);
+    },
+    /**
+     * Mean velocity of 4/4 comp chops on beat 2/4 against everywhere else the comp plays.
+     * Reggae's accented chop must never be the quiet stroke (B5): a lift makes the whole hand
+     * louder, but 2 and 4 stay on top of it.
+     */
+    compBackbeatVelocityRatio: (takes) => {
+        let n24 = 0;
+        let sum24 = 0;
+        let nOther = 0;
+        let sumOther = 0;
+        for (const { timeline: t, events } of takes) {
+            for (const e of events) {
+                if (e.lane !== 'comp' || e.muted || t.bars[e.bar].meter.name !== '4/4') {
+                    continue;
+                }
+                const step = stepOf(t, e);
+                if (step === 4 || step === 12) {
+                    n24++;
+                    sum24 += e.velocity;
+                } else {
+                    nOther++;
+                    sumOther += e.velocity;
+                }
+            }
+        }
+        const meanOther = ratio(sumOther, nOther);
+        return meanOther === 0 ? 1 : ratio(sum24, n24) / meanOther;
+    },
+    /**
+     * Share of struck 4/4 bars where both beat 2 and beat 4 get a chop: the genre's one
+     * non-negotiable gesture, present whichever skank figure the section picked.
+     */
+    compBackbeat24Coverage: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { timeline: t, events } of takes) {
+            const comp = onsetsByBar(t, events, 'comp');
+            for (const b of t.bars) {
+                if (b.meter.name !== '4/4') {
+                    continue;
+                }
+                const onsets = comp.get(b.index);
+                if (!onsets || onsets.size === 0) {
+                    continue;
+                }
+                n++;
+                hit += onsets.has(4) && onsets.has(12) ? 1 : 0;
+            }
+        }
+        return ratio(hit, n);
+    },
 };
 
 // ---------------------------------------------------------------- the claims
@@ -921,9 +1001,20 @@ const GUITAR_CLAIMS: Record<StyleId, Claim[]> = {
 /** The organ, where a style plays it its own way rather than holding pads. */
 const ORGAN_CLAIMS: Partial<Record<StyleId, Claim[]>> = {
     reggae: [
-        ['compOffbeatShare', 0.95, 1, 'the bubble lives between the beats'],
+        // Was [0.95, 1]: a tautology once the 2-and-4 chop (T1) is deliberately ON the beat.
+        // The bubble itself is still almost entirely offbeat; the chop is the one exception,
+        // so this drops but stays high, and a regression either way (an on-beat bubble, or a
+        // missing chop pushing it back toward 1) would fail it.
+        [
+            'compOffbeatShare',
+            0.75,
+            0.95,
+            'the bubble lives between the beats; the 2-and-4 chop is its one exception',
+        ],
         ['compShort', 0.9, 1, 'the bubble is chopped, never held'],
-        ['compStrikesPerBar', 5, 8, 'two taps a beat: the "and" and the "a"'],
+        // Replaces the old compStrikesPerBar range (a tautology: it just restated the count
+        // the code already produced, and would have failed the correct e-&-a bubble anyway).
+        ['compOnOneAndThree', 0, 0.05, 'nothing on 1 and 3, same as the skank'],
     ],
 };
 
@@ -935,6 +1026,29 @@ describe.each(Object.keys(ORGAN_CLAIMS) as StyleId[])('%s critique on organ', (s
         expect(value, `${style} ${metric} = ${value.toFixed(3)}`).toBeLessThanOrEqual(max);
     });
 });
+
+/**
+ * The organ bubble's own cell, checked at mid energy specifically: low energy drops the e/a
+ * touches on purpose (a quiet band plays only the "and"), and a blended default take mixes
+ * tiers, so neither shows whether the e-&-a motion is really there (T9).
+ */
+const ORGAN_MID_CLAIMS: Partial<Record<StyleId, Claim[]>> = {
+    reggae: [
+        ['compEAndAMotion', 0.95, 1, 'every beat gets the full e-&-a cell: felt, chord, felt'],
+    ],
+};
+
+describe.each(Object.keys(ORGAN_MID_CLAIMS) as StyleId[])(
+    '%s critique on organ at mid energy',
+    (style) => {
+        const takes = perform(style, 0.6, 'organ');
+        it.each(ORGAN_MID_CLAIMS[style] ?? [])('%s in [%d, %d] — %s', (metric, min, max) => {
+            const value = METRICS[metric](takes);
+            expect(value, `${style} ${metric} = ${value.toFixed(3)}`).toBeGreaterThanOrEqual(min);
+            expect(value, `${style} ${metric} = ${value.toFixed(3)}`).toBeLessThanOrEqual(max);
+        });
+    },
+);
 
 /** Quiet sections, where nothing (no scratch, no busy pattern) hides how a stab is played. */
 const GUITAR_LOW_CLAIMS: Partial<Record<StyleId, Claim[]>> = {
@@ -968,6 +1082,39 @@ describe.each(Object.keys(GUITAR_LOW_CLAIMS) as StyleId[])(
     (style) => {
         const takes = perform(style, 0.2, 'guitar');
         it.each(GUITAR_LOW_CLAIMS[style] ?? [])('%s in [%d, %d] — %s', (metric, min, max) => {
+            const value = METRICS[metric](takes);
+            expect(value, `${style} ${metric} = ${value.toFixed(3)}`).toBeGreaterThanOrEqual(min);
+            expect(value, `${style} ${metric} = ${value.toFixed(3)}`).toBeLessThanOrEqual(max);
+        });
+    },
+);
+
+/**
+ * High energy, where the "ands" skank can get picked. Pins B5: a lift used to turn the 2-and-4
+ * chop into the quiet stroke (every hit lowercase, ~78 against the plain skank's 108) and drop
+ * it off the backbeat entirely. The chop must stay the loudest hit in the bar and never miss it.
+ */
+const GUITAR_HIGH_CLAIMS: Partial<Record<StyleId, Claim[]>> = {
+    reggae: [
+        // Bracketed near the real ~1.22 rather than left slack down to 1: the "ands" skank is
+        // only 2 of 5 weight at high tier, so a regression that quiets just its own 2-and-4
+        // chop is diluted by the still-correct plain/double bars and would slip past a claim
+        // that only demanded "at least as loud" (>= 1).
+        [
+            'compBackbeatVelocityRatio',
+            1.15,
+            1.4,
+            '2 and 4 are louder than the rest of the hand, not just tied with it',
+        ],
+        ['compBackbeat24Coverage', 0.9, 1, '2 and 4 are chopped in nearly every bar'],
+    ],
+};
+
+describe.each(Object.keys(GUITAR_HIGH_CLAIMS) as StyleId[])(
+    '%s critique on guitar at high energy',
+    (style) => {
+        const takes = perform(style, 0.9, 'guitar');
+        it.each(GUITAR_HIGH_CLAIMS[style] ?? [])('%s in [%d, %d] — %s', (metric, min, max) => {
             const value = METRICS[metric](takes);
             expect(value, `${style} ${metric} = ${value.toFixed(3)}`).toBeGreaterThanOrEqual(min);
             expect(value, `${style} ${metric} = ${value.toFixed(3)}`).toBeLessThanOrEqual(max);

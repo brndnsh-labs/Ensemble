@@ -72,7 +72,9 @@ const reggaeDrums = drumIdiom({
     fillLength: { phrase: { low: 0, mid: 2, high: 4 }, section: { low: 2, mid: 4, high: 4 } },
     groove(ctx, tier) {
         if (tier === 'high') {
-            const riddim = ctx.rng('riddim', 'section').pick(['steppers', 'rockers'] as const);
+            // The riddim is the tune's, not the section's: a band commits to steppers or
+            // rockers for the whole performance, it doesn't flip between choruses.
+            const riddim = ctx.rng('riddim', 'song').pick(['steppers', 'rockers'] as const);
             return RIDDIMS[riddim];
         }
         if (tier === 'low') {
@@ -298,15 +300,19 @@ const reggaeBass: PitchedIdiom = {
 // ================================================================ comp
 /**
  * Skank figures in sixteenths, for the piano and the guitar: `X` the chop, `x` a lighter
- * one. The chop is on 2 and 4 — beats 1 and 3 belong to the bass and the drop.
+ * one. The chop on 2 and 4 is reggae's non-negotiable comp gesture — every figure below
+ * keeps it accented, never softer than the lighter strokes around it — while beats 1 and 3
+ * stay empty, left to the bass and the drop.
  * - plain: the one-drop skank;
  * - double: the chop and a sixteenth flick after it ("chk-a"), a busier hand;
- * - ands: a chop on every "and", the rockers/steppers skank (guitar only).
+ * - ands: the 2-and-4 chop plus every other "and" as a lighter stroke, the rockers/steppers
+ *   lift (guitar only). A lift has to sound *louder*, not softer: the "and"s are lighter
+ *   than 2 and 4, never a replacement for them.
  */
 const SKANKS = {
     plain: '....X.......X...',
     double: '....Xx......Xx..',
-    ands: '..x...x...x...x.',
+    ands: '..x.X.x...x.X.x.',
 } as const;
 type Skank = keyof typeof SKANKS;
 
@@ -351,23 +357,36 @@ function skankLine(ctx: BarContext, tier: EnergyTier, family: 'keyboard' | 'guit
 }
 
 /**
- * The organ bubble, per beat: a chord on the "and" and a lighter double-tap on the "a" —
- * "chk-a, chk-a" — leaving every beat itself empty. The light sixteenth swing drags the tap
- * late, which is the bubble's lope. A quiet band plays only the "and"s.
+ * The organ bubble: the canonical "space-left-right-left" cell on e-&-a. Each beat is a
+ * hole; a felt left-hand touch anticipates the chord on the "e", the chord itself lands on
+ * the "and" (the right hand), and a matching felt touch trails it on the "a". The touches
+ * are lighter, not literally lower — this book plays one voicing at a time (there's no
+ * second, lower hand to give them their own note), so softness is what stands in for the
+ * second voice. A quiet band drops the e/a touches and plays only the chord, same as before.
+ * The light sixteenth swing drags the "a" late, which is the bubble's lope.
  */
 function bubble(ctx: BarContext, { from, to }: { from: number; to: number }, tier: EnergyTier) {
     const hits: Hit[] = [];
+    const push = (step: number, length: number, velocity: number) => {
+        if (step >= from && step < to) {
+            hits.push({ step, length, velocity });
+        }
+    };
     for (const p of pulses(ctx.bar)) {
         // The pulse's last eighth is its "and" (a 4/4 beat's step 2, a 6/8 group's step 4).
         const and = p.step + p.steps - 2;
-        const cell: [number, number, number][] = [[and, 0.9, 88]];
+        push(and, 0.9, 88);
         if (tier !== 'low') {
-            cell.push([and + 1, 0.7, 64]);
+            push(and - 1, 0.5, 46); // "e": felt, ahead of the chord
+            push(and + 1, 0.5, 46); // "a": felt, trailing it
         }
-        for (const [step, length, velocity] of cell) {
-            if (step >= from && step < to) {
-                hits.push({ step, length, velocity });
-            }
+        // With no guitar in the band, the organ alone has to carry reggae's one non-negotiable
+        // gesture: a right-hand chop on 2 and 4, doubling what the skank would play there. The
+        // organ is always this band's only comp (there's no second instrument to lean on), so
+        // it plays at every tier — the same accent the skank gives it — or an organ-only band
+        // would never sound unmistakably reggae.
+        if (p.role === 'back') {
+            push(p.step, 0.9, 96);
         }
     }
     return hits;
@@ -410,12 +429,15 @@ const reggaeGuitar = compIdiom({
     grip: { strings: 3, slot: { lo: 55, hi: 81, top: 72, pull: 0.8 }, open: false },
     push: { low: 0, mid: 0, high: 0 },
     rhythm(ctx, { from, to }, tier) {
-        const { line, skank } = skankLine(ctx, tier, 'guitar');
-        // The pendulum sets each chop's direction: the hand swings in eighths with the hats,
-        // so the 2-and-4 chop is a downstroke and a rockers skank on every "and" comes up;
-        // a double chop swings in sixteenths, the flick after the chop an upstroke.
+        const { line } = skankLine(ctx, tier, 'guitar');
+        // At reggae tempos the hand swings in sixteenths, not eighths (T2): every skank line
+        // uses grid 1. The pendulum then sets each chop's direction from its own position —
+        // the 2-and-4 chop lands on an even sixteenth, so it's always a downstroke, and so is
+        // every "and" (also an even sixteenth): the meatier chop a lift wants, not the lighter
+        // upstroke an eighth-grid hand would have given it. The double chop's sixteenth flick
+        // right after it is the only hit on an odd step, so it alone comes up.
         // The hand lets go at once: a chop sounds for under a sixteenth.
-        return strums(line, from, to, skank === 'double' ? 1 : 2, 0.8);
+        return strums(line, from, to, 1, 0.8);
     },
 });
 
@@ -432,10 +454,13 @@ export const reggae: Style = {
     bass: reggaeBass,
     comp: { keyboard: reggaeKeys, guitar: reggaeGuitar },
     // Guitar, against the old mapping's organ. The band has one comp instrument, and it has
-    // to carry the genre alone: the chop on 2 and 4 is reggae's non-negotiable comp gesture,
-    // and only the skank plays it. The organ bubble is iconic, but on a record it bubbles
-    // *between* the skank's chops — alone it is a run of offbeat sixteenths that could be
-    // rocksteady or ska. The old engine chose the organ in a two-channel world, where the
-    // chords lane skanked and the harmony lane bubbled beside it.
+    // to carry the genre alone: the chop on 2 and 4 is reggae's non-negotiable comp gesture.
+    // The skank plays it as the beat itself; the organ bubble is iconic, but on a record it
+    // bubbles *between* the skank's chops, so alone it now borrows that chop on its own right
+    // hand (see `bubble`) to stay a credible alternative rather than a run of offbeat
+    // sixteenths that could be rocksteady or ska. Guitar stays the default because it's the
+    // more idiomatic solo voice — the skank *is* the genre's rhythm guitar part. The old
+    // engine chose the organ in a two-channel world, where the chords lane skanked and the
+    // harmony lane bubbled beside it.
     prefers: 'guitar',
 };
