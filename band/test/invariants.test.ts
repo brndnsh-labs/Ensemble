@@ -10,6 +10,7 @@ import {
     type CompInstrument,
     DEFAULT_SETTINGS,
     type PitchedNote,
+    type StyleId,
 } from '../core/types.js';
 import { MAX_CHARACTER_MS } from '../feel/feel.js';
 import { chordAt, compileTimeline, type Timeline } from '../form/timeline.js';
@@ -18,7 +19,7 @@ import { isPlayable } from '../players/comp/fretboard.js';
 import { COMP_INSTRUMENTS } from '../players/comp/instruments.js';
 import { STEP } from '../players/grid.js';
 import { feelFor, STYLE_IDS, STYLES } from '../styles/index.js';
-import { chordPcs } from '../theory/chord.js';
+import { type ChordFacts, chordPcs, fifthOf } from '../theory/chord.js';
 import { mod12 } from '../theory/pitch.js';
 import { FIXTURES } from './scores.js';
 
@@ -34,6 +35,34 @@ const INSTRUMENTS: CompInstrument[] = ['piano', 'organ', 'guitar', 'nylon'];
  * bass note itself (the swing shell's root, doubling the walking bass on purpose).
  */
 const GUITAR_FLOOR_WITH_BASS = 48;
+/**
+ * The styles whose comp plays power chords on purpose, and so the only ones where a power
+ * chord (`isPowerChord`) is exempt from two rules below:
+ * - **the guide tones**: a power chord has no third by design. Under distortion a third
+ *   beating against root and fifth turns to mud, so metal states a chord by its root and its
+ *   own fifth (the tritone for a diminished chord, the #5 for an augmented one) and leaves
+ *   the quality to the melody — the old engine's `power-metal` comp did the same;
+ * - **the guitar's floor** (the "who owns the bottom" law): E2 and A2 power chords, doubling
+ *   the bass an octave up, are the metal riff. The floor still binds every other shape, so a
+ *   metal grip carrying a third, or any note but the root and its fifth, stays above it.
+ * Scoped by style *and* shape so the exemption can't hide a voicing bug anywhere else: a
+ * style that dropped its thirds by accident still fails.
+ */
+const POWER_CHORD_STYLES: ReadonlySet<StyleId> = new Set(['metal']);
+
+/** Only the chord's root and its fifth (in any octaves), with the root lowest: R-5-8. */
+function isPowerChord(midis: number[], chord: ChordFacts | null | undefined): boolean {
+    if (!chord || midis.length < 2) {
+        return false;
+    }
+    const fifth = mod12(chord.root + fifthOf(chord));
+    const lowest = Math.min(...midis);
+    return (
+        mod12(lowest) === chord.root &&
+        midis.some((m) => mod12(m) === fifth) &&
+        midis.every((m) => mod12(m) === chord.root || mod12(m) === fifth)
+    );
+}
 
 describe.each(STYLE_IDS)('%s invariants', (styleId) => {
     const style = STYLES[styleId];
@@ -110,6 +139,14 @@ function checkPass(
         problems.push(`${where}: silent`);
     }
     const instrument = COMP_INSTRUMENTS[settings.comp];
+    const powerChords = POWER_CHORD_STYLES.has(settings.style);
+    // Every comp note sounding at a tick (palm-muted ones too: a chug is the grip, damped).
+    const compAt = new Map<number, number[]>();
+    for (const e of events) {
+        if (e.lane === 'comp') {
+            compAt.set(e.tick, [...(compAt.get(e.tick) ?? []), e.midi]);
+        }
+    }
     const strummed = strumRanks(events);
     const lastPitch = new Map<string, PitchedNote>();
     for (const e of events) {
@@ -140,7 +177,8 @@ function checkPass(
             instrument.family === 'guitar' &&
             settings.lanes.bass &&
             e.midi < GUITAR_FLOOR_WITH_BASS &&
-            mod12(e.midi) !== chordAt(timeline, e.tick)?.bass
+            mod12(e.midi) !== chordAt(timeline, e.tick)?.bass &&
+            !(powerChords && isPowerChord(compAt.get(e.tick) ?? [], chordAt(timeline, e.tick)))
         ) {
             fail(e, `guitar ${e.midi} in the bass's register`);
         }
@@ -205,10 +243,18 @@ function checkPass(
             notes.length === 2 &&
             mod12(lowNote) === here?.bass &&
             [7, 8, 9, 10].includes(highNote - lowNote);
+        // A power chord on a power-chord style states the chord by root and fifth alone.
+        const power =
+            powerChords &&
+            isPowerChord(
+                notes.map((n) => n.midi),
+                here,
+            );
         if (
             notes.length > 1 &&
             !up &&
             !bassRole &&
+            !power &&
             !(carries(here) || carries(nextInBar) || carries(next))
         ) {
             fail(notes[0], `comp chord lacks the guide tones of ${here?.symbol}`);

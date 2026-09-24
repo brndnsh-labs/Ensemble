@@ -11,6 +11,7 @@ import { disco } from './disco.js';
 import { funk } from './funk.js';
 import { hiphop } from './hiphop.js';
 import { jazz } from './jazz.js';
+import { metal } from './metal.js';
 import { neosoul } from './neosoul.js';
 import { reggae } from './reggae.js';
 import { rock } from './rock.js';
@@ -23,6 +24,7 @@ export const CLAIMS: Record<StyleId, StyleClaims> = {
     funk,
     hiphop,
     jazz,
+    metal,
     neosoul,
     reggae,
     rock,

@@ -97,7 +97,11 @@ physical: its range, its strum speed, whether it sustains.
   (up) at the instrument's `strumMs`, and takes tier-3 placement as one gesture.
 - **Who owns the bottom.** With a bass in the band, grips stay above C3 — except the chord's bass
   note itself: the swing shell (`rootBottom`, one muted string skipped: `8x89xx`) puts its root
-  on the low strings, doubling the walking bass on purpose. With the bass lane off, a book's
+  on the low strings, doubling the walking bass on purpose. Metal's power chords (`kind:
+  'power'`, root-5-8 in a low slot) are the one other exception: an E2 or A2 power chord doubling
+  the bass is the riff, so on a power-chord style (`POWER_CHORD_STYLES` in the invariant suite) a
+  grip of only the root and its own fifth may sit below the floor and needs no third; any other
+  shape still obeys both rules. With the bass lane off, a book's
   `alone` shape takes over: rock plays full root-position chords, and the bossa grip carries
   the root on its bottom string while the thumb fills root/fifth between plucks.
 - **Idiom physics.** Open strings are off where the idiom mutes by releasing the fretting hand
@@ -120,7 +124,8 @@ schedules everything due in the next 150 ms on a 25 ms timer.
 - **Tempo** re-anchors the clock.
 - **Style, intensity, lanes, swing, humanize and the comp instrument** regenerate the pass from
   the next barline. The comp instrument follows the chords lane's sound (`COMP_FOR_VOICE` in
-  `runtime.ts`); in next mode a native genre's Auto sound is its style's `prefers`.
+  `runtime.ts`); in next mode a native genre's Auto sound is its style's `prefers`, unless
+  `AUTO_VOICE_FOR_STYLE` names another sound for the same instrument (metal: the crunch guitar).
 - **A staged genre** is committed at once.
 - **The chart pointer** follows `songTick()` to the written event under it (`slotAt`).
 

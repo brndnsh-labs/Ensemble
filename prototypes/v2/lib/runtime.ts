@@ -140,7 +140,7 @@ const STYLE_FOR_GENRE: Record<string, StyleId> = {
     Reggae: 'reggae',
     Acoustic: 'rock',
     Country: 'country',
-    Metal: 'rock',
+    Metal: 'metal',
     'Ska-Punk': 'rock',
 };
 /** The chords-lane sound for each comp instrument (what the band's Auto sound selects). */
@@ -161,10 +161,23 @@ const COMP_FOR_VOICE: Record<string, CompInstrument> = Object.assign(Object.crea
     'pack:electric-guitar-rhythm': 'guitar',
     'pack:electric-guitar-driven': 'guitar',
 });
+/**
+ * A native style whose Auto sound is not its comp instrument's default sound. Metal's comp is
+ * the guitar book, but heard through the crunch pack (the old engine's #698): power chords are
+ * what a *distorted* guitar plays, and on the clean pack they sound thin. The sound is the
+ * app's business, so it lives here rather than on the engine's `Style`; `COMP_FOR_VOICE` still
+ * maps the pack back to the guitar book.
+ */
+const AUTO_VOICE_FOR_STYLE: Partial<Record<StyleId, InstrumentVoice>> = {
+    metal: 'pack:electric-guitar-rhythm',
+};
 /** In next mode, a genre the band plays natively picks its own comp instrument's sound. */
 function bandAutoComp(genre: string | undefined): InstrumentVoice | null {
     const style = STYLE_IDS.find((id) => STYLES[id].name === genre);
-    return ENGINE_NEXT && style ? VOICE_FOR_COMP[STYLES[style].prefers] : null;
+    if (!ENGINE_NEXT || !style) {
+        return null;
+    }
+    return AUTO_VOICE_FOR_STYLE[style] ?? VOICE_FOR_COMP[STYLES[style].prefers];
 }
 let band: BandHost | null = null;
 let bandSeed = '';
