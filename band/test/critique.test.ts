@@ -970,6 +970,64 @@ const METRICS: Record<string, Metric> = {
         }
         return ratio(hit, n);
     },
+    /** Kicks per groove bar that land between the beats (off steps 0, 4, 8 and 12). */
+    kickSyncopation: (takes) => {
+        let n = 0;
+        let off = 0;
+        for (const { timeline: t, events } of takes) {
+            for (const b of grooveBars(t, events)) {
+                n++;
+                off += [...drumSteps(t, events, b.index, ['kick'])].filter((s) => s % 4).length;
+            }
+        }
+        return ratio(off, n);
+    },
+    /**
+     * A beat is a loop: the share of groove bars whose drum part (every piece and step, but
+     * the crash and the cymbal it replaces on the One) is the same as two bars before in the
+     * same section visit — a two-bar loop repeats exactly, a groove that re-rolls does not.
+     */
+    drumLoopRepeat: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { timeline: t, events } of takes) {
+            const signature = (bar: number) =>
+                (
+                    events.filter(
+                        (e) => e.lane === 'drums' && e.bar === bar && e.piece !== 'crash',
+                    ) as DrumHit[]
+                )
+                    .map((e) => `${e.piece}:${stepOf(t, e)}`)
+                    .filter((s) => !/^(hat|hatOpen|ride):0$/.test(s))
+                    .sort()
+                    .join(',');
+            const groove = new Set(grooveBars(t, events).map((b) => b.index));
+            for (const index of groove) {
+                const b = t.bars[index];
+                const before = t.bars[index - 2];
+                if (!before || before.visit.ordinal !== b.visit.ordinal || !groove.has(index - 2)) {
+                    continue;
+                }
+                n++;
+                hit += signature(index) === signature(index - 2) ? 1 : 0;
+            }
+        }
+        return ratio(hit, n);
+    },
+    /** Mean written length of the sounding bass notes, in sixteenths. */
+    bassMeanSteps: (takes) => {
+        let n = 0;
+        let sum = 0;
+        for (const { events } of takes) {
+            for (const e of events) {
+                if (e.lane === 'bass' && !e.muted) {
+                    n++;
+                    sum += e.dur / STEP;
+                }
+            }
+        }
+        return ratio(sum, n);
+    },
 };
 
 // ---------------------------------------------------------------- the claims
@@ -1061,6 +1119,18 @@ const CLAIMS: Record<StyleId, Claim[]> = {
         ['compBackbeatShare', 0.6, 1, 'the piano answers the boom on 2 and 4'],
         ['compColour', 0, 0.1, 'triads and sixths, not jazz ninths'],
     ],
+    hiphop: [
+        ['snareBackbeat', 0.95, 1, 'a hard snare on 2 and 4, every bar'],
+        ['kickOnOne', 0.95, 1, 'the kick owns the One'],
+        ['kickSyncopation', 1, 2.75, 'boom-bap: kicks between the beats, never a busy double time'],
+        ['drumLoopRepeat', 0.9, 1, 'a beat is a loop: bars in a section repeat'],
+        ['bassKickUnison', 0.75, 1, 'the sub is struck with the kick'],
+        ['bassMeanPitch', 30, 38, 'a sub line in the lowest octave'],
+        ['bassMeanSteps', 3, 16, 'long sub notes, held to the next kick'],
+        ['bassArrivesOnBass', 0.95, 1, 'every change arrives on its root (or slash note)'],
+        ['compColour', 0.6, 1, 'the sampled-jazz Rhodes: 9ths and 13ths'],
+        ['compStrikesPerBar', 1, 3, 'a sparse loop: a chord or two a bar, never a pulse'],
+    ],
 };
 
 // A second take at low energy, for the styles whose feel actually changes there — a walk
@@ -1135,6 +1205,12 @@ const GUITAR_CLAIMS: Record<StyleId, Claim[]> = {
         ['compBackbeatShare', 0.6, 1, 'the chick: strums on 2 and 4'],
         ['compMeanLowest', 50, 56, 'open-position grips on the top four strings, off the bass'],
         ['compColour', 0, 0.1, 'open triads, not jazz extensions'],
+    ],
+    hiphop: [
+        ['compStrikesPerBar', 1, 3.5, 'minimal: a couple of damped hits a bar, rarely strummed'],
+        ['compShort', 0.9, 1, 'every hit is damped at once, never let ring'],
+        ['compColour', 0.5, 1, 'the jazzy 3-7-9 grip where a seventh chord allows'],
+        ['compMeanLowest', 55, 67, 'a small grip on the top strings, far above the sub'],
     ],
 };
 
