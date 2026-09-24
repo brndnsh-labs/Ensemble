@@ -14,6 +14,7 @@ import { jazz } from './jazz.js';
 import { neosoul } from './neosoul.js';
 import { reggae } from './reggae.js';
 import { rock } from './rock.js';
+import { skapunk } from './skapunk.js';
 
 export const CLAIMS: Record<StyleId, StyleClaims> = {
     blues,
@@ -26,4 +27,5 @@ export const CLAIMS: Record<StyleId, StyleClaims> = {
     neosoul,
     reggae,
     rock,
+    skapunk,
 };
