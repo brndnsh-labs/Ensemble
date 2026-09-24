@@ -84,7 +84,13 @@ function isBlast(t: Timeline, events: BandEvent[], bar: number) {
 }
 
 const metrics = {
-    /** Share of sounding comp strikes that are power chords of the chord they sound over. */
+    /**
+     * Share of sounding comp strikes that are power chords of the chord they sound over. Reads
+     * high almost by construction — `isPower` re-derives the same `fifthOf` the voicing was
+     * built from, so most strikes trivially match it. What it actually guards is the one thing
+     * that *can* drift: the lowest note sitting on the chord's root (or slash bass) rather than
+     * some other tone, which a slash chord or a voice-leading bug could still get wrong.
+     */
     compPowerChordShare: (takes) => {
         let n = 0;
         let hit = 0;
@@ -100,8 +106,9 @@ const metrics = {
         return ratio(hit, n);
     },
     /**
-     * Share of comp strikes that are palm-muted power chords: a damped *grip*, root and fifth
-     * under the palm, not a pitchless scratch (a one-note or a non-power muted strike misses).
+     * Share of comp strikes that are palm-muted power chords: a damped *grip* that keeps its
+     * pitch (`palm`), root and fifth under the palm — never a pitchless scratch (`muted`), and
+     * never a one-note or non-power strike either.
      */
     compPalmMuteShare: (takes) => {
         let n = 0;
@@ -109,7 +116,7 @@ const metrics = {
         for (const { timeline: t, events } of takes) {
             for (const notes of compStrikes(events).values()) {
                 n++;
-                hit += notes.every((x) => x.muted) && isPower(t, notes) ? 1 : 0;
+                hit += notes.every((x) => x.palm && !x.muted) && isPower(t, notes) ? 1 : 0;
             }
         }
         return ratio(hit, n);
@@ -379,9 +386,9 @@ export const metal = defineClaims({
                 ],
                 [
                     'compEighthDownstrokes',
-                    0.35,
-                    0.8,
-                    'alternate-picked eighths: the "and"s come up until the band drives',
+                    0.95,
+                    1,
+                    'downpicked eighth chugs for weight, same as the driving band above it',
                 ],
                 [
                     'bassNotesPerBeat',

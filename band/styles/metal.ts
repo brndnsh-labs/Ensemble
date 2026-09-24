@@ -337,7 +337,11 @@ function riff(ctx: BarContext, from: number, to: number, attack: boolean): Hit[]
     if (tier === 'low') {
         return [{ step: from, length: to - from, velocity: attack ? 100 : 84, stroke: 'down' }];
     }
-    const grid = tier === 'high' ? 1 : 2;
+    // why: metal downpicks its palm-muted eighths for weight — the sixteenth pendulum (grid 1)
+    // puts every eighth on a downstroke at every tier above low, the same as the high-energy
+    // drive; alternation is still what a sixteenth run (the gallop, a blast burst) gets, since
+    // those steps fall on the pendulum's offbeat side regardless of this constant.
+    const grid = 1;
     if (tier === 'high' && heardBlast(ctx)) {
         const hits: Hit[] = [];
         for (let s = from; s < to; s++) {
@@ -377,7 +381,9 @@ function riff(ctx: BarContext, from: number, to: number, attack: boolean): Hit[]
         // The chug digs in harder on the beat; a sixteenth between is the lightest.
         const base = tier === 'high' ? 90 : 80;
         const velocity = step % 4 === 0 ? base + 8 : step % 2 === 0 ? base : base - 6;
-        return { step, length: 0.5, velocity, stroke, muted: true };
+        // why: a palm mute keeps the grip's pitch (a damped chord strike), unlike a scratch
+        // (`muted`) which kills it — the chug is a real, if dark, statement of the chord.
+        return { step, length: 0.5, velocity, stroke, palm: true };
     });
 }
 
