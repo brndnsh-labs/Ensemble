@@ -89,7 +89,10 @@ physical: its range, its strum speed, whether it sustains.
   unless the book is `percussive`: its figure is the part (the reggae bubble is chopped).
 - **Guitars** play *grips found on the fretboard* (`fretboard.ts`): one note per string, on
   adjacent strings, within a four-fret reach, costed like a keyboard voicing. The invariant
-  suite holds every guitar chord to `isPlayable`.
+  suite holds every guitar chord to `isPlayable`. An open-position book (`openPosition`, the
+  acoustic strum) plays first-position shapes that ring their open strings (x32010, x02210,
+  133211), standing on the root, four fingers at most; a guitar that is the band's bottom may
+  make the low-interval limits law for its two lowest voices (`bottomLaw`).
 - **The strumming hand is a pendulum**: down on the beat side of its grid, up on the offbeat,
   so direction follows position. A muted scratch deadens the grip the hand is holding; a palm
   mute (`palm`) keeps its pitch — a short, dark chug the host damps to ~80–130 ms.

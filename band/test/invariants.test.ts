@@ -13,7 +13,7 @@ import {
     type StyleId,
 } from '../core/types.js';
 import { MAX_CHARACTER_MS } from '../feel/feel.js';
-import { chordAt, compileTimeline, type Timeline } from '../form/timeline.js';
+import { compileTimeline, type Timeline } from '../form/timeline.js';
 import { performPass } from '../perform.js';
 import { isPlayable } from '../players/comp/fretboard.js';
 import { COMP_INSTRUMENTS } from '../players/comp/instruments.js';
@@ -38,6 +38,21 @@ const INSTRUMENTS: CompInstrument[] = ['piano', 'organ', 'guitar', 'nylon'];
  * chord (Am x02210), while a third, seventh or tension down there still fails.
  */
 const GUITAR_FLOOR_WITH_BASS = 48;
+
+/**
+ * The chords a comp strike at `tick` may be playing: the one sounding, or — an anticipation
+ * plays the next chord early — the next one in the bar, or the next bar's first (wrapping at
+ * the end of the song).
+ */
+function strikeChords(timeline: Timeline, barIndex: number, tick: number) {
+    const bar = timeline.bars[barIndex];
+    const index = bar.spans.findIndex((s) => s.start <= tick && tick < s.end);
+    return {
+        here: bar.spans[index]?.chord,
+        nextInBar: bar.spans[index + 1]?.chord,
+        next: timeline.bars[barIndex + 1]?.spans[0]?.chord ?? timeline.bars[0].spans[0]?.chord,
+    };
+}
 
 /** Whether a guitar note below the floor doubles the bass's job (see the floor above). */
 function doublesTheBass(midi: number, grip: number[], chord: ChordFacts | null | undefined) {
@@ -203,7 +218,11 @@ function checkPass(
             instrument.family === 'guitar' &&
             settings.lanes.bass &&
             e.midi < GUITAR_FLOOR_WITH_BASS &&
-            !doublesTheBass(e.midi, compAt.get(e.tick) ?? [], chordAt(timeline, e.tick))
+            // Judged against the chord the strike plays: an anticipated open G7 (3x0001)
+            // doubles the bass note that is about to arrive.
+            !Object.values(strikeChords(timeline, e.bar, e.tick)).some((chord) =>
+                doublesTheBass(e.midi, compAt.get(e.tick) ?? [], chord),
+            )
         ) {
             fail(e, `guitar ${e.midi} in the bass's register`);
         }
@@ -245,14 +264,8 @@ function checkPass(
         clusters.set(n.tick, [...(clusters.get(n.tick) ?? []), n]);
     }
     for (const [tick, notes] of clusters) {
-        const bar = timeline.bars[notes[0].bar];
-        const index = bar.spans.findIndex((s) => s.start <= tick && tick < s.end);
-        const here = bar.spans[index]?.chord;
-        // An anticipation may play the next chord early: the next one in the bar, or the
-        // next bar's first (wrapping at the end of the song).
-        const nextInBar = bar.spans[index + 1]?.chord;
-        const next =
-            timeline.bars[notes[0].bar + 1]?.spans[0]?.chord ?? timeline.bars[0].spans[0]?.chord;
+        // An anticipation may play the next chord early (`strikeChords`).
+        const { here, nextInBar, next } = strikeChords(timeline, notes[0].bar, tick);
         const pcs = new Set(notes.map((n) => mod12(n.midi)));
         // A picked pair is a double-stop — two strings of the grip the hand holds (the soul
         // guitar's 3rds and 6ths), a line over the chord rather than the chord itself — so it

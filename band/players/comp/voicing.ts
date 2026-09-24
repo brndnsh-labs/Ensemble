@@ -210,8 +210,11 @@ function candidates(tones: number[], kind: VoicingKind): number[][] {
     return out;
 }
 
-/** Lowest note (MIDI) for the lower voice of each interval, in semitones. */
-const LOW_INTERVAL_LIMIT: Record<number, number> = {
+/**
+ * Lowest note (MIDI) for the lower voice of each interval, in semitones. `cost` weighs it for
+ * every voicing; a grip shape with `bottomLaw` (`fretboard.ts`) makes it binding.
+ */
+export const LOW_INTERVAL_LIMIT: Record<number, number> = {
     1: 52, // m2: E3
     2: 51, // M2: Eb3
     3: 48, // m3: C3
