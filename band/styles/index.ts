@@ -6,6 +6,7 @@
  * `test/claims/<id>.ts`.
  */
 import type { StyleId } from '../core/types.js';
+import { acoustic } from './acoustic.js';
 import { blues } from './blues.js';
 import { bossa } from './bossa.js';
 import { country } from './country.js';
@@ -33,6 +34,7 @@ export const STYLES: Record<StyleId, Style> = {
     neosoul,
     metal,
     skapunk,
+    acoustic,
 };
 
 export const STYLE_IDS = Object.keys(STYLES) as StyleId[];

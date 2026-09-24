@@ -81,7 +81,8 @@ export type StyleId =
     | 'disco'
     | 'neosoul'
     | 'metal'
-    | 'skapunk';
+    | 'skapunk'
+    | 'acoustic';
 
 export interface BandSettings {
     style: StyleId;
