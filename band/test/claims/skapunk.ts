@@ -8,6 +8,7 @@
 import type { BandEvent, DrumHit, PitchedNote } from '../../core/types.js';
 import type { Bar, Timeline } from '../../form/timeline.js';
 import { STEP } from '../../players/grid.js';
+import { fifthOf } from '../../theory/chord.js';
 import { mod12 } from '../../theory/pitch.js';
 import { defineClaims, type Take } from '../critique/harness.js';
 
@@ -18,6 +19,8 @@ const ratio = (hits: number, total: number) => (total ? hits / total : 0);
 type Side = 'verse' | 'chorus';
 const onSide = (b: Bar, side: Side) =>
     b.meter.name === '4/4' && isChorus(b) === (side === 'chorus');
+const chordFor = (t: Timeline, tick: number) =>
+    t.spans.find((s) => s.start <= tick && tick < s.end)?.chord;
 
 /** Sounding comp strikes (one per onset) in 4/4 bars on one side of the switch. */
 function strikes(takes: Take[], side: Side): { t: Timeline; notes: PitchedNote[] }[] {
@@ -105,15 +108,41 @@ const metrics = {
             all.length,
         );
     },
-    /** Share of the choruses' comp chords (two notes or more) with the chord's bass lowest. */
+    /**
+     * Share of the choruses' comp chords (two notes or more) with the chord's OWN root lowest —
+     * a power chord's bottom is always its root, never a slash chord's bass note (the slash
+     * note is the bassist's job; see `fretboard.ts`'s `grip`), so this checks `chord.root`, not
+     * `chord.bass`.
+     */
     chorusCompRootLowest: (takes: Take[]) => {
         const all = strikes(takes, 'chorus').filter(({ notes }) => notes.length > 1);
         return ratio(
             all.filter(({ t, notes }) => {
-                const chord = t.spans.find(
-                    (s) => s.start <= notes[0].tick && notes[0].tick < s.end,
-                )?.chord;
-                return chord && mod12(Math.min(...notes.map((n) => n.midi))) === chord.bass;
+                const chord = chordFor(t, notes[0].tick);
+                return chord && mod12(Math.min(...notes.map((n) => n.midi))) === chord.root;
+            }).length,
+            all.length,
+        );
+    },
+    /**
+     * Share of the choruses' sounding comp chords (two notes or more) that are true power
+     * chords: the root lowest, and nothing sounding but the root and its own fifth — no third,
+     * whatever the chart's chord quality (mirrors metal's `isPower`).
+     */
+    chorusPowerChords: (takes: Take[]) => {
+        const all = strikes(takes, 'chorus').filter(({ notes }) => notes.length > 1);
+        return ratio(
+            all.filter(({ t, notes }) => {
+                const chord = chordFor(t, notes[0].tick);
+                if (!chord) {
+                    return false;
+                }
+                const fifth = mod12(chord.root + fifthOf(chord));
+                const pcs = notes.map((n) => mod12(n.midi));
+                return (
+                    mod12(Math.min(...notes.map((n) => n.midi))) === chord.root &&
+                    pcs.every((pc) => pc === chord.root || pc === fifth)
+                );
             }).length,
             all.length,
         );
@@ -126,6 +155,20 @@ const metrics = {
                 const s = pieceSteps(t, drums, ['snare', 'rim']);
                 return s.has(4) && s.has(12) && ![2, 6, 10, 14].some((x) => s.has(x));
             }).length,
+            bars.length,
+        );
+    },
+    /**
+     * Verse groove bars whose kick pushes the "and" of 3 (step 10) — the rock beat's
+     * syncopation, which no `SKA_TIME` kick ever plays (they only ever land on the beat). The
+     * snare's backbeat is identical between ska and a driving punk verse (both keep 2 and 4), so
+     * `verseBackbeat` alone can't tell a genuinely driving verse from a verse that stayed in ska
+     * time; this is the discriminant that actually reads the kick's gear, not just the snare.
+     */
+    verseKickDrives: (takes: Take[]) => {
+        const bars = grooveBars(takes, 'verse');
+        return ratio(
+            bars.filter(({ t, drums }) => pieceSteps(t, drums, ['kick']).has(10)).length,
             bars.length,
         );
     },
@@ -261,6 +304,33 @@ const metrics = {
         }
         return ratio(hit, n);
     },
+    /**
+     * At a REPEATED chord (the span before it shares the same bass note, so nothing actually
+     * changes), the share where the bass note just before it is still a half step away — the
+     * mannerism the walk must not force. A little overlap is expected (a scale tone can
+     * legitimately sit a half step off, and a bar-ending chord may simply repeat its own root),
+     * but it must read nothing like `bassChromaticApproach`'s real-change rate.
+     */
+    bassRepeatApproach: (takes: Take[]) => {
+        let n = 0;
+        let hit = 0;
+        for (const { timeline: t, events } of takes) {
+            const bass = events.filter((e): e is PitchedNote => e.lane === 'bass' && !e.muted);
+            for (const [k, span] of t.spans.entries()) {
+                const before = t.spans[k - 1]?.chord;
+                if (!span.chord || !before || before.bass !== span.chord.bass) {
+                    continue;
+                }
+                const i = bass.findIndex((e) => Math.abs(e.tick - span.start) < 1);
+                if (i < 1) {
+                    continue;
+                }
+                n++;
+                hit += Math.abs(bass[i].midi - bass[i - 1].midi) === 1 ? 1 : 0;
+            }
+        }
+        return ratio(hit, n);
+    },
 };
 
 export const skapunk = defineClaims({
@@ -297,12 +367,18 @@ export const skapunk = defineClaims({
                 ],
                 [
                     'bassChromaticApproach',
-                    0.75,
-                    1,
-                    'nearly every change is led into by a half step in pitch',
+                    0.3,
+                    0.6,
+                    'a ska walk runs scales and arpeggios, chromatic approach as seasoning',
                 ],
                 ['bassArrivesOnBass', 0.95, 1, 'every chord arrives on its bass note'],
                 ['compColour', 0, 0.15, 'triads and sevenths, no extensions'],
+                [
+                    'bassRepeatApproach',
+                    0,
+                    0.25,
+                    "a repeated chord isn't chromatically approached — nothing to lead into",
+                ],
             ],
         },
         {
@@ -328,7 +404,13 @@ export const skapunk = defineClaims({
                     'verseBackbeat',
                     0.95,
                     1,
-                    'a punk verse drives the rock beat, keeping the skate beat for the chorus',
+                    'the verse still keeps the backbeat on 2 and 4, driving or not',
+                ],
+                [
+                    'verseKickDrives',
+                    0.8,
+                    1,
+                    "a punk verse drives the rock beat's kick, keeping the skate beat for the chorus",
                 ],
             ],
         },
@@ -341,6 +423,12 @@ export const skapunk = defineClaims({
                 ['verseCompChopped', 0.9, 1, 'the fretting hand damps the chop at once'],
                 ['compMeanLowest', 52, 67, 'small grips, high on the neck, above the bass'],
                 ['compColour', 0, 0.15, 'triads and sevenths, no extensions'],
+                [
+                    'chorusPowerChords',
+                    0.95,
+                    1,
+                    'the chorus strikes are power chords, root lowest — never a sounding third',
+                ],
             ],
         },
         {
