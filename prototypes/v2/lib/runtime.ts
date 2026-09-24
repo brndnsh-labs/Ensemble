@@ -125,8 +125,8 @@ let currentScore: SemanticScore | null = null;
 /** One sixteenth in band ticks: the old engine's step, so step maps convert exactly. */
 const STEP_TICKS = PPQ / 4;
 /**
- * The genres the band engine plays natively, and the nearest one standing in for each of the
- * rest until they are ported (v0 scope: the rhythm section in four styles).
+ * The band engine's style for each of the 13 canonical genres (all native). A lookup by a
+ * persisted genre name is guarded with `Object.hasOwn`.
  */
 const STYLE_FOR_GENRE: Record<string, StyleId> = {
     Rock: 'rock',
