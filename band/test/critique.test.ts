@@ -17,6 +17,7 @@ import {
 import { chordAt, compileTimeline, type Timeline } from '../form/timeline.js';
 import { type PassMemory, performPass } from '../perform.js';
 import { STEP } from '../players/grid.js';
+import { chordPcs } from '../theory/chord.js';
 import { mod12 } from '../theory/pitch.js';
 import { FIXTURES } from './scores.js';
 
@@ -698,7 +699,11 @@ const METRICS: Record<string, Metric> = {
     },
     /**
      * Of the chord changes at a barline after a whole-bar chord, the share walked into: notes
-     * on beats 3 and 4 stepping (1–2 semitones each, one direction) onto the new chord's bass.
+     * on beats 3 and 4 stepping (1–2 semitones each, one direction) onto the new chord's bass,
+     * where beat 4 — the note the ear judges right before the landing (T8) — is either a tone
+     * of the chord it's walking away from, or a half step from where it lands. A contour-only
+     * check let a walk clash straight through this: A7's altered scale can produce a
+     * contour-clean A-Bb-C run into Dm whose C natural fights the chord's own C# (B4).
      */
     bassWalkUps: (takes) => {
         let n = 0;
@@ -720,7 +725,9 @@ const METRICS: Record<string, Metric> = {
                 const [a, c] = [four - three, land - four];
                 const steps = [1, 2].includes(Math.abs(a)) && [1, 2].includes(Math.abs(c));
                 const lands = mod12(land) === next.chord.bass;
-                hit += steps && Math.sign(a) === Math.sign(c) && lands ? 1 : 0;
+                const leadsIn =
+                    chordPcs(chord).includes(mod12(four)) || Math.abs(land - four) === 1;
+                hit += steps && Math.sign(a) === Math.sign(c) && lands && leadsIn ? 1 : 0;
             }
         }
         return ratio(hit, n);
@@ -743,7 +750,9 @@ const METRICS: Record<string, Metric> = {
     },
     /**
      * A guitar's own boom (no bass in the band): in bars holding one root-position chord, the
-     * share with a lone low note (below E3) on 1 that is the root, and on 3 the fifth.
+     * share with a lone low note (below E3) on 1 that is the root, and on 3 the fifth. Same
+     * exclusion as `bassRootFifth`: a bar the walk-up (I3) claims for its approach into the
+     * next chord isn't a boom-chick bar to judge here — `compWalkUps` judges those.
      */
     compBoomChick: (takes) => {
         let n = 0;
@@ -751,7 +760,11 @@ const METRICS: Record<string, Metric> = {
         for (const { timeline: t, events } of takes) {
             const comp = onsetsByBar(t, events, 'comp');
             for (const [b, chord] of wholeBarChords(t)) {
-                if (chord.bass !== chord.root || chord.fifth === null) {
+                const walked = comp
+                    .get(b.index)
+                    ?.get(12)
+                    ?.some((x) => x.midi < 52);
+                if (chord.bass !== chord.root || chord.fifth === null || walked) {
                     continue;
                 }
                 n++;
@@ -760,6 +773,43 @@ const METRICS: Record<string, Metric> = {
                     return notes?.length === 1 && notes[0].midi < 52 && mod12(notes[0].midi) === pc;
                 };
                 hit += low(0, chord.root) && low(8, mod12(chord.root + chord.fifth)) ? 1 : 0;
+            }
+        }
+        return ratio(hit, n);
+    },
+    /**
+     * The guitar-alone analogue of `bassWalkUps` (I3): with no bassist, the pick's own low
+     * strings (below E3, same threshold as `compBoomChick`) are the only voice that can play
+     * the walk-up into a change — same contour-and-chord-tone check as the bass's.
+     */
+    compWalkUps: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { timeline: t, events } of takes) {
+            const comp = onsetsByBar(t, events, 'comp');
+            const low = (bar: number, step: number) =>
+                comp
+                    .get(bar)
+                    ?.get(step)
+                    ?.find((x) => x.midi < 52)?.midi;
+            for (const [b, chord] of wholeBarChords(t)) {
+                const next = t.bars[b.index + 1]?.spans[0];
+                if (!next?.attack || !next.chord || next.chord.bass === chord.bass) {
+                    continue;
+                }
+                n++;
+                const three = low(b.index, 8);
+                const four = low(b.index, 12);
+                const land = low(b.index + 1, 0);
+                if (three === undefined || four === undefined || land === undefined) {
+                    continue;
+                }
+                const [a, c] = [four - three, land - four];
+                const steps = [1, 2].includes(Math.abs(a)) && [1, 2].includes(Math.abs(c));
+                const lands = mod12(land) === next.chord.bass;
+                const leadsIn =
+                    chordPcs(chord).includes(mod12(four)) || Math.abs(land - four) === 1;
+                hit += steps && Math.sign(a) === Math.sign(c) && lands && leadsIn ? 1 : 0;
             }
         }
         return ratio(hit, n);
@@ -870,7 +920,14 @@ const LOW_CLAIMS: Partial<Record<StyleId, Claim[]>> = {
         ['bassNotesPerBeat', 0.45, 0.75, 'two-feel: root and fifth, an approach on 4 now and then'],
         ['bassRepeatedNotes', 0, 0.05, 'no lope at low energy'],
     ],
-    country: [['bassNotesPerBeat', 0.45, 0.55, 'the ballad two-beat: half notes, no walks']],
+    country: [
+        // T11: the old bracket just pinned the constructed 0.5 of two half notes a bar — a
+        // regression guard on the ballad's note count, kept honest as that (not as "no walks":
+        // the real claim for that is `bassWalkUps` below, which the tier gate keeps at exactly
+        // 0 by construction — a walk needs a beat-3/4 pair that low energy never writes).
+        ['bassNotesPerBeat', 0.45, 0.55, 'regression guard: two half notes a bar, nothing else'],
+        ['bassWalkUps', 0, 0, 'the ballad two-beat: the energy gate keeps walk-ups out'],
+    ],
 };
 
 /**
@@ -946,8 +1003,12 @@ const GUITAR_LOW_CLAIMS: Partial<Record<StyleId, Claim[]>> = {
 /** With the bass lane off: the guitarist is the band's bottom. */
 const GUITAR_ALONE_CLAIMS: Partial<Record<StyleId, Claim[]>> = {
     country: [
-        ['compBoomChick', 0.9, 1, 'Carter-style: the pick plays root on 1, fifth on 3, down low'],
+        ['compBoomChick', 0.9, 1, 'bass-strum: the pick plays root on 1, fifth on 3, down low'],
         ['compBackbeatShare', 0.6, 1, 'and strums the chick on 2 and 4'],
+        // I3: with no bassist the pick is the only voice left to play the walk-up (measured
+        // ~0.21 — lower than the bass's own ~0.3, since the guitar has no "new section"
+        // probability bump and the low-register read can miss a walk note that climbs near 52).
+        ['compWalkUps', 0.15, 0.45, 'walks lead into at least some changes when there is no bass'],
     ],
 };
 
