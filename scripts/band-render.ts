@@ -131,7 +131,12 @@ for (const chart of charts) {
         );
         console.log(`${file}  ${all.length} events`);
         if (args.print) {
-            printBars(timeline, all, Number(args.print));
+            // The first pass only: a later pass reuses the bar indices at offset ticks.
+            printBars(
+                timeline,
+                all.filter((e) => e.tick < timeline.ticks),
+                Number(args.print),
+            );
         }
     }
 }
