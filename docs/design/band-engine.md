@@ -69,11 +69,13 @@ from any bar reproduces the same music.
 ## Styles and idioms
 
 An *idiom* is one way to play one instrument: a backbeat, a walking line, a Charleston comp.
-A *style* is a feel plus one idiom per lane (`styles/index.ts`). Adding a genre usually means
+A *style* is a feel plus one idiom per lane, and each style is one file (`styles/rock.ts`,
+`styles/jazz.ts`, …) registered in `styles/index.ts`: a genre's whole musical identity in one
+place, so genres can be written side by side without touching each other. Adding a genre usually means
 composing existing idioms. An influence, such as rock with a Motown bass, is a style that
 borrows another family's idiom. Shared machinery does everything that isn't the idiom itself:
 - `players/drums/kit.ts`: fills, crashes, endings, odd-meter cells.
-- `players/comp/books.ts` (`compIdiom`): voice leading, anticipations tied over the barline,
+- `players/comp/idiom.ts` (`compIdiom`): voice leading, anticipations tied over the barline,
   strokes and scratches, one chord at a time.
 - `players/bass/line.ts`: register and approach notes.
 

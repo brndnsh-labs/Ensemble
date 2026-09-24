@@ -115,3 +115,18 @@ export function kickSteps(ctx: BarContext): Set<number> {
             .map((h) => Math.round((h.tick - ctx.bar.start) / STEP)),
     );
 }
+
+export interface LineMemory {
+    last: number | null;
+}
+
+/** Where the line is heading at the end of span `i`: the next chord's bass, placed near `from`. */
+export function targetAfter(
+    spans: { span: BarSpan }[],
+    i: number,
+    next: ChordFacts | null,
+    from: number,
+) {
+    const following = spans[i + 1]?.span.chord ?? (i === spans.length - 1 ? next : null);
+    return following ? place(bassPc(following), from) : null;
+}
