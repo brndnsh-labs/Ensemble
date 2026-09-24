@@ -10,7 +10,7 @@
  * the bass note itself: the swing shell's root sits on the low strings on purpose, doubling
  * the walking bass (`rootBottom`). With no bassist, a book may bring its grips down.
  */
-import type { ChordFacts } from '../../theory/chord.js';
+import { type ChordFacts, fifthOf } from '../../theory/chord.js';
 import { mod12 } from '../../theory/pitch.js';
 import { cost, type Slot, type VoicingKind, voicingTones } from './voicing.js';
 
@@ -133,7 +133,7 @@ export function grip(
     }
     // A grip with more strings than tones doubles the root or fifth: a fuller strum.
     const size = Math.max(pcs.length, Math.min(shape.strings, pcs.length + 1));
-    const doubles = new Set([chord.root, mod12(chord.root + (chord.fifth ?? 7))]);
+    const doubles = new Set([chord.root, mod12(chord.root + fifthOf(chord))]);
     const search: Search = {
         pcs,
         size,

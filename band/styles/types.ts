@@ -27,8 +27,10 @@ export interface BarContext {
      * stable no matter what was generated before it. `scope: 'section'` keys on the
      * written section instead of the bar, for choices that should hold for a whole section
      * (a groove's kick pattern, a funk riff) — the motif is the section's, not the bar's.
+     * `scope: 'song'` keys on the performance alone, for what a band commits to for the whole
+     * tune (reggae's riddim: a band doesn't flip from rockers to steppers between choruses).
      */
-    rng(purpose: string, scope?: 'bar' | 'section'): Rng;
+    rng(purpose: string, scope?: 'bar' | 'section' | 'song'): Rng;
 }
 
 export interface Idiom<E, M> {

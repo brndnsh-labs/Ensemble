@@ -5,7 +5,7 @@
  * `grip()` for a guitar — choosing the placement that moves least from the previous chord,
  * sits in the instrument's register, and avoids the clashes a player would avoid.
  */
-import type { ChordFacts } from '../../theory/chord.js';
+import { type ChordFacts, fifthOf } from '../../theory/chord.js';
 import { mod12 } from '../../theory/pitch.js';
 
 /** Where a voicing may sit (MIDI), and where its top voice aims. */
@@ -51,13 +51,13 @@ function fifthSeat(chord: ChordFacts): number {
     if (chord.family === 'dominant' && written.includes(9)) {
         return 9;
     }
-    return chord.fifth ?? 7;
+    return fifthOf(chord);
 }
 
 /** The tones (semitones above the root, < 12) a voicing kind plays for a chord. */
 export function voicingTones(chord: ChordFacts, kind: VoicingKind): number[] {
     const third = chord.third ?? (has(chord, 5) ? 5 : has(chord, 2) ? 2 : null);
-    const fifth = chord.fifth ?? 7;
+    const fifth = fifthOf(chord);
     const colour = chord.seventh ?? (chord.sixth ? 9 : null);
     const written = chord.tensions;
     if (chord.family === 'power') {

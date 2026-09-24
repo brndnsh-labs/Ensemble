@@ -21,7 +21,7 @@ import {
 import { compIdiom, type Hit, pendulum, strums } from '../players/comp/idiom.js';
 import { drumIdiom, snareFigure, tomRun } from '../players/drums/kit.js';
 import { dyn, spanSteps } from '../players/grid.js';
-import type { ChordFacts } from '../theory/chord.js';
+import { type ChordFacts, fifthOf } from '../theory/chord.js';
 import type { PitchedIdiom, Style } from './types.js';
 
 // ================================================================ drums
@@ -89,7 +89,7 @@ function riffPitch(code: string, root: number, chord: ChordFacts): number {
         case 'O':
             return root + 12 <= BASS_SLOT_HI ? root + 12 : root;
         case '5':
-            return root + (chord.fifth ?? 7);
+            return root + fifthOf(chord);
         case '7': {
             // The b7 drops below the root when it would leave the register (a funk staple).
             const up = chord.seventh === 10 ? root + 10 : root + 12;

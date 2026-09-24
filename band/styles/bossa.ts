@@ -3,6 +3,7 @@
  * Bossa: its feel, and its drums, bass and comp (keyboard and guitar) idioms. The
  * shared machinery lives in `players/`; this file is only what makes it this genre.
  */
+
 import type { EnergyTier } from '../arrange/plan.js';
 import type { Rng } from '../core/random.js';
 import type { PitchedNote } from '../core/types.js';
@@ -19,6 +20,7 @@ import {
 import { compIdiom, type Hit } from '../players/comp/idiom.js';
 import { drumIdiom, type Lines, snareFigure } from '../players/drums/kit.js';
 import { at, barSteps, dyn, isCommonTime, pulses, STEP, spanSteps } from '../players/grid.js';
+import { fifthOf } from '../theory/chord.js';
 import { mod12, nearestMidi } from '../theory/pitch.js';
 import type { BarContext, PitchedIdiom, Style } from './types.js';
 
@@ -85,7 +87,7 @@ const bossaBass: PitchedIdiom = {
             }
             const root = sectionPlace(ctx, bassPc(chord));
             // The fifth sits below the root when the root is high, so the line stays low.
-            const up = root + (chord.fifth ?? 7);
+            const up = root + fifthOf(chord);
             const fifth = up > BASS.hi ? up - 12 : up;
             const steps = grid.filter((s) => s >= from && s < to);
             if (span.attack && !steps.includes(from)) {
@@ -227,7 +229,7 @@ const bossaGuitar: PitchedIdiom = {
                     continue;
                 }
                 // The chord's bass where it arrives, its fifth on the other half of the bar.
-                const pc = step === from ? chord.bass : mod12(chord.root + (chord.fifth ?? 7));
+                const pc = step === from ? chord.bass : mod12(chord.root + fifthOf(chord));
                 last = nearestMidi(pc, last, 40, 52);
                 thumb.push({
                     lane: 'comp',

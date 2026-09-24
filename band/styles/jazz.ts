@@ -19,7 +19,7 @@ import {
 import { compIdiom, type Hit } from '../players/comp/idiom.js';
 import { drumIdiom } from '../players/drums/kit.js';
 import { dyn, pulses, spanSteps } from '../players/grid.js';
-import type { ChordFacts } from '../theory/chord.js';
+import { type ChordFacts, fifthOf } from '../theory/chord.js';
 import { mod12 } from '../theory/pitch.js';
 import type { PitchedIdiom, Style } from './types.js';
 
@@ -172,7 +172,7 @@ const walkingBass: PitchedIdiom = {
             // 2. Two-feel: root, then the fifth on 3 — with a quarter-note approach on 4
             //    (35%) splitting the half note when a change follows.
             if (twoFeel) {
-                const fifth = place(mod12(chord.root + (chord.fifth ?? 7)), first);
+                const fifth = place(mod12(chord.root + fifthOf(chord)), first);
                 const notes: [number, number][] = [];
                 notes.push([steps[0], first]);
                 if (steps.length > 1) {
@@ -252,7 +252,7 @@ const walkingBass: PitchedIdiom = {
                         options.push([m, w]);
                     }
                 }
-                const fallback = place(mod12(chord.root + (chord.fifth ?? 7)), prev);
+                const fallback = place(mod12(chord.root + fifthOf(chord)), prev);
                 line.push(
                     options.length
                         ? rng.weighted(options)

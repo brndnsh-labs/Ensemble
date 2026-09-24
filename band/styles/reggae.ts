@@ -25,7 +25,7 @@ import {
 import { compIdiom, type Hit, strums } from '../players/comp/idiom.js';
 import { drumIdiom, type Lines, snareFigure, tomRun } from '../players/drums/kit.js';
 import { barSteps, dyn, isCommonTime, type Pulse, pulses, spanSteps } from '../players/grid.js';
-import type { ChordFacts } from '../theory/chord.js';
+import { type ChordFacts, fifthOf } from '../theory/chord.js';
 import { mod12, nearestMidi } from '../theory/pitch.js';
 import type { BarContext, PitchedIdiom, Style } from './types.js';
 
@@ -155,7 +155,7 @@ function riffPitch(code: string, root: number, chord: ChordFacts): number {
         case 'O':
             return root + 12 <= BASS_SLOT_HI ? root + 12 : root;
         case '5':
-            return up(chord.fifth ?? 7);
+            return up(fifthOf(chord));
         case '3':
             // A sus chord's 4th stands in for its 3rd.
             return up(chord.third ?? (chord.intervals.includes(5) ? 5 : 7));

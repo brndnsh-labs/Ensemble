@@ -21,7 +21,7 @@ import { type GripShape, grip } from '../players/comp/fretboard.js';
 import { compIdiom, type Hit, strums } from '../players/comp/idiom.js';
 import { drumIdiom, tomRun } from '../players/drums/kit.js';
 import { at, dyn, isCommonTime, pulses, STEP, spanSteps } from '../players/grid.js';
-import type { ChordFacts } from '../theory/chord.js';
+import { type ChordFacts, fifthOf } from '../theory/chord.js';
 import { mod12, nearestMidi } from '../theory/pitch.js';
 import type { BarContext, DrumIdiom, PitchedIdiom, Style } from './types.js';
 
@@ -147,7 +147,7 @@ const bluesDrums = withLope(shuffleKit);
  * from, or no 6th to rock to.
  */
 function rockingSixth(chord: ChordFacts): 9 | 8 | null {
-    if ((chord.fifth ?? 7) !== 7) {
+    if (fifthOf(chord) !== 7) {
         return null;
     }
     if (chord.third === 4 || chord.sixth || chord.scale.includes(9)) {
@@ -172,7 +172,7 @@ function boogieBox(chord: ChordFacts): { up: number[]; down: number[] } {
         return { up: [0, 0, 0, 0], down: [0, 0, 0, 0] };
     }
     const has = (n: number) => chord.intervals.some((i) => mod12(i) === n);
-    const fifth = chord.fifth ?? 7;
+    const fifth = fifthOf(chord);
     // Sus chords take their 4th (or 2nd) where the 3rd would be; a power chord has none.
     const third = chord.third ?? (has(5) ? 5 : has(2) ? 2 : null);
     const top = chord.seventh === 10 || chord.seventh === 9 ? chord.seventh : 12;
@@ -278,7 +278,7 @@ const shuffleBass: PitchedIdiom = {
                 // Two-feel: the chord's bass on its arrival, the fifth on 3 (below the root when
                 // the root sits high, so the line stays down). A change after a half note may
                 // take a quarter-note approach on 4 (35%: a push, not a habit).
-                const up = chord.root + (chord.fifth ?? 7);
+                const up = chord.root + fifthOf(chord);
                 const fifth = nearestMidi(mod12(up), root + 4, BASS.lo, BASS.hi);
                 const halves = beats.filter((s, k) => k === 0 || s % 8 === 0);
                 halves.forEach((step, k) => {
@@ -495,7 +495,7 @@ function boogie(ctx: BarContext, memory: HandMemory, tier: EnergyTier) {
         const shape = grip(chord, 'close', BOOGIE_GRIP, voicing);
         const low = shape[0];
         const root = low !== undefined && low <= 52 ? low : nearestMidi(chord.bass, 45, 40, 52);
-        const fifth = chord.fifth ?? 7;
+        const fifth = fifthOf(chord);
         // A chord with nothing to rock to stays on its 5th.
         const sixth = rockingSixth(chord) ?? fifth;
         const reach = tier === 'high' && chord.seventh === 10;
@@ -534,13 +534,18 @@ const bluesGuitar: PitchedIdiom = {
     play(ctx, memory: HandMemory) {
         const tier = energyTier(ctx.plan.energy);
         // The boogie takes over only where it is the idiom: no bassist, the band moving, a 4/4
-        // bar with no fermata, no slash chord (its bass note is not a boogie root), not the end.
+        // bar with no fermata, no slash chord (its bass note is not a boogie root), a plain 5th
+        // to rock from (a diminished or altered chord is played as the chord), not the end.
         const boogieBar =
             !ctx.plan.lanes.bass &&
             tier !== 'low' &&
             !ctx.plan.ending &&
             isCommonTime(ctx.bar) &&
-            ctx.bar.spans.every((s) => !s.fermata && (!s.chord || s.chord.bass === s.chord.root));
+            ctx.bar.spans.every(
+                (s) =>
+                    !s.fermata &&
+                    (!s.chord || (s.chord.bass === s.chord.root && s.chord.fifth === 7)),
+            );
         return boogieBar ? boogie(ctx, memory, tier) : shuffleGuitar.play(ctx, memory);
     },
 };

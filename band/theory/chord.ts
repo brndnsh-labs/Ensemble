@@ -386,6 +386,15 @@ export function parseChord(symbol: string, key: KeyContext): ChordFacts | null {
     };
 }
 
+/**
+ * The chord's 5th, as a line should play it (semitones above the root). A chord that writes
+ * no 5th — the altered dominant, 1 3 b7 b9 #9 b13 — has its b13 in that seat: inventing a
+ * natural 5th would play exactly the note "alt" excludes.
+ */
+export function fifthOf(chord: ChordFacts): number {
+    return chord.fifth ?? (chord.tensions.includes(8) ? 8 : 7);
+}
+
 /** Chord tones as pitch classes (root-relative intervals folded, then transposed). */
 export function chordPcs(chord: ChordFacts): number[] {
     return [...new Set(chord.intervals.map((n) => mod12(chord.root + n)))];

@@ -2,6 +2,7 @@ import { DEFAULT_SETTINGS, type PitchedNote, PPQ } from './core/types.js';
 import { chordAt, compileTimeline } from './form/timeline.js';
 import { performPass } from './perform.js';
 import { FIXTURES, score } from './test/scores.js';
+import { fifthOf } from './theory/chord.js';
 
 const BAR = PPQ * 4;
 
@@ -120,7 +121,7 @@ describe('comp instruments', () => {
         expect(thumb.length).toBeGreaterThan(timeline.bars.length / 2);
         for (const note of thumb) {
             const chord = chordAt(timeline, note.tick);
-            const pcs = [chord?.bass, chord && (chord.root + (chord.fifth ?? 7)) % 12];
+            const pcs = [chord?.bass, chord && (chord.root + fifthOf(chord)) % 12];
             expect(pcs, `thumb ${note.midi} @${note.tick}`).toContain(note.midi % 12);
         }
     });

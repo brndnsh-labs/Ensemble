@@ -78,9 +78,18 @@ export function performPass(
             heard,
             instrument,
             rng: (purpose, scope = 'bar') =>
-                scope === 'section'
-                    ? rng(settings.seed, style.id, lane, 'section', bar.visit.sectionIndex, purpose)
-                    : rng(settings.seed, style.id, lane, options.pass, bar.index, purpose),
+                scope === 'song'
+                    ? rng(settings.seed, style.id, lane, 'song', purpose)
+                    : scope === 'section'
+                      ? rng(
+                            settings.seed,
+                            style.id,
+                            lane,
+                            'section',
+                            bar.visit.sectionIndex,
+                            purpose,
+                        )
+                      : rng(settings.seed, style.id, lane, options.pass, bar.index, purpose),
         });
         if (plan.lanes.drums) {
             const out = style.drums.play(context('drums'), memory.drums);

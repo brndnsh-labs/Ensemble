@@ -196,12 +196,15 @@ function checkPass(
         // A single note is a bossa thumb (the bass role), not a chord; an upstroke catches
         // only the top strings — the downstroke before it carried the chord.
         const up = notes[0].stroke === 'up';
-        // With no bassist, a two-note figure on the chord's bass (the blues boogie's R5/R6) is
-        // the guitar playing the bass role, not a chord short of its guide tones.
+        // With no bassist, a boogie dyad on the chord's bass — the bass note with its 5th, b6,
+        // 6th or b7 above (the blues boogie's R5/R6/Rb7) — is the guitar playing the bass role,
+        // not a chord short of its guide tones.
+        const [lowNote, highNote] = notes.map((n) => n.midi).sort((a, b) => a - b);
         const bassRole =
             !settings.lanes.bass &&
             notes.length === 2 &&
-            mod12(Math.min(...notes.map((n) => n.midi))) === here?.bass;
+            mod12(lowNote) === here?.bass &&
+            [7, 8, 9, 10].includes(highNote - lowNote);
         if (
             notes.length > 1 &&
             !up &&
