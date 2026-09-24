@@ -44,6 +44,25 @@
     font-size: 12px;
     line-height: 1.5;
 }
+.measure-editor-toggle {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 44px;
+    font-size: 13px;
+    cursor: pointer;
+}
+.measure-editor-toggle input {
+    flex: 0 0 auto;
+    width: 18px;
+    height: 18px;
+    margin: 0;
+    accent-color: var(--green);
+}
+.measure-editor-toggle:focus-within {
+    outline: 3px solid #b34e3490;
+    outline-offset: 3px;
+}
 .measure-editor-lengths {
     margin: 0;
     padding: 0;

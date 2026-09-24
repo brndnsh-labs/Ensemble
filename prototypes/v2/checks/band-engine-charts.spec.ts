@@ -38,6 +38,9 @@ test('the band engine opens and plays holds, N.C., fermatas and off-grid lengths
     await page.getByRole('button', { name: '＋ New song', exact: true }).click();
     await editorRevealed(page);
     await page.getByLabel('Song title').fill('Held and free');
+    // Default mode offers no way to author a fermata at all — the old engine refuses any chart
+    // that carries one, so the control is gated out entirely, not merely hidden per-bar.
+    await expect(page.getByLabel('Fermata (hold the last chord)', { exact: true })).toHaveCount(0);
     for (const [i, text] of ['C', 'F', 'G7', 'C'].entries()) {
         await page.getByLabel('Chords in this bar').fill(text);
         if (i < 3) {
@@ -129,6 +132,28 @@ test('the band engine opens and plays holds, N.C., fermatas and off-grid lengths
     await page.getByLabel('Chords in this bar').fill('F /');
     await page.getByRole('button', { name: 'Update chart', exact: true }).click();
     await expect(sheetBars.nth(2).locator('.chord')).toHaveText(['F', '/']);
+
+    // The last bar's own fermata (authored by the import, not the UI) is no longer read-only:
+    // its chords stay editable text, and the toggle reflects and can clear the flag.
+    await page.getByRole('button', { name: 'Edit bar 4', exact: true }).click();
+    await editorRevealed(page);
+    const fermataToggle = page.getByLabel('Fermata (hold the last chord)', { exact: true });
+    await expect(fermataToggle).toBeChecked();
+    await expect(page.getByLabel('Chords in this bar')).toBeEditable();
+    await fermataToggle.uncheck();
+    await page.getByRole('button', { name: 'Update chart', exact: true }).click();
+    await expect(sheetBars.nth(3).locator('.chord')).toHaveText(['Dm7', 'G7', 'C']);
+    await expect(sheetBars.nth(3).locator('.fermata')).toHaveCount(0);
+
+    // Setting it again, through the toggle alone, puts the 𝄐 back without retyping the chords.
+    await page.getByRole('button', { name: 'Edit bar 4', exact: true }).click();
+    await editorRevealed(page);
+    await expect(fermataToggle).not.toBeChecked();
+    await fermataToggle.check();
+    await page.getByRole('button', { name: 'Update chart', exact: true }).click();
+    await expect(sheetBars.nth(3).locator('.chord')).toHaveText(['Dm7', 'G7', '𝄐C']);
+    await expect(sheetBars.nth(3).locator('.fermata')).toHaveCount(1);
+
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
     await expect(page.locator('.error-banner')).toHaveCount(0);

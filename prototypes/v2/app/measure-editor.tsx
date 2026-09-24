@@ -5,8 +5,14 @@ import { validateSemanticScore } from '@engine/songbook/score-codec';
 import { resolveScoreContext } from '@engine/songbook/score-context';
 import { durationToSteps, scoreDuration, scoreMeter } from '@engine/songbook/score-duration';
 import { parseChordBar, printChordBar } from '@engine/songbook/score-text';
-import type { ScoreContext, ScoreMeasure, SemanticScore } from '@engine/songbook/score-types';
+import type {
+    ScoreContext,
+    ScoreEvent,
+    ScoreMeasure,
+    SemanticScore,
+} from '@engine/songbook/score-types';
 import { type Ref, useEffect, useId, useImperativeHandle, useRef, useState } from 'react';
+import { ENGINE_NEXT } from '../lib/engine-mode';
 import { applyMeasureForm, type FormDraft, readMeasureForm } from '../lib/form-editing';
 import { defaultGrouping, groupingsFor, groupingText, parseGrouping } from '../lib/grouping';
 import { FormControls } from './form-controls';
@@ -35,6 +41,8 @@ interface BarDraft {
     text: string;
     context: ScoreContext;
     form: FormDraft | null;
+    /** Next mode only (`?engine=next`); the old engine cannot play a fermata at all. */
+    fermata: boolean;
 }
 
 type EffectiveContext = ReturnType<typeof resolveScoreContext>;
@@ -82,18 +90,59 @@ function entriesFor(score: SemanticScore, drafts: Map<string, BarDraft>): BarEnt
     });
 }
 
+/** Next mode only — the one placement the fermata toggle can express (see `printableEvents`). */
+function lastEventFermata(measure: ScoreMeasure): boolean {
+    return measure.content.kind === 'events'
+        ? Boolean(measure.content.events.at(-1)?.fermata)
+        : false;
+}
+
+function stripFermata(event: ScoreEvent): ScoreEvent {
+    const { fermata: _fermata, ...rest } = event;
+    return rest as ScoreEvent;
+}
+
+/**
+ * `printChordBar` (score-text.ts) refuses to print any event that carries a `fermata` key at
+ * all, by design: the flag is editor state, not text. In next mode, strip it from the LAST
+ * event so the bar's chords stay editable text — `commit()`'s `withFermata` reapplies it once
+ * the text is re-parsed, so a text edit can never silently drop it. A fermata anywhere but the
+ * last event is a placement the toggle cannot represent (iReal import is the only source of
+ * one), so that bar is left for `printChordBar` to refuse, same as default mode.
+ */
+function printableEvents(events: readonly ScoreEvent[]): ScoreEvent[] {
+    const last = events.length - 1;
+    if (last < 0 || !events[last].fermata) {
+        return events as ScoreEvent[];
+    }
+    return [...events.slice(0, last), stripFermata(events[last])];
+}
+
 function editableText(measure: ScoreMeasure, meter: string): string | null {
     if (measure.content.kind !== 'events') {
         return null;
     }
     try {
-        const printed = printChordBar(measure.content.events, meter);
+        const events = ENGINE_NEXT
+            ? printableEvents(measure.content.events)
+            : measure.content.events;
+        const printed = printChordBar(events, meter);
         const durations = measure.content.events.map((event) => event.duration.join('/'));
         // Most bars need no duration syntax. Unequal lengths remain visible and lossless.
         return new Set(durations).size === 1 ? printed.replace(/:[^\s]+/g, '') : printed;
     } catch {
         return null;
     }
+}
+
+/** Reapply the toggle's flag to the freshly re-parsed last event (`printableEvents` stripped it
+ * for printing) — `parseChordBar` never emits `fermata` itself, so `false` needs no cleanup. */
+function withFermata(events: readonly ScoreEvent[], fermata: boolean): ScoreEvent[] {
+    const last = events.length - 1;
+    if (!fermata || last < 0) {
+        return events as ScoreEvent[];
+    }
+    return events.map((event, index) => (index === last ? { ...event, fermata: true } : event));
 }
 
 function initialDraft(entry: BarEntry): BarDraft {
@@ -108,6 +157,7 @@ function initialDraft(entry: BarEntry): BarDraft {
         text: editableText(entry.measure, entry.effective.meter) ?? '',
         context: writtenContext(entry.measure),
         form,
+        fermata: lastEventFermata(entry.measure),
     };
 }
 
@@ -250,7 +300,10 @@ export function MeasureEditor({
                     return {
                         ...next,
                         ...buffer.context,
-                        content: { kind: 'events' as const, events: parsedBar.value },
+                        content: {
+                            kind: 'events' as const,
+                            events: withFermata(parsedBar.value, buffer.fermata),
+                        },
                     };
                 }),
             })),
@@ -419,6 +472,23 @@ export function MeasureEditor({
                         Type chords separated by spaces, like C Dm G7. They share the bar equally;
                         set different lengths below.
                     </p>
+                    {ENGINE_NEXT && (
+                        // Next mode only (docs/design/band-engine.md): the band engine holds the
+                        // chord through a stretched span with drums crashing; the old engine
+                        // refuses any chart carrying a fermata, so default mode offers no way to
+                        // author one.
+                        <label className="measure-editor-toggle">
+                            <input
+                                type="checkbox"
+                                checked={draft.fermata}
+                                disabled={disabled}
+                                onChange={(event) =>
+                                    updateDraft({ ...draft, fermata: event.target.checked })
+                                }
+                            />
+                            <span>Fermata (hold the last chord)</span>
+                        </label>
+                    )}
                     {rows.length > 0 && (
                         <fieldset className="measure-editor-lengths" disabled={disabled}>
                             <legend>
