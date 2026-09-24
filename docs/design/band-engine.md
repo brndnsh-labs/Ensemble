@@ -139,7 +139,9 @@ their exact widths. The old engine is given no plan for such a score, so its `ar
 derive empty and its worker idles. Every path that lets a chart onto the stand (open, edit,
 import, the guided form) asks `checkPlayable` in `lib/engine-mode.ts`: on the band engine
 that is `validateSemanticScore` plus `compileTimeline`, and on the old engine it is still
-`prepareScorePlayback`. A measure-less (v1) chart is still drawn from the old maps.
+`prepareScorePlayback`. A measure-less (v1) chart is still drawn from the old maps. In next
+mode the measure editor can put a fermata on (or take it off) a bar's last event: the flag is
+editor state carried across the bar's text round-trip, never encoded in chord text.
 
 Genres outside v0 play their nearest v0 style (`STYLE_FOR_GENRE` in `runtime.ts`).
 
