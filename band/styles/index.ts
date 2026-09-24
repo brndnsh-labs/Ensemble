@@ -9,6 +9,7 @@ import type { StyleId } from '../core/types.js';
 import { blues } from './blues.js';
 import { bossa } from './bossa.js';
 import { country } from './country.js';
+import { disco } from './disco.js';
 import { funk } from './funk.js';
 import { hiphop } from './hiphop.js';
 import { jazz } from './jazz.js';
@@ -25,6 +26,7 @@ export const STYLES: Record<StyleId, Style> = {
     blues,
     country,
     hiphop,
+    disco,
 };
 
 export const STYLE_IDS = Object.keys(STYLES) as StyleId[];

@@ -77,7 +77,8 @@ export type StyleId =
     | 'reggae'
     | 'blues'
     | 'country'
-    | 'hiphop';
+    | 'hiphop'
+    | 'disco';
 
 export interface BandSettings {
     style: StyleId;

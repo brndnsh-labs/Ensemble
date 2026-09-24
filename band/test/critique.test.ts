@@ -1028,6 +1028,83 @@ const METRICS: Record<string, Metric> = {
         }
         return ratio(sum, n);
     },
+    /** Share of groove bars with the kick on all four beats (four on the floor). */
+    kickFourOnFloor: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { timeline: t, events } of takes) {
+            for (const b of grooveBars(t, events)) {
+                n++;
+                const s = drumSteps(t, events, b.index, ['kick']);
+                hit += [0, 4, 8, 12].every((x) => s.has(x)) ? 1 : 0;
+            }
+        }
+        return ratio(hit, n);
+    },
+    /**
+     * Share of groove bars where every "and" is the open hat and none of them a closed one:
+     * the disco "tss" on each offbeat eighth (one hand, one cymbal).
+     */
+    openHatOnAnds: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { timeline: t, events } of takes) {
+            for (const b of grooveBars(t, events)) {
+                n++;
+                const open = drumSteps(t, events, b.index, ['hatOpen']);
+                const closed = drumSteps(t, events, b.index, ['hat']);
+                hit += [2, 6, 10, 14].every((x) => open.has(x) && !closed.has(x)) ? 1 : 0;
+            }
+        }
+        return ratio(hit, n);
+    },
+    /**
+     * The octave pump's density: per 4/4 beat with a bass note on it, the share whose "and"
+     * sounds exactly an octave *above* that beat's note. Directional, so a pump folded down
+     * into an inversion scores as a miss (the old engine's #1271).
+     */
+    bassOctavePumpPerBeat: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { timeline: t, events } of takes) {
+            for (const [bar, steps] of onsetsByBar(t, events, 'bass')) {
+                if (t.bars[bar].meter.name !== '4/4') {
+                    continue;
+                }
+                for (const beat of [0, 4, 8, 12]) {
+                    const on = steps.get(beat)?.[0];
+                    if (!on) {
+                        continue;
+                    }
+                    n++;
+                    hit += steps.get(beat + 2)?.[0]?.midi === on.midi + 12 ? 1 : 0;
+                }
+            }
+        }
+        return ratio(hit, n);
+    },
+    /**
+     * Share of fill bars (4/4 bars with toms, or a phrase's last bar) whose kick still plays
+     * all four beats: `kickFourOnFloor` judges only groove bars, so this is the claim that the
+     * floor keeps going *through* the fills.
+     */
+    kickFourOnFloorInFills: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { timeline: t, events } of takes) {
+            const groove = new Set(grooveBars(t, events).map((b) => b.index));
+            for (const b of t.bars) {
+                const drums = events.some((e) => e.lane === 'drums' && e.bar === b.index);
+                if (b.meter.name !== '4/4' || !drums || groove.has(b.index) || b.barInVisit === 0) {
+                    continue;
+                }
+                n++;
+                const s = drumSteps(t, events, b.index, ['kick']);
+                hit += [0, 4, 8, 12].every((x) => s.has(x)) ? 1 : 0;
+            }
+        }
+        return ratio(hit, n);
+    },
 };
 
 // ---------------------------------------------------------------- the claims
@@ -1131,6 +1208,30 @@ const CLAIMS: Record<StyleId, Claim[]> = {
         ['compColour', 0.6, 1, 'the sampled-jazz Rhodes: 9ths and 13ths'],
         ['compStrikesPerBar', 1, 3, 'a sparse loop: a chord or two a bar, never a pulse'],
     ],
+    disco: [
+        ['kickFourOnFloor', 0.98, 1, 'four on the floor: the kick on every beat, every bar'],
+        ['kickFourOnFloorInFills', 0.98, 1, 'the floor keeps dancing through every fill'],
+        ['snareBackbeat', 0.95, 1, 'the snare cracks 2 and 4'],
+        ['openHatOnAnds', 0.85, 1, 'the open hat barks every "and" (only a quiet band closes it)'],
+        ['bassArrivesOnBass', 0.95, 1, 'every chord arrives on its root, or its slash note'],
+        [
+            'bassOctavePumpPerBeat',
+            0.5,
+            0.9,
+            'the pump: the octave pops on the "and" above the beat',
+        ],
+        [
+            'bassChromaticApproach',
+            0.25,
+            0.6,
+            'passing tones lead into many changes by a half step in pitch',
+        ],
+        ['bassMeanPitch', 34, 42, 'the root down low, its octave on the neck above it'],
+        ['compOffbeatShare', 0.9, 1, 'the stabs live on the "and"s and the sixteenths around them'],
+        ['compOnOneAndThree', 0, 0.05, "the stabs leave the kick's beats alone"],
+        ['compShort', 0.85, 1, 'a stab is a sixteenth, damped at once'],
+        ['compColour', 0.6, 1, 'lush 9ths (and 6/9s) on the Rhodes stabs from mid energy'],
+    ],
 };
 
 // A second take at low energy, for the styles whose feel actually changes there — a walk
@@ -1160,6 +1261,17 @@ const LOW_CLAIMS: Partial<Record<StyleId, Claim[]>> = {
         // 0 by construction — a walk needs a beat-3/4 pair that low energy never writes).
         ['bassNotesPerBeat', 0.45, 0.55, 'regression guard: two half notes a bar, nothing else'],
         ['bassWalkUps', 0, 0, 'the ballad two-beat: the energy gate keeps walk-ups out'],
+    ],
+    disco: [
+        ['kickFourOnFloor', 0.98, 1, 'the kick never stops, only softens'],
+        ['openHatOnAnds', 0, 0.02, 'a quiet band keeps the hat closed'],
+        [
+            'bassOctavePumpPerBeat',
+            0,
+            0.2,
+            'quarter-note roots: the pump waits for the band to build',
+        ],
+        ['compColour', 0, 0.1, 'plain triads and sevenths when quiet, the 9ths come later'],
     ],
 };
 
@@ -1211,6 +1323,18 @@ const GUITAR_CLAIMS: Record<StyleId, Claim[]> = {
         ['compShort', 0.9, 1, 'every hit is damped at once, never let ring'],
         ['compColour', 0.5, 1, 'the jazzy 3-7-9 grip where a seventh chord allows'],
         ['compMeanLowest', 55, 67, 'a small grip on the top strings, far above the sub'],
+    ],
+    disco: [
+        ['compScratchShare', 0.6, 0.85, 'mostly muted scratches, the chord only where it chops'],
+        ['compStrikesPerBar', 14, 16, 'the hand never stops: a stroke on nearly every sixteenth'],
+        ['compOffbeatShare', 0.9, 1, 'the chops land off the beat; the beat is scratched'],
+        ['compMeanLowest', 60, 68, "small grips high on the neck, above funk's (~57)"],
+        [
+            'compUpstrokeShare',
+            0.03,
+            0.2,
+            'a sixteenth pendulum: chops come down, only the light pickups come up',
+        ],
     ],
 };
 
