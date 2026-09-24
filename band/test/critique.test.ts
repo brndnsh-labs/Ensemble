@@ -137,6 +137,20 @@ const METRICS: Record<string, Metric> = {
         }
         return ratio(hit, n);
     },
+    /** Share of bars where kick and cross-stick (or snare) land together on beat 3: the drop. */
+    dropOnThree: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { timeline: t, events } of takes) {
+            for (const b of grooveBars(t, events)) {
+                n++;
+                const kick = drumSteps(t, events, b.index, ['kick']);
+                const stick = drumSteps(t, events, b.index, ['rim', 'snare']);
+                hit += kick.has(8) && stick.has(8) ? 1 : 0;
+            }
+        }
+        return ratio(hit, n);
+    },
     /** Share of bars whose rim part is one of the two bars of the bossa clave. */
     claveRim: (takes) => {
         const clave = ['0,6,12', '4,10'];
@@ -205,6 +219,67 @@ const METRICS: Record<string, Metric> = {
             }
         }
         return ratio(hit, n);
+    },
+    /** Share of 4/4 bars (with a bass part) where the bass plays on the One. */
+    bassOnOne: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { timeline: t, events } of takes) {
+            const bars = new Map<number, Set<number>>();
+            for (const e of events) {
+                if (e.lane === 'bass' && t.bars[e.bar].meter.name === '4/4') {
+                    bars.set(e.bar, (bars.get(e.bar) ?? new Set()).add(stepOf(t, e)));
+                }
+            }
+            for (const steps of bars.values()) {
+                n++;
+                hit += steps.has(0) ? 1 : 0;
+            }
+        }
+        return ratio(hit, n);
+    },
+    /** Share of the time in 4/4 bars with a bass part when no bass note sounds (its rests). */
+    bassSilence: (takes) => {
+        let total = 0;
+        let sounding = 0;
+        for (const { timeline: t, events } of takes) {
+            const bars = new Map<number, [number, number][]>();
+            for (const e of events) {
+                if (e.lane === 'bass' && t.bars[e.bar].meter.name === '4/4') {
+                    bars.set(e.bar, [...(bars.get(e.bar) ?? []), [e.tick, e.tick + e.dur]]);
+                }
+            }
+            for (const [index, notes] of bars) {
+                const bar = t.bars[index];
+                const end = bar.start + bar.meter.barTicks;
+                total += bar.meter.barTicks;
+                // The union of the notes' spans, clipped to the bar.
+                let reach = bar.start;
+                for (const [from, to] of notes.sort((a, b) => a[0] - b[0])) {
+                    const lo = Math.max(from, reach);
+                    const hi = Math.min(to, end);
+                    if (hi > lo) {
+                        sounding += hi - lo;
+                        reach = hi;
+                    }
+                }
+            }
+        }
+        return ratio(total - sounding, total);
+    },
+    /** Mean pitch (MIDI) of the sounding bass notes. */
+    bassMeanPitch: (takes) => {
+        let n = 0;
+        let sum = 0;
+        for (const { events } of takes) {
+            for (const e of events) {
+                if (e.lane === 'bass' && !e.muted) {
+                    n++;
+                    sum += e.midi;
+                }
+            }
+        }
+        return ratio(sum, n);
     },
     bassNotesPerBeat: (takes) => {
         let notes = 0;
@@ -325,6 +400,25 @@ const METRICS: Record<string, Metric> = {
             for (const o of onsets) {
                 n++;
                 hit += Number(o.split(':')[1]) % 4 !== 0 ? 1 : 0;
+            }
+        }
+        return ratio(hit, n);
+    },
+    /** Share of sounding comp onsets in 4/4 bars that fall on beat 1 or beat 3. */
+    compOnOneAndThree: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { timeline: t, events } of takes) {
+            const onsets = new Set(
+                events
+                    .filter(
+                        (e) => e.lane === 'comp' && !e.muted && t.bars[e.bar].meter.name === '4/4',
+                    )
+                    .map((e) => `${e.bar}:${stepOf(t, e)}`),
+            );
+            for (const o of onsets) {
+                n++;
+                hit += Number(o.split(':')[1]) % 8 === 0 ? 1 : 0;
             }
         }
         return ratio(hit, n);
@@ -534,10 +628,25 @@ const CLAIMS: Record<StyleId, Claim[]> = {
         ['compColour', 0.5, 1, 'ninths on the comp'],
         ['compTopVoiceMotion', 0, 3.5, 'smooth voice leading'],
     ],
+    reggae: [
+        ['dropOnThree', 0.9, 1, 'kick and cross-stick land together on 3 in every riddim'],
+        ['kickOnOne', 0, 0.35, 'the One is a hole: only the high-energy riddims fill it'],
+        ['bassOnOne', 0.15, 0.75, 'the bass leaves the One open as often as it plays it'],
+        ['bassMeanPitch', 32, 42, 'a heavy line in the lowest octave'],
+        ['bassSilence', 0.2, 0.6, 'melodic, with space: the rests are part of the line'],
+        ['bassArrivesOnBass', 0.9, 1, 'a chord that gets a note on its arrival gets its root'],
+        ['compOnOneAndThree', 0, 0.05, 'the skank leaves 1 and 3 to the bass and the drop'],
+        ['compShort', 0.9, 1, 'the skank is a chop, damped at once'],
+        ['compColour', 0, 0.15, 'triads and sevenths, no extensions'],
+    ],
 };
 
 // A second jazz take at low energy, where the walk relaxes into a two-feel.
 const LOW_CLAIMS: Partial<Record<StyleId, Claim[]>> = {
+    reggae: [
+        ['kickOnOne', 0, 0.02, 'a quiet one drop never kicks the One'],
+        ['dropOnThree', 0.9, 1, 'the drop stays, softer'],
+    ],
     jazz: [
         ['bassNotesPerBeat', 0.45, 0.75, 'two-feel: half notes, with an occasional approach on 4'],
         [
@@ -576,7 +685,32 @@ const GUITAR_CLAIMS: Record<StyleId, Claim[]> = {
         ['compColour', 0.5, 1, 'ninths in the grips'],
         ['compTopVoiceMotion', 0, 3.5, 'the grips move by step, not by leap'],
     ],
+    reggae: [
+        ['compOnOneAndThree', 0, 0.05, 'the skank never chops on 1 or 3'],
+        ['compShort', 0.9, 1, 'the fretting hand damps the chop at once'],
+        ['compMeanLowest', 55, 67, 'a small grip on the top strings, far above the bass'],
+        ['compStrikesPerBar', 1.8, 4.5, 'two chops a bar, doubled or on every "and" when it lifts'],
+        ['compColour', 0, 0.15, 'triads and sevenths, no extensions'],
+    ],
 };
+
+/** The organ, where a style plays it its own way rather than holding pads. */
+const ORGAN_CLAIMS: Partial<Record<StyleId, Claim[]>> = {
+    reggae: [
+        ['compOffbeatShare', 0.95, 1, 'the bubble lives between the beats'],
+        ['compShort', 0.9, 1, 'the bubble is chopped, never held'],
+        ['compStrikesPerBar', 5, 8, 'two taps a beat: the "and" and the "a"'],
+    ],
+};
+
+describe.each(Object.keys(ORGAN_CLAIMS) as StyleId[])('%s critique on organ', (style) => {
+    const takes = perform(style, null, 'organ');
+    it.each(ORGAN_CLAIMS[style] ?? [])('%s in [%d, %d] — %s', (metric, min, max) => {
+        const value = METRICS[metric](takes);
+        expect(value, `${style} ${metric} = ${value.toFixed(3)}`).toBeGreaterThanOrEqual(min);
+        expect(value, `${style} ${metric} = ${value.toFixed(3)}`).toBeLessThanOrEqual(max);
+    });
+});
 
 /** Quiet sections, where nothing (no scratch, no busy pattern) hides how a stab is played. */
 const GUITAR_LOW_CLAIMS: Partial<Record<StyleId, Claim[]>> = {
