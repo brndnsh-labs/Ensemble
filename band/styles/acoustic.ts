@@ -14,7 +14,7 @@
  */
 import { type EnergyTier, energyTier } from '../arrange/plan.js';
 import type { PitchedNote } from '../core/types.js';
-import { chordAt } from '../form/timeline.js';
+import { type Bar, chordAt } from '../form/timeline.js';
 import {
     BASS,
     bassNote,
@@ -69,11 +69,18 @@ const acousticDrums = drumIdiom({
         }
         const kick = ctx.rng('kick', 'section').weighted(KICKS);
         if (tier === 'mid') {
-            // Some sections play brushes: soft taps on every eighth (the sweep, as a drum
-            // machine can voice it) with the backbeat laid in on 2 and 4 and the hat foot
-            // with it. The rest keep a cross-stick backbeat over hat or shaker eighths.
+            // Some sections play brushes. A brush's sweep is a continuous hiss, not a string of
+            // taps, and the closest sound the kit has is a soft shaker on every sixteenth,
+            // swelling a little on each beat as the sweep turns; the brush taps the backbeat
+            // on 2 and 4, soft (no stick crack), with the hat foot. The rest keep a cross-stick
+            // backbeat over hat or shaker eighths.
             if (ctx.rng('brushes', 'section').chance(0.35)) {
-                return { kick, snare: 'g.g.o.g.g.g.o.g.', hatPedal: '....o.......o...' };
+                return {
+                    kick,
+                    shaker: 'ogggogggogggoggg',
+                    snare: '....o.......o...',
+                    hatPedal: '....o.......o...',
+                };
             }
             const pulse: Lines = ctx.rng('pulse', 'section').chance(0.5)
                 ? { hat: EIGHTHS }
@@ -278,6 +285,39 @@ const acousticBass: PitchedIdiom = {
 };
 
 // ================================================================ comp: shared
+/**
+ * How often a songwriter colours a plain triad with its 9th (the add9: Cadd9, Am(add9)), by
+ * the chord's function in the key. The add9 is a shape family (G, Cadd9, Em7 around anchored
+ * top strings), and it lives on the chords that rest: the tonic and the subdominant ring it
+ * most, the relative minor sometimes, and the dominant rarely, since a 9th on V blunts its
+ * pull home. In a minor key the resting chords are i, bIII and bVI (Am(add9), Fadd9).
+ */
+const ADD9_MAJOR: Record<number, number> = {
+    // why: I and IV — the add9's home (Cadd9, Fadd9); most sections ring it.
+    0: 0.75,
+    5: 0.75,
+    // why: vi — a colour some sections take (Am(add9)); ii a little less (it moves on).
+    9: 0.45,
+    2: 0.35,
+    // why: bVII, the folk-rock borrowed chord (D-C-G), rests like a IV more often than not.
+    10: 0.5,
+    // why: V rarely — a 9th on the dominant blunts its pull back to I.
+    7: 0.15,
+};
+const ADD9_MINOR: Record<number, number> = {
+    // why: i, bIII and bVI are the minor key's resting chords (Am(add9), Cadd9, Fadd9).
+    0: 0.6,
+    3: 0.6,
+    8: 0.75,
+    // why: iv and bVII sometimes; v/V rarely, as in major.
+    5: 0.4,
+    10: 0.45,
+    7: 0.15,
+};
+// why: a triad outside the key's own functions (a secondary dominant written as a triad)
+// has a job to do; it takes the colour now and then.
+const ADD9_ELSEWHERE = 0.2;
+
 const plainTriad = (chord: ChordFacts) =>
     (chord.family === 'major' || chord.family === 'minor') &&
     chord.seventh === null &&
@@ -285,32 +325,56 @@ const plainTriad = (chord: ChordFacts) =>
     chord.tensions.length === 0;
 
 /**
- * A plain triad takes its 9th (the add9: Cadd9, Am(add9)) — the singer-songwriter's colour —
- * only where its own chord scale owns a natural 9th. One chord authority: a phrygian iii
- * would have a b9 there, so it stays a plain triad.
+ * Whether a plain triad takes its add9 in a bar. Only where its own chord scale owns a
+ * natural 9th (one chord authority: a phrygian iii would have a b9 there, so it stays a
+ * plain triad), and then by its function, decided once per section: a verse's I rings its
+ * Cadd9 every time round, and the chorus decides for itself. `bar` is the bar the chord is
+ * played in (the next one, for an anticipation), so its own key and section decide.
  */
-const takesAdd9 = (chord: ChordFacts) => plainTriad(chord) && chord.scale.includes(2);
+function takesAdd9(ctx: BarContext, bar: Bar, chord: ChordFacts): boolean {
+    if (!plainTriad(chord) || !chord.scale.includes(2)) {
+        return false;
+    }
+    const degree = mod12(chord.root - bar.key.tonic);
+    const chance = (bar.key.minor ? ADD9_MINOR : ADD9_MAJOR)[degree] ?? ADD9_ELSEWHERE;
+    // Keyed on the chord's section by hand (`scope: 'section'` is this bar's own), so the
+    // next bar's chord is judged by its own section's choice.
+    const key = `add9:${bar.visit.sectionIndex}:${degree}:${chord.family}`;
+    return ctx.rng(key, 'song').chance(chance);
+}
 
 /**
  * The book a bar plays from. `rootless` over a plain triad is R-3-5-9 — exactly the add9
  * (`voicingTones`) — so it is reused rather than a new kind; everything else plays the close
  * chord it's written as (sevenths stay sevenths, never jazz-extended). Chosen per bar, over
- * the bar's own chords. An anticipation plays the next bar's chord with this bar's book, so
- * an add9 bar leading into a chord that can't take the add9 (a V7, a phrygian iii) holds its
- * push: the colour is the part, a push is optional.
+ * the bar's own chords. A quiet bar stays bare (the old engine, by ear: at 0.2 a triad is
+ * plain), on piano and guitar alike. An anticipation plays the next bar's chord with this
+ * bar's book, so an add9 bar leading into a chord that won't take the add9 (a V, a phrygian
+ * iii, a quiet bar) holds its push: the colour is the part, a push is optional.
  */
 type Book = 'close' | 'add9' | 'add9Held';
 
 function colourBook(ctx: BarContext): Book {
-    const own = ctx.bar.spans.flatMap((s) => (s.chord ? [s.chord] : []));
-    if (!own.length || !own.every(takesAdd9)) {
+    if (energyTier(ctx.plan.energy) === 'low') {
         return 'close';
     }
-    const ahead = ctx.next?.bar.spans[0]?.chord;
-    return !ahead || takesAdd9(ahead) ? 'add9' : 'add9Held';
+    const own = ctx.bar.spans.flatMap((s) => (s.chord ? [s.chord] : []));
+    if (!own.length || !own.every((chord) => takesAdd9(ctx, ctx.bar, chord))) {
+        return 'close';
+    }
+    const next = ctx.next;
+    const ahead = next?.bar.spans[0]?.chord;
+    return !next ||
+        !ahead ||
+        (energyTier(next.plan.energy) !== 'low' && takesAdd9(ctx, next.bar, ahead))
+        ? 'add9'
+        : 'add9Held';
 }
 
 const NO_PUSH: Record<EnergyTier, number> = { low: 0, mid: 0, high: 0 };
+
+/** C3: with a bassist, the guitar's grip stays above it but for the bassist's own notes. */
+const GUITAR_FLOOR = 48;
 
 /** A held chord a broken-chord hand picks through, note by note. */
 interface Run {
@@ -432,10 +496,22 @@ function brokenPick(ctx: BarContext): (run: Run, steps: number[]) => Pluck[] {
         // (E-G-C-E), so the four places of a pattern are four different notes. A guitar grip
         // always has four strings or more, and a note off the grip couldn't be fretted.
         const [low] = run.notes;
-        const notes =
-            run.notes.length === 3 && ctx.instrument.family === 'keyboard' && low + 12 <= top
-                ? [...run.notes, low + 12].sort((a, b) => a - b)
+        // Over a bassist, the open grip's low strings keep only the bassist's own note: a
+        // low fifth plucked alone on its eighth (the B2 of an open E) would stand as the bass
+        // of an inversion under the bassist's root. Strummed, the whole grip rings as one.
+        const held =
+            ctx.instrument.family === 'guitar' && ctx.plan.lanes.bass
+                ? run.notes.filter(
+                      (m) =>
+                          m >= GUITAR_FLOOR ||
+                          mod12(m) === run.chord.root ||
+                          mod12(m) === run.chord.bass,
+                  )
                 : run.notes;
+        const notes =
+            held.length === 3 && ctx.instrument.family === 'keyboard' && low + 12 <= top
+                ? [...held, low + 12].sort((a, b) => a - b)
+                : held;
         let roll = 0;
         return steps.map((step, k) => {
             const place =
@@ -538,19 +614,18 @@ const KEYS_BOOKS: Record<Book, PitchedIdiom> = {
 };
 
 /**
- * The singer-songwriter piano. The add9 is a colour the pianist reaches for once the band is
- * past quiet (the old engine's rule: at 0.2 a triad stays bare); a quiet broken chord is
- * plain. The books share `compIdiom`'s memory, so voice leading carries across a change of
- * kind. An organ holds its chord instead of breaking it — a broken chord needs a struck,
- * decaying instrument.
+ * The singer-songwriter piano. The add9 is a colour the pianist reaches for on the resting
+ * chords once the band is past quiet (`colourBook`); a quiet broken chord is plain. The books
+ * share `compIdiom`'s memory, so voice leading carries across a change of kind. An organ
+ * holds its chord instead of breaking it — a broken chord needs a struck, decaying
+ * instrument.
  */
 const acousticKeys: PitchedIdiom = {
     ...KEYS_BOOKS.close,
     name: 'acoustic piano',
     play(ctx, memory) {
         const tier = energyTier(ctx.plan.energy);
-        const book = tier === 'low' ? 'close' : colourBook(ctx);
-        const out = KEYS_BOOKS[book].play(ctx, memory);
+        const out = KEYS_BOOKS[colourBook(ctx)].play(ctx, memory);
         const broken =
             keysMode(ctx, tier) === 'broken' && !ctx.instrument.legato && !ctx.plan.ending;
         return broken
@@ -619,18 +694,32 @@ const guitarBook = (kind: VoicingKind, push: Record<EnergyTier, number>) =>
     compIdiom({
         name: `acoustic guitar (${kind})`,
         kind,
-        // Open position, open strings ON — the ringing open strings are the acoustic sound
-        // (unlike the funk scratch or the swing chunk, nothing here mutes by releasing). With a
-        // bassist the grips stay at or above C3 (the low strings are the bassist's); a strong
-        // pull keeps the hand in first position instead of drifting up the neck.
-        grip: { strings: 6, slot: { lo: 48, hi: 72, top: 64, pull: 0.8 }, open: true },
-        // Alone, the guitar is the band's bottom: full open chords with the root on the low
-        // strings (x32010, 320003), which is also the shape a Travis thumb picks from.
+        // Open position (`openPosition`), open strings ON — the ringing open strings are the
+        // acoustic sound (unlike the funk scratch or the swing chunk, nothing here mutes by
+        // releasing): x32010, x02210, xx0232, 133211. With a bassist, the grip's thirds and
+        // colours stay at or above C3, and only the root (or a fifth over it) goes lower,
+        // doubling the bassist's own note (Am x02210). G can't be 320003 then — its B2 is a
+        // third in the bass's register — so it is 3x0003, the A string muted by the finger on
+        // the low G: the folk G that leaves the bottom to the root. `skip` allows that mute.
+        grip: {
+            strings: 6,
+            slot: { lo: GUITAR_FLOOR, hi: 72, top: 64, pull: 0.8 },
+            open: true,
+            openPosition: true,
+            skip: true,
+        },
+        // Alone, the guitar is the band's bottom: full open chords standing on the chord's bass,
+        // which is also the shape a Travis thumb picks from. The low-interval limits are law
+        // for its two lowest voices (`bottomLaw`): no F2-A2, and no 320003 either (G2-B2 is a
+        // major 3rd below Bb2), so G is again 3x0003.
         alone: {
             strings: 6,
             slot: { lo: 40, hi: 72, top: 64, pull: 0.8 },
             rootBottom: true,
             open: true,
+            openPosition: true,
+            skip: true,
+            bottomLaw: true,
         },
         // The last upstroke often changes early to the next chord; a picked bar never pushes
         // (its holds sit on the pulses).
@@ -657,38 +746,54 @@ const TRAVIS_FINGERS: readonly (readonly number[])[] = [
 ];
 
 /**
+ * The thumb's three strings over a grip: the chord's bass, the alternate bass (its fifth —
+ * its root, over a slash chord whose bass is the fifth) and the upper string it rocks to.
+ * The alternate always sits on a lower string than the upper note, so the thumb alternates
+ * bass strings, never rolls up the chord.
+ * - First choice, the alternate below the bass, where one more finger reaches it with the
+ *   grip held: C x32010 takes G2 on the low E (C3 E3 G2 E3, strings 5-4-6-4), Am the open E2
+ *   (A2 E3 E2 E3), D the open A2 (D3 A3 A2 A3).
+ * - Else the grip's own fifth on the string above the bass, the upper note the string above
+ *   that: E 022100 is E2 E3 B2 E3 (6-4-5-4), G 3x0003 is G2 G3 D3 G3.
+ * - A grip with no fifth anywhere (a 7#9) rocks between its bass and the string above.
+ */
+function thumbStrings(chord: ChordFacts, notes: number[], lo: number) {
+    const root = notes[0];
+    const fifth = mod12(chord.root + fifthOf(chord));
+    const alternate = fifth === mod12(root) ? chord.root : fifth;
+    const under = nearestMidi(alternate, root - 5, lo, root - 1);
+    if (under < root && under >= lo && isPlayable([under, ...notes])) {
+        return { root, alt: under, upper: notes[1] ?? root };
+    }
+    // Two strings above the upper note stay for the fingers.
+    const own = notes.findIndex((m, i) => i > 0 && i + 3 < notes.length && mod12(m) === alternate);
+    if (own > 0) {
+        return { root, alt: notes[own], upper: notes[own + 1] };
+    }
+    return { root, alt: root, upper: notes[1] ?? root };
+}
+
+/**
  * The Travis hand (no bassist: the low strings are the guitar's). The thumb keeps an
- * alternating bass on every pulse — the chord's bass on the One, then a string up, then the
- * alternate bass, then the string up again (C: C, E, G, E, the G on the 6th string) — and the
- * fingers pluck the treble strings on the "and"s. The alternate is the fifth on a lower string
- * when the hand can hold it with the grip, else the grip's own fifth; every note comes from
- * one fretted shape.
+ * alternating bass on every pulse — the chord's bass on the One, the upper string, the
+ * alternate bass, the upper string again (`thumbStrings`) — and the fingers pluck the treble
+ * strings above it on the "and"s. Every note comes from one fretted shape (and the finger
+ * that reaches the alternate).
  */
 function travisPick(ctx: BarContext): (run: Run, steps: number[]) => Pluck[] {
     const order = ctx.rng('travis', 'section').pick(TRAVIS_FINGERS);
     const beats = new Set(pulses(ctx.bar).map((p) => p.step));
     const [lo] = ctx.instrument.range;
     return ({ chord, notes }, steps) => {
-        const root = notes[0];
-        const fifth = mod12(chord.root + fifthOf(chord));
-        const under = nearestMidi(fifth, root - 5, lo, root - 1);
-        const alt =
-            under < root && under >= lo && isPlayable([under, ...notes])
-                ? under
-                : (notes.slice(1, 3).find((m) => mod12(m) === fifth) ?? notes[1] ?? root);
-        const upper = notes[1] === alt ? (notes[2] ?? root) : (notes[1] ?? root);
-        // The alternate bass only when it adds a note: over x35533 the string above the root is
-        // already the fifth, and the thumb just alternates root and fifth (C, G, C, G).
-        const third = mod12(alt) === mod12(upper) ? root : alt;
-        const thumbTop = Math.max(upper, notes.includes(alt) ? alt : upper);
-        const trebles = notes.filter((m) => m > thumbTop).reverse();
+        const { root, alt, upper } = thumbStrings(chord, notes, lo);
+        const trebles = notes.filter((m) => m > upper).reverse();
         const fingers = trebles.length >= 2 ? trebles : notes.slice(-2).reverse();
         let thumb = 0;
         let finger = 0;
         return steps.map((step, k) => {
             if (k === 0 || beats.has(step)) {
                 const j = thumb++;
-                const midi = j % 2 === 1 ? upper : j % 4 === 2 ? third : root;
+                const midi = j % 2 === 1 ? upper : j % 4 === 2 ? alt : root;
                 return { midi, velocity: step === 0 ? 74 : 66 };
             }
             // The roll runs on through the chord, whatever the meter: in 4/4, one place per beat.
@@ -700,19 +805,17 @@ function travisPick(ctx: BarContext): (run: Run, steps: number[]) => Pluck[] {
 }
 
 /**
- * The acoustic guitar: strummed or fingerpicked (see `picking`). Its grips take the add9
- * where the chord's scale owns it — Cadd9 (x32033), the ringing open-position family — when
- * the tune calls for that sound: a whole-song choice, as a songwriter's shapes are.
- * Who owns the bottom: with a bassist, the picking hand breaks the grip above C3; alone, it
- * plays a Travis thumb on the low strings.
+ * The acoustic guitar: strummed or fingerpicked (see `picking`), in open position. Its grips
+ * take the add9 on the resting chords (`colourBook`): Cadd9 (x32030), the ringing
+ * open-position family. Who owns the bottom: with a bassist, the picking hand breaks the
+ * open grip; alone, it plays a Travis thumb on the low strings.
  */
 const acousticGuitar: PitchedIdiom = {
     ...GUITAR_BOOKS.close,
     name: 'acoustic guitar',
     play(ctx, memory) {
         const tier = energyTier(ctx.plan.energy);
-        const add9 = ctx.rng('add9', 'song').chance(0.6);
-        const out = GUITAR_BOOKS[add9 ? colourBook(ctx) : 'close'].play(ctx, memory);
+        const out = GUITAR_BOOKS[colourBook(ctx)].play(ctx, memory);
         if (!picking(ctx, tier) || ctx.plan.ending) {
             return out;
         }

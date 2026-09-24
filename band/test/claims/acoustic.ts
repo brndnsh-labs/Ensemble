@@ -4,10 +4,9 @@
  * library: no other style asks for them.
  */
 import type { BandEvent, DrumHit, PitchedNote } from '../../core/types.js';
-import { chordAt, type Timeline } from '../../form/timeline.js';
-import { pendulum } from '../../players/comp/idiom.js';
+import { type Bar, chordAt, type Timeline } from '../../form/timeline.js';
 import { STEP } from '../../players/grid.js';
-import { chordPcs, fifthOf } from '../../theory/chord.js';
+import { type ChordFacts, chordPcs, fifthOf } from '../../theory/chord.js';
 import { mod12 } from '../../theory/pitch.js';
 import { defineClaims, type Take } from '../critique/harness.js';
 
@@ -37,6 +36,95 @@ function grooveBars(t: Timeline, events: BandEvent[]) {
             b.barInVisit > 0
         );
     });
+}
+
+/** A plain major or minor triad whose own chord scale owns a natural 9th: add9 territory. */
+const ownsAdd9 = (chord: ChordFacts) =>
+    (chord.family === 'major' || chord.family === 'minor') &&
+    chord.seventh === null &&
+    !chord.sixth &&
+    chord.tensions.length === 0 &&
+    chord.scale.includes(2);
+
+/**
+ * Of the 4/4 bars holding one add9-territory triad whose function in the bar's key passes
+ * `judged`, the share whose sounding comp notes include its 9th — struck or picked, so a
+ * fingerpicked bar counts as much as a strummed one.
+ */
+function add9Bars(takes: Take[], judged: (degree: number, bar: Bar) => boolean): number {
+    let n = 0;
+    let hit = 0;
+    for (const { timeline: t, events } of takes) {
+        const notes = new Map<number, PitchedNote[]>();
+        for (const e of events) {
+            if (e.lane === 'comp' && !e.muted) {
+                notes.set(e.bar, [...(notes.get(e.bar) ?? []), e]);
+            }
+        }
+        for (const b of t.bars) {
+            const chord = b.spans[0]?.chord;
+            const heard = notes.get(b.index);
+            if (
+                b.meter.name !== '4/4' ||
+                b.spans.length !== 1 ||
+                !chord ||
+                !heard ||
+                !ownsAdd9(chord) ||
+                !judged(mod12(chord.root - b.key.tonic), b)
+            ) {
+                continue;
+            }
+            n++;
+            hit += heard.some((x) => mod12(x.midi - chord.root) === 2) ? 1 : 0;
+        }
+    }
+    return ratio(hit, n);
+}
+
+/** Lowest MIDI note for the lower voice of each interval (semitones): the arranger's table. */
+const LOW_INTERVAL_LIMIT: Record<number, number> = {
+    1: 52, // m2: E3
+    2: 51, // M2: Eb3
+    3: 48, // m3: C3
+    4: 46, // M3: Bb2
+    5: 46, // P4: Bb2
+    6: 47, // tritone: B2
+    7: 34, // P5: Bb1
+    8: 43, // m6: G2
+    9: 41, // M6: F2
+    10: 41, // m7: F2
+    11: 41, // M7: F2
+};
+
+/** Standard tuning, low E to high E. */
+const STRINGS = [40, 45, 50, 55, 59, 64];
+
+/**
+ * How many open strings a chord rings, fretted the most open way a hand can: one note per
+ * string, in pitch order, with the fretted notes inside a four-fret reach. A note on an open
+ * string's pitch fretted up the neck (the E4 of x55553's B string) doesn't count: only a
+ * shape that sits where the open strings are rings them.
+ */
+function openStrings(notes: number[]): number {
+    const sorted = [...notes].sort((a, b) => a - b);
+    let best = 0;
+    const place = (i: number, string: number, frets: number[]) => {
+        if (i === sorted.length) {
+            const fretted = frets.filter((f) => f > 0);
+            if (!fretted.length || Math.max(...fretted) - Math.min(...fretted) <= 3) {
+                best = Math.max(best, frets.length - fretted.length);
+            }
+            return;
+        }
+        for (let s = string + 1; s < STRINGS.length; s++) {
+            const fret = sorted[i] - STRINGS[s];
+            if (fret >= 0 && fret <= 18) {
+                place(i + 1, s, [...frets, fret]);
+            }
+        }
+    };
+    place(0, -1, []);
+    return best;
 }
 
 export const acoustic = defineClaims({
@@ -157,7 +245,11 @@ export const acoustic = defineClaims({
             }
             return ratio(hit, n);
         },
-        /** Share of sounding comp notes below C3 (MIDI 48): the low strings. */
+        /**
+         * Share of sounding comp notes below C3 (MIDI 48): the low strings. With a bassist the
+         * invariant suite holds every one of them to doubling the bass (root, fifth or bass in a
+         * grip standing on it); this measures how much the guitar uses that room.
+         */
         compBelowC3Share: (takes: Take[]) => {
             let n = 0;
             let hit = 0;
@@ -172,29 +264,13 @@ export const acoustic = defineClaims({
             return ratio(hit, n);
         },
         /**
-         * Of the stroked 4/4 comp strikes, the share whose direction is the eighth-note
-         * pendulum's: down on the beat side of each eighth pair, up on the "and".
-         */
-        strokesFollowPendulum: (takes: Take[]) => {
-            let n = 0;
-            let hit = 0;
-            for (const { timeline: t, events } of takes) {
-                for (const notes of onsets(events).values()) {
-                    const first = notes[0];
-                    if (!first.stroke || t.bars[first.bar].meter.name !== '4/4') {
-                        continue;
-                    }
-                    n++;
-                    hit += first.stroke === pendulum(stepOf(t, first), 2) ? 1 : 0;
-                }
-            }
-            return ratio(hit, n);
-        },
-        /**
          * The Travis thumb: in 4/4 bars holding one chord and picked in single notes, the share
-         * where the thumb (the notes on the beats) starts on the chord's bass, alternates
-         * between at least two bass strings, and stays below every note the fingers pick on
-         * the "and"s.
+         * where the thumb (the notes on the beats) alternates bass strings the way a Travis
+         * picker does — the chord's bass on 1, the upper string on 2 and 4, and on 3 the
+         * alternate bass (the chord's fifth; its root over a slash chord on the fifth): a
+         * different note from beat 1, on a lower string than the upper note (so the thumb
+         * never rolls up the chord), with every thumb note under the fingers' notes on the
+         * "and"s. C: C3 E3 G2 E3; Am: A2 E3 E2 E3; E: E2 E3 B2 E3.
          */
         travisAlternatingBass: (takes: Take[]) => {
             let n = 0;
@@ -219,48 +295,42 @@ export const acoustic = defineClaims({
                         continue;
                     }
                     n++;
-                    const thumb = [0, 4, 8, 12].map((s) => plucks.get(s)?.[0].midi);
+                    const [one, two, three, four] = [0, 4, 8, 12].map(
+                        (s) => plucks.get(s)?.[0].midi,
+                    );
                     const fingers = [...plucks]
                         .filter(([s]) => s % 4 !== 0)
                         .map(([, notes]) => notes[0].midi);
-                    const [one] = thumb;
+                    const fifth = mod12(chord.root + fifthOf(chord));
+                    const alternate = fifth === chord.bass ? chord.root : fifth;
                     hit +=
                         one !== undefined &&
-                        thumb.every((m) => m !== undefined && m < Math.min(...fingers)) &&
+                        two !== undefined &&
+                        three !== undefined &&
+                        four === two &&
                         mod12(one) === chord.bass &&
-                        new Set(thumb).size >= 2
+                        three !== one &&
+                        mod12(three) === alternate &&
+                        three < two &&
+                        Math.max(one, two, three) < Math.min(...fingers)
                             ? 1
                             : 0;
                 }
             }
             return ratio(hit, n);
         },
+        /** Of the bars holding one add9-territory triad (`add9Bars`), the share sounding its 9th. */
+        add9OnOwnedTriads: (takes: Take[]) => add9Bars(takes, () => true),
         /**
-         * Of the plain major and minor triads whose chord scale owns a natural 9th, the share of
-         * their struck chords (two notes or more) that sound it: the add9.
+         * The same share on the chords that rest — I and IV in a major key, i, bIII and bVI in
+         * a minor one: where a songwriter's add9 lives.
          */
-        add9OnOwnedTriads: (takes: Take[]) => {
-            let n = 0;
-            let hit = 0;
-            for (const { timeline: t, events } of takes) {
-                for (const [tick, notes] of onsets(events)) {
-                    const chord = chordAt(t, tick);
-                    const plain =
-                        chord &&
-                        (chord.family === 'major' || chord.family === 'minor') &&
-                        chord.seventh === null &&
-                        !chord.sixth &&
-                        chord.tensions.length === 0 &&
-                        chord.scale.includes(2);
-                    if (!chord || !plain || notes.length < 2) {
-                        continue;
-                    }
-                    n++;
-                    hit += notes.some((x) => mod12(x.midi - chord.root) === 2) ? 1 : 0;
-                }
-            }
-            return ratio(hit, n);
-        },
+        add9OnRestChords: (takes: Take[]) =>
+            add9Bars(takes, (degree, bar) =>
+                bar.key.minor ? [0, 3, 8].includes(degree) : [0, 5].includes(degree),
+            ),
+        /** The same share on the dominant (V), where a 9th blunts the pull home. */
+        add9OnDominant: (takes: Take[]) => add9Bars(takes, (degree) => degree === 7),
         /** Of the strummed strikes (a stroke direction set), the share that are upstrokes. */
         strumUpShare: (takes: Take[]) => {
             let n = 0;
@@ -270,6 +340,42 @@ export const acoustic = defineClaims({
                     if (notes[0].stroke) {
                         n++;
                         hit += notes[0].stroke === 'up' ? 1 : 0;
+                    }
+                }
+            }
+            return ratio(hit, n);
+        },
+        /**
+         * Open strings per downstroked chord (`openStrings`): x32010 rings two, x02020 three,
+         * a barre up the neck none.
+         */
+        openStringsPerDownstroke: (takes: Take[]) => {
+            let n = 0;
+            let open = 0;
+            for (const { events } of takes) {
+                for (const notes of onsets(events).values()) {
+                    if (notes[0].stroke === 'down' && notes.length > 2) {
+                        n++;
+                        open += openStrings(notes.map((x) => x.midi));
+                    }
+                }
+            }
+            return ratio(open, n);
+        },
+        /**
+         * Of the downstroked chords, the share whose two lowest notes keep the low-interval
+         * limit for their interval (a major 3rd no lower than Bb2, a minor 3rd no lower than
+         * C3, …): the arranger's table, stated here independently of the engine's copy.
+         */
+        bottomPairInLimit: (takes: Take[]) => {
+            let n = 0;
+            let hit = 0;
+            for (const { events } of takes) {
+                for (const notes of onsets(events).values()) {
+                    if (notes[0].stroke === 'down' && notes.length > 2) {
+                        const [a, b] = notes.map((x) => x.midi).sort((x, y) => x - y);
+                        n++;
+                        hit += a >= (LOW_INTERVAL_LIMIT[b - a] ?? 0) ? 1 : 0;
                     }
                 }
             }
@@ -344,10 +450,17 @@ export const acoustic = defineClaims({
             claims: [
                 [
                     'add9OnOwnedTriads',
-                    0.9,
-                    1,
-                    'past quiet, the piano colours a plain triad with its 9th wherever the scale owns it',
+                    0.4,
+                    0.75,
+                    'past quiet, about half the plain triads the scale lets take a 9th ring it',
                 ],
+                [
+                    'add9OnRestChords',
+                    0.6,
+                    0.95,
+                    'the add9 lives on the resting chords: I and IV (i, bIII, bVI in minor)',
+                ],
+                ['add9OnDominant', 0, 0.3, 'rarely on V: a 9th there blunts its pull home'],
                 ['compNotesInScale', 0.998, 1, 'every add9 is in the chord scale (one authority)'],
             ],
         },
@@ -363,30 +476,37 @@ export const acoustic = defineClaims({
             take: { comp: 'guitar', intensity: 0.6 },
             claims: [
                 [
-                    'strokesFollowPendulum',
-                    0.98,
-                    1,
-                    'strum direction follows the eighth-note pendulum',
-                ],
-                [
                     'strumUpShare',
                     0.3,
                     0.55,
                     'D-DU-UDU and friends: the "and"s come up, the beats go down',
                 ],
                 [
-                    'strumMeanLowest',
-                    48,
-                    52,
-                    'open-position grips from C3 up: the low strings belong to the bassist',
+                    'openStringsPerDownstroke',
+                    1.2,
+                    2.2,
+                    'open-position shapes: x32010, x02210, xx0212 ring their open strings',
                 ],
-                ['compBelowC3Share', 0, 0, 'with a bassist, nothing on the low strings'],
+                [
+                    'strumMeanLowest',
+                    43,
+                    47,
+                    'an open chord stands on its root, down on the low strings (A2 of x02210)',
+                ],
+                [
+                    'compBelowC3Share',
+                    0.05,
+                    0.2,
+                    'below C3 only the root or its fifth, doubling the bassist (the invariants hold it)',
+                ],
                 [
                     'add9OnOwnedTriads',
-                    0.4,
-                    0.85,
-                    'the Cadd9 family is a whole-tune choice: most tunes ring it, some play plain',
+                    0.35,
+                    0.7,
+                    'the Cadd9 shape family on about half the triads that can take it',
                 ],
+                ['add9OnRestChords', 0.55, 0.9, 'Cadd9 and Fadd9: on the resting chords'],
+                ['add9OnDominant', 0, 0.3, 'rarely on V'],
                 // Not 1: an anticipating upstroke catches only the top three strings of the next chord,
                 // which may miss its guide tones, so the harness judges it against the old chord.
                 ['compNotesInScale', 0.997, 1, 'every add9 grip is in the chord scale'],
@@ -396,12 +516,18 @@ export const acoustic = defineClaims({
             take: { comp: 'nylon', intensity: 0.2 },
             claims: [
                 ['compSingleNoteShare', 0.9, 1, 'fingerpicked: each arpeggio note its own event'],
-                ['compBelowC3Share', 0, 0, 'broken chords above C3, over the bassist'],
+                [
+                    'compBelowC3Share',
+                    0.05,
+                    0.25,
+                    'the picking thumb takes the root of the open grip, doubling the bassist',
+                ],
+                ['add9OnOwnedTriads', 0, 0.02, 'a quiet guitar picks its triads bare'],
                 [
                     'travisAlternatingBass',
                     0,
                     0.1,
-                    'with a bassist the thumb keeps off the bass strings: broken chords, no Travis',
+                    'with a bassist, broken chords: the thumb leaves the alternating bass to the bass',
                 ],
             ],
         },
@@ -410,12 +536,29 @@ export const acoustic = defineClaims({
             claims: [
                 [
                     'travisAlternatingBass',
-                    0.9,
+                    0.95,
                     1,
-                    'Travis: the thumb starts on the bass and alternates, under the fingers',
+                    'Travis: the thumb alternates bass strings (C3 E3 G2 E3), under the fingers',
                 ],
                 ['compBelowC3Share', 0.08, 0.3, 'alone, the thumb owns the low strings'],
                 ['compSingleNoteShare', 0.9, 1, 'fingerpicked, one note at a time'],
+            ],
+        },
+        {
+            take: { comp: 'guitar', intensity: 0.6, bass: false },
+            claims: [
+                [
+                    'openStringsPerDownstroke',
+                    1.2,
+                    2.2,
+                    'alone, the same open shapes, standing on the bass of the chord',
+                ],
+                [
+                    'bottomPairInLimit',
+                    1,
+                    1,
+                    'the bottom of the band keeps its low-interval limit: no F2-A2, no G2-B2',
+                ],
             ],
         },
     ],
