@@ -12,7 +12,7 @@ import type { BandEvent, BandSettings, DrumHit, Lane, PitchedNote } from './core
 import { applyFeel } from './feel/feel.js';
 import type { Timeline } from './form/timeline.js';
 import { COMP_INSTRUMENTS } from './players/comp/instruments.js';
-import { STYLES } from './styles/index.js';
+import { feelFor, STYLES } from './styles/index.js';
 import type { BarContext } from './styles/types.js';
 import { nearestMidi } from './theory/pitch.js';
 
@@ -103,7 +103,7 @@ export function performPass(
 
     const fermatas = holdFermatas(events, timeline, plans);
     const held = instrument.legato ? sustain(fermatas, timeline) : fermatas;
-    const felt = applyFeel(held, timeline, style.feel, {
+    const felt = applyFeel(held, timeline, feelFor(style, instrument.family), {
         ...settings,
         strumMs: instrument.strumMs,
     });

@@ -17,7 +17,7 @@ import { performPass } from '../perform.js';
 import { isPlayable } from '../players/comp/fretboard.js';
 import { COMP_INSTRUMENTS } from '../players/comp/instruments.js';
 import { STEP } from '../players/grid.js';
-import { STYLE_IDS, STYLES } from '../styles/index.js';
+import { feelFor, STYLE_IDS, STYLES } from '../styles/index.js';
 import { chordPcs } from '../theory/chord.js';
 import { mod12 } from '../theory/pitch.js';
 import { FIXTURES } from './scores.js';
@@ -64,7 +64,7 @@ describe.each(STYLE_IDS)('%s invariants', (styleId) => {
                         checkPass(
                             timeline,
                             first.events,
-                            style.feel.lean,
+                            feelFor(style, COMP_INSTRUMENTS[comp].family).lean,
                             settings,
                             seed,
                             problems,
@@ -78,7 +78,7 @@ describe.each(STYLE_IDS)('%s invariants', (styleId) => {
                         checkPass(
                             timeline,
                             second.events,
-                            style.feel.lean,
+                            feelFor(style, COMP_INSTRUMENTS[comp].family).lean,
                             settings,
                             `${seed}/pass1`,
                             problems,

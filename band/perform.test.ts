@@ -125,7 +125,7 @@ describe('comp instruments', () => {
         }
     });
 
-    it('an organ holds each chord until the next strike', () => {
+    it('an organ presses once per chord and holds it until the next', () => {
         for (const style of ['rock', 'jazz', 'funk', 'bossa'] as const) {
             const comp = performPass(
                 timeline,
@@ -133,6 +133,18 @@ describe('comp instruments', () => {
                 { pass: 0, looping: true },
             ).events.filter((e): e is PitchedNote => e.lane === 'comp');
             const strikes = [...new Set(comp.map((e) => e.tick))];
+            // It presses only on a change: two presses in a row never play the same chord.
+            const chord = (tick: number) =>
+                comp
+                    .filter((e) => e.tick === tick)
+                    .map((e) => e.midi)
+                    .sort()
+                    .join(',');
+            for (let i = 0; i + 1 < strikes.length; i++) {
+                expect(chord(strikes[i + 1]), `${style} re-press @${strikes[i + 1]}`).not.toBe(
+                    chord(strikes[i]),
+                );
+            }
             for (let i = 0; i + 1 < strikes.length; i++) {
                 const ends = comp.filter((e) => e.tick === strikes[i]).map((e) => e.tick + e.dur);
                 // Within a bar, the pad sounds right up to the next chord.

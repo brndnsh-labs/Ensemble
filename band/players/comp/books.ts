@@ -30,6 +30,8 @@ const TIE_STEPS = 2;
 
 interface CompMemory {
     voicing: number[] | null;
+    /** The chord the hand last struck (its symbol), for an instrument that holds it. */
+    chord?: string | null;
     /** The next bar's first chord was already played as an anticipation. */
     pushed: boolean;
 }
@@ -102,7 +104,10 @@ function compIdiom(book: CompBook): PitchedIdiom {
                     prev = place(chord, prev);
                     chordAt(prev, 0, total, 92, shape && { stroke: 'down' });
                 }
-                return { events, memory: { voicing: prev, pushed: false } };
+                return {
+                    events,
+                    memory: { voicing: prev, pushed: false, chord: chord?.symbol ?? null },
+                };
             }
             const nextFirst = ctx.next?.bar.spans[0];
             let pushed = false;
@@ -191,6 +196,41 @@ function compIdiom(book: CompBook): PitchedIdiom {
             });
             planned.sort((a, b) => a.step - b.step);
             const { legato } = ctx.instrument;
+            if (legato) {
+                // An organist holds a chord and presses again only when it changes: the comping
+                // rhythm is for a struck instrument, and re-pressing a held organ chord on every
+                // hit is a stutter, not a groove. So the organ presses on each chord's arrival
+                // (or on a push just before it) and holds; `sustain` in perform.ts carries it
+                // across barlines. An N.C. lets go, so the next chord is pressed anew.
+                const kept = planned.filter((h) => h.early);
+                let last = memory.pushed ? null : (memory.chord ?? null);
+                spans.forEach(({ span, from, to }, index) => {
+                    const chord = span.chord;
+                    if (!chord) {
+                        last = null;
+                        return;
+                    }
+                    const tiedIn = index === 0 && (memory.pushed || !span.attack);
+                    const pushed = kept.some(
+                        (h) => h.chord === chord && h.step >= from - TIE_STEPS && h.step < from,
+                    );
+                    if (!tiedIn && !pushed && chord.symbol !== last && !span.fermata) {
+                        kept.push({ step: from, length: to - from, velocity: 80, chord });
+                    }
+                    last = chord.symbol;
+                });
+                if (spans.some(({ span }) => span.fermata)) {
+                    // A fermata's single held chord was planned above; keep it as it is.
+                    kept.push(
+                        ...planned.filter(
+                            (h) =>
+                                !h.early &&
+                                spans.some(({ span, from }) => span.fermata && h.step === from),
+                        ),
+                    );
+                }
+                planned.splice(0, planned.length, ...kept.sort((a, b) => a.step - b.step));
+            }
             let held: ChordFacts | null = null;
             let ahead = false;
             planned.forEach((hit, i) => {
@@ -227,7 +267,14 @@ function compIdiom(book: CompBook): PitchedIdiom {
                 const notes = hit.stroke === 'up' && prev.length > 3 ? prev.slice(-3) : prev;
                 chordAt(notes, hit.step, length, hit.velocity, hit);
             });
-            return { events, memory: { voicing: prev, pushed } };
+            // What the hand holds going into the next bar: the last chord struck, unless the
+            // bar ends in an N.C.
+            const endsInRest = !bar.spans[bar.spans.length - 1]?.chord;
+            const struck = planned.filter((h) => !h.muted).at(-1)?.chord.symbol ?? memory.chord;
+            return {
+                events,
+                memory: { voicing: prev, pushed, chord: endsInRest ? null : (struck ?? null) },
+            };
         },
     };
 }
@@ -533,15 +580,16 @@ export const jazzGuitar = compIdiom({
             // Quiet choruses: comp like the piano (a Charleston, a push on the "and").
             return jazzComp(span, tier, rng);
         }
-        // Four to the bar: short, even strokes, 2 and 4 a touch stronger. A three-string chunk
-        // sounds as one — no audible roll, which would smear it against the walking bass.
+        // Four to the bar, the Freddie Green way: 1 and 3 a little longer and softer, 2 and 4
+        // short, crisp and leaned on — the long-short pull between them is the chunk's swing.
+        // A three-string chunk sounds as one: no audible roll to smear it against the bass.
         return pulses(ctx.bar)
             .filter((p) => p.step >= span.from && p.step < span.to)
-            .map((p) => ({
-                step: p.step,
-                length: 1.6,
-                velocity: p.role === 'back' ? 80 : 72,
-            }));
+            .map((p) =>
+                p.role === 'back'
+                    ? { step: p.step, length: 1.2, velocity: 86 }
+                    : { step: p.step, length: 2.4, velocity: 70 },
+            );
     },
 });
 

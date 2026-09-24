@@ -452,6 +452,24 @@ const METRICS: Record<string, Metric> = {
         }
         return ratio(sum, n);
     },
+    /** Mean length of 4/4 comp chords on beats 1 and 3 over those on 2 and 4 (long-short). */
+    compLongShort: (takes) => {
+        const sum = { down: 0, back: 0 };
+        const n = { down: 0, back: 0 };
+        for (const { timeline: t, events } of takes) {
+            for (const notes of compChords(events).values()) {
+                const bar = t.bars[notes[0].bar];
+                const step = stepOf(t, notes[0]);
+                if (bar.meter.name !== '4/4' || step % 4 !== 0) {
+                    continue;
+                }
+                const beat = step % 8 === 0 ? 'down' : 'back';
+                sum[beat] += notes[0].dur;
+                n[beat]++;
+            }
+        }
+        return ratio(ratio(sum.down, n.down), ratio(sum.back, n.back));
+    },
     /** Comp strikes (sounding or scratched) per bar played. */
     compStrikesPerBar: (takes) => {
         let bars = 0;
@@ -542,7 +560,7 @@ const GUITAR_CLAIMS: Record<StyleId, Claim[]> = {
     ],
     jazz: [
         ['compOffbeatShare', 0, 0.2, 'four to the bar: the guitar marks the beats'],
-        ['compShort', 0.75, 1, 'short chunks, damped by the fretting hand'],
+        ['compLongShort', 1.5, 3, 'long-short: 1 and 3 held a little, 2 and 4 crisp'],
         ['compStrikesPerBar', 3, 4.2, 'one stroke per beat'],
         ['compRootLowest', 0.8, 1, 'the root on the bottom string, doubling the walking bass'],
         ['compMeanLowest', 40, 52, 'the chunk sits low (roots on the 6th and 5th strings)'],

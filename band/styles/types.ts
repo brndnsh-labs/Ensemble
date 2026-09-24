@@ -50,6 +50,11 @@ export interface Feel {
      * never lean. Positive = behind the beat.
      */
     lean: Record<Exclude<Lane, 'drums'>, number>;
+    /**
+     * The comp's lean when the instrument family plays it differently: a jazz pianist lays
+     * back behind the beat, a swing rhythm guitarist sits right with the walking bass.
+     */
+    compLean?: Partial<Record<'keyboard' | 'guitar', number>>;
     /** Default human variation, 0–100. */
     humanize: number;
 }

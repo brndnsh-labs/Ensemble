@@ -16,7 +16,7 @@ import {
     rockKeys,
 } from '../players/comp/books.js';
 import { bossaDrums, funkDrums, jazzDrums, rockDrums } from '../players/drums/books.js';
-import type { Style } from './types.js';
+import type { Feel, Style } from './types.js';
 
 export const STYLES: Record<StyleId, Style> = {
     rock: {
@@ -35,7 +35,14 @@ export const STYLES: Record<StyleId, Style> = {
         name: 'Jazz',
         // Medium swing (offbeat at ~62% of the beat, not a hard triplet). The walking bass
         // sits on top of the ride (a hair ahead drives the time); the comping lays back.
-        feel: { swing: 72, swingGrid: 8, lean: { bass: -2, comp: 8 }, humanize: 40 },
+        // The guitar's four-to-the-bar chunk is part of the time, locked with the bass.
+        feel: {
+            swing: 72,
+            swingGrid: 8,
+            lean: { bass: -2, comp: 8 },
+            compLean: { guitar: -2 },
+            humanize: 40,
+        },
         drums: jazzDrums,
         bass: walkingBass,
         comp: { keyboard: jazzKeys, guitar: jazzGuitar },
@@ -65,3 +72,9 @@ export const STYLES: Record<StyleId, Style> = {
 };
 
 export const STYLE_IDS = Object.keys(STYLES) as StyleId[];
+
+/** The feel a style plays with on a given comp family (its comp lean may differ). */
+export function feelFor(style: Style, family: 'keyboard' | 'guitar'): Feel {
+    const comp = style.feel.compLean?.[family];
+    return comp === undefined ? style.feel : { ...style.feel, lean: { ...style.feel.lean, comp } };
+}
