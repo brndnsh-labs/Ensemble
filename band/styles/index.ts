@@ -6,6 +6,7 @@
  * `test/critique.test.ts`.
  */
 import type { StyleId } from '../core/types.js';
+import { blues } from './blues.js';
 import { bossa } from './bossa.js';
 import { funk } from './funk.js';
 import { jazz } from './jazz.js';
@@ -13,7 +14,7 @@ import { reggae } from './reggae.js';
 import { rock } from './rock.js';
 import type { Feel, Style } from './types.js';
 
-export const STYLES: Record<StyleId, Style> = { rock, jazz, funk, bossa, reggae };
+export const STYLES: Record<StyleId, Style> = { rock, jazz, funk, bossa, reggae, blues };
 
 export const STYLE_IDS = Object.keys(STYLES) as StyleId[];
 

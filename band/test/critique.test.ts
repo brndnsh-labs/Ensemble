@@ -167,6 +167,33 @@ const METRICS: Record<string, Metric> = {
         }
         return ratio(hit, n);
     },
+    /** Share of groove bars with the kick on both 1 and 3 (the shuffle's ground). */
+    kickOnOneAndThree: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { timeline: t, events } of takes) {
+            for (const b of grooveBars(t, events)) {
+                n++;
+                const s = drumSteps(t, events, b.index, ['kick']);
+                hit += s.has(0) && s.has(8) ? 1 : 0;
+            }
+        }
+        return ratio(hit, n);
+    },
+    /** Share of groove bars whose cymbals play every eighth and nothing between (a shuffle's time). */
+    cymbalEighths: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { timeline: t, events } of takes) {
+            for (const b of grooveBars(t, events)) {
+                n++;
+                const s = drumSteps(t, events, b.index, ['hat', 'hatOpen', 'ride', 'crash']);
+                const eighths = [0, 2, 4, 6, 8, 10, 12, 14].every((x) => s.has(x));
+                hit += eighths && [...s].every((x) => x % 2 === 0) ? 1 : 0;
+            }
+        }
+        return ratio(hit, n);
+    },
     ghostsPerBar: (takes) => {
         let n = 0;
         let ghosts = 0;
@@ -344,6 +371,25 @@ const METRICS: Record<string, Metric> = {
         }
         return ratio(hit, n);
     },
+    /** Of the bass notes under dominant 7th chords, the share on the major 6th (the boogie's). */
+    bassSixthOnDominants: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { timeline: t, events } of takes) {
+            for (const e of events) {
+                if (e.lane !== 'bass' || e.muted) {
+                    continue;
+                }
+                const chord = chordAt(t, e.tick);
+                if (chord?.family !== 'dominant' || chord.seventh !== 10) {
+                    continue;
+                }
+                n++;
+                hit += mod12(e.midi - chord.root) === 9 ? 1 : 0;
+            }
+        }
+        return ratio(hit, n);
+    },
     bassMeanLeap: (takes) => {
         let n = 0;
         let sum = 0;
@@ -419,6 +465,21 @@ const METRICS: Record<string, Metric> = {
             for (const o of onsets) {
                 n++;
                 hit += Number(o.split(':')[1]) % 8 === 0 ? 1 : 0;
+            }
+        }
+        return ratio(hit, n);
+    },
+    /** Share of sounding 4/4 comp strikes on beats 2 and 4. */
+    compOnBackbeat: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { timeline: t, events } of takes) {
+            for (const notes of compChords(events).values()) {
+                if (t.bars[notes[0].bar].meter.name !== '4/4') {
+                    continue;
+                }
+                n++;
+                hit += stepOf(t, notes[0]) % 8 === 4 ? 1 : 0;
             }
         }
         return ratio(hit, n);
@@ -639,6 +700,23 @@ const CLAIMS: Record<StyleId, Claim[]> = {
         ['compShort', 0.9, 1, 'the skank is a chop, damped at once'],
         ['compColour', 0, 0.15, 'triads and sevenths, no extensions'],
     ],
+    blues: [
+        ['snareBackbeat', 0.95, 1, 'the backbeat on 2 and 4, every bar'],
+        ['kickOnOneAndThree', 0.95, 1, 'the kick grounds 1 and 3'],
+        ['cymbalEighths', 0.9, 1, 'the shuffle: the cymbal on every eighth, never a sixteenth'],
+        ['kickConsistency', 0.75, 1, 'a section keeps its shuffle'],
+        ['bassArrivesOnBass', 0.8, 1, 'the box starts on the root (a 2nd bar turns from the b7)'],
+        ['bassSixthOnDominants', 0.1, 0.35, 'the boogie box rocks through the 6th'],
+        [
+            'bassRepeatedNotes',
+            0.1,
+            0.5,
+            'the lope re-strikes the beat; it never moves on the "and"',
+        ],
+        ['compColour', 0.5, 1, 'rootless 9ths and 13ths over the dominants'],
+        ['compOffbeatShare', 0.3, 0.8, 'stabs and pushes on the "and"s'],
+        ['compTopVoiceMotion', 0, 3.5, 'smooth voice leading'],
+    ],
 };
 
 // A second jazz take at low energy, where the walk relaxes into a two-feel.
@@ -655,6 +733,10 @@ const LOW_CLAIMS: Partial<Record<StyleId, Claim[]>> = {
             1,
             'a held half note is a chord tone, never a passing tone',
         ],
+    ],
+    blues: [
+        ['bassNotesPerBeat', 0.45, 0.75, 'two-feel: root and fifth, an approach on 4 now and then'],
+        ['bassRepeatedNotes', 0, 0.05, 'no lope at low energy'],
     ],
 };
 
@@ -692,6 +774,10 @@ const GUITAR_CLAIMS: Record<StyleId, Claim[]> = {
         ['compStrikesPerBar', 1.8, 4.5, 'two chops a bar, doubled or on every "and" when it lifts'],
         ['compColour', 0, 0.15, 'triads and sevenths, no extensions'],
     ],
+    blues: [
+        ['compOnBackbeat', 0.5, 0.9, 'the chop sits on 2 and 4 with the snare'],
+        ['compColour', 0, 0.2, "plain 7th and 6th grips, not the piano's 9ths and 13ths"],
+    ],
 };
 
 /** The organ, where a style plays it its own way rather than holding pads. */
@@ -716,6 +802,7 @@ describe.each(Object.keys(ORGAN_CLAIMS) as StyleId[])('%s critique on organ', (s
 const GUITAR_LOW_CLAIMS: Partial<Record<StyleId, Claim[]>> = {
     funk: [['compShort', 0.9, 1, 'stabs stay staccato with no scratch between them']],
     jazz: [['compRootLowest', 0.8, 1, 'the sparse comp keeps the root on the bottom']],
+    blues: [['compShort', 0.9, 1, 'the chop on 2 and 4 is damped at once, never let ring']],
 };
 
 describe.each(Object.keys(GUITAR_LOW_CLAIMS) as StyleId[])(

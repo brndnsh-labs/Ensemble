@@ -69,7 +69,7 @@ export type BandEvent = DrumHit | PitchedNote;
 export type CompInstrument = 'piano' | 'rhodes' | 'organ' | 'clav' | 'guitar' | 'nylon';
 
 /** The four v0 genres. New genres add a style file; see `styles/index.ts`. */
-export type StyleId = 'rock' | 'jazz' | 'funk' | 'bossa' | 'reggae';
+export type StyleId = 'rock' | 'jazz' | 'funk' | 'bossa' | 'reggae' | 'blues';
 
 export interface BandSettings {
     style: StyleId;
