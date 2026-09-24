@@ -33,6 +33,12 @@ export interface BarContext {
 
 export interface Idiom<E, M> {
     name: string;
+    /**
+     * A comp idiom whose figure *is* its articulation: it plays even a sustaining instrument
+     * short, so the organ's hold-to-the-next-strike is off (the reggae organ bubble is chopped,
+     * never held). Absent everywhere else: an organ holds.
+     */
+    percussive?: boolean;
     init(): M;
     play(ctx: BarContext, memory: M): { events: E[]; memory: M };
 }

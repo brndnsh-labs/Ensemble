@@ -102,7 +102,7 @@ export function performPass(
     }
 
     const fermatas = holdFermatas(events, timeline, plans);
-    const held = instrument.legato ? sustain(fermatas, timeline) : fermatas;
+    const held = instrument.legato && !comp.percussive ? sustain(fermatas, timeline) : fermatas;
     const felt = applyFeel(held, timeline, feelFor(style, instrument.family), {
         ...settings,
         strumMs: instrument.strumMs,

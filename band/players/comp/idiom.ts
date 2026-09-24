@@ -56,11 +56,17 @@ export interface CompBook {
     push: Record<EnergyTier, number>;
     /** A hit an eighth before a mid-bar chord change plays the new chord (bossa). */
     pushInBar?: boolean;
+    /**
+     * The rhythm is the part even on a sustaining instrument: the organ plays the book's hits
+     * as written, short, instead of pressing once per chord and holding (the reggae bubble).
+     */
+    percussive?: boolean;
 }
 
 export function compIdiom(book: CompBook): PitchedIdiom {
     return {
         name: book.name,
+        percussive: book.percussive,
         init: (): CompMemory => ({ voicing: null, pushed: false }),
         play(ctx, memory: CompMemory) {
             const { bar, plan } = ctx;
@@ -194,7 +200,7 @@ export function compIdiom(book: CompBook): PitchedIdiom {
                 }
             });
             planned.sort((a, b) => a.step - b.step);
-            const { legato } = ctx.instrument;
+            const legato = ctx.instrument.legato && !book.percussive;
             if (legato) {
                 // An organist holds a chord and presses again only when it changes: the comping
                 // rhythm is for a struck instrument, and re-pressing a held organ chord on every

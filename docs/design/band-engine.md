@@ -85,7 +85,8 @@ A style gives the comp **one book per instrument family**, keyboard and guitar
 (`Style.comp`), and names the instrument its genre is heard on by default (`Style.prefers`:
 bossa on nylon, funk on clav). The instrument (`players/comp/instruments.ts`) adds what is
 physical: its range, its strum speed, whether it sustains.
-- **Keyboards** voice for two hands (`voicing.ts`). The organ holds each chord to the next.
+- **Keyboards** voice for two hands (`voicing.ts`). The organ holds each chord to the next,
+  unless the book is `percussive`: its figure is the part (the reggae bubble is chopped).
 - **Guitars** play *grips found on the fretboard* (`fretboard.ts`): one note per string, on
   adjacent strings, within a four-fret reach, costed like a keyboard voicing. The invariant
   suite holds every guitar chord to `isPlayable`.
