@@ -153,9 +153,12 @@ Genres outside v0 play their nearest v0 style (`STYLE_FOR_GENRE` in `runtime.ts`
   determinism, bar and register bounds, velocities, the timing tiers (strum included), no
   pitched onsets under N.C., no same-pitch overlaps, bass arrivals on chord tones, comp chords
   that carry their guide tones, and playable guitar grips off the bass's register.
-- `band/test/critique.test.ts` holds one metric library and a table of statistical claims per
-  style, harvested from what the old critique suite asserted about these genres, plus a table
-  per style on guitar. It prints a report per style.
+- The critique: one claims file per style (`band/test/claims/<id>.ts`, built with
+  `defineClaims`), each a list of *takes* (comp instrument, a fixed energy, bass on or off)
+  with statistical claims harvested from what the old critique suite asserted about the genre.
+  The shared metric library is `band/test/critique/harness.ts`; a style may define its own
+  metrics in its claims file. `band/test/critique.test.ts` runs them all and prints a report
+  per take.
 - Unit specs sit beside their modules (`form/`, `theory/`, `feel/`).
 - `npm run band:render` writes `.mid` files and, with `--print=N`, a text grid of the first N
   bars.

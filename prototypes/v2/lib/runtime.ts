@@ -216,7 +216,11 @@ function scoreForBand(): SemanticScore {
 function bandSettings(): BandSettings {
     const { groove, bass, chords, playback } = getState();
     return {
-        style: STYLE_FOR_GENRE[groove.lastSmartGenre] ?? 'rock',
+        // A persisted genre string indexes this table: guard with hasOwn (the #1266 rule), so
+        // 'constructor' or a retired key can't read an Object prototype member as a style.
+        style: Object.hasOwn(STYLE_FOR_GENRE, groove.lastSmartGenre)
+            ? STYLE_FOR_GENRE[groove.lastSmartGenre]
+            : 'rock',
         lanes: { drums: groove.enabled, bass: bass.enabled, comp: chords.enabled },
         comp: COMP_FOR_VOICE[chords.voice] ?? 'piano',
         intensity: playback.autoIntensity ? null : playback.bandIntensity,

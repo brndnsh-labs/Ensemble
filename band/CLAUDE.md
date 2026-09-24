@@ -12,7 +12,7 @@ shape and its laws. Rules that bind every change here:
   fretboard.ts`). The invariant suite rejects any grip a hand can't fret.
 - **One genre, one file** (`styles/<id>.ts`). Shared machinery goes in `players/`, never in
   another genre's file.
-- **A new style gets the invariant suite automatically.** Also add its claims to
-  `test/critique.test.ts`, then render it (`npm run band:render -- --style=<id> --print=8`)
+- **A new style gets the invariant suite automatically.** Also write its claims file
+  (`test/claims/<id>.ts`, registered in `test/claims/index.ts`), then render it (`npm run band:render -- --style=<id> --print=8`)
   and read the grid before asking for an ear check.
 - **Taste is Brandon's.** A green critique means the rules hold. It does not mean it grooves.

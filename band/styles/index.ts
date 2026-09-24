@@ -2,8 +2,8 @@
  * The style registry. A style is a feel plus one idiom per lane (the comp's per instrument
  * family); each lives in its own file (`styles/<id>.ts`) — the whole of what makes "rock"
  * rock. To add a genre, write its file (composing `players/` machinery, and writing a new
- * idiom only when the vocabulary lacks one), register it here, and add its claims to
- * `test/critique.test.ts`.
+ * idiom only when the vocabulary lacks one), register it here, and write its claims in
+ * `test/claims/<id>.ts`.
  */
 import type { StyleId } from '../core/types.js';
 import { blues } from './blues.js';
