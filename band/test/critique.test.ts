@@ -32,14 +32,17 @@ function perform(
     style: StyleId,
     intensity: number | null = null,
     comp: CompInstrument = 'piano',
+    bass = true,
 ): Take[] {
     const takes: Take[] = [];
+    const lanes = { ...DEFAULT_SETTINGS.lanes, bass };
     for (const chart of CHARTS) {
         const timeline = compileTimeline(FIXTURES[chart]);
         for (const seed of SEEDS) {
             let memory: PassMemory | undefined;
             for (let pass = 0; pass < 2; pass++) {
                 const settings = { ...DEFAULT_SETTINGS, style, comp, seed, swing: 0, intensity };
+                settings.lanes = lanes;
                 const result = performPass(timeline, settings, { pass, looping: true, memory });
                 memory = result.memory;
                 takes.push({ timeline, events: result.events });
@@ -85,6 +88,30 @@ function drumSteps(t: Timeline, events: BandEvent[], bar: number, pieces: string
             )
             .map((e) => stepOf(t, e)),
     );
+}
+
+/** 4/4 bars holding one chord for the whole bar, struck on the One: [bar, its chord]. */
+function wholeBarChords(t: Timeline) {
+    return t.bars.flatMap((b) => {
+        const span = b.spans[0];
+        return b.meter.name === '4/4' && b.spans.length === 1 && span.attack && span.chord
+            ? [[b, span.chord] as const]
+            : [];
+    });
+}
+
+/** Per bar, onset step → the sounding notes a lane plays there. */
+function onsetsByBar(t: Timeline, events: BandEvent[], lane: 'bass' | 'comp') {
+    const out = new Map<number, Map<number, PitchedNote[]>>();
+    for (const e of events) {
+        if (e.lane === lane && !e.muted) {
+            const bar = out.get(e.bar) ?? new Map<number, PitchedNote[]>();
+            const step = stepOf(t, e);
+            bar.set(step, [...(bar.get(step) ?? []), e]);
+            out.set(e.bar, bar);
+        }
+    }
+    return out;
 }
 
 type Metric = (takes: Take[]) => number;
@@ -643,6 +670,100 @@ const METRICS: Record<string, Metric> = {
         }
         return ratio(strikes, bars);
     },
+    /**
+     * Boom-chick: in bars holding one root-position chord and not walking (nothing on beat 4),
+     * the share with the root on 1 and the fifth on 3.
+     */
+    bassRootFifth: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { timeline: t, events } of takes) {
+            const bass = onsetsByBar(t, events, 'bass');
+            for (const [b, chord] of wholeBarChords(t)) {
+                const notes = bass.get(b.index);
+                if (chord.bass !== chord.root || chord.fifth === null || notes?.has(12)) {
+                    continue;
+                }
+                n++;
+                const one = notes?.get(0)?.[0];
+                const three = notes?.get(8)?.[0];
+                const fifth = mod12(chord.root + chord.fifth);
+                hit +=
+                    one && three && mod12(one.midi) === chord.root && mod12(three.midi) === fifth
+                        ? 1
+                        : 0;
+            }
+        }
+        return ratio(hit, n);
+    },
+    /**
+     * Of the chord changes at a barline after a whole-bar chord, the share walked into: notes
+     * on beats 3 and 4 stepping (1–2 semitones each, one direction) onto the new chord's bass.
+     */
+    bassWalkUps: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { timeline: t, events } of takes) {
+            const bass = onsetsByBar(t, events, 'bass');
+            for (const [b, chord] of wholeBarChords(t)) {
+                const next = t.bars[b.index + 1]?.spans[0];
+                if (!next?.attack || !next.chord || next.chord.bass === chord.bass) {
+                    continue;
+                }
+                n++;
+                const three = bass.get(b.index)?.get(8)?.[0]?.midi;
+                const four = bass.get(b.index)?.get(12)?.[0]?.midi;
+                const land = bass.get(b.index + 1)?.get(0)?.[0]?.midi;
+                if (three === undefined || four === undefined || land === undefined) {
+                    continue;
+                }
+                const [a, c] = [four - three, land - four];
+                const steps = [1, 2].includes(Math.abs(a)) && [1, 2].includes(Math.abs(c));
+                const lands = mod12(land) === next.chord.bass;
+                hit += steps && Math.sign(a) === Math.sign(c) && lands ? 1 : 0;
+            }
+        }
+        return ratio(hit, n);
+    },
+    /** Share of sounding 4/4 comp chords (two notes or more) struck on beat 2 or 4. */
+    compBackbeatShare: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { timeline: t, events } of takes) {
+            for (const notes of compChords(events).values()) {
+                if (notes.length < 2 || t.bars[notes[0].bar].meter.name !== '4/4') {
+                    continue;
+                }
+                n++;
+                const step = stepOf(t, notes[0]);
+                hit += step === 4 || step === 12 ? 1 : 0;
+            }
+        }
+        return ratio(hit, n);
+    },
+    /**
+     * A guitar's own boom (no bass in the band): in bars holding one root-position chord, the
+     * share with a lone low note (below E3) on 1 that is the root, and on 3 the fifth.
+     */
+    compBoomChick: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { timeline: t, events } of takes) {
+            const comp = onsetsByBar(t, events, 'comp');
+            for (const [b, chord] of wholeBarChords(t)) {
+                if (chord.bass !== chord.root || chord.fifth === null) {
+                    continue;
+                }
+                n++;
+                const low = (step: number, pc: number) => {
+                    const notes = comp.get(b.index)?.get(step);
+                    return notes?.length === 1 && notes[0].midi < 52 && mod12(notes[0].midi) === pc;
+                };
+                hit += low(0, chord.root) && low(8, mod12(chord.root + chord.fifth)) ? 1 : 0;
+            }
+        }
+        return ratio(hit, n);
+    },
 };
 
 // ---------------------------------------------------------------- the claims
@@ -717,6 +838,17 @@ const CLAIMS: Record<StyleId, Claim[]> = {
         ['compOffbeatShare', 0.3, 0.8, 'stabs and pushes on the "and"s'],
         ['compTopVoiceMotion', 0, 3.5, 'smooth voice leading'],
     ],
+    country: [
+        ['snareBackbeat', 0.9, 1, 'the chick on 2 and 4 (snare, or cross-stick when quiet)'],
+        ['kickOnOne', 0.95, 1, 'the boom on the One'],
+        ['ghostsPerBar', 1, 5, 'train-beat sections keep the snare going between backbeats'],
+        ['bassRootFifth', 0.9, 1, 'boom-chick bass: the root on 1, the fifth on 3'],
+        ['bassWalkUps', 0.2, 0.6, 'walk-ups step into the new root at many changes'],
+        ['bassArrivesOnBass', 0.95, 1, 'every change arrives on its bass note'],
+        ['bassNotesPerBeat', 0.5, 0.75, 'two booms a bar, plus walks'],
+        ['compBackbeatShare', 0.6, 1, 'the piano answers the boom on 2 and 4'],
+        ['compColour', 0, 0.1, 'triads and sixths, not jazz ninths'],
+    ],
 };
 
 // A second jazz take at low energy, where the walk relaxes into a two-feel.
@@ -738,6 +870,7 @@ const LOW_CLAIMS: Partial<Record<StyleId, Claim[]>> = {
         ['bassNotesPerBeat', 0.45, 0.75, 'two-feel: root and fifth, an approach on 4 now and then'],
         ['bassRepeatedNotes', 0, 0.05, 'no lope at low energy'],
     ],
+    country: [['bassNotesPerBeat', 0.45, 0.55, 'the ballad two-beat: half notes, no walks']],
 };
 
 /**
@@ -778,6 +911,11 @@ const GUITAR_CLAIMS: Record<StyleId, Claim[]> = {
         ['compOnBackbeat', 0.5, 0.9, 'the chop sits on 2 and 4 with the snare'],
         ['compColour', 0, 0.2, "plain 7th and 6th grips, not the piano's 9ths and 13ths"],
     ],
+    country: [
+        ['compBackbeatShare', 0.6, 1, 'the chick: strums on 2 and 4'],
+        ['compMeanLowest', 50, 56, 'open-position grips on the top four strings, off the bass'],
+        ['compColour', 0, 0.1, 'open triads, not jazz extensions'],
+    ],
 };
 
 /** The organ, where a style plays it its own way rather than holding pads. */
@@ -804,6 +942,26 @@ const GUITAR_LOW_CLAIMS: Partial<Record<StyleId, Claim[]>> = {
     jazz: [['compRootLowest', 0.8, 1, 'the sparse comp keeps the root on the bottom']],
     blues: [['compShort', 0.9, 1, 'the chop on 2 and 4 is damped at once, never let ring']],
 };
+
+/** With the bass lane off: the guitarist is the band's bottom. */
+const GUITAR_ALONE_CLAIMS: Partial<Record<StyleId, Claim[]>> = {
+    country: [
+        ['compBoomChick', 0.9, 1, 'Carter-style: the pick plays root on 1, fifth on 3, down low'],
+        ['compBackbeatShare', 0.6, 1, 'and strums the chick on 2 and 4'],
+    ],
+};
+
+describe.each(Object.keys(GUITAR_ALONE_CLAIMS) as StyleId[])(
+    '%s critique on guitar without a bass',
+    (style) => {
+        const takes = perform(style, null, 'guitar', false);
+        it.each(GUITAR_ALONE_CLAIMS[style] ?? [])('%s in [%d, %d] — %s', (metric, min, max) => {
+            const value = METRICS[metric](takes);
+            expect(value, `${style} ${metric} = ${value.toFixed(3)}`).toBeGreaterThanOrEqual(min);
+            expect(value, `${style} ${metric} = ${value.toFixed(3)}`).toBeLessThanOrEqual(max);
+        });
+    },
+);
 
 describe.each(Object.keys(GUITAR_LOW_CLAIMS) as StyleId[])(
     '%s critique on guitar at low energy',
