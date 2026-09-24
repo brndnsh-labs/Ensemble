@@ -53,6 +53,7 @@ const DRUM_ROWS = [
     'tomMid',
     'tomLow',
     'kick',
+    'shaker',
 ];
 
 function printBars(timeline: Timeline, events: BandEvent[], count: number) {

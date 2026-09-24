@@ -304,10 +304,14 @@ export function strums(line: string, from: number, to: number, grid: 1 | 2, ring
             continue;
         }
         if (c === '-') {
+            // A muted scratch is still the pendulum's hand: a downstroke digs in with the
+            // arm's weight, an upstroke is a lighter flick. The 14-point gap matches the
+            // sounded strokes below (86 vs 72), centered on the old flat 44 so a style that
+            // doesn't otherwise vary its scratch reads at the same average loudness (I3).
             hits.push({
                 step: s,
                 length: 0.5,
-                velocity: 44,
+                velocity: pendulum(s, grid) === 'down' ? 50 : 36,
                 stroke: pendulum(s, grid),
                 muted: true,
             });
