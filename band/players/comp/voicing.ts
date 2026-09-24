@@ -27,12 +27,36 @@ export type VoicingKind = 'close' | 'rootless' | 'stab' | 'drop2' | 'shell';
 
 const has = (chord: ChordFacts, n: number) => chord.intervals.some((i) => mod12(i) === n);
 
-/** A written alteration of a tension wins over the default natural one. */
+/**
+ * A written alteration of a tension wins over the default natural one; otherwise the chord's
+ * scale decides. A phrygian minor 7th (iii7 in a major key) owns no natural 9, and its b9 is
+ * an avoid note on a minor chord, so the 11th takes the seat (b3-5-b7-11). A dominant whose
+ * scale has only the b9 takes it.
+ */
 function ninth(chord: ChordFacts): number {
-    return has(chord, 1) ? 1 : has(chord, 3) && chord.third === 4 ? 3 : (chord.implied?.ninth ?? 2);
+    if (has(chord, 1)) {
+        return 1;
+    }
+    if (has(chord, 3) && chord.third === 4) {
+        return 3;
+    }
+    if (chord.implied) {
+        return chord.implied.ninth;
+    }
+    if (chord.scale.includes(2)) {
+        return 2;
+    }
+    return chord.third === 3 ? 5 : chord.scale.includes(1) ? 1 : 2;
 }
 function thirteenth(chord: ChordFacts): number {
-    return has(chord, 8) && chord.fifth !== 8 ? 8 : (chord.implied?.thirteenth ?? 9);
+    if (has(chord, 8) && chord.fifth !== 8) {
+        return 8;
+    }
+    if (chord.implied) {
+        return chord.implied.thirteenth;
+    }
+    // A dominant whose scale has a b13 and no 13 (mixolydian b13) voices the b13.
+    return !chord.scale.includes(9) && chord.scale.includes(8) ? 8 : 9;
 }
 
 /**
@@ -125,9 +149,12 @@ export function voicingTones(chord: ChordFacts, kind: VoicingKind): number[] {
         }
         case 'drop2': {
             if (colour === null) {
-                // A plain triad is coloured the bossa way: a 6/9 (major or minor).
+                // A plain triad is coloured the bossa way: a 6/9 (major or minor). A minor
+                // chord whose scale owns no natural 6th (aeolian vi, phrygian iii) takes its
+                // b7 instead — a b6 there is an avoid note.
                 if (chord.family === 'major' || chord.family === 'minor') {
-                    return [...new Set([third ?? 7, fifth, 9, 2])];
+                    const sixth = chord.scale.includes(9) || chord.family === 'major' ? 9 : 10;
+                    return [...new Set([third ?? 7, fifth, sixth, ninth(chord)])];
                 }
                 return [...new Set([0, third ?? 7, fifth, written[0] ?? 0])];
             }
@@ -223,8 +250,10 @@ export function cost(v: number[], prev: number[] | null, chord: ChordFacts, slot
             if (gap === 13 && !tense) {
                 c += 12;
             }
+            // In a three-note stab the rub is naked (Dm7 as E-F-C), where a fuller voicing
+            // absorbs it (Em9 as F#-G-B-D).
             if (gap === 1 && !tense) {
-                c += 8;
+                c += v.length <= 3 ? 24 : 8;
             }
         }
     }
