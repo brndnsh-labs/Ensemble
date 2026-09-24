@@ -460,16 +460,13 @@ const BOOGIE_GRIP: GripShape = {
 };
 
 /**
- * The Jimmy Reed boogie, for a guitarist with no bassist: the guitar is the bottom now. The
- * root on the low string on every beat, and the string above it on the swung "and", 5th then
- * 6th (R-5, R-6, the boogie's rock), reaching up to the b7 on beat 3 at high energy on a
- * dominant chord (R-5, R-6, R-b7, R-6). Each chord's arrival is the whole chord, root on the
- * same bottom string, so the harmony is stated before the boogie implies it.
- *
- * Jimmy Reed strikes the two strings together as a dyad. Here the pick alternates between
- * them, root on the downstroke and the upper string on the upstroke: a two-note chord would
- * be a chord without its 3rd and 7th, which the band's comp never plays, while one string at
- * a time is the bass role (as the bossa thumb is).
+ * The Jimmy Reed boogie, for a guitarist with no bassist: the guitar is the bottom now. Two
+ * strings struck together on every swung eighth — the root on the low string with its 5th,
+ * then with its 6th (R5 R5 R6 R6, the boogie's rock), reaching up to the b7 on beat 3 at
+ * high energy on a dominant chord. Each chord's arrival is the whole chord, root on the same
+ * bottom string, so the harmony is stated before the dyads imply it. (A dyad with no 3rd or
+ * 7th is the bass role, not a thin chord: the invariant suite allows exactly this — a
+ * root-bottom two-note figure when no bass plays.)
  */
 function boogie(ctx: BarContext, memory: HandMemory, tier: EnergyTier) {
     const { bar, plan } = ctx;
@@ -509,16 +506,20 @@ function boogie(ctx: BarContext, memory: HandMemory, tier: EnergyTier) {
         }
         for (const step of beats) {
             const beat = Math.floor(step / 4);
+            // 5th on beats 1 and 3 (the b7 on 3 when it reaches), 6th on 2 and 4.
+            const upper = beat % 2 === 0 ? (reach && beat === 2 ? 10 : fifth) : sixth;
+            const dyad = [root, root + upper];
             if (step === from && !tiedIn) {
                 events.push(...shape.map((m) => note(step, m, 1.8, 92, false)));
             } else if (!(step === 0 && memory.pushed)) {
-                events.push(note(step, root, 1.8, beat % 2 === 0 ? 92 : 86, false));
+                events.push(
+                    ...dyad.map((m) => note(step, m, 1.8, beat % 2 === 0 ? 92 : 86, false)),
+                );
             }
-            // The upper string on the swung "and" (none after an off-beat arrival: the next
-            // beat is already there).
+            // The same dyad again on the swung "and", an upstroke (none after an off-beat
+            // arrival: the next beat is already there).
             if (step % 4 === 0 && step + 2 < to) {
-                const upper = beat % 2 === 0 ? (reach && beat === 2 ? 10 : fifth) : sixth;
-                events.push(note(step + 2, root + upper, 0.8, 72, true));
+                events.push(...dyad.map((m) => note(step + 2, m, 0.8, 72, true)));
             }
         }
         voicing = shape;

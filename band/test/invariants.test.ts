@@ -196,7 +196,18 @@ function checkPass(
         // A single note is a bossa thumb (the bass role), not a chord; an upstroke catches
         // only the top strings — the downstroke before it carried the chord.
         const up = notes[0].stroke === 'up';
-        if (notes.length > 1 && !up && !(carries(here) || carries(nextInBar) || carries(next))) {
+        // With no bassist, a two-note figure on the chord's bass (the blues boogie's R5/R6) is
+        // the guitar playing the bass role, not a chord short of its guide tones.
+        const bassRole =
+            !settings.lanes.bass &&
+            notes.length === 2 &&
+            mod12(Math.min(...notes.map((n) => n.midi))) === here?.bass;
+        if (
+            notes.length > 1 &&
+            !up &&
+            !bassRole &&
+            !(carries(here) || carries(nextInBar) || carries(next))
+        ) {
             fail(notes[0], `comp chord lacks the guide tones of ${here?.symbol}`);
         }
         // Every guitar chord — thumb and fingers together — is one a hand can fret.
