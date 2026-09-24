@@ -1,6 +1,145 @@
-import { defineClaims } from '../critique/harness.js';
+import type { DrumHit, PitchedNote } from '../../core/types.js';
+import { STEP } from '../../players/grid.js';
+import { defineClaims, type Take } from '../critique/harness.js';
 
 export const hiphop = defineClaims({
+    metrics: {
+        /**
+         * The loop's second bar answers the first (S6): share of two-bar loop pairs (a
+         * kick-bearing state bar immediately followed by its answer, both in the same
+         * section visit) whose kick pattern actually differs. `drumLoopRepeat` only checks
+         * that a bar repeats its own phase two bars later — it never checks that the *other*
+         * phase brings a change, so a drummer who played the same bar twice would still pass
+         * it.
+         */
+        answerBarKickDiffers: (takes: Take[]): number => {
+            let n = 0;
+            let diff = 0;
+            for (const { timeline: t, events } of takes) {
+                const kicksByBar = new Map<number, string>();
+                for (const b of t.bars) {
+                    if (b.meter.name !== '4/4') {
+                        continue;
+                    }
+                    const steps = events
+                        .filter(
+                            (e): e is DrumHit =>
+                                e.lane === 'drums' && e.bar === b.index && e.piece === 'kick',
+                        )
+                        .map((e) => Math.round((e.tick - b.start) / STEP))
+                        .sort((x, y) => x - y)
+                        .join(',');
+                    if (steps) {
+                        kicksByBar.set(b.index, steps);
+                    }
+                }
+                for (const b of t.bars) {
+                    if (b.meter.name !== '4/4' || b.barInVisit % 2 !== 0) {
+                        continue;
+                    }
+                    const answer = t.bars[b.index + 1];
+                    if (
+                        !answer ||
+                        answer.visit.ordinal !== b.visit.ordinal ||
+                        answer.barInVisit !== b.barInVisit + 1
+                    ) {
+                        continue;
+                    }
+                    const state = kicksByBar.get(b.index);
+                    const ans = kicksByBar.get(answer.index);
+                    if (!state || !ans) {
+                        // No kick at all in one of the pair (a drop ate it): not a loop pair
+                        // to judge here — `dropKickSilent` judges the drop itself.
+                        continue;
+                    }
+                    n++;
+                    diff += state !== ans ? 1 : 0;
+                }
+            }
+            return n ? diff / n : 0;
+        },
+        /**
+         * The beat actually cuts out at a phrase's end (S6): share of a phrase's last 4/4
+         * bars (with a drum part at all) whose kick is silent over its last beat — the drop.
+         * `grooveBars` in the shared harness excludes exactly these bars from every other
+         * drum claim, so nothing was asserting the drop itself happens. Checks the kick only
+         * (not every piece): the "building into a louder section" case keeps a snare roll
+         * there, but the kick still drops under it either way.
+         */
+        dropKickSilent: (takes: Take[]): number => {
+            let n = 0;
+            let silent = 0;
+            for (const { timeline: t, events } of takes) {
+                for (const b of t.bars) {
+                    if (b.meter.name !== '4/4' || b.phrase.bar !== b.phrase.length - 1) {
+                        continue;
+                    }
+                    const kicks = events
+                        .filter(
+                            (e): e is DrumHit =>
+                                e.lane === 'drums' && e.bar === b.index && e.piece === 'kick',
+                        )
+                        .map((e) => Math.round((e.tick - b.start) / STEP));
+                    if (!kicks.length) {
+                        // No drums at all in this bar (the lane's off, or a low-energy phrase
+                        // that plays no fill in the first place): nothing to judge.
+                        continue;
+                    }
+                    n++;
+                    silent += kicks.every((s) => s < 12) ? 1 : 0;
+                }
+            }
+            return n ? silent / n : 0;
+        },
+        /**
+         * T4's regression guard: of the answer-bar note pairs shaped like a slide's final
+         * half-step (the note right before a barline root change sits exactly a semitone from
+         * it — the grace's own signature, since `slide = target - sign(target - held)` is
+         * always one semitone from `target`), the share where the note *before that* — the
+         * held pitch the glide actually leaps from — is no more than a minor 3rd from the
+         * arrival. A wide leap into the grace (the T4 bug: a tritone or a major 3rd) shows up
+         * here as a wide `held`-to-arrival span even though the grace itself still measures
+         * one semitone; a plain half-step-away arrival (no grace needed) also measures 1 and
+         * is excluded by requiring a genuine `held` two positions back.
+         */
+        bassSlideLeap: (takes: Take[]): number => {
+            let n = 0;
+            let hit = 0;
+            for (const { timeline: t, events } of takes) {
+                const bass = events
+                    .filter((e): e is PitchedNote => e.lane === 'bass' && !e.muted)
+                    .sort((a, b) => a.tick - b.tick);
+                for (const b of t.bars) {
+                    if (b.meter.name !== '4/4' || b.barInVisit % 2 !== 1) {
+                        continue;
+                    }
+                    const next = t.bars[b.index + 1];
+                    const nextFirst = next?.spans[0];
+                    const thisChord = b.spans[b.spans.length - 1]?.chord;
+                    if (
+                        !nextFirst?.attack ||
+                        !nextFirst.chord ||
+                        !thisChord ||
+                        nextFirst.chord.bass === thisChord.bass
+                    ) {
+                        continue;
+                    }
+                    const idx = bass.findIndex((e) => Math.abs(e.tick - next.start) < 1);
+                    if (idx < 2) {
+                        continue;
+                    }
+                    const graceDist = Math.abs(bass[idx].midi - bass[idx - 1].midi);
+                    if (graceDist !== 1) {
+                        continue;
+                    }
+                    n++;
+                    const width = Math.abs(bass[idx].midi - bass[idx - 2].midi);
+                    hit += width <= 3 ? 1 : 0;
+                }
+            }
+            return n ? hit / n : 0;
+        },
+    },
     takes: [
         {
             take: {},
@@ -14,9 +153,19 @@ export const hiphop = defineClaims({
                     'boom-bap: kicks between the beats, never a busy double time',
                 ],
                 ['drumLoopRepeat', 0.9, 1, 'a beat is a loop: bars in a section repeat'],
+                [
+                    'answerBarKickDiffers',
+                    0.6,
+                    1,
+                    'the loop’s second bar answers the first with a real change',
+                ],
+                ['dropKickSilent', 0.5, 1, 'the beat actually cuts out at a phrase’s end'],
+                ['bassSlideLeap', 0.85, 1, 'the 808’s glide never leaps more than a minor 3rd in'],
                 ['bassKickUnison', 0.75, 1, 'the sub is struck with the kick'],
                 ['bassMeanPitch', 30, 38, 'a sub line in the lowest octave'],
-                ['bassMeanSteps', 3, 16, 'long sub notes, held to the next kick'],
+                // 4 (a walking bass averages 3.74 — S5) so this claim actually distinguishes
+                // the sub's long, held notes from a bass that keeps moving every beat.
+                ['bassMeanSteps', 4, 16, 'long sub notes, held to the next kick'],
                 ['bassArrivesOnBass', 0.95, 1, 'every change arrives on its root (or slash note)'],
                 ['compColour', 0.6, 1, 'the sampled-jazz Rhodes: 9ths and 13ths'],
                 ['compStrikesPerBar', 1, 3, 'a sparse loop: a chord or two a bar, never a pulse'],

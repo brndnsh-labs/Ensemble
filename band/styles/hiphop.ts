@@ -13,7 +13,7 @@ import { type EnergyTier, energyTier } from '../arrange/plan.js';
 import type { PitchedNote } from '../core/types.js';
 import { bassNote, bassPc, kickSteps, type LineMemory, nextChord } from '../players/bass/line.js';
 import { compIdiom, type Hit, pendulum, strums } from '../players/comp/idiom.js';
-import { drumIdiom, type Lines } from '../players/drums/kit.js';
+import { type DrumBook, drumIdiom, fillStart, type Lines } from '../players/drums/kit.js';
 import { barSteps, dyn, isCommonTime, spanSteps } from '../players/grid.js';
 import { type ChordFacts, fifthOf } from '../theory/chord.js';
 import { nearestMidi } from '../theory/pitch.js';
@@ -36,18 +36,13 @@ const FILL_LENGTH: Record<'phrase' | 'section', Record<EnergyTier, number>> = {
 };
 
 /**
- * The step where this bar's fill begins, or null: the same arithmetic the kit uses to lay
- * a fill over the time (`drumIdiom`), so the lanes after the drums agree on where the beat
- * drops out.
+ * The step where this bar's fill begins, or null: shares the kit's own arithmetic
+ * (`fillStart`) so the bass agrees with the drums on where the beat drops out, instead of
+ * carrying a second copy of it. With no drummer in the band there is no beat to drop out of
+ * — the sub keeps playing through what would have been the fill.
  */
 function fillFrom(ctx: BarContext): number | null {
-    const { plan } = ctx;
-    if (plan.fill === 'none' || plan.ending) {
-        return null;
-    }
-    const total = barSteps(ctx.bar);
-    const length = Math.min(FILL_LENGTH[plan.fill][energyTier(plan.energy)], total - 4);
-    return length > 0 ? total - length : null;
+    return ctx.plan.lanes.drums ? fillStart(ctx, boomBapBook) : null;
 }
 
 /**
@@ -65,9 +60,11 @@ function building(ctx: BarContext): boolean {
 
 // ================================================================ drums
 /**
- * Kick loops, one per section, as the loop's two bars: the first states it, the second
+ * Kick loops, one per song, as the loop's two bars: the first states it, the second
  * answers with one kick moved or added (a pickup into the top of the loop, a doubled
- * "and"). Every loop owns the One and keeps off the backbeat, where the snare cracks; what
+ * "and"). A producer chops one beat for the whole record — a boom-bap track doesn't swap
+ * its kick pattern section to section the way its hats and ghosts thin and thicken with
+ * energy. Every loop owns the One and keeps off the backbeat, where the snare cracks; what
  * makes it boom-bap is the kick *between* the beats — the "and" of 3 in every one of them,
  * the "and" or "a" of 2 in most.
  */
@@ -119,12 +116,16 @@ function snareRoll(steps: number): string {
     }).join('');
 }
 
-const boomBap = drumIdiom({
+// A named book (not an inline literal): `fillFrom` above needs to share its `fillLength`
+// with the kit's own `fillStart`, and can only do that against a real reference.
+const boomBapBook: DrumBook = {
     name: 'boom-bap',
     timekeeper: ['hat', 'hatOpen'],
     fillLength: FILL_LENGTH,
     groove(ctx, tier) {
-        const loop = ctx.rng('kick', 'section').pick(KICK_LOOPS);
+        // why: 'song' scope — the record's one beat, not a per-section re-roll. Hats and
+        // ghosts (below) stay per-section: the layers that thin and thicken with energy.
+        const loop = ctx.rng('kick', 'song').pick(KICK_LOOPS);
         // The core loop is the same at every energy; only a quiet band plays it as a one-bar
         // loop (no answer), because the answer is a gesture and a quiet band makes none.
         const kick = tier !== 'low' && answerBar(ctx) ? loop[1] : loop[0];
@@ -173,7 +174,8 @@ const boomBap = drumIdiom({
             ? { snare: snareRoll(steps), kick: silence }
             : { kick: silence, snare: silence };
     },
-});
+};
+const boomBap = drumIdiom(boomBapBook);
 
 // ================================================================ bass
 /**
@@ -292,7 +294,9 @@ const subBass: PitchedIdiom = {
                 // off the next root on the side the line comes from, so it resolves by step
                 // in pitch, into exactly the note the next bar plays (`subRoot`). A line
                 // already a half step away resolves by itself: no grace to add. And a glide
-                // spans at most a fifth — wider, an 808 jumps rather than slides.
+                // spans at most a minor 3rd (the grace itself leaps at most a whole tone
+                // in): wider than that, the grace note reads as its own leap, not the tail
+                // of one glide, so an 808 jumps straight to the next root instead.
                 const lastSpan = i === spans.length - 1 && end === total;
                 if (lastSpan && next && nextAttack && next.bass !== chord.bass) {
                     const target = subRoot(ctx, bassPc(next));
@@ -300,7 +304,7 @@ const subBass: PitchedIdiom = {
                     const kept = notes.filter((n) => n.step < at);
                     const held = kept[kept.length - 1]?.midi ?? root;
                     const slide = target - Math.sign(target - held);
-                    if (slide !== held && Math.abs(target - held) <= 7) {
+                    if (slide !== held && Math.abs(target - held) <= 3) {
                         notes.splice(0, notes.length, ...kept, {
                             step: at,
                             midi: slide,
@@ -331,8 +335,9 @@ const subBass: PitchedIdiom = {
 // ================================================================ comp
 /**
  * The Rhodes loop: a sampled jazz chord, chopped. Each figure is [step, length] strikes in a
- * 4/4 bar, one per section, so the sample repeats bar after bar. They are held or lightly
- * syncopated — never a pulse on every beat:
+ * 4/4 bar, one for the whole song — a producer chops one sample and lets it run for the
+ * record, the same way the kick loop above does — so the sample repeats bar after bar. They
+ * are held or lightly syncopated — never a pulse on every beat:
  * - held: the One, rung through the bar (the sustained sample chord);
  * - float: the One held through beat 3, re-struck with the kick on the "and" of 3;
  * - push: the One, then the "and" of 2 held (the chord leaned into early);
@@ -388,7 +393,10 @@ const rhodesLoop = compIdiom({
             // Other meters: the chord held from its arrival.
             return [{ step: from, length: to - from, velocity: base }];
         }
-        const figure = ctx.rng('figure', 'section').weighted(KEYS_FIGURES);
+        // why: 'song' scope, matching the kick loop — one chopped figure for the whole
+        // record. Tier still thins it (low) or extends it (high); the shape itself doesn't
+        // change section to section.
+        const figure = ctx.rng('figure', 'song').weighted(KEYS_FIGURES);
         // Low energy: the sample's first chord alone, held. High adds the "and" of 4, the
         // push into the next bar, where the figure doesn't already reach it.
         const strikes =
@@ -421,7 +429,12 @@ const cleanGuitar = compIdiom({
     // The three-note 3-7-9 grip on the top strings: a jazz chord hit, not a strum. No open
     // strings: the hit is damped by releasing the fretting hand, and an open string rings on.
     kind: 'stab',
-    grip: { strings: 3, slot: { lo: 55, hi: 79, top: 67, pull: 0.8 }, open: false },
+    // why: top 71 (was 67) — at 67 the voice-led grip settled with its lowest note under 60
+    // a third of the time (down to 55, three semitones above the sub's own ceiling): too
+    // close to "far above the sub" to read as a separate register. 71 pulls the hand up the
+    // neck; the lowest note clears 60 in over 90% of grips (measured across the claims
+    // fixtures), with the same reach and the same fretboard search otherwise.
+    grip: { strings: 3, slot: { lo: 55, hi: 79, top: 71, pull: 0.8 }, open: false },
     // A damped hit stays inside its bar: tied over the barline, it would ring.
     push: { low: 0, mid: 0, high: 0 },
     rhythm(ctx, { from, to }, tier) {

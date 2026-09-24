@@ -39,6 +39,22 @@ function composeFromCells(ctx: BarContext, tier: EnergyTier, book: DrumBook): Li
     return out as Lines;
 }
 
+/**
+ * The step where a bar's fill begins, or null when it plays no fill: the kit uses this to
+ * lay the fill over the time; a lane that needs to know where the beat drops out (hip hop's
+ * sub bass follows the kick loop's own drop, `fillFrom` in `styles/hiphop.ts`) shares it
+ * instead of re-deriving the same arithmetic against its own copy of `fillLength`.
+ */
+export function fillStart(ctx: BarContext, book: DrumBook): number | null {
+    const { plan, bar } = ctx;
+    if (plan.fill === 'none' || plan.ending) {
+        return null;
+    }
+    const total = barSteps(bar);
+    const length = Math.min(book.fillLength[plan.fill][energyTier(plan.energy)], total - 4);
+    return length > 0 ? total - length : null;
+}
+
 function overlay(base: Lines, fill: Lines, from: number, total: number, keep: DrumPiece[]): Lines {
     const out: Record<string, string> = {};
     const pieces = new Set([...Object.keys(base), ...Object.keys(fill)]);
@@ -84,12 +100,10 @@ export function drumIdiom(book: DrumBook): DrumIdiom {
             let lines = isCommonTime(bar)
                 ? book.groove(ctx, tier)
                 : composeFromCells(ctx, tier, book);
-            if (plan.fill !== 'none') {
-                const length = Math.min(book.fillLength[plan.fill][tier], total - 4);
-                if (length > 0) {
-                    const fill = book.fill(ctx, length, ctx.rng('fill'));
-                    lines = overlay(lines, fill, total - length, total, ['kick', 'hatPedal']);
-                }
+            const fillStep = fillStart(ctx, book);
+            if (fillStep !== null) {
+                const fill = book.fill(ctx, total - fillStep, ctx.rng('fill'));
+                lines = overlay(lines, fill, fillStep, total, ['kick', 'hatPedal']);
             }
             for (const [piece, line] of Object.entries(lines) as [DrumPiece, string][]) {
                 for (const [step, velocity] of readLine(line.slice(0, total))) {
