@@ -53,6 +53,9 @@ const DRUM_NAMES: Record<string, string> = {
 
 /** A palm-muted bass note's mute amount in the voice's own terms (`mute-contract.ts`). */
 const BASS_MUTE = 0.85;
+/** A palm-muted chug's audible length (seconds): damped at the bridge, it rings ~80–130 ms. */
+const PALM_MIN_S = 0.08;
+const PALM_MAX_S = 0.13;
 
 interface Segment {
     pass: number;
@@ -124,19 +127,20 @@ export function playBandEvent(
         return;
     }
     // A guitar scratch: the strings deadened under the hand — a click with a trace of
-    // pitch, so it is cut to a few tens of milliseconds whatever its written length.
-    playNote(
-        state,
-        hz(event.midi),
-        time,
-        event.muted ? Math.min(durationSeconds, 0.03) : durationSeconds,
-        {
-            muted: event.muted,
-            vol: (event.velocity / 127) * 0.8,
-            instrument: (state.chords as { instrument?: string }).instrument || 'Piano',
-            numVoices: chordSize,
-        },
-    );
+    // pitch, so it is cut to a few tens of milliseconds whatever its written length. A palm
+    // mute keeps its pitch: the damped string still rings for a tenth of a second or so,
+    // whatever its written length, a touch quieter than an open strike.
+    const length = event.muted
+        ? Math.min(durationSeconds, 0.03)
+        : event.palm
+          ? Math.min(Math.max(durationSeconds, PALM_MIN_S), PALM_MAX_S)
+          : durationSeconds;
+    playNote(state, hz(event.midi), time, length, {
+        muted: event.muted,
+        vol: (event.velocity / 127) * (event.palm ? 0.7 : 0.8),
+        instrument: (state.chords as { instrument?: string }).instrument || 'Piano',
+        numVoices: chordSize,
+    });
 }
 
 function chordSizes(events: BandEvent[]): Map<number, number> {

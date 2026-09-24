@@ -22,6 +22,8 @@ export interface Hit {
     stroke?: 'down' | 'up';
     /** A muted scratch: the hand deadens the strings of the grip it's holding. */
     muted?: boolean;
+    /** Palm-muted: the grip sounds, damped at the bridge (see `PitchedNote.palm`). */
+    palm?: boolean;
 }
 
 /** An anticipation ties over the barline for this many sixteenths (an eighth). */
@@ -89,7 +91,7 @@ export function compIdiom(book: CompBook): PitchedIdiom {
                 step: number,
                 length: number,
                 velocity: number,
-                hit?: { stroke?: 'down' | 'up'; muted?: boolean },
+                hit?: { stroke?: 'down' | 'up'; muted?: boolean; palm?: boolean },
             ) => {
                 for (const m of midi) {
                     const note: PitchedNote = {
@@ -106,6 +108,9 @@ export function compIdiom(book: CompBook): PitchedIdiom {
                     }
                     if (hit?.muted) {
                         note.muted = true;
+                    }
+                    if (hit?.palm) {
+                        note.palm = true;
                     }
                     events.push(note);
                 }

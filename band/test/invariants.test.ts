@@ -31,24 +31,39 @@ const BASS_REGISTER = [23, 57] as const;
  */
 const INSTRUMENTS: CompInstrument[] = ['piano', 'organ', 'guitar', 'nylon'];
 /**
- * With a bassist in the band, a guitar stays off the low strings — except for the chord's
- * bass note itself (the swing shell's root, doubling the walking bass on purpose).
+ * With a bassist in the band, a guitar stays off the low strings (below C3) — except for a
+ * note that doubles the bass's own job: the chord's bass, root or fifth, in a grip whose
+ * lowest note is the root or the bass. That one shape rule covers the swing shell's root on
+ * the low strings, the metal and punk power chord (E2, A2), and the open-position acoustic
+ * chord (Am x02210), while a third, seventh or tension down there still fails.
  */
 const GUITAR_FLOOR_WITH_BASS = 48;
+
+/** Whether a guitar note below the floor doubles the bass's job (see the floor above). */
+function doublesTheBass(midi: number, grip: number[], chord: ChordFacts | null | undefined) {
+    if (!chord) {
+        return false;
+    }
+    const lowest = mod12(Math.min(...grip, midi));
+    const pc = mod12(midi);
+    const fifth = mod12(chord.root + fifthOf(chord));
+    return (
+        (lowest === chord.root || lowest === chord.bass) &&
+        (pc === chord.bass || pc === chord.root || pc === fifth)
+    );
+}
 /**
  * The styles whose comp plays power chords on purpose, and so the only ones where a power
- * chord (`isPowerChord`) is exempt from two rules below:
+ * chord (`isPowerChord`) is exempt from the guide-tone rule:
  * - **the guide tones**: a power chord has no third by design. Under distortion a third
  *   beating against root and fifth turns to mud, so metal states a chord by its root and its
  *   own fifth (the tritone for a diminished chord, the #5 for an augmented one) and leaves
- *   the quality to the melody — the old engine's `power-metal` comp did the same;
- * - **the guitar's floor** (the "who owns the bottom" law): E2 and A2 power chords, doubling
- *   the bass an octave up, are the metal riff. The floor still binds every other shape, so a
- *   metal grip carrying a third, or any note but the root and its fifth, stays above it.
+ *   the quality to the melody — the old engine's `power-metal` comp did the same. A punk
+ *   chorus (ska-punk) is the same distorted guitar, under someone else's third.
  * Scoped by style *and* shape so the exemption can't hide a voicing bug anywhere else: a
  * style that dropped its thirds by accident still fails.
  */
-const POWER_CHORD_STYLES: ReadonlySet<StyleId> = new Set(['metal']);
+const POWER_CHORD_STYLES: ReadonlySet<StyleId> = new Set(['metal', 'skapunk']);
 
 /** Only the chord's root and its fifth (in any octaves), with the root lowest: R-5-8. */
 function isPowerChord(midis: number[], chord: ChordFacts | null | undefined): boolean {
@@ -177,8 +192,7 @@ function checkPass(
             instrument.family === 'guitar' &&
             settings.lanes.bass &&
             e.midi < GUITAR_FLOOR_WITH_BASS &&
-            mod12(e.midi) !== chordAt(timeline, e.tick)?.bass &&
-            !(powerChords && isPowerChord(compAt.get(e.tick) ?? [], chordAt(timeline, e.tick)))
+            !doublesTheBass(e.midi, compAt.get(e.tick) ?? [], chordAt(timeline, e.tick))
         ) {
             fail(e, `guitar ${e.midi} in the bass's register`);
         }

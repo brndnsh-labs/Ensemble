@@ -53,6 +53,12 @@ export interface PitchedNote extends EventTiming {
     /** A dead/palm-muted note: percussive, pitch barely audible (a bass pop, a guitar scratch). */
     muted?: boolean;
     /**
+     * Palm-muted: the picking hand rests on the strings by the bridge. Unlike `muted` the pitch
+     * sounds — a short, dark, pitched chug (the metal and punk rhythm guitar) — so it is a
+     * real chord strike to every rule; only the host shortens and darkens it.
+     */
+    palm?: boolean;
+    /**
      * A strummed chord's direction: the feel layer rolls its notes low→high on a downstroke
      * and high→low on an upstroke, at the instrument's strum speed. Unset = struck together.
      */

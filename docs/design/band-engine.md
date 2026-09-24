@@ -91,17 +91,17 @@ physical: its range, its strum speed, whether it sustains.
   adjacent strings, within a four-fret reach, costed like a keyboard voicing. The invariant
   suite holds every guitar chord to `isPlayable`.
 - **The strumming hand is a pendulum**: down on the beat side of its grid, up on the offbeat,
-  so direction follows position. An upstroke misses the lowest string only when that note is
-  doubled. A muted scratch deadens the grip the hand is holding.
+  so direction follows position. A muted scratch deadens the grip the hand is holding; a palm
+  mute (`palm`) keeps its pitch — a short, dark chug the host damps to ~80–130 ms.
 - **Strum is time, so it lives in `feel/`**: a stroked chord rolls low→high (down) or high→low
   (up) at the instrument's `strumMs`, and takes tier-3 placement as one gesture.
-- **Who owns the bottom.** With a bass in the band, grips stay above C3 — except the chord's bass
-  note itself: the swing shell (`rootBottom`, one muted string skipped: `8x89xx`) puts its root
-  on the low strings, doubling the walking bass on purpose. Metal's power chords (`kind:
-  'power'`, root-5-8 in a low slot) are the one other exception: an E2 or A2 power chord doubling
-  the bass is the riff, so on a power-chord style (`POWER_CHORD_STYLES` in the invariant suite) a
-  grip of only the root and its own fifth may sit below the floor and needs no third; any other
-  shape still obeys both rules. With the bass lane off, a book's
+- **Who owns the bottom.** With a bass in the band, grips stay above C3 — except a note that
+  doubles the bass's own job: the chord's bass, root or fifth, in a grip whose lowest note is the
+  root or the bass. That one shape rule covers the swing shell (`rootBottom`, one muted string
+  skipped: `8x89xx`), the metal and punk power chord (`kind: 'power'`, an E2 or A2 root-5-8
+  doubling the bass), and an open-position acoustic chord (Am x02210); a third, seventh or
+  tension below C3 still fails. A power chord needs no third only on a power-chord style
+  (`POWER_CHORD_STYLES` in the invariant suite). With the bass lane off, a book's
   `alone` shape takes over: rock plays full root-position chords, and the bossa grip carries
   the root on its bottom string while the thumb fills root/fifth between plucks.
 - **Idiom physics.** Open strings are off where the idiom mutes by releasing the fretting hand
