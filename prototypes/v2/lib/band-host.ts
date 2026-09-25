@@ -206,8 +206,8 @@ export class BandHost {
     private resumeBar: number | null = null;
     private timer: ReturnType<typeof setInterval> | null = null;
     private nextPass = 0;
-    /** Audio time of the barline where the last settings change is first heard. */
-    private changeAt = 0;
+    /** The barline where the last settings change is first heard, while it is still to come. */
+    private change: { segment: Segment; tick: number } | null = null;
 
     constructor(options: HostOptions) {
         this.options = options;
@@ -281,7 +281,7 @@ export class BandHost {
         this.segments.length = index + 1;
         const cutoffBar = this.barAt(this.tickAt(current, horizon), true);
         if (cutoffBar >= current.window.to) {
-            this.changeAt = this.endTime(current);
+            this.change = { segment: current, tick: current.to };
             return;
         }
         // Resume from the engine's own memory at that barline, so the new bars follow on
@@ -293,7 +293,7 @@ export class BandHost {
             window: { ...current.window, from: cutoffBar },
         });
         const cutoff = timeline.bars[cutoffBar].start;
-        this.changeAt = this.timeOf(current, cutoff);
+        this.change = { segment: current, tick: cutoff };
         current.events = current.events.filter((e) => e.tick < cutoff).concat(tail.events);
         current.cursor = current.events.findIndex(
             (e) => this.timeOf(current, e.tick) + e.offsetMs / 1000 > horizon,
@@ -358,7 +358,13 @@ export class BandHost {
     /** Has the band reached the barline where its last settings change is heard? */
     changeHeard(): boolean {
         const audio = this.audio;
-        return !audio || audio.currentTime >= this.changeAt;
+        const change = this.change;
+        // Kept as a song tick, not a time, so a tempo change re-anchors it with its segment;
+        // a segment that is gone (played through, or a restart) has nothing left to wait for.
+        if (!audio || !change || !this.segments.includes(change.segment)) {
+            return true;
+        }
+        return audio.currentTime >= this.timeOf(change.segment, change.tick);
     }
 
     /** The song tick sounding now, or null while stopped. */
@@ -384,6 +390,7 @@ export class BandHost {
     // ------------------------------------------------------------ internals
 
     private halt(): void {
+        this.change = null;
         if (this.timer) {
             clearInterval(this.timer);
             this.timer = null;

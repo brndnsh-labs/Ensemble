@@ -69,9 +69,9 @@ describe('timeline', () => {
         expect(t.bars.map((b) => b.spans[0].chord?.root)).toEqual([0, 5, 7, 0, 5, 9]);
     });
 
-    it('starts a new visit when the performance jumps back inside a section', () => {
+    it('starts a new visit where a D.S. jumps back inside a section, not at an inner repeat', () => {
         // D.S. to a segno on bar 2 of the same section: the return is its own visit, not bars
-        // 5–7 of one long one. A written repeat from bar 1 is the same shape.
+        // 5–7 of one long one.
         const ds = compileTimeline(
             score([
                 {
@@ -103,12 +103,15 @@ describe('timeline', () => {
                     label: 'A',
                     bars: 'C | F | G | Am',
                     start: { 1: [{ kind: 'repeat-start' }] },
-                    end: { 2: [{ kind: 'repeat-end', times: 2 }] },
+                    end: { 2: [{ kind: 'repeat-end', times: 3 }] },
                 },
             ]),
         );
-        expect(repeat.visits.map((v) => v.barCount)).toEqual([3, 3]);
-        // A second ending skips forward, which stays inside the visit.
+        // A written repeat from bar 2 (a vamp, three times) stays inside its visit.
+        expect(repeat.visits.map((v) => v.barCount)).toEqual([8]);
+        expect(repeat.bars.map((b) => b.barInVisit)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
+        // A repeat from the section's first bar starts a visit per lap; its second ending
+        // skips forward, which stays inside the visit.
         const endings = compileTimeline(
             score([
                 {

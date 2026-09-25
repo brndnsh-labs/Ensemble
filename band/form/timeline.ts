@@ -36,7 +36,7 @@ export interface BarSpan extends ChordSpan {
 }
 
 export interface SectionVisit {
-    /** Ordinal of this visit in the performance (any jump back, a D.C. or a repeat, is a new visit). */
+    /** Ordinal of this visit in the performance (a D.C. or D.S. revisit is a new visit). */
     ordinal: number;
     sectionIndex: number;
     id: string;
@@ -98,6 +98,20 @@ function phraseLayout(barCount: number): number[] {
     return phrases;
 }
 
+/**
+ * Did the performance get from one bar to the next by a written repeat's jump back? The pass
+ * of the repeat it jumped in goes up by one; everything outside it stays the same.
+ */
+function repeatedFrom(before: number[], after: number[]): boolean {
+    const depth = after.length - 1;
+    return (
+        depth >= 0 &&
+        depth < before.length &&
+        after[depth] === before[depth] + 1 &&
+        after.slice(0, depth).every((pass, i) => pass === before[i])
+    );
+}
+
 export function compileTimeline(score: SemanticScore): Timeline {
     const visitsWritten = compileScoreForm(score);
     const events = resolveScoreMeasureEvents(score);
@@ -118,14 +132,20 @@ export function compileTimeline(score: SemanticScore): Timeline {
     let tick = 0;
     let visit: SectionVisit | null = null;
     let visitKey = '';
-    let lastMeasure = -1;
+    let last: (typeof visitsWritten)[number] | null = null;
 
     for (const written of visitsWritten) {
         const section = score.sections[written.sectionIndex];
         const key = `${written.sectionIndex}:${written.sectionPass}`;
-        // A jump back inside the section (a repeat, a D.S. to a segno within it) starts a new
-        // visit; a forward skip (a second ending) stays inside this one.
-        if (!visit || key !== visitKey || written.measureIndex <= lastMeasure) {
+        // A new visit starts at the section's first bar, and wherever a D.C. or D.S. jumps
+        // back into it. A written repeat inside the section (a vamp, a two-bar turnaround) is
+        // part of the visit it sits in, as is a forward skip (a second ending): giving each
+        // lap its own visit would put a section fill and a crash on every one.
+        const jumpedBack =
+            last !== null &&
+            written.measureIndex <= last.measureIndex &&
+            !repeatedFrom(last.repeatPasses, written.repeatPasses);
+        if (!visit || key !== visitKey || written.measureIndex === 0 || jumpedBack) {
             const lanes: Partial<Record<Lane, boolean>> = {};
             for (const [name, on] of Object.entries(section.instruments ?? {})) {
                 // An authored key indexes this table: guard with hasOwn (the #1266 rule).
@@ -150,7 +170,7 @@ export function compileTimeline(score: SemanticScore): Timeline {
             visits.push(visit);
             visitKey = key;
         }
-        lastMeasure = written.measureIndex;
+        last = written;
         const context = contexts[written.sectionIndex][written.measureIndex];
         const meter = buildMeter(context.meter, context.grouping);
         const keyContext = { tonic: notePc(context.key), minor: context.isMinor };

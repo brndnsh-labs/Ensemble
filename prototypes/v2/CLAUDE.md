@@ -77,8 +77,10 @@ gate evidence. Do not copy old test totals or preview SHAs into a new claim of v
 - Never migrate/delete guest or legacy stores incidentally. Do not cache private API/auth
   responses or personalized HTML in the anonymous app shell. No credentials or chart contents
   in telemetry. Keep local safety, cloud confirmation and verified offline sounds distinct.
-- Existing generators, voicings and worker contract remain. Unsupported chart semantics block
-  with an explanation; full iReal compatibility is a target, not today's capability.
+- The band engine (`../../band/`, `lib/band-host.ts`) plays; the old generators and worker
+  contract remain only behind `?engine=old` until #1404 retires them. Unsupported chart
+  semantics block with an explanation; full iReal compatibility is a target, not today's
+  capability.
 - Passkeys plus downloadable recovery code are approved. Hosting, backup/restore operations,
   production migration and public rollout still need their explicit gates. Do not invent an
   email reset, social account service, subscription tier or Docker mandate.

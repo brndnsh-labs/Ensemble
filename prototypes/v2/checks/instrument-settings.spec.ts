@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { appUrl, expect, test } from './fixtures';
 
 // #1275 — per-instrument volume/reverb controls (and, on the old engine, style) in
@@ -100,6 +101,16 @@ test('bass volume persists through save, reload, revert and a share link', async
     await expect(bassVolume).toHaveValue('40');
     await closeSounds(page);
 
+    // The old engine's fields the band hides are saved exactly as they were: no migration.
+    await page.getByRole('button', { name: 'Song actions' }).click();
+    const download = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Export file', exact: true }).click();
+    const saved = JSON.parse(await readFile((await (await download).path())!, 'utf8'));
+    await page.getByRole('button', { name: 'Close', exact: true }).click();
+    expect(saved.chart.band.bass.style).toBe('blues');
+    expect(saved.chart.band.chords.density).toBe('standard');
+    expect(saved.chart.performance.complexity).toBe(0.3);
+
     // Share link round-trip: opens as an unsaved draft carrying the same values.
     await page.getByRole('button', { name: 'Song actions' }).click();
     await page.getByRole('button', { name: 'Copy link', exact: true }).click();
@@ -136,4 +147,81 @@ test('changing an instrument style during playback does not stop the band', asyn
     // Still playing — a style swap must not have tripped the transport.
     await expect(page.getByRole('button', { name: 'Stop playback', exact: true })).toBeEnabled();
     await page.getByRole('button', { name: 'Stop playback', exact: true }).click();
+});
+
+// The old engine's style and density pickers, kept under `?engine=old` until it retires (#1404).
+test('old engine: bass style, bass volume and chords density persist through save, reload, revert and a share link', async ({
+    page,
+    context,
+}) => {
+    // Registered before the first navigation, like `share-link.spec.ts`: an
+    // `addInitScript` only takes effect on a page's NEXT document load.
+    await withoutClipboard(page);
+    await page.goto(appUrl('?engine=old'));
+    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
+    await openSounds(page);
+
+    const bassStyle = page.getByLabel('Bass style', { exact: true });
+    const bassVolume = page.getByLabel('Bass volume', { exact: true });
+    const chordsDensity = page.getByLabel('Chords density', { exact: true });
+    // The Blues starter's genre resolves a concrete bass style at creation
+    // time (`SET_GENRE_FEEL` writes `bass.style` directly, not `'smart'`) —
+    // assert the known starting point before changing it.
+    await expect(bassStyle).toHaveValue('blues');
+    await expect(bassVolume).toHaveValue('100');
+    await expect(chordsDensity).toHaveValue('standard');
+
+    await bassStyle.selectOption('funk');
+    await setRange(page, 'Bass volume', 40);
+    await chordsDensity.selectOption('rich');
+    await expect(bassStyle).toHaveValue('funk');
+    await expect(bassVolume).toHaveValue('40');
+    await expect(chordsDensity).toHaveValue('rich');
+    await closeSounds(page);
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeEnabled();
+
+    // Revert to saved restores the pre-edit values while still unsaved.
+    await page.getByRole('button', { name: 'Song actions' }).click();
+    await page.getByRole('button', { name: 'Revert to saved' }).click();
+    await openSounds(page);
+    await expect(bassStyle).toHaveValue('blues');
+    await expect(bassVolume).toHaveValue('100');
+    await expect(chordsDensity).toHaveValue('standard');
+    await closeSounds(page);
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
+
+    // Redo the edits and this time save them.
+    await openSounds(page);
+    await bassStyle.selectOption('funk');
+    await setRange(page, 'Bass volume', 40);
+    await chordsDensity.selectOption('rich');
+    await closeSounds(page);
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
+
+    await page.reload();
+    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).first().click();
+    await openSounds(page);
+    await expect(bassStyle).toHaveValue('funk');
+    await expect(bassVolume).toHaveValue('40');
+    await expect(chordsDensity).toHaveValue('rich');
+    await closeSounds(page);
+
+    // Share link round-trip: opens as an unsaved draft carrying the same values.
+    await page.getByRole('button', { name: 'Song actions' }).click();
+    await page.getByRole('button', { name: 'Copy link', exact: true }).click();
+    const linkInput = page.getByTestId('share-link-fallback');
+    await expect(linkInput).toBeVisible();
+    const link = await linkInput.inputValue();
+    expect(link).toContain(appUrl('#chart='));
+    await page.getByRole('button', { name: 'Close', exact: true }).click();
+
+    const fresh = await context.newPage();
+    await withoutClipboard(fresh);
+    await fresh.goto(link.replace('#chart=', '?engine=old#chart='));
+    await expect(fresh.getByRole('heading', { name: 'Blue pocket' })).toBeVisible();
+    await openSounds(fresh);
+    await expect(fresh.getByLabel('Bass style', { exact: true })).toHaveValue('funk');
+    await expect(fresh.getByLabel('Bass volume', { exact: true })).toHaveValue('40');
+    await expect(fresh.getByLabel('Chords density', { exact: true })).toHaveValue('rich');
 });
