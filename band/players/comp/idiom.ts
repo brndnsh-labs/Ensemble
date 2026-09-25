@@ -87,6 +87,11 @@ export interface Answer {
     layOut: number;
     /** Chance of a stab in a breath the lead leaves that the figure left empty. */
     fill: number;
+    /**
+     * A strike that lays out lets the one before ring on instead (a Rhodes holds its chord
+     * under the singer); without it the hand simply doesn't play (a pianist's short stabs).
+     */
+    hold?: boolean;
 }
 
 /** A breath worth answering: a dotted quarter without the lead (in sixteenths). */
@@ -377,15 +382,38 @@ function answerLead(
     for (let i = planned.length - 1; i >= 0; i--) {
         const hit = planned[i];
         if (
-            !hit.muted &&
-            !hit.early &&
-            !firsts.has(hit) &&
-            sounding[hit.step] &&
-            rng.chance(book.answer.layOut)
+            hit.muted ||
+            hit.early ||
+            firsts.has(hit) ||
+            !sounding[hit.step] ||
+            !rng.chance(book.answer.layOut)
         ) {
-            planned.splice(i, 1);
+            continue;
+        }
+        planned.splice(i, 1);
+        if (book.answer.hold) {
+            // A held-chord instrument leans back rather than going quiet: the strike before
+            // (the same chord) rings on through the one it gave up.
+            const before = planned
+                .slice(0, i)
+                .reverse()
+                .find((h) => !h.muted && h.chord === hit.chord);
+            if (before) {
+                before.length = Math.max(before.length, hit.step + hit.length - before.step);
+            }
         }
     }
+    // Where a chord changes, the eighth before it belongs to the new chord (a push), so a
+    // stab there would strike the old one: the last span's end is the next bar's chord.
+    const pushZone = (x: number) =>
+        spans.some(({ to }) => x >= to - TIE_STEPS && x < to && to < total) ||
+        x >= total - TIE_STEPS;
+    // A breath that began in the bar before (the lead let go before the barline) counts its
+    // silence there too, so a phrase end across the barline is heard as one breath.
+    const before =
+        !carried && memory.leadUntil !== undefined
+            ? Math.max(0, Math.round((bar.start - memory.leadUntil) / STEP))
+            : 0;
     // In the holes when it breathes.
     for (let s = 0; s < total; ) {
         if (sounding[s]) {
@@ -396,22 +424,24 @@ function answerLead(
         while (end < total && !sounding[end]) {
             end++;
         }
-        if (end - s >= BREATH_STEPS) {
-            // A chord's own first strike isn't an answer: it would be there anyway.
+        if (end - s + (s === 0 ? before : 0) >= BREATH_STEPS) {
+            // A chord's own first strike isn't an answer (it would be there anyway), nor is a
+            // push, which is the figure's own accent.
             const inside = planned.filter(
-                (h) => !h.muted && !firsts.has(h) && h.step >= s && h.step < end,
+                (h) => !h.muted && !h.early && !firsts.has(h) && h.step >= s && h.step < end,
             );
             if (inside.length) {
                 inside[0].velocity += ANSWER_LIFT;
             } else if (rng.chance(book.answer.fill)) {
-                // On the first offbeat eighth after the lead lets go (at least an eighth after
-                // it), clear of the strikes already there: the classic answer.
+                // On the first offbeat eighth at least an eighth after the lead lets go, a
+                // quarter clear of the strikes already there (an "and" straight after a
+                // struck beat is a stutter, not an answer), and never on a change's push.
                 const step = Array.from({ length: end - s }, (_, k) => s + k).find(
                     (x) =>
                         x % 4 === 2 &&
                         (s === 0 || x >= s + 2) &&
-                        x < total - 1 &&
-                        !planned.some((h) => Math.abs(h.step - x) < 2),
+                        !pushZone(x) &&
+                        !planned.some((h) => Math.abs(h.step - x) < 4),
                 );
                 const chord =
                     step === undefined

@@ -519,7 +519,7 @@ const neoKeys: PitchedIdiom = compIdiom({
     pushInBar: true,
     // A Rhodes behind a singer: it leans back under the line and fills some of its breaths,
     // lazily — less than a jazz comper, the groove's held chords carry the rest.
-    answer: { layOut: 0.4, fill: 0.5 },
+    answer: { layOut: 0.4, fill: 0.5, hold: true },
     rhythm: (ctx, span, tier) => keysRhythm(ctx, span, tier),
 });
 

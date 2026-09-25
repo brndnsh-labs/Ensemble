@@ -176,16 +176,25 @@ expression devices take turns rather than stack; one peak note per cycle.
   `players/comp/idiom.ts`). The styles that have one are the jazz piano, the neo-soul Rhodes
   and the blues pianist's rootless comp.
   - Under a sounding lead note, a strike may lay out. Each chord's first strike always stays.
-  - In a breath of a dotted quarter or more, the figure's own strike is played up. If the
-    figure left the breath empty, a stab lands on the first offbeat eighth after the lead
-    lets go.
-  - A bar the lead sits out right after playing counts as a breath. A longer rest (the lead
-    resting by form) doesn't.
+    On the Rhodes (`hold`), the strike before rings on through the one it gave up, so the
+    comp leans back instead of going silent.
+  - In a breath of a dotted quarter or more, the figure's own strike is played up. A chord's
+    first strike or a push doesn't count: it would be there anyway.
+  - If the figure left the breath empty, a stab can land on the first offbeat eighth at
+    least an eighth after the lead lets go. It stays a quarter clear of other strikes (an
+    "and" straight after a struck beat stutters), and off the eighth before a change, which
+    belongs to the new chord.
+  - A breath that began before the barline counts its silence there. A bar the lead sits out
+    right after playing counts as a breath. A longer rest (the lead resting by form) doesn't.
   - A strummed or chopped groove (funk, rock, reggae and the rest) keeps its figure under the
     lead. So does the organ, which holds.
   - With the lead off, nothing changes.
-  - Claims: `compBreathDensity` (the comp's strikes per sixteenth in the breaths over under
-    the line) and `compAnswersBreaths`.
+  - Claims, each pinned by an ablation:
+    - `compBreathDensity`: the comp's strikes per sixteenth in the breaths, over the same
+      under the line.
+    - `compAnswersBreaths`: breaths holding a strike the comper chose.
+    - `compAnswerLift`: answers louder than strikes under the line.
+    - `compLineDensity`: thinner under the line, with a floor that keeps the time.
 
 ## The live host (`prototypes/v2/lib/band-host.ts`)
 
