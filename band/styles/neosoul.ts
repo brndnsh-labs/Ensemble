@@ -24,6 +24,8 @@ import { compIdiom, type Hit, strums } from '../players/comp/idiom.js';
 import { type VoicingKind, voicingTones } from '../players/comp/voicing.js';
 import { drumIdiom, type Lines, snareFigure, tomRun } from '../players/drums/kit.js';
 import { barSteps, dyn, isCommonTime, pulses, STEP, spanSteps } from '../players/grid.js';
+import { leadIdiom } from '../players/lead/idiom.js';
+import { chordPentatonic } from '../players/lead/palette.js';
 import { type ChordFacts, fifthOf } from '../theory/chord.js';
 import { mod12, nearestMidi } from '../theory/pitch.js';
 import type { BarContext, DrumIdiom, PitchedIdiom, Style } from './types.js';
@@ -683,6 +685,141 @@ const neoGuitar: PitchedIdiom = {
     },
 };
 
+// ================================================================ lead
+/**
+ * A chord's written colour, as semitones above its root: the 9th, a minor chord's 11th, the
+ * 13th, a lydian #11. Never an altered tension (b9, #9, b13): those rub when a lyrical line
+ * lands and holds on them. Only what the chart writes is here, so a landing on colour is
+ * still a tone of the chord.
+ */
+function colourTones(chord: ChordFacts): number[] {
+    return chord.tensions.filter(
+        (t) =>
+            t === 2 ||
+            t === 9 ||
+            (t === 5 && chord.third !== 4) ||
+            (t === 6 && chord.family !== 'minor'),
+    );
+}
+
+const pcsOf = (chord: ChordFacts, intervals: readonly number[]) => [
+    ...new Set(intervals.map((i) => mod12(chord.root + i))),
+];
+
+/**
+ * Where a neo-soul change lands: the 3rd, then the chord's written colour (the 9th a Rhodes
+ * voicing is built on), then the 7th, 5th and root — the root last, the bass has it.
+ */
+function neoArrive(chord: ChordFacts): number[] {
+    const order: number[] = [];
+    if (chord.third !== null) {
+        order.push(chord.third);
+    }
+    order.push(...colourTones(chord));
+    if (chord.seventh !== null) {
+        order.push(chord.seventh);
+    } else if (chord.sixth) {
+        order.push(9);
+    }
+    order.push(fifthOf(chord), 0);
+    return pcsOf(chord, order);
+}
+
+/**
+ * Where a neo-soul phrase comes to rest: on the written 9th where there is one — the phrase
+ * floats rather than resolves — else the 3rd, then the 5th; the root last.
+ */
+function neoSettle(chord: ChordFacts): number[] {
+    const order = colourTones(chord).slice(0, 1);
+    if (chord.third !== null) {
+        order.push(chord.third);
+    }
+    order.push(fifthOf(chord));
+    if (chord.seventh !== null) {
+        order.push(chord.seventh);
+    }
+    order.push(0);
+    return pcsOf(chord, order);
+}
+
+// A neo-soul guitarist behind a singer (the Soulquarians' session players, Isaiah Sharkey with
+// D'Angelo): short lyrical phrases with a lot of air around them, entering late — on the "e"
+// or the "a" of a beat — and hanging on a note while the pocket plays. Its notes are the
+// pentatonic on each chord's root, which carries the 9ths, 11ths and 13ths the harmony is made
+// of, and it lands on that colour; half-step slides (the bent-in 3rd) and chromatic grace
+// notes into a target are the jazz in its hands. Runs are quick flicks with a hold after, the
+// quick notes in a valley ghosted. The head sings like a vocal line: a period, lazily placed.
+const neoLead = leadIdiom({
+    name: 'neo-soul lead',
+    cells: {
+        // Fragments: a lazy pickup into a held note, or a late entry, and then room.
+        sparse: [
+            '...x-x------....',
+            '..x-x--x-----...',
+            'x--x-----.......',
+            '......x-xx-x----',
+            '.x-x-------.....',
+        ],
+        // A sixteenth pair flicked into a note, the phrase placed off the beat.
+        mid: [
+            '..xx-x---x-x----',
+            'x--x-xx-x-------',
+            '...x-x-xx-x--...',
+            'x-.x-x---..x-x--',
+            '.x-x-x--x-x-----',
+        ],
+        // A flurry, then a hold: neo-soul runs are quick pentatonic flicks, never a stream.
+        busy: [
+            'x-xxx-x-xx-x----',
+            '..xxxx-x-x-xx-x-',
+            'xxx-x--xx-x-x---',
+            'x-x-xxx-x--x-x--',
+            '.xxx-x-x-xxx-x--',
+        ],
+    },
+    // A phrase lands — often on an upbeat — and hangs there.
+    endings: [
+        '..x-x-----------',
+        'x--x------------',
+        '...x-x----------',
+        'x-----------....',
+        '.x-x-x----------',
+    ],
+    head: {
+        // A vocal line: phrases placed behind the beat, a held note to breathe on.
+        cells: [
+            '..x-x--x-x------',
+            'x---..x-x-x-----',
+            '...x-x-x---x----',
+            'x--x--x-----....',
+            '.x-x-x-x-x------',
+        ],
+        endings: ['x---------------', '..x-------------', 'x--x------------'],
+        form: 'period',
+    },
+    pool: (chord) => chordPentatonic(chord),
+    arrive: (chord) => neoArrive(chord),
+    settle: (chord) => neoSettle(chord),
+    // why: the genre is jazz-literate — a chromatic grace note into a target is its accent,
+    // more often than rock's or disco's (0.1–0.15), less than bebop's run-throughs (0.45).
+    chromatic: 0.3,
+    // why: an enclosure now and then, the Rhodes player's habit, never a bebop pattern.
+    enclosure: 0.12,
+    // why: a phrase is a lyric, not a riff: a bar repeats now and then (the loop under it
+    // repeats for it), far less than disco's or funk's.
+    riff: 0.15,
+    // why: space is the style — the most room of any lead here, a phrase and then the pocket.
+    space: 0.45,
+    // why: the half-step slide up into the 3rd is the guitarist's move; a whole-step bend
+    // into the root belongs to blues and rock, so it is rare.
+    bends: { blue: 0.4, root: 0.08 },
+    // why: on a horn (a muted trumpet, Roy Hargrove on Voodoo), the scoop is the slide.
+    scoop: 0.35,
+    // why: a cool, understated shake: only on a held half-bar or longer, never a blues
+    // guitarist's vibrato on every note.
+    vibrato: 8,
+});
+
 export const neosoul: Style = {
     id: 'neosoul',
     name: 'Neo-Soul',
@@ -694,10 +831,15 @@ export const neosoul: Style = {
     // placement): the old engine's drunken jitter reached ±7.5 ms off the beat and a third
     // of that on it; one amount for every position sits between the two, drunk without
     // smearing the beat. Bass 32 + 5.4 stays inside the old engine's 40 ms floor.
-    feel: { swing: 30, swingGrid: 16, lean: { bass: 32, comp: 25 }, humanize: 60 },
+    // The lead drags with the Rhodes, 25 ms back (a singer's lazy phrasing), and no deeper:
+    // the bass is the pocket's bottom and the deepest lean.
+    feel: { swing: 30, swingGrid: 16, lean: { bass: 32, comp: 25, lead: 25 }, humanize: 60 },
     drums: neoDrums,
     bass: neoBass,
     comp: { keyboard: neoKeys, guitar: neoGuitar },
     // The genre's keyboard is the Rhodes (the old sound map's Neo-Soul chords, `pack:rhodes`).
     prefers: 'rhodes',
+    // A clean electric guitar: over a Rhodes it is the genre's instrumental voice, and its
+    // slides (bent-in 3rds) and quiet vibrato are the idiom; a horn stays one pick away.
+    lead: { idiom: neoLead, prefers: 'guitar' },
 };

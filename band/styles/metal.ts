@@ -16,7 +16,10 @@ import { BASS, bassNote, kickSteps, type LineMemory } from '../players/bass/line
 import { compIdiom, type Hit, pendulum } from '../players/comp/idiom.js';
 import { drumIdiom, type Lines, snareFigure, tomRun } from '../players/drums/kit.js';
 import { barSteps, dyn, isCommonTime, pulses, STEP, spanSteps } from '../players/grid.js';
-import { mod12 } from '../theory/pitch.js';
+import { leadIdiom } from '../players/lead/idiom.js';
+import { chordScale, fifthFirst, rootFirst } from '../players/lead/palette.js';
+import { type ChordFacts, chordPcs } from '../theory/chord.js';
+import { type KeyContext, mod12 } from '../theory/pitch.js';
 import type { BarContext, PitchedIdiom, Style } from './types.js';
 
 // ================================================================ drums
@@ -432,17 +435,143 @@ const metalKeys = compIdiom({
     },
 });
 
+// ================================================================ lead
+/**
+ * The scale a metal lead moves through over `chord`. In a minor key it is the key's natural
+ * minor, bent to fit the chord: a chord tone the scale lacks takes the place of its half-step
+ * neighbour. So the V's major 3rd raises the b7 (harmonic minor, the neoclassical leading
+ * tone), the bII's root lowers the 2nd (phrygian, the darkest colour metal has), and the
+ * minor chords of the key keep the natural minor as it is. Never the tonic or the key's 5th:
+ * they anchor the key, so a chord tone next to one is simply added. In a major key it is the
+ * chord's own scale.
+ */
+function metalScale(chord: ChordFacts, key: KeyContext): number[] {
+    if (!key.minor) {
+        return chordScale(chord);
+    }
+    const scale = [0, 2, 3, 5, 7, 8, 10].map((i) => mod12(key.tonic + i));
+    const tones = chordPcs(chord);
+    const anchors = [mod12(key.tonic), mod12(key.tonic + 7)];
+    for (const tone of tones) {
+        if (scale.includes(tone)) {
+            continue;
+        }
+        // The lower neighbour first (a raised note: the b7 up to the leading tone), then the
+        // upper (a lowered one: the 2nd down to the b2) — never a chord tone or an anchor.
+        const at = [mod12(tone - 1), mod12(tone + 1)]
+            .map((pc) => scale.indexOf(pc))
+            .find((i) => i >= 0 && !tones.includes(scale[i]) && !anchors.includes(scale[i]));
+        if (at === undefined) {
+            scale.push(tone);
+        } else {
+            scale[at] = tone;
+        }
+    }
+    return scale;
+}
+
+/**
+ * Where a metal phrase lands on a change: the 5th and the power-chord's root, the 3rd for
+ * colour — but where the chord's 3rd is the key's leading tone (the V of a minor key, raised),
+ * that first: the note that pulls home is the neoclassical player's target.
+ */
+function metalArrive(chord: ChordFacts, key: KeyContext): number[] {
+    const order = fifthFirst(chord);
+    const third = chord.third === null ? null : mod12(chord.root + chord.third);
+    return third === mod12(key.tonic - 1) ? [third, ...order.filter((pc) => pc !== third)] : order;
+}
+
+// An overdriven shred guitarist: the key's natural minor, bent to harmonic minor over the V
+// and phrygian over the bII; a slow, bent opening statement, then gallops and the riff played
+// again (metal is built on riffs), then continuous sixteenth runs at the peak. It lands on
+// roots and 5ths like the power chords under it, and on the leading tone over the V; every
+// held note is shaken, and the landings are bent up a whole step. The head is a twin-guitar
+// melody in the riff's gallop, a period.
+const metalLead = leadIdiom({
+    name: 'metal shred lead',
+    cells: {
+        // Chorus one: long notes, bent and shaken — the slow melodic statement before the shred.
+        sparse: [
+            'x-------x-------',
+            'x-----x-x-------',
+            'x-x-x-------....',
+            '....x---x-------',
+            'x-----------x-x-',
+        ],
+        // The gallop (an eighth and two sixteenths) and its reverse, the riff's own rhythm.
+        mid: [
+            'x-xxx-xxx-xxx---',
+            'xxx-xxx-xxx-x---',
+            'x-x-xxx-x-x-xxx-',
+            'x-xxx-x-x-xxx---',
+            'x---x-xxx-xxx---',
+        ],
+        // Shred: unbroken sixteenth runs, a held note only to breathe.
+        busy: [
+            'xxxxxxxxxxxxxxxx',
+            'xxxxxxxxxxxxx---',
+            'x-xxxxxxxxxxxxxx',
+            'xxxxxxxxx-x-x---',
+            'xxxxxx-xxxxxx-x-',
+        ],
+    },
+    // A run into a screaming held note.
+    endings: [
+        'xxxxx-----------',
+        'x-xxx-----------',
+        'x---------------',
+        'xxxxxxx-x-------',
+        'x-x-x-----------',
+    ],
+    head: {
+        // A twin-guitar melody in the gallop: a riff with a tune on top.
+        cells: [
+            'x-xxx-xxx-x-x---',
+            'x-x-x-xxx-------',
+            'x---x-x-x-xxx---',
+            'x-xxx-x-x-------',
+            'x-----x-x-x-x---',
+        ],
+        endings: ['x---------------', 'x-xxx-----------', 'x-------x-------'],
+        form: 'period',
+    },
+    pool: (chord, key) => metalScale(chord, key),
+    arrive: (chord, key) => metalArrive(chord, key),
+    settle: (chord) => rootFirst(chord),
+    // why: a shred run slips chromatically into its targets now and then (the passing half
+    // steps of a fast line), more than rock's pentatonic player (0.1).
+    chromatic: 0.2,
+    // why: the neoclassical enclosure — above, then the half step below — around a target.
+    enclosure: 0.15,
+    // why: metal is riffs: a lick hammered bar after bar, more than rock (0.4).
+    riff: 0.45,
+    // why: a metal solo is relentless — the least room of any lead; it breathes, it doesn't wait.
+    space: 0.12,
+    // why: the whole-step bend into the root or 5th is metal's landing, three times in four
+    // (more than rock's 0.55: a shredder bends nearly every held landing); the half-step bend
+    // into a major 3rd only over the few major chords (the V, the bVI).
+    bends: { blue: 0.25, root: 0.75 },
+    // why: a guitar bends; on a horn a scoop would be foreign to the style.
+    scoop: 0,
+    // why: every note a beat or longer gets the wide shake — a shredder never holds a note still.
+    vibrato: 4,
+});
+
 export const metal: Style = {
     id: 'metal',
     name: 'Metal',
     // Straight and on the grid: the drums are the clock and nobody leans. The riff is three
     // instruments on the same sixteenths, and any lag between them smears the chug. Metal is
     // precise, so very little human variation (the old engine's entropy 0.05).
-    feel: { swing: 0, swingGrid: 16, lean: { bass: 0, comp: 0 }, humanize: 10 },
+    // The lead too: a shred run dragged behind the double kick smears; it sits on the grid.
+    feel: { swing: 0, swingGrid: 16, lean: { bass: 0, comp: 0, lead: 0 }, humanize: 10 },
     drums: metalDrums,
     bass: metalBass,
     comp: { keyboard: metalKeys, guitar: metalGuitar },
     // The rhythm guitar is the genre. Its Auto *sound* is the crunch pack, not the clean
     // guitar `prefers: 'guitar'` maps to by default (`AUTO_VOICE_FOR_STYLE` in runtime.ts).
     prefers: 'guitar',
+    // Overdrive: the lead guitar is the genre's voice — sustain for the held notes, gain for
+    // the runs, and strings to bend.
+    lead: { idiom: metalLead, prefers: 'overdrive' },
 };

@@ -14,6 +14,8 @@ import { BASS, bassNote, type LineMemory, nextChord } from '../players/bass/line
 import { compIdiom, type Hit, strums } from '../players/comp/idiom.js';
 import { drumIdiom, type Lines, tomRun } from '../players/drums/kit.js';
 import { barSteps, dyn, isCommonTime, type Pulse, pulses, spanSteps } from '../players/grid.js';
+import { leadIdiom } from '../players/lead/idiom.js';
+import { chordPentatonic, guideTones, restingTones } from '../players/lead/palette.js';
 import { mod12 } from '../theory/pitch.js';
 import type { BarContext, PitchedIdiom, Style } from './types.js';
 
@@ -433,6 +435,84 @@ const discoGuitar = compIdiom({
     },
 });
 
+// ================================================================ lead
+// A disco sax break: a horn soaring over four on the floor (the tenor on "Street Life", the
+// session players who cut disco by day and bebop by night). Its rhythm is funk's sixteenths
+// made legato — syncopated riffs that tie across the "and", the 3-3-2 anticipation — and it
+// repeats a riff to work the floor. Its notes are the pentatonic on each chord's root (major
+// over major, minor-with-the-9th over minor), so it sings rather than runs; it lands the 3rd
+// or 7th on a change like the jazz player it is, and every phrase peaks on a big held note,
+// scooped and shaken. The head is a singable hook, a period like the song's own tune.
+const discoLead = leadIdiom({
+    name: 'disco sax break',
+    cells: {
+        // Chorus one: long tones and a short pickup into them, the horn finding the room.
+        sparse: [
+            'x-------x-x-----',
+            '..x-x-------....',
+            'x-----x-x-------',
+            '......x-x-x-----',
+            'x---x-------....',
+        ],
+        // Funk's syncopation, legato: ties over the "and", the 3-3-2, a sixteenth pickup.
+        mid: [
+            'x-xx-x-x---x-x--',
+            'x-x-xx-x----x-x-',
+            '..x-x-xx-x------',
+            'x--x--x-x-x-----',
+            'x-x-x--x-x------',
+        ],
+        // The peak: sixteenth runs, broken by a held note so the line still sings.
+        busy: [
+            'xxxxx-x-xxxx-x--',
+            'x-xxx-xxx-xxx-x-',
+            'xxxxxxxx-x-x-x--',
+            '..xxxxxxx-x-x---',
+            'x-x-xxxxx-x-----',
+        ],
+    },
+    // Every phrase ends on the big held note, reached straight or by a short pickup.
+    endings: [
+        'x---------------',
+        'x-x-x-----------',
+        '..x-x-----------',
+        'x.x-x-----------',
+        'x--x------------',
+    ],
+    head: {
+        // A hook a dance floor can sing: eighths and the 3-3-2, a held note to breathe on.
+        cells: [
+            'x-x-x---x-x-----',
+            'x--x--x-x-------',
+            '..x-x-x-x---x---',
+            'x---x-x-x-x-----',
+            'x-x---x-x-------',
+        ],
+        endings: ['x---------------', 'x--x------------', 'x-x-x-----------'],
+        form: 'period',
+    },
+    pool: (chord) => chordPentatonic(chord),
+    arrive: (chord) => guideTones(chord),
+    settle: (chord) => restingTones(chord),
+    // why: a pop horn steps into its chords; the odd half-step slide into a target is the
+    // funk and bebop in it, but a disco break stays inside the song, not outside it.
+    chromatic: 0.15,
+    // why: an enclosure is a bebop device; a session player lets one slip now and then.
+    enclosure: 0.05,
+    // why: disco is built on repetition — a riff played again works the floor harder than a
+    // new idea, so a bar repeats more often than a jazz line (0.08), less than funk's (0.5).
+    riff: 0.35,
+    // why: the dance floor wants the energy kept up — less room than jazz or blues take.
+    space: 0.2,
+    // why: on a guitar (not the default), the half-step bend into the 3rd is the R&B lick; a
+    // whole-step bend into the root is rock's, rarer here.
+    bends: { blue: 0.3, root: 0.2 },
+    // why: the R&B tenor's signature: a scoop from below into a long note, a third of the time.
+    scoop: 0.3,
+    // why: a pop sax shakes every held note — a dotted eighth or longer — not just long ones.
+    vibrato: 6,
+});
+
 export const disco: Style = {
     id: 'disco',
     name: 'Disco',
@@ -440,7 +520,9 @@ export const disco: Style = {
     // ahead of them (the old engine's −2 ms), pulling the four on the floor forward. The comp
     // sits dead on the grid: the stabs and the chuck double the open hat's "and", and any lag
     // against it would flam. Little human variation — the dance floor wants a metronome.
-    feel: { swing: 0, swingGrid: 16, lean: { bass: -2, comp: 0 }, humanize: 15 },
+    // The sax floats a hair over the machine (4 ms, felt rather than heard as late): pushed
+    // ahead with the bass, a soaring line would rush the floor.
+    feel: { swing: 0, swingGrid: 16, lean: { bass: -2, comp: 0, lead: 4 }, humanize: 15 },
     drums: discoDrums,
     bass: discoBass,
     comp: { keyboard: discoKeys, guitar: discoGuitar },
@@ -454,4 +536,7 @@ export const disco: Style = {
     // strokes are real, so it gets the job. The Rhodes (lush 9ths on the "and"s) stays a
     // strong alternative.
     prefers: 'guitar',
+    // The alto sax: the disco break is a horn's (the guitar is already chucking the comp, and
+    // a second guitar would fight it for the same register and attack).
+    lead: { idiom: discoLead, prefers: 'sax' },
 };
