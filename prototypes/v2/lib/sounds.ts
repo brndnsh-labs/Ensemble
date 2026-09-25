@@ -1,5 +1,9 @@
 import { packsForInstrument, revForPack, SOUND_PACKS } from '@engine/data/sound-packs';
-import { isPackLoaded, packIdFromVoice } from '@engine/engine/instrument-registry';
+import {
+    isPackLoaded,
+    markPackInstalled,
+    packIdFromVoice,
+} from '@engine/engine/instrument-registry';
 import { ensurePackLoaded } from '@engine/engine/pack-runtime';
 import { type PackManifest, setPackAssetFetcher, withRevToken } from '@engine/engine/sample-loader';
 import type { ChartContent } from '@engine/songbook/types';
@@ -92,6 +96,68 @@ async function asset(source: string, cachedOnly = false): Promise<Response> {
 
 export function initializeSounds(): void {
     setPackAssetFetcher(asset);
+}
+
+/**
+ * Mark every pack whose files all sit in this cache as installed (#1405), so a lane on Follow
+ * feel resolves to it from the first chart the page opens. v1 seeded the registry's installed
+ * set like this at bootstrap; that went with the v1 shell (#1358), and until this ran nothing in
+ * v2 did, so after a reload every pack read as missing until Play decoded it again.
+ *
+ * A presence check, deliberately cheap enough to await at startup: it reads only this cache
+ * (no catalog fetch, no network) and digests nothing. It compares pathnames because a key drops
+ * the rev token and adds the content hash. Nothing is trusted on the strength of it: `asset()`
+ * still verifies every byte when Play prepares the pack, and fetches whatever this missed.
+ */
+export function seedInstalledSounds(): Promise<void> {
+    // Startup awaits this, and a Cache Storage call can stall rather than throw. Past the bound
+    // the band starts on what is known; the walk still finishes and marks packs late, which only
+    // means the next opened song sees them.
+    return Promise.race([
+        seed(),
+        new Promise<void>((resolve) => setTimeout(resolve, SEED_TIMEOUT_MS)),
+    ]);
+}
+
+const SEED_TIMEOUT_MS = 2000;
+
+async function seed(): Promise<void> {
+    try {
+        if (typeof caches === 'undefined' || !(await caches.has(CACHE))) {
+            return;
+        }
+        const cache = await caches.open(CACHE);
+        const keys = await cache.keys();
+        // On the root build, an entry `migrateSoundCacheBase` has not moved yet still sits under
+        // `/v2`, and `asset()` adopts it on read, so it counts as installed here too.
+        const pathOf = (request: Request) => {
+            const { pathname } = new URL(request.url);
+            return BASE_PATH === '' && pathname.startsWith('/v2/packs/')
+                ? pathname.slice('/v2'.length)
+                : pathname;
+        };
+        const present = new Set(keys.map(pathOf));
+        const path = (source: string) => withBase(new URL(source, location.origin).pathname);
+        for (const pack of SOUND_PACKS) {
+            try {
+                const manifestPath = path(`/packs/${pack.id}/manifest.json`);
+                const key = keys.find((request) => pathOf(request) === manifestPath);
+                const stored = key && (await cache.match(key));
+                if (!stored) {
+                    continue;
+                }
+                const manifest = (await stored.json()) as PackManifest;
+                const urls = manifest.samples?.length ? sampleUrls(manifest) : [];
+                if (urls.length && urls.every((url) => present.has(path(url)))) {
+                    markPackInstalled(pack.id, true);
+                }
+            } catch {
+                // One unreadable pack is one pack that plays the built-in sound until installed.
+            }
+        }
+    } catch {
+        // No readable cache: every lane on Follow feel plays the built-in sounds, as before.
+    }
 }
 
 /**

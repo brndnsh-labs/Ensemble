@@ -42,7 +42,8 @@ function guestSong(id: string) {
         revision: 0,
         createdAt: '2026-01-01T00:00:00.000Z',
         updatedAt: '2026-01-01T00:00:00.000Z',
-        chart: {} as never,
+        // The band is the one part of a chart adoption reads (#1405's `withFollowFeel`).
+        chart: { band: { chords: { voice: 'synth', autoSound: true } } } as never,
     };
 }
 
@@ -284,6 +285,19 @@ describe('adoptGuestSongs', () => {
         ]);
         // ONE pass for the whole batch, never one per song (#1268's explicit design constraint).
         expect(run).toHaveBeenCalledTimes(1);
+    });
+
+    it('copies an old built-in default onto Follow feel, since the Save restamps it (#1405)', async () => {
+        const old = candidate('a');
+        old.document = {
+            ...old.document,
+            chart: { band: { chords: { voice: 'synth', autoSound: false } } } as never,
+        };
+        await adoptGuestSongs([old], () => {});
+        expect(save.mock.calls[0][0].chart.band.chords).toEqual({
+            voice: 'synth',
+            autoSound: true,
+        });
     });
 
     it('counts only songs actually copied, so a failure does not inflate the progress line', async () => {

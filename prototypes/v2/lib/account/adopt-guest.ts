@@ -35,6 +35,7 @@
  * is offered, starter or not.
  */
 
+import { withFollowFeel } from '../documents';
 import * as repository from '../repository';
 import type { ChartDocument } from '../runtime';
 import { digest, LocalRevisionError } from '../sync/protocol';
@@ -178,7 +179,8 @@ export async function adoptGuestSongs(
         try {
             // No owner claim (#1311): these are GUEST songs, which belong to no account at all
             // until this copy files them under whichever one is attached right now.
-            await accountSync.save(candidate.document, null, null);
+            // The fresh stamp this Save gives it would make an old default read as a choice.
+            await accountSync.save(withFollowFeel(candidate.document), null, null);
             adopted += 1;
         } catch (error) {
             if (error instanceof LocalRevisionError) {

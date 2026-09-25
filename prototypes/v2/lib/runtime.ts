@@ -64,6 +64,7 @@ import {
     deriveSoloistModeOnBoot,
     handleEffects,
     reconcileUrlGenreOnBoot,
+    resolveAutoVoices,
 } from '@engine/state/state-effects';
 import {
     ACTIONS,
@@ -86,7 +87,13 @@ import {
 } from './documents';
 import { checkPlayable, ENGINE_NEXT } from './engine-mode';
 import { masterVolumePreference, rememberMasterVolume } from './session';
-import { initializeSounds, prepareSound, prepareSounds, validateVoice } from './sounds';
+import {
+    initializeSounds,
+    prepareSound,
+    prepareSounds,
+    seedInstalledSounds,
+    validateVoice,
+} from './sounds';
 
 export type { ChartContent, ChartDocument, StemInstrument };
 export { GENRE_NAMES };
@@ -344,7 +351,7 @@ function syncBand(): void {
     }
     // The genre-change effect in `public/` picks the old engine's Auto sound; on the band,
     // a native genre's own comp instrument wins (bossa is heard on nylon). Only an installed
-    // pack is taken — the explicit genre change (`setGenre`) installs it beforehand.
+    // pack is taken, since Follow feel never downloads (#1405).
     const { chords } = getState();
     const auto = bandAutoComp(groove.lastSmartGenre);
     if (auto && chords.autoSound && chords.voice !== auto && isPackInstalled(auto.slice(5))) {
@@ -568,6 +575,9 @@ export function initialize(): Promise<void> {
                 },
             );
             await loadDrumPreset('Basic Rock');
+            // #1405 — before any chart opens, so Follow feel resolves against what this device
+            // really holds. Local and bounded (`seedInstalledSounds`); no network.
+            await seedInstalledSounds();
             // Guest startup must not download audio without an install/selection gesture.
             for (const module of ['groove', 'bass', 'chords', 'harmony', 'soloist'] as const) {
                 param(module, 'autoSound', false);
@@ -869,15 +879,17 @@ export function recommendedVoice(
     const state = getState();
     const bandVoice =
         module === 'chords' ? bandAutoComp(genre ?? state.groove.lastSmartGenre) : null;
-    if (bandVoice) {
+    if (bandVoice && isPackInstalled(bandVoice.slice(5))) {
         return bandVoice;
     }
-    // Resolve the intended mapping, not a temporary synth fallback based on RAM.
-    // Every caller prepares these files before committing the choice or playing.
+    // Follow feel plays only what this device has installed and never downloads by itself
+    // (#1405, as v1 did); "Install all & use genre sounds" is the download gesture. Installed
+    // is the cache (`seedInstalledSounds`) plus whatever this page has loaded, and every caller
+    // still prepares — verifies and decodes — the files before committing the choice or playing.
     return autoVoiceForGenre(
         genre ?? state.groove.lastSmartGenre,
         module,
-        () => true,
+        isPackInstalled,
         chordStyle ?? state.chords.style,
     );
 }
@@ -960,6 +972,10 @@ export function load(document: ChartDocument): void {
     loading = true;
     try {
         apply(checked.chart);
+        // #1405 — a lane on Follow feel stores the sound it last resolved to, which says nothing
+        // about this device. Resolve it again against what is installed here, by the same rule a
+        // feel change uses.
+        resolveAutoVoices(getState(), getState().groove.lastSmartGenre, dispatch);
         rebuild();
     } catch (error) {
         apply(previous);
@@ -968,6 +984,26 @@ export function load(document: ChartDocument): void {
     } finally {
         loading = false;
     }
+}
+
+/**
+ * `document` as {@link load} just resolved it on this device (#1405): each Follow-feel lane's
+ * sound, and the soloist's phrasing when that follows too. Only for the document that was
+ * loaded. The shell shows and baselines this rather than the stored copy, so the Sounds panel
+ * names what is actually playing and a sound resolved on open is not an unsaved change.
+ */
+export function withLoadedSounds<T extends ChartDocument>(document: T): T {
+    const state = getState();
+    const next = structuredClone(document);
+    for (const module of AUTO_LANES) {
+        if (next.chart.band[module].autoSound) {
+            next.chart.band[module].voice = state[module].voice;
+        }
+    }
+    if (next.chart.band.soloist.autoMode) {
+        next.chart.band.soloist.mode = state.soloist.mode as SoloistMode;
+    }
+    return next;
 }
 
 /**
