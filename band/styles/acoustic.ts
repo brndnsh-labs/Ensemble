@@ -29,6 +29,8 @@ import { compIdiom, type Hit, pendulum, strums } from '../players/comp/idiom.js'
 import type { VoicingKind } from '../players/comp/voicing.js';
 import { drumIdiom, type Lines, snareFigure, tomRun } from '../players/drums/kit.js';
 import { at, barSteps, dyn, isCommonTime, pulses, STEP, spanSteps } from '../players/grid.js';
+import { leadIdiom } from '../players/lead/idiom.js';
+import { guideTones, restingTones, songPentatonic } from '../players/lead/palette.js';
 import { type ChordFacts, fifthOf } from '../theory/chord.js';
 import { mod12, nearestMidi } from '../theory/pitch.js';
 import type { BarContext, PitchedIdiom, Style } from './types.js';
@@ -824,6 +826,69 @@ const acousticGuitar: PitchedIdiom = {
     },
 };
 
+// ================================================================ lead
+// A singer-songwriter's instrumental break: the verse melody's cousin, played on a second
+// guitar. It sings rather than shows off — quarter and eighth notes in the rhythm of a sung
+// line, the key's major pentatonic bent to fit each chord (so it never sits on a 4th or a
+// major 7th over the I), landing on the chord's 3rd and resting on its 3rd or root, a figure
+// played again the way a lyric repeats, and a hammer-on now and then: a grace sixteenth
+// flicked into the next note, or the 3rd slurred up to from the half step below. No bebop
+// devices, no blues bends, no flurries.
+const acousticLead = leadIdiom({
+    name: 'acoustic lead',
+    cells: {
+        // Chorus one: a few sung notes, the last one held.
+        sparse: ['x---x---x-------', 'x-----x-x-------', '..x-x-x-----....', 'x---x-x-----....'],
+        // A melody in quarters and eighths. `.xx-` is a hammer-on: a grace sixteenth flicked
+        // into the note on the eighth after it.
+        mid: [
+            'x-x-x---x-x-x---',
+            'x---x-x-x---x---',
+            '..x-x-x-x-x-----',
+            'x-x-x-.xx---x---',
+            'x-----x-x-x-x---',
+        ],
+        // At its busiest a picked eighth-note line with a hammer-on in it, never a run of
+        // sixteenths.
+        busy: ['x-x-x-x-x---x---', '..x-x-x-x-x-x---', 'x-x-.xx-x-x-x---', 'x---x-x-x-.xx---'],
+    },
+    endings: ['x---------------', 'x---x-----------', 'x-x-x-----------', '..x-x-----------'],
+    head: {
+        // A tune in the rhythm of a verse: mostly quarters, a pickup, a held note.
+        cells: [
+            'x---x---x---x---',
+            'x-----x-x-------',
+            'x-x-x---x-------',
+            '..x-x-x-x---x---',
+            'x---x-x-x-------',
+        ],
+        endings: ['x---------------', 'x-------x-------', 'x---x-----------'],
+        form: 'period',
+    },
+    pool: (chord, key) => songPentatonic(chord, key),
+    // The 3rd first (the note a singer lands on), then the 5th, the root last; a 7th only
+    // where the chart writes one.
+    arrive: (chord) => guideTones(chord),
+    settle: (chord) => restingTones(chord),
+    // A folk player walks the scale; a chromatic approach is the rare passing note.
+    chromatic: 0.05,
+    // An enclosure is a bebop device: none.
+    enclosure: 0,
+    // A song repeats its figures: more often than jazz (0.08), less than a blues lick (0.35).
+    riff: 0.25,
+    // Room to breathe, as a singer takes: about the blues' 0.3.
+    space: 0.3,
+    // The only "bend" an acoustic player makes is a slur into the 3rd from the half step
+    // below (a hammer-on or slide, which the bend-in glide stands in for) on a quarter of its
+    // landings; a nylon string doesn't bend a whole step.
+    bends: { blue: 0.25, root: 0 },
+    // A horn's device; a guitar slurs instead.
+    scoop: 0,
+    // Vibrato only on a half note or longer: a fingerstyle player lets shorter notes ring
+    // plain.
+    vibrato: 8,
+});
+
 export const acoustic: Style = {
     id: 'acoustic',
     name: 'Acoustic',
@@ -831,7 +896,8 @@ export const acoustic: Style = {
     // engine's Acoustic feel. The band sits on the drums, as the old engine called it — honest,
     // no affected pocket — except the upright, a hair behind (the old bass's own lay-back,
     // 10–15 ms, less the old drums' 4–8 ms). Humanize moderate: human, never sloppy.
-    feel: { swing: 15, swingGrid: 8, lean: { bass: 5, comp: 0 }, humanize: 30 },
+    // The lead sits right on the time with the strumming guitar: honest, no affected pocket.
+    feel: { swing: 15, swingGrid: 8, lean: { bass: 5, comp: 0, lead: 0 }, humanize: 30 },
     drums: acousticDrums,
     bass: acousticBass,
     comp: { keyboard: acousticKeys, guitar: acousticGuitar },
@@ -845,4 +911,8 @@ export const acoustic: Style = {
     // softer than a steel string, and Bossa is on nylon too — but no one hears a D-DU-UDU strum
     // over a cross-stick backbeat as bossa. Revisit when a steel-string pack exists.
     prefers: 'nylon',
+    // The nylon again, for the break: a songwriter's solo is a second acoustic guitar over the
+    // first, and the nylon is the only acoustic we have. The electric reads as a band, a horn as
+    // another genre.
+    lead: { idiom: acousticLead, prefers: 'nylon' },
 };

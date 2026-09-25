@@ -24,6 +24,8 @@ import { isPlayable } from '../players/comp/fretboard.js';
 import { compIdiom, type Hit, strums } from '../players/comp/idiom.js';
 import { drumIdiom, type Lines, snareFigure, tomRun } from '../players/drums/kit.js';
 import { at, barSteps, dyn, isCommonTime, pulses, STEP, spanSteps } from '../players/grid.js';
+import { leadIdiom } from '../players/lead/idiom.js';
+import { bluesTargets, restingTones, songPentatonic } from '../players/lead/palette.js';
 import { type ChordFacts, chordPcs } from '../theory/chord.js';
 import { mod12, nearestMidi } from '../theory/pitch.js';
 import type { BarContext, PitchedIdiom, Style } from './types.js';
@@ -653,6 +655,75 @@ const countryGuitar: PitchedIdiom = {
     },
 };
 
+// ================================================================ lead
+// A Telecaster picker: chicken-pickin'. The key's major pentatonic bent to each chord, with
+// the b3 curling up into the major 3rd — a chromatic approach into it, or a bend from the half
+// step below on most landings: the country sound. The 4th is bent up a whole step into the 5th
+// and the b7 into the root, as a pedal steel would glide. Clipped, staccato sixteenths snapped
+// between longer notes (the cluck is the space after a note), a lick played again to drive it
+// home, and double-time sixteenth runs at the peak. The head is a plain country tune, a song
+// form's period.
+const countryLead = leadIdiom({
+    name: 'country lead',
+    cells: {
+        // Chorus one: short calls, a snapped pair and a held, bent note.
+        sparse: ['x-x-x-------....', '..x-x-x-------..', 'x---x-x---------', 'x.x.x---x-------'],
+        // Chicken-pickin': staccato notes (`x.`) clucked between the held ones.
+        mid: [
+            'x.x.x.x.x---x---',
+            'x-x.x.x-x-------',
+            '..x.x.x.x-x-x---',
+            'x.x.x-x.x-------',
+            'x---x.x.x.x-----',
+        ],
+        // Double time: sixteenth runs broken by clucked staccato notes, then a landing.
+        busy: ['xxxxx.x.x.x-x---', 'x.xxxxx.x.x-----', 'x.x.xxxxx.x.x---', 'xxxx.x.xxxx.x---'],
+    },
+    endings: [
+        'x---------------',
+        'x-x-x-----------',
+        '..x-x-x---------',
+        'x.x.x-----------',
+        'x---x-----------',
+    ],
+    head: {
+        // A country melody: quarters and eighths with a pickup, a held note at the end of the
+        // line.
+        cells: [
+            'x---x---x-x-x---',
+            'x-x-x---x-------',
+            '..x-x-x-x-------',
+            'x---x-x-x---x---',
+            'x-----x-x-------',
+        ],
+        endings: ['x---------------', 'x-------x-------'],
+        form: 'period',
+    },
+    // The blue third is not in the pool: a country b3 always curls up into the 3rd (the
+    // approach and the bend below), and a b3 held against the chord's 3rd is a rub, not a lick.
+    pool: (chord, key) => songPentatonic(chord, key),
+    // The 3rd first (bent into from the blue third), then the root; a written 7th before the
+    // 5th.
+    arrive: (chord) => bluesTargets(chord),
+    settle: (chord) => restingTones(chord),
+    // The half step below a landing a quarter of the time — b3 curling into the 3rd, #4 into
+    // the 5th, the Nashville chromatic walk — between rock's 0.1 and bebop's 0.45.
+    chromatic: 0.25,
+    // An enclosure is a jazz device: a picker all but never plays one.
+    enclosure: 0.05,
+    // A lick repeated to drive it home, as often as a blues player (0.35).
+    riff: 0.35,
+    // A picker keeps the licks coming: jazz and rock's 0.25, under the blues' 0.3.
+    space: 0.25,
+    // The curl into the major 3rd on most of its landings, the country guitar's signature;
+    // a whole-step pedal-steel bend into the root or the 5th on under half of theirs.
+    bends: { blue: 0.6, root: 0.4 },
+    // A horn's device; a guitar bends instead.
+    scoop: 0,
+    // A country bend holds steady like a steel; vibrato only on a half note or longer.
+    vibrato: 8,
+});
+
 export const country: Style = {
     id: 'country',
     name: 'Country',
@@ -664,7 +735,8 @@ export const country: Style = {
     feel: {
         swing: 30,
         swingGrid: 8,
-        lean: { bass: 0, comp: 3 },
+        // The picker sits right on the kick with the bass: chicken-pickin' is crisp, on top.
+        lean: { bass: 0, comp: 3, lead: 0 },
         compLean: { guitar: 0 },
         humanize: 25,
     },
@@ -678,4 +750,7 @@ export const country: Style = {
     // and the grand is what the old engine settled on by ear (`genre-sound-map.ts`).
     // Revisit when a steel-string pack exists.
     prefers: 'piano',
+    // The clean electric: a Telecaster's snap is the country lead, and it bends. (It reads as
+    // rockabilly *comping*, above; as the lead it is exactly right.)
+    lead: { idiom: countryLead, prefers: 'guitar' },
 };

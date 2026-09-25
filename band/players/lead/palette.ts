@@ -155,3 +155,21 @@ export function bluesColour(chord: ChordFacts, key: KeyContext): number[] {
     const degree = mod12(chord.root - key.tonic);
     return key.minor || degree === 0 || degree === 5 ? minorPentatonic(key.tonic) : [];
 }
+
+/**
+ * A songwriter's pentatonic: the key's major pentatonic (minor pentatonic in a minor key), kept
+ * only where the chord's own scale has the note and it isn't an avoid note (a half step above
+ * one of the chord's tones: the key's C over a G chord, a 4th leaning on its 3rd), plus the
+ * chord's tones. It is the scale a folk or country picker hears in the song, not the blues: no
+ * blue third, and over a chord from outside the key (a secondary dominant, a borrowed iv) the
+ * pentatonic gives way to the chord — the key's C over an A7 yields to the chord's C#. A
+ * pentatonic line skips the notes a singer would only lean on; any note of this pool can be
+ * held.
+ */
+export function songPentatonic(chord: ChordFacts, key: KeyContext): number[] {
+    const tones = chordPcs(chord);
+    const scale = (key.minor ? minorPentatonic(key.tonic) : majorPentatonic(key.tonic)).filter(
+        (pc) => chord.scale.includes(mod12(pc - chord.root)) && !tones.includes(mod12(pc - 1)),
+    );
+    return [...new Set([...scale, ...tones])];
+}
