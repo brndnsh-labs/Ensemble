@@ -45,9 +45,11 @@ export function start(): Promise<ChartDocument[]> {
                     sections: [{ id: 'a', label: 'A', value, repeat: 1 }],
                 };
                 chart.performance.bpm = bpm;
+                // Follow feel (#1405): installed sounds play from the first open, and a device
+                // with none plays the built-in ones. Resolved on open, never downloaded.
                 for (const lane of Object.values(chart.band)) {
                     lane.voice = 'synth';
-                    lane.autoSound = false;
+                    lane.autoSound = true;
                 }
                 chart.band.soloist.enabled = false;
                 chart.band.harmony.enabled = false;

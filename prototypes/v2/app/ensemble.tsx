@@ -30,6 +30,7 @@ import {
     convertedCopy,
     extendedScore,
     type SectionChange,
+    withFollowFeel,
     withoutMeasure,
     withoutSection,
     withSectionSettings,
@@ -736,10 +737,11 @@ export default function Ensemble() {
         // own recovery keys), and `lastOpened`/`rememberSong` are left alone since this
         // isn't a library entry yet. "Keep a copy" (`keepSharedCopy`) is what turns it into
         // one.
-        const openSharedDraft = (document: ChartDocument, note: string) => {
+        const openSharedDraft = (link: ChartDocument, note: string) => {
+            const document = withFollowFeel(link);
             runtime.load(document);
             setSaved(null);
-            setCurrent(document);
+            setCurrent(runtime.withLoadedSounds(document));
             // A shared draft belongs to no songbook yet; "Keep a copy" decides that.
             // `bindStand` inlined: a component-scope function is a new reference every
             // render, which useExhaustiveDependencies rightly rejects as a dependency.
@@ -1542,9 +1544,9 @@ export default function Ensemble() {
      * round trip to a store that is going to say no. The text stays in memory, which is where the
      * banner and `exportSong` can still reach it.
      */
-    function draft(next: ChartDocument) {
+    function draft(next: ChartDocument, baseline = saved) {
         setCurrent(next);
-        if (saved && same(next, saved)) {
+        if (baseline && same(next, baseline)) {
             retainNothingFor(next.id);
             setRecoveryHealthy(true);
             return;
@@ -1780,7 +1782,10 @@ export default function Ensemble() {
     }
     async function open(document: ChartDocument) {
         const { recovery, unreadable } = await retainedDraftFor(document);
-        const next = volatileDrafts.current.get(document.id) || recovery?.document || document;
+        // A retained draft opens exactly as the musician left it; only the stored song is
+        // upgraded (`withFollowFeel`, #1405).
+        const stored = withFollowFeel(document);
+        const next = volatileDrafts.current.get(document.id) || recovery?.document || stored;
         if (signedIn && !unreadable) {
             // What the store just answered, replacing whatever this tab believed about that song —
             // including nothing, on the first open after a reload.
@@ -1790,8 +1795,9 @@ export default function Ensemble() {
             }
         }
         runtime.load(next);
-        setSaved(document);
-        setCurrent(next);
+        const onDevice = runtime.withLoadedSounds(next);
+        setSaved(next === stored ? onDevice : stored);
+        setCurrent(onDevice);
         // The songbook this chart came from AND the account it belongs to, for as long as it is
         // on the stand (#1311). From the SESSION, not `sync.owner` — see `liveStand` for why the
         // loop's snapshot is null in exactly the window this has to be right in.
@@ -2162,7 +2168,9 @@ export default function Ensemble() {
             };
             accountSync.setActiveDocument(moved.id);
             setCurrent(moved);
-            setSaved(resolution.document);
+            // As resolved on this device, like `current` (#1405), or the chip reports a sound
+            // resolved on open as an unsaved change.
+            setSaved(runtime.withLoadedSounds(resolution.document));
             // The account the transaction actually SETTLED TO, reported back by the loop rather
             // than read from this render's snapshot (#1311 patch review R1).
             bindStand({ store: 'account', ownerId: resolution.ownerId });
@@ -3208,7 +3216,7 @@ export default function Ensemble() {
                         // until it is committed, so it belongs to whichever account is live —
                         // never to whoever happens to be on the stand behind this dialog.
                         const result = await storeSave(
-                            { ...candidate, id: crypto.randomUUID() },
+                            { ...withFollowFeel(candidate), id: crypto.randomUUID() },
                             null,
                             { owner: null, stand: false },
                         );
@@ -3635,7 +3643,11 @@ export default function Ensemble() {
                             return;
                         }
                         runtime.load(saved);
-                        draft(saved);
+                        // Re-resolved on this device (#1405): Install all may have run since
+                        // open, or `saved` came in under a draft and was never resolved.
+                        const reverted = runtime.withLoadedSounds(saved);
+                        setSaved(reverted);
+                        draft(reverted, reverted);
                         clearBuffers();
                         selectSection(saved);
                         setMenu(false);
@@ -3654,7 +3666,7 @@ export default function Ensemble() {
                         // song it was a draft of.
                         const copy = await storeSave(
                             {
-                                ...record.document,
+                                ...withFollowFeel(record.document, record.capturedAt),
                                 id: crypto.randomUUID(),
                                 title: `${record.document.title.slice(0, 140)} — recovered`,
                             },

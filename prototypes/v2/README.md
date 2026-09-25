@@ -110,8 +110,12 @@ local browser projects and never deploys.
 - The Sounds dialog offers one explicit install-all action (about 9.1 MB) that applies the
   existing genre sound map to the current draft. Per-lane Follow feel updates on genre changes;
   a manual choice pins that lane. Other saved songs are not rewritten. Save keeps the chosen
-  setup, including Follow feel, and Revert restores it. Guest startup remains built-in-only
-  until a sound-selection/install gesture. Existing decoding,
+  setup, including Follow feel, and Revert restores it. Follow feel plays only what this device
+  has installed and never downloads by itself (#1405): startup reads the installed packs from
+  the sound cache, and opening a song resolves each Follow-feel lane against them, so a device
+  with nothing installed stays built-in-only until a sound-selection/install gesture. Starters
+  and new songs start on Follow feel, and a song last saved before 2026-09-25 opens its
+  built-in-pinned lanes on Follow feel (`withFollowFeel`). Existing decoding,
   sample playback, calibrated gain and voice effects are reused without musical changes. A host
   asset-fetch adapter maps original pack URLs into `/v2/packs/`, never root-app storage. The
   production host retains its ordinary fetch path.

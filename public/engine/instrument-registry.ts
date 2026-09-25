@@ -165,10 +165,10 @@ export function getPackBufferVariants(packId: string, key: string): readonly Aud
  * (the persistent source of truth survives reloads; decoded buffers do not).
  * A *sync* mirror of that cache so the genre auto-follow effect (#675) can gate
  * "is this pack installed?" without async Cache API I/O on every genre change.
- * Only {@link markPackInstalled} fills it. v1 seeded it at bootstrap from the real cache
- * and its Sounds UI kept it in step; both went with the v1 shell (#1358), and the v2 stand
- * manages its sounds through its own cache (`prototypes/v2/lib/sounds.ts`), so in v2 the
- * `isPackLoaded` arm of {@link isPackInstalled} is what answers.
+ * Only {@link markPackInstalled} fills it: the v2 stand seeds it at startup from its own
+ * sound cache (`seedInstalledSounds` in `prototypes/v2/lib/sounds.ts`, #1405), as v1's
+ * bootstrap did before #1358, and a pack decoded this session answers through the
+ * `isPackLoaded` arm of {@link isPackInstalled}.
  */
 const installedPacks = new Set<string>();
 

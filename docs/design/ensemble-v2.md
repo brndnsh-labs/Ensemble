@@ -53,6 +53,10 @@ controls during playback with a reversible Show controls action. An explicit ins
 downloads the existing catalog and applies established genre defaults to the current draft.
 Follow feel and manual overrides belong to the saved setup; installation never rewrites other
 saved songs. This is not a new sound-design or whole-library migration project.
+(#1405, 2026-09-24) Installing is durable, so activating is too: Follow feel resolves at open
+against the packs this device has installed, as v1 did, and never downloads by itself. Starters
+and new songs default to it, and songs last saved before the change open their built-in pins
+on Follow feel, a read-time upgrade that a Save persists rather than a rewrite of the library.
 
 This approved v2 direction supersedes VISION's absolute no-accounts/no-backend language and the
 old no-navigation premise for this preview. It does not change the production app until an
