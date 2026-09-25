@@ -97,7 +97,9 @@ test('Export audio (stems) downloads one WAV per instrument lane', async ({ page
     // (also comfortably slower than its default 45s here), hence the wide
     // budget (matches `foundation.spec.ts`'s heaviest per-lane-catalog test).
     test.setTimeout(240_000);
-    await page.goto(appUrl());
+    // The old engine's five stems, harmony included; the band engine's four are
+    // `band-audio-export.chromium.spec.ts`'s. This retires with the old engine (#1404).
+    await page.goto(appUrl('?engine=old'));
     await page.getByRole('button', { name: blue }).click();
     await page.getByRole('button', { name: 'Song actions' }).click();
 

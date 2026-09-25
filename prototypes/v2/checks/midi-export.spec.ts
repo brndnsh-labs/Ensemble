@@ -194,27 +194,22 @@ test('Export MIDI downloads a valid multi-track file matching the chart', async 
     await page.getByRole('button', { name: 'Close', exact: true }).click();
 
     expect(parsed.format).toBe(1);
-    // Meta track + chords/bass/soloist/harmonies/drums. The MIDI exporter
-    // force-enables every lane for the run's duration regardless of the
-    // starter's own soloist/harmony-off default (`ExportProcessor`'s
-    // constructor, public/engine/midi-worker-logic.ts) — track count doesn't
-    // depend on which lanes were live in the UI.
-    expect(parsed.trackCount).toBe(6);
-    expect(parsed.tracks).toHaveLength(6);
+    // The conductor track + drums/bass/comp: the band engine's `.mid` sink writes a lead track
+    // only when the lead played, and the starter's soloist is off (band/sinks/midi.ts).
+    expect(parsed.trackCount).toBe(4);
+    expect(parsed.tracks).toHaveLength(4);
 
     const expectedMspb = Math.round(60_000_000 / STARTER_BPM);
     expect(parsed.tracks[0].tempo).toBe(expectedMspb);
 
-    // Plausible length, not a byte-for-byte replica of the internal loop-count
-    // formula: the default export loops the chart to fill ~3 minutes
-    // (`targetDuration`/`loopMode` defaults in midi-worker-logic.ts), so assert
-    // a wide band around "several loops of this chart", not one exact loop.
+    // The band renders the song once through with its ending (`BandHost.render`), so a little
+    // over one loop of this chart.
     const secondsPerStep = 60 / STARTER_BPM / 4;
     const oneLoopSeconds = STARTER_BARS * STEPS_PER_BAR * secondsPerStep;
     const maxTick = Math.max(...parsed.tracks.map((t) => t.maxTick));
     const durationSeconds = (maxTick / parsed.ppq) * (60 / STARTER_BPM);
-    expect(durationSeconds).toBeGreaterThan(oneLoopSeconds * 1.5);
-    expect(durationSeconds).toBeLessThan(oneLoopSeconds * 15);
+    expect(durationSeconds).toBeGreaterThan(oneLoopSeconds * 0.95);
+    expect(durationSeconds).toBeLessThan(oneLoopSeconds * 1.5);
 });
 
 test('Export MIDI during playback does not stop or glitch the band', async ({ page }) => {
@@ -235,9 +230,8 @@ test('Export MIDI during playback does not stop or glitch the band', async ({ pa
     await download;
     await page.getByRole('button', { name: 'Close', exact: true }).click();
 
-    // Still playing: the export clones state into a fresh detached worker
-    // (`cloneStateForDetachedGeneration`) and never touches the live scheduler,
-    // so the transport must not have stopped or needed a restart.
+    // Still playing: the export renders the band's own event stream offline and never touches
+    // the live host, so the transport must not have stopped or needed a restart.
     await expect(page.getByRole('button', { name: 'Stop playback', exact: true })).toBeEnabled();
     await page.getByRole('button', { name: 'Stop playback', exact: true }).click();
 });

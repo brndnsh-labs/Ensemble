@@ -7,9 +7,10 @@ import {
 import type { ChordDensity } from '@engine/types';
 import type { RefObject } from 'react';
 import { useEffect, useRef, useState } from 'react';
+import { BAND_ENGINE } from '../lib/engine-mode';
 import type { ChartDocument } from '../lib/runtime';
 import { allSoundsSizeMB, packsForInstrument } from '../lib/sounds';
-import { type Lane, lanes } from './band-lanes';
+import { type Lane, visibleLanes } from './band-lanes';
 import { whenClosed } from './dialog-close';
 
 /** The one style-picker list each style-bearing lane has (#1275). Groove/drums
@@ -177,7 +178,7 @@ export function SoundsPanel({
                 <span>Or choose each instrument:</span>
             </div>
             <div className="sound-choices">
-                {lanes.map(([lane, label]) => {
+                {visibleLanes.map(([lane, label]) => {
                     const band = current.chart.band[lane];
                     const styleOptions = STYLE_OPTIONS[lane];
                     return (
@@ -221,7 +222,10 @@ export function SoundsPanel({
                                     }
                                 </small>
                             </label>
-                            {styleOptions && 'style' in band && (
+                            {/* The band engine plays each genre's own idioms (docs/design/
+                                band-engine.md): the old engine's per-lane style pickers, chord
+                                density and soloist mode have nothing to set there. */}
+                            {styleOptions && 'style' in band && !BAND_ENGINE && (
                                 <label>
                                     {label} style
                                     <select
@@ -244,7 +248,7 @@ export function SoundsPanel({
                                     </select>
                                 </label>
                             )}
-                            {lane === 'chords' && (
+                            {lane === 'chords' && !BAND_ENGINE && (
                                 <label>
                                     Chords density
                                     <select
@@ -263,7 +267,7 @@ export function SoundsPanel({
                                     </select>
                                 </label>
                             )}
-                            {lane === 'soloist' && (
+                            {lane === 'soloist' && !BAND_ENGINE && (
                                 <label>
                                     Soloist mode
                                     <select

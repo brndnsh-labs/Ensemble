@@ -1,7 +1,7 @@
 import type { IRealImportResult } from '@engine/songbook/ireal-import';
-import { prepareScorePlayback } from '@engine/songbook/score-playback';
 import type { ChartDocumentV2 } from '@engine/songbook/score-types';
 import { type ChartDocument, followingFeel, validateDocument } from './documents';
+import { checkPlayable } from './engine-mode';
 
 /** Build a detached candidate only. Reviewing an import never changes the running band. */
 export function importedDocument(
@@ -21,7 +21,7 @@ export function importedDocument(
     if (!Number.isInteger(bpm) || bpm < 40 || bpm > 240) {
         throw new Error('Choose a tempo from 40 to 240 BPM.');
     }
-    prepareScorePlayback(song.score);
+    checkPlayable(song.score);
     const now = new Date().toISOString();
     return validateDocument({
         schemaVersion: 2,

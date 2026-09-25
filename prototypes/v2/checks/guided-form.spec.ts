@@ -220,11 +220,13 @@ test('opening the guide preserves complex forms and failed validation retains pe
     await expect(page.getByLabel('Start repeat here', { exact: true })).toBeChecked();
     expect((await exported(page)).chart).toEqual(source.chart);
     await start(page, 'Pending validation');
-    await page.getByLabel('Chords in this bar').fill('C Dm G7');
+    // Six counts in a 4/4 bar, which no engine plays (the band plays off-grid lengths). The
+    // pending bar is checked before the guide opens: it stays closed, names the bar, and keeps
+    // the typing.
+    await page.getByLabel('Chords in this bar').fill('C:3 Dm:3');
     const invalid = await openGuide(page);
-    await expect(invalid.getByRole('alert')).toContainText(/grid|step|duration/i);
-    await expect(invalid.getByRole('button', { name: 'Apply', exact: true })).toBeDisabled();
-    await invalid.getByRole('button', { name: 'Cancel', exact: true }).click();
-    await expect(page.getByLabel('Chords in this bar')).toHaveValue('C Dm G7');
+    await expect(invalid).toHaveCount(0);
+    await expect(page.getByRole('alert').filter({ hasText: 'A · bar 1' })).toContainText(/counts/i);
+    await expect(page.getByLabel('Chords in this bar')).toHaveValue('C:3 Dm:3');
     await expect(page.locator('.bar .chord')).toHaveText(['C', 'G', 'Am', 'F']);
 });

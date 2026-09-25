@@ -31,7 +31,14 @@ export function arrangementOf(document: ChartDocument): ChartContent['arrangemen
     if (document.schemaVersion === 1) {
         return document.chart.arrangement;
     }
-    const score = document.chart.score;
+    return scoreArrangementView(document.chart.score);
+}
+
+/**
+ * A score's arrangement settings with no v1 chord text. The band engine installs this in the
+ * runtime too: it plays and draws the score itself, so the old engine is given nothing to parse.
+ */
+export function scoreArrangementView(score: SemanticScore): ChartContent['arrangement'] {
     return {
         key: score.key,
         isMinor: score.isMinor,

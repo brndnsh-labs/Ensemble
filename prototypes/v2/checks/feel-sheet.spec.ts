@@ -1,6 +1,6 @@
 import { appUrl, expect, test } from './fixtures';
 
-// #1276 — the Feel & mix sheet: swing/swing grid/humanize/complexity/chord notation
+// #1276 — the Feel & mix sheet: swing/swing grid/humanize/chord notation
 // (document-owned, saved with the chart), master volume (a device preference,
 // persisted independent of Save), and band intensity/auto intensity/metronome
 // (runtime-derived, session-only by design — never saved, never a preference).
@@ -35,16 +35,86 @@ test('every Feel-sheet control has an accessible name', async ({ page }) => {
     await expect(page.getByLabel('Humanize', { exact: true })).toBeVisible();
     await expect(page.getByLabel('Auto intensity', { exact: true })).toBeVisible();
     await expect(page.getByLabel('Band intensity', { exact: true })).toBeVisible();
-    await expect(page.getByLabel('Complexity', { exact: true })).toBeVisible();
+    // Complexity is the old engine's harmonic setting; the band engine has nothing for it to set.
+    await expect(page.getByLabel('Complexity', { exact: true })).toHaveCount(0);
     await expect(page.getByLabel('Master volume', { exact: true })).toBeVisible();
     await expect(page.getByLabel('Metronome', { exact: true })).toBeVisible();
     await expect(page.getByLabel('Chord notation', { exact: true })).toBeVisible();
 });
 
-test('document-owned feel fields (swing, swing grid, humanize, complexity, notation) persist through save, reload and revert', async ({
+test('document-owned feel fields (swing, swing grid, humanize, notation) persist through save, reload and revert', async ({
     page,
 }) => {
     await page.goto(appUrl());
+    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
+    await openFeel(page);
+
+    const swing = page.getByLabel('Swing', { exact: true });
+    const swingGrid = page.getByLabel('Swing grid', { exact: true });
+    const humanize = page.getByLabel('Humanize', { exact: true });
+    const notation = page.getByLabel('Chord notation', { exact: true });
+    // The Blues starter's genre sets swing/swingSub at creation time
+    // (`SET_GENRE_FEEL`), then its 'Blues Shuffle' drum preset's own `swing: 100`
+    // wins over the genre's raw `swing: 90` (`loadDrumPreset` in
+    // `instrument-controller.ts` runs as the genre-change effect and overwrites
+    // it) — 100 is the real, correct value production applies, not 90.
+    // humanize is the engine default; the starter's own arrangement
+    // is authored with 'name' notation.
+    await expect(swing).toHaveValue('100');
+    await expect(swingGrid).toHaveValue('8th');
+    await expect(humanize).toHaveValue('20');
+    await expect(notation).toHaveValue('name');
+
+    await setRange(page, 'Swing', 60);
+    await swingGrid.selectOption('16th');
+    await setRange(page, 'Humanize', 55);
+    await notation.selectOption('roman');
+    await expect(swing).toHaveValue('60');
+    await expect(swingGrid).toHaveValue('16th');
+    await expect(humanize).toHaveValue('55');
+    await expect(notation).toHaveValue('roman');
+    // Notation re-renders the chart immediately, not just the sheet's own select.
+    await expect(page.locator('.chord-button').first()).not.toHaveText('C7');
+    await closeFeel(page);
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeEnabled();
+
+    // Revert to saved restores the pre-edit values while still unsaved.
+    await page.getByRole('button', { name: 'Song actions' }).click();
+    await page.getByRole('button', { name: 'Revert to saved' }).click();
+    await expect(page.locator('.chord-button').first()).toHaveText('C7');
+    await openFeel(page);
+    await expect(swing).toHaveValue('100');
+    await expect(swingGrid).toHaveValue('8th');
+    await expect(humanize).toHaveValue('20');
+    await expect(notation).toHaveValue('name');
+    await closeFeel(page);
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
+
+    // Redo the edits and this time save them.
+    await openFeel(page);
+    await setRange(page, 'Swing', 60);
+    await swingGrid.selectOption('16th');
+    await setRange(page, 'Humanize', 55);
+    await notation.selectOption('roman');
+    await closeFeel(page);
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
+
+    await page.reload();
+    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).first().click();
+    await expect(page.locator('.chord-button').first()).not.toHaveText('C7');
+    await openFeel(page);
+    await expect(swing).toHaveValue('60');
+    await expect(swingGrid).toHaveValue('16th');
+    await expect(humanize).toHaveValue('55');
+    await expect(notation).toHaveValue('roman');
+});
+
+// The old engine's complexity slider, kept under `?engine=old` until it retires (#1404).
+test('old engine: complexity persists with the other feel fields through save, reload and revert', async ({
+    page,
+}) => {
+    await page.goto(appUrl('?engine=old'));
     await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
     await openFeel(page);
 

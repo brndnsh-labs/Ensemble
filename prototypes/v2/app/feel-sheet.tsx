@@ -3,6 +3,7 @@ import type { SwingSub } from '@engine/types';
 import type { RefObject } from 'react';
 import { useEffect, useState } from 'react';
 import { arrangementOf } from '../lib/documents';
+import { BAND_ENGINE } from '../lib/engine-mode';
 import type { ChartDocument } from '../lib/runtime';
 import { whenClosed } from './dialog-close';
 
@@ -206,14 +207,18 @@ export function FeelSheet({
                         disabled={busy || feel.autoIntensity}
                         onCommit={onBandIntensity}
                     />
-                    <RangeSetting
-                        label="Complexity"
-                        ariaLabel="Complexity"
-                        value={current.chart.performance.complexity}
-                        max={1}
-                        disabled={busy}
-                        onCommit={onComplexity}
-                    />
+                    {/* The old engine's harmonic complexity; the band engine voices each
+                        genre's own chords and has nothing for it to set. */}
+                    {!BAND_ENGINE && (
+                        <RangeSetting
+                            label="Complexity"
+                            ariaLabel="Complexity"
+                            value={current.chart.performance.complexity}
+                            max={1}
+                            disabled={busy}
+                            onCommit={onComplexity}
+                        />
+                    )}
                 </div>
                 <div className="feel-group">
                     <h3>Mix</h3>

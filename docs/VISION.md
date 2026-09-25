@@ -57,11 +57,11 @@ Designed for laptop, tablet and phone alike. Tablet is the sweet spot: readable 
 
 ## What's next
 
-*Last updated: 2026-09-23. The GitHub tracker is the source of truth; this is the priority order.*
+*Last updated: 2026-09-25. The GitHub tracker is the source of truth; this is the priority order.*
 
 1. **Finish v2 editing.** Every score field needs a writer: major/minor (#1375), beat grouping (#1376), one section-settings surface (#1374), removing a bar or section (#1373). Milestone "V2 — parity".
 2. **Close out the cutover.** Retire the v1 runtime once the flip has held (#1384); verify two-device and cold-start behaviour on real phones (#1273); privacy-preserving analytics (#1389); audition links that carry intensity, part mutes and autoplay (#1382).
-3. **Musical depth.** Generalize the engine's musical improvements and surface instrument capabilities (#1164), including the auxiliary percussion lanes that exist in the engine but no genre triggers; the parked harmony and bass design calls (#1148, #1149, #1161, #1162); the by-ear listening sweep (#534).
+3. **Musical depth, on the band engine (#1404).** The comp answering the soloist's gaps, trading fours, ensemble kicks and idiomatic odd meters; then retiring the old engine and its tests, and the audio/synth rewrite. The old engine's parked design calls (#1148, #1149, #1161, #1162, #1164) and listening sweep (#534) are re-read against the band before any of them is built.
 4. **The live performer, last.** The band-leader gesture probe (#937) and tempo breathing (#936), both opt-in by the principle above.
 
 ## Key decisions
@@ -71,7 +71,7 @@ Designed for laptop, tablet and phone alike. Tablet is the sweet spot: readable 
 - **Offline-first static app plus one small API**, released as container images; `main` is continuously deployed.
 - **Semantic charts with an honest import boundary** (#1171): imports preview what they keep and explain what they can't represent.
 - Chart-first single surface; the chart is a music stand during playback.
-- The musical engine is the differentiator and is kept, not rewritten — v2 compiles `public/` as its library.
+- **The band engine replaces the old one (2026-09-25, #1404).** `band/` is a ground-up, deterministic rewrite that carries the old engine's by-ear lessons over as design laws, not code. It reverses the earlier "kept, not rewritten" decision; see `docs/design/band-engine.md`. v2 still compiles `public/` for the songbook, state and voices.
 - Metronomic by default; expressive timing and live-performance control are **opt-in, off by default** (the #936 ruling), protecting the practicing musician.
 - The live-performer / "instrument" identity is parked behind a probe-first plan (#937), not built speculatively.
 - Sharing is a marquee feature, not a hidden one.

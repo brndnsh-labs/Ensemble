@@ -59,6 +59,9 @@ const test = base.extend<{ disconnect: () => Promise<void> }>({
     },
 });
 
+/** The band's lanes on the stand; harmony is not a band role (docs/design/band-engine.md). */
+const LANES = ['Drums', 'Bass', 'Chords', 'Soloist'];
+
 async function openSounds(page: import('@playwright/test').Page) {
     await page.getByRole('button', { name: 'Sounds', exact: true }).click();
 }
@@ -146,13 +149,13 @@ test('manual sounds save, revert, export/import and play sampled audio after off
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
 });
 
-test('all five lanes route real samples and every catalog choice downloads', async ({ page }) => {
+test('every lane routes real samples and every catalog choice downloads', async ({ page }) => {
     test.setTimeout(120_000);
     await observeSamples(page);
     await page.goto(appUrl());
     await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
-    for (const label of ['Drums', 'Bass', 'Chords', 'Harmony', 'Soloist']) {
-        for (const other of ['Drums', 'Bass', 'Chords', 'Harmony', 'Soloist']) {
+    for (const label of LANES) {
+        for (const other of LANES) {
             const mute = page.getByRole('button', { name: other, exact: true });
             if (((await mute.getAttribute('aria-pressed')) === 'true') !== (other === label)) {
                 await mute.click();
@@ -253,15 +256,15 @@ test('one install applies genre sounds, preserves manual overrides and follows f
     await expect(
         page.getByText('All sound packs available offline', { exact: true }),
     ).toBeVisible();
-    for (const label of ['Drums', 'Bass', 'Chords', 'Harmony', 'Soloist']) {
+    for (const label of LANES) {
         await expect(page.getByLabel(`${label} sound`, { exact: true })).toHaveValue('auto');
     }
     await expect(page.locator('.resolved-sound')).toContainText([
         'Acoustic Drum Kit',
         'Upright Bass',
-        'Drawbar Organ',
-        'Horn Section',
-        'Alto Sax',
+        // The band's own Blues instruments: a piano comp, a clean-guitar lead.
+        'Acoustic Grand Piano',
+        'Electric Guitar (Clean)',
     ]);
     await page.getByLabel('Chords sound', { exact: true }).selectOption('pack:rhodes');
     await expect(page.getByLabel('Chords sound', { exact: true })).toBeEnabled();
@@ -273,8 +276,7 @@ test('one install applies genre sounds, preserves manual overrides and follows f
     await expect(page.locator('.resolved-sound')).toContainText([
         'Acoustic Drum Kit',
         'Built-in',
-        'Horn Section',
-        'Electric Guitar (Clean)',
+        'Alto Sax',
     ]);
     await closeSounds(page);
     await page.getByRole('button', { name: 'Save', exact: true }).click();
@@ -285,9 +287,8 @@ test('one install applies genre sounds, preserves manual overrides and follows f
     const path = await (await download).path();
     const exported = JSON.parse(await readFile(path!, 'utf8'));
     expect(exported.chart.band.soloist).toMatchObject({
-        voice: 'pack:electric-guitar-clean',
+        voice: 'pack:sax-alto',
         autoSound: true,
-        mode: 'guitar',
     });
     expect(exported.chart.band.chords).toMatchObject({ voice: 'pack:rhodes', autoSound: false });
     await page.getByRole('button', { name: 'Close', exact: true }).click();
@@ -311,7 +312,6 @@ test('one install applies genre sounds, preserves manual overrides and follows f
     await expect(page.locator('.resolved-sound')).toContainText([
         'Acoustic Drum Kit',
         'Upright Bass',
-        'Horn Section',
         'Alto Sax',
     ]);
     await expect(
@@ -375,10 +375,10 @@ test('installed sounds follow the feel after a reload without touching the Sound
     });
     await page.getByRole('button', { name: 'Minor swing sketch Jazz · Saved locally' }).click();
     await openSounds(page);
-    for (const label of ['Drums', 'Bass', 'Chords', 'Harmony', 'Soloist']) {
+    for (const label of LANES) {
         await expect(page.getByLabel(`${label} sound`, { exact: true })).toHaveValue('auto');
     }
-    await expect(page.locator('.resolved-sound')).toHaveCount(5);
+    await expect(page.locator('.resolved-sound')).toHaveCount(LANES.length);
     await expect(page.locator('.resolved-sound', { hasText: 'Built-in' })).toHaveCount(0);
     await closeSounds(page);
     // Resolving on open is not an edit.
@@ -413,10 +413,12 @@ test('failed bulk installation keeps every previous voice and retries completed 
     await page.getByRole('button', { name: 'Install all & use genre sounds' }).click();
     await expect(page.locator('.error-banner')).toContainText('Storage full', { timeout: 60_000 });
     // Starters follow the feel (#1405); a failed install changes none of them.
-    for (const label of ['Drums', 'Bass', 'Chords', 'Harmony', 'Soloist']) {
+    for (const label of LANES) {
         await expect(page.getByLabel(`${label} sound`, { exact: true })).toHaveValue('auto');
     }
-    await expect(page.locator('.resolved-sound')).toHaveText(Array(5).fill('Using Built-in'));
+    await expect(page.locator('.resolved-sound')).toHaveText(
+        Array(LANES.length).fill('Using Built-in'),
+    );
     await expect(page.getByText('All sound packs available offline', { exact: true })).toBeHidden();
     await closeSounds(page);
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
@@ -446,12 +448,14 @@ test('feel preparation keeps the stand stable, rolls back playback safely, and r
     test.setTimeout(120_000);
     await observeSamples(page);
     // Browser-side body; the pack URL arrives as an argument (see the corrupt-download test).
-    await page.addInitScript((grand: string) => {
+    // The held pack is one only Jazz needs (its lead's alto sax): the Blues band keeps playing
+    // through the hold, and holding a pack it plays too (the grand, its comp) would stall it.
+    await page.addInitScript((held: string) => {
         const match = Cache.prototype.match;
         const control = { hold: false, release: null as null | (() => void) };
         Object.assign(window, { __preparation: control });
         Cache.prototype.match = async function (request, options) {
-            if (control.hold && String(request).includes(grand)) {
+            if (control.hold && String(request).includes(held)) {
                 control.hold = false;
                 await new Promise<void>((resolve) => {
                     control.release = resolve;
@@ -459,7 +463,7 @@ test('feel preparation keeps the stand stable, rolls back playback safely, and r
             }
             return match.call(this, request, options);
         };
-    }, appUrl('packs/grand/'));
+    }, appUrl('packs/sax-alto/'));
     const hold = () =>
         page.evaluate(() => {
             const control = (
@@ -511,7 +515,7 @@ test('feel preparation keeps the stand stable, rolls back playback safely, and r
     await page.evaluate(async () => {
         const cache = await caches.open('ensemble-v2-sounds-v1');
         const file = (await cache.keys()).find(
-            (r) => r.url.includes('/grand/') && r.url.includes('.m4a'),
+            (r) => r.url.includes('/sax-alto/') && r.url.includes('.m4a'),
         )!;
         await cache.delete(file);
     });

@@ -2,7 +2,6 @@
 
 import { KEY_ORDER } from '@engine/config';
 import { decodeChartLink, encodeChartLink } from '@engine/songbook/chart-link';
-import { prepareScorePlayback } from '@engine/songbook/score-playback';
 import type { SemanticScore } from '@engine/songbook/score-types';
 import type { InstrumentVoice } from '@engine/types';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -36,6 +35,7 @@ import {
     withSectionSettings,
 } from '../lib/documents';
 import { validateEditorText } from '../lib/editor';
+import { checkPlayable } from '../lib/engine-mode';
 import {
     describeV1Outcome,
     findV1Data,
@@ -2815,7 +2815,7 @@ export default function Ensemble() {
             }
             const converted = convertedCopy(original);
             // Capability preflight before creating a copy or changing the active song.
-            prepareScorePlayback(converted.chart.score);
+            checkPlayable(converted.chart.score);
             // The stand's owner (#1311): a converted copy is the open chart's music, so it is as
             // much that account's as a `Save a copy` is.
             const created = await storeSave(converted, null, {
@@ -3210,7 +3210,7 @@ export default function Ensemble() {
                         }
                         const candidate = repository.validated(JSON.parse(await source.text()));
                         if (candidate.schemaVersion === 2) {
-                            prepareScorePlayback(candidate.chart.score);
+                            checkPlayable(candidate.chart.score);
                         }
                         // No owner claim (#1311): a file off this device's disk is nobody's chart
                         // until it is committed, so it belongs to whichever account is live —
@@ -3232,7 +3232,7 @@ export default function Ensemble() {
                     onAdd={async (candidate) => {
                         const checked = repository.validated(candidate);
                         if (checked.schemaVersion === 2) {
-                            prepareScorePlayback(checked.chart.score);
+                            checkPlayable(checked.chart.score);
                         }
                         if (current) {
                             updateChart();

@@ -1,7 +1,7 @@
 import { KEY_ORDER } from '@engine/config';
 import { arrangementOf } from '../lib/documents';
 import { type ChartDocument, GENRE_NAMES } from '../lib/runtime';
-import { type Lane, lanes } from './band-lanes';
+import { type Lane, visibleLanes } from './band-lanes';
 import { TempoControl } from './tempo-control';
 
 interface TransportBarProps {
@@ -94,7 +94,7 @@ export function TransportBar({
                 </button>
             </div>
             <div className="band-controls" aria-label="Band instruments">
-                {lanes.map(([key, label]) => (
+                {visibleLanes.map(([key, label]) => (
                     <button
                         key={key}
                         className={`band-toggle ${current.chart.band[key].enabled ? 'on' : 'off'}`}

@@ -106,7 +106,7 @@ deterministic evidence, not a substitute for the `Needs-ear` gate.
 
 ## Architecture
 
-Ensemble is a browser-based "virtual band" PWA. One app, two layers: the music stand in `prototypes/v2/` (React, Next static export — the only UI) and the library it compiles from `public/` — deep-signal state slices, a real-time logic worker for generative note creation, the Web Audio engine, and the songbook codecs.
+Ensemble is a browser-based "virtual band" PWA. One app, two layers: the music stand in `prototypes/v2/` (React, Next static export — the only UI) and the library it compiles from `public/` — deep-signal state slices, the Web Audio engine and voices, the songbook codecs, and the old worker-based generator (`?engine=old`). The band that plays is `band/` (below).
 
 ### Runtime bootstrap (`prototypes/v2/lib/runtime.ts`)
 
@@ -133,7 +133,15 @@ Enforced by `npm run check-mutations` over `public/**/*.{ts,tsx}` — it catches
 
 `// @worker-mutation` is the sibling marker for writes to the **worker's own copy** of the tree — reconstructed from `getSyncState()`, never round-tripped back to the main thread. It is *not* interchangeable with `@direct-mutation`: using it on a main-thread file sends the next reader hunting for a worker boundary that doesn't exist.
 
-### Generative Engine Pipeline (worker thread)
+### The band engine (`band/`) — the default since 2026-09-25
+
+Every page plays the ground-up band engine: `band/` is a pure, deterministic `performPass` over the
+score's timeline, driven live by `prototypes/v2/lib/band-host.ts` and exported through the same
+event stream (`.mid`, WAV). Read `band/CLAUDE.md` and `docs/design/band-engine.md` before touching
+it. `?engine=old` still plays the old worker pipeline below, for comparison, until #1404 retires
+it; the Musical Logic sections that name `public/engine` files describe that old engine.
+
+### Generative Engine Pipeline (worker thread) — the old engine, `?engine=old`
 
 - `public/worker-client.ts` — main-thread bridge; sends full snapshots (`getSyncState()`) or deltas (`syncWorker()`).
 - `public/logic-worker.ts` — orchestrates live note generation, buffer fills, and resolution handling.

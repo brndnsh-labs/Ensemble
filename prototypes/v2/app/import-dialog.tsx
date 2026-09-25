@@ -1,9 +1,9 @@
 'use client';
 
 import { type IRealImportResult, parseIRealImport } from '@engine/songbook/ireal-import';
-import { prepareScorePlayback } from '@engine/songbook/score-playback';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { type ChartDocument, validateDocument } from '../lib/documents';
+import { checkPlayable } from '../lib/engine-mode';
 import { importedDocument } from '../lib/import-document';
 import { directionLabel } from '../lib/score-labels';
 import './import-dialog.css';
@@ -60,7 +60,7 @@ export function ImportDialog({
             if (text.trimStart().startsWith('{')) {
                 const candidate = validateDocument(JSON.parse(text));
                 if (candidate.schemaVersion === 2) {
-                    prepareScorePlayback(candidate.chart.score);
+                    checkPlayable(candidate.chart.score);
                 }
                 setNative(candidate);
             } else {
@@ -84,7 +84,7 @@ export function ImportDialog({
             return '';
         }
         try {
-            prepareScorePlayback(song.score);
+            checkPlayable(song.score);
             return '';
         } catch (reason) {
             return reason instanceof Error ? reason.message : 'This chart cannot be played yet.';

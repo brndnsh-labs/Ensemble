@@ -223,7 +223,10 @@ export const SOUND_PACKS: readonly SoundPack[] = [
         attribution:
             'FreePats Clean Electric Guitar (Fender, bridge pickup) — CC0 1.0 (public domain)',
         approxSizeMB: 0.7,
-        instruments: ['soloist'],
+        // Also a rhythm guitar: the band engine comps on it with fretboard grips and strums
+        // (band/players/comp/). Its gain was calibrated on the soloist bus; unverified on
+        // the chords bus until an ear pass.
+        instruments: ['soloist', 'chords'],
         // Calibrated 2026-06-23 (#740) via `mix-report --calibrate-pack=soloist:electric-guitar-clean`:
         // pack sat 9.7 dB under the synth lead (RMS-match = 3.0×). Centroid is
         // essentially matched (−52 Hz — unlike the dark nylon's −820 Hz), so the

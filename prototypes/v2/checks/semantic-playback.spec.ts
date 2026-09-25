@@ -288,6 +288,8 @@ test('the chart-visit matcher forgives a dropped sample but not a wrong form', (
     expect(() => expectVisitsFollowForm([...lap, lap[0]], lap)).toThrow();
 });
 
+// The old engine's worker pipeline (its flush snapshots); the band engine's laps and repeat
+// visits are `band-engine*.spec.ts`'s and `band/form`'s. This retires with the old engine (#1404).
 test('semantic timing reaches the real worker, audio output and chart for two complete laps', async ({
     page,
 }) => {
@@ -297,7 +299,7 @@ test('semantic timing reaches the real worker, audio output and chart for two co
     const pageErrors: string[] = [];
     page.on('pageerror', (error) => pageErrors.push(error.message));
     await observePlayback(page);
-    await page.goto(appUrl());
+    await page.goto(appUrl('?engine=old'));
     await page.getByRole('button', { name: '＋ New song', exact: true }).click();
     await editorRevealed(page);
     await page.getByLabel('Song title').fill('Two lap timing study');
@@ -396,6 +398,8 @@ test('semantic timing reaches the real worker, audio output and chart for two co
     expect(evidence.secondLapAudioSamples).toBeGreaterThan(0);
 });
 
+// The old engine's worker pipeline (its flush snapshots); the band engine's laps and repeat
+// visits are `band-engine*.spec.ts`'s and `band/form`'s. This retires with the old engine (#1404).
 test('repeat visits follow the real band while the music stand keeps four written bars', async ({
     page,
 }, info) => {
@@ -403,7 +407,7 @@ test('repeat visits follow the real band while the music stand keeps four writte
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     await observePlayback(page);
-    await page.goto(appUrl());
+    await page.goto(appUrl('?engine=old'));
     await page.getByRole('button', { name: '＋ New song', exact: true }).click();
     await editorRevealed(page);
     await page.getByLabel('Song title').fill('Two endings study');
