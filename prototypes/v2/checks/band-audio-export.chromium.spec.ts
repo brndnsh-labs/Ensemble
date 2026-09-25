@@ -6,8 +6,7 @@ import { appUrl, editorRevealed, expect, test } from './fixtures';
  * Chromium-only, same reasoning as `audio-export.chromium.spec.ts`: this exercises a real
  * `OfflineAudioContext` render, and headless WebKit's support for one is unproven here.
  *
- * `docs/design/band-engine.md` used to list "audio (WAV) export" under "not yet on the host" —
- * this proves it now works under `?engine=next`: `runtime.exportAudio` renders `BandHost`'s
+ * This proves audio (WAV) export works on the band engine: `runtime.exportAudio` renders `BandHost`'s
  * event stream (`band-export.ts`) through the same `playBandEvent` voice adapter the live host
  * schedules with, so what downloads is what was heard.
  */
@@ -38,7 +37,7 @@ function parseWav(buf: Buffer): ParsedWav {
 
 /** Same New-song-via-bar-editor flow `band-engine.spec.ts` uses, shared by both tests below. */
 async function newBandChart(page: Page, title: string): Promise<void> {
-    await page.goto(appUrl('?engine=next'));
+    await page.goto(appUrl());
     await page.getByRole('button', { name: '＋ New song', exact: true }).click();
     await editorRevealed(page);
     await page.getByLabel('Song title').fill(title);
@@ -75,7 +74,7 @@ test('Export audio (mix) works on the band engine and downloads a valid WAV', as
     // a wide band, not an exact swing-adjusted sum (this suite doesn't fix the new-song tempo).
     expect(wav.durationSeconds).toBeGreaterThan(1);
     expect(wav.durationSeconds).toBeLessThan(30);
-    // No page error along the way (a thrown ENGINE_NEXT branch would surface as the menu's
+    // No page error along the way (a thrown BAND_ENGINE branch would surface as the menu's
     // own error banner, not a page crash, so check that too).
     await expect(page.locator('.error-banner')).toHaveCount(0);
 });

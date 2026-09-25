@@ -1,9 +1,15 @@
 # The band engine (`band/`)
 
-**Status:** v0 in progress on `feat/band-engine` (DECISION 2026-09-23, Brandon).
-**Replaces, at cutover:** the generative engine in `public/engine/` (worker, scheduler,
-conductor, per-lane generators) and its critique suite. Until cutover it runs only behind
-`?engine=next`, beside the old engine, so the two can be compared on the same build.
+**Status:** the default engine since the cutover (DECISION 2026-09-25, Brandon), after all 13
+genres' rhythm sections and leads passed his ear on `feat/band-engine` (DECISION 2026-09-23).
+**Replaces:** the generative engine in `public/engine/` (worker, scheduler, conductor, per-lane
+generators) and its critique suite. `?engine=old` still plays the old engine, for comparison,
+until it is retired (#1404).
+
+**The cutover (2026-09-25).** The band engine plays every page. Controls the band has nothing
+to set are hidden on it: the per-lane style pickers, chord density, soloist mode, complexity
+and the harmony lane. Their document fields are kept as written, so a chart opened with
+`?engine=old` plays as it did. Live MIDI out was not a cutover item, since v2 never exposed it.
 
 ## Decision
 
@@ -23,10 +29,10 @@ ports the old engine's *lessons*, not its code.
 - **Out of v0:** soloist, harmony, the other nine genres, live MIDI out, an audio-layer
   rewrite. Audio reuses today's voices and sample packs, so the listening gate judges one
   change at a time.
-- **Gate per genre:** Brandon's ear, on a `/deploy-test` build with `?engine=next`. Tests prove
-  rules; they do not prove taste.
-- At cutover, VISION.md's "the engine is kept, not rewritten" is updated, and `public/engine`'s
-  generators and their tests are deleted.
+- **Gate per genre:** Brandon's ear, on a `/deploy-test` build. Tests prove rules; they do not
+  prove taste.
+- At cutover, VISION.md's "the engine is kept, not rewritten" is updated. `public/engine`'s
+  generators and their tests are deleted once the band has held as the default.
 
 ## Shape: one pure function, one event stream
 
@@ -169,16 +175,18 @@ expression devices take turns rather than stack; one peak note per cycle.
 
 ## The live host (`prototypes/v2/lib/band-host.ts`)
 
-`?engine=next` routes the runtime's play, stop and resume paths through `startBand`/`stopBand`
-instead of `TOGGLE_PLAY`, so the old worker never starts and its callbacks are ignored. The
+The runtime's play, stop and resume paths go through `startBand`/`stopBand` instead of
+`TOGGLE_PLAY` (unless `?engine=old`), so the old worker never starts and its callbacks are
+ignored. The
 host keeps a queue of *segments*, one pass of the song or one lap of a practice loop each, and
 schedules everything due in the next 150 ms on a 25 ms timer.
 - **Tempo** re-anchors the clock.
 - **Style, intensity, lanes, swing, humanize and the comp instrument** regenerate the pass from
   the next barline. The comp instrument follows the chords lane's sound (`COMP_FOR_VOICE` in
-  `runtime.ts`); in next mode a native genre's Auto sound is its style's `prefers`, unless
+  `runtime.ts`); a genre's Auto sound is its style's `prefers`, unless
   `AUTO_VOICE_FOR_STYLE` names another sound for the same instrument (metal: the crunch guitar).
-- **A staged genre** is committed at once.
+- **A staged genre** is committed at once; `setGenre` then waits for the barline where the band
+  first plays it (`BandHost.changeHeard`), so "Switching feel at the next bar" reads true.
 - **The chart pointer** follows `songTick()` to the written event under it (`slotAt`).
 
 A pass is generated on the main thread (about 5–7 ms for 32 bars on a desktop), two seconds
@@ -186,9 +194,10 @@ before it is needed.
 
 Audio (WAV/stem) export renders `BandHost.render()`'s events offline (`lib/band-export.ts`)
 through `playBandEvent`, the same voice mapping `BandHost` schedules live with, feel offsets
-included. A stem export renders drums, bass and chords (the comp) only. `app/band-lanes.ts`'s
-`visibleLanes` drops soloist/harmony from every lane-driven control (transport mute chips, the
-Sounds panel).
+included. A stem export renders drums, bass, chords (the comp) and soloist (the lead).
+`app/band-lanes.ts`'s `visibleLanes` drops harmony from every lane-driven control (transport
+mute chips, the Sounds panel). The `.mid` export is the same stream through `band/sinks/midi.ts`:
+the song once through with its ending, a lead track only when the lead played.
 
 **The chart sheet** draws a score from the score and its timeline (`prototypes/v2/lib/band-chart.ts`),
 not from the old engine's plan, so any chart the timeline compiles opens, edits and plays:
@@ -197,11 +206,11 @@ their exact widths. The old engine is given no plan for such a score, so its `ar
 derive empty and its worker idles. Every path that lets a chart onto the stand (open, edit,
 import, the guided form) asks `checkPlayable` in `lib/engine-mode.ts`: on the band engine
 that is `validateSemanticScore` plus `compileTimeline`, and on the old engine it is still
-`prepareScorePlayback`. A measure-less (v1) chart is still drawn from the old maps. In next
-mode the measure editor can put a fermata on (or take it off) a bar's last event: the flag is
+`prepareScorePlayback`. A measure-less (v1) chart is still drawn from the old maps. On the
+band engine the measure editor can put a fermata on (or take it off) a bar's last event: the flag is
 editor state carried across the bar's text round-trip, never encoded in chord text.
 
-Genres outside v0 play their nearest v0 style (`STYLE_FOR_GENRE` in `runtime.ts`).
+Every canonical genre has its own style (`STYLE_FOR_GENRE` in `runtime.ts`).
 
 ## Tests: two harnesses
 

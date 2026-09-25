@@ -1,5 +1,5 @@
 /**
- * The chart sheet's view of a score on the band engine (`?engine=next`).
+ * The chart sheet's view of a score on the band engine.
  *
  * The old engine's display is its playback plan (`arranger.progression`/`stepMap`), so a chart
  * it cannot plan cannot even be drawn. Here the display is read from the two things the band

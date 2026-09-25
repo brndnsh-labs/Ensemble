@@ -35,9 +35,9 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/render-bridge.ts` | Puts engine internals on `window.ensemble` for the listening-gate tools (`mix:report` and the scripts built on it). Installed by the v2 runtime only in a `NEXT_PUBLIC_RENDER_BRIDGE=1` build. | `installRenderBridge` |
 | `public/telemetry.ts` | Production-only, privacy-safe Umami analytics boundary. | `initializeTelemetry`, `track` |
 
-## Band Engine (`band/`, v0 — behind `?engine=next`)
+## Band Engine (`band/`, the default engine; `?engine=old` plays the old one)
 
-The ground-up replacement for the generative engine; see `docs/design/band-engine.md` and `band/CLAUDE.md`.
+The ground-up replacement for the generative engine, the default since 2026-09-25; see `docs/design/band-engine.md` and `band/CLAUDE.md`.
 
 | Path | Responsibility | Key Exports / Symbols |
 | :--- | :--- | :--- |
@@ -54,10 +54,10 @@ The ground-up replacement for the generative engine; see `docs/design/band-engin
 | `band/sinks/midi.ts` | BandEvent[] → Standard MIDI File. | `toMidi` |
 | `band/test/` | Fixture charts, the invariant suite, the critique (`critique/harness.ts` metric library; `claims/<id>.ts` one claims file per style). | `FIXTURES`, `defineClaims`, `METRICS` |
 | `scripts/band-render.ts` | `npm run band:render` — `.mid` + text grid from node. | CLI |
-| `prototypes/v2/lib/band-host.ts` | Live host for `?engine=next`: segments on the audio clock, regenerate-at-barline, voice adapter (`playBandEvent`) onto today's synth/sample voices, metronome. Driven only by `runtime.ts`. | `BandHost`, `playBandEvent` |
-| `prototypes/v2/lib/band-export.ts` | Offline WAV/stem export for `?engine=next`: `band-host.ts`'s `playBandEvent` against an `OfflineAudioContext`, so an export matches live playback. Stems are drums/bass/chords (the comp) only. | `renderBandMixToWav`, `renderBandStemsToWav` |
-| `prototypes/v2/lib/band-chart.ts` | The chart sheet's view of a score on `?engine=next`, from the score + band timeline: every written event (holds, N.C., fermatas, off-grid lengths), its performed slots, section loop windows, chord names in all three notations. | `bandChart`, `slotAt`, `chordNames` |
-| `prototypes/v2/lib/engine-mode.ts` | The `?engine=next` flag and `checkPlayable`, the one capability check every open/edit/import path asks (band: valid + timeline compiles; old engine: `prepareScorePlayback`). | `ENGINE_NEXT`, `checkPlayable` |
+| `prototypes/v2/lib/band-host.ts` | Live host for the band engine: segments on the audio clock, regenerate-at-barline, voice adapter (`playBandEvent`) onto today's synth/sample voices, metronome. Driven only by `runtime.ts`. | `BandHost`, `playBandEvent` |
+| `prototypes/v2/lib/band-export.ts` | Offline WAV/stem export for the band engine: `band-host.ts`'s `playBandEvent` against an `OfflineAudioContext`, so an export matches live playback. Stems are drums/bass/chords (the comp)/soloist (the lead). | `renderBandMixToWav`, `renderBandStemsToWav` |
+| `prototypes/v2/lib/band-chart.ts` | The chart sheet's view of a score on the band engine, from the score + band timeline: every written event (holds, N.C., fermatas, off-grid lengths), its performed slots, section loop windows, chord names in all three notations. | `bandChart`, `slotAt`, `chordNames` |
+| `prototypes/v2/lib/engine-mode.ts` | The `BAND_ENGINE` flag (false only under `?engine=old`) and `checkPlayable`, the one capability check every open/edit/import path asks (band: valid + timeline compiles; old engine: `prepareScorePlayback`). | `BAND_ENGINE`, `checkPlayable` |
 
 ## State Management (Domain Slices)
 

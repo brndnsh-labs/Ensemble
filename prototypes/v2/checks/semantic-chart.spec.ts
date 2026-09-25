@@ -280,17 +280,23 @@ test('semantic revision conflicts keep both takes, and unsupported imports never
         ],
     });
     const beforeImport = await documents(second);
+    // A valid chart the form compiler can't perform yet: a D.C. al 2nd ending.
     const unsupported = structuredClone(copy);
-    unsupported.chart.score.sections[0].measures[0].content = {
-        kind: 'events',
-        events: [{ kind: 'no-chord', duration: [4, 1] }],
-    };
+    const measures = unsupported.chart.score.sections[0].measures;
+    measures[0].start = [{ kind: 'repeat-start' }];
+    measures[1].start = [{ kind: 'ending-start', passes: [1] }];
+    measures[1].end = [{ kind: 'repeat-end', times: 2 }, { kind: 'ending-end' }];
+    measures[2].start = [{ kind: 'ending-start', passes: [2] }];
+    measures[2].end = [{ kind: 'ending-end' }];
+    measures[3].end = [
+        { kind: 'jump', from: 'start', destination: { kind: 'ending', pass: 2 }, repeats: 'skip' },
+    ];
     await second.getByLabel('Import Ensemble document').setInputFiles({
         name: 'not-yet-playable.ensemble',
         mimeType: 'application/json',
         buffer: Buffer.from(JSON.stringify(unsupported)),
     });
-    await expect(second.locator('.error-banner')).toContainText('cannot be played yet');
+    await expect(second.locator('.error-banner')).toContainText('not supported yet');
     expect(await documents(second)).toEqual(beforeImport);
     await expect(second.locator('.bar').first().locator('.chord')).toHaveText(['F', 'G7']);
 });

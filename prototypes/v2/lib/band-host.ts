@@ -1,5 +1,5 @@
 /**
- * The live host for the band engine (`?engine=next`). It turns `performPass` output into
+ * The live host for the band engine. It turns `performPass` output into
  * sound through today's voices and sample packs, on the audio clock:
  *
  *   - Playback is a queue of *segments*. Each is one window of bars in performance order: a
@@ -206,6 +206,8 @@ export class BandHost {
     private resumeBar: number | null = null;
     private timer: ReturnType<typeof setInterval> | null = null;
     private nextPass = 0;
+    /** Audio time of the barline where the last settings change is first heard. */
+    private changeAt = 0;
 
     constructor(options: HostOptions) {
         this.options = options;
@@ -279,6 +281,7 @@ export class BandHost {
         this.segments.length = index + 1;
         const cutoffBar = this.barAt(this.tickAt(current, horizon), true);
         if (cutoffBar >= current.window.to) {
+            this.changeAt = this.endTime(current);
             return;
         }
         // Resume from the engine's own memory at that barline, so the new bars follow on
@@ -290,6 +293,7 @@ export class BandHost {
             window: { ...current.window, from: cutoffBar },
         });
         const cutoff = timeline.bars[cutoffBar].start;
+        this.changeAt = this.timeOf(current, cutoff);
         current.events = current.events.filter((e) => e.tick < cutoff).concat(tail.events);
         current.cursor = current.events.findIndex(
             (e) => this.timeOf(current, e.tick) + e.offsetMs / 1000 > horizon,
@@ -349,6 +353,12 @@ export class BandHost {
             this.resumeBar =
                 current.window.to < this.timeline!.bars.length ? current.window.to : null;
         }
+    }
+
+    /** Has the band reached the barline where its last settings change is heard? */
+    changeHeard(): boolean {
+        const audio = this.audio;
+        return !audio || audio.currentTime >= this.changeAt;
     }
 
     /** The song tick sounding now, or null while stopped. */

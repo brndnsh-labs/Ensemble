@@ -3,12 +3,13 @@ import { validateSemanticScore } from '@engine/songbook/score-codec';
 import { prepareScorePlayback } from '@engine/songbook/score-playback';
 
 /**
- * `?engine=next` plays the new band engine (`band/`, docs/design/band-engine.md) in place of
- * the worker/scheduler generator. Read once per page.
+ * The band engine (`band/`, docs/design/band-engine.md) plays every page. `?engine=old` plays
+ * the old worker/scheduler generator instead, for A/B comparison until it is retired (#1404).
+ * Read once per page.
  */
-export const ENGINE_NEXT =
-    typeof window !== 'undefined' &&
-    new URLSearchParams(window.location.search).get('engine') === 'next';
+export const BAND_ENGINE =
+    typeof window === 'undefined' ||
+    new URLSearchParams(window.location.search).get('engine') !== 'old';
 
 /**
  * Can this page's engine play the score? Throws the reason if not. Every path that lets a
@@ -18,7 +19,7 @@ export const ENGINE_NEXT =
  * timeline compiles.
  */
 export function checkPlayable(score: unknown): void {
-    if (!ENGINE_NEXT) {
+    if (!BAND_ENGINE) {
         prepareScorePlayback(score);
         return;
     }

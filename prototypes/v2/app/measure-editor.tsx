@@ -12,7 +12,7 @@ import type {
     SemanticScore,
 } from '@engine/songbook/score-types';
 import { type Ref, useEffect, useId, useImperativeHandle, useRef, useState } from 'react';
-import { ENGINE_NEXT } from '../lib/engine-mode';
+import { BAND_ENGINE } from '../lib/engine-mode';
 import { applyMeasureForm, type FormDraft, readMeasureForm } from '../lib/form-editing';
 import { defaultGrouping, groupingsFor, groupingText, parseGrouping } from '../lib/grouping';
 import { FormControls } from './form-controls';
@@ -41,7 +41,7 @@ interface BarDraft {
     text: string;
     context: ScoreContext;
     form: FormDraft | null;
-    /** Next mode only (`?engine=next`); the old engine cannot play a fermata at all. */
+    /** Band engine only; the old engine (`?engine=old`) cannot play a fermata at all. */
     fermata: boolean;
 }
 
@@ -90,7 +90,7 @@ function entriesFor(score: SemanticScore, drafts: Map<string, BarDraft>): BarEnt
     });
 }
 
-/** Next mode only — the one placement the fermata toggle can express (see `printableEvents`). */
+/** Band engine only — the one placement the fermata toggle can express (see `printableEvents`). */
 function lastEventFermata(measure: ScoreMeasure): boolean {
     return measure.content.kind === 'events'
         ? Boolean(measure.content.events.at(-1)?.fermata)
@@ -104,7 +104,7 @@ function stripFermata(event: ScoreEvent): ScoreEvent {
 
 /**
  * `printChordBar` (score-text.ts) refuses to print any event that carries a `fermata` key at
- * all, by design: the flag is editor state, not text. In next mode, strip it from the LAST
+ * all, by design: the flag is editor state, not text. On the band engine, strip it from the LAST
  * event so the bar's chords stay editable text — `commit()`'s `withFermata` reapplies it once
  * the text is re-parsed, so a text edit can never silently drop it. A fermata anywhere but the
  * last event is a placement the toggle cannot represent (iReal import is the only source of
@@ -123,7 +123,7 @@ function editableText(measure: ScoreMeasure, meter: string): string | null {
         return null;
     }
     try {
-        const events = ENGINE_NEXT
+        const events = BAND_ENGINE
             ? printableEvents(measure.content.events)
             : measure.content.events;
         const printed = printChordBar(events, meter);
@@ -472,8 +472,8 @@ export function MeasureEditor({
                         Type chords separated by spaces, like C Dm G7. They share the bar equally;
                         set different lengths below.
                     </p>
-                    {ENGINE_NEXT && (
-                        // Next mode only (docs/design/band-engine.md): the band engine holds the
+                    {BAND_ENGINE && (
+                        // Band engine only (docs/design/band-engine.md): the band engine holds the
                         // chord through a stretched span with drums crashing; the old engine
                         // refuses any chart carrying a fermata, so default mode offers no way to
                         // author one.

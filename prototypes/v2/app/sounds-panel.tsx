@@ -7,7 +7,7 @@ import {
 import type { ChordDensity } from '@engine/types';
 import type { RefObject } from 'react';
 import { useEffect, useRef, useState } from 'react';
-import { ENGINE_NEXT } from '../lib/engine-mode';
+import { BAND_ENGINE } from '../lib/engine-mode';
 import type { ChartDocument } from '../lib/runtime';
 import { allSoundsSizeMB, packsForInstrument } from '../lib/sounds';
 import { type Lane, visibleLanes } from './band-lanes';
@@ -222,34 +222,33 @@ export function SoundsPanel({
                                     }
                                 </small>
                             </label>
-                            {/* The band engine's lead is its style's own soloist: the old
-                                engine's soloist style and mode pickers have nothing to set. */}
-                            {styleOptions &&
-                                'style' in band &&
-                                !(ENGINE_NEXT && lane === 'soloist') && (
-                                    <label>
-                                        {label} style
-                                        <select
-                                            aria-label={`${label} style`}
-                                            value={band.style}
-                                            disabled={busy}
-                                            onChange={(event) => onStyle(lane, event.target.value)}
-                                        >
-                                            {/* A style outside the picker list (e.g. Acoustic's
+                            {/* The band engine plays each genre's own idioms (docs/design/
+                                band-engine.md): the old engine's per-lane style pickers, chord
+                                density and soloist mode have nothing to set there. */}
+                            {styleOptions && 'style' in band && !BAND_ENGINE && (
+                                <label>
+                                    {label} style
+                                    <select
+                                        aria-label={`${label} style`}
+                                        value={band.style}
+                                        disabled={busy}
+                                        onChange={(event) => onStyle(lane, event.target.value)}
+                                    >
+                                        {/* A style outside the picker list (e.g. Acoustic's
                                             genre-routed 'arp', #1257) is still selected and
                                             named, never silently swapped for the first option. */}
-                                            {!styleOptions.some(
-                                                (entry) => entry.id === band.style,
-                                            ) && <option value={band.style}>{band.style}</option>}
-                                            {styleOptions.map((entry) => (
-                                                <option key={entry.id} value={entry.id}>
-                                                    {entry.name}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </label>
-                                )}
-                            {lane === 'chords' && (
+                                        {!styleOptions.some((entry) => entry.id === band.style) && (
+                                            <option value={band.style}>{band.style}</option>
+                                        )}
+                                        {styleOptions.map((entry) => (
+                                            <option key={entry.id} value={entry.id}>
+                                                {entry.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </label>
+                            )}
+                            {lane === 'chords' && !BAND_ENGINE && (
                                 <label>
                                     Chords density
                                     <select
@@ -268,7 +267,7 @@ export function SoundsPanel({
                                     </select>
                                 </label>
                             )}
-                            {lane === 'soloist' && !ENGINE_NEXT && (
+                            {lane === 'soloist' && !BAND_ENGINE && (
                                 <label>
                                     Soloist mode
                                     <select

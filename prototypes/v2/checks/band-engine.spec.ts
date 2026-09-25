@@ -7,8 +7,8 @@ declare global {
 }
 
 /**
- * `?engine=next` plays the new band engine (docs/design/band-engine.md) instead of the
- * worker generator. This proves the switch end to end on the real stand: sound reaches the
+ * The band engine (docs/design/band-engine.md) plays by default, instead of the worker
+ * generator. This proves the switch end to end on the real stand: sound reaches the
  * speakers, the chart pointer follows the form round the loop, the old worker generates
  * nothing, and Stop stops — with no page errors along the way. The lead (the soloist lane,
  * off by default) is switched on, so its head plays too.
@@ -55,7 +55,7 @@ test('the band engine plays the chart round the loop and stops', async ({ page }
             return result;
         } as AudioNode['connect'];
     });
-    await page.goto(appUrl('?engine=next'));
+    await page.goto(appUrl());
     await page.getByRole('button', { name: '＋ New song', exact: true }).click();
     await editorRevealed(page);
     await page.getByLabel('Song title').fill('Band engine study');

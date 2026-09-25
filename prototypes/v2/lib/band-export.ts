@@ -1,5 +1,5 @@
 /**
- * WAV export for the band engine (`?engine=next`) — the offline sibling of `band-host.ts`'s
+ * WAV export for the band engine — the offline sibling of `band-host.ts`'s
  * live scheduling. A `performPass` output is a plain event stream in ticks; this walks the
  * same stream through `playBandEvent` (the one event→voice mapping both paths share) against
  * an `OfflineAudioContext`, so an exported mix or stem is exactly what the live band played.
