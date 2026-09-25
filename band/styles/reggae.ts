@@ -486,6 +486,10 @@ const reggaeLead = leadIdiom({
     // Hooks come round again (0.45): a riff played twice is the genre's repetition, the dub
     // loop in miniature, but not so often that every phrase stutters.
     riff: 0.45,
+    // A roots horn restates its phrase now and then, as a dub hook does.
+    loop: 0.25,
+    // Its peak is a lift, not a scream: within a 7th of home.
+    peak: 10,
     // Spacious (0.45): nearly half the phrases take a roomier shape than the arc asks for — the
     // horn answers the band, it doesn't lead it.
     space: 0.45,

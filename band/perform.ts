@@ -140,10 +140,12 @@ export function performPass(
 
 /**
  * The comp gives the lead its register. While the lead sounds, a keyboard voice at or above
- * it (within a half step) drops an octave, the way a pianist moves the left hand's voicing
- * down under a horn — never below middle C, where a dropped voice would muddy the chord; a
- * voice that can't go down, and that another voice already doubles, is left out instead. The
- * chord keeps its pitch classes either way. A guitar's grip is its hand shape, so it stays.
+ * it (within a half step) drops an octave, the way a pianist moves the right hand's voicing
+ * down under a horn — never below middle C, where a dropped voice would muddy the chord, and
+ * never beneath the chord's own bottom note (a power chord keeps its root under its 5th). A
+ * voice that can't go down, and that a voice staying in the chord doubles, is left out
+ * instead. The chord keeps its pitch classes either way. A guitar's grip is its hand shape, so
+ * it stays.
  */
 function yieldToLead(events: BandEvent[]): BandEvent[] {
     const lead = events.filter((e): e is PitchedNote => e.lane === 'lead');
@@ -151,22 +153,35 @@ function yieldToLead(events: BandEvent[]): BandEvent[] {
         return events;
     }
     const comp = events.filter((e): e is PitchedNote => e.lane === 'comp' && !e.muted);
-    const dropped = new Map<BandEvent, BandEvent | null>();
+    const chords = new Map<number, PitchedNote[]>();
     for (const c of comp) {
-        let under = Number.POSITIVE_INFINITY;
-        for (const l of lead) {
-            if (l.tick < c.tick + c.dur && l.tick + l.dur > c.tick) {
-                under = Math.min(under, l.midi);
+        chords.set(c.tick, [...(chords.get(c.tick) ?? []), c]);
+    }
+    const dropped = new Map<BandEvent, BandEvent | null>();
+    for (const notes of chords.values()) {
+        // Top voice first: the one most in the lead's way, and the one a doubling gives up.
+        const voices = [...notes].sort((a, b) => b.midi - a.midi);
+        const bottom = Math.min(...voices.map((v) => v.midi));
+        const sounding = new Set(voices.map((v) => v.midi));
+        for (const c of voices) {
+            let under = Number.POSITIVE_INFINITY;
+            for (const l of lead) {
+                if (l.tick < c.tick + c.dur && l.tick + l.dur > c.tick) {
+                    under = Math.min(under, l.midi);
+                }
             }
-        }
-        if (c.midi < under - 1) {
-            continue;
-        }
-        const chord = comp.filter((o) => o.tick === c.tick && o !== c);
-        if (c.midi - 12 >= 60 && !chord.some((o) => o.midi === c.midi - 12)) {
-            dropped.set(c, { ...c, midi: c.midi - 12 });
-        } else if (chord.some((o) => (o.midi - c.midi) % 12 === 0)) {
-            dropped.set(c, null);
+            if (c.midi < under - 1) {
+                continue;
+            }
+            const down = c.midi - 12;
+            if (down >= 60 && !sounding.has(down) && (c.midi === bottom || down > bottom)) {
+                dropped.set(c, { ...c, midi: down });
+                sounding.delete(c.midi);
+                sounding.add(down);
+            } else if ([...sounding].some((m) => m !== c.midi && (m - c.midi) % 12 === 0)) {
+                dropped.set(c, null);
+                sounding.delete(c.midi);
+            }
         }
     }
     if (!dropped.size) {

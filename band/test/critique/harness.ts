@@ -1492,7 +1492,10 @@ export const METRICS = {
         }
         return ratio(hit, n);
     },
-    /** Share of phrase-ending notes that are tones of their chord. */
+    /**
+     * Share of phrase-ending notes that are tones of their chord — the chord struck under, or,
+     * for an anticipation held into a change, the chord it arrives on.
+     */
     leadPhraseEndsOnChordTone: (takes) => {
         let n = 0;
         let hit = 0;
@@ -1503,7 +1506,10 @@ export const METRICS = {
                     continue;
                 }
                 n++;
-                hit += chordPcs(chord).includes(mod12(note.midi)) ? 1 : 0;
+                const into = chordAt(t, note.tick + note.dur - 1);
+                const tone = (c: typeof chord | null) =>
+                    !!c && chordPcs(c).includes(mod12(note.midi));
+                hit += tone(chord) || tone(into) ? 1 : 0;
             }
         }
         return ratio(hit, n);

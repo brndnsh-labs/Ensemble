@@ -518,6 +518,10 @@ const hipHopLead = leadIdiom({
     // A loop repeats (0.7): most bars play the bar before them again, adapted to the chord —
     // the hook developing slowly, the way a producer lets a sample run.
     riff: 0.7,
+    // A sampled hook comes round: half the solo phrases play the last one again, whole.
+    loop: 0.5,
+    // A hook doesn't climb to the top of the guitar: the peak stays within a 6th of home.
+    peak: 9,
     // The hook's room lives inside the bar (the cells' rests and the note let ring), so a
     // roomier phrase shape is taken only now and then (0.3): an emptier shape has fewer bars
     // in a row for the loop to come round in.

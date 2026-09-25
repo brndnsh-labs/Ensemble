@@ -172,7 +172,9 @@ export function songPentatonic(chord: ChordFacts, key: KeyContext): number[] {
         (pc) => chord.scale.includes(mod12(pc - chord.root)) && !tones.includes(mod12(pc - 1)),
     );
     return [...new Set([...scale, ...tones])];
+}
 
+/**
  * The pentatonic on the chord's own root, following the changes rather than the key: the
  * major pentatonic over a major chord (1 2 3 5 6), with the b7 over a dominant; the minor
  * pentatonic with the 9th over a minor chord (1 2 b3 4 5 b7). It is the vocabulary a pop, soul

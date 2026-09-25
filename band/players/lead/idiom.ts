@@ -40,6 +40,16 @@ export interface LeadBook extends LinePalette {
     /** Chance a solo bar plays the bar before it again (a riff) rather than moving on. */
     riff: number;
     /**
+     * Chance a solo phrase plays the phrase before it again, whole, moved onto its chords — a
+     * looped hook (hip hop's sampled lick) rather than a line that keeps moving. Unset: never.
+     */
+    loop?: number;
+    /**
+     * How high the peak climbs, in semitones above the instrument's home. Unset: to the top
+     * of the instrument (a jazz or rock climax); a sampled hook or a roots horn stays nearer.
+     */
+    peak?: number;
+    /**
      * Chance a solo phrase takes a roomier shape than its density asks for (the sparse shapes'
      * call-and-answer, a late entry). Room is a breath, never a gap: no shape leaves more than
      * one empty bar after the sparse first chorus, and no phrase slot rests whole.
@@ -87,6 +97,14 @@ export interface LeadMemory {
     motif: Motif | null;
     /** Empty bars the last solo phrase ended with: the next phrase comes straight in after one. */
     trailing: number;
+    /** The last solo phrase, whole: a looping book may play it again. */
+    phrase: PhraseMemory | null;
+}
+
+interface PhraseMemory {
+    kinds: BarKind[];
+    cells: (string | null)[];
+    notes: { bar: number; step: number; midi: number; chord: ChordFacts }[];
 }
 
 /**
@@ -99,7 +117,7 @@ const SPAN: Record<Density, number> = { sparse: 6, mid: 9, busy: 12 };
  * A slot's shapes by density, weighted. A soloist breathes for a beat to a bar between ideas,
  * and a band with nobody answering (the comp doesn't fill yet) turns a longer silence into dead
  * air — Brandon's ear on the first audition. So a phrase leaves at most one empty bar; only the
- * sparse first chorus may leave two (its opening call with room after it). Mid plays two or
+ * solo's opening statement may leave two (a call with room after it). Mid plays two or
  * three bars, busy three or four; a call-and-answer shape breathes in the middle instead.
  */
 const SOLO_SHAPES: Record<Density, readonly (readonly [BarKind[], number])[]> = {
@@ -199,6 +217,8 @@ interface SlotPlan {
     develops: Motif | null;
     /** A head phrase that restates the section's opening phrase (its melody, not only its rhythm). */
     restates: number | null;
+    /** A solo phrase that plays the last one again, whole (a looping book's hook). */
+    loops: PhraseMemory | null;
     peak: boolean;
 }
 
@@ -265,6 +285,7 @@ function headPlan(ctx: BarContext, book: LeadBook, slotStart: number): SlotPlan 
         riffs: kinds.map(() => false),
         develops: null,
         restates,
+        loops: null,
         peak: false,
     };
 }
@@ -280,8 +301,38 @@ function soloPlan(
     const first = bars[slotStart];
     const rng = ctx.rng(`solo:${ctx.pass}:${slotStart}`, 'song');
     const arc = soloArc(chorus, ctx.timeline, slotStart, energyTier(ctx.plan.energy));
+    const [lo, hi] = ctx.lead.range;
+    // The peak's top note: the instrument's top, or the book's reach above home.
+    const top = book.peak === undefined ? hi - 1 : Math.min(hi - 1, ctx.lead.home + book.peak);
+    // A looping book plays its last phrase again, whole — the hook comes round.
+    const previousPhrase = memory.phrase;
+    if (
+        previousPhrase &&
+        !arc.peak &&
+        !arc.windDown &&
+        previousPhrase.kinds.length === first.phrase.length &&
+        rng.chance(book.loop ?? 0)
+    ) {
+        return {
+            kinds: [...previousPhrase.kinds],
+            cells: [...previousPhrase.cells],
+            contour: 'arch',
+            centre: Math.min(top - 6, ctx.lead.home + arc.register),
+            span: SPAN[arc.density],
+            velocity: 88,
+            from: memory.last,
+            riffs: previousPhrase.kinds.map(() => false),
+            develops: null,
+            restates: null,
+            loops: previousPhrase,
+            peak: false,
+        };
+    }
+    // The solo's opening statement may leave two bars of room after it; nothing else does.
+    const opensSolo =
+        chorus === 1 && (slotStart === 0 || /^intro/i.test(bars[slotStart - 1].visit.label));
     // Now and then (the book's `space`) a phrase takes a roomier shape than its density — but
-    // the two-bar breath stays the first chorus's, and a phrase after an empty bar comes
+    // the two-bar breath stays the opening statement's, and a phrase after an empty bar comes
     // straight in.
     const roomier =
         !arc.peak && !arc.windDown && arc.density !== 'sparse' && rng.chance(book.space);
@@ -289,7 +340,7 @@ function soloPlan(
     const choices = SOLO_SHAPES[density].filter(
         ([s]) =>
             (memory.trailing === 0 || s[0] !== 'rest') &&
-            (chorus === 1 || s.slice(-2).join() !== 'rest,rest'),
+            (opensSolo || s.slice(-2).join() !== 'rest,rest'),
     );
     const shape = arc.peak
         ? (['line', 'line', 'line', 'end'] as BarKind[])
@@ -329,13 +380,12 @@ function soloPlan(
         previous = cell;
         return cell;
     });
-    const [lo, hi] = ctx.lead.range;
     const span = SPAN[arc.density];
-    // The peak climbs to the top of the instrument; the busy phrases around it stay a 3rd or
-    // more below, so the peak is the top.
+    // The peak climbs to its top; the busy phrases around it stay a 3rd or more below, so the
+    // peak is the top.
     const centre = arc.peak
-        ? hi - span / 2 - 1
-        : Math.min(ctx.lead.home + arc.register, hi - span / 2 - 7);
+        ? top - span / 2
+        : Math.min(ctx.lead.home + arc.register, top - span / 2 - 6);
     return {
         kinds,
         cells,
@@ -347,6 +397,7 @@ function soloPlan(
         riffs,
         develops,
         restates: null,
+        loops: null,
         peak: arc.peak,
     };
 }
@@ -468,7 +519,14 @@ function adapt(
 ): number {
     const pool = palette.pool(onset.chord, onset.key);
     const tones = chordPcs(onset.chord);
-    const fits = (m: number) => (target ? tones.includes(mod12(m)) : pool.includes(mod12(m)));
+    // A held note obeys the line's rub rule: no non-chord tone a half step from a chord tone.
+    const held = onset.dur > STEP * 2;
+    const rub = (m: number) =>
+        held &&
+        !tones.includes(mod12(m)) &&
+        (tones.includes(mod12(m - 1)) || tones.includes(mod12(m + 1)));
+    const fits = (m: number) =>
+        target ? tones.includes(mod12(m)) : pool.includes(mod12(m)) && !rub(m);
     let m = source;
     if (!fits(m)) {
         let shift = mod12(onset.chord.root - sourceChord.root);
@@ -477,7 +535,7 @@ function adapt(
         }
         m = source + shift;
         if (!fits(m)) {
-            m = nearestOf(target ? tones : pool, m);
+            m = nearestOf(target || held ? tones : pool, m);
         }
     }
     while (m < range[0]) {
@@ -555,6 +613,14 @@ function voiceSolo(
     role: LeadRole,
 ): Voiced {
     const onsets = onsetsFor(ctx, slotStart, plan);
+    const targets = targetsOf(onsets);
+    // A looped phrase keeps the last one's notes, each moved onto the chord now under it.
+    const carried: (number | null)[] = onsets.map((o, i) => {
+        const source = plan.loops?.notes.find((n) => n.bar === o.bar && n.step === o.step);
+        return source
+            ? adapt(source.midi, source.chord, o, targets[i], book, ctx.lead.range)
+            : null;
+    });
     const pitches = voiceLine(
         onsets,
         book,
@@ -566,8 +632,8 @@ function voiceSolo(
             from: plan.from,
         },
         lineRng(ctx, role, slotStart),
+        carried,
     );
-    const targets = targetsOf(onsets);
     const inBar = (k: number) => onsets.map((o, i) => (o.bar === k ? i : -1)).filter((i) => i >= 0);
     // A developed motif keeps its intervals: the opening bar's first note lands where the line
     // put it, and the rest follow the motif's shape from there, moved onto this chord.
@@ -619,9 +685,14 @@ function planSlot(
     slotStart: number,
     role: LeadRole,
     memory: LeadMemory,
-): { notes: Planned[]; motif: Motif | null; trailing: number } {
+): {
+    notes: Planned[];
+    motif: Motif | null;
+    trailing: number;
+    phrase: PhraseMemory | null;
+} {
     if (role.kind === 'rest') {
-        return { notes: [], motif: memory.motif, trailing: memory.trailing };
+        return { notes: [], motif: memory.motif, trailing: memory.trailing, phrase: memory.phrase };
     }
     let voiced: Voiced;
     if (role.kind === 'head') {
@@ -668,12 +739,17 @@ function planSlot(
         // arrive).
         if (ctx.lead.bends && (targets[i] || apex) && o.dur >= STEP * 2) {
             const fifth = o.chord.fifth ?? 7;
-            if (pc === 4 && o.chord.third === 4 && (apex || rng.chance(book.bends.blue))) {
+            // The peak's top note is bent if this player bends at all.
+            if (
+                pc === 4 &&
+                o.chord.third === 4 &&
+                ((apex && book.bends.blue > 0) || rng.chance(book.bends.blue))
+            ) {
                 note.bendIn = 1;
             } else if (
                 (pc === 0 || (pc === fifth && fifth === 7)) &&
                 o.dur >= STEP * 4 &&
-                (apex || rng.chance(book.bends.root))
+                ((apex && book.bends.root > 0) || rng.chance(book.bends.root))
             ) {
                 note.bendIn = 2;
             }
@@ -701,13 +777,33 @@ function planSlot(
             : memory.motif;
     // Two empty bars at the end of a slot are a rest already: the next slot plays.
     const trailing = plan.kinds.length - 1 - plan.kinds.map((k) => k !== 'rest').lastIndexOf(true);
-    return { notes, motif, trailing };
+    const phrase: PhraseMemory | null =
+        role.kind === 'solo'
+            ? {
+                  kinds: plan.kinds,
+                  cells: plan.cells,
+                  notes: onsets.map((o, i) => ({
+                      bar: o.bar,
+                      step: o.step,
+                      midi: pitches[i],
+                      chord: o.chord,
+                  })),
+              }
+            : memory.phrase;
+    return { notes, motif, trailing, phrase };
 }
 
 export function leadIdiom(book: LeadBook): PitchedIdiom {
     return {
         name: book.name,
-        init: (): LeadMemory => ({ slot: '', notes: [], last: null, motif: null, trailing: 0 }),
+        init: (): LeadMemory => ({
+            slot: '',
+            notes: [],
+            last: null,
+            motif: null,
+            trailing: 0,
+            phrase: null,
+        }),
         play(ctx: BarContext, memory: LeadMemory) {
             const { bar } = ctx;
             const slotStart = bar.index - bar.phrase.bar;
@@ -722,6 +818,7 @@ export function leadIdiom(book: LeadBook): PitchedIdiom {
                     notes: planned.notes,
                     motif: planned.motif,
                     trailing: planned.trailing,
+                    phrase: planned.phrase,
                 };
             }
             const events: PitchedNote[] = next.notes

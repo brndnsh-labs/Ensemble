@@ -266,6 +266,28 @@ export function voiceLine(
         }
         a = b;
     }
+    // An approach placed before its walk can still complete a trill (a-b-a-b) with the walk's
+    // last notes: re-choose the free note in the middle of it.
+    for (let i = 3; i < n; i++) {
+        const [w, x, y, z] = [pitches[i - 3], pitches[i - 2], pitches[i - 1], pitches[i]];
+        if (w === null || w !== y || x !== z || w === x) {
+            continue;
+        }
+        const k = !placed[i - 2] ? i - 2 : !placed[i - 1] ? i - 1 : -1;
+        if (k < 0) {
+            continue;
+        }
+        const o = onsets[k];
+        pitches[k] = snap(
+            pitches[k] as number,
+            palette.pool(o.chord, o.key),
+            chordPcs(o.chord),
+            register,
+            [pitches[k], pitches[k - 1], pitches[k + 1], pitches[k - 2] ?? null],
+            o.step % 4 === 0,
+            o.dur > PASSING,
+        );
+    }
     return pitches.map((m, i) => fold(m ?? Math.round(ideal(i)), range));
 }
 
