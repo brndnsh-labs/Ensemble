@@ -69,6 +69,63 @@ describe('timeline', () => {
         expect(t.bars.map((b) => b.spans[0].chord?.root)).toEqual([0, 5, 7, 0, 5, 9]);
     });
 
+    it('starts a new visit when the performance jumps back inside a section', () => {
+        // D.S. to a segno on bar 2 of the same section: the return is its own visit, not bars
+        // 5–7 of one long one. A written repeat from bar 1 is the same shape.
+        const ds = compileTimeline(
+            score([
+                {
+                    label: 'A',
+                    bars: 'C | F | G | Am',
+                    start: { 1: [{ kind: 'segno', label: 'S' }] },
+                    end: {
+                        3: [
+                            {
+                                kind: 'jump',
+                                from: 'segno',
+                                segno: 'S',
+                                destination: { kind: 'end' },
+                                repeats: 'play',
+                            },
+                        ],
+                    },
+                },
+            ]),
+        );
+        expect(ds.visits.map((v) => [v.label, v.barCount])).toEqual([
+            ['A', 4],
+            ['A', 3],
+        ]);
+        expect(ds.bars.map((b) => b.barInVisit)).toEqual([0, 1, 2, 3, 0, 1, 2]);
+        const repeat = compileTimeline(
+            score([
+                {
+                    label: 'A',
+                    bars: 'C | F | G | Am',
+                    start: { 1: [{ kind: 'repeat-start' }] },
+                    end: { 2: [{ kind: 'repeat-end', times: 2 }] },
+                },
+            ]),
+        );
+        expect(repeat.visits.map((v) => v.barCount)).toEqual([3, 3]);
+        // A second ending skips forward, which stays inside the visit.
+        const endings = compileTimeline(
+            score([
+                {
+                    label: 'A',
+                    bars: 'C | F | G | Am',
+                    start: {
+                        0: [{ kind: 'repeat-start' }],
+                        2: [{ kind: 'ending-start', passes: [1] }],
+                        3: [{ kind: 'ending-start', passes: [2] }],
+                    },
+                    end: { 2: [{ kind: 'repeat-end', times: 2 }], 3: [{ kind: 'ending-end' }] },
+                },
+            ]),
+        );
+        expect(endings.visits.map((v) => v.barCount)).toEqual([3, 3]);
+    });
+
     it('resolves roman numerals against the section key', () => {
         const t = compileTimeline(FIXTURES.romanNumerals);
         expect(chordAt(t, 0)?.root).toBe(7); // I in G

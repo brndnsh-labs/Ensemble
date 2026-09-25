@@ -36,7 +36,7 @@ export interface BarSpan extends ChordSpan {
 }
 
 export interface SectionVisit {
-    /** Ordinal of this visit in the performance (a D.C. revisit is a new visit). */
+    /** Ordinal of this visit in the performance (any jump back, a D.C. or a repeat, is a new visit). */
     ordinal: number;
     sectionIndex: number;
     id: string;
@@ -118,11 +118,14 @@ export function compileTimeline(score: SemanticScore): Timeline {
     let tick = 0;
     let visit: SectionVisit | null = null;
     let visitKey = '';
+    let lastMeasure = -1;
 
     for (const written of visitsWritten) {
         const section = score.sections[written.sectionIndex];
         const key = `${written.sectionIndex}:${written.sectionPass}`;
-        if (!visit || key !== visitKey || written.measureIndex === 0) {
+        // A jump back inside the section (a repeat, a D.S. to a segno within it) starts a new
+        // visit; a forward skip (a second ending) stays inside this one.
+        if (!visit || key !== visitKey || written.measureIndex <= lastMeasure) {
             const lanes: Partial<Record<Lane, boolean>> = {};
             for (const [name, on] of Object.entries(section.instruments ?? {})) {
                 // An authored key indexes this table: guard with hasOwn (the #1266 rule).
@@ -147,6 +150,7 @@ export function compileTimeline(score: SemanticScore): Timeline {
             visits.push(visit);
             visitKey = key;
         }
+        lastMeasure = written.measureIndex;
         const context = contexts[written.sectionIndex][written.measureIndex];
         const meter = buildMeter(context.meter, context.grouping);
         const keyContext = { tonic: notePc(context.key), minor: context.isMinor };
