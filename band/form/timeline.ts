@@ -76,7 +76,12 @@ function durationTicks([n, d]: Readonly<ScoreDuration>): number {
     return Math.round((n * PPQ) / d);
 }
 
-const SECTION_LANES: Record<string, Lane> = { groove: 'drums', bass: 'bass', chords: 'comp' };
+const SECTION_LANES: Record<string, Lane> = {
+    groove: 'drums',
+    bass: 'bass',
+    chords: 'comp',
+    soloist: 'lead',
+};
 
 function phraseLayout(barCount: number): number[] {
     // Four-bar phrases; a short tail joins the last phrase (a 6-bar section is 6, not 4+2).
@@ -120,7 +125,8 @@ export function compileTimeline(score: SemanticScore): Timeline {
         if (!visit || key !== visitKey || written.measureIndex === 0) {
             const lanes: Partial<Record<Lane, boolean>> = {};
             for (const [name, on] of Object.entries(section.instruments ?? {})) {
-                const lane = SECTION_LANES[name];
+                // An authored key indexes this table: guard with hasOwn (the #1266 rule).
+                const lane = Object.hasOwn(SECTION_LANES, name) ? SECTION_LANES[name] : null;
                 if (lane && typeof on === 'boolean') {
                     lanes[lane] = on;
                 }

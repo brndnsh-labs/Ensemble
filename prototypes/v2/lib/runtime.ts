@@ -2,6 +2,8 @@ import {
     type BandSettings,
     type CompInstrument,
     compileTimeline,
+    DEFAULT_SETTINGS,
+    type LeadInstrument,
     PPQ,
     STYLE_IDS,
     STYLES,
@@ -178,6 +180,37 @@ const COMP_FOR_VOICE: Record<string, CompInstrument> = Object.assign(Object.crea
 const AUTO_VOICE_FOR_STYLE: Partial<Record<StyleId, InstrumentVoice>> = {
     metal: 'pack:electric-guitar-rhythm',
 };
+/** The lead's instruments as the soloist lane's sounds. The built-in lead voice is a trumpet. */
+const VOICE_FOR_LEAD: Record<LeadInstrument, InstrumentVoice> = {
+    sax: 'pack:sax-alto',
+    trumpet: 'synth',
+    guitar: 'pack:electric-guitar-clean',
+    overdrive: 'pack:electric-guitar-driven',
+    nylon: 'pack:nylon-guitar',
+};
+const LEAD_FOR_VOICE: Record<string, LeadInstrument> = Object.assign(
+    Object.create(null),
+    Object.fromEntries(Object.entries(VOICE_FOR_LEAD).map(([lead, voice]) => [voice, lead])),
+);
+/** In next mode, a native style with a lead picks its lead instrument's sound. */
+function bandAutoLead(genre: string | undefined): InstrumentVoice | null {
+    const style = STYLE_IDS.find((id) => STYLES[id].name === genre);
+    const lead = style ? STYLES[style].lead : undefined;
+    return ENGINE_NEXT && lead ? VOICE_FOR_LEAD[lead.prefers] : null;
+}
+/**
+ * The lead instrument the band plays. The soloist's sound names it — except the built-in
+ * voice on Follow feel, which is only the sound a device without packs has: the style's own
+ * instrument still decides how the lead plays (a rock guitarist bends, whatever it sounds on).
+ */
+function bandLead(style: StyleId): LeadInstrument {
+    const { soloist } = getState();
+    const preferred = STYLES[style].lead?.prefers ?? DEFAULT_SETTINGS.lead;
+    if (soloist.autoSound && soloist.voice === 'synth') {
+        return preferred;
+    }
+    return LEAD_FOR_VOICE[soloist.voice] ?? preferred;
+}
 /** In next mode, a genre the band plays natively picks its own comp instrument's sound. */
 function bandAutoComp(genre: string | undefined): InstrumentVoice | null {
     const style = STYLE_IDS.find((id) => STYLES[id].name === genre);
@@ -234,15 +267,22 @@ function scoreForBand(): SemanticScore {
 }
 
 function bandSettings(): BandSettings {
-    const { groove, bass, chords, playback } = getState();
+    const { groove, bass, chords, soloist, playback } = getState();
+    // A persisted genre string indexes this table: guard with hasOwn (the #1266 rule), so
+    // 'constructor' or a retired key can't read an Object prototype member as a style.
+    const style = Object.hasOwn(STYLE_FOR_GENRE, groove.lastSmartGenre)
+        ? STYLE_FOR_GENRE[groove.lastSmartGenre]
+        : 'rock';
     return {
-        // A persisted genre string indexes this table: guard with hasOwn (the #1266 rule), so
-        // 'constructor' or a retired key can't read an Object prototype member as a style.
-        style: Object.hasOwn(STYLE_FOR_GENRE, groove.lastSmartGenre)
-            ? STYLE_FOR_GENRE[groove.lastSmartGenre]
-            : 'rock',
-        lanes: { drums: groove.enabled, bass: bass.enabled, comp: chords.enabled },
+        style,
+        lanes: {
+            drums: groove.enabled,
+            bass: bass.enabled,
+            comp: chords.enabled,
+            lead: soloist.enabled,
+        },
         comp: COMP_FOR_VOICE[chords.voice] ?? 'piano',
+        lead: bandLead(style),
         intensity: playback.autoIntensity ? null : playback.bandIntensity,
         swing: groove.swing,
         swingGrid: groove.swingSub === '16th' ? 16 : 8,
@@ -352,11 +392,23 @@ function syncBand(): void {
     // The genre-change effect in `public/` picks the old engine's Auto sound; on the band,
     // a native genre's own comp instrument wins (bossa is heard on nylon). Only an installed
     // pack is taken, since Follow feel never downloads (#1405).
-    const { chords } = getState();
+    const { chords, soloist } = getState();
     const auto = bandAutoComp(groove.lastSmartGenre);
     if (auto && chords.autoSound && chords.voice !== auto && isPackInstalled(auto.slice(5))) {
         dispatch(ACTIONS.SET_INSTRUMENT_VOICE, { module: 'chords', voice: auto, auto: true });
         return; // that dispatch syncs the band again
+    }
+    // The same for the lead: a native style's own lead instrument, when its pack is installed
+    // (the built-in voice needs no pack).
+    const autoLead = bandAutoLead(groove.lastSmartGenre);
+    if (
+        autoLead &&
+        soloist.autoSound &&
+        soloist.voice !== autoLead &&
+        (autoLead === 'synth' || isPackInstalled(autoLead.slice(5)))
+    ) {
+        dispatch(ACTIONS.SET_INSTRUMENT_VOICE, { module: 'soloist', voice: autoLead, auto: true });
+        return;
     }
     if (!host?.playing) {
         return;
@@ -878,8 +930,12 @@ export function recommendedVoice(
 ): InstrumentVoice {
     const state = getState();
     const bandVoice =
-        module === 'chords' ? bandAutoComp(genre ?? state.groove.lastSmartGenre) : null;
-    if (bandVoice && isPackInstalled(bandVoice.slice(5))) {
+        module === 'chords'
+            ? bandAutoComp(genre ?? state.groove.lastSmartGenre)
+            : module === 'soloist'
+              ? bandAutoLead(genre ?? state.groove.lastSmartGenre)
+              : null;
+    if (bandVoice && (bandVoice === 'synth' || isPackInstalled(bandVoice.slice(5)))) {
         return bandVoice;
     }
     // Follow feel plays only what this device has installed and never downloads by itself
@@ -1281,8 +1337,14 @@ export function exportMidi(filename: string): Promise<void> {
         const host = bandHost();
         host.setScore(scoreForBand());
         bandSeed ||= String(getState().arranger.seed || 'ensemble');
-        const { events, timeline } = host.render(bandSettings());
-        const bytes = toMidi(events, timeline, { bpm: getState().playback.bpm, title: filename });
+        const settings = bandSettings();
+        const { events, timeline } = host.render(settings);
+        const bytes = toMidi(events, timeline, {
+            bpm: getState().playback.bpm,
+            title: filename,
+            comp: settings.comp,
+            lead: settings.lead,
+        });
         const name = `${filename.replace(/[^a-zA-Z0-9\s\-_()]/g, '').trim() || 'ensemble'}.mid`;
         downloadExportResult({
             blob: new Blob([bytes], { type: 'audio/midi' }),
@@ -1364,7 +1426,7 @@ export async function exportAudio(
         // pass every stem below is sliced from, rather than muting/soloing per-stem state.
         const { events, timeline } = host.render({
             ...bandSettings(),
-            lanes: { drums: true, bass: true, comp: true },
+            lanes: { drums: true, bass: true, comp: true, lead: true },
         });
         try {
             const results = await renderBandStemsToWav(events, timeline, bpm, instruments, {

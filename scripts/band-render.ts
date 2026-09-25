@@ -3,10 +3,12 @@
  *
  *   npm run band:render -- --chart=blues --style=jazz --bpm=140 [--seed=x] [--passes=2]
  *                          [--intensity=0.8] [--comp=guitar] [--off=bass] [--out=tmp/band]
- *                          [--print=8]
+ *                          [--print=8] [--lead[=guitar]] [--show=1]
  *
  * `--chart=all --style=all` renders every fixture in every style. `--print=N` prints the
- * first N bars as a grid, for reading a groove without a DAW.
+ * first N bars as a grid, for reading a groove without a DAW; `--show=P` prints pass P instead
+ * of the first (the lead's head is pass 0, its solo choruses passes 1–3). `--lead` turns the
+ * lead on, on its style's instrument or the one named.
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -16,9 +18,11 @@ import {
     type CompInstrument,
     compileTimeline,
     DEFAULT_SETTINGS,
+    type LeadInstrument,
     type PassMemory,
     performPass,
     STYLE_IDS,
+    STYLES,
     type StyleId,
     type Timeline,
     toMidi,
@@ -74,19 +78,31 @@ function printBars(timeline: Timeline, events: BandEvent[], count: number) {
             }
             console.log(`  ${piece.padEnd(8)} ${row.join('')}`);
         }
-        for (const lane of ['bass', 'comp'] as const) {
+        for (const lane of ['lead', 'bass', 'comp'] as const) {
             const notes = inBar.filter((e) => e.lane === lane);
             const byStep = new Map<number, string[]>();
             for (const n of notes) {
                 if (n.lane === 'drums') {
                     continue;
                 }
-                const mark = n.muted ? '×' : n.palm ? 'ᵖ' : n.stroke === 'up' ? '↑' : '';
-                const name = `${NOTE[n.midi % 12]}${Math.floor(n.midi / 12) - 1}${mark}`;
+                const mark = n.muted
+                    ? '×'
+                    : n.palm
+                      ? 'ᵖ'
+                      : n.stroke === 'up'
+                        ? '↑'
+                        : n.bendIn
+                          ? `⤴${n.bendIn}`
+                          : '';
+                const held =
+                    n.lane === 'lead' ? `/${Math.round(n.dur / 120)}${n.vibrato ? '~' : ''}` : '';
+                const name = `${NOTE[n.midi % 12]}${Math.floor(n.midi / 12) - 1}${mark}${held}`;
                 byStep.set(cell(n), [...(byStep.get(cell(n)) ?? []), name]);
             }
             const text = [...byStep].map(([s, names]) => `${s}:${names.join('+')}`).join(' ');
-            console.log(`  ${lane.padEnd(8)} ${text}`);
+            if (text || lane !== 'lead') {
+                console.log(`  ${lane.padEnd(8)} ${text}`);
+            }
         }
     }
 }
@@ -98,8 +114,12 @@ for (const chart of charts) {
     }
     const timeline = compileTimeline(score);
     for (const style of styles) {
+        const leadOn = args.lead !== undefined;
         const settings = {
             ...DEFAULT_SETTINGS,
+            lead: (args.lead && args.lead !== 'true'
+                ? args.lead
+                : (STYLES[style].lead?.prefers ?? 'sax')) as LeadInstrument,
             style,
             seed: args.seed ?? 'ensemble',
             intensity: args.intensity ? Number(args.intensity) : null,
@@ -108,6 +128,7 @@ for (const chart of charts) {
                 drums: !args.off?.includes('drums'),
                 bass: !args.off?.includes('bass'),
                 comp: !args.off?.includes('comp'),
+                lead: leadOn,
             },
         };
         const all: BandEvent[] = [];
@@ -127,14 +148,23 @@ for (const chart of charts) {
         const file = path.join(out, `${chart}-${style}.mid`);
         writeFileSync(
             file,
-            toMidi(all, extended, { bpm, title: `${chart} (${style})`, comp: settings.comp }),
+            toMidi(all, extended, {
+                bpm,
+                title: `${chart} (${style})`,
+                comp: settings.comp,
+                lead: settings.lead,
+            }),
         );
         console.log(`${file}  ${all.length} events`);
         if (args.print) {
-            // The first pass only: a later pass reuses the bar indices at offset ticks.
+            // One pass (the first unless `--show`): passes reuse the bar indices at offset ticks.
+            const show = Number(args.show ?? 0);
+            const from = show * timeline.ticks;
             printBars(
                 timeline,
-                all.filter((e) => e.tick < timeline.ticks),
+                all
+                    .filter((e) => e.tick >= from && e.tick < from + timeline.ticks)
+                    .map((e) => ({ ...e, tick: e.tick - from })),
                 Number(args.print),
             );
         }

@@ -25,6 +25,7 @@ import {
 import { playBassNote } from '@engine/engine/synth-bass';
 import { playNote } from '@engine/engine/synth-chords';
 import { playDrumSound } from '@engine/engine/synth-drums';
+import { playSoloNote } from '@engine/engine/synth-soloist';
 import type { SemanticScore } from '@engine/songbook/score-types';
 import type { EnsembleState } from '@engine/types';
 
@@ -70,6 +71,8 @@ interface Segment {
     cursor: number;
     /** Keys chord sizes by tick, for the voice's per-note gain. */
     chordSizes: Map<number, number>;
+    /** Lead notes slurred from the one before. */
+    legato: Set<BandEvent>;
     /** Engine memory before each bar, and after the last one. */
     memoryBefore: PassMemory | undefined;
     snapshots: PassMemory[];
@@ -109,6 +112,7 @@ export function playBandEvent(
     time: number,
     durationSeconds: number,
     chordSize: number,
+    legato = false,
 ): void {
     if (event.lane === 'drums') {
         // The drum voices take roughly 0–1.2 (an accent sits a little over 1).
@@ -123,6 +127,24 @@ export function playBandEvent(
             durationSeconds,
             (event.velocity / 127) * 1.1,
             event.muted ? BASS_MUTE : 0,
+        );
+        return;
+    }
+    if (event.lane === 'lead') {
+        // The soloist's voice or pack (sax, trumpet, guitars) on the soloist bus. A bend or
+        // scoop starts below the written pitch and glides up into it; the per-note seed keys
+        // the voice's timbral humanising to the note's place in the song.
+        playSoloNote(
+            state,
+            hz(event.midi),
+            time,
+            durationSeconds,
+            (event.velocity / 127) * 1.1,
+            -(event.bendIn ?? 0),
+            'scalar',
+            legato,
+            event.vibrato === true,
+            event.tick,
         );
         return;
     }
@@ -141,6 +163,25 @@ export function playBandEvent(
         instrument: (state.chords as { instrument?: string }).instrument || 'Piano',
         numVoices: chordSize,
     });
+}
+
+/**
+ * The lead notes that follow the one before without a gap — slurred, not re-tongued or
+ * re-picked. A bent or scooped note is always attacked: the bend is its articulation.
+ */
+export function legatoLeads(events: BandEvent[]): Set<BandEvent> {
+    const out = new Set<BandEvent>();
+    let previousEnd = Number.NEGATIVE_INFINITY;
+    for (const e of events) {
+        if (e.lane !== 'lead') {
+            continue;
+        }
+        if (!e.bendIn && Math.abs(e.tick - previousEnd) < 10) {
+            out.add(e);
+        }
+        previousEnd = e.tick + e.dur;
+    }
+    return out;
 }
 
 function chordSizes(events: BandEvent[]): Map<number, number> {
@@ -257,6 +298,7 @@ export class BandHost {
             current.cursor = current.events.length;
         }
         current.chordSizes = chordSizes(current.events);
+        current.legato = legatoLeads(current.events);
         for (let bar = cutoffBar; bar < current.window.to; bar++) {
             current.snapshots[bar] = tail.snapshots[bar];
         }
@@ -381,6 +423,7 @@ export class BandHost {
             events: result.events,
             cursor: 0,
             chordSizes: chordSizes(result.events),
+            legato: legatoLeads(result.events),
             memoryBefore: memory,
             snapshots: result.snapshots,
             memoryAfter: result.memory,
@@ -463,7 +506,14 @@ export class BandHost {
             event.lane === 'drums'
                 ? 0
                 : this.timeOf(segment, event.tick + event.dur) - this.timeOf(segment, event.tick);
-        playBandEvent(state, event, time, durationSeconds, segment.chordSizes.get(event.tick) ?? 1);
+        playBandEvent(
+            state,
+            event,
+            time,
+            durationSeconds,
+            segment.chordSizes.get(event.tick) ?? 1,
+            segment.legato.has(event),
+        );
     }
 
     /** The click: a beep on each pulse, accented on the downbeat. Same voice as the old engine. */

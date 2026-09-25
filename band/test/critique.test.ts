@@ -7,8 +7,9 @@ import type { StyleId } from '../core/types.js';
 import { CLAIMS } from './claims/index.js';
 import { METRICS, type Metric, perform, type TakeSpec } from './critique/harness.js';
 
-function label({ comp, intensity, bass }: TakeSpec): string {
+function label({ comp, intensity, bass, lead }: TakeSpec): string {
     const parts = [
+        lead ? `lead ${lead}` : '',
         comp ? `on ${comp}` : '',
         intensity === undefined ? '' : `at energy ${intensity}`,
         bass === false ? 'without bass' : '',
@@ -20,7 +21,13 @@ for (const style of Object.keys(CLAIMS) as StyleId[]) {
     const { metrics, takes } = CLAIMS[style];
     for (const { take, claims } of takes) {
         describe(`${style} critique${label(take)}`, () => {
-            const performed = perform(style, take.intensity ?? null, take.comp, take.bass);
+            const performed = perform(
+                style,
+                take.intensity ?? null,
+                take.comp,
+                take.bass,
+                take.lead,
+            );
             const report: string[] = [];
             it.each(claims)('%s in [%d, %d] — %s', (metric, min, max) => {
                 const measure: Metric | undefined =

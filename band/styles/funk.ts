@@ -21,6 +21,8 @@ import {
 import { compIdiom, type Hit, pendulum, strums } from '../players/comp/idiom.js';
 import { drumIdiom, snareFigure, tomRun } from '../players/drums/kit.js';
 import { dyn, spanSteps } from '../players/grid.js';
+import { leadIdiom } from '../players/lead/idiom.js';
+import { chordScale, minorPentatonic, rootFirst } from '../players/lead/palette.js';
 import { type ChordFacts, fifthOf } from '../theory/chord.js';
 import type { PitchedIdiom, Style } from './types.js';
 
@@ -258,6 +260,35 @@ const funkGuitar = compIdiom({
     },
 });
 
+// ================================================================ lead
+// A funk horn: short, clipped sixteenth figures with space around them (the rests are part of
+// the groove), a riff repeated bar after bar more often than not, the chord's own scale with
+// the key's minor pentatonic, landing on roots and fifths, and a scoop into a held note now
+// and then.
+const funkLead = leadIdiom({
+    name: 'funk lead',
+    cells: {
+        sparse: ['x..x..x.........', '..x.x..x........', 'x.x...x.x.......', '....x..x.x......'],
+        mid: ['x..x..x.x.x.....', '..x.xx.x..x.x...', 'x.xx..x.x..x....', 'x..x.x..x..x.x..'],
+        busy: ['x.xx.xx.x.xx.x..', 'xxx.x.xx.x.x.x..', '..xx.x.xx.x.xx..', 'x.x.xx.x.xx.x.x.'],
+    },
+    endings: ['x.x.x-----......', 'x-------........', '..x.x.x---......', 'x..x..x-----....'],
+    head: {
+        cells: ['x..x..x.x.......', '..x.x..x..x.....', 'x.x...x.x-......', 'x..x.x..x-......'],
+        endings: ['x-------........', 'x.x.x-------....'],
+        form: 'period',
+    },
+    pool: (chord, key) => [...new Set([...chordScale(chord), ...minorPentatonic(key.tonic)])],
+    arrive: (chord) => rootFirst(chord),
+    settle: (chord) => rootFirst(chord),
+    chromatic: 0.25,
+    enclosure: 0.05,
+    riff: 0.5,
+    space: 0.3,
+    bends: { blue: 0, root: 0 },
+    scoop: 0.2,
+});
+
 export const funk: Style = {
     id: 'funk',
     name: 'Funk',
@@ -267,4 +298,5 @@ export const funk: Style = {
     bass: funkBass,
     comp: { keyboard: funkKeys, guitar: funkGuitar },
     prefers: 'clav',
+    lead: { idiom: funkLead, prefers: 'sax' },
 };

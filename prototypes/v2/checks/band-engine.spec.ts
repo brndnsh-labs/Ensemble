@@ -10,7 +10,8 @@ declare global {
  * `?engine=next` plays the new band engine (docs/design/band-engine.md) instead of the
  * worker generator. This proves the switch end to end on the real stand: sound reaches the
  * speakers, the chart pointer follows the form round the loop, the old worker generates
- * nothing, and Stop stops — with no page errors along the way.
+ * nothing, and Stop stops — with no page errors along the way. The lead (the soloist lane,
+ * off by default) is switched on, so its head plays too.
  */
 test('the band engine plays the chart round the loop and stops', async ({ page }) => {
     test.setTimeout(60_000);
@@ -72,6 +73,10 @@ test('the band engine plays the chart round the loop and stops', async ({ page }
     await tempo.fill('240');
     await tempo.press('Enter');
     await expect(page.locator('.chord')).toHaveText(['C', 'F', 'G7', 'C']);
+    const lead = page.getByRole('button', { name: 'Soloist', exact: true });
+    await expect(lead).toHaveAttribute('aria-pressed', 'false');
+    await lead.click();
+    await expect(lead).toHaveAttribute('aria-pressed', 'true');
 
     await page.evaluate(() => {
         window.__band.armed = true;

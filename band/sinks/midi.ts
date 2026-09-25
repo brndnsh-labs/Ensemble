@@ -4,9 +4,16 @@
  * Micro-timing (lean + character) is baked into tick positions at the given tempo; bar
  * meters and fermata stretches are written as meta events so a DAW's grid lines up.
  */
-import { type BandEvent, type CompInstrument, type DrumPiece, PPQ } from '../core/types.js';
+import {
+    type BandEvent,
+    type CompInstrument,
+    type DrumPiece,
+    type LeadInstrument,
+    PPQ,
+} from '../core/types.js';
 import type { Timeline } from '../form/timeline.js';
 import { COMP_INSTRUMENTS } from '../players/comp/instruments.js';
+import { LEAD_INSTRUMENTS } from '../players/lead/instruments.js';
 
 /** General MIDI percussion keys. */
 const GM_DRUMS: Record<DrumPiece, number> = {
@@ -77,12 +84,14 @@ export interface MidiOptions {
     title?: string;
     /** The comp lane's instrument, for its General MIDI program. */
     comp?: CompInstrument;
+    /** The lead's instrument, for its General MIDI program. */
+    lead?: LeadInstrument;
 }
 
 export function toMidi(
     events: BandEvent[],
     timeline: Timeline,
-    { bpm, title = 'Ensemble', comp = 'piano' }: MidiOptions,
+    { bpm, title = 'Ensemble', comp = 'piano', lead = 'sax' }: MidiOptions,
 ): Uint8Array<ArrayBuffer> {
     const msToTicks = (ms: number) => (ms / 1000) * (bpm / 60) * PPQ;
     // Conductor track: tempo, meters, stretches.
@@ -111,15 +120,21 @@ export function toMidi(
             });
         }
     }
-    const lanes: Record<
-        'drums' | 'bass' | 'comp',
-        { channel: number; program: number; name: string; out: Timed[] }
+    const lanes: Partial<
+        Record<BandEvent['lane'], { channel: number; program: number; name: string; out: Timed[] }>
     > = {
         drums: { channel: 9, program: 0, name: 'Drums', out: [] },
         bass: { channel: 0, program: 33, name: 'Bass', out: [] },
         comp: { channel: 1, program: COMP_INSTRUMENTS[comp].program, name: 'Comp', out: [] },
     };
+    // A lead track only when the lead played: a band-only file keeps its three tracks.
+    if (events.some((e) => e.lane === 'lead')) {
+        lanes.lead = { channel: 2, program: LEAD_INSTRUMENTS[lead].program, name: 'Lead', out: [] };
+    }
     for (const lane of Object.values(lanes)) {
+        if (!lane) {
+            continue;
+        }
         lane.out.push({ tick: 0, order: 0, data: text(0x03, lane.name) });
         if (lane.channel !== 9) {
             lane.out.push({ tick: 0, order: 0, data: [0xc0 | lane.channel, lane.program] });
@@ -146,14 +161,17 @@ export function toMidi(
     }
     notes.forEach(({ e, start, note }, i) => {
         const lane = lanes[e.lane];
+        if (!lane) {
+            return;
+        }
         lane.out.push({ tick: start, order: 2, data: [0x90 | lane.channel, note, e.velocity] });
         // Note-offs sort before note-ons at the same tick, so a re-strike is never swallowed.
         lane.out.push({ tick: ends[i], order: 1, data: [0x80 | lane.channel, note, 0] });
     });
     const chunks = [
-        header(3 + 1),
+        header(Object.keys(lanes).length + 1),
         track(conductor),
-        ...Object.values(lanes).map((l) => track(l.out)),
+        ...Object.values(lanes).map((l) => track(l?.out ?? [])),
     ];
     const out = new Uint8Array(chunks.reduce((n, c) => n + c.length, 0));
     let offset = 0;

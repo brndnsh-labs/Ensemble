@@ -118,6 +118,49 @@ physical: its range, its strum speed, whether it sustains.
 Idioms write whole-bar patterns for 4/4 and pulse cells for other meters. Every meter the codec
 accepts plays; only 4/4 is idiomatic in v0.
 
+### The lead: a soloist that knows the whole song (Round 3, DECISION 2026-09-24)
+
+The lead plays after the bass and before the comp, so the comp hears it (`heard.lead`) and can
+answer it. It is **off by default** (`BandSettings.lanes.lead`): someone practising wants the
+band, not a soloist. A style gives it one book (`Style.lead`) and a default instrument; the
+instrument (`players/lead/instruments.ts`: alto sax, trumpet, clean or overdriven guitar,
+nylon) adds its range, its home register and whether it bends.
+
+Carried over from the old soloist as laws, not code: a phrase is planned whole before a note is
+chosen; strong beats land on chord tones, and a chord change lands on a guide tone, by rule
+rather than by weighted chance; motifs belong to phrases and sections, not to single notes;
+expression devices take turns rather than stack; one peak note per cycle.
+
+- **Form first.** The lead works out the song's form before any note.
+  - The first time through, it plays the **head**: a tune it writes from the changes, keyed on
+    the written section, so an AABA chart gets an AABA tune and the head sounds the same every
+    time it comes back.
+  - Looping, it solos over the next three choruses and brings the head back on the fourth:
+    head, solo, solo, solo, head… The three solo choruses are one arc: the first starts low and
+    sparse, the second develops, the third reaches the cycle's one peak note, then winds down so
+    the head can return.
+  - An intro is the band's: the lead enters after it. A section labelled Solo is a solo on any
+    pass.
+- **Phrases, and the space between them.** Each four-bar phrase of the timeline is a slot the
+  lead plays in or rests in. A phrase is planned whole at its first bar and kept in memory, so
+  any barline can resume it. Most slots leave room: a phrase plays two or three bars and
+  breathes, or plays a call and an answer with a gap between.
+- **Rhythm before pitch.** A phrase's rhythm is built from the style's rhythm vocabulary (cells
+  on the sixteenth grid: bebop eighth-note lines, a blues call, funk stabs), and its last note
+  is a long one: an arrival. The style's cells are its dialect, as the comp's cells are.
+- **Targets, then the line between them.** Pitches are chosen targets-first. The phrase's first
+  note, its last note, and every note that falls on a chord change are *targets*: a guide tone
+  (3rd or 7th) at a change, a stable chord tone at the end. The notes between walk toward the
+  next target through the style's note pool (the chord scale for jazz, the key's blues scale
+  for blues), mostly by step, and the note before a target may approach it by half step or
+  enclose it. A contour (arch, fall, climb, wave) sets where the targets sit.
+- **Motifs develop.** A phrase's first cell and its contour are its motif. The next phrase may
+  repeat it, sequence it onto the new chord, vary its rhythm or answer it; a blues head is
+  AAB (a call, the same call over the IV, a different answer).
+- **Articulation.** A long note sings with vibrato; a guitar bends into a blue third or a root
+  from below (`bendIn`); a horn scoops now and then. The host plays the lead on today's
+  soloist voices and packs.
+
 ## The live host (`prototypes/v2/lib/band-host.ts`)
 
 `?engine=next` routes the runtime's play, stop and resume paths through `startBand`/`stopBand`

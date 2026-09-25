@@ -23,19 +23,20 @@ import {
 } from '@engine/export/audio-export';
 import { cloneStateForDetachedGeneration } from '@engine/export/detached-generation-state';
 import { getState } from '@engine/state';
-import { playBandEvent } from './band-host';
+import { legatoLeads, playBandEvent } from './band-host';
 
 /** Matches `audio-export.ts`'s `leadIn` — a hair of silence before the first note. */
 const LEAD_IN_S = 0.25;
 /** Tail after the pass ends for release/reverb decay, matching `audio-export.ts`'s own `+2`. */
 const RELEASE_TAIL_S = 2;
 
-/** The band's three lanes a stem export can isolate; `StemInstrument`'s `soloist`/`harmony`
- * have no band lane at all — the engine plays neither (v0 scope, docs/design/band-engine.md). */
+/** The band's lanes a stem export can isolate; `StemInstrument`'s `harmony` has no band lane
+ * (harmony is not a band role — docs/design/band-engine.md). */
 const STEM_LANE: Partial<Record<StemInstrument, Lane>> = {
     drums: 'drums',
     bass: 'bass',
     chords: 'comp',
+    soloist: 'lead',
 };
 
 /**
@@ -72,6 +73,7 @@ async function renderBandEventsToWav(
             chordSizes.set(event.tick, (chordSizes.get(event.tick) ?? 0) + 1);
         }
     }
+    const legato = legatoLeads(events);
     for (const event of events) {
         // The feel layer's micro-timing (lean, character, the strum roll) rides on
         // `offsetMs`, exactly as the live host schedules it — without it an export is quantized.
@@ -84,7 +86,14 @@ async function renderBandEventsToWav(
                 ? 0
                 : secondsAt(timeline, event.tick + event.dur, bpm) -
                   secondsAt(timeline, event.tick, bpm);
-        playBandEvent(state, event, time, durationSeconds, chordSizes.get(event.tick) ?? 1);
+        playBandEvent(
+            state,
+            event,
+            time,
+            durationSeconds,
+            chordSizes.get(event.tick) ?? 1,
+            legato.has(event),
+        );
     }
 
     const rendered = await offlineCtx.startRendering();
@@ -123,7 +132,7 @@ export async function renderBandMixToWav(
  * (`renderCurrentSessionToWav`'s sibling contract in `audio-export.ts`'s `renderStemsToWav`,
  * which re-clones state per stem with the target lane forced on instead; the band engine
  * needs only one such pass since lane muting is a settings input, not a state mutation).
- * `soloist`/`harmony` are silently dropped — the band engine has no such lane to render.
+ * `harmony` is silently dropped — the band engine has no such lane to render.
  */
 export async function renderBandStemsToWav(
     events: BandEvent[],

@@ -21,6 +21,8 @@ import { type GripShape, grip } from '../players/comp/fretboard.js';
 import { compIdiom, type Hit, strums } from '../players/comp/idiom.js';
 import { drumIdiom, tomRun } from '../players/drums/kit.js';
 import { at, dyn, isCommonTime, pulses, STEP, spanSteps } from '../players/grid.js';
+import { leadIdiom } from '../players/lead/idiom.js';
+import { bluesPool, bluesTargets, restingTones } from '../players/lead/palette.js';
 import { type ChordFacts, fifthOf } from '../theory/chord.js';
 import { mod12, nearestMidi } from '../theory/pitch.js';
 import type { BarContext, DrumIdiom, PitchedIdiom, Style } from './types.js';
@@ -621,6 +623,35 @@ const bluesGuitar: PitchedIdiom = {
     },
 };
 
+// ================================================================ lead
+// A blues guitarist: licks from the key's blues scale with the chord's own 3rd mixed in, a
+// call that is played again over the IV and then answered (the head is AAB, like a lyric), bends
+// up into the chord's 3rd from the blue third and into the root from the b7, a repeated lick
+// more often than a jazz player would allow, and room left between calls.
+const bluesLead = leadIdiom({
+    name: 'blues lead',
+    cells: {
+        sparse: ['x-x-x-------....', '..x-x-x-----....', 'x---x-x-----....', '....x-x-x-x-----'],
+        mid: ['x-x-x-x-x-------', '..x-x-x-x-x-x---', 'x-x-x---x-x-----', 'x---x-x-x-x-----'],
+        busy: ['x-x-x-x-x-x-x-x-', 'x-x-x-x-x-x-x---', '..x-x-x-x-x-x-x-', 'x-x-x-x-x---x-x-'],
+    },
+    endings: ['x-----------....', 'x-x-x-----------', 'x---------------', '..x-x-x---------'],
+    head: {
+        cells: ['x-x-x-------....', '..x-x-x-----....', 'x---x-x---x-----', 'x-x---x-x-------'],
+        endings: ['x---------------', 'x-x-x-----------'],
+        form: 'aab',
+    },
+    pool: (chord, key) => bluesPool(chord, key),
+    arrive: (chord) => bluesTargets(chord),
+    settle: (chord) => restingTones(chord),
+    chromatic: 0.2,
+    enclosure: 0.05,
+    riff: 0.35,
+    space: 0.3,
+    bends: { blue: 0.5, root: 0.25 },
+    scoop: 0.15,
+});
+
 export const blues: Style = {
     id: 'blues',
     name: 'Blues',
@@ -645,4 +676,5 @@ export const blues: Style = {
     // very book this style writes. The organ stays available (a held pad under the shuffle,
     // filling the space a lead will later take), just not the genre's default voice.
     prefers: 'piano',
+    lead: { idiom: bluesLead, prefers: 'guitar' },
 };

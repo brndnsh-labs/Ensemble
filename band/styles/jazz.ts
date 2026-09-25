@@ -19,6 +19,8 @@ import {
 import { compIdiom, type Hit } from '../players/comp/idiom.js';
 import { drumIdiom } from '../players/drums/kit.js';
 import { dyn, pulses, spanSteps } from '../players/grid.js';
+import { leadIdiom } from '../players/lead/idiom.js';
+import { bebopScale, guideTones, restingTones } from '../players/lead/palette.js';
 import { type ChordFacts, fifthOf } from '../theory/chord.js';
 import { mod12 } from '../theory/pitch.js';
 import type { PitchedIdiom, Style } from './types.js';
@@ -383,6 +385,68 @@ const jazzGuitar = compIdiom({
     },
 });
 
+// ================================================================ lead
+// A bebop horn: eighth-note lines (swung by the feel pass) that start on an upbeat as often as
+// on a beat, land a 3rd or 7th on every chord change and enclose it now and then, and end with
+// a short "doo-dat" or a held note. The bebop scale puts chord tones on the beats of a run.
+// The head is a period: a statement, its answer, a contrast, the statement back.
+const jazzLead = leadIdiom({
+    name: 'bebop lead',
+    cells: {
+        // Chorus one opens with short motifs: three or four notes and a breath.
+        sparse: [
+            '..x-x-x-----....',
+            'x-x---x-----....',
+            '....x-x-x-------',
+            'x---..x-x---....',
+            '..x-----x-x-x---',
+        ],
+        mid: [
+            'x---x-x-x-----..',
+            '..x-x-x---..x-x-',
+            'x-x-x-----..x-x-',
+            '....x-x-x---x---',
+            '..x---x-x---....',
+        ],
+        busy: [
+            'x-x-x-x-x-x-x-x-',
+            '..x-x-x-x-x-x-x-',
+            'x-x-x-x-x-x-x---',
+            '....x-x-x-x-x-x-',
+            'x-x-x---x-x-x-x-',
+        ],
+    },
+    // A phrase ends on an arrival; a call or an answer is a short figure that ends held.
+    endings: [
+        'x-x-x-------....',
+        '..x-x-x-----....',
+        'x-x---..........',
+        'x---x-------....',
+        '..x-x-x-x-------',
+        'x-------........',
+    ],
+    head: {
+        cells: [
+            'x---x---x-------',
+            'x-x-x---x-------',
+            '..x-x-x-x-------',
+            'x-----x-x---x---',
+            '....x-x-x-x-x---',
+        ],
+        endings: ['x---------------', 'x-----------....', 'x-x-x-----------'],
+        form: 'period',
+    },
+    pool: (chord) => bebopScale(chord),
+    arrive: (chord) => guideTones(chord),
+    settle: (chord) => restingTones(chord),
+    chromatic: 0.45,
+    enclosure: 0.25,
+    riff: 0.08,
+    space: 0.25,
+    bends: { blue: 0, root: 0 },
+    scoop: 0.15,
+});
+
 export const jazz: Style = {
     id: 'jazz',
     name: 'Jazz',
@@ -400,4 +464,5 @@ export const jazz: Style = {
     bass: walkingBass,
     comp: { keyboard: jazzKeys, guitar: jazzGuitar },
     prefers: 'piano',
+    lead: { idiom: jazzLead, prefers: 'sax' },
 };

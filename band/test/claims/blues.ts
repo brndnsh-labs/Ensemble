@@ -85,5 +85,26 @@ export const blues = defineClaims({
                 ],
             ],
         },
+        {
+            take: { lead: 'head' },
+            claims: [
+                ['leadRestShare', 0.35, 0.65, 'a call, then room for the band to answer'],
+                ['leadChordToneOnBeats', 0.8, 1, 'the call sits on the chord on the beats'],
+                ['leadPhraseEndsOnChordTone', 0.95, 1, 'each call comes to rest on a chord tone'],
+                ['leadBendShare', 0.08, 0.35, 'bent into the blue third and the root'],
+            ],
+        },
+        {
+            take: { lead: 'solo' },
+            claims: [
+                ['leadRestShare', 0.2, 0.55, 'the solo leaves space between licks'],
+                ['leadChordToneOnBeats', 0.75, 1, 'blue notes pass; the beats are the chord'],
+                ['leadChangeGuideTones', 0.4, 0.85, "the chord's 3rd marks each change"],
+                ['leadBendShare', 0.06, 0.3, 'a guitarist bends'],
+                ['leadStepShare', 0.55, 0.9, "licks move by step and by the scale's thirds"],
+                ['leadLeapShare', 0, 0.05, 'no wide leaps inside a lick'],
+                ['leadPhraseEndsOnChordTone', 0.9, 1, 'licks end on a chord tone'],
+            ],
+        },
     ],
 });

@@ -32,5 +32,25 @@ export const rock = defineClaims({
                 ['compColour', 0, 0.15, 'open triads and sevenths, not jazz extensions'],
             ],
         },
+        {
+            take: { lead: 'head' },
+            claims: [
+                ['leadRestShare', 0, 0.15, 'the tune fills the form'],
+                ['leadChordToneOnBeats', 0.8, 1, 'the melody sits on the chords'],
+                ['leadPhraseEndsOnChordTone', 0.95, 1, 'phrases resolve'],
+            ],
+        },
+        {
+            take: { lead: 'solo' },
+            claims: [
+                ['leadRestShare', 0.2, 0.55, 'the solo breathes'],
+                ['leadChordToneOnBeats', 0.8, 1, 'pentatonic lines land on the chord'],
+                ['leadChangeGuideTones', 0, 0.4, 'changes land on roots and fifths, not 3rds'],
+                ['leadChromaticApproach', 0, 0.6, 'a rock player steps, rarely chromatically'],
+                ['leadBendShare', 0.06, 0.3, 'bent notes'],
+                ['leadRange', 11, 26, 'the solo climbs'],
+                ['leadPhraseEndsOnChordTone', 0.9, 1, 'phrases resolve'],
+            ],
+        },
     ],
 });

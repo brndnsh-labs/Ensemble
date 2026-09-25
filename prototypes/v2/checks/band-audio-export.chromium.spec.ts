@@ -80,25 +80,26 @@ test('Export audio (mix) works on the band engine and downloads a valid WAV', as
     await expect(page.locator('.error-banner')).toHaveCount(0);
 });
 
-test('Export audio (stems) renders drums/bass/chords only, never soloist or harmony', async ({
+test('Export audio (stems) renders drums/bass/chords/soloist, never harmony', async ({
     page,
 }, testInfo) => {
-    // Three full offline renders (`renderBandStemsToWav`), one per lane the band engine has.
-    test.setTimeout(90_000);
+    // Four full offline renders (`renderBandStemsToWav`), one per lane the band engine has.
+    test.setTimeout(120_000);
     await newBandChart(page, 'Band stems study');
 
     await page.getByRole('button', { name: 'Song actions' }).click();
-    // `renderBandStemsToWav` drops `soloist`/`harmony` before rendering anything for them
-    // (band-export.ts) — the band engine has no such lane — so exactly 3 downloads land, not
-    // the old engine's 5, matching `audio-export.chromium.spec.ts`'s accumulation pattern for
+    // `renderBandStemsToWav` drops `harmony` before rendering anything for it (band-export.ts)
+    // — the band engine has no such lane — so exactly 4 downloads land, not the old engine's
+    // 5; the soloist stem is the lead, forced on like every stem even though it is off live.
+    // Matches `audio-export.chromium.spec.ts`'s accumulation pattern for
     // `downloadExportResult`'s tight synchronous loop.
     const downloads: import('@playwright/test').Download[] = [];
     page.on('download', (event) => downloads.push(event));
     await page.getByRole('button', { name: 'Export audio (stems)' }).click();
-    await expect.poll(() => downloads.length, { timeout: 80_000 }).toBe(3);
+    await expect.poll(() => downloads.length, { timeout: 110_000 }).toBe(4);
     const names = downloads.map((event) => event.suggestedFilename()).sort();
     expect(names).toEqual(
-        ['drums', 'bass', 'chords']
+        ['drums', 'bass', 'chords', 'soloist']
             .map((instrument) => `Band stems study-stem-${instrument}.wav`)
             .sort(),
     );

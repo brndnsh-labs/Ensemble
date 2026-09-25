@@ -109,7 +109,7 @@ describe('comp instruments', () => {
                     style: 'bossa',
                     comp: 'nylon',
                     seed: 't',
-                    lanes: { drums: true, bass, comp: true },
+                    lanes: { drums: true, bass, comp: true, lead: false },
                 },
                 { pass: 0, looping: true },
             ).events.filter((e): e is PitchedNote => e.lane === 'comp');

@@ -14,11 +14,14 @@ import {
 } from '../core/types.js';
 import { MAX_CHARACTER_MS } from '../feel/feel.js';
 import { compileTimeline, type Timeline } from '../form/timeline.js';
-import { performPass } from '../perform.js';
+import { type PassMemory, performPass } from '../perform.js';
 import { isPlayable } from '../players/comp/fretboard.js';
 import { COMP_INSTRUMENTS } from '../players/comp/instruments.js';
 import { STEP } from '../players/grid.js';
+import { CYCLE } from '../players/lead/form.js';
+import { LEAD_INSTRUMENTS } from '../players/lead/instruments.js';
 import { feelFor, STYLE_IDS, STYLES } from '../styles/index.js';
+import type { Feel } from '../styles/types.js';
 import { type ChordFacts, chordPcs, fifthOf } from '../theory/chord.js';
 import { mod12 } from '../theory/pitch.js';
 import { FIXTURES } from './scores.js';
@@ -124,7 +127,10 @@ describe.each(STYLE_IDS)('%s invariants', (styleId) => {
                             style: styleId,
                             comp,
                             seed,
-                            lanes: { drums: true, bass: !noBass, comp: true },
+                            // A style with a lead plays it here too, so its first pass (the head)
+                            // is held to every rule below alongside the band.
+                            lanes: { drums: true, bass: !noBass, comp: true, lead: !!style.lead },
+                            lead: style.lead?.prefers ?? DEFAULT_SETTINGS.lead,
                         };
                         const first = performPass(timeline, settings, { pass: 0, looping });
                         const again = performPass(timeline, settings, { pass: 0, looping });
@@ -162,6 +168,61 @@ describe.each(STYLE_IDS)('%s invariants', (styleId) => {
 });
 
 /**
+ * The lead through a whole cycle — the head, three solo choruses, the head again — on every
+ * fixture: each pass keeps every rule, and the head comes back note for note.
+ */
+describe.each(STYLE_IDS.filter((id) => STYLES[id].lead))('%s lead', (styleId) => {
+    const style = STYLES[styleId];
+    for (const [name, score] of Object.entries(FIXTURES)) {
+        const timeline = compileTimeline(score);
+        it(`${name}: a cycle keeps the rules, and the head returns`, () => {
+            const problems: string[] = [];
+            for (const seed of SEEDS.slice(0, 4)) {
+                const settings: BandSettings = {
+                    ...DEFAULT_SETTINGS,
+                    style: styleId,
+                    seed,
+                    lanes: { drums: true, bass: true, comp: true, lead: true },
+                    lead: style.lead?.prefers ?? DEFAULT_SETTINGS.lead,
+                };
+                const lean = feelFor(style, COMP_INSTRUMENTS[settings.comp].family).lean;
+                const heads: string[] = [];
+                let memory: PassMemory | undefined;
+                for (let pass = 0; pass <= CYCLE; pass++) {
+                    const result = performPass(timeline, settings, { pass, looping: true, memory });
+                    memory = result.memory;
+                    checkPass(
+                        timeline,
+                        result.events,
+                        lean,
+                        settings,
+                        `${seed}/pass${pass}`,
+                        problems,
+                    );
+                    if (pass % CYCLE === 0) {
+                        heads.push(
+                            JSON.stringify(
+                                result.events
+                                    .filter((e) => e.lane === 'lead')
+                                    .map((e) => [
+                                        e.tick,
+                                        e.lane === 'lead' && e.midi,
+                                        e.lane === 'lead' && e.dur,
+                                    ]),
+                            ),
+                        );
+                    }
+                }
+                if (heads[0] !== heads[1]) {
+                    problems.push(`${seed}: the head changed when it came back`);
+                }
+            }
+            expect(problems.slice(0, 10), `${styleId}/${name}`).toEqual([]);
+        });
+    }
+});
+
+/**
  * Checks one pass, pushing a readable line per broken rule onto `problems` (collected
  * rather than asserted one by one: the suite checks millions of facts, and building an
  * assertion message for each passing one is most of the cost).
@@ -169,7 +230,7 @@ describe.each(STYLE_IDS)('%s invariants', (styleId) => {
 function checkPass(
     timeline: Timeline,
     events: BandEvent[],
-    lean: Record<'bass' | 'comp', number>,
+    lean: Feel['lean'],
     settings: BandSettings,
     where: string,
     problems: string[],
@@ -202,14 +263,23 @@ function checkPass(
         // Timing tiers: drums are the clock (character only); melodic lanes add their lean,
         // and a strummed chord rolls later by its place in the strum.
         const centre =
-            e.lane === 'drums' ? 0 : lean[e.lane] + (strummed.get(e) ?? 0) * instrument.strumMs;
+            e.lane === 'drums'
+                ? 0
+                : e.lane === 'lead'
+                  ? (lean.lead ?? lean.bass)
+                  : lean[e.lane] + (strummed.get(e) ?? 0) * instrument.strumMs;
         if (Math.abs(e.offsetMs - centre) > MAX_CHARACTER_MS + 1e-9) {
             fail(e, `offset ${e.offsetMs.toFixed(1)}ms from ${centre}`);
         }
         if (e.lane === 'drums') {
             continue;
         }
-        const [lo, hi] = e.lane === 'bass' ? BASS_REGISTER : instrument.range;
+        const [lo, hi] =
+            e.lane === 'bass'
+                ? BASS_REGISTER
+                : e.lane === 'lead'
+                  ? LEAD_INSTRUMENTS[settings.lead].range
+                  : instrument.range;
         if (e.midi < lo || e.midi > hi) {
             fail(e, `midi ${e.midi} outside ${lo}–${hi}`);
         }
@@ -246,19 +316,33 @@ function checkPass(
         lastPitch.set(key, e);
     }
 
+    // The lead is one voice: a note ends before the next begins.
+    const lead = events.filter((e): e is PitchedNote => e.lane === 'lead');
+    for (let i = 1; i < lead.length; i++) {
+        if (lead[i - 1].tick + lead[i - 1].dur > lead[i].tick + 1) {
+            fail(lead[i], `lead overlaps the note at ${lead[i - 1].tick}`);
+        }
+    }
     // Chord arrivals: the bass lands on a chord tone; comp chords carry the guide tones.
     const bass = events.filter((e): e is PitchedNote => e.lane === 'bass');
     const chords = events.filter((e): e is PitchedNote => e.lane === 'comp' && !e.muted);
-    for (const span of timeline.spans) {
+    timeline.spans.forEach((span, spanIndex) => {
         const chord = span.chord;
         if (!chord) {
-            continue;
+            return;
         }
         const arrival = bass.find((n) => Math.abs(n.tick - span.start) < 1 && !n.muted);
         if (arrival && !chordPcs(chord).includes(mod12(arrival.midi))) {
             fail(arrival, `bass arrival not a tone of ${chord.symbol}`);
         }
-    }
+        // A lead note struck on a chord change is one of the chord's tones: a target, by rule.
+        // (The same chord again in the next bar is no change: the line may pass through it.)
+        const changed = timeline.spans[spanIndex - 1]?.chord?.symbol !== chord.symbol;
+        const landing = changed && lead.find((n) => Math.abs(n.tick - span.start) < 1);
+        if (landing && !chordPcs(chord).includes(mod12(landing.midi))) {
+            fail(landing, `lead lands on a non-tone of ${chord.symbol}`);
+        }
+    });
     const clusters = new Map<number, PitchedNote[]>();
     for (const n of chords) {
         clusters.set(n.tick, [...(clusters.get(n.tick) ?? []), n]);

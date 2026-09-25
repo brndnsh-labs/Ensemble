@@ -17,6 +17,8 @@ import {
 import { chordAt, compileTimeline, type Timeline } from '../../form/timeline.js';
 import { type PassMemory, performPass } from '../../perform.js';
 import { STEP } from '../../players/grid.js';
+import { CYCLE } from '../../players/lead/form.js';
+import { STYLES } from '../../styles/index.js';
 import { chordPcs, fifthOf } from '../../theory/chord.js';
 import { mod12 } from '../../theory/pitch.js';
 import { FIXTURES } from '../scores.js';
@@ -34,23 +36,85 @@ export function perform(
     intensity: number | null = null,
     comp: CompInstrument = 'piano',
     bass = true,
+    lead?: 'head' | 'solo',
 ): Take[] {
     const takes: Take[] = [];
-    const lanes = { ...DEFAULT_SETTINGS.lanes, bass };
+    const lanes = { ...DEFAULT_SETTINGS.lanes, bass, lead: lead !== undefined };
+    const instrument = STYLES[style].lead?.prefers ?? DEFAULT_SETTINGS.lead;
+    // The lead's form spans a cycle: the head is pass 0, the solo choruses passes 1–3.
+    const passes = lead ? CYCLE : 2;
     for (const chart of CHARTS) {
         const timeline = compileTimeline(FIXTURES[chart]);
         for (const seed of SEEDS) {
             let memory: PassMemory | undefined;
-            for (let pass = 0; pass < 2; pass++) {
-                const settings = { ...DEFAULT_SETTINGS, style, comp, seed, swing: 0, intensity };
+            for (let pass = 0; pass < passes; pass++) {
+                const settings = {
+                    ...DEFAULT_SETTINGS,
+                    style,
+                    comp,
+                    seed,
+                    swing: 0,
+                    intensity,
+                    lead: instrument,
+                };
                 settings.lanes = lanes;
                 const result = performPass(timeline, settings, { pass, looping: true, memory });
                 memory = result.memory;
-                takes.push({ timeline, events: result.events });
+                if (!lead || (lead === 'head') === (pass === 0)) {
+                    takes.push({ timeline, events: result.events });
+                }
             }
         }
     }
     return takes;
+}
+
+// ---------------------------------------------------------------- lead helpers
+/** The lead's notes in a take, in order, each with the gap since the note before it. */
+function leadNotes(events: BandEvent[]): PitchedNote[] {
+    return events.filter((e): e is PitchedNote => e.lane === 'lead');
+}
+
+/** Consecutive pairs of lead notes inside one phrase (no rest of a beat or more between). */
+function leadPairs(events: BandEvent[]): [PitchedNote, PitchedNote][] {
+    const notes = leadNotes(events);
+    const pairs: [PitchedNote, PitchedNote][] = [];
+    for (let i = 1; i < notes.length; i++) {
+        const [a, b] = [notes[i - 1], notes[i]];
+        if (b.tick - (a.tick + a.dur) < STEP * 4) {
+            pairs.push([a, b]);
+        }
+    }
+    return pairs;
+}
+
+/** The lead notes struck on a real chord change (a different chord from the span before). */
+function leadLandings(t: Timeline, events: BandEvent[]) {
+    const notes = leadNotes(events);
+    const out: {
+        note: PitchedNote;
+        chord: NonNullable<ReturnType<typeof chordAt>>;
+        before?: PitchedNote;
+    }[] = [];
+    t.spans.forEach((span, i) => {
+        if (!span.chord || t.spans[i - 1]?.chord?.symbol === span.chord.symbol) {
+            return;
+        }
+        const k = notes.findIndex((n) => Math.abs(n.tick - span.start) < 1);
+        if (k >= 0) {
+            out.push({ note: notes[k], chord: span.chord, before: notes[k - 1] });
+        }
+    });
+    return out;
+}
+
+/** The last note of each phrase: followed by a rest of a beat or more (or nothing). */
+function phraseEnds(events: BandEvent[]): PitchedNote[] {
+    const notes = leadNotes(events);
+    return notes.filter((n, i) => {
+        const next = notes[i + 1];
+        return !next || next.tick - (n.tick + n.dur) >= STEP * 4;
+    });
 }
 
 // ---------------------------------------------------------------- metric library
@@ -1193,6 +1257,176 @@ export const METRICS = {
         }
         return ratio(hit, n);
     },
+
+    // ---- the lead
+    /** Lead notes per bar, across the takes. */
+    leadNotesPerBar: (takes) => {
+        let notes = 0;
+        let bars = 0;
+        for (const { timeline: t, events } of takes) {
+            notes += leadNotes(events).length;
+            bars += t.bars.length;
+        }
+        return ratio(notes, bars);
+    },
+    /** Share of bars the lead leaves empty: the space it breathes in. */
+    leadRestShare: (takes) => {
+        let empty = 0;
+        let bars = 0;
+        for (const { timeline: t, events } of takes) {
+            const played = new Set(leadNotes(events).map((n) => n.bar));
+            empty += t.bars.filter((b) => !played.has(b.index)).length;
+            bars += t.bars.length;
+        }
+        return ratio(empty, bars);
+    },
+    /** Share of lead notes on a beat that are tones of the chord sounding. */
+    leadChordToneOnBeats: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { timeline: t, events } of takes) {
+            for (const note of leadNotes(events)) {
+                const chord = chordAt(t, note.tick);
+                if (stepOf(t, note) % 4 !== 0 || !chord) {
+                    continue;
+                }
+                n++;
+                hit += chordPcs(chord).includes(mod12(note.midi)) ? 1 : 0;
+            }
+        }
+        return ratio(hit, n);
+    },
+    /** Share of chord-change landings on a guide tone (the 3rd or 7th, a 6 chord's 6th). */
+    leadChangeGuideTones: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { timeline: t, events } of takes) {
+            for (const { note, chord } of leadLandings(t, events)) {
+                n++;
+                const pcs = [chord.third, chord.seventh ?? (chord.sixth ? 9 : null)]
+                    .filter((i): i is NonNullable<typeof i> => i !== null)
+                    .map((i) => mod12(chord.root + i));
+                hit += pcs.includes(mod12(note.midi)) ? 1 : 0;
+            }
+        }
+        return ratio(hit, n);
+    },
+    /** Share of chord-change landings approached by half step from the note just before. */
+    leadChromaticApproach: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { timeline: t, events } of takes) {
+            for (const { note, before } of leadLandings(t, events)) {
+                if (!before || note.tick - before.tick > STEP * 2) {
+                    continue;
+                }
+                n++;
+                hit += Math.abs(note.midi - before.midi) === 1 ? 1 : 0;
+            }
+        }
+        return ratio(hit, n);
+    },
+    /** Share of moves inside a phrase that are steps (a whole step or less). */
+    leadStepShare: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { events } of takes) {
+            for (const [a, b] of leadPairs(events)) {
+                n++;
+                hit += Math.abs(b.midi - a.midi) <= 2 && a.midi !== b.midi ? 1 : 0;
+            }
+        }
+        return ratio(hit, n);
+    },
+    /** Mean interval between consecutive notes of a phrase, in semitones. */
+    leadMeanInterval: (takes) => {
+        let n = 0;
+        let sum = 0;
+        for (const { events } of takes) {
+            for (const [a, b] of leadPairs(events)) {
+                n++;
+                sum += Math.abs(b.midi - a.midi);
+            }
+        }
+        return ratio(sum, n);
+    },
+    /** Share of moves inside a phrase wider than a fifth. */
+    leadLeapShare: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { events } of takes) {
+            for (const [a, b] of leadPairs(events)) {
+                n++;
+                hit += Math.abs(b.midi - a.midi) > 7 ? 1 : 0;
+            }
+        }
+        return ratio(hit, n);
+    },
+    /** Share of moves inside a phrase that repeat the same pitch. */
+    leadRepeatedNotes: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { events } of takes) {
+            for (const [a, b] of leadPairs(events)) {
+                n++;
+                hit += a.midi === b.midi ? 1 : 0;
+            }
+        }
+        return ratio(hit, n);
+    },
+    /** Share of phrase-ending notes that are tones of their chord. */
+    leadPhraseEndsOnChordTone: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { timeline: t, events } of takes) {
+            for (const note of phraseEnds(events)) {
+                const chord = chordAt(t, note.tick);
+                if (!chord) {
+                    continue;
+                }
+                n++;
+                hit += chordPcs(chord).includes(mod12(note.midi)) ? 1 : 0;
+            }
+        }
+        return ratio(hit, n);
+    },
+    /** Share of lead notes an eighth or shorter: how much of the playing is running lines. */
+    leadShortShare: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { events } of takes) {
+            for (const note of leadNotes(events)) {
+                n++;
+                hit += note.dur <= STEP * 2 ? 1 : 0;
+            }
+        }
+        return ratio(hit, n);
+    },
+    /** Share of lead notes bent or scooped into from below. */
+    leadBendShare: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { events } of takes) {
+            for (const note of leadNotes(events)) {
+                n++;
+                hit += note.bendIn ? 1 : 0;
+            }
+        }
+        return ratio(hit, n);
+    },
+    /** Mean span of each take's lead, lowest to highest note (semitones). */
+    leadRange: (takes) => {
+        let n = 0;
+        let sum = 0;
+        for (const { events } of takes) {
+            const midis = leadNotes(events).map((e) => e.midi);
+            if (midis.length) {
+                n++;
+                sum += Math.max(...midis) - Math.min(...midis);
+            }
+        }
+        return ratio(sum, n);
+    },
 } satisfies Record<string, Metric>;
 
 // ---------------------------------------------------------------- claims
@@ -1201,6 +1435,8 @@ export interface TakeSpec {
     comp?: CompInstrument;
     intensity?: number;
     bass?: boolean;
+    /** Judge the lead: its head (the first pass) or its solo choruses (passes 1–3). */
+    lead?: 'head' | 'solo';
 }
 
 type MetricName = keyof typeof METRICS;

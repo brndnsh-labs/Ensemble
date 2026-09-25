@@ -6,8 +6,9 @@
 /** Ticks per quarter note. 480 = 2⁵·3·5: exact for 32nds, triplets and quintuplets. */
 export const PPQ = 480;
 
-export type Lane = 'drums' | 'bass' | 'comp';
-export const LANES: readonly Lane[] = ['drums', 'bass', 'comp'];
+export type Lane = 'drums' | 'bass' | 'comp' | 'lead';
+/** In playing order: each lane hears the ones before it, so the comp can answer the lead. */
+export const LANES: readonly Lane[] = ['drums', 'bass', 'lead', 'comp'];
 
 /**
  * The kit, named for what a drummer plays rather than for any one sound source.
@@ -46,7 +47,7 @@ export interface DrumHit extends EventTiming {
 }
 
 export interface PitchedNote extends EventTiming {
-    lane: 'bass' | 'comp';
+    lane: 'bass' | 'comp' | 'lead';
     midi: number;
     /** Written length in ticks (after swing, still ticks). */
     dur: number;
@@ -63,6 +64,13 @@ export interface PitchedNote extends EventTiming {
      * and high→low on an upstroke, at the instrument's strum speed. Unset = struck together.
      */
     stroke?: 'down' | 'up';
+    /**
+     * A lead note that starts this many semitones below its written pitch and glides up into
+     * it: a horn's scoop (1) or a guitarist's bend into the note (1 = b3 → 3, 2 = b7 → root).
+     */
+    bendIn?: number;
+    /** A lead note held long enough to sing: the player adds vibrato. */
+    vibrato?: boolean;
 }
 
 export type BandEvent = DrumHit | PitchedNote;
@@ -73,6 +81,12 @@ export type BandEvent = DrumHit | PitchedNote;
  * style decides *what* is played. See `players/comp/instruments.ts`.
  */
 export type CompInstrument = 'piano' | 'rhodes' | 'organ' | 'clav' | 'guitar' | 'nylon';
+
+/**
+ * What plays the lead. Like the comp, the instrument decides what is physical (range, breath,
+ * whether it bends) and the style decides what is played. See `players/lead/instruments.ts`.
+ */
+export type LeadInstrument = 'sax' | 'trumpet' | 'guitar' | 'overdrive' | 'nylon';
 
 /** The genres the band plays natively. A new genre is a style file; see `styles/index.ts`. */
 export type StyleId =
@@ -96,6 +110,8 @@ export interface BandSettings {
     lanes: Record<Lane, boolean>;
     /** The comp lane's instrument. */
     comp: CompInstrument;
+    /** The lead's instrument. */
+    lead: LeadInstrument;
     /** 0–1. The band's energy. `null` lets the arrangement plan follow the form. */
     intensity: number | null;
     /** 0–100 shuffle amount (100 = triplet swing); `null` uses the style's own feel. */
@@ -110,8 +126,10 @@ export interface BandSettings {
 
 export const DEFAULT_SETTINGS: BandSettings = {
     style: 'rock',
-    lanes: { drums: true, bass: true, comp: true },
+    // The lead is off until asked for: someone practising wants the band, not a soloist.
+    lanes: { drums: true, bass: true, comp: true, lead: false },
     comp: 'piano',
+    lead: 'sax',
     intensity: null,
     swing: null,
     swingGrid: null,

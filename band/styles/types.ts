@@ -7,9 +7,16 @@
  */
 import type { BarPlan } from '../arrange/plan.js';
 import type { Rng } from '../core/random.js';
-import type { CompInstrument, DrumHit, Lane, PitchedNote, StyleId } from '../core/types.js';
+import type {
+    CompInstrument,
+    DrumHit,
+    LeadInstrument,
+    PitchedNote,
+    StyleId,
+} from '../core/types.js';
 import type { Bar, Timeline } from '../form/timeline.js';
 import type { CompProfile } from '../players/comp/instruments.js';
+import type { LeadProfile } from '../players/lead/instruments.js';
 
 /** Everything an idiom may know when it plays one bar. All of it is read-only. */
 export interface BarContext {
@@ -19,9 +26,15 @@ export interface BarContext {
     /** The bar after this one in performance order (wrapping when the song loops). */
     next: { bar: Bar; plan: BarPlan } | null;
     /** What the lanes before this one already played in this bar, on the straight grid. */
-    heard: { drums: DrumHit[]; bass: PitchedNote[] };
+    heard: { drums: DrumHit[]; bass: PitchedNote[]; lead: PitchedNote[] };
     /** The comp lane's instrument (what is physical about it: range, strum, sustain). */
     instrument: CompProfile;
+    /** The lead's instrument. */
+    lead: LeadProfile;
+    /** Which time through the song this is (0 = first). The lead's form is built on it. */
+    pass: number;
+    /** Whether the performance goes round again after this pass. */
+    looping: boolean;
     /**
      * A seeded stream for one decision. Keyed on the musical position, so a decision is
      * stable no matter what was generated before it. `scope: 'section'` keys on the
@@ -57,7 +70,10 @@ export interface Feel {
      * Tier-2 band lean in ms: melodic lanes against the drums, which are the clock and
      * never lean. Positive = behind the beat.
      */
-    lean: Record<Exclude<Lane, 'drums'>, number>;
+    lean: Record<'bass' | 'comp', number> & {
+        /** The lead's lean; unset, it sits with the bass. */
+        lead?: number;
+    };
     /**
      * The comp's lean when the instrument family plays it differently: a jazz pianist lays
      * back behind the beat, a swing rhythm guitarist sits right with the walking bass.
@@ -77,4 +93,9 @@ export interface Style {
     comp: { keyboard: PitchedIdiom; guitar: PitchedIdiom };
     /** The comp instrument the genre is heard on by default (the app's Auto sound). */
     prefers: CompInstrument;
+    /**
+     * The lead: the style's soloist, and the instrument it is heard on by default. Absent,
+     * the style has no lead yet and the lane stays silent.
+     */
+    lead?: { idiom: PitchedIdiom; prefers: LeadInstrument };
 }

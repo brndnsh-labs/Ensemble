@@ -124,7 +124,12 @@ export function applyFeel(
         const position = Math.round(event.tick - bar.start);
         // Tier 3: placement keyed on bar position, not bar index (settled, repeating).
         const place = rng(settings.seed, 'place', event.lane, voice, position).bipolar();
-        const lean = event.lane === 'drums' ? 0 : feel.lean[event.lane];
+        const lean =
+            event.lane === 'drums'
+                ? 0
+                : event.lane === 'lead'
+                  ? (feel.lean.lead ?? feel.lean.bass)
+                  : feel.lean[event.lane];
         const offsetMs =
             event.offsetMs + lean + place * MAX_CHARACTER_MS * human + (rank ?? 0) * strumMs;
         const jitter = rng(

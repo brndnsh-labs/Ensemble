@@ -29,5 +29,24 @@ export const funk = defineClaims({
             take: { comp: 'guitar', intensity: 0.2 },
             claims: [['compShort', 0.9, 1, 'stabs stay staccato with no scratch between them']],
         },
+        {
+            take: { lead: 'head' },
+            claims: [
+                ['leadRestShare', 0, 0.15, 'the riff tune fills the form'],
+                ['leadShortShare', 0.8, 1, 'clipped sixteenths'],
+                ['leadPhraseEndsOnChordTone', 0.95, 1, 'figures end on a chord tone'],
+            ],
+        },
+        {
+            take: { lead: 'solo' },
+            claims: [
+                ['leadRestShare', 0.2, 0.55, 'space around the figures'],
+                ['leadShortShare', 0.8, 1, 'short, clipped notes'],
+                ['leadChordToneOnBeats', 0.72, 1, 'the beats sit on the chord'],
+                ['leadChangeGuideTones', 0, 0.45, 'roots and fifths mark the changes'],
+                ['leadLeapShare', 0, 0.05, 'riffs, not leaps'],
+                ['leadPhraseEndsOnChordTone', 0.9, 1, 'figures end on a chord tone'],
+            ],
+        },
     ],
 });

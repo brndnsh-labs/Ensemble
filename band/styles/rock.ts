@@ -21,6 +21,8 @@ import {
 import { compIdiom, type Hit, strums } from '../players/comp/idiom.js';
 import { drumIdiom, snareFigure, tomRun } from '../players/drums/kit.js';
 import { dyn, isCommonTime, pulses, spanSteps } from '../players/grid.js';
+import { leadIdiom } from '../players/lead/idiom.js';
+import { pentatonicPool, restingTones, rootFirst } from '../players/lead/palette.js';
 import { mod12 } from '../theory/pitch.js';
 import type { PitchedIdiom, Style } from './types.js';
 
@@ -234,6 +236,35 @@ const rockGuitar = compIdiom({
     },
 });
 
+// ================================================================ lead
+// An overdriven rock guitarist: the key's pentatonic (major pentatonic in a major key, with the
+// blue minor third bent up into the major one; minor pentatonic in a minor key), landing on
+// roots and fifths, long bent notes with vibrato, licks repeated to drive them home, and a burst
+// of sixteenths at the peak.
+const rockLead = leadIdiom({
+    name: 'rock lead',
+    cells: {
+        sparse: ['x-------x-------', 'x-----x-x-------', '....x---x-------', 'x---x-------....'],
+        mid: ['x-x-x---x-------', 'x---x-x-x---x---', '..x-x-x-x-------', 'x-x-x-x-x-------'],
+        busy: ['x-x-xxxxx-x-x---', 'xxxxx-x-x-------', 'x-x-x-x-x-x-x-x-', 'x-xxx-x-x-xxx---'],
+    },
+    endings: ['x---------------', 'x-x-x-----------', 'x---x-----------', '..x-x-x---------'],
+    head: {
+        cells: ['x---x---x-x-x---', 'x-x-x---x-------', 'x-----x-x-------', 'x-x-x-x-x---x---'],
+        endings: ['x---------------', 'x-------x-------'],
+        form: 'period',
+    },
+    pool: (chord, key) => pentatonicPool(chord, key),
+    arrive: (chord) => rootFirst(chord),
+    settle: (chord) => restingTones(chord),
+    chromatic: 0.1,
+    enclosure: 0,
+    riff: 0.4,
+    space: 0.25,
+    bends: { blue: 0.3, root: 0.4 },
+    scoop: 0,
+});
+
 export const rock: Style = {
     id: 'rock',
     name: 'Rock',
@@ -244,4 +275,5 @@ export const rock: Style = {
     bass: rockBass,
     comp: { keyboard: rockKeys, guitar: rockGuitar },
     prefers: 'piano',
+    lead: { idiom: rockLead, prefers: 'overdrive' },
 };

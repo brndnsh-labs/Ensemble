@@ -2,8 +2,8 @@
  * The engine: `(timeline, settings, pass) → BandEvent[]`. One pure function; live playback,
  * MIDI export and audio export all consume what it returns, so they cannot disagree.
  *
- * Per bar, lanes play in a fixed order — drums, then bass, then comp — and each later lane
- * hears what the earlier ones played (`heard`). That is the whole coordination model: data
+ * Per bar, lanes play in a fixed order — drums, bass, lead, then comp — and each later lane
+ * hears what the earlier ones played (`heard`), so the comp can answer the lead. That is the whole coordination model: data
  * flowing one way, not a blackboard every lane writes.
  */
 import { fullWindow, type PassWindow, planBars } from './arrange/plan.js';
@@ -12,6 +12,7 @@ import type { BandEvent, BandSettings, DrumHit, Lane, PitchedNote } from './core
 import { applyFeel } from './feel/feel.js';
 import type { Timeline } from './form/timeline.js';
 import { COMP_INSTRUMENTS } from './players/comp/instruments.js';
+import { LEAD_INSTRUMENTS } from './players/lead/instruments.js';
 import { feelFor, STYLES } from './styles/index.js';
 import type { BarContext } from './styles/types.js';
 import { nearestMidi } from './theory/pitch.js';
@@ -47,11 +48,18 @@ export function performPass(
     const style = STYLES[settings.style];
     const instrument = COMP_INSTRUMENTS[settings.comp];
     const comp = style.comp[instrument.family];
+    const lead = style.lead?.idiom;
+    const leadProfile = LEAD_INSTRUMENTS[settings.lead];
     const window = options.window ?? fullWindow(timeline);
     const plans = planBars(timeline, settings, { ...options, window });
     const memory: PassMemory = options.memory
         ? { ...options.memory }
-        : { drums: style.drums.init(), bass: style.bass.init(), comp: comp.init() };
+        : {
+              drums: style.drums.init(),
+              bass: style.bass.init(),
+              comp: comp.init(),
+              lead: lead?.init() ?? null,
+          };
     const { bars } = timeline;
     const events: BandEvent[] = [];
     const snapshots: PassMemory[] = [];
@@ -69,7 +77,7 @@ export function performPass(
             ending: false,
             fill: 'none',
         };
-        const heard: BarContext['heard'] = { drums: [], bass: [] };
+        const heard: BarContext['heard'] = { drums: [], bass: [], lead: [] };
         const context = (lane: Lane): BarContext => ({
             timeline,
             bar,
@@ -77,6 +85,9 @@ export function performPass(
             next: nextIndex >= 0 ? { bar: bars[nextIndex], plan: nextPlan } : null,
             heard,
             instrument,
+            lead: leadProfile,
+            pass: options.pass,
+            looping: options.looping,
             rng: (purpose, scope = 'bar') =>
                 scope === 'song'
                     ? rng(settings.seed, style.id, lane, 'song', purpose)
@@ -101,6 +112,12 @@ export function performPass(
             const out = style.bass.play(context('bass'), memory.bass);
             memory.bass = out.memory;
             heard.bass = out.events as PitchedNote[];
+            events.push(...out.events);
+        }
+        if (plan.lanes.lead && lead) {
+            const out = lead.play(context('lead'), memory.lead);
+            memory.lead = out.memory;
+            heard.lead = out.events as PitchedNote[];
             events.push(...out.events);
         }
         if (plan.lanes.comp) {
@@ -146,7 +163,8 @@ function sustain(events: BandEvent[], timeline: Timeline): BandEvent[] {
     });
 }
 
-const laneOrder = (e: BandEvent) => (e.lane === 'drums' ? 0 : e.lane === 'bass' ? 1 : 2);
+const LANE_ORDER: Record<BandEvent['lane'], number> = { drums: 0, bass: 1, comp: 2, lead: 3 };
+const laneOrder = (e: BandEvent) => LANE_ORDER[e.lane];
 
 /**
  * A fermata is a held chord, not a slow groove: whatever the idioms played inside a fermata
