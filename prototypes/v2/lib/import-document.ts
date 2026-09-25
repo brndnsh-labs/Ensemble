@@ -1,7 +1,7 @@
 import type { IRealImportResult } from '@engine/songbook/ireal-import';
 import { prepareScorePlayback } from '@engine/songbook/score-playback';
 import type { ChartDocumentV2 } from '@engine/songbook/score-types';
-import { type ChartDocument, validateDocument } from './documents';
+import { type ChartDocument, followingFeel, validateDocument } from './documents';
 
 /** Build a detached candidate only. Reviewing an import never changes the running band. */
 export function importedDocument(
@@ -38,7 +38,7 @@ export function importedDocument(
         chart: {
             score: song.score,
             performance: { ...base.chart.performance, bpm },
-            band: base.chart.band,
+            band: followingFeel(base.chart.band),
         },
     }) as ChartDocumentV2;
 }

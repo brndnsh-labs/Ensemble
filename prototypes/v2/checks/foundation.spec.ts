@@ -215,11 +215,12 @@ test('corrupt downloads and storage failures preserve the previous sound', async
     await openSounds(page);
     await page.getByLabel('Chords sound', { exact: true }).selectOption('pack:grand');
     await expect(page.locator('.error-banner')).toContainText('could not be verified');
-    await expect(page.getByLabel('Chords sound', { exact: true })).toHaveValue('synth');
+    // The starter's own setting, Follow feel (#1405), is what a failed pick leaves in place.
+    await expect(page.getByLabel('Chords sound', { exact: true })).toHaveValue('auto');
     await page.evaluate(() => Object.assign(window, { __breakSound: 'quota' }));
     await page.getByLabel('Chords sound', { exact: true }).selectOption('pack:grand');
     await expect(page.locator('.error-banner')).toContainText('Storage full');
-    await expect(page.getByLabel('Chords sound', { exact: true })).toHaveValue('synth');
+    await expect(page.getByLabel('Chords sound', { exact: true })).toHaveValue('auto');
     await closeSounds(page);
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
     await openSounds(page);
@@ -350,6 +351,44 @@ test('one install applies genre sounds, preserves manual overrides and follows f
     await expect(page.getByLabel('Chords sound', { exact: true })).toHaveValue('pack:rhodes');
 });
 
+test('installed sounds follow the feel after a reload without touching the Sounds panel', async ({
+    page,
+}) => {
+    // #1405: installing is durable, so activating must be too. After a reload the stand reads
+    // what is installed from the sound cache, and a song never opened since plays on it.
+    test.setTimeout(120_000);
+    await observeSamples(page);
+    await page.goto(appUrl());
+    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
+    await openSounds(page);
+    await page.getByRole('button', { name: 'Install all & use genre sounds' }).click();
+    await expect(page.getByRole('button', { name: 'Install all & use genre sounds' })).toBeEnabled({
+        timeout: 60_000,
+    });
+    await closeSounds(page);
+    await page.reload();
+    const downloads: string[] = [];
+    page.on('request', (request) => {
+        if (request.url().includes(appUrl('packs/'))) {
+            downloads.push(request.url());
+        }
+    });
+    await page.getByRole('button', { name: 'Minor swing sketch Jazz · Saved locally' }).click();
+    await openSounds(page);
+    for (const label of ['Drums', 'Bass', 'Chords', 'Harmony', 'Soloist']) {
+        await expect(page.getByLabel(`${label} sound`, { exact: true })).toHaveValue('auto');
+    }
+    await expect(page.locator('.resolved-sound')).toHaveCount(5);
+    await expect(page.locator('.resolved-sound', { hasText: 'Built-in' })).toHaveCount(0);
+    await closeSounds(page);
+    // Resolving on open is not an edit.
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
+    await page.getByRole('button', { name: 'Start playback', exact: true }).click();
+    await expect.poll(() => sampleStarts(page)).toBeGreaterThan(0);
+    await page.getByRole('button', { name: 'Stop playback' }).click();
+    expect(downloads).toEqual([]);
+});
+
 test('failed bulk installation keeps every previous voice and retries completed downloads', async ({
     page,
 }) => {
@@ -373,9 +412,11 @@ test('failed bulk installation keeps every previous voice and retries completed 
     await openSounds(page);
     await page.getByRole('button', { name: 'Install all & use genre sounds' }).click();
     await expect(page.locator('.error-banner')).toContainText('Storage full', { timeout: 60_000 });
+    // Starters follow the feel (#1405); a failed install changes none of them.
     for (const label of ['Drums', 'Bass', 'Chords', 'Harmony', 'Soloist']) {
-        await expect(page.getByLabel(`${label} sound`, { exact: true })).toHaveValue('synth');
+        await expect(page.getByLabel(`${label} sound`, { exact: true })).toHaveValue('auto');
     }
+    await expect(page.locator('.resolved-sound')).toHaveText(Array(5).fill('Using Built-in'));
     await expect(page.getByText('All sound packs available offline', { exact: true })).toBeHidden();
     await closeSounds(page);
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
