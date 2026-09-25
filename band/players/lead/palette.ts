@@ -155,3 +155,30 @@ export function bluesColour(chord: ChordFacts, key: KeyContext): number[] {
     const degree = mod12(chord.root - key.tonic);
     return key.minor || degree === 0 || degree === 5 ? minorPentatonic(key.tonic) : [];
 }
+
+/**
+ * The pentatonic on the chord's own root, following the changes rather than the key: the
+ * major pentatonic over a major chord (1 2 3 5 6), with the b7 over a dominant; the minor
+ * pentatonic with the 9th over a minor chord (1 2 b3 4 5 b7). It is the vocabulary a pop, soul
+ * or disco player moves in over a vamp: no half-step rubs (no 4th against a major 3rd, no
+ * major 7th against a dominant), and the colour tones a soul player leans on — the 9th, the
+ * minor chord's 11th, the 6th or 13th — built in. A degree is kept only where the chord's own
+ * scale has it (a phrygian iii drops the 9th, an altered dominant its natural 9th and 13th),
+ * and the chord's written tones are always in. A diminished, half-diminished or augmented
+ * chord has no pentatonic that sits on it: it keeps its chord scale.
+ */
+export function chordPentatonic(chord: ChordFacts): number[] {
+    const shapes: Partial<Record<ChordFacts['family'], readonly number[]>> = {
+        major: [0, 2, 4, 7, 9],
+        dominant: [0, 2, 4, 7, 9, 10],
+        minor: [0, 2, 3, 5, 7, 10],
+        sus: [0, 2, 5, 7, 10],
+        power: [0, 3, 5, 7, 10],
+    };
+    const shape = shapes[chord.family];
+    if (!shape) {
+        return chordScale(chord);
+    }
+    const kept = shape.filter((i) => chord.scale.includes(i));
+    return [...new Set([...abs(chord, kept), ...chordPcs(chord)])];
+}
