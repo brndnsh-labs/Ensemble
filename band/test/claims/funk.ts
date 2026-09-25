@@ -34,17 +34,20 @@ export const funk = defineClaims({
             claims: [
                 ['leadRestShare', 0, 0.15, 'the riff tune fills the form'],
                 ['leadShortShare', 0.8, 1, 'clipped sixteenths'],
+                ['leadInnerSpace', 0.5, 0.85, 'rests inside every bar: the space is the groove'],
                 ['leadPhraseEndsOnChordTone', 0.95, 1, 'figures end on a chord tone'],
             ],
         },
         {
             take: { lead: 'solo' },
             claims: [
-                ['leadRestShare', 0.2, 0.55, 'space around the figures'],
+                ['leadInnerSpace', 0.4, 0.8, 'space around the figures inside the bar'],
                 ['leadShortShare', 0.8, 1, 'short, clipped notes'],
                 ['leadChordToneOnBeats', 0.72, 1, 'the beats sit on the chord'],
-                ['leadChangeGuideTones', 0, 0.45, 'roots and fifths mark the changes'],
+                ['leadChangeRootFifth', 0.45, 0.8, 'roots and fifths mark the changes'],
                 ['leadLeapShare', 0, 0.05, 'riffs, not leaps'],
+                ['leadOscillation', 0, 0.05, 'no mechanical trills'],
+                ['leadArcRise', 1.6, 4, 'the solo builds'],
                 ['leadPhraseEndsOnChordTone', 0.9, 1, 'figures end on a chord tone'],
             ],
         },

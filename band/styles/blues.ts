@@ -648,8 +648,11 @@ const bluesLead = leadIdiom({
     enclosure: 0.05,
     riff: 0.35,
     space: 0.3,
-    bends: { blue: 0.5, root: 0.25 },
+    // Bent landings: most blue-third landings are bent up to the 3rd, about half the roots.
+    bends: { blue: 0.65, root: 0.45 },
     scoop: 0.15,
+    // A blues guitarist shakes every held note.
+    vibrato: 6,
 });
 
 export const blues: Style = {
@@ -663,7 +666,8 @@ export const blues: Style = {
     feel: {
         swing: 90,
         swingGrid: 8,
-        lean: { bass: 2, comp: 6 },
+        // The lead sits back like the keys: blues is behind the beat.
+        lean: { bass: 2, comp: 6, lead: 8 },
         compLean: { guitar: 2 },
         humanize: 35,
     },

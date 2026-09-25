@@ -342,6 +342,13 @@ function checkPass(
         if (landing && !chordPcs(chord).includes(mod12(landing.midi))) {
             fail(landing, `lead lands on a non-tone of ${chord.symbol}`);
         }
+        // A lead note held into a change is heard against the new chord: an anticipation, so
+        // one of its tones. (A note struck earlier stops at the change instead.)
+        const held =
+            changed && lead.find((n) => n.tick < span.start - 1 && n.tick + n.dur > span.start + 1);
+        if (held && !chordPcs(chord).includes(mod12(held.midi))) {
+            fail(held, `lead holds a non-tone into ${chord.symbol}`);
+        }
     });
     const clusters = new Map<number, PitchedNote[]>();
     for (const n of chords) {

@@ -445,6 +445,8 @@ const jazzLead = leadIdiom({
     space: 0.25,
     bends: { blue: 0, root: 0 },
     scoop: 0.15,
+    // Bebop alto is mostly straight tone: vibrato only on a half note or longer.
+    vibrato: 8,
 });
 
 export const jazz: Style = {
@@ -456,7 +458,8 @@ export const jazz: Style = {
     feel: {
         swing: 72,
         swingGrid: 8,
-        lean: { bass: -2, comp: 8 },
+        // The soloist lays back against the ride, like the comping, not ahead with the bass.
+        lean: { bass: -2, comp: 8, lead: 10 },
         compLean: { guitar: -2 },
         humanize: 40,
     },

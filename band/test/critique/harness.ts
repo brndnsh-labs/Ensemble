@@ -29,6 +29,8 @@ const SEEDS = ['one', 'two', 'three', 'four'];
 export interface Take {
     timeline: Timeline;
     events: BandEvent[];
+    /** Which time through the song (the lead's form is built on it). */
+    pass?: number;
 }
 
 export function perform(
@@ -61,7 +63,7 @@ export function perform(
                 const result = performPass(timeline, settings, { pass, looping: true, memory });
                 memory = result.memory;
                 if (!lead || (lead === 'head') === (pass === 0)) {
-                    takes.push({ timeline, events: result.events });
+                    takes.push({ timeline, events: result.events, pass });
                 }
             }
         }
@@ -1311,7 +1313,10 @@ export const METRICS = {
         }
         return ratio(hit, n);
     },
-    /** Share of chord-change landings approached by half step from the note just before. */
+    /**
+     * Share of chord-change landings approached by a chromatic note: a half step away and
+     * outside the scale of the chord it passes over (a diatonic half step, E→F, isn't one).
+     */
     leadChromaticApproach: (takes) => {
         let n = 0;
         let hit = 0;
@@ -1321,10 +1326,104 @@ export const METRICS = {
                     continue;
                 }
                 n++;
-                hit += Math.abs(note.midi - before.midi) === 1 ? 1 : 0;
+                const under = chordAt(t, before.tick);
+                const outside = !!under && !under.scale.includes(mod12(before.midi - under.root));
+                hit += Math.abs(note.midi - before.midi) === 1 && outside ? 1 : 0;
             }
         }
         return ratio(hit, n);
+    },
+    /** Share of chord-change landings on the chord's root or 5th. */
+    leadChangeRootFifth: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { timeline: t, events } of takes) {
+            for (const { note, chord } of leadLandings(t, events)) {
+                n++;
+                const pcs = [chord.root, mod12(chord.root + fifthOf(chord))];
+                hit += pcs.includes(mod12(note.midi)) ? 1 : 0;
+            }
+        }
+        return ratio(hit, n);
+    },
+    /** Share of four-note runs inside a phrase that trill: a-b-a-b. */
+    leadOscillation: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { events } of takes) {
+            const pairs = leadPairs(events);
+            for (let i = 2; i < pairs.length; i++) {
+                const [a, b] = pairs[i - 2];
+                const [c, d] = [pairs[i - 1][1], pairs[i][1]];
+                if (pairs[i - 1][0] !== b || pairs[i][0] !== c) {
+                    continue; // not one unbroken run
+                }
+                n++;
+                hit += a.midi === c.midi && b.midi === d.midi && a.midi !== b.midi ? 1 : 0;
+            }
+        }
+        return ratio(hit, n);
+    },
+    /** Share of sixteenths left silent inside the bars the lead plays in: its inner space. */
+    leadInnerSpace: (takes) => {
+        let steps = 0;
+        let silent = 0;
+        for (const { timeline: t, events } of takes) {
+            const byBar = new Map<number, PitchedNote[]>();
+            for (const note of leadNotes(events)) {
+                byBar.set(note.bar, [...(byBar.get(note.bar) ?? []), note]);
+            }
+            for (const [index, notes] of byBar) {
+                const bar = t.bars[index];
+                const count = Math.round(bar.meter.barTicks / STEP);
+                const sounding = new Set<number>();
+                for (const note of notes) {
+                    const from = Math.max(0, Math.round((note.tick - bar.start) / STEP));
+                    const to = Math.min(
+                        count,
+                        Math.round((note.tick + note.dur - bar.start) / STEP),
+                    );
+                    for (let s = from; s < Math.max(to, from + 1); s++) {
+                        sounding.add(s);
+                    }
+                }
+                steps += count;
+                silent += count - sounding.size;
+            }
+        }
+        return ratio(silent, steps);
+    },
+    /**
+     * How much busier the third solo chorus is than the first (notes per bar, chorus 3 over
+     * chorus 1): the arc's build. Solo takes come in cycles of three, passes 1–3.
+     */
+    leadArcRise: (takes) => {
+        let first = 0;
+        let third = 0;
+        for (const { events, pass } of takes) {
+            const notes = leadNotes(events).length;
+            if (pass === 1) {
+                first += notes;
+            } else if (pass === 3) {
+                third += notes;
+            }
+        }
+        return ratio(third, first);
+    },
+    /** Share of solo cycles whose highest note is in the third chorus: the peak is the top. */
+    leadPeakIsTop: (takes) => {
+        let cycles = 0;
+        let hit = 0;
+        for (let i = 0; i + 2 < takes.length; i++) {
+            if (takes[i].pass !== 1 || takes[i + 2].pass !== 3) {
+                continue;
+            }
+            const top = (k: number) =>
+                Math.max(-1, ...leadNotes(takes[i + k].events).map((e) => e.midi));
+            cycles++;
+            hit += top(2) >= Math.max(top(0), top(1)) ? 1 : 0;
+        }
+        return ratio(hit, cycles);
     },
     /** Share of moves inside a phrase that are steps (a whole step or less). */
     leadStepShare: (takes) => {

@@ -22,7 +22,7 @@ import { compIdiom, type Hit, strums } from '../players/comp/idiom.js';
 import { drumIdiom, snareFigure, tomRun } from '../players/drums/kit.js';
 import { dyn, isCommonTime, pulses, spanSteps } from '../players/grid.js';
 import { leadIdiom } from '../players/lead/idiom.js';
-import { pentatonicPool, restingTones, rootFirst } from '../players/lead/palette.js';
+import { fifthFirst, pentatonicPool, rootFirst } from '../players/lead/palette.js';
 import { mod12 } from '../theory/pitch.js';
 import type { PitchedIdiom, Style } from './types.js';
 
@@ -255,14 +255,16 @@ const rockLead = leadIdiom({
         form: 'period',
     },
     pool: (chord, key) => pentatonicPool(chord, key),
-    arrive: (chord) => rootFirst(chord),
-    settle: (chord) => restingTones(chord),
+    arrive: (chord) => fifthFirst(chord),
+    settle: (chord) => rootFirst(chord),
     chromatic: 0.1,
     enclosure: 0,
     riff: 0.4,
     space: 0.25,
-    bends: { blue: 0.3, root: 0.4 },
+    bends: { blue: 0.45, root: 0.55 },
     scoop: 0,
+    // Every held rock-guitar note gets vibrato.
+    vibrato: 6,
 });
 
 export const rock: Style = {
@@ -270,7 +272,8 @@ export const rock: Style = {
     name: 'Rock',
     // Straight eighths, the band right on the drummer; keys a hair behind so the
     // chords sit under the backbeat rather than on top of it.
-    feel: { swing: 0, swingGrid: 8, lean: { bass: 0, comp: 3 }, humanize: 35 },
+    // The lead lays back a hair against the backbeat.
+    feel: { swing: 0, swingGrid: 8, lean: { bass: 0, comp: 3, lead: 4 }, humanize: 35 },
     drums: rockDrums,
     bass: rockBass,
     comp: { keyboard: rockKeys, guitar: rockGuitar },

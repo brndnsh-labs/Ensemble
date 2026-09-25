@@ -127,7 +127,8 @@ export function performPass(
         }
     }
 
-    const fermatas = holdFermatas(events, timeline, plans);
+    const yielded = instrument.family === 'keyboard' ? yieldToLead(events) : events;
+    const fermatas = holdFermatas(yielded, timeline, plans);
     const held = instrument.legato && !comp.percussive ? sustain(fermatas, timeline) : fermatas;
     const felt = applyFeel(held, timeline, feelFor(style, instrument.family), {
         ...settings,
@@ -135,6 +136,46 @@ export function performPass(
     });
     felt.sort((a, b) => a.tick - b.tick || laneOrder(a) - laneOrder(b));
     return { events: felt, memory, snapshots };
+}
+
+/**
+ * The comp gives the lead its register. While the lead sounds, a keyboard voice at or above
+ * it (within a half step) drops an octave, the way a pianist moves the left hand's voicing
+ * down under a horn — never below middle C, where a dropped voice would muddy the chord; a
+ * voice that can't go down, and that another voice already doubles, is left out instead. The
+ * chord keeps its pitch classes either way. A guitar's grip is its hand shape, so it stays.
+ */
+function yieldToLead(events: BandEvent[]): BandEvent[] {
+    const lead = events.filter((e): e is PitchedNote => e.lane === 'lead');
+    if (!lead.length) {
+        return events;
+    }
+    const comp = events.filter((e): e is PitchedNote => e.lane === 'comp' && !e.muted);
+    const dropped = new Map<BandEvent, BandEvent | null>();
+    for (const c of comp) {
+        let under = Number.POSITIVE_INFINITY;
+        for (const l of lead) {
+            if (l.tick < c.tick + c.dur && l.tick + l.dur > c.tick) {
+                under = Math.min(under, l.midi);
+            }
+        }
+        if (c.midi < under - 1) {
+            continue;
+        }
+        const chord = comp.filter((o) => o.tick === c.tick && o !== c);
+        if (c.midi - 12 >= 60 && !chord.some((o) => o.midi === c.midi - 12)) {
+            dropped.set(c, { ...c, midi: c.midi - 12 });
+        } else if (chord.some((o) => (o.midi - c.midi) % 12 === 0)) {
+            dropped.set(c, null);
+        }
+    }
+    if (!dropped.size) {
+        return events;
+    }
+    return events.flatMap((e) => {
+        const replaced = dropped.get(e);
+        return replaced === undefined ? [e] : replaced ? [replaced] : [];
+    });
 }
 
 /**
@@ -168,8 +209,8 @@ const laneOrder = (e: BandEvent) => LANE_ORDER[e.lane];
 
 /**
  * A fermata is a held chord, not a slow groove: whatever the idioms played inside a fermata
- * span is replaced by one crash-and-kick, one held bass note and the comp's first chord, all
- * ringing to the end of the (stretched) span. A fermata on a hold ties over: nothing new is
+ * span is replaced by one crash-and-kick, one held bass note, the comp's first chord and the
+ * lead's note if it struck one there, all ringing to the end of the (stretched) span. A fermata on a hold ties over: nothing new is
  * struck, and the notes already sounding are extended through it.
  */
 function holdFermatas(
@@ -192,6 +233,8 @@ function holdFermatas(
             continue; // outside this pass's window
         }
         const compAtStart = out.filter((e) => e.lane === 'comp' && e.tick === span.start);
+        // The lead's note on the fermata is held with the band; anything after it goes.
+        const leadAtStart = out.filter((e) => e.lane === 'lead' && e.tick === span.start);
         const before = out.filter((e) => e.tick < span.start);
         out = out.filter((e) => !inside(e));
         if (span.tied) {
@@ -253,6 +296,7 @@ function holdFermatas(
             });
         }
         out.push(...compAtStart.map((e) => ({ ...e, dur: length })));
+        out.push(...leadAtStart.map((e) => ({ ...e, dur: length })));
     }
     return out;
 }

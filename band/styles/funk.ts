@@ -22,7 +22,7 @@ import { compIdiom, type Hit, pendulum, strums } from '../players/comp/idiom.js'
 import { drumIdiom, snareFigure, tomRun } from '../players/drums/kit.js';
 import { dyn, spanSteps } from '../players/grid.js';
 import { leadIdiom } from '../players/lead/idiom.js';
-import { chordScale, minorPentatonic, rootFirst } from '../players/lead/palette.js';
+import { bluesColour, chordScale, fifthFirst, rootFirst } from '../players/lead/palette.js';
 import { type ChordFacts, fifthOf } from '../theory/chord.js';
 import type { PitchedIdiom, Style } from './types.js';
 
@@ -278,8 +278,8 @@ const funkLead = leadIdiom({
         endings: ['x-------........', 'x.x.x-------....'],
         form: 'period',
     },
-    pool: (chord, key) => [...new Set([...chordScale(chord), ...minorPentatonic(key.tonic)])],
-    arrive: (chord) => rootFirst(chord),
+    pool: (chord, key) => [...new Set([...chordScale(chord), ...bluesColour(chord, key)])],
+    arrive: (chord) => fifthFirst(chord),
     settle: (chord) => rootFirst(chord),
     chromatic: 0.25,
     enclosure: 0.05,
@@ -287,13 +287,16 @@ const funkLead = leadIdiom({
     space: 0.3,
     bends: { blue: 0, root: 0 },
     scoop: 0.2,
+    // Clipped figures: vibrato only on the rare long note.
+    vibrato: 12,
 });
 
 export const funk: Style = {
     id: 'funk',
     name: 'Funk',
     // Straight sixteenths, bass and keys a touch *ahead* — funk pushes on the One.
-    feel: { swing: 0, swingGrid: 16, lean: { bass: -5, comp: -3 }, humanize: 25 },
+    // The horn rides on top of the pocket, right on the grid while the rhythm section pushes.
+    feel: { swing: 0, swingGrid: 16, lean: { bass: -5, comp: -3, lead: 0 }, humanize: 25 },
     drums: funkDrums,
     bass: funkBass,
     comp: { keyboard: funkKeys, guitar: funkGuitar },

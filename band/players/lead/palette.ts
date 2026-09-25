@@ -16,11 +16,21 @@ export function chordScale(chord: ChordFacts): number[] {
 
 /**
  * The bebop scale: the chord scale plus the passing tone that puts chord tones on the beats
- * of an eighth-note run — the major 7th between a dominant's b7 and root, the #5 between a
- * major chord's 5th and 6th.
+ * of an eighth-note run. Each is built on one mode, so each is added only over it: the major
+ * 7th between a mixolydian dominant's b7 and root (never over an altered or diminished
+ * dominant, whose scale has other plans), the natural 3rd between a dorian minor's b3 and 4th,
+ * the #5 between a major chord's 5th and 6th.
  */
 export function bebopScale(chord: ChordFacts): number[] {
-    const extra = chord.family === 'dominant' ? [11] : chord.family === 'major' ? [8] : [];
+    const has = (...degrees: number[]) => degrees.every((d) => chord.scale.includes(d));
+    const extra =
+        chord.family === 'dominant' && has(2, 4, 7, 9, 10)
+            ? [11]
+            : chord.family === 'minor' && has(2, 3, 5, 7, 9, 10)
+              ? [4]
+              : chord.family === 'major' && has(7, 9, 11)
+                ? [8]
+                : [];
     return abs(chord, [...chord.scale, ...extra]);
 }
 
@@ -61,7 +71,7 @@ function bluesScale(key: KeyContext): number[] {
 }
 
 /** The key's minor pentatonic (1 b3 4 5 b7). */
-export function minorPentatonic(tonic: number): number[] {
+function minorPentatonic(tonic: number): number[] {
     return [0, 3, 5, 7, 10].map((i) => mod12(tonic + i));
 }
 
@@ -70,7 +80,24 @@ function majorPentatonic(tonic: number): number[] {
     return [0, 2, 4, 7, 9].map((i) => mod12(tonic + i));
 }
 
-/** A rock or funk landing: the root first, then the 5th and 3rd (and a written 7th). */
+/**
+ * Where a rock or funk phrase lands mid-phrase: the 5th, then the 3rd and a written 7th, the
+ * root last — the bass has the root, and a lead that lands on it at every change is just the
+ * bass line up an octave.
+ */
+export function fifthFirst(chord: ChordFacts): number[] {
+    const order = [fifthOf(chord)];
+    if (chord.third !== null) {
+        order.push(chord.third);
+    }
+    if (chord.seventh !== null) {
+        order.push(chord.seventh);
+    }
+    order.push(0);
+    return abs(chord, order);
+}
+
+/** Where a rock or funk phrase comes to rest: the root first, then the 5th and 3rd. */
 export function rootFirst(chord: ChordFacts): number[] {
     const order = [0, fifthOf(chord)];
     if (chord.third !== null) {
@@ -115,6 +142,16 @@ export function bluesPool(chord: ChordFacts, key: KeyContext): number[] {
 export function pentatonicPool(chord: ChordFacts, key: KeyContext): number[] {
     const scale = key.minor
         ? minorPentatonic(key.tonic)
-        : [...majorPentatonic(key.tonic), mod12(key.tonic + 3)];
+        : [...majorPentatonic(key.tonic), ...bluesColour(chord, key).slice(1, 2)];
     return [...new Set([...scale, ...chordPcs(chord)])];
+}
+
+/**
+ * The key's minor pentatonic as colour over a chord it suits: in a minor key, always; in a
+ * major key only over the I and the IV, where its b3 is the blue third (and the IV's b7). Over
+ * the V or the vi it is a wrong note held, not a blue one. Ordered 1 b3 4 5 b7.
+ */
+export function bluesColour(chord: ChordFacts, key: KeyContext): number[] {
+    const degree = mod12(chord.root - key.tonic);
+    return key.minor || degree === 0 || degree === 5 ? minorPentatonic(key.tonic) : [];
 }

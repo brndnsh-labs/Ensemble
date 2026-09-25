@@ -2,17 +2,19 @@
  * Pitch for a planned phrase, targets first.
  *
  * A phrase's rhythm is fixed before any pitch is chosen. Then its *targets* are placed: the
- * first note, the last note, and every note that falls on a chord change. A change lands on a
- * guide tone and the end on a stable tone, chosen by rule (nearest to the phrase's contour),
- * never by weighted chance. Only then are the notes between filled in: they walk toward the next
- * target through the style's note pool, mostly by step, and the note before a target may
- * approach it by half step or enclose it. That is how a line sounds like it is going somewhere.
+ * first note, the last note, every note on a chord change and every note before a breath. A
+ * change lands on a guide tone and the end on a stable tone, chosen by rule (nearest to the
+ * phrase's contour), never by weighted chance. Only then are the notes between filled in: they
+ * walk toward the next target through the style's note pool, mostly by step, and the note
+ * before a target may approach it by half step or enclose it. That is how a line sounds like it
+ * is going somewhere.
+ *
+ * Some pitches arrive already decided (`carried`): a head restating its opening, a riff played
+ * again, a motif developed. The line keeps them and fills around them.
  */
 import type { Rng } from '../../core/random.js';
-import type { ChordFacts } from '../../theory/chord.js';
-import { chordPcs } from '../../theory/chord.js';
-import type { KeyContext } from '../../theory/pitch.js';
-import { mod12 } from '../../theory/pitch.js';
+import { type ChordFacts, chordPcs } from '../../theory/chord.js';
+import { type KeyContext, mod12 } from '../../theory/pitch.js';
 
 export type Contour = 'arch' | 'fall' | 'climb' | 'wave';
 
@@ -26,7 +28,7 @@ export interface Onset {
     key: KeyContext;
     /**
      * The harmony changed since the phrase's previous note — even across a bar the line rested
-     * through — so this note is a target.
+     * through, or into a chord this note anticipates — so this note is a target.
      */
     change: boolean;
 }
@@ -56,6 +58,11 @@ export interface LineShape {
     from: number | null;
 }
 
+/** An eighth note, in ticks: an approach note is a passing note, never a held one. */
+const PASSING = 240;
+/** A beat of silence after a note ends a figure. */
+const BREATH = 480;
+
 /** The contour's ideal pitch at `t` (0–1 through the phrase). */
 function contourAt(shape: LineShape, t: number): number {
     const { centre, span } = shape;
@@ -71,6 +78,18 @@ function contourAt(shape: LineShape, t: number): number {
     }
 }
 
+/**
+ * The phrase's register: the contour's reach and a little either side (a step past it, not a
+ * register away), inside the instrument. Targets and walks both stay in it.
+ */
+function registerOf(shape: LineShape): readonly [number, number] {
+    const [lo, hi] = shape.range;
+    return [
+        Math.max(lo, Math.floor(shape.centre - shape.span / 2 - 3)),
+        Math.min(hi, Math.ceil(shape.centre + shape.span / 2 + 3)),
+    ];
+}
+
 /** Every MIDI note of the pitch classes `pcs` inside `range`. */
 function candidates(pcs: readonly number[], [lo, hi]: readonly [number, number]): number[] {
     const out: number[] = [];
@@ -82,24 +101,22 @@ function candidates(pcs: readonly number[], [lo, hi]: readonly [number, number])
     return out;
 }
 
-/** An eighth note, in ticks: an approach note is a passing note, never a held one. */
-const PASSING = 240;
-
 /**
  * The candidate nearest `ideal`, ranked pitch classes breaking near-ties (earlier = better),
- * never `avoid` (a target doesn't restate the note right before it).
+ * never one of `avoid` (a target doesn't restate the note right before it). The rank weight
+ * (1.25 per place) is a little more than a semitone: a better-ranked tone wins unless the
+ * next one is more than a step nearer the contour.
  */
 function nearestRanked(
     pcs: readonly number[],
     ideal: number,
     range: readonly [number, number],
-    avoid: number | null | readonly (number | null)[] = null,
-) {
-    const avoided = Array.isArray(avoid) ? avoid : [avoid];
+    avoid: readonly (number | null)[] = [],
+): number {
     let best = Math.round(ideal);
     let score = Number.POSITIVE_INFINITY;
     for (const m of candidates(pcs, range)) {
-        if (avoided.includes(m)) {
+        if (avoid.includes(m)) {
             continue;
         }
         const s = Math.abs(m - ideal) + pcs.indexOf(mod12(m)) * 1.25;
@@ -112,29 +129,32 @@ function nearestRanked(
 }
 
 /**
- * The pool note nearest `ideal`, never `avoid` (no repeated pitch inside a run). On a downbeat,
- * a chord tone within reach wins over a passing tone: the bebop rule that keeps a line's strong
- * beats on the harmony.
+ * The pool note nearest `ideal`, never one of `avoid` (the note before, and the one before
+ * that: a line that returns to the note two back is trilling, and a trill belongs in a style's
+ * cells, not in a walk). On a downbeat a chord tone within reach wins over a passing tone —
+ * the bebop rule that keeps a run's beats on the harmony (1.5: a chord tone a step and a half
+ * away still beats a passing tone right at the contour). A held note a half step from a chord
+ * tone is a rub, not colour (a b9 held over a minor seventh, a b3 held against a major 3rd):
+ * a passing note may brush it, a held one steers clear (3: past any nearer choice).
  */
 function snap(
     ideal: number,
     pool: readonly number[],
     tones: readonly number[],
     range: readonly [number, number],
-    avoid: number | null,
+    avoid: readonly (number | null)[],
     downbeat: boolean,
     held: boolean,
 ): number {
     let best = Math.round(ideal);
     let score = Number.POSITIVE_INFINITY;
     for (const m of candidates(pool, range)) {
-        if (m === avoid) {
+        if (avoid.includes(m)) {
             continue;
         }
         const chordTone = tones.includes(mod12(m));
-        // A held note a half step above a chord tone is a rub, not colour (a b9 held over a
-        // minor seventh chord): a passing note may brush it, a held one steers clear.
-        const rub = held && !chordTone && tones.includes(mod12(m - 1));
+        const rub =
+            held && !chordTone && (tones.includes(mod12(m - 1)) || tones.includes(mod12(m + 1)));
         const s = Math.abs(m - ideal) - (downbeat && chordTone ? 1.5 : 0) + (rub ? 3 : 0);
         if (s < score) {
             score = s;
@@ -144,7 +164,7 @@ function snap(
     return best;
 }
 
-/** The pool note a step away from `target` on the side `from` comes from. */
+/** The pool note a step away from `target`, above or below it. */
 function neighbour(target: number, pool: readonly number[], above: boolean): number {
     for (let d = 1; d <= 3; d++) {
         const m = above ? target + d : target - d;
@@ -166,21 +186,40 @@ function fold(m: number, [lo, hi]: readonly [number, number]): number {
     return out;
 }
 
-/**
- * Pitches for `onsets`, one per onset. `targets` may add indices that must be chord tones
- * (a style's strong beats); the first, the last and every chord change are always targets.
- */
+/** Reflect `want` back inside [lo, hi]: a line reaching a register edge turns round. */
+function reflect(want: number, lo: number, hi: number): number {
+    if (want > hi) {
+        return Math.max(lo, hi - (want - hi));
+    }
+    if (want < lo) {
+        return Math.min(hi, lo + (lo - want));
+    }
+    return want;
+}
+
+/** Which notes of a phrase are targets: first, last, changes, and before a breath. */
+export function targetsOf(onsets: readonly Onset[]): boolean[] {
+    const n = onsets.length;
+    return onsets.map(
+        (o, i) =>
+            i === 0 || i === n - 1 || o.change || onsets[i + 1].tick - (o.tick + o.dur) >= BREATH,
+    );
+}
+
+/** Pitches for `onsets`, one per onset, keeping any `carried` pitch as given. */
 export function voiceLine(
     onsets: readonly Onset[],
     palette: LinePalette,
     shape: LineShape,
     rng: Rng,
+    carried: readonly (number | null)[] = [],
 ): number[] {
     const n = onsets.length;
     if (!n) {
         return [];
     }
     const { range } = shape;
+    const register = registerOf(shape);
     const ideal = (i: number) => {
         const t = n === 1 ? 0.5 : i / (n - 1);
         const at = contourAt(shape, t);
@@ -188,24 +227,27 @@ export function voiceLine(
         return i === 0 && shape.from !== null ? (at + shape.from) / 2 : at;
     };
 
-    // A note followed by a breath (a beat or more of silence) ends a figure: it lands too.
-    const breath = (i: number) => onsets[i + 1].tick - (onsets[i].tick + onsets[i].dur) >= 480;
-    const isTarget = onsets.map((o, i) => i === 0 || i === n - 1 || o.change || breath(i));
-    const pitches: (number | null)[] = onsets.map(() => null);
+    const isTarget = targetsOf(onsets);
+    const pitches: (number | null)[] = onsets.map((_, i) => carried[i] ?? null);
+    const placed = pitches.map((m, i) => m !== null || isTarget[i]);
     let previousTarget: number | null = null;
     for (let i = 0; i < n; i++) {
+        if (pitches[i] !== null) {
+            previousTarget = pitches[i];
+            continue;
+        }
         if (!isTarget[i]) {
             continue;
         }
         const { chord, key } = onsets[i];
         const pcs = i === n - 1 ? palette.settle(chord, key) : palette.arrive(chord, key);
-        const adjacent = i > 0 && isTarget[i - 1] ? pitches[i - 1] : null;
-        let m = nearestRanked(pcs, ideal(i), range, adjacent);
+        const adjacent = i > 0 ? pitches[i - 1] : null;
+        let m = nearestRanked(pcs, ideal(i), register, [adjacent]);
         // A target a long way from the last one is folded nearer: a line doesn't leap a tenth
         // to reach its next chord when the same tone sits an octave closer.
         if (previousTarget !== null && Math.abs(m - previousTarget) > 9) {
             const closer = m > previousTarget ? m - 12 : m + 12;
-            if (closer >= range[0] && closer <= range[1] && closer !== adjacent) {
+            if (closer >= register[0] && closer <= register[1] && closer !== adjacent) {
                 m = closer;
             }
         }
@@ -213,17 +255,14 @@ export function voiceLine(
         previousTarget = m;
     }
 
-    // Fill between each pair of targets.
+    // Fill between each pair of placed notes (targets and carried pitches).
     let a = 0;
     for (let b = 1; b < n; b++) {
-        if (!isTarget[b]) {
+        if (!placed[b]) {
             continue;
         }
-        const from = pitches[a] as number;
-        const to = pitches[b] as number;
-        const gap = b - a - 1;
-        if (gap > 0) {
-            fill(onsets, pitches, a, b, from, to, palette, shape, rng);
+        if (b - a - 1 > 0) {
+            fill(onsets, pitches, a, b, palette, register, rng);
         }
         a = b;
     }
@@ -235,33 +274,39 @@ function fill(
     pitches: (number | null)[],
     a: number,
     b: number,
-    from: number,
-    to: number,
     palette: LinePalette,
-    shape: LineShape,
+    register: readonly [number, number],
     rng: Rng,
 ): void {
-    const { range } = shape;
-    // A walk may turn past its target, but stays inside the phrase's register.
-    const floor = shape.centre - shape.span / 2 - 2;
-    const ceiling = shape.centre + shape.span / 2 + 2;
+    const from = pitches[a] as number;
+    const to = pitches[b] as number;
+    const [floor, ceiling] = register;
     const { chord, key } = onsets[b - 1];
     const pool = palette.pool(chord, key);
     const rising = to >= from;
-    let end = b; // first index that is already placed
-    // The approach: the note (or two) before the target. A chromatic or enclosing approach is
-    // a passing note; on a held note the line steps into the target from a chord tone instead.
     const short = (i: number) => onsets[i].dur <= PASSING;
+    // A chromatic note is a passing note: off the beat, never held.
+    const passing = (i: number) => short(i) && onsets[i].step % 4 !== 0;
+    let end = b; // first index that is already placed
+    // The approach: the note (or two) before the target.
     if (!short(b - 1)) {
-        const tones = chordPcs(chord);
-        pitches[b - 1] = nearestRanked(tones, rising ? to - 3 : to + 3, range, [to, from]);
+        // A held note steps into the target from a chord tone.
+        pitches[b - 1] = nearestRanked(chordPcs(chord), rising ? to - 3 : to + 3, register, [
+            to,
+            from,
+            pitches[b - 2] ?? null,
+        ]);
         end = b - 1;
-    } else if (b - a - 1 >= 2 && short(b - 2) && rng.chance(palette.enclosure)) {
+    } else if (b - a - 1 >= 2 && passing(b - 1) && short(b - 2) && rng.chance(palette.enclosure)) {
+        // Scale step above, half step below, target.
         pitches[b - 2] = neighbour(to, pool, true);
         pitches[b - 1] = to - 1;
         end = b - 2;
-    } else if (rng.chance(palette.chromatic)) {
-        pitches[b - 1] = rising ? to - 1 : to + 1;
+    } else if (passing(b - 1) && rng.chance(palette.chromatic)) {
+        // From above only where the half step above is in the scale (a 4th onto a major 3rd);
+        // otherwise from below — a raised note above a minor 3rd is its major 3rd.
+        const above = !rising && pool.includes(mod12(to + 1));
+        pitches[b - 1] = above ? to + 1 : to - 1;
         end = b - 1;
     } else {
         pitches[b - 1] = neighbour(to, pool, !rising);
@@ -274,44 +319,42 @@ function fill(
     const target = pitches[end] as number;
     const distance = target - from;
     // More notes than the distance needs: the line turns (goes past and comes back) rather
-    // than repeating itself; fewer: it skips through chord tones (an arpeggio).
+    // than repeating itself, by up to a 5th (7). About 1.8 semitones per note is a scale
+    // run's pace; with fewer notes than that pace needs (over 2.6 a note) it skips through
+    // chord tones instead: an arpeggio.
     const room = Math.max(0, count * 1.8 - Math.abs(distance));
     const bump = (distance >= 0 ? 1 : -1) * Math.min(7, room / 2);
     const arpeggio = Math.abs(distance) / (count + 1) > 2.6;
-    let previous = from;
     for (let k = 1; k <= count; k++) {
         const t = k / (count + 1);
-        const want = Math.min(
-            ceiling,
-            Math.max(floor, from + distance * t + bump * Math.sin(Math.PI * t)),
-        );
+        const want = reflect(from + distance * t + bump * Math.sin(Math.PI * t), floor, ceiling);
         const i = a + k;
         const onset = onsets[i];
         const localPool = palette.pool(onset.chord, onset.key);
         const localTones = chordPcs(onset.chord);
-        const m = snap(
+        pitches[i] = snap(
             want,
             arpeggio ? localTones : localPool,
             localTones,
-            range,
-            previous,
+            register,
+            [pitches[i - 1], pitches[i - 2] ?? null],
             onset.step % 4 === 0,
             onset.dur > PASSING,
         );
-        pitches[i] = m;
-        previous = m;
     }
-    // The last walking note never lands on the approach's own pitch, nor falls back onto the
-    // note before it: it takes whichever neighbour of the approach is free.
+    // The last walking note never lands on the approach's own pitch or turns back to the note
+    // before it: it is chosen again under the same rules with both ruled out.
     const last = end - 1;
     if (last > a && pitches[last] === pitches[end]) {
         const onset = onsets[last];
-        const pool = palette.pool(onset.chord, onset.key);
-        const approachPitch = pitches[end] as number;
-        const options = [
-            neighbour(approachPitch, pool, approachPitch > to),
-            neighbour(approachPitch, pool, approachPitch <= to),
-        ];
-        pitches[last] = options.find((m) => m !== pitches[last - 1]) ?? options[0];
+        pitches[last] = snap(
+            pitches[end] as number,
+            palette.pool(onset.chord, onset.key),
+            chordPcs(onset.chord),
+            register,
+            [pitches[end], pitches[last - 1]],
+            onset.step % 4 === 0,
+            onset.dur > PASSING,
+        );
     }
 }
