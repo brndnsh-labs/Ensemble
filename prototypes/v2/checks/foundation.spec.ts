@@ -448,12 +448,14 @@ test('feel preparation keeps the stand stable, rolls back playback safely, and r
     test.setTimeout(120_000);
     await observeSamples(page);
     // Browser-side body; the pack URL arrives as an argument (see the corrupt-download test).
-    await page.addInitScript((grand: string) => {
+    // The held pack is one only Jazz needs (its lead's alto sax): the Blues band keeps playing
+    // through the hold, and holding a pack it plays too (the grand, its comp) would stall it.
+    await page.addInitScript((held: string) => {
         const match = Cache.prototype.match;
         const control = { hold: false, release: null as null | (() => void) };
         Object.assign(window, { __preparation: control });
         Cache.prototype.match = async function (request, options) {
-            if (control.hold && String(request).includes(grand)) {
+            if (control.hold && String(request).includes(held)) {
                 control.hold = false;
                 await new Promise<void>((resolve) => {
                     control.release = resolve;
@@ -461,7 +463,7 @@ test('feel preparation keeps the stand stable, rolls back playback safely, and r
             }
             return match.call(this, request, options);
         };
-    }, appUrl('packs/grand/'));
+    }, appUrl('packs/sax-alto/'));
     const hold = () =>
         page.evaluate(() => {
             const control = (
