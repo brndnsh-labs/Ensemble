@@ -15,6 +15,14 @@ import { bassNote, bassPc, kickSteps, type LineMemory, nextChord } from '../play
 import { compIdiom, type Hit, pendulum, strums } from '../players/comp/idiom.js';
 import { type DrumBook, drumIdiom, fillStart, type Lines } from '../players/drums/kit.js';
 import { barSteps, dyn, isCommonTime, spanSteps } from '../players/grid.js';
+import { leadIdiom } from '../players/lead/idiom.js';
+import {
+    bluesColour,
+    chordScale,
+    guideTones,
+    pentatonicPool,
+    restingTones,
+} from '../players/lead/palette.js';
 import { type ChordFacts, fifthOf } from '../theory/chord.js';
 import { nearestMidi } from '../theory/pitch.js';
 import type { BarContext, PitchedIdiom, Style } from './types.js';
@@ -465,6 +473,64 @@ const cleanGuitar = compIdiom({
     },
 });
 
+// ================================================================ lead
+// A sampled hook, not a soloist: the one- or two-bar lick a producer lifts off a soul or jazz
+// record and loops (a clean guitar phrase, a horn line), with a lot of air around it. So the
+// "solo" is the hook developing: a figure played again bar after bar more often than not,
+// moved only where the chord moves, with a new idea now and then and whole bars left to the
+// beat. It moves through the minor pentatonic in a minor key (the dark, dusty loop), the
+// chord's own scale with the blue third in a major one (the soul record it came from), lands on
+// the Rhodes' 3rds and 7ths, and sits back behind the beat with the Rhodes, inside the loop.
+const hipHopLead = leadIdiom({
+    name: 'hip hop lead',
+    cells: {
+        // A short lick and room: two to four plucked notes, then the beat alone.
+        sparse: ['x-x-x---........', '......x-x-x-....', 'x---..x-x---....', '..x.x---x---....'],
+        // The hook proper: a figure with a sixteenth snap in it and a rest before the bar ends.
+        mid: ['x-x.x-x---......', '..x-x-x.x---....', 'x.x-..x-x-x-....', '....x-x-x.x-x-..'],
+        // Busier, still a loop, never a run: one sixteenth snap (the swing lopes it) and air
+        // before the bar ends.
+        busy: ['..x.x-x-..x-x-..', 'x-x-x.x-x-..x-..', 'x.x-x-..x.x-x-..', '..x-x-x-x.x-x-..'],
+    },
+    // A lick ends on a note let ring for a beat or two; the beat carries the rest of the bar.
+    endings: ['x-------........', 'x-x-x-----......', '..x-x-----......', 'x---x-------....'],
+    head: {
+        cells: ['x-x-x---..x-x-..', '..x-x-x---......', 'x.x-x---x---....', '....x-x-x-x---..'],
+        endings: ['x-------........', 'x-x-x-------....'],
+        // The hook, the hook again, a turn — each with a bar of beat after it. An 8-bar
+        // section plays its four-bar hook twice, note for note: the loop.
+        form: 'aab',
+    },
+    // Minor: the minor pentatonic with the chord's tones (the dusty loop). Major: the chord's
+    // scale, and the blue third over the I and IV (a soul record's colour).
+    pool: (chord, key) =>
+        key.minor
+            ? pentatonicPool(chord, key)
+            : [...new Set([...chordScale(chord), ...bluesColour(chord, key)])],
+    // The Rhodes plays 7ths and 9ths; the hook lands on the notes that name them, 3rd and 7th.
+    arrive: (chord) => guideTones(chord),
+    // A lick rests on a chord's 3rd, root or 5th, the note a loop can turn around on.
+    settle: (chord) => restingTones(chord),
+    // A half step into a note now and then (0.1): a jazz record's inflection, not a bebop line.
+    chromatic: 0.1,
+    // No enclosures: a hook is plain enough to hum.
+    enclosure: 0,
+    // A loop repeats (0.7): most bars play the bar before them again, adapted to the chord —
+    // the hook developing slowly, the way a producer lets a sample run.
+    riff: 0.7,
+    // The hook's room lives inside the bar (the cells' rests and the note let ring), so a
+    // roomier phrase shape is taken only now and then (0.3): an emptier shape has fewer bars
+    // in a row for the loop to come round in.
+    space: 0.3,
+    // A soul guitarist's small bends: into the 3rd from the blue third now and then (0.25), the
+    // rock player's whole-step bend into the root rarely (0.1).
+    bends: { blue: 0.25, root: 0.1 },
+    // A guitar bends rather than scoops.
+    scoop: 0,
+    // Clean and sparing: only a note held a half note or longer gets the shake.
+    vibrato: 8,
+});
+
 export const hiphop: Style = {
     id: 'hiphop',
     name: 'Hip Hop',
@@ -478,7 +544,8 @@ export const hiphop: Style = {
     // only 4 ms: under ~10 ms it fuses with the kick into one fatter hit instead of flamming
     // against it. Humanize is low: a programmed beat, whose per-position character still
     // repeats every bar, so its small push and drag loop with the beat.
-    feel: { swing: 25, swingGrid: 16, lean: { bass: 4, comp: 12 }, humanize: 20 },
+    // The hook is part of the chopped sample, so it drags with the Rhodes, 12 ms behind.
+    feel: { swing: 25, swingGrid: 16, lean: { bass: 4, comp: 12, lead: 12 }, humanize: 20 },
     drums: boomBap,
     bass: subBass,
     comp: { keyboard: rhodesLoop, guitar: cleanGuitar },
@@ -488,4 +555,8 @@ export const hiphop: Style = {
     // needs. A piano's hammer reads as a live player, an organ holds and drops the chop, and
     // a guitar here is the rare exception, not the genre's voice.
     prefers: 'rhodes',
+    // Clean guitar: a soul-record guitar lick is the classic sampled hook, and over the Rhodes
+    // its plucked attack sits apart from the tines (a sax would blur into them), with a small
+    // bend to sound played rather than programmed.
+    lead: { idiom: hipHopLead, prefers: 'guitar' },
 };
