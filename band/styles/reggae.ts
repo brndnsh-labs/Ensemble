@@ -25,6 +25,8 @@ import {
 import { compIdiom, type Hit, strums } from '../players/comp/idiom.js';
 import { drumIdiom, type Lines, snareFigure, tomRun } from '../players/drums/kit.js';
 import { barSteps, dyn, isCommonTime, type Pulse, pulses, spanSteps } from '../players/grid.js';
+import { leadIdiom } from '../players/lead/idiom.js';
+import { chordScale, pentatonicPool, restingTones, rootFirst } from '../players/lead/palette.js';
 import { type ChordFacts, fifthOf } from '../theory/chord.js';
 import { mod12, nearestMidi } from '../theory/pitch.js';
 import type { BarContext, PitchedIdiom, Style } from './types.js';
@@ -441,6 +443,60 @@ const reggaeGuitar = compIdiom({
     },
 });
 
+// ================================================================ lead
+// A roots horn line, the sound between a melodica and a Wailers horn section: short phrases that
+// start after the One (the one drop leaves the downbeat empty, and so does the melody) and come
+// to rest on the drop on 3, long warm notes scooped into, and a lot of room — the skank and the
+// bass are the song, the horn answers them. A minor-key tune moves through the minor
+// pentatonic (the dub melodica's dark, modal sound); a major-key one through the chord's own
+// scale, sweet rather than blue. It lands on the 3rd, comes home to the root, and says the same
+// hook again rather than something new: a call, the call again, an answer (the head is AAB), and
+// a riff played twice in a solo more often than not.
+const reggaeLead = leadIdiom({
+    name: 'reggae lead',
+    cells: {
+        // Chorus one: two or three notes after the One, the last held onto the drop.
+        sparse: ['..x-x-------....', '....x---x-------', '......x-x-x-----', '..x---..x-------'],
+        // A short line: offbeat entries, a long note on 3, sometimes a pickup into the next bar.
+        mid: ['..x-x-x-x-------', 'x---..x-x---x---', '..x-x-..x-x-x---', '....x-x-x---..x-'],
+        // Busier, still laid back: eighth lines with a sixteenth turn, never a bebop run.
+        busy: ['..x-x-x-x-x-x---', 'x-x-..x-x-x-x-x-', '..xxx-x-x---x-x-', '....x-xxx-x-x---'],
+    },
+    // A phrase ends on a long note from beat 2 or on the drop, and holds through the skank.
+    endings: ['..x-x-----------', '....x-----------', '..x-x-x---------', '......x-x-------'],
+    head: {
+        cells: ['..x-x-x-x-------', '....x-x-x-------', '..x---x-x---x---', 'x---..x-x-------'],
+        endings: ['..x-------------', '..x-x-----------'],
+        // A call, the same call again, a different answer, each with a bar of room for the
+        // skank: the way a roots horn line (or a dub melodica) hangs a hook over the riddim.
+        form: 'aab',
+    },
+    // Minor: the minor pentatonic with the chord's tones (Augustus Pablo's modal minor). Major:
+    // the chord's own scale — reggae's major-key tunes are sweet, and a blue third held over a
+    // skanking I sounds like rock, not roots.
+    pool: (chord, key) => (key.minor ? pentatonicPool(chord, key) : chordScale(chord)),
+    // A change lands on the 3rd first (the note horn sections harmonise on), then root and 5th.
+    arrive: (chord) => restingTones(chord),
+    // A phrase comes home to the root: the hook resolves, and the riddim rolls on under it.
+    settle: (chord) => rootFirst(chord),
+    // A half-step approach now and then (0.1): the line is diatonic and singable, not bebop.
+    chromatic: 0.1,
+    // Enclosures are a bebop device; a reggae horn line steps straight into its notes.
+    enclosure: 0,
+    // Hooks come round again (0.45): a riff played twice is the genre's repetition, the dub
+    // loop in miniature, but not so often that every phrase stutters.
+    riff: 0.45,
+    // Spacious (0.45): nearly half the phrases take a roomier shape than the arc asks for — the
+    // horn answers the band, it doesn't lead it.
+    space: 0.45,
+    // A horn doesn't bend.
+    bends: { blue: 0, root: 0 },
+    // A lazy scoop into a long note (0.25): the melodica's and the roots horn's slide up to pitch.
+    scoop: 0.25,
+    // Warm vibrato on a half note or longer; the short notes of a line stay straight.
+    vibrato: 8,
+});
+
 export const reggae: Style = {
     id: 'reggae',
     name: 'Reggae',
@@ -449,7 +505,9 @@ export const reggae: Style = {
     // skank sit back behind them — the famously deep, laid-back pocket (the old engine laid
     // the band 8 ms back). The bass drags most; the skank a touch less, so the chop stays
     // crisp against the hat.
-    feel: { swing: 20, swingGrid: 16, lean: { bass: 8, comp: 5 }, humanize: 30 },
+    // The horn lays back furthest of all, well behind the drums: roots horn lines drag, and
+    // the lazier the melody the deeper the pocket feels.
+    feel: { swing: 20, swingGrid: 16, lean: { bass: 8, comp: 5, lead: 12 }, humanize: 30 },
     drums: reggaeDrums,
     bass: reggaeBass,
     comp: { keyboard: reggaeKeys, guitar: reggaeGuitar },
@@ -463,4 +521,8 @@ export const reggae: Style = {
     // engine chose the organ in a two-channel world, where the chords lane skanked and the
     // harmony lane bubbled beside it.
     prefers: 'guitar',
+    // Sax: the comp is already a guitar, and a roots lead is a horn or a melodica — Dean Fraser,
+    // Tommy McCook. Of the band's leads the sax's reedy, breathy tone is the nearest to the
+    // melodica, and warmer than the trumpet, which ska wants for its brightness.
+    lead: { idiom: reggaeLead, prefers: 'sax' },
 };

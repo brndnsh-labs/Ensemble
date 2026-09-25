@@ -331,6 +331,27 @@ const metrics = {
         }
         return ratio(hit, n);
     },
+    /**
+     * Share of the lead's attacks in 4/4 bars that fall on an eighth-note offbeat (an "and",
+     * where the skank chops): the horn punching with the upstroke. A line that started every
+     * figure on the beat would read ~0.3 here, as any eighth-note line's upbeats do; the ska
+     * horn's leans the other way. The lead can't hear the ska/punk switch (its book is one
+     * vocabulary for both), so this judges both sides of it together.
+     */
+    leadOffbeatShare: (takes: Take[]) => {
+        let n = 0;
+        let hit = 0;
+        for (const { timeline: t, events } of takes) {
+            for (const e of events) {
+                if (e.lane !== 'lead' || t.bars[e.bar].meter.name !== '4/4') {
+                    continue;
+                }
+                n++;
+                hit += stepOf(t, e) % 4 === 2 ? 1 : 0;
+            }
+        }
+        return ratio(hit, n);
+    },
 };
 
 export const skapunk = defineClaims({
@@ -479,6 +500,41 @@ export const skapunk = defineClaims({
             claims: [
                 ['verseCompOnAnds', 0.97, 1, 'the piano doubles the skank'],
                 ['verseCompChopped', 0.9, 1, 'damped at once'],
+            ],
+        },
+        {
+            take: { lead: 'head' },
+            claims: [
+                ['leadLongBreath', 0, 0.02, 'the tune never drops out for two bars'],
+                ['leadRestShare', 0, 0.15, 'the horn line is the song: it fills the form'],
+                ['leadNotesPerBar', 3, 5.5, 'a tongued, busy tune'],
+                ['leadShortShare', 0.65, 0.95, 'punched short notes, the odd one held'],
+                // An even eighth-note line puts half its attacks on the "and"s (0.5); a line of
+                // quarters on the beat, none. The ska tune leans past half onto the offbeats.
+                ['leadOffbeatShare', 0.55, 0.8, 'syncopated: the tune pushes the "and"s'],
+                ['leadChordToneOnBeats', 0.72, 1, 'the beats sit on the chord'],
+                ['leadChangeRootFifth', 0.5, 0.85, 'the fanfare lands 5ths and roots on changes'],
+                ['leadPhraseEndsOnChordTone', 0.95, 1, 'phrases end on a chord tone'],
+                ['leadLeapShare', 0, 0.05, 'no wide leaps inside a phrase'],
+                ['leadOscillation', 0, 0.04, 'no trilling back and forth'],
+            ],
+        },
+        {
+            take: { lead: 'solo' },
+            claims: [
+                ['leadLongBreath', 0, 0.12, 'breaths, not gaps: two empty bars are rare'],
+                ['leadRestShare', 0.1, 0.35, 'urgent: less room than a roots or hip hop lead'],
+                ['leadShortShare', 0.72, 0.95, 'tongued short, even at the peak'],
+                ['leadOffbeatShare', 0.52, 0.75, 'the horn punches the offbeats with the skank'],
+                ['leadInnerSpace', 0.2, 0.45, 'staccato stabs leave space inside the bar'],
+                ['leadChordToneOnBeats', 0.72, 1, 'the beats sit on the chord'],
+                ['leadChangeRootFifth', 0.4, 0.75, 'changes mostly land on 5ths and roots'],
+                ['leadStepShare', 0.5, 0.85, 'lines, with the odd arpeggio skip'],
+                ['leadLeapShare', 0, 0.05, 'no wide leaps inside a phrase'],
+                ['leadOscillation', 0, 0.05, 'no mechanical trills'],
+                ['leadPhraseEndsOnChordTone', 0.9, 1, 'phrases end on a chord tone'],
+                ['leadArcRise', 1.5, 4, 'the solo builds to the punk drive'],
+                ['leadPeakIsTop', 0.85, 1, 'the peak chorus holds the top note'],
             ],
         },
     ],

@@ -20,6 +20,8 @@ import { approach, BASS, bassNote, bassPc, nextChord, place } from '../players/b
 import { compIdiom, type Hit, strums } from '../players/comp/idiom.js';
 import { drumIdiom, type Lines, snareFigure } from '../players/drums/kit.js';
 import { barSteps, dyn, pulses, spanSteps } from '../players/grid.js';
+import { leadIdiom } from '../players/lead/idiom.js';
+import { chordScale, fifthFirst, rootFirst } from '../players/lead/palette.js';
 import { type ChordFacts, chordPcs } from '../theory/chord.js';
 import { mod12, nearestMidi } from '../theory/pitch.js';
 import type { BarContext, PitchedIdiom, Style } from './types.js';
@@ -530,6 +532,61 @@ const skaPunkGuitar: PitchedIdiom = {
     play: (ctx, memory) => (modeAt(ctx) === 'punk' ? punkGuitar : skankGuitar).play(ctx, memory),
 };
 
+// ================================================================ lead
+// A ska-punk trumpet, the horn line of a third-wave band: bright, tongued eighths, punched
+// short on the offbeats with the skank ("and"s at steps 2, 6, 10, 14 in the fast count) or held
+// long on a high note, never a run of sixteenths at these tempos. It plays tunes, not licks: the
+// head is a full period that fills the form (the horn line *is* the song's hook), and a riff
+// comes round bar after bar. It moves through the chord's own scale, lands its changes on the
+// bright 5th and 3rd like a fanfare and ends on the root, and at the top of the solo arc it
+// drives: straight tongued eighths, the punk half's urgency.
+const skaPunkLead = leadIdiom({
+    name: 'ska-punk lead',
+    cells: {
+        // Chorus one: horn punctuation on the "and"s with the skank, then one held note.
+        sparse: ['..x-..x-..x-----', '..x-..x-x-------', '..x-x-..x-------', '......x-x-x-----'],
+        // A tongued line, offbeats leaned on, a held note or an offbeat push to finish.
+        mid: ['..x-..x-x-x-x---', 'x-x-..x-..x-x---', '..x-x-x-..x-..x-', '..x---x-..x-x---'],
+        // Punk drive: straight eighths, tongued short (`x.`) where the beat is hammered, and
+        // one line that still skips a downbeat to push the "and".
+        busy: ['x-x-x-x-x-x-x-x-', 'x.x.x.x.x.x.x-x-', '..x.x.x.x.x.x-x-', 'x-x-..x-x-x-..x-'],
+    },
+    // A horn line ends on a held note (often pushed: struck on the "and" before the beat) or
+    // "bap-bap-baaa": two stabs and a long one.
+    endings: ['x-x-x-----------', '..x-..x---------', '..x-------......', 'x.x.x-------....'],
+    head: {
+        // Syncopated tunes: most figures skip a downbeat and land on the "and" before it.
+        cells: ['..x-x-..x-x-..x-', '..x-..x-x---x-x-', 'x-x-..x-..x-x---', '..x-x-x---x-..x-'],
+        endings: ['..x-------------', 'x.x.x-----------'],
+        // A statement, its answer, a contrast, the statement back: a ska horn line is a song's
+        // whole melody, played by the section, and it fills its phrases.
+        form: 'period',
+    },
+    // The chord's own scale: ska grew out of jump blues and jazz (the Skatalites), but a
+    // third-wave horn line is major-key and diatonic, bright rather than blue.
+    pool: (chord) => chordScale(chord),
+    // Changes land on the 5th, then the 3rd: the fanfare's bright notes, off the bass's root.
+    arrive: (chord) => fifthFirst(chord),
+    // A phrase ends home on the root, the horn section's unison button.
+    settle: (chord) => rootFirst(chord),
+    // A half step into a change now and then (0.15), the Skatalites' jazz accent; a punk horn
+    // line is mostly diatonic.
+    chromatic: 0.15,
+    // A rare bebop enclosure (0.05) survives from ska's jazz roots.
+    enclosure: 0.05,
+    // Riffs repeat (0.45): a horn hook is driven home bar after bar, the way the section plays it.
+    riff: 0.45,
+    // Little room (0.15): at these tempos the space is inside the bar (the offbeat stabs), and
+    // the band's urgency doesn't leave whole bars empty.
+    space: 0.15,
+    // A horn doesn't bend.
+    bends: { blue: 0, root: 0 },
+    // A trumpet attacks its notes straight, tongued; a scoop into a long note is rare (0.1).
+    scoop: 0.1,
+    // Straight tone: only a note held most of a bar gets the trumpet's shake.
+    vibrato: 12,
+});
+
 export const skapunk: Style = {
     id: 'skapunk',
     name: 'Ska-Punk',
@@ -538,7 +595,8 @@ export const skapunk: Style = {
     // pocket. The bass stays on the kick: a walking line that rushed would drag the band.
     // Tight: the old engine held ska-punk's time nearly rigid at these tempos, where a
     // loose hand reads as sloppy rather than human.
-    feel: { swing: 0, swingGrid: 8, lean: { bass: 0, comp: -4 }, humanize: 20 },
+    // The horn pushes with the skank: the offbeat stabs and the upstroke hit as one section.
+    feel: { swing: 0, swingGrid: 8, lean: { bass: 0, comp: -4, lead: -4 }, humanize: 20 },
     drums: skaPunkDrums,
     bass: skaPunkBass,
     comp: { keyboard: skaPunkKeys, guitar: skaPunkGuitar },
@@ -549,4 +607,7 @@ export const skapunk: Style = {
     // The old engine chose the organ in a two-channel world, where the chords lane skanked
     // beside a horn section; here the guitar is the part that carries both halves.
     prefers: 'guitar',
+    // Trumpet: the lead of a ska horn section, the brightest and most cutting horn, the one
+    // that carries a hook over distorted guitars at 180 bpm.
+    lead: { idiom: skaPunkLead, prefers: 'trumpet' },
 };

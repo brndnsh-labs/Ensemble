@@ -139,6 +139,34 @@ export const hiphop = defineClaims({
             }
             return n ? hit / n : 0;
         },
+        /**
+         * The hook loops: share of the lead's bars, played straight after another played bar,
+         * that play the bar before's figure again (the same onsets, step for step). The shared
+         * lead metrics measure a line's notes, not whether a figure comes round, and a sampled
+         * hook is exactly a figure coming round.
+         */
+        leadFigureRepeats: (takes: Take[]): number => {
+            let n = 0;
+            let hit = 0;
+            for (const { timeline: t, events } of takes) {
+                const figure = new Map<number, string>();
+                for (const e of events) {
+                    if (e.lane === 'lead') {
+                        const step = Math.round((e.tick - t.bars[e.bar].start) / STEP);
+                        figure.set(e.bar, `${figure.get(e.bar) ?? ''}${step},`);
+                    }
+                }
+                for (const [bar, steps] of figure) {
+                    const before = figure.get(bar - 1);
+                    if (before === undefined) {
+                        continue;
+                    }
+                    n++;
+                    hit += before === steps ? 1 : 0;
+                }
+            }
+            return n ? hit / n : 0;
+        },
     },
     takes: [
         {
@@ -183,6 +211,39 @@ export const hiphop = defineClaims({
                 ['compShort', 0.9, 1, 'every hit is damped at once, never let ring'],
                 ['compColour', 0.5, 1, 'the jazzy 3-7-9 grip where a seventh chord allows'],
                 ['compMeanLowest', 55, 67, 'a small grip on the top strings, far above the sub'],
+            ],
+        },
+        {
+            take: { lead: 'head' },
+            claims: [
+                ['leadLongBreath', 0, 0.02, 'the hook never drops out for two bars'],
+                ['leadRestShare', 0.15, 0.4, 'the hook, then a bar of beat'],
+                ['leadInnerSpace', 0.28, 0.55, 'air inside the bar: a lick, then the beat'],
+                ['leadNotesPerBar', 1.8, 3.2, 'a sparse hook'],
+                ['leadChordToneOnBeats', 0.75, 1, 'the hook sits on the chords on the beats'],
+                ['leadChangeGuideTones', 0.5, 0.85, "changes land on the Rhodes' 3rds and 7ths"],
+                ['leadPhraseEndsOnChordTone', 0.9, 1, 'each lick rests on a chord tone'],
+                ['leadLeapShare', 0, 0.05, 'no wide leaps inside a lick'],
+                ['leadOscillation', 0, 0.05, 'no trilling back and forth'],
+            ],
+        },
+        {
+            take: { lead: 'solo' },
+            claims: [
+                ['leadLongBreath', 0, 0.12, 'breaths, not gaps: two empty bars are rare'],
+                // Funk and rock riff at ~0.2 by this measure; the loop can only come round
+                // between two line bars of a phrase, so hip hop's ceiling is near 0.3.
+                ['leadFigureRepeats', 0.2, 0.45, 'the hook comes round, bar after bar'],
+                ['leadRestShare', 0.15, 0.4, 'whole bars left to the beat'],
+                ['leadInnerSpace', 0.3, 0.6, 'lots of air inside the bar'],
+                ['leadNotesPerBar', 1.8, 3.5, 'a sparse hook, not a solo'],
+                ['leadChordToneOnBeats', 0.75, 1, 'the beats sit on the chord'],
+                ['leadChangeGuideTones', 0.55, 0.9, "changes land on the Rhodes' 3rds and 7ths"],
+                ['leadLeapShare', 0, 0.05, 'no wide leaps inside a lick'],
+                ['leadOscillation', 0, 0.05, 'no mechanical trills'],
+                ['leadPhraseEndsOnChordTone', 0.9, 1, 'licks end on a chord tone'],
+                ['leadArcRise', 1.4, 4, 'the hook develops: busier by the third chorus'],
+                ['leadPeakIsTop', 0.85, 1, 'the peak chorus holds the top note'],
             ],
         },
     ],

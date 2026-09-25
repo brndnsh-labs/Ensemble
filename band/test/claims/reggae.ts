@@ -1,6 +1,34 @@
-import { defineClaims } from '../critique/harness.js';
+import { STEP } from '../../players/grid.js';
+import { defineClaims, type Take } from '../critique/harness.js';
 
 export const reggae = defineClaims({
+    metrics: {
+        /**
+         * Share of the bars the lead plays in (4/4) where it strikes the One. The one drop
+         * leaves the downbeat empty, and a roots melody does too: it comes in after the One,
+         * on its "and" or on beat 2, and lands on the drop.
+         */
+        leadOnTheOne: (takes: Take[]): number => {
+            let bars = 0;
+            let hit = 0;
+            for (const { timeline: t, events } of takes) {
+                const played = new Map<number, boolean>();
+                for (const e of events) {
+                    const bar = t.bars[e.bar];
+                    if (e.lane !== 'lead' || bar.meter.name !== '4/4') {
+                        continue;
+                    }
+                    const one = Math.round((e.tick - bar.start) / STEP) === 0;
+                    played.set(e.bar, (played.get(e.bar) ?? false) || one);
+                }
+                for (const one of played.values()) {
+                    bars++;
+                    hit += one ? 1 : 0;
+                }
+            }
+            return bars ? hit / bars : 0;
+        },
+    },
     takes: [
         {
             take: {},
@@ -87,6 +115,40 @@ export const reggae = defineClaims({
                     1,
                     'every beat gets the full e-&-a cell: felt, chord, felt',
                 ],
+            ],
+        },
+        {
+            take: { lead: 'head' },
+            claims: [
+                ['leadLongBreath', 0, 0.02, 'the tune never drops out for two bars'],
+                ['leadRestShare', 0.15, 0.4, 'a call, then a bar of room for the skank'],
+                ['leadNotesPerBar', 1.4, 3, 'few notes, long ones: a hook to hum'],
+                ['leadShortShare', 0.3, 0.6, 'long notes held through the skank'],
+                // The other leads strike the One in most bars they play (jazz ~0.5-0.7, rock
+                // ~0.8-1); a roots tune mostly leaves it to the riddim.
+                ['leadOnTheOne', 0, 0.35, 'the tune comes in after the One, like the drop'],
+                ['leadChordToneOnBeats', 0.85, 1, 'a sweet, diatonic tune on the chords'],
+                ['leadPhraseEndsOnChordTone', 0.95, 1, 'each call comes home to a chord tone'],
+                ['leadBendShare', 0.05, 0.25, 'the horn scoops into its long notes'],
+                ['leadLeapShare', 0, 0.05, 'no wide leaps inside a phrase'],
+                ['leadOscillation', 0, 0.04, 'no trilling back and forth'],
+            ],
+        },
+        {
+            take: { lead: 'solo' },
+            claims: [
+                ['leadLongBreath', 0, 0.12, 'breaths, not gaps: two empty bars are rare'],
+                ['leadRestShare', 0.15, 0.45, 'the horn answers the band and leaves it room'],
+                ['leadNotesPerBar', 2, 3.5, 'short phrases, never a bebop run'],
+                ['leadShortShare', 0.5, 0.85, 'eighth lines broken by long held notes'],
+                ['leadOnTheOne', 0, 0.35, 'phrases start after the One'],
+                ['leadChordToneOnBeats', 0.72, 1, 'the beats sit on the chord'],
+                ['leadStepShare', 0.45, 0.8, 'singable: mostly steps'],
+                ['leadLeapShare', 0, 0.05, 'no wide leaps inside a phrase'],
+                ['leadOscillation', 0, 0.05, 'no mechanical trills'],
+                ['leadPhraseEndsOnChordTone', 0.9, 1, 'phrases come home to a chord tone'],
+                ['leadArcRise', 1.5, 4, 'the solo builds'],
+                ['leadPeakIsTop', 0.85, 1, 'the peak chorus holds the top note'],
             ],
         },
     ],
