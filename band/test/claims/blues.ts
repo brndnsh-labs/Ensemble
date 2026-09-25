@@ -88,7 +88,8 @@ export const blues = defineClaims({
         {
             take: { lead: 'head' },
             claims: [
-                ['leadRestShare', 0.35, 0.65, 'a call, then room for the band to answer'],
+                ['leadLongBreath', 0, 0.02, 'the tune never drops out for two bars'],
+                ['leadRestShare', 0.15, 0.4, 'a call, then a bar of room for the band to answer'],
                 ['leadChordToneOnBeats', 0.8, 1, 'the call sits on the chord on the beats'],
                 ['leadPhraseEndsOnChordTone', 0.95, 1, 'each call comes to rest on a chord tone'],
                 ['leadBendShare', 0.08, 0.35, 'bent into the blue third and the root'],
@@ -98,6 +99,7 @@ export const blues = defineClaims({
         {
             take: { lead: 'solo' },
             claims: [
+                ['leadLongBreath', 0, 0.12, 'breaths, not gaps: two empty bars are rare'],
                 ['leadRestShare', 0.2, 0.5, 'the solo leaves space between licks'],
                 ['leadChordToneOnBeats', 0.75, 1, 'blue notes pass; the beats are the chord'],
                 ['leadChangeGuideTones', 0.4, 0.85, 'a 3rd or 7th marks most changes'],

@@ -1364,6 +1364,25 @@ export const METRICS = {
         }
         return ratio(hit, n);
     },
+    /**
+     * Share of the lead's breaths (a beat or more of silence) that last two bars or more: the
+     * difference between phrasing and dropping out.
+     */
+    leadLongBreath: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { events } of takes) {
+            const notes = leadNotes(events);
+            for (let i = 1; i < notes.length; i++) {
+                const gap = notes[i].tick - (notes[i - 1].tick + notes[i - 1].dur);
+                if (gap >= STEP * 4) {
+                    n++;
+                    hit += gap >= STEP * 32 ? 1 : 0;
+                }
+            }
+        }
+        return ratio(hit, n);
+    },
     /** Share of sixteenths left silent inside the bars the lead plays in: its inner space. */
     leadInnerSpace: (takes) => {
         let steps = 0;

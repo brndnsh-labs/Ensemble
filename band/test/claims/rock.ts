@@ -35,6 +35,7 @@ export const rock = defineClaims({
         {
             take: { lead: 'head' },
             claims: [
+                ['leadLongBreath', 0, 0.02, 'the tune never drops out for two bars'],
                 ['leadRestShare', 0, 0.15, 'the tune fills the form'],
                 ['leadChordToneOnBeats', 0.8, 1, 'the melody sits on the chords'],
                 ['leadPhraseEndsOnChordTone', 0.95, 1, 'phrases resolve'],
@@ -44,6 +45,7 @@ export const rock = defineClaims({
         {
             take: { lead: 'solo' },
             claims: [
+                ['leadLongBreath', 0, 0.12, 'breaths, not gaps: two empty bars are rare'],
                 ['leadRestShare', 0.2, 0.5, 'the solo breathes'],
                 ['leadChordToneOnBeats', 0.8, 1, 'pentatonic lines land on the chord'],
                 ['leadChangeRootFifth', 0.45, 0.8, 'changes mostly land on 5ths and roots'],

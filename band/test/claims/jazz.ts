@@ -52,6 +52,7 @@ export const jazz = defineClaims({
         {
             take: { lead: 'head' },
             claims: [
+                ['leadLongBreath', 0, 0.02, 'the tune never drops out for two bars'],
                 ['leadRestShare', 0, 0.15, 'the head is a tune: it fills the form'],
                 ['leadNotesPerBar', 2, 4.5, 'a singable line, not a run'],
                 ['leadChordToneOnBeats', 0.75, 1, 'the tune sits on the harmony on the beats'],
@@ -71,6 +72,7 @@ export const jazz = defineClaims({
         {
             take: { lead: 'solo' },
             claims: [
+                ['leadLongBreath', 0, 0.12, 'breaths, not gaps: two empty bars are rare'],
                 ['leadRestShare', 0.2, 0.5, 'the solo breathes between phrases'],
                 ['leadShortShare', 0.6, 0.95, 'bebop: running eighth-note lines'],
                 ['leadChordToneOnBeats', 0.72, 1, 'chord tones on the beats of a run'],

@@ -32,6 +32,7 @@ export const funk = defineClaims({
         {
             take: { lead: 'head' },
             claims: [
+                ['leadLongBreath', 0, 0.02, 'the tune never drops out for two bars'],
                 ['leadRestShare', 0, 0.15, 'the riff tune fills the form'],
                 ['leadShortShare', 0.8, 1, 'clipped sixteenths'],
                 ['leadInnerSpace', 0.5, 0.85, 'rests inside every bar: the space is the groove'],
@@ -41,6 +42,7 @@ export const funk = defineClaims({
         {
             take: { lead: 'solo' },
             claims: [
+                ['leadLongBreath', 0, 0.12, 'breaths, not gaps: two empty bars are rare'],
                 ['leadInnerSpace', 0.4, 0.8, 'space around the figures inside the bar'],
                 ['leadShortShare', 0.8, 1, 'short, clipped notes'],
                 ['leadChordToneOnBeats', 0.72, 1, 'the beats sit on the chord'],
