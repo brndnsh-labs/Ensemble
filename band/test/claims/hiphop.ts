@@ -233,13 +233,17 @@ export const hiphop = defineClaims({
                 ['leadLongBreath', 0, 0.12, 'breaths, not gaps: two empty bars are rare'],
                 // Funk and rock riff at ~0.2 by this measure; the loop can only come round
                 // between two line bars of a phrase, so hip hop's ceiling is near 0.3.
-                ['leadFigureRepeats', 0.2, 0.45, 'the hook comes round, bar after bar'],
+                ['leadPhraseLoop', 0.12, 0.6, 'the sampled hook comes round, whole'],
+                ['leadFigureRepeats', 0.2, 0.45, 'and figures repeat bar to bar'],
+                ['leadRepeatedNotes', 0, 0.05, 'a hook, not one note hammered'],
                 ['leadRestShare', 0.15, 0.4, 'whole bars left to the beat'],
                 ['leadInnerSpace', 0.3, 0.6, 'lots of air inside the bar'],
                 ['leadNotesPerBar', 1.8, 3.5, 'a sparse hook, not a solo'],
                 ['leadChordToneOnBeats', 0.75, 1, 'the beats sit on the chord'],
                 ['leadChangeGuideTones', 0.55, 0.9, "changes land on the Rhodes' 3rds and 7ths"],
-                ['leadLeapShare', 0, 0.05, 'no wide leaps inside a lick'],
+                // A looped soul lick keeps its shape, octave and 6th leaps included, when it is moved whole
+                // onto the next chord (the `loop` book option): a little more room than a line's 0.05.
+                ['leadLeapShare', 0, 0.07, 'few wide leaps inside a lick'],
                 ['leadOscillation', 0, 0.05, 'no mechanical trills'],
                 ['leadPhraseEndsOnChordTone', 0.9, 1, 'licks end on a chord tone'],
                 ['leadArcRise', 1.4, 4, 'the hook develops: busier by the third chorus'],

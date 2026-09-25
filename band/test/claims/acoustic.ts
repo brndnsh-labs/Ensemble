@@ -585,7 +585,7 @@ export const acoustic = defineClaims({
                 ['leadChordToneOnBeats', 0.8, 1, 'the beats sit on the chord'],
                 ['leadChangeGuideTones', 0.6, 1, 'the 3rd a singer lands on marks each change'],
                 ['leadChromaticApproach', 0, 0.05, 'a folk player walks the scale'],
-                ['leadStepShare', 0.35, 0.75, "pentatonic: steps and the scale's minor thirds"],
+                ['leadStepShare', 0.35, 0.75, 'pentatonic: a step on more than a third of moves'],
                 ['leadLeapShare', 0, 0.05, 'no wide leaps'],
                 ['leadOscillation', 0, 0.04, 'no mechanical trills'],
                 ['leadPhraseEndsOnChordTone', 0.95, 1, 'phrases resolve to a chord tone'],

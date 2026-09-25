@@ -138,7 +138,8 @@ export const reggae = defineClaims({
             take: { lead: 'solo' },
             claims: [
                 ['leadLongBreath', 0, 0.12, 'breaths, not gaps: two empty bars are rare'],
-                ['leadRestShare', 0.15, 0.45, 'the horn answers the band and leaves it room'],
+                ['leadRestShare', 0.22, 0.45, 'the horn answers the band and leaves it room'],
+                ['leadPhraseLoop', 0.05, 0.4, 'a dub hook comes round now and then'],
                 ['leadNotesPerBar', 2, 3.5, 'short phrases, never a bebop run'],
                 ['leadShortShare', 0.5, 0.85, 'eighth lines broken by long held notes'],
                 ['leadOnTheOne', 0, 0.35, 'phrases start after the One'],

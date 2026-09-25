@@ -518,6 +518,8 @@ const hipHopLead = leadIdiom({
     // A loop repeats (0.7): most bars play the bar before them again, adapted to the chord —
     // the hook developing slowly, the way a producer lets a sample run.
     riff: 0.7,
+    // The sample sits over the Rhodes, a minor 3rd up.
+    register: 3,
     // A sampled hook comes round: half the solo phrases play the last one again, whole.
     loop: 0.5,
     // A hook doesn't climb to the top of the guitar: the peak stays within a 6th of home.

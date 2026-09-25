@@ -242,7 +242,10 @@ export function voiceLine(
         const { chord, key } = onsets[i];
         const pcs = i === n - 1 ? palette.settle(chord, key) : palette.arrive(chord, key);
         const adjacent = i > 0 ? pitches[i - 1] : null;
-        let m = nearestRanked(pcs, ideal(i), register, [adjacent]);
+        // A phrase doesn't come to rest on the very note the last one ended on: a first chorus
+        // that settles on the same F every time a Dm comes round has stopped going anywhere.
+        const avoid = i === n - 1 ? [adjacent, shape.from] : [adjacent];
+        let m = nearestRanked(pcs, ideal(i), register, avoid);
         // A target a long way from the last one is folded nearer: a line doesn't leap a tenth
         // to reach its next chord when the same tone sits an octave closer.
         if (previousTarget !== null && Math.abs(m - previousTarget) > 9) {
@@ -265,6 +268,21 @@ export function voiceLine(
             fill(onsets, pitches, a, b, palette, register, rng);
         }
         a = b;
+    }
+    // A lone sixteenth flicked into a longer note is a grace note: the scale step below it (a
+    // hammer-on, a turn's lower note), not a leap.
+    for (let i = 0; i + 1 < n; i++) {
+        const [o, next] = [onsets[i], onsets[i + 1]];
+        const lone = i === 0 || onsets[i - 1].tick + onsets[i - 1].dur < o.tick;
+        if (
+            !placed[i] &&
+            lone &&
+            o.dur <= PASSING / 2 &&
+            next.tick - o.tick <= PASSING / 2 &&
+            next.dur >= PASSING
+        ) {
+            pitches[i] = neighbour(pitches[i + 1] as number, palette.pool(o.chord, o.key), false);
+        }
     }
     // An approach placed before its walk can still complete a trill (a-b-a-b) with the walk's
     // last notes: re-choose the free note in the middle of it.
@@ -312,19 +330,35 @@ function fill(
     let end = b; // first index that is already placed
     // The approach: the note (or two) before the target.
     if (!short(b - 1)) {
-        // A held note steps into the target from a chord tone.
-        pitches[b - 1] = nearestRanked(chordPcs(chord), rising ? to - 3 : to + 3, register, [
-            to,
-            from,
-            pitches[b - 2] ?? null,
-        ]);
+        // A held note steps into the target: the scale step beside it (a 9th onto the root, a
+        // 4th onto the 3rd), unless holding that step would rub its chord — then from a chord
+        // tone.
+        const tones = chordPcs(chord);
+        const step = neighbour(to, pool, !rising);
+        const rubs =
+            !tones.includes(mod12(step)) &&
+            (tones.includes(mod12(step - 1)) || tones.includes(mod12(step + 1)));
+        pitches[b - 1] =
+            rubs || step === from
+                ? nearestRanked(tones, rising ? to - 3 : to + 3, register, [
+                      to,
+                      from,
+                      pitches[b - 2] ?? null,
+                  ])
+                : step;
         end = b - 1;
     } else if (b - a - 1 >= 2 && passing(b - 1) && short(b - 2) && rng.chance(palette.enclosure)) {
         // Scale step above, half step below, target.
         pitches[b - 2] = neighbour(to, pool, true);
         pitches[b - 1] = to - 1;
         end = b - 2;
-    } else if (passing(b - 1) && rng.chance(palette.chromatic)) {
+    } else if (
+        passing(b - 1) &&
+        // Straight after the note before it, a chromatic approach needs that note within a
+        // 3rd: a tritone drop onto a chromatic note is a clam, not a line.
+        (b - 1 > a + 1 || Math.abs(to - from) <= 4) &&
+        rng.chance(palette.chromatic)
+    ) {
         // From above only where the half step above is in the scale (a 4th onto a major 3rd);
         // otherwise from below — a raised note above a minor 3rd is its major 3rd.
         const above = !rising && pool.includes(mod12(to + 1));

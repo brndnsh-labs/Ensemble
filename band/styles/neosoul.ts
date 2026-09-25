@@ -808,6 +808,8 @@ const neoLead = leadIdiom({
     // why: a phrase is a lyric, not a riff: a bar repeats now and then (the loop under it
     // repeats for it), far less than disco's or funk's.
     riff: 0.15,
+    // Over the Rhodes grip, where its colour tones can be heard: a major 3rd up.
+    register: 4,
     // why: space is the style — the most room of any lead here, a phrase and then the pocket.
     space: 0.45,
     // why: the half-step slide up into the 3rd is the guitarist's move; a whole-step bend

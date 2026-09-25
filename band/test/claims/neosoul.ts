@@ -218,11 +218,9 @@ export const neosoul = defineClaims({
                 ['leadChordToneOnBeats', 0.75, 1, 'the tune sits on the harmony on the beats'],
                 ['leadChangeGuideTones', 0.55, 0.95, 'a change lands on its 3rd or 7th, or colour'],
                 ['leadChromaticApproach', 0, 0.1, 'a tune steps into its chords'],
-                // The 3-3-2 figure's last note anticipates a mid-bar change by an eighth: it is
-                // voiced for the incoming chord, but the metric reads it against the old one.
                 [
                     'leadPhraseEndsOnChordTone',
-                    0.82,
+                    0.95,
                     1,
                     'phrases rest on a chord tone, or on the next chord an eighth early',
                 ],
@@ -235,7 +233,8 @@ export const neosoul = defineClaims({
             take: { lead: 'solo' },
             claims: [
                 ['leadLongBreath', 0, 0.12, 'breaths, not gaps: two empty bars are rare'],
-                ['leadRestShare', 0.18, 0.5, 'space is the style: a phrase, then the pocket'],
+                ['leadRestShare', 0.22, 0.5, 'space is the style: more room than any other lead'],
+                ['leadThirdBend', 0.12, 0.5, 'a half-step slide into the 3rd, often'],
                 ['leadInnerSpace', 0.12, 0.4, 'room inside the bar: late entries, held notes'],
                 ['leadNotesPerBar', 2.2, 4.5, 'short lyrical phrases, never a stream'],
                 ['leadShortShare', 0.5, 0.85, 'quick flicks, then a held note'],

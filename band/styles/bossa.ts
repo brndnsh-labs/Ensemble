@@ -342,6 +342,8 @@ const bossaLead = leadIdiom({
     // A bossa melody restates its figure (One Note Samba lives on it) more than a bebop line
     // does, much less than a blues lick.
     riff: 0.2,
+    // Cool-school: the peak is a lift to around G5, never the altissimo scream.
+    peak: 11,
     // Cool is spare: the roomiest shape more often than jazz's 0.25.
     space: 0.35,
     // A horn doesn't bend a string.

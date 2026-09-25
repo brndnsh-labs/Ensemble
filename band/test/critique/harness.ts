@@ -1383,6 +1383,73 @@ export const METRICS = {
         }
         return ratio(hit, n);
     },
+    /**
+     * Share of four-bar solo phrases that play a phrase again — the four bars before, or the
+     * same four bars of the chorus before — with the same rhythm and the same intervals (moved
+     * whole): a looped hook, not a line that keeps moving.
+     */
+    leadPhraseLoop: (takes) => {
+        // A phrase's shape: its rhythm and its intervals, from its first note.
+        const shapeOf = (t: Timeline, events: BandEvent[], from: number) => {
+            const bars = t.bars.slice(from, from + 4);
+            if (bars.length < 4) {
+                return null;
+            }
+            const start = bars[0].start;
+            const end = bars[3].start + bars[3].meter.barTicks;
+            const inside = leadNotes(events).filter((e) => e.tick >= start && e.tick < end);
+            if (inside.length < 3) {
+                return null;
+            }
+            return inside
+                .map((e, i) => `${e.tick - start}:${i ? e.midi - inside[i - 1].midi : 0}`)
+                .join(' ');
+        };
+        let n = 0;
+        let hit = 0;
+        takes.forEach(({ timeline: t, events, pass }, k) => {
+            // The chorus before (same chart and seed), for a hook that comes round at the same
+            // place in the form.
+            const before = takes[k - 1];
+            const earlier =
+                before && pass !== undefined && before.pass === pass - 1 && before.timeline === t
+                    ? before.events
+                    : null;
+            for (let b = 0; b + 4 <= t.bars.length; b += 4) {
+                const here = shapeOf(t, events, b);
+                if (!here) {
+                    continue;
+                }
+                n++;
+                const previous = b >= 4 ? shapeOf(t, events, b - 4) : null;
+                const again = earlier ? shapeOf(t, earlier, b) : null;
+                hit += here === previous || here === again ? 1 : 0;
+            }
+        });
+        return ratio(hit, n);
+    },
+    /**
+     * Share of the lead's landings on a major 3rd (an eighth or longer) that are bent or slid
+     * into from below: a country curl or a soul slide, measured where it belongs.
+     */
+    leadThirdBend: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { timeline: t, events } of takes) {
+            for (const note of leadNotes(events)) {
+                const chord = chordAt(t, note.tick);
+                if (chord?.third !== 4 || note.dur < STEP * 2) {
+                    continue;
+                }
+                if (mod12(note.midi - chord.root) !== 4) {
+                    continue;
+                }
+                n++;
+                hit += note.bendIn === 1 ? 1 : 0;
+            }
+        }
+        return ratio(hit, n);
+    },
     /** Share of sixteenths left silent inside the bars the lead plays in: its inner space. */
     leadInnerSpace: (takes) => {
         let steps = 0;

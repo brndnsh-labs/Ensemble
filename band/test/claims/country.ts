@@ -82,7 +82,7 @@ export const country = defineClaims({
                 ['leadLongBreath', 0, 0.02, 'the tune never drops out for two bars'],
                 ['leadRestShare', 0, 0.15, 'the tune fills the form'],
                 ['leadChordToneOnBeats', 0.8, 1, 'the melody sits on the chords'],
-                ['leadChangeGuideTones', 0.4, 0.8, 'the major 3rd marks most changes'],
+                ['leadChangeGuideTones', 0.4, 0.8, 'a 3rd or 7th marks most changes'],
                 ['leadChromaticApproach', 0, 0.1, 'a tune steps into its chords'],
                 ['leadBendShare', 0.06, 0.3, 'even the tune curls up into its 3rds'],
                 ['leadPhraseEndsOnChordTone', 0.95, 1, 'phrases resolve'],
@@ -112,7 +112,8 @@ export const country = defineClaims({
                     0.2,
                     'bent landings: the curl into the 3rd, a pedal-steel bend',
                 ],
-                ['leadChangeGuideTones', 0.4, 0.8, 'the major 3rd marks most changes'],
+                ['leadThirdBend', 0.3, 0.8, 'the curl: most held major 3rds bent up into'],
+                ['leadChangeGuideTones', 0.4, 0.8, 'a 3rd or 7th marks most changes'],
                 ['leadChangeRootFifth', 0.2, 0.55, 'the root the other landing'],
                 [
                     'leadChromaticApproach',

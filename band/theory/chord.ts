@@ -276,7 +276,15 @@ function chordScale(
             // IV in a major key and bVI in a minor key are lydian: the natural 4 over them
             // would contradict the key's own leading tone or tonic.
             const lydian = has(6) || degree === (key.minor ? 8 : 5);
-            return lydian ? [0, 2, 4, 6, 7, 9, 11] : [0, 2, 4, 5, 7, 9, 11];
+            if (lydian) {
+                return [0, 2, 4, 6, 7, 9, 11];
+            }
+            // A plain triad on V of a major key is the dominant: mixolydian, the key's own 4th
+            // as its b7. Its major 7th would be a leading tone to V — a key change, not a V.
+            if (!key.minor && degree === 7 && !has(11)) {
+                return [0, 2, 4, 5, 7, 9, 10];
+            }
+            return [0, 2, 4, 5, 7, 9, 11];
         }
         case 'dominant':
             if (d.third === null) {

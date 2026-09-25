@@ -876,6 +876,10 @@ const acousticLead = leadIdiom({
     enclosure: 0,
     // A song repeats its figures: more often than jazz (0.08), less than a blues lick (0.35).
     riff: 0.25,
+    // A second guitar over the strum, not inside it: a 4th above the nylon's home.
+    register: 5,
+    // A songwriter's break doesn't go to the 17th fret: the peak stays within an octave.
+    peak: 12,
     // Room to breathe, as a singer takes: about the blues' 0.3.
     space: 0.3,
     // The only "bend" an acoustic player makes is a slur into the 3rd from the half step

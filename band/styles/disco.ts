@@ -502,6 +502,8 @@ const discoLead = leadIdiom({
     // why: disco is built on repetition — a riff played again works the floor harder than a
     // new idea, so a bar repeats more often than a jazz line (0.08), less than funk's (0.5).
     riff: 0.35,
+    // The break soars over the chuck, not under it: a major 3rd above the alto's home.
+    register: 4,
     // why: the dance floor wants the energy kept up — less room than jazz or blues take.
     space: 0.2,
     // why: on a guitar (not the default), the half-step bend into the 3rd is the R&B lick; a

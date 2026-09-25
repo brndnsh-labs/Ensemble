@@ -448,7 +448,7 @@ export const metal = defineClaims({
             take: { lead: 'solo' },
             claims: [
                 ['leadLongBreath', 0, 0.12, 'breaths, not gaps: two empty bars are rare'],
-                ['leadRestShare', 0.1, 0.35, 'relentless: it breathes, it does not wait'],
+                ['leadRestShare', 0.1, 0.2, 'relentless: less room than any other lead'],
                 ['leadNotesPerBar', 4.5, 9, 'shred: the busiest solo in the band'],
                 ['leadShortShare', 0.8, 1, 'sixteenth runs'],
                 ['leadInnerSpace', 0, 0.15, 'the runs fill the bar'],

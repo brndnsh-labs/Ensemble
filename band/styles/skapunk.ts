@@ -21,7 +21,7 @@ import { compIdiom, type Hit, strums } from '../players/comp/idiom.js';
 import { drumIdiom, type Lines, snareFigure } from '../players/drums/kit.js';
 import { barSteps, dyn, pulses, spanSteps } from '../players/grid.js';
 import { leadIdiom } from '../players/lead/idiom.js';
-import { chordScale, fifthFirst, rootFirst } from '../players/lead/palette.js';
+import { chordPentatonic, fifthFirst, rootFirst } from '../players/lead/palette.js';
 import { type ChordFacts, chordPcs } from '../theory/chord.js';
 import { mod12, nearestMidi } from '../theory/pitch.js';
 import type { BarContext, PitchedIdiom, Style } from './types.js';
@@ -549,7 +549,8 @@ const skaPunkLead = leadIdiom({
         mid: ['..x-..x-x-x-x---', 'x-x-..x-..x-x---', '..x-x-x-..x-..x-', '..x---x-..x-x---'],
         // Punk drive: straight eighths, tongued short (`x.`) where the beat is hammered, and
         // one line that still skips a downbeat to push the "and".
-        busy: ['x-x-x-x-x-x-x-x-', 'x.x.x.x.x.x.x-x-', '..x.x.x.x.x.x-x-', 'x-x-..x-x-x-..x-'],
+        // Punched on the "and"s: the busiest lines still lean on the upstroke.
+        busy: ['..x-x.x-..x-x.x-', 'x.x.x.x.x.x.x-x-', '..x.x.x.x.x.x-x-', '..x-..x-x-x-..x-'],
     },
     // A horn line ends on a held note (often pushed: struck on the "and" before the beat) or
     // "bap-bap-baaa": two stabs and a long one.
@@ -564,7 +565,8 @@ const skaPunkLead = leadIdiom({
     },
     // The chord's own scale: ska grew out of jump blues and jazz (the Skatalites), but a
     // third-wave horn line is major-key and diatonic, bright rather than blue.
-    pool: (chord) => chordScale(chord),
+    // A third-wave fanfare is triadic and pentatonic: no 4th against a major 3rd, no major 7th.
+    pool: (chord) => chordPentatonic(chord),
     // Changes land on the 5th, then the 3rd: the fanfare's bright notes, off the bass's root.
     arrive: (chord) => fifthFirst(chord),
     // A phrase ends home on the root, the horn section's unison button.

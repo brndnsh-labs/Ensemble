@@ -57,7 +57,7 @@ export const bossa = defineClaims({
                     0.65,
                     'long notes among the eighths, not a bebop torrent (jazz: 0.6 up)',
                 ],
-                ['leadStepShare', 0.45, 0.85, 'soft, stepwise lines'],
+                ['leadStepShare', 0.5, 0.85, 'soft lines, stepping into their landings'],
                 ['leadMeanInterval', 1.6, 3.2, 'lines, not leaps'],
                 ['leadLeapShare', 0, 0.05, 'a wide leap is rare'],
                 [
