@@ -157,9 +157,15 @@ expression devices take turns rather than stack; one peak note per cycle.
 - **Motifs develop.** A phrase's first cell and its contour are its motif. The next phrase may
   repeat it, sequence it onto the new chord, vary its rhythm or answer it; a blues head is
   AAB (a call, the same call over the IV, a different answer).
-- **Articulation.** A long note sings with vibrato; a guitar bends into a blue third or a root
-  from below (`bendIn`); a horn scoops now and then. The host plays the lead on today's
-  soloist voices and packs.
+- **Held notes and changes.** A note held into a chord change is heard against the new chord.
+  Struck within an eighth of the change it is an anticipation, voiced for the incoming chord;
+  struck earlier, it stops at the change.
+- **Articulation.** Vibrato on notes as long as the book says (a guitarist shakes every held
+  note, a bebop alto only long ones); a guitar bends into its landings from below (`bendIn`:
+  the major 3rd from the blue third, the root or 5th from a whole step); a horn scoops now and
+  then. The host plays the lead on today's soloist voices and packs.
+- **The comp gives the lead its register.** While the lead sounds, a keyboard voice at or
+  above it drops an octave (never below middle C). A guitar grip is a hand shape and stays.
 
 ## The live host (`prototypes/v2/lib/band-host.ts`)
 
