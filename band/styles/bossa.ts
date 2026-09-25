@@ -20,7 +20,9 @@ import {
 import { compIdiom, type Hit } from '../players/comp/idiom.js';
 import { drumIdiom, type Lines, snareFigure } from '../players/drums/kit.js';
 import { at, barSteps, dyn, isCommonTime, pulses, STEP, spanSteps } from '../players/grid.js';
-import { fifthOf } from '../theory/chord.js';
+import { leadIdiom } from '../players/lead/idiom.js';
+import { chordScale, guideTones } from '../players/lead/palette.js';
+import { type ChordFacts, fifthOf } from '../theory/chord.js';
 import { mod12, nearestMidi } from '../theory/pitch.js';
 import type { BarContext, PitchedIdiom, Style } from './types.js';
 
@@ -258,14 +260,111 @@ const bossaGuitar: PitchedIdiom = {
     },
 };
 
+// ================================================================ lead
+/**
+ * Where a bossa phrase comes to rest: the 3rd, then the colour the chord owns — a major 7th or
+ * a 6th, a written 9th, #11 or 13th — then the 5th, and the root last. Jobim's tunes hang on
+ * the maj7 and the 9th ("Girl from Ipanema" sits on them); every choice is a chord tone, so a
+ * phrase still ends on the harmony. A dominant's b7 and a b9 or #9 are tension to move
+ * through, never a place to rest.
+ */
+function bossaRest(chord: ChordFacts): number[] {
+    const order: number[] = [];
+    if (chord.third !== null) {
+        order.push(chord.third);
+    }
+    if (chord.seventh === 11) {
+        order.push(11);
+    } else if (chord.sixth) {
+        order.push(9);
+    }
+    order.push(...chord.tensions.filter((t) => t === 2 || t === 6 || t === 9));
+    order.push(fifthOf(chord), 0);
+    return [...new Set(order.map((i) => mod12(chord.root + i)))];
+}
+
+// A cool-school horn over the clave: Stan Getz on "Getz/Gilberto". Soft, lyrical lines that
+// move by step through the chord's own scale (its 9ths, 13ths and #11s are the colour), long
+// notes with the syncopation of the guitar's figure (the 3+3+2, a held note struck on the
+// "and") rather than a bebop horn's running eighths, a phrase that lands on the 3rd or 7th
+// and rests on the maj7 or the 9th, and a lot of air. Straight tone: vibrato only at the end
+// of a long note. The head is a Jobim song form — a statement, its answer, a contrast, the
+// statement back.
+const bossaLead = leadIdiom({
+    name: 'bossa lead',
+    cells: {
+        // Chorus one: two or three long notes a bar, placed on the clave's 3+3+2.
+        sparse: [
+            'x-----x-----....',
+            '..x-------x-----',
+            'x-----x-x-------',
+            '....x-----x-----',
+            '..x---x-----....',
+        ],
+        // The guitar's own syncopations: the "and" of a beat pushing into a held note.
+        mid: [
+            'x-x---x-x---x---',
+            '..x-x---x-x---..',
+            'x---x-x---x-x---',
+            'x-----x-x-x-x---',
+            '..x---x---x-x---',
+        ],
+        // Getz at his busiest is a legato eighth line with a sixteenth turn in it, never bebop's
+        // chromatic torrent.
+        busy: ['x-x-x-x-x---x---', '..x-x-x-x-x-x---', 'x-x-x---x-x-x-x-', 'x-x-xxx-x---x---'],
+    },
+    // A phrase arrives on a long note: on the One, or late on the "and" of it (the bossa
+    // singer's delayed arrival), or a short-long sigh.
+    endings: ['x---------------', '..x-------------', 'x-----x---------', 'x-x-----------..'],
+    head: {
+        // A Jobim tune: long notes on the 3+3+2, pushed along by the "and"s, with the last
+        // figure's pickup on the "and" of 4.
+        cells: [
+            'x-----x-----x---',
+            '..x-x-----x-x---',
+            'x-----x-x-------',
+            'x---x-x-----x---',
+            '....x-x-x-----x-',
+        ],
+        endings: ['x---------------', '..x-------------', 'x-----x---------'],
+        form: 'period',
+    },
+    pool: (chord) => chordScale(chord),
+    arrive: (chord) => guideTones(chord),
+    settle: (chord) => bossaRest(chord),
+    // Jobim's chromaticism is in the chords, which the chord scale already carries; the line
+    // itself steps through them, with a half-step approach now and then (under blues' 0.2,
+    // a third of bebop's 0.45).
+    chromatic: 0.15,
+    // Getz came up through bebop and still encloses a target now and then: a third of jazz's
+    // 0.25.
+    enclosure: 0.08,
+    // A bossa melody restates its figure (One Note Samba lives on it) more than a bebop line
+    // does, much less than a blues lick.
+    riff: 0.2,
+    // Cool is spare: the roomiest shape more often than jazz's 0.25.
+    space: 0.35,
+    // A horn doesn't bend a string.
+    bends: { blue: 0, root: 0 },
+    // Straight, pure tone: a scoop is rare (a third of jazz's 0.15).
+    scoop: 0.05,
+    // Vibrato only at the tail of a note of three beats or more; everything shorter is
+    // straight tone.
+    vibrato: 12,
+});
+
 export const bossa: Style = {
     id: 'bossa',
     // Bossa nova *is* the nylon guitar; the piano comp is the alternative.
     name: 'Bossa',
     // Straight, light, slightly forward: bossa floats, it never drags.
-    feel: { swing: 0, swingGrid: 16, lean: { bass: -3, comp: -3 }, humanize: 30 },
+    // The horn floats a hair behind the guitar, as Getz did over João Gilberto.
+    feel: { swing: 0, swingGrid: 16, lean: { bass: -3, comp: -3, lead: 5 }, humanize: 30 },
     drums: bossaDrums,
     bass: bossaBass,
     comp: { keyboard: bossaKeys, guitar: bossaGuitar },
     prefers: 'nylon',
+    // The sax, not the nylon: the bossa lead voice is Getz's horn, and a nylon melody over the
+    // nylon comp would be two of the same guitar in the same register.
+    lead: { idiom: bossaLead, prefers: 'sax' },
 };
