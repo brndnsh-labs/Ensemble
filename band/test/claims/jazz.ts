@@ -72,6 +72,10 @@ export const jazz = defineClaims({
         {
             take: { lead: 'solo' },
             claims: [
+                // Measured 1.60 (0.87 before the comp answered the lead): denser in the holes.
+                ['compBreathDensity', 1.2, 2.5, "the comper talks in the soloist's breaths"],
+                // Measured 0.90 (0.79 before).
+                ['compAnswersBreaths', 0.85, 1, 'nearly every breath gets an answer'],
                 ['leadLongBreath', 0, 0.12, 'breaths, not gaps: two empty bars are rare'],
                 ['leadRestShare', 0.2, 0.5, 'the solo breathes between phrases'],
                 ['leadShortShare', 0.6, 0.95, 'bebop: running eighth-note lines'],

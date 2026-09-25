@@ -172,6 +172,20 @@ expression devices take turns rather than stack; one peak note per cycle.
   then. The host plays the lead on today's soloist voices and packs.
 - **The comp gives the lead its register.** While the lead sounds, a keyboard voice at or
   above it drops an octave (never below middle C). A guitar grip is a hand shape and stays.
+- **A conversational comp answers the lead** (`CompBook.answer`, `answerLead` in
+  `players/comp/idiom.ts`). The styles that have one are the jazz piano, the neo-soul Rhodes
+  and the blues pianist's rootless comp.
+  - Under a sounding lead note, a strike may lay out. Each chord's first strike always stays.
+  - In a breath of a dotted quarter or more, the figure's own strike is played up. If the
+    figure left the breath empty, a stab lands on the first offbeat eighth after the lead
+    lets go.
+  - A bar the lead sits out right after playing counts as a breath. A longer rest (the lead
+    resting by form) doesn't.
+  - A strummed or chopped groove (funk, rock, reggae and the rest) keeps its figure under the
+    lead. So does the organ, which holds.
+  - With the lead off, nothing changes.
+  - Claims: `compBreathDensity` (the comp's strikes per sixteenth in the breaths over under
+    the line) and `compAnswersBreaths`.
 
 ## The live host (`prototypes/v2/lib/band-host.ts`)
 

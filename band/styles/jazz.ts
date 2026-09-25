@@ -348,6 +348,9 @@ const jazzKeys = compIdiom({
     name: 'jazz comp',
     kind: 'rootless',
     push: { low: 0.15, mid: 0.3, high: 0.4 },
+    // The comper and the horn share the space: most strikes under a moving line lay out,
+    // and most breaths get a stab (Wynton Kelly behind a soloist).
+    answer: { layOut: 0.6, fill: 0.7 },
     rhythm: (_ctx, span, tier, rng) => jazzComp(span, tier, rng),
 });
 

@@ -232,6 +232,13 @@ export const neosoul = defineClaims({
         {
             take: { lead: 'solo' },
             claims: [
+                // Measured 1.25 (0.92 before the Rhodes answered the lead).
+                [
+                    'compBreathDensity',
+                    1.05,
+                    2,
+                    'the Rhodes leans back under the line, fills the gaps',
+                ],
                 ['leadLongBreath', 0, 0.12, 'breaths, not gaps: two empty bars are rare'],
                 ['leadRestShare', 0.22, 0.5, 'space is the style: more room than any other lead'],
                 ['leadThirdBend', 0.12, 0.5, 'a half-step slide into the 3rd, often'],

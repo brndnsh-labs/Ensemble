@@ -1451,6 +1451,92 @@ export const METRICS = {
         return ratio(hit, n);
     },
     /** Share of sixteenths left silent inside the bars the lead plays in: its inner space. */
+    /**
+     * How much busier the comp is in the lead's breaths (a dotted quarter or more without it,
+     * inside a bar it plays) than under its notes: comp strikes per sixteenth in the breaths
+     * over strikes per sixteenth under the line. Above 1, the comp talks in the holes.
+     */
+    compBreathDensity: (takes) => {
+        let breathSteps = 0;
+        let breathStrikes = 0;
+        let lineSteps = 0;
+        let lineStrikes = 0;
+        for (const { timeline: t, events } of takes) {
+            const lead = leadNotes(events);
+            const strikes = new Set(
+                events
+                    .filter((e) => e.lane === 'comp' && !(e as PitchedNote).muted)
+                    .map((e) => e.tick),
+            );
+            for (const index of new Set(lead.map((l) => l.bar))) {
+                const bar = t.bars[index];
+                const count = Math.round(bar.meter.barTicks / STEP);
+                const sounding = Array.from({ length: count }, (_, s) => {
+                    const from = bar.start + s * STEP;
+                    return lead.some((l) => l.tick < from + STEP && l.tick + l.dur > from);
+                });
+                for (let s = 0; s < count; ) {
+                    let end = s;
+                    while (end < count && sounding[end] === sounding[s]) {
+                        end++;
+                    }
+                    const hits = [...strikes].filter(
+                        (tick) => tick >= bar.start + s * STEP && tick < bar.start + end * STEP,
+                    ).length;
+                    if (sounding[s]) {
+                        lineSteps += end - s;
+                        lineStrikes += hits;
+                    } else if (end - s >= 6) {
+                        breathSteps += end - s;
+                        breathStrikes += hits;
+                    }
+                    s = end;
+                }
+            }
+        }
+        return ratio(
+            breathStrikes / Math.max(1, breathSteps),
+            lineStrikes / Math.max(1, lineSteps),
+        );
+    },
+    /**
+     * Of the breaths the lead takes inside a bar it plays (a dotted quarter or more without
+     * it), the share the comp strikes in: the answer in the hole.
+     */
+    compAnswersBreaths: (takes) => {
+        let n = 0;
+        let answered = 0;
+        for (const { timeline: t, events } of takes) {
+            const lead = leadNotes(events);
+            const strikes = events.filter((e): e is PitchedNote => e.lane === 'comp' && !e.muted);
+            for (const index of new Set(lead.map((l) => l.bar))) {
+                const bar = t.bars[index];
+                const count = Math.round(bar.meter.barTicks / STEP);
+                const sounding = (s: number) => {
+                    const from = bar.start + s * STEP;
+                    return lead.some((l) => l.tick < from + STEP && l.tick + l.dur > from);
+                };
+                for (let s = 0; s < count; ) {
+                    if (sounding(s)) {
+                        s++;
+                        continue;
+                    }
+                    let end = s;
+                    while (end < count && !sounding(end)) {
+                        end++;
+                    }
+                    if (end - s >= 6) {
+                        n++;
+                        const from = bar.start + s * STEP;
+                        const to = bar.start + end * STEP;
+                        answered += strikes.some((c) => c.tick >= from && c.tick < to) ? 1 : 0;
+                    }
+                    s = end;
+                }
+            }
+        }
+        return ratio(answered, n);
+    },
     leadInnerSpace: (takes) => {
         let steps = 0;
         let silent = 0;

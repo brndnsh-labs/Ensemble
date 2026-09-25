@@ -517,6 +517,9 @@ const neoKeys: PitchedIdiom = compIdiom({
     // A lazy re-strike in the eighth before a mid-bar change is the new chord arriving early
     // and tied over the change: the drag the figures are written for (see `KEYS_FIGURES`).
     pushInBar: true,
+    // A Rhodes behind a singer: it leans back under the line and fills some of its breaths,
+    // lazily — less than a jazz comper, the groove's held chords carry the rest.
+    answer: { layOut: 0.4, fill: 0.5 },
     rhythm: (ctx, span, tier) => keysRhythm(ctx, span, tier),
 });
 
