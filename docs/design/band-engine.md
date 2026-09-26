@@ -241,11 +241,13 @@ Every canonical genre has its own style (`STYLE_FOR_GENRE` in `runtime.ts`).
 
 ## Tests: two harnesses
 
-- `band/test/invariants.test.ts` checks every style × fixture chart × comp instrument (piano,
+- `band/test/invariants/` checks every style × fixture chart × comp instrument (piano,
   organ, guitar, nylon) × 8 seeds, looping and ending, first and second pass. It covers
   determinism, bar and register bounds, velocities, the timing tiers (strum included), no
   pitched onsets under N.C., no same-pitch overlaps, bass arrivals on chord tones, comp chords
-  that carry their guide tones, and playable guitar grips off the bass's register.
+  that carry their guide tones, and playable guitar grips off the bass's register. It is one
+  suite (`suite.ts`) split by style over `shard-*.test.ts`, only so the runner spreads it over
+  its workers; a new style still joins it the moment it is registered.
 - The critique: one claims file per style (`band/test/claims/<id>.ts`, built with
   `defineClaims`), each a list of *takes* (comp instrument, a fixed energy, bass on or off)
   with statistical claims harvested from what the old critique suite asserted about the genre.

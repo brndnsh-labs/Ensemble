@@ -1,11 +1,13 @@
 /**
  * The invariants every style must keep on every chart. One table-driven run over
- * style × fixture × seed; a new style is covered the moment it is registered.
+ * style × fixture × seed; a new style is covered the moment it is registered. The run is
+ * split across the `shard-*.test.ts` files beside this one (by style) only so the test runner
+ * can spread it over its workers; each shard is the same suite over a quarter of the styles.
  * These are the rules no amount of musical taste may break — the idiom-specific "does it
  * sound like the genre" claims live in `critique.test.ts`.
  */
 
-import { CYCLE } from '../arrange/cycle.js';
+import { CYCLE } from '../../arrange/cycle.js';
 import {
     type BandEvent,
     type BandSettings,
@@ -14,19 +16,19 @@ import {
     type PitchedNote,
     type StyleId,
     type TradeSettings,
-} from '../core/types.js';
-import { MAX_CHARACTER_MS } from '../feel/feel.js';
-import { compileTimeline, type Timeline } from '../form/timeline.js';
-import { type PassMemory, performPass } from '../perform.js';
-import { isPlayable } from '../players/comp/fretboard.js';
-import { COMP_INSTRUMENTS } from '../players/comp/instruments.js';
-import { STEP } from '../players/grid.js';
-import { LEAD_INSTRUMENTS } from '../players/lead/instruments.js';
-import { feelFor, STYLE_IDS, STYLES } from '../styles/index.js';
-import type { Feel } from '../styles/types.js';
-import { type ChordFacts, chordPcs, fifthOf } from '../theory/chord.js';
-import { mod12 } from '../theory/pitch.js';
-import { FIXTURES } from './scores.js';
+} from '../../core/types.js';
+import { MAX_CHARACTER_MS } from '../../feel/feel.js';
+import { compileTimeline, type Timeline } from '../../form/timeline.js';
+import { type PassMemory, performPass } from '../../perform.js';
+import { isPlayable } from '../../players/comp/fretboard.js';
+import { COMP_INSTRUMENTS } from '../../players/comp/instruments.js';
+import { STEP } from '../../players/grid.js';
+import { LEAD_INSTRUMENTS } from '../../players/lead/instruments.js';
+import { feelFor, STYLE_IDS, STYLES } from '../../styles/index.js';
+import type { Feel } from '../../styles/types.js';
+import { type ChordFacts, chordPcs, fifthOf } from '../../theory/chord.js';
+import { mod12 } from '../../theory/pitch.js';
+import { FIXTURES } from '../scores.js';
 
 const SEEDS = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
 const BASS_REGISTER = [23, 57] as const;
@@ -110,150 +112,175 @@ function isPowerChord(midis: number[], chord: ChordFacts | null | undefined): bo
     );
 }
 
-describe.each(STYLE_IDS)('%s invariants', (styleId) => {
-    const style = STYLES[styleId];
-    for (const [name, score] of Object.entries(FIXTURES)) {
-        const timeline = compileTimeline(score);
-        for (const comp of INSTRUMENTS) {
-            // Guitars also play without a bassist: the grips come down, the bossa thumb plays.
-            const bassless = COMP_INSTRUMENTS[comp].family === 'guitar' ? [false, true] : [false];
-            for (const [looping, noBass] of [true, false].flatMap((l) =>
-                bassless.map((b) => [l, b] as const),
-            )) {
-                const label = `${name} on ${comp}${noBass ? ' without bass' : ''}`;
-                it(`${label}${looping ? ' (looping)' : ' (ending)'}`, () => {
-                    const problems: string[] = [];
-                    for (const seed of SEEDS) {
-                        const settings: BandSettings = {
-                            ...DEFAULT_SETTINGS,
-                            style: styleId,
-                            comp,
-                            seed,
-                            // A style with a lead plays it here too, so its first pass (the head)
-                            // is held to every rule below alongside the band.
-                            lanes: { drums: true, bass: !noBass, comp: true, lead: !!style.lead },
-                            lead: style.lead?.prefers ?? DEFAULT_SETTINGS.lead,
-                        };
-                        const first = performPass(timeline, settings, { pass: 0, looping });
-                        const again = performPass(timeline, settings, { pass: 0, looping });
-                        if (JSON.stringify(again.events) !== JSON.stringify(first.events)) {
-                            problems.push(`${seed}: not deterministic`);
+/** How many shard files split the styles between them. */
+const SHARDS = 4;
+
+/** The invariant suite over the styles of one shard (every `SHARDS`th style, from `shard`). */
+export function invariantSuite(shard: number): void {
+    const styles = STYLE_IDS.filter((_, i) => i % SHARDS === shard);
+    defineStyles(styles);
+    defineLeads(styles.filter((id) => STYLES[id].lead));
+}
+
+function defineStyles(styles: StyleId[]): void {
+    describe.each(styles)('%s invariants', (styleId) => {
+        const style = STYLES[styleId];
+        for (const [name, score] of Object.entries(FIXTURES)) {
+            const timeline = compileTimeline(score);
+            for (const comp of INSTRUMENTS) {
+                // Guitars also play without a bassist: the grips come down, the bossa thumb plays.
+                const bassless =
+                    COMP_INSTRUMENTS[comp].family === 'guitar' ? [false, true] : [false];
+                for (const [looping, noBass] of [true, false].flatMap((l) =>
+                    bassless.map((b) => [l, b] as const),
+                )) {
+                    const label = `${name} on ${comp}${noBass ? ' without bass' : ''}`;
+                    it(`${label}${looping ? ' (looping)' : ' (ending)'}`, () => {
+                        const problems: string[] = [];
+                        for (const seed of SEEDS) {
+                            const settings: BandSettings = {
+                                ...DEFAULT_SETTINGS,
+                                style: styleId,
+                                comp,
+                                seed,
+                                // A style with a lead plays it here too, so its first pass (the head)
+                                // is held to every rule below alongside the band.
+                                lanes: {
+                                    drums: true,
+                                    bass: !noBass,
+                                    comp: true,
+                                    lead: !!style.lead,
+                                },
+                                lead: style.lead?.prefers ?? DEFAULT_SETTINGS.lead,
+                            };
+                            const first = performPass(timeline, settings, { pass: 0, looping });
+                            const again = performPass(timeline, settings, { pass: 0, looping });
+                            if (JSON.stringify(again.events) !== JSON.stringify(first.events)) {
+                                problems.push(`${seed}: not deterministic`);
+                            }
+                            checkPass(
+                                timeline,
+                                first.events,
+                                feelFor(style, COMP_INSTRUMENTS[comp].family).lean,
+                                settings,
+                                seed,
+                                problems,
+                            );
+                            // The second time round continues from the first pass's memory.
+                            const second = performPass(timeline, settings, {
+                                pass: 1,
+                                looping,
+                                memory: first.memory,
+                            });
+                            checkPass(
+                                timeline,
+                                second.events,
+                                feelFor(style, COMP_INSTRUMENTS[comp].family).lean,
+                                settings,
+                                `${seed}/pass1`,
+                                problems,
+                            );
                         }
-                        checkPass(
-                            timeline,
-                            first.events,
-                            feelFor(style, COMP_INSTRUMENTS[comp].family).lean,
-                            settings,
-                            seed,
-                            problems,
-                        );
-                        // The second time round continues from the first pass's memory.
-                        const second = performPass(timeline, settings, {
-                            pass: 1,
-                            looping,
-                            memory: first.memory,
-                        });
-                        checkPass(
-                            timeline,
-                            second.events,
-                            feelFor(style, COMP_INSTRUMENTS[comp].family).lean,
-                            settings,
-                            `${seed}/pass1`,
-                            problems,
-                        );
-                    }
-                    expect(problems.slice(0, 10), `${styleId}/${name}/${comp}`).toEqual([]);
-                });
+                        expect(problems.slice(0, 10), `${styleId}/${name}/${comp}`).toEqual([]);
+                    });
+                }
             }
         }
-    }
-});
+    });
 
-/**
- * The lead through a whole cycle — the head, three solo choruses, the head again — on every
- * fixture: each pass keeps every rule, and the head comes back note for note. Then trading:
- * with the soloist in fours and twos, and with the drummer where the style's drummer solos.
- */
-describe.each(STYLE_IDS.filter((id) => STYLES[id].lead))('%s lead', (styleId) => {
-    const style = STYLES[styleId];
-    for (const [name, score] of Object.entries(FIXTURES)) {
-        const timeline = compileTimeline(score);
-        it(`${name}: a cycle keeps the rules, and the head returns`, () => {
-            const problems: string[] = [];
-            for (const seed of SEEDS.slice(0, 4)) {
-                const settings: BandSettings = {
-                    ...DEFAULT_SETTINGS,
-                    style: styleId,
-                    seed,
-                    lanes: { drums: true, bass: true, comp: true, lead: true },
-                    lead: style.lead?.prefers ?? DEFAULT_SETTINGS.lead,
-                };
-                const lean = feelFor(style, COMP_INSTRUMENTS[settings.comp].family).lean;
-                const heads: string[] = [];
-                const cycle = CYCLE;
-                let memory: PassMemory | undefined;
-                for (let pass = 0; pass <= cycle; pass++) {
-                    const result = performPass(timeline, settings, { pass, looping: true, memory });
-                    memory = result.memory;
-                    checkPass(
-                        timeline,
-                        result.events,
-                        lean,
-                        settings,
-                        `${seed}/pass${pass}`,
-                        problems,
-                    );
-                    if (pass % cycle === 0) {
-                        heads.push(
-                            JSON.stringify(
-                                result.events
-                                    .filter((e) => e.lane === 'lead')
-                                    .map((e) => [
-                                        e.tick,
-                                        e.lane === 'lead' && e.midi,
-                                        e.lane === 'lead' && e.dur,
-                                    ]),
-                            ),
-                        );
-                    }
-                }
-                if (heads[0] !== heads[1]) {
-                    problems.push(`${seed}: the head changed when it came back`);
-                }
-                const trades: TradeSettings[] = [
-                    { with: 'lead', bars: 4 },
-                    { with: 'lead', bars: 2 },
-                    ...(style.drums.solos
-                        ? ([
-                              { with: 'drums', bars: 4 },
-                              { with: 'drums', bars: 8 },
-                          ] as const)
-                        : []),
-                ];
-                for (const trade of trades) {
-                    let traded: PassMemory | undefined;
-                    for (let pass = 0; pass < 3; pass++) {
-                        const result = performPass(
-                            timeline,
-                            { ...settings, trade },
-                            { pass, looping: true, memory: traded },
-                        );
-                        traded = result.memory;
+    /**
+     * The lead through a whole cycle — the head, three solo choruses, the head again — on every
+     * fixture: each pass keeps every rule, and the head comes back note for note. Then trading:
+     * with the soloist in fours and twos, and with the drummer where the style's drummer solos.
+     */
+}
+
+function defineLeads(styles: StyleId[]): void {
+    describe.each(styles)('%s lead', (styleId) => {
+        const style = STYLES[styleId];
+        for (const [name, score] of Object.entries(FIXTURES)) {
+            const timeline = compileTimeline(score);
+            it(`${name}: a cycle keeps the rules, and the head returns`, () => {
+                const problems: string[] = [];
+                for (const seed of SEEDS.slice(0, 4)) {
+                    const settings: BandSettings = {
+                        ...DEFAULT_SETTINGS,
+                        style: styleId,
+                        seed,
+                        lanes: { drums: true, bass: true, comp: true, lead: true },
+                        lead: style.lead?.prefers ?? DEFAULT_SETTINGS.lead,
+                    };
+                    const lean = feelFor(style, COMP_INSTRUMENTS[settings.comp].family).lean;
+                    const heads: string[] = [];
+                    const cycle = CYCLE;
+                    let memory: PassMemory | undefined;
+                    for (let pass = 0; pass <= cycle; pass++) {
+                        const result = performPass(timeline, settings, {
+                            pass,
+                            looping: true,
+                            memory,
+                        });
+                        memory = result.memory;
                         checkPass(
                             timeline,
                             result.events,
                             lean,
                             settings,
-                            `${seed}/trade ${trade.with} ${trade.bars}/pass${pass}`,
+                            `${seed}/pass${pass}`,
                             problems,
                         );
+                        if (pass % cycle === 0) {
+                            heads.push(
+                                JSON.stringify(
+                                    result.events
+                                        .filter((e) => e.lane === 'lead')
+                                        .map((e) => [
+                                            e.tick,
+                                            e.lane === 'lead' && e.midi,
+                                            e.lane === 'lead' && e.dur,
+                                        ]),
+                                ),
+                            );
+                        }
+                    }
+                    if (heads[0] !== heads[1]) {
+                        problems.push(`${seed}: the head changed when it came back`);
+                    }
+                    const trades: TradeSettings[] = [
+                        { with: 'lead', bars: 4 },
+                        { with: 'lead', bars: 2 },
+                        ...(style.drums.solos
+                            ? ([
+                                  { with: 'drums', bars: 4 },
+                                  { with: 'drums', bars: 8 },
+                              ] as const)
+                            : []),
+                    ];
+                    for (const trade of trades) {
+                        let traded: PassMemory | undefined;
+                        for (let pass = 0; pass < 3; pass++) {
+                            const result = performPass(
+                                timeline,
+                                { ...settings, trade },
+                                { pass, looping: true, memory: traded },
+                            );
+                            traded = result.memory;
+                            checkPass(
+                                timeline,
+                                result.events,
+                                lean,
+                                settings,
+                                `${seed}/trade ${trade.with} ${trade.bars}/pass${pass}`,
+                                problems,
+                            );
+                        }
                     }
                 }
-            }
-            expect(problems.slice(0, 10), `${styleId}/${name}`).toEqual([]);
-        });
-    }
-});
+                expect(problems.slice(0, 10), `${styleId}/${name}`).toEqual([]);
+            });
+        }
+    });
+}
 
 /**
  * Checks one pass, pushing a readable line per broken rule onto `problems` (collected
