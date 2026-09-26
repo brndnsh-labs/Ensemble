@@ -4,14 +4,12 @@
  * `muted` carries **two unrelated meanings**, and every consumer that reads it has
  * to say which one it means:
  *
- * - **Bass** writes a NUMERIC palm-mute amount, `0` (open) … `1` (fully muted) —
- *   see `getBassNote`'s `@param muted` in `bass-engine.ts`. The funk slap "chuck"
- *   and the palm-muted chromatic pickups emit `1`. These are **real notes a bassist
- *   plays**; they sound, quietly.
+ * - **Bass** takes a NUMERIC palm-mute amount, `0` (open) … `1` (fully muted): the band
+ *   host passes one for a muted band bass note (`playBandEvent`). These are **real notes
+ *   a bassist plays**; they sound, quietly.
  * - **Chords** write a BOOLEAN. `true` is a CC-only carrier (a sustain-pedal event
  *   with no pitch); `false` is an audible note, including a deliberately quiet ghost
- *   articulation. See `getAccompanimentNotes` in `accompaniment.ts` and
- *   `emitCompNotes` in `comping-emit.ts`.
+ *   articulation.
  * - **Soloist, harmony and drums** never write the field at all, so they always read
  *   `undefined` — which normalizes to "open", the same as `0`.
  *

@@ -26,10 +26,8 @@
  * identical — see notes on `stringHash33` vs `stringHash31` below — while
  * removing the dead-helper duplication.
  *
- * The consolidation is complete: `scrambleHash` is defined here and nowhere
- * else. The soloist migrated with it — `soloist-phrase-first.ts` imports the
- * canonical helper, and the old `soloist.ts` that carried a byte-identical
- * local copy no longer exists.
+ * `scrambleHash` is defined here and nowhere else (the old engine's generators that
+ * shared it were deleted, #1404; the synth voices still use it).
  *
  * why two string hashes, not one: changing which djb2 variant an engine feeds
  * into its seeded RNG shifts the distribution flowing into the critique gates
@@ -60,8 +58,9 @@ export const scrambleHash = (seed: number): number => {
  * djb2 string hash, ×33 multiplier seeded from 5381 (the classic djb2
  * constants). Returns a signed 32-bit int (`| 0`).
  *
- * Used by bass-engine + groove-engine for section-id folding. The signed
- * result is intentional — both call sites XOR it into a larger seed.
+ * The old engine's bass and drums folded section ids with it; today the v1 import's
+ * content digest (`import-v1.ts`) pairs it with `stringHash31`. The signed result is
+ * intentional.
  */
 export const stringHash33 = (str: string): number => {
     let h = 5381 | 0;
@@ -74,7 +73,7 @@ export const stringHash33 = (str: string): number => {
 /**
  * djb2-style string hash, ×31 multiplier seeded from 0. Returns a signed
  * 32-bit int (`| 0`); callers that need a non-negative value apply
- * `Math.abs` themselves (see `hashSectionId` in accompaniment.ts).
+ * `Math.abs` themselves.
  *
  * Used by accompaniment cell-bank picking and groove instrument-name folding.
  * Kept distinct from `stringHash33` so those engines' seeded distributions —

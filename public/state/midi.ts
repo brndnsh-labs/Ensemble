@@ -48,12 +48,7 @@ export function midiReducer(action: Action): boolean {
         // preference, and it is also why resetting `enabled`/`selectedOutputId` here
         // cannot strand an open port or a held note: there is nothing open yet.
         //
-        // Boot-only by contract: `RESET_STATE` has no delta case in `worker-client.ts`,
-        // so it posts nothing, yet this case now writes 13 worker-mirrored fields. Safe
-        // today only because hydration runs before `initWorker()`. If a reset ever gets
-        // a UI entry point, it must be followed by `flushBuffers()` — not a bare
-        // `syncWorker()`, which patches slices without resetting cursors. See
-        // `docs/guides/WORKER_CONTRACT.md` rule 8.
+        // Boot-only: nothing in the app dispatches `RESET_STATE` after boot.
         case ACTIONS.RESET_STATE:
             m.enabled = false;
             m.selectedOutputId = null;

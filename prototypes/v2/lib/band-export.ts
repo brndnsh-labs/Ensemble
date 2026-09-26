@@ -143,8 +143,8 @@ export async function renderBandPasses(
     options: BandRenderOptions,
 ): Promise<BandRender> {
     const { sampleRate } = options;
-    // A throwaway clone, never the live state tree — same discipline as `audio-export.ts`'s
-    // `cloneStateForRender`. Nothing here dispatches or touches the live scheduler/audio graph.
+    // A throwaway clone, never the live state tree. Nothing here dispatches or touches the live
+    // band or audio graph.
     const state = cloneStateForDetachedGeneration(getState());
     // A lane with events in this render is heard. `initAudio` holds a lane's bus at silence
     // (0.0001) while its state is disabled, which is right live and wrong here: a stem renders
@@ -209,7 +209,7 @@ export async function renderBandPasses(
     const channels: Float32Array[] = [];
     for (let ch = 0; ch < rendered.numberOfChannels; ch++) {
         // .slice() copies — without it the underlying buffer is shared with the AudioBuffer
-        // and may be reclaimed by the context's GC (same note as `audio-export.ts`).
+        // and may be reclaimed by the context's GC.
         channels.push(rendered.getChannelData(ch).slice());
     }
     return {
