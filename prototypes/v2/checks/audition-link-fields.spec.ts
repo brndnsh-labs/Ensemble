@@ -114,3 +114,51 @@ test('a link without autoplay never shows the tap-to-play hint', async ({ page }
         'tap anywhere to play',
     );
 });
+
+/**
+ * The gesture that arms autoplay can itself land ON the Play button — review finding on
+ * b2748d51: the window-level listener started the band, and the SAME tap's `click` then
+ * reached `onPlayToggle`, which read `isPlaying` (already true, since `runtime.toggle()` can
+ * resolve inside the tap's own pointerdown-to-click gap) and called `runtime.stop()` —
+ * starting and immediately stopping the band on the very gesture meant to start it. Both
+ * specs below hold `expect(status).toContainText('Band is playing')` for a beat afterward
+ * (Playwright's own polling, not a fixed sleep) so a start-then-stop blip would show up as a
+ * later failure even if the very first check happened to catch the band mid-blip.
+ */
+test('clicking Play on an armed autoplay link plays — it does not start and immediately stop', async ({
+    page,
+}) => {
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    await page.goto(auditionLink({ autoplay: '1' }));
+    await expect(page.getByRole('heading', { name: 'Shared song' })).toBeVisible();
+    const status = page.locator('.playback-footer [role="status"]');
+    await expect(status).toContainText('tap anywhere to play');
+
+    await page.getByRole('button', { name: 'Start playback', exact: true }).click();
+    await expect(status).toContainText('Band is playing');
+    await expect(status).not.toContainText('tap anywhere to play');
+    // Holds past the point a start-then-stop race would have undone it.
+    await page.waitForTimeout(500);
+    await expect(status).toContainText('Band is playing');
+    expect(errors).toEqual([]);
+});
+
+test('pressing Enter on the focused Play button plays an armed autoplay link the same way', async ({
+    page,
+}, testInfo) => {
+    // Keyboard-focus interaction; webkit-phone's iPhone emulation doesn't drive Tab/Enter
+    // focus the way a laptop keyboard does, so this one is laptop-only per the review note.
+    test.skip(testInfo.project.name !== 'laptop', 'keyboard-focus interaction, laptop only');
+    await page.goto(auditionLink({ autoplay: '1' }));
+    await expect(page.getByRole('heading', { name: 'Shared song' })).toBeVisible();
+    const status = page.locator('.playback-footer [role="status"]');
+    await expect(status).toContainText('tap anywhere to play');
+
+    await page.getByRole('button', { name: 'Start playback', exact: true }).focus();
+    await page.keyboard.press('Enter');
+    await expect(status).toContainText('Band is playing');
+    await expect(status).not.toContainText('tap anywhere to play');
+    await page.waitForTimeout(500);
+    await expect(status).toContainText('Band is playing');
+});

@@ -871,17 +871,38 @@ export default function Ensemble() {
         if (!pendingAutoplay) {
             return;
         }
-        const start = () => {
+        const start = (event: Event) => {
             setPendingAutoplay(false);
+            const target = event.target;
+            // The gesture landed on Play itself (`data-play-toggle`, `transport-bar.tsx`):
+            // disarm and let the button's OWN `onClick` start playback. Calling
+            // `startPlayback()` here too raced that click — `runtime.toggle()` can resolve
+            // inside the ~100ms between a tap's `pointerdown` and its `click`, so by the time
+            // `onPlayToggle` ran `isPlaying` already read true and it called `runtime.stop()`,
+            // starting and immediately stopping the band on the very tap meant to start it.
+            if (target instanceof Element && target.closest('[data-play-toggle]')) {
+                return;
+            }
             startPlayback();
         };
-        window.addEventListener('pointerdown', start, { once: true });
-        window.addEventListener('keydown', start, { once: true });
+        // `capture: true` so a nested handler's `stopPropagation` on the way up can't
+        // swallow the gesture before this sees it — this listener only ever reads the
+        // event, never acts on behalf of whatever it landed on.
+        window.addEventListener('pointerdown', start, { once: true, capture: true });
+        window.addEventListener('keydown', start, { once: true, capture: true });
         return () => {
-            window.removeEventListener('pointerdown', start);
-            window.removeEventListener('keydown', start);
+            window.removeEventListener('pointerdown', start, { capture: true });
+            window.removeEventListener('keydown', start, { capture: true });
         };
     }, [pendingAutoplay]);
+    // Disarms autoplay the moment the band is playing by ANY means — including the Play
+    // button's own click a moment after the branch above deferred to it — so a later stray
+    // tap/key elsewhere on the page can never reach `startPlayback()` a second time.
+    useEffect(() => {
+        if (playing) {
+            setPendingAutoplay(false);
+        }
+    }, [playing]);
     useEffect(() => {
         // #1274 — look for v1 data only once the songbook is ready: guest startup owns
         // the critical path, and nothing here may delay or block it. A profile whose v1
