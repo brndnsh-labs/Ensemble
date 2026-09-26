@@ -38,8 +38,8 @@ import { debounceSaveState } from './persistence.js';
 //     so these fire ~every step during an intensity ramp.
 // Excluding the high-frequency ones is what lets the 1s debounce actually settle
 // during playback instead of being perpetually reset (a real save gets written
-// ~1s after the last genuine change; a periodic loop-boundary saveCurrentState()
-// in conductor.ts and a visibilitychange flush in main.ts bound the window).
+// ~1s after the last genuine change; in v1 a loop-boundary save in the old conductor
+// and a visibilitychange flush in main.ts bounded the window, and neither exists now).
 // Persist-by-default (denylist, not allowlist) so a new persisted field can never
 // silently miss a save — the exact silent-drift failure this story closes.
 const TRANSIENT_PERSIST_ACTIONS = new Set<string>([

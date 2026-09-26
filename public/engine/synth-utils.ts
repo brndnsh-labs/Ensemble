@@ -403,10 +403,9 @@ export interface VelocityTimbreOptions {
      * soloist) omits this option, so they keep that default; whether pinning is
      * actually the musically-right shape for them is untested — #1331 only
      * argued the case for bass, where it demonstrably wasn't. Note this default
-     * doesn't mean those voices only ever SEE `[0, 1]`: `scheduler-core.ts`
-     * multiplies `conductorVelocity` (up to 1.15) onto every lane's velocity
-     * before the voice renders it, bass included, so an accent can already
-     * arrive above unity and pin today regardless of this option.
+     * doesn't mean those voices only ever SEE `[0, 1]`: the band host scales each
+     * event's velocity past unity for accents (`playBandEvent`), so an accent can
+     * already arrive above 1 and pin regardless of this option.
      *
      * A voice whose engine emits above unity passes its real ceiling here (#1331:
      * the bass, `[0, 1.5]`). Velocities in `(1, maxVelocity]` then keep opening

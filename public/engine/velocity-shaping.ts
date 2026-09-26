@@ -27,9 +27,9 @@
  */
 
 /**
- * Top of the bass velocity **domain** (#1331). Every emission-side clamp in
- * `bass-engine.ts` uses this — it is the widest value a generated bass note may
- * carry, NOT the loudest value a style is allowed to author.
+ * Top of the bass velocity **domain** (#1331): the widest value a bass note may carry
+ * into the voice, NOT the loudest value a style is allowed to author. (It was the old
+ * engine's bass generator's emission clamp; the band host sends at most ~1.1.)
  *
  * why 1.5: it is the domain `normalizeMidiVelocity` (`midi-utils.ts`) has always
  * assumed for the `.mid` export ("we treat 1.5 as the theoretical maximum for
@@ -102,9 +102,9 @@ const BASS_VOICE_INPUT_MAX = 2.5;
  *    player is digging into.
  *
  * **This law deliberately does NOT clamp at `BASS_VELOCITY_DOMAIN_MAX`.** That
- * constant is an *emission-side* contract — what `bass-engine.ts` may generate —
- * and the voice legitimately receives more, because `scheduler-core.ts`
- * multiplies the emitted velocity by the lane's macro swell (`bassMacroGain`,
+ * constant was an *emission-side* contract — what the old bass generator could emit —
+ * and the voice legitimately received more, because the old scheduler
+ * multiplied the emitted velocity by the lane's macro swell (`bassMacroGain`,
  * up to 1.5) and by per-note humanize (`velSpread` 0.1 → up to 1.1) AFTER the
  * engine clamped. Re-clamping at 1.5 here would just move the original bug one
  * layer down: at chorus intensity every note above ~1.0 emitted would collapse

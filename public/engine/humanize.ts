@@ -1,13 +1,9 @@
 /**
  * humanize.ts — the shared, seeded humanization primitives (#1068).
  *
- * Deliberately a LEAF module: it imports nothing but `hash-utils.js`, because
- * both the main-thread synth layer (`scheduler-core.ts`, `synth-chords.ts`) and
- * the worker-side generative engines (`groove-engine.ts`, `harmonies.ts`,
- * `midi-worker-logic.ts`) consume it. These primitives used to live in
- * `synth-utils.ts`, which pulls in `sample-voice.ts` / `pack-runtime.ts` —
- * importing that from a worker-side engine would drag the whole audio-synthesis
- * tree across the thread boundary for three pure functions.
+ * Deliberately a LEAF module: it imports nothing but `hash-utils.js`. The synth voices
+ * consume it; the old engine's worker-side generators did too, which is why it was
+ * split out of `synth-utils.ts` (that pulls in `sample-voice.ts` / `pack-runtime.ts`).
  */
 import { scrambleHash, stringHash31 } from './hash-utils.js';
 // --- Shared seeded humanization (#1068 re-model) ----------------------------

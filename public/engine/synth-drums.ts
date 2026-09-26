@@ -2103,10 +2103,9 @@ function playDrumSoundCurrent(
     // engine (±20% at knob 100 — 2.5× the seeded scheduler path that three
     // separate comments in this file already claimed had replaced it), it made
     // every drum hit irreproducible, and it survived `humanize: 0` only by
-    // accident of multiplying to zero. Velocity humanization for the kit is now
-    // seeded and lives in exactly two places: `humanizeVelocity` in
-    // `groove-engine.ts` (baked into the note, so it reaches the `.mid` export
-    // too) and `humanizeColor` in `scheduleDrums` (`scheduler-core.ts`).
+    // accident of multiplying to zero. Velocity humanization for the kit is seeded
+    // upstream, in the band's feel pass (`band/feel/feel.ts`), so it reaches the
+    // `.mid` export too.
     // Apply the density ducking factor to the master drum volume
     const masterVol = velocity * 1.3 * densityDuck;
 

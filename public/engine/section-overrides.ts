@@ -91,11 +91,8 @@ function sectionAtStep(arranger: ArrangerState | null | undefined, step: number)
  * Effective conductor target intensity for the section the playhead is currently
  * inside. Returns the global target when there is no override.
  *
- * Main-thread only — reads `state.conductor`, which `getSyncState()` does not
- * mirror to the worker. Calling this from worker-side code (e.g. `tick-logic.ts`)
- * would throw on the `state.conductor.targetIntensity` access. Today's only
- * caller is `conductor.ts:updateAutoConductor`, run by `scheduler-core.ts` on
- * the main thread.
+ * No app caller is left: its only caller was the old engine's conductor (#1404). Kept with
+ * its test for now.
  */
 export function effectiveTargetIntensity(state: EnsembleState, step: number): number {
     // Transport remains monotonic during a section-practice drill. Resolve the

@@ -30,12 +30,8 @@ export function getState(): EnsembleState {
     return stateMap;
 }
 
-// --- Worker sync payload builders ---
-// One builder per module, shared by the full-snapshot sync (getSyncState, below)
-// and the hard-flush sync (syncAndFlushWorker in engine/scheduler-core.ts). Add a
-// newly-worker-relevant field here ONCE and both call sites pick it up — the two
-// used to be independently hand-maintained and drifted (#906; see the #698
-// chords-voice/note-generation sync bug this class of gap already caused).
+// The arranger's wire snapshot, as the old engine's worker received it. No app caller is
+// left (#1404); the score-plan tests still read it, and it goes with the old score plan.
 
 export function buildArrangerSyncPayload(arranger: ArrangerState) {
     return {
