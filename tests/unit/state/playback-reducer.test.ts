@@ -1,21 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { playback, playbackReducer } from '../../../public/state/playback.js';
-import { ACTIONS, type Mutable } from '../../../public/types.js';
-
-const mutablePlayback = playback as Mutable<typeof playback>;
+import { ACTIONS } from '../../../public/types.js';
+import { resetAllStateForTest } from '../../utils/reset-state.js';
 
 describe('Playback Reducer', () => {
     beforeEach(() => {
-        playbackReducer({ type: ACTIONS.RESET_STATE, payload: undefined });
+        resetAllStateForTest();
         vi.useFakeTimers();
-    });
-
-    it('should reset to default values', () => {
-        mutablePlayback.bpm = 150;
-        mutablePlayback.bandIntensity = 0.8;
-        playbackReducer({ type: ACTIONS.RESET_STATE, payload: undefined });
-        expect(playback.bpm).toBe(100);
-        expect(playback.bandIntensity).toBe(0.35);
     });
 
     it('should set BPM with clamping', () => {
@@ -34,9 +25,6 @@ describe('Playback Reducer', () => {
 
         playbackReducer({ type: ACTIONS.SET_METRONOME, payload: true });
         expect(playback.metronome).toBe(true);
-
-        playbackReducer({ type: ACTIONS.SET_SESSION_TIMER, payload: 10 });
-        expect(playback.sessionTimer).toBe(10);
     });
 
     describe('section practice (#1016)', () => {
@@ -73,34 +61,17 @@ describe('Playback Reducer', () => {
         });
     });
 
-    it('should handle modal opening/closing for valid modals only (line 168)', () => {
-        // Valid modal
-        const result = playbackReducer({
-            type: ACTIONS.SET_MODAL_OPEN,
-            payload: { modal: 'settings', open: true },
-        });
-        expect(result).toBe(true);
-        expect(playback.modals.settings).toBe(true);
-
-        // Invalid modal (hits line 168)
-        const invalidResult = playbackReducer({
-            type: ACTIONS.SET_MODAL_OPEN,
-            payload: { modal: 'invalid_modal', open: true },
-        } as unknown as Parameters<typeof playbackReducer>[0]);
-        expect(invalidResult).toBe(false);
-    });
-
     it('should handle generic SET_PARAM action and break for other modules (line 174)', () => {
         playbackReducer({
             type: ACTIONS.SET_PARAM,
-            payload: { module: 'playback', param: 'palette', value: 'midnight' },
+            payload: { module: 'playback', param: 'masterVolume', value: 0.6 },
         });
-        expect(playback.palette).toBe('midnight');
+        expect(playback.masterVolume).toBe(0.6);
 
         // Other module (hits line 174)
         const result = playbackReducer({
             type: ACTIONS.SET_PARAM,
-            payload: { module: 'not_playback', param: 'palette', value: 'forest' },
+            payload: { module: 'not_playback', param: 'masterVolume', value: 0.9 },
         });
         expect(result).toBe(false);
     });
@@ -123,39 +94,6 @@ describe('Playback Reducer', () => {
 
         playbackReducer({ type: ACTIONS.FLASH_EXPIRED, payload: undefined });
         expect(playback.flashIntensity).toBe(0);
-    });
-
-    it('should update conductor decision', () => {
-        const payload = {
-            velocity: 0.7,
-            intent: { anticipation: 0.8 },
-        };
-        playbackReducer({ type: ACTIONS.UPDATE_CONDUCTOR_DECISION, payload });
-        expect(playback.conductorVelocity).toBe(0.7);
-        expect(playback.intent.anticipation).toBe(0.8);
-    });
-
-    it('#1064 — UPDATE_CONDUCTOR_DECISION writes the runtime-derived complexity mirror', () => {
-        expect(playback.conductorHarmonyComplexity).toBeNull();
-
-        playbackReducer({
-            type: ACTIONS.UPDATE_CONDUCTOR_DECISION,
-            payload: { harmonyComplexity: 0.9 },
-        });
-
-        expect(playback.conductorHarmonyComplexity).toBe(0.9);
-    });
-
-    it('#1064 — RESET_STATE clears the conductor complexity mirror', () => {
-        playbackReducer({
-            type: ACTIONS.UPDATE_CONDUCTOR_DECISION,
-            payload: { harmonyComplexity: 0.1 },
-        });
-        expect(playback.conductorHarmonyComplexity).toBe(0.1);
-
-        playbackReducer({ type: ACTIONS.RESET_STATE, payload: undefined });
-
-        expect(playback.conductorHarmonyComplexity).toBeNull();
     });
 
     describe('setPlaybackParam via reducer', () => {

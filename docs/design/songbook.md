@@ -89,6 +89,18 @@ its compatibility payload unchanged without making the new codecs depend on that
 | `WorkspacePreferences` | Palette/mode; visual aids; count-in and practice defaults; output master volume; **session timer and song mode**; MIDI device IDs, latency, local audio muting, octave offsets, velocity sensitivity, and **channel mappings**. |
 | `RuntimeState` / derived | Transport and practice progress; the metronome; `sectionSeedMap`; generated arranger/worker maps; audio handles; undo and transient UI. |
 
+**Amended 2026-09-26 (#1381).** The `WorkspacePreferences` codec (`validate`/`decode`/`encode` and
+its `WorkspaceAppearancePreferences`/`WorkspacePracticePreferences`/`WorkspaceMidiPreferences`
+sub-shapes) never had a reader anywhere in `public/` or `prototypes/v2` — the row above describes
+a device-preferences record that was never actually persisted through this codec — and was
+deleted outright, along with `playback.palette`/`.mode` themselves (v2's Day/Stage theme is its
+own device preference, `app/use-stage-theme.ts`, outside `state-ownership.ts` entirely). The
+`preferences` ownership *classification* in `state-ownership.ts` survives for the fields that are
+still live (master volume, count-in, MIDI settings, etc.) — only this section's specific codec and
+palette/mode are gone. If workspace preferences ever need their own persisted record again, it
+needs a live reader in hand first (`public/CLAUDE.md`'s retired-key pattern), not a resurrection
+of this shape from history.
+
 **Amended 2026-09-26 (#1404, chart format).** A chart holds the music plus the settings the band
 honours. The old engine's fields — complexity; per-lane style, octave, density and instrument;
 the soloist's preset, octave, phrasing intensity and section trade mode; the whole harmony lane;

@@ -8,6 +8,7 @@ import {
 } from '../../../public/data/smart-genres.js';
 import { dispatch, getState } from '../../../public/state.js';
 import { ACTIONS } from '../../../public/types.js';
+import { resetAllStateForTest } from '../../utils/reset-state.js';
 
 // Mock dependencies that are dynamically imported to prevent floating promises
 vi.mock('../../../public/state.js', async (importOriginal) => {
@@ -55,7 +56,7 @@ describe('Smart Genre System', () => {
         harmony = state.harmony;
         groove = state.groove;
 
-        dispatch(ACTIONS.RESET_STATE);
+        resetAllStateForTest();
         // Ensure we are not playing to avoid pending state by default
         playback.isPlaying = false;
 
@@ -181,9 +182,23 @@ describe('Smart Genre System', () => {
             };
 
             dispatch(ACTIONS.SET_GENRE_FEEL, JAZZ_CONFIG);
-            dispatch(ACTIONS.SET_STYLE, { module: 'chords', style: JAZZ_CONFIG.chord });
-            dispatch(ACTIONS.SET_STYLE, { module: 'bass', style: JAZZ_CONFIG.bass });
-            dispatch(ACTIONS.SET_STYLE, { module: 'soloist', style: JAZZ_CONFIG.soloist });
+            // #1381 — ACTIONS.SET_STYLE was deleted (nothing dispatched it); the live
+            // per-module style write goes through generic SET_PARAM instead.
+            dispatch(ACTIONS.SET_PARAM, {
+                module: 'chords',
+                param: 'style',
+                value: JAZZ_CONFIG.chord,
+            });
+            dispatch(ACTIONS.SET_PARAM, {
+                module: 'bass',
+                param: 'style',
+                value: JAZZ_CONFIG.bass,
+            });
+            dispatch(ACTIONS.SET_PARAM, {
+                module: 'soloist',
+                param: 'style',
+                value: JAZZ_CONFIG.soloist,
+            });
 
             expect(chords.style).toBe('jazz');
             expect(bass.style).toBe('quarter');

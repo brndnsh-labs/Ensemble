@@ -167,6 +167,15 @@ Both fixes are merged on `main`; a quick grep of `state-ownership.ts` confirms `
 and neither original write site (the trade block's direct `enabled` flip, `applyConductor`'s
 direct `density`/`complexity` dispatch) remains in `conductor.ts`.
 
+*Amended 2026-09-26 (#1381):* `ACTIONS.UPDATE_SB`, `ACTIONS.UPDATE_HB`, and
+`ACTIONS.UPDATE_CONDUCTOR_DECISION` — the three actions named above — were deleted outright:
+nothing dispatched any of them any more (the old engine's conductor and trade block that once
+did both went with it in #1404). The field-ownership lesson stands unchanged (a runtime opinion
+still lands on a paired `runtime-derived` field, composed at read time); only the dispatch
+mechanism these two incidents happened to travel through is gone. `soloist.tradeSilenced` and
+`playback.conductorHarmonyComplexity` remain `runtime-derived` in the manifest even though
+nothing currently writes them.
+
 ## 6. How to apply this
 
 When a runtime system needs to modulate a `document`- or `preferences`-owned field during

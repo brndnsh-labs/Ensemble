@@ -1,5 +1,5 @@
 import { arranger, arrangerReducer } from './state/arranger.js';
-import { conductor, conductorReducer } from './state/conductor.js';
+import { conductor } from './state/conductor.js';
 import { groove, grooveReducer } from './state/groove.js';
 import { bass, chords, harmony, instrumentReducer, soloist } from './state/instruments.js';
 import { midi, midiReducer } from './state/midi.js';
@@ -70,7 +70,6 @@ export const dispatch: Dispatch = (action, ...args) => {
     // Delegate to Reducers
     playbackReducer(a);
     arrangerReducer(a);
-    conductorReducer(a);
     instrumentReducer(a);
     grooveReducer(a, playback);
     midiReducer(a);

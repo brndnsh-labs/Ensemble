@@ -53,8 +53,6 @@ export const STATE_OWNERSHIP_MANIFEST = {
         isCountingIn: 'runtime-derived',
         countInBeat: 'runtime-derived',
         isDrawing: 'runtime-derived',
-        palette: 'preferences',
-        mode: 'preferences',
         wakeLock: 'runtime-derived',
         // The chart's energy (`ChartPerformance.energy`, DECISION 2026-09-26): the user is
         // the only writer; nothing at runtime modulates it.

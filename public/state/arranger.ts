@@ -1,4 +1,4 @@
-import { deepSignal } from 'deepsignal';
+import { deepSignal } from 'deepsignal/core';
 import { normalizeSongSeed } from '../sanitize.js';
 import type { Action, ArrangerState, Mutable, Section } from '../types.js';
 import { ACTIONS } from '../types.js';
@@ -46,47 +46,8 @@ export function arrangerReducer(action: Action): boolean {
                 return true;
             }
             break;
-        case ACTIONS.RESET_STATE:
-            a.scorePlan = null;
-            a.sections = [
-                {
-                    id: 's1',
-                    label: 'Intro',
-                    value: 'I | V | vi | IV',
-                    repeat: 1,
-                },
-            ];
-            a.key = 'C';
-            a.timeSignature = '4/4';
-            a.notation = 'roman';
-            a.isMinor = false;
-            a.isDirty = false;
-            a.history = [];
-            a.grouping = null;
-            a.seed = '';
-            a.randomizeSeed = true;
-            return true;
         case ACTIONS.SET_NOTATION:
             a.notation = action.payload;
-            return true;
-        case ACTIONS.SET_TIME_SIGNATURE:
-            if (a.timeSignature !== action.payload) {
-                a.timeSignature = action.payload;
-                a.grouping = null;
-            }
-            return true;
-        case ACTIONS.SET_GROUPING:
-            a.grouping = action.payload;
-            return true;
-        case ACTIONS.SET_KEY:
-            a.key = action.payload;
-            return true;
-        case ACTIONS.SET_SECTIONS:
-            a.sections = action.payload;
-            a.isDirty = true;
-            return true;
-        case ACTIONS.SET_IS_MINOR:
-            a.isMinor = !!action.payload;
             return true;
         case ACTIONS.SET_SONG_SEED:
             // #1266 — the single bound on the seed keyspace, applied at the write

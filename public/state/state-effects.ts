@@ -1,14 +1,7 @@
 import { setBpm } from '../controllers/app-controller.js';
 import { autoVoiceForGenre } from '../data/genre-sound-map.js';
 import { SMART_GENRES } from '../data/smart-genres.js';
-import { validateProgression } from '../engine/chords-engine.js';
-import {
-    initAudio,
-    restoreGains,
-    syncBusReverbSend,
-    syncBusVolume,
-    syncMasterVolume,
-} from '../engine/engine.js';
+import { syncBusReverbSend, syncBusVolume, syncMasterVolume } from '../engine/engine.js';
 import { isPackInstalled, packIdFromVoice } from '../engine/instrument-registry.js';
 import { ensurePackLoaded } from '../engine/pack-runtime.js';
 import { deriveSoloistMode } from '../engine/soloist-mode-policy.js';
@@ -150,14 +143,7 @@ export function handleEffects(
     context: HandleEffectsContext,
 ): void {
     const { dispatch } = context;
-    // No HYDRATE case: this subscriber isn't attached until after boot hydration
-    // already dispatched it, so boot-time effects (theme, etc.) run directly from main.ts.
     switch (action.type) {
-        case ACTIONS.SET_STYLE:
-            if (action.payload.module === 'chords') {
-                resolveAutoVoices(stateMap, stateMap.groove.lastSmartGenre, dispatch);
-            }
-            break;
         case ACTIONS.SET_INSTRUMENT_VOICE: {
             const payload = action.payload;
             // Epic 6 — selecting a `pack:<id>` voice lazily loads that pack's
@@ -215,17 +201,6 @@ export function handleEffects(
             }
             break;
         }
-        case ACTIONS.SET_SECTIONS:
-        case ACTIONS.ADD_SECTION:
-        case ACTIONS.REMOVE_SECTION:
-        case ACTIONS.UPDATE_SECTION:
-        case ACTIONS.SET_KEY:
-        case ACTIONS.SET_TIME_SIGNATURE:
-        case ACTIONS.SET_GROUPING:
-        case ACTIONS.SET_IS_MINOR: {
-            validateProgression(stateMap, dispatch);
-            break;
-        }
         case ACTIONS.SET_BPM: {
             setBpm(action.payload, true, context.oldBpm);
             break;
@@ -234,12 +209,6 @@ export function handleEffects(
             // #675 — Auto voices + soloist mode. `setGenre` runs the same helper through
             // reconcileUrlGenreOnBoot instead (the v2 runtime skips this case).
             applyGenreEffects(stateMap, action.payload, dispatch);
-            break;
-        }
-        case ACTIONS.SET_SOLOIST_AUTO_MODE: {
-            // #856 — re-enabling Auto immediately re-derives the phrasing mode
-            // from the current lead voice + genre (a pin is a no-op in the helper).
-            syncSoloistMode(stateMap, stateMap.groove.lastSmartGenre, dispatch);
             break;
         }
         case ACTIONS.SHOW_TOAST: {
@@ -265,17 +234,6 @@ export function handleEffects(
             setTimeout(() => {
                 dispatch(ACTIONS.FLASH_EXPIRED);
             }, 50);
-            break;
-        }
-        case ACTIONS.RESTORE_GAINS: {
-            restoreGains(stateMap);
-            break;
-        }
-        case ACTIONS.INIT_AUDIO: {
-            // initAudio now loads any already-selected pack voice itself (#666),
-            // on every audio-up path — so a persisted pack is ready whether audio
-            // came up here or via the play path's direct initAudio() call.
-            initAudio(stateMap);
             break;
         }
     }

@@ -3,7 +3,7 @@
  * @vitest-environment happy-dom
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { setBpm, setMode, setPalette } from '../../../public/controllers/app-controller.js';
+import { setBpm } from '../../../public/controllers/app-controller.js';
 import { dispatch, getState } from '../../../public/state.js';
 
 vi.mock('../../../public/state.js', () => ({
@@ -18,8 +18,6 @@ describe('App Controller', () => {
         vi.clearAllMocks();
         state = {
             playback: {
-                palette: 'after-hours',
-                mode: 'dark',
                 bpm: 120,
                 isPlaying: false,
                 audio: { currentTime: 100 },
@@ -46,44 +44,6 @@ describe('App Controller', () => {
                 removeEventListener: vi.fn(),
                 dispatchEvent: vi.fn(),
             })),
-        });
-    });
-
-    describe('setPalette', () => {
-        it('should dispatch SET_PARAM for a new palette', () => {
-            // #1144 — persistence is no longer this function's job: the
-            // dispatch alone schedules the #1127 chokepoint's save (proven by
-            // tests/unit/app/persistence-roundtrip.test.ts), so dispatch is
-            // the only observable effect to assert here.
-            setPalette('midnight');
-            expect(dispatch).toHaveBeenCalledWith('SET_PARAM', {
-                module: 'playback',
-                param: 'palette',
-                value: 'midnight',
-            });
-        });
-
-        it('should not dispatch if the palette is unchanged', () => {
-            state.playback.palette = 'after-hours';
-            setPalette('after-hours');
-            expect(dispatch).not.toHaveBeenCalled();
-        });
-    });
-
-    describe('setMode', () => {
-        it('should dispatch SET_PARAM for a new mode', () => {
-            setMode('light');
-            expect(dispatch).toHaveBeenCalledWith('SET_PARAM', {
-                module: 'playback',
-                param: 'mode',
-                value: 'light',
-            });
-        });
-
-        it('should not dispatch if the mode is unchanged', () => {
-            state.playback.mode = 'dark';
-            setMode('dark');
-            expect(dispatch).not.toHaveBeenCalled();
         });
     });
 

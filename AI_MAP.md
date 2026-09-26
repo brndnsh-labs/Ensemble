@@ -29,7 +29,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `prototypes/v2/lib/telemetry.ts` | Production-only, privacy-safe Umami analytics boundary (#1389) — UI-host code, not engine library, so it lives here rather than in `public/`. | `initializeTelemetry`, `track` |
 | `public/state.ts` | Central Redux-like state store. | `getState`, `dispatch`, `subscribe` |
 | `public/types.ts` | Global Action constants and shared types. | `ACTIONS` |
-| `public/controllers/app-controller.ts` | BPM updates with in-flight scheduler rescheduling (called from `state-effects.ts`), plus v1's palette/mode setters (no app caller since #1358). | `setBpm`, `setPalette`, `setMode` |
+| `public/controllers/app-controller.ts` | BPM updates with in-flight scheduler rescheduling (called from `state-effects.ts`). v1's palette/mode setters (no app caller since #1358) were deleted in #1381 — v2's Day/Stage theme is its own device preference (`app/use-stage-theme.ts`). | `setBpm` |
 
 ## Band Engine (`band/`, the engine the app plays)
 
@@ -79,7 +79,7 @@ The ground-up replacement for the generative engine, the default since 2026-09-2
 
 | Path | Responsibility | Key Exports / Symbols |
 | :--- | :--- | :--- |
-| `public/songbook/types.ts` | Version-1 portable chart and workspace-preference schemas, kept independent of live state slices. A chart holds the music plus the settings the band honours; the old engine's fields are typed as legacy (read, never written). | `ChartDocument`, `ChartContent`, `ChartEnergy`, `WorkspacePreferences` |
+| `public/songbook/types.ts` | Version-1 portable chart schema, kept independent of live state slices. A chart holds the music plus the settings the band honours; the old engine's fields are typed as legacy (read, never written). The `WorkspacePreferences` codec this file also typed had no reader anywhere — deleted in #1381. | `ChartDocument`, `ChartContent`, `ChartEnergy` |
 | `public/songbook/codec.ts` | Pure complete-candidate validation plus JSON encode/decode, including explicit invalid/current/future-version results. Tolerant of an old chart's legacy fields (reproduced byte for byte, never written by capture); reads the genre from `genre` or the legacy name/feel pair. | `validateChartDocument`, `decodeChartDocument`, `encodeChartDocument`, `chartGenre`, `writtenSettings` |
 | `public/songbook/score-types.ts` | Document-v2 authored-score types: exact events, measures, context, repeat and jump directions; isolated preview adoption preserves v1 sources. | `ChartDocumentV2`, `SemanticScore`, `ScoreMeasure`, `ScoreDirection` |
 | `public/songbook/score-duration.ts` | Bounded rational quarter-note arithmetic and exact sixteenth-grid capability checks. | `scoreDuration`, `scoreMeter`, `durationToSteps` |

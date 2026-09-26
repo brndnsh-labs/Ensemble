@@ -7,39 +7,28 @@ import {
     soloist,
 } from '../../../public/state/instruments.js';
 import { ACTIONS, type Mutable } from '../../../public/types.js';
+import { resetAllStateForTest } from '../../utils/reset-state.js';
 
 const mutableHarmony = harmony as Mutable<typeof harmony>;
-const mutableSoloist = soloist as Mutable<typeof soloist>;
 
 describe('Instrument Reducer', () => {
     beforeEach(() => {
-        instrumentReducer({ type: ACTIONS.RESET_STATE, payload: undefined });
-    });
-
-    it('should reset all instruments to default values', () => {
-        mutableSoloist.enabled = true;
-        mutableSoloist.volume = 0.9;
-        instrumentReducer({ type: ACTIONS.RESET_STATE, payload: undefined });
-        expect(soloist.enabled).toBe(false);
-        expect(soloist.volume).toBe(1.0);
-    });
-
-    it('should return false for SET_MODAL_OPEN', () => {
-        const result = instrumentReducer({
-            type: ACTIONS.SET_MODAL_OPEN,
-            payload: { modal: 'settings', open: true },
-        });
-        expect(result).toBe(false);
+        resetAllStateForTest();
     });
 
     it('should set style for modules', () => {
-        instrumentReducer({ type: ACTIONS.SET_STYLE, payload: { module: 'bass', style: 'funk' } });
+        // #1381 — ACTIONS.SET_STYLE was deleted (nothing dispatched it); the live
+        // per-module style write goes through generic SET_PARAM instead.
+        instrumentReducer({
+            type: ACTIONS.SET_PARAM,
+            payload: { module: 'bass', param: 'style', value: 'funk' },
+        });
         expect(bass.style).toBe('funk');
 
-        // Invalid module
+        // Invalid module — must not throw.
         instrumentReducer({
-            type: ACTIONS.SET_STYLE,
-            payload: { module: 'invalid', style: 'funk' },
+            type: ACTIONS.SET_PARAM,
+            payload: { module: 'invalid', param: 'style', value: 'funk' },
         });
     });
 
@@ -84,15 +73,6 @@ describe('Instrument Reducer', () => {
             expect(harmony.voice).toBe('synth');
             expect(harmony.autoSound).toBe(true);
         });
-
-        it('defaults autoSound to true on reset', () => {
-            mutableHarmony.autoSound = false;
-            instrumentReducer({ type: ACTIONS.RESET_STATE, payload: undefined });
-            expect(harmony.autoSound).toBe(true);
-            expect(bass.autoSound).toBe(true);
-            expect(chords.autoSound).toBe(true);
-            expect(soloist.autoSound).toBe(true);
-        });
     });
 
     it('should handle SET_GENRE_FEEL for all instruments', () => {
@@ -104,41 +84,27 @@ describe('Instrument Reducer', () => {
         expect(harmony.style).toBe('strings');
     });
 
-    it('should update HB and SB state', () => {
-        instrumentReducer({ type: ACTIONS.UPDATE_HB, payload: { style: 'horns' } });
-        expect(harmony.style).toBe('horns');
-        instrumentReducer({ type: ACTIONS.UPDATE_SB, payload: { tension: 0.5 } });
-        expect(soloist.session.tension).toBe(0.5);
-    });
-
-    it('#1064 — UPDATE_HB never writes harmony.complexity', () => {
-        // The conductor's only historical caller of UPDATE_HB with `complexity`
-        // was applyConductor, which now targets playback.conductorHarmonyComplexity
-        // instead. The reducer itself excludes `complexity` from its generic
-        // key pass-through so a future caller can't silently resurrect the bug
-        // (harmony.complexity is document-owned — persisted, shareable).
-        mutableHarmony.complexity = 0.2;
-        instrumentReducer({
-            type: ACTIONS.UPDATE_HB,
-            payload: { complexity: 0.9, style: 'horns' },
-        });
-        expect(harmony.complexity).toBe(0.2);
-        // Sibling keys in the same payload still apply — only `complexity` is excluded.
-        expect(harmony.style).toBe('horns');
-    });
-
     it('drops deprecated soloist payload keys instead of resurrecting them (#866 compat shim)', () => {
         // An old persisted session / share-URL carries the inert legacy fields
         // removed in #866. They must be silently dropped on load — NOT written
         // back onto state via applySoloistPayload's unknown-key fall-through.
+        // `ACTIONS.UPDATE_SB` (the old multi-key batch form this once went
+        // through) was deleted in #1381 — nothing dispatched it — but
+        // `applySoloistPayload` itself is still live under `SET_PARAM`
+        // (one key per dispatch), which exercises the same per-key filter.
         instrumentReducer({
-            type: ACTIONS.UPDATE_SB,
-            payload: {
-                pinnedProfile: 'evans',
-                motifTracking: true,
-                tension: 0.42, // a live key alongside them still applies
-            },
-        } as unknown as Parameters<typeof instrumentReducer>[0]);
+            type: ACTIONS.SET_PARAM,
+            payload: { module: 'soloist', param: 'pinnedProfile', value: 'evans' },
+        });
+        instrumentReducer({
+            type: ACTIONS.SET_PARAM,
+            payload: { module: 'soloist', param: 'motifTracking', value: true },
+        });
+        instrumentReducer({
+            type: ACTIONS.SET_PARAM,
+            // a live key alongside the deprecated ones still applies
+            payload: { module: 'soloist', param: 'tension', value: 0.42 },
+        });
         expect(soloist.session.tension).toBe(0.42);
         expect((soloist as Record<string, unknown>).pinnedProfile).toBeUndefined();
         expect((soloist as Record<string, unknown>).motifTracking).toBeUndefined();

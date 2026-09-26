@@ -1058,19 +1058,6 @@ export interface AudioGraph {
     readonly drums: InstrumentBus;
 }
 
-/** Curated color-palette identities. v1 gave each a light + dark variant in its
- *  stylesheet (deleted in #1358); the v2 stand has its own Day/Stage theme. */
-export type Palette =
-    | 'after-hours'
-    | 'midnight'
-    | 'high-contrast'
-    | 'forest'
-    | 'sunset'
-    | 'synthwave';
-
-/** Light/dark preference. 'auto' resolves against the OS at apply time. */
-export type ThemeMode = 'auto' | 'light' | 'dark';
-
 export interface GlobalContext {
     /** The Web Audio API context. */
     readonly audio: AudioContext | null;
@@ -1119,13 +1106,6 @@ export interface GlobalContext {
     readonly countInBeat: number;
     /** Whether the visualizer loop is active. */
     readonly isDrawing: boolean;
-    /** The chosen color palette identity (instrument hues + accent). Each
-     *  palette has a light and a dark variant; `mode` selects which. */
-    readonly palette: Palette;
-    /** Light/dark preference. 'auto' follows the OS (prefers-color-scheme);
-     *  'light'/'dark' force a variant. Resolved to a concrete mode at apply
-     *  time and written to `<html data-mode>`. */
-    readonly mode: ThemeMode;
     /** The screen wake lock object. */
     readonly wakeLock: WakeLockSentinel | null;
     /** Global band intensity/energy level (0.0 - 1.0). */
@@ -1293,11 +1273,6 @@ export interface ActionPayloadSetParam {
     value: unknown;
 }
 
-export interface ActionPayloadSetStyle {
-    module: string;
-    style: string;
-}
-
 export interface ActionPayloadSetVolume {
     module: string;
     value: number;
@@ -1319,11 +1294,6 @@ export interface ActionPayloadSetInstrumentVoice {
     auto?: boolean;
 }
 
-export interface ActionPayloadSetModalOpen {
-    modal: keyof ModalsState;
-    open: boolean;
-}
-
 export interface ActionPayloadSetGenreFeel {
     genreName?: string;
     feel?: string;
@@ -1335,17 +1305,6 @@ export interface ActionPayloadSetGenreFeel {
     harmony?: string;
 }
 
-export interface ActionPayloadUpdateConductorDecision {
-    velocity?: number;
-    intent?: Partial<PlaybackIntent>;
-    /** Written into `playback.conductorHarmonyComplexity`, never `harmony.complexity` (#1064). */
-    harmonyComplexity?: number | null;
-    feel?: string;
-    genreName?: string;
-    swing?: number;
-    sub?: string;
-}
-
 export interface ActionPayloadShowToast {
     id?: string;
     message?: string;
@@ -1355,135 +1314,25 @@ export interface ActionPayloadShowToast {
     actions?: string[];
 }
 
-export interface ActionPayloadSetMidiConfig {
-    enabled?: boolean;
-    outputs?: Array<{ id: string; name: string }>;
-    selectedOutputId?: string | null;
-    chordsChannel?: number;
-    bassChannel?: number;
-    soloistChannel?: number;
-    harmonyChannel?: number;
-    drumsChannel?: number;
-    latency?: number;
-    muteLocal?: boolean;
-    chordsOctave?: number;
-    bassOctave?: number;
-    soloistOctave?: number;
-    harmonyOctave?: number;
-    drumsOctave?: number;
-    velocitySensitivity?: number;
-    inputs?: Array<{ id: string; name: string }>;
-    selectedInputId?: string | null;
-    inputEnabled?: boolean;
-}
-
-export type ActionPayloadUpdateHB = Partial<HarmonyState>;
-
-type AtLeastOne<T> = {
-    [K in keyof T]-?: Pick<T, K> & Partial<Omit<T, K>>;
-}[keyof T];
-
-/**
- * UPDATE_SB payload — flat-keyed for worker-wire and conductor compatibility.
- * The reducer (`applySoloistPayload`) routes each flat key to its actual
- * nested location under `session` / `audio`. Accepts the union of:
- *
- * - Top-level config fields (Partial<SoloistState>'s flat shape).
- * - Flat engine-runtime aliases: `sessionSeed`, `sessionSteps`, `phraseCount`,
- *   `tension`, `lastSmartStyle`, `phrasingState`, `isResting`, `transitionState`,
- *   `restSteps`, `activeSteps`, `busySteps`, `isWaitingForEntry`, `isYielding`,
- *   `lastAttackStep`, `phraseStartStep`, `phraseLoopCount`, `phraseSectionLabel`,
- *   `phraseSectionOccurrence`, `notesInPhrase`, `phraseContext`, `recentNotes`,
- *   `sharedHookBuffer`, `sectionRecall`, `sectionRecallLoop`, `formArcRecall`,
- *   `melodicTrend`, `direction`, `contourSteps`, `activeVoices`, `buffer`,
- *   `lastFreq`, `lastMidiPlayed`, `lastRenderedFreq`, `lastPlayedFreq`,
- *   `lastNoteEnd`.
- *
- * At least one known field is required so a broad `Record<string, unknown>`
- * cannot bypass the dispatcher contract. Runtime hydration and legacy JS still
- * reach the reducer's fallback path, preserving compatibility outside typed
- * production callers.
- */
-export type ActionPayloadUpdateSB = AtLeastOne<{
-    enabled: boolean;
-    mode: string;
-    style: string;
-    volume: number;
-    reverb: number;
-    sessionSeed: SoloistSessionSeed | null;
-    sessionSteps: number;
-    phraseCount: number;
-    tension: number;
-    lastSmartStyle: string;
-    phrasingState: string;
-    isResting: boolean;
-    transitionState: string | null;
-    restSteps: number;
-    activeSteps: number;
-    busySteps: number;
-    isWaitingForEntry: boolean;
-    isYielding: boolean;
-    lastAttackStep: number;
-    barsSinceRest: number;
-    phraseStartStep: number | null;
-    phraseLoopCount: number | null;
-    phraseSectionLabel: string | null;
-    phraseSectionOccurrence: number;
-    notesInPhrase: number;
-    phraseContext: SoloistPhraseContext;
-    recentNotes: RecentSoloistNote[];
-    sharedHookBuffer: SoloistHook[];
-    sectionRecall: Record<string, SectionRecallEntry>;
-    sectionRecallLoop: number | null;
-    formArcRecall: Record<string, FormArcEntry>;
-    melodicTrend: string;
-    direction: number;
-    contourSteps: number;
-    activeVoices: SoloistVoice[];
-    buffer: Map<number, any>;
-    lastFreq: number | null;
-    lastMidiPlayed: number | null;
-    lastRenderedFreq: number | null;
-    lastPlayedFreq: number | null;
-    lastNoteEnd: number;
-}>;
-export type ActionPayloadUpdateGB = Partial<GrooveState>;
-
 export interface ActionPayloadMap {
     SET_PARAM: ActionPayloadSetParam;
     SET_BAND_INTENSITY: number;
     SET_AUTO_INTENSITY: boolean;
-    UPDATE_CONDUCTOR_DECISION: ActionPayloadUpdateConductorDecision;
     SHOW_TOAST: ActionPayloadShowToast | string;
     TRIGGER_FLASH?: number;
-    SET_MODAL_OPEN: ActionPayloadSetModalOpen;
     SET_CHART_LOCKED: boolean;
     SET_BPM: number | string;
-    SET_STYLE: ActionPayloadSetStyle;
     SET_VOLUME: ActionPayloadSetVolume;
     SET_REVERB: ActionPayloadSetReverb;
     SET_SOLOIST_MODE: string;
-    SET_SOLOIST_AUTO_MODE: boolean;
     SET_SONG_SEED: string;
     SET_INSTRUMENT_VOICE: ActionPayloadSetInstrumentVoice;
-    UPDATE_SB: ActionPayloadUpdateSB;
     SET_SWING: number;
     SET_SWING_SUB: string;
     SET_HUMANIZE: number;
     SET_GENRE_FEEL: ActionPayloadSetGenreFeel;
-    UPDATE_HB: ActionPayloadUpdateHB;
-    UPDATE_GB: ActionPayloadUpdateGB;
-    SET_SECTIONS: Section[];
-    ADD_SECTION: Section;
-    REMOVE_SECTION: string;
-    UPDATE_SECTION: Section;
-    SET_KEY: string;
-    SET_TIME_SIGNATURE: string;
-    SET_GROUPING: number[] | null;
-    SET_IS_MINOR: boolean;
     SET_METRONOME: boolean;
     SET_NOTATION: string;
-    SET_SESSION_TIMER: number;
     /** Section-practice: seed the step the next play begins from (#1016). */
     SET_START_STEP: number;
     /**
@@ -1491,15 +1340,8 @@ export interface ActionPayloadMap {
      * `{ start, end }` are absolute steps within `[0, totalSteps)`.
      */
     SET_PRACTICE_LOOP: { start: number; end: number } | null;
-    RESET_STATE: undefined;
-    SET_MIDI_CONFIG: ActionPayloadSetMidiConfig;
-    RESTORE_GAINS: undefined;
-    INIT_AUDIO: undefined;
-    HYDRATE?: undefined;
     TOAST_EXPIRED: string;
     FLASH_EXPIRED?: undefined;
-    VIS_RESET?: undefined;
-    VIS_UPDATE?: unknown;
     PROG_VALIDATED?: undefined;
 }
 
@@ -1529,57 +1371,32 @@ export const ACTIONS = {
     SET_PARAM: 'SET_PARAM',
     SET_BAND_INTENSITY: 'SET_BAND_INTENSITY',
     SET_AUTO_INTENSITY: 'SET_AUTO_INTENSITY',
-    UPDATE_CONDUCTOR_DECISION: 'UPDATE_CONDUCTOR_DECISION',
     SHOW_TOAST: 'SHOW_TOAST',
     TRIGGER_FLASH: 'TRIGGER_FLASH',
-    SET_MODAL_OPEN: 'SET_MODAL_OPEN',
     SET_CHART_LOCKED: 'SET_CHART_LOCKED',
     SET_BPM: 'SET_BPM',
 
     // --- Instrument Settings ---
-    SET_STYLE: 'SET_STYLE',
     SET_VOLUME: 'SET_VOLUME',
     SET_REVERB: 'SET_REVERB',
     SET_SOLOIST_MODE: 'SET_SOLOIST_MODE',
-    SET_SOLOIST_AUTO_MODE: 'SET_SOLOIST_AUTO_MODE',
     SET_SONG_SEED: 'SET_SONG_SEED',
     SET_INSTRUMENT_VOICE: 'SET_INSTRUMENT_VOICE',
-    UPDATE_SB: 'UPDATE_SB',
 
     // --- Groove / Drums ---
     SET_SWING: 'SET_SWING',
     SET_SWING_SUB: 'SET_SWING_SUB',
     SET_HUMANIZE: 'SET_HUMANIZE',
     SET_GENRE_FEEL: 'SET_GENRE_FEEL',
-    UPDATE_HB: 'UPDATE_HB',
-    UPDATE_GB: 'UPDATE_GB',
 
     // --- Options / Arranger ---
-    SET_SECTIONS: 'SET_SECTIONS',
-    ADD_SECTION: 'ADD_SECTION',
-    REMOVE_SECTION: 'REMOVE_SECTION',
-    UPDATE_SECTION: 'UPDATE_SECTION',
-    SET_KEY: 'SET_KEY',
-    SET_TIME_SIGNATURE: 'SET_TIME_SIGNATURE',
-    SET_GROUPING: 'SET_GROUPING',
-    SET_IS_MINOR: 'SET_IS_MINOR',
     SET_METRONOME: 'SET_METRONOME',
     SET_NOTATION: 'SET_NOTATION',
-    SET_SESSION_TIMER: 'SET_SESSION_TIMER',
     SET_START_STEP: 'SET_START_STEP',
     SET_PRACTICE_LOOP: 'SET_PRACTICE_LOOP',
-    RESET_STATE: 'RESET_STATE',
-
-    // --- MIDI ---
-    SET_MIDI_CONFIG: 'SET_MIDI_CONFIG',
-    RESTORE_GAINS: 'RESTORE_GAINS',
-    INIT_AUDIO: 'INIT_AUDIO',
 
     // --- Signal-only / Lifecycle (payload-less notifications) ---
-    HYDRATE: 'HYDRATE',
     TOAST_EXPIRED: 'TOAST_EXPIRED',
     FLASH_EXPIRED: 'FLASH_EXPIRED',
-    VIS_RESET: 'VIS_RESET',
-    VIS_UPDATE: 'VIS_UPDATE',
     PROG_VALIDATED: 'PROG_VALIDATED',
 } as const satisfies { readonly [K in keyof ActionPayloadMap]-?: K };

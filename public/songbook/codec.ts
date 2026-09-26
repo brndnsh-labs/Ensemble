@@ -38,24 +38,10 @@ import {
     DEFAULT_SOLOIST_TRADE_CHORUSES,
     SOLOIST_TRADE_BARS,
     type SoloistTradeMode,
-    WORKSPACE_PREFERENCES_SCHEMA_VERSION,
-    type WorkspaceAppearancePreferences,
-    type WorkspaceMidiPreferences,
-    type WorkspacePracticePreferences,
-    type WorkspacePreferences,
 } from './types.js';
 
 type JsonRecord = Record<string, unknown>;
 
-const PALETTES = new Set([
-    'after-hours',
-    'midnight',
-    'high-contrast',
-    'forest',
-    'sunset',
-    'synthwave',
-]);
-const THEME_MODES = new Set(['auto', 'light', 'dark']);
 const NOTATIONS = new Set(['roman', 'name', 'nns']);
 const SOLOIST_MODES = new Set(['monophonic', 'guitar']);
 const SOLOIST_TRADE_MODES = new Set(['manual', 'sections', 'loops']);
@@ -179,22 +165,6 @@ function optionalStringField(
         return undefined;
     }
     return stringField(ctx, record, key, path, options);
-}
-
-function nullableStringField(
-    ctx: ValidationContext,
-    record: JsonRecord,
-    key: string,
-    path: string,
-    max: number,
-): string | null {
-    if (!hasField(record, key)) {
-        return null;
-    }
-    if (record[key] === null) {
-        return null;
-    }
-    return stringField(ctx, record, key, path, { max });
 }
 
 function booleanField(
@@ -901,122 +871,6 @@ function validateChartContent(
     };
 }
 
-function validateAppearance(
-    ctx: ValidationContext,
-    candidate: unknown,
-    path: string,
-): WorkspaceAppearancePreferences {
-    const record = ctx.object(candidate, path, [
-        'palette',
-        'mode',
-        'visualFlash',
-        'qualityColors',
-        'visualizerEnabled',
-    ]);
-    return {
-        palette: stringField(ctx, record, 'palette', path, {
-            min: 1,
-            max: 32,
-            allowed: PALETTES,
-            message: 'Unknown palette',
-        }) as WorkspaceAppearancePreferences['palette'],
-        mode: stringField(ctx, record, 'mode', path, {
-            min: 1,
-            max: 8,
-            allowed: THEME_MODES,
-            message: 'Unknown theme mode',
-        }) as WorkspaceAppearancePreferences['mode'],
-        visualFlash: booleanField(ctx, record, 'visualFlash', path),
-        qualityColors: booleanField(ctx, record, 'qualityColors', path),
-        visualizerEnabled: booleanField(ctx, record, 'visualizerEnabled', path),
-    };
-}
-
-function validatePractice(
-    ctx: ValidationContext,
-    candidate: unknown,
-    path: string,
-): WorkspacePracticePreferences {
-    const record = ctx.object(
-        candidate,
-        path,
-        [
-            'countIn',
-            'applyPresetSettings',
-            'sessionTimer',
-            'songMode',
-            'rampBpmPerLoop',
-            'rampStartPct',
-        ],
-        // RETIRED LEGACY KEY (#1314). `practiceMode` was a default-on preference with no
-        // behavioural reader left after #1313 moved "leave room for the bass" onto the bass
-        // LANE, so it is gone from the slice, the types and every writer. It stays listed here
-        // — as OPTIONAL, and deliberately not read below — for one reason: every workspace
-        // document saved before this release carries it, and `ctx.object` rejects any key it
-        // does not know. Listing it keeps those documents loading; omitting it from the
-        // returned object means the key is dropped on read and never written again (the
-        // encoder stringifies what the validator BUILDS, so a round-trip strips it). No schema
-        // version bump: nothing about the meaning of any surviving field changed.
-        //
-        // Do not "tidy" this into a `booleanField` read — required or not, reading it would
-        // put the key back into the encoder's output and resurrect the field.
-        ['practiceMode'],
-    );
-    return {
-        countIn: booleanField(ctx, record, 'countIn', path),
-        applyPresetSettings: booleanField(ctx, record, 'applyPresetSettings', path),
-        sessionTimer: numberField(ctx, record, 'sessionTimer', path, 0, 60, true),
-        songMode: booleanField(ctx, record, 'songMode', path),
-        rampBpmPerLoop: numberField(ctx, record, 'rampBpmPerLoop', path, 1, 20, true),
-        rampStartPct: numberField(ctx, record, 'rampStartPct', path, 0.4, 0.95),
-    };
-}
-
-function validateMidi(
-    ctx: ValidationContext,
-    candidate: unknown,
-    path: string,
-): WorkspaceMidiPreferences {
-    const record = ctx.object(candidate, path, [
-        'enabled',
-        'selectedOutputId',
-        'inputEnabled',
-        'selectedInputId',
-        'chordsChannel',
-        'bassChannel',
-        'soloistChannel',
-        'harmonyChannel',
-        'drumsChannel',
-        'chordsOctave',
-        'bassOctave',
-        'soloistOctave',
-        'harmonyOctave',
-        'drumsOctave',
-        'latency',
-        'muteLocal',
-        'velocitySensitivity',
-    ]);
-    return {
-        enabled: booleanField(ctx, record, 'enabled', path),
-        selectedOutputId: nullableStringField(ctx, record, 'selectedOutputId', path, 512),
-        inputEnabled: booleanField(ctx, record, 'inputEnabled', path),
-        selectedInputId: nullableStringField(ctx, record, 'selectedInputId', path, 512),
-        chordsChannel: numberField(ctx, record, 'chordsChannel', path, 1, 16, true),
-        bassChannel: numberField(ctx, record, 'bassChannel', path, 1, 16, true),
-        soloistChannel: numberField(ctx, record, 'soloistChannel', path, 1, 16, true),
-        harmonyChannel: numberField(ctx, record, 'harmonyChannel', path, 1, 16, true),
-        drumsChannel: numberField(ctx, record, 'drumsChannel', path, 1, 16, true),
-        chordsOctave: numberField(ctx, record, 'chordsOctave', path, -2, 2, true),
-        bassOctave: numberField(ctx, record, 'bassOctave', path, -2, 2, true),
-        soloistOctave: numberField(ctx, record, 'soloistOctave', path, -2, 2, true),
-        harmonyOctave: numberField(ctx, record, 'harmonyOctave', path, -2, 2, true),
-        drumsOctave: numberField(ctx, record, 'drumsOctave', path, -2, 2, true),
-        latency: numberField(ctx, record, 'latency', path, -100, 100, true),
-        muteLocal: booleanField(ctx, record, 'muteLocal', path),
-        velocitySensitivity: numberField(ctx, record, 'velocitySensitivity', path, 0.5, 2),
-    };
-}
-
 type CandidatePreparationResult =
     | { kind: 'ok'; candidate: unknown }
     | { kind: 'invalid'; issues: CodecIssue[] };
@@ -1185,40 +1039,6 @@ export function validateChartDocument(candidate: unknown): CodecDecodeResult<Cha
     return ctx.issues.length > 0 ? { kind: 'invalid', issues: ctx.issues } : { kind: 'ok', value };
 }
 
-export function validateWorkspacePreferences(
-    candidate: unknown,
-): CodecDecodeResult<WorkspacePreferences> {
-    const prepared = prepareCandidate(candidate);
-    if (prepared.kind === 'invalid') {
-        return prepared;
-    }
-    const version = readVersion(
-        prepared.candidate,
-        WORKSPACE_PREFERENCES_SCHEMA_VERSION,
-        prepared.candidate,
-    );
-    if (version.kind !== 'current') {
-        return version;
-    }
-
-    const ctx = new ValidationContext();
-    const record = ctx.object(version.record, '$', [
-        'schemaVersion',
-        'appearance',
-        'practice',
-        'masterVolume',
-        'midi',
-    ]);
-    const value: WorkspacePreferences = {
-        schemaVersion: WORKSPACE_PREFERENCES_SCHEMA_VERSION,
-        appearance: validateAppearance(ctx, record.appearance, '$.appearance'),
-        practice: validatePractice(ctx, record.practice, '$.practice'),
-        masterVolume: numberField(ctx, record, 'masterVolume', '$', 0, 1),
-        midi: validateMidi(ctx, record.midi, '$.midi'),
-    };
-    return ctx.issues.length > 0 ? { kind: 'invalid', issues: ctx.issues } : { kind: 'ok', value };
-}
-
 export function decodeJson<T>(
     json: string,
     validator: (candidate: unknown) => CodecDecodeResult<T>,
@@ -1250,10 +1070,6 @@ export function decodeJson<T>(
 
 export function decodeChartDocument(json: string): CodecDecodeResult<ChartDocument> {
     return decodeJson(json, validateChartDocument);
-}
-
-export function decodeWorkspacePreferences(json: string): CodecDecodeResult<WorkspacePreferences> {
-    return decodeJson(json, validateWorkspacePreferences);
 }
 
 export function encodeValidated<T>(
@@ -1294,8 +1110,4 @@ export function encodeValidated<T>(
 
 export function encodeChartDocument(document: ChartDocument): CodecEncodeResult {
     return encodeValidated(document, validateChartDocument);
-}
-
-export function encodeWorkspacePreferences(preferences: WorkspacePreferences): CodecEncodeResult {
-    return encodeValidated(preferences, validateWorkspacePreferences);
 }

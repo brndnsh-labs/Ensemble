@@ -1,4 +1,4 @@
-import { deepSignal } from 'deepsignal';
+import { deepSignal } from 'deepsignal/core';
 import type { Action, GlobalContext, Mutable } from '../types.js';
 import { ACTIONS } from '../types.js';
 
@@ -24,8 +24,6 @@ export const playback = deepSignal<GlobalContext>({
     isCountingIn: false,
     countInBeat: 0,
     isDrawing: false,
-    palette: 'after-hours',
-    mode: 'auto',
     wakeLock: null,
     bandIntensity: DEFAULT_BAND_INTENSITY,
     autoIntensity: true,
@@ -77,41 +75,9 @@ export const playback = deepSignal<GlobalContext>({
 export function playbackReducer(action: Action): boolean {
     const p = playback as Mutable<typeof playback>;
     switch (action.type) {
-        case ACTIONS.RESET_STATE:
-            p.bpm = 100;
-            p.palette = 'after-hours';
-            p.mode = 'auto';
-            p.bandIntensity = DEFAULT_BAND_INTENSITY;
-            p.autoIntensity = true;
-            p.metronome = false;
-            p.countIn = true;
-            p.visualFlash = false;
-            p.qualityColors = true;
-            p.sessionTimer = 5;
-            p.applyPresetSettings = false;
-            p.conductorVelocity = 1.0;
-            p.conductorHarmonyComplexity = null;
-            // #1259 — hydrated fields that RESET_STATE used to skip. `masterVolume` is
-            // the one with teeth: it is clamped to [0,1], so a persisted `0` survived
-            // the fallback and booted the app **silent** — a silent app on top of a
-            // deliberately silent recovery is the worst case to debug.
-            p.songMode = true;
-            p.masterVolume = 0.4;
-            return true;
         case ACTIONS.SET_BPM:
             p.bpm = Math.max(40, Math.min(240, parseInt(String(action.payload), 10)));
             return true;
-        case ACTIONS.SET_MODAL_OPEN:
-            if (Object.hasOwn(playback.modals, action.payload.modal)) {
-                // `as any` is load-bearing here: deepSignal types each modal flag as
-                // `Signal<boolean> & true | Signal<boolean> & false`, so a dynamic-key
-                // WRITE won't accept a plain boolean under a `keyof` narrow (TS2322).
-                // The read-side sibling in GlobalShortcuts.tsx narrows fine; this one
-                // can't. Guarded by the `Object.hasOwn` check above.
-                (playback.modals as any)[action.payload.modal] = !!action.payload.open;
-                return true;
-            }
-            return false;
         case ACTIONS.SET_CHART_LOCKED:
             p.chartLocked = !!action.payload;
             return true;
@@ -140,9 +106,6 @@ export function playbackReducer(action: Action): boolean {
         case ACTIONS.SET_METRONOME:
             p.metronome = action.payload;
             return true;
-        case ACTIONS.SET_SESSION_TIMER:
-            p.sessionTimer = action.payload;
-            return true;
         case ACTIONS.SET_START_STEP:
             // Section-practice (#1016): seed the step the next play starts from.
             p.startStep = Number.isFinite(action.payload) ? Math.max(0, action.payload) : 0;
@@ -168,24 +131,6 @@ export function playbackReducer(action: Action): boolean {
                 p.loopEndStep = -1;
             }
             return true;
-        case ACTIONS.UPDATE_CONDUCTOR_DECISION:
-            if (action.payload.velocity) {
-                p.conductorVelocity = action.payload.velocity;
-            }
-            // #1064 — runtime-derived mirror of harmony.complexity. Never written onto
-            // the document field itself; readers compose the two at READ time.
-            if (action.payload.harmonyComplexity !== undefined) {
-                p.conductorHarmonyComplexity = action.payload.harmonyComplexity;
-            }
-            if (action.payload.intent) {
-                if (action.payload.intent.anticipation !== undefined) {
-                    playback.intent.anticipation = action.payload.intent.anticipation;
-                }
-                if (action.payload.intent.layBack !== undefined) {
-                    playback.intent.layBack = action.payload.intent.layBack;
-                }
-            }
-            break;
         case ACTIONS.SHOW_TOAST: {
             const toast = action.payload;
             const isObj = typeof toast === 'object' && toast !== null;
@@ -199,13 +144,13 @@ export function playbackReducer(action: Action): boolean {
             p.toasts = [...p.toasts, entry];
             return true;
         }
-        case 'TOAST_EXPIRED':
+        case ACTIONS.TOAST_EXPIRED:
             p.toasts = p.toasts.filter((t) => t.id !== action.payload);
             return true;
         case ACTIONS.TRIGGER_FLASH:
             p.flashIntensity = action.payload || 0.25;
             return true;
-        case 'FLASH_EXPIRED':
+        case ACTIONS.FLASH_EXPIRED:
             p.flashIntensity = 0;
             return true;
     }

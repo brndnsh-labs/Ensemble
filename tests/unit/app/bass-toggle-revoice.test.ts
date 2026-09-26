@@ -11,8 +11,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { togglePower } from '../../../public/controllers/instrument-controller.js';
 import { validateProgression } from '../../../public/engine/chords-engine.js';
-import { dispatch, getState } from '../../../public/state.js';
-import { ACTIONS } from '../../../public/types.js';
+import { getState } from '../../../public/state.js';
+import { resetAllStateForTest } from '../../utils/reset-state.js';
 
 vi.mock('../../../public/engine/engine.js', () => ({
     killAllPianoNotes: vi.fn(),
@@ -36,7 +36,7 @@ const rootSounds = (chord) =>
 describe('bass toggle re-voices the comp (#1313)', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        dispatch(ACTIONS.RESET_STATE);
+        resetAllStateForTest();
         const state = getState();
         state.groove.genreFeel = 'Jazz';
         state.playback.bandIntensity = 0.35;

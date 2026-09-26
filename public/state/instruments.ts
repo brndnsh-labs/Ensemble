@@ -1,4 +1,4 @@
-import { deepSignal } from 'deepsignal';
+import { deepSignal } from 'deepsignal/core';
 import { resolveSoloistMode } from '../engine/soloist-mode-policy.js';
 import type {
     Action,
@@ -153,11 +153,11 @@ export const harmony = deepSignal<HarmonyState>({
 });
 
 /**
- * UPDATE_SB / SET_PARAM accept flat-keyed payloads (kept that way for worker-wire
- * compatibility, hydration, and external dispatchers like the conductor). The
- * physical state layout is now nested under `session` / `audio`, so this table
- * routes each flat key to its actual home. Adding a new soloist field means
- * adding one entry here.
+ * SET_PARAM accepts a flat-keyed soloist payload (kept that way for worker-wire
+ * compatibility and hydration; `ACTIONS.UPDATE_SB`, the old multi-key batch form,
+ * was deleted in #1381 — nothing dispatched it). The physical state layout is
+ * nested under `session` / `audio`, so this table routes each flat key to its
+ * actual home. Adding a new soloist field means adding one entry here.
  */
 type SoloistFieldRoute =
     | { kind: 'config'; key: keyof SoloistState }
@@ -330,112 +330,6 @@ export function instrumentReducer(action: Action): boolean {
             }
             break;
         }
-        case ACTIONS.SET_MODAL_OPEN:
-            return false;
-        case ACTIONS.RESET_STATE: {
-            c.enabled = true;
-            c.volume = 1.0;
-            c.reverb = INSTRUMENT_REVERB_DEFAULTS.chords;
-            c.voice = 'synth';
-            c.autoSound = true;
-            // #1259 — the chords lane was the one instrument whose `style` this case
-            // forgot (bass/soloist/harmony all had it), so a reset chart kept the old
-            // comping style. That was the worst *realistic* outcome of the whole gap.
-            c.style = 'smart';
-
-            b.enabled = true;
-            b.volume = 1.0;
-            b.reverb = INSTRUMENT_REVERB_DEFAULTS.bass;
-            b.style = 'smart';
-            b.voice = 'synth';
-            b.autoSound = true;
-
-            s.enabled = false;
-            s.voice = 'synth';
-            s.autoSound = true;
-            s.volume = 1.0;
-            s.reverb = INSTRUMENT_REVERB_DEFAULTS.soloist;
-            s.style = 'smart';
-            s.mode = 'monophonic';
-            // #1259 — hydrated (#856) but never reset. Left false, the `mode` this case
-            // just set back to 'monophonic' would stay manually pinned instead of
-            // re-deriving from the voice on the next fresh session.
-            s.autoMode = true;
-            // Reset engine runtime to a fresh session.
-            const session = s.session as Mutable<typeof s.session>;
-            const phr = session.phrasing as Mutable<typeof session.phrasing>;
-            const cp = session.currentPhrase as Mutable<typeof session.currentPhrase>;
-            const cpCtx = cp.context as Mutable<typeof cp.context>;
-            const mem = session.memory as Mutable<typeof session.memory>;
-            const con = session.contour as Mutable<typeof session.contour>;
-            session.seed = null;
-            session.sessionSteps = 0;
-            session.phraseCount = 0;
-            session.tension = 0;
-            session.lastSmartStyle = 'scalar';
-            phr.state = 'rest';
-            phr.isResting = true;
-            phr.transitionState = null;
-            phr.restSteps = 0;
-            phr.activeSteps = 0;
-            phr.busySteps = 0;
-            phr.isWaitingForEntry = false;
-            phr.isYielding = false;
-            phr.lastAttackStep = -100;
-            cp.startStep = null;
-            cp.loopCount = null;
-            cp.sectionLabel = null;
-            cp.sectionOccurrence = 0;
-            cp.notesInPhrase = 0;
-            cpCtx.role = 'call';
-            cpCtx.skeleton = [];
-            cpCtx.lastInterval = null;
-            cpCtx.profile = 'srv';
-            cpCtx.signature = null;
-            cpCtx.responseSignature = null;
-            cpCtx.responseMode = 'free';
-            cpCtx.responseSource = 'free';
-            cpCtx.sectionLabel = null;
-            cpCtx.sectionOccurrence = 0;
-            cpCtx.restatementEcho = null;
-            mem.recentNotes = [];
-            mem.sharedHookBuffer = [];
-            mem.sectionRecall = {};
-            mem.sectionRecallLoop = null;
-            mem.formArcRecall = {};
-            con.trend = 'Static';
-            con.direction = 1;
-            con.steps = 0;
-            // why: the `audio` runtime carries cross-call voice-leading state —
-            // `lastMidiPlayed` feeds the pitch engine's interval decision at
-            // soloist-pitch-engine.ts (`const lastMidi = audio.lastMidiPlayed`).
-            // Every other session.* field was rebuilt above but `audio` was
-            // skipped, so a transport reset left the soloist voice-leading off
-            // the previous session's final pitch (and leaked it across seeded
-            // determinism-test runs). activeVoices/buffer are main-thread synth
-            // tracking — left to the synth's own lifecycle, not reset here.
-            const aud = s.audio as Mutable<typeof s.audio>;
-            aud.lastFreq = null;
-            aud.lastMidiPlayed = null;
-            aud.lastRenderedFreq = null;
-            aud.lastPlayedFreq = null;
-            aud.lastNoteEnd = 0;
-
-            h.enabled = false;
-            h.volume = 1.0;
-            h.reverb = INSTRUMENT_REVERB_DEFAULTS.harmony;
-            h.octave = 60;
-            h.style = 'smart';
-            h.complexity = 0.5;
-            h.voice = 'synth';
-            h.autoSound = true;
-            return true;
-        }
-        case ACTIONS.SET_STYLE:
-            if (instrumentStateMap[action.payload.module]) {
-                instrumentStateMap[action.payload.module].style = action.payload.style;
-            }
-            return true;
         case ACTIONS.SET_VOLUME:
             // grooveReducer owns the groove lane for this action (#1182).
             if (isGrooveModule(action.payload.module)) {
@@ -456,11 +350,6 @@ export function instrumentReducer(action: Action): boolean {
             return true;
         case ACTIONS.SET_SOLOIST_MODE:
             s.mode = resolveSoloistMode(action.payload);
-            return true;
-        case ACTIONS.SET_SOLOIST_AUTO_MODE:
-            // #856 — Auto vs pinned. When re-enabling Auto, state-effects
-            // re-derives `mode` from the lead voice + genre.
-            s.autoMode = !!action.payload;
             return true;
         case ACTIONS.SET_INSTRUMENT_VOICE: {
             // synth-audit Epic 0 S1 — A/B voice switch. instrumentStateMap
@@ -491,28 +380,6 @@ export function instrumentReducer(action: Action): boolean {
             if (action.payload.harmony) {
                 h.style = action.payload.harmony;
             }
-            return true;
-        case ACTIONS.UPDATE_HB:
-            // #1064 — `complexity` is excluded from this generic pass-through:
-            // it's `document`-owned (persisted, shareable — state-ownership.ts),
-            // and the auto-conductor's runtime-derived equivalent now lives at
-            // `playback.conductorHarmonyComplexity`, composed at READ time by
-            // consumers (harmonies.ts). The only historical caller of UPDATE_HB
-            // with `complexity` was `applyConductor`, which no longer sends it;
-            // this guard keeps a future caller from silently resurrecting the bug.
-            for (const key in action.payload) {
-                if (key === 'complexity') {
-                    continue;
-                }
-                if (Object.hasOwn(harmony, key)) {
-                    (harmony as Record<string, unknown>)[key] = (
-                        action.payload as Record<string, unknown>
-                    )[key];
-                }
-            }
-            return true;
-        case ACTIONS.UPDATE_SB:
-            applySoloistPayload(soloist, action.payload as Record<string, unknown>);
             return true;
     }
     return false;
