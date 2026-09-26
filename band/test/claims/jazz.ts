@@ -70,7 +70,7 @@ export const jazz = defineClaims({
             ],
         },
         {
-            take: { trade: { with: 'drums', bars: 4 } },
+            take: { trade: { with: 'drums', bars: 4, choruses: null } },
             claims: [
                 ['tradeYourTurn', 1, 1, 'your four are yours: no sax, and the band keeps time'],
                 ['tradeBandLaysOut', 1, 1, "the drummer's four are the drums alone"],
@@ -81,7 +81,7 @@ export const jazz = defineClaims({
             ],
         },
         {
-            take: { trade: { with: 'lead', bars: 4 } },
+            take: { trade: { with: 'lead', bars: 4, choruses: null } },
             claims: [
                 ['tradeLeadPlays', 0.95, 1, 'the sax plays each of its fours through'],
                 ['tradeYourTurn', 1, 1, 'then it lays out, and the band keeps comping for you'],

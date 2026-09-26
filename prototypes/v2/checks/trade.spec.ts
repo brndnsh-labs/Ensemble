@@ -30,9 +30,13 @@ test('trading with the soloist is chosen by the soloist, saved with the chart an
     // (An <option>'s own `disabled` attribute: Playwright's enabled-state check reads the
     // select, not the option.)
     await expect(sheet.locator('option[value="drums"]')).toHaveAttribute('disabled', '');
-    await expect(sheet.getByLabel('Turns')).toBeDisabled();
+    await expect(sheet.getByLabel('Turns', { exact: true })).toBeDisabled();
+    // "Head returns" defaults to 2 choruses, same as an untraded chart's implicit default.
+    await expect(sheet.getByLabel('Head returns')).toBeDisabled();
+    await expect(sheet.getByLabel('Head returns')).toHaveValue('2');
     await sheet.getByLabel('Trade with').selectOption('soloist');
-    await sheet.getByLabel('Turns').selectOption('2');
+    await sheet.getByLabel('Turns', { exact: true }).selectOption('2');
+    await sheet.getByLabel('Head returns').selectOption('3');
     await sheet.getByRole('button', { name: 'Close trade' }).click();
 
     // Trading with the soloist turns it on; the button shows the turns.
@@ -51,6 +55,7 @@ test('trading with the soloist is chosen by the soloist, saved with the chart an
     const soloist = await exportedSoloist(page);
     expect(soloist.tradeWith).toBe('soloist');
     expect(soloist.tradeBars).toBe(2);
+    expect(soloist.tradeChoruses).toBe(3);
 
     // The soloist off: the chart still asks to trade, but the band can't, and the button and
     // the sheet say so rather than claiming a trade.
@@ -71,6 +76,7 @@ test('trading with the soloist is chosen by the soloist, saved with the chart an
     const off = await exportedSoloist(page);
     expect(off.tradeWith).toBeUndefined();
     expect(off.tradeBars).toBeUndefined();
+    expect(off.tradeChoruses).toBeUndefined();
 });
 
 // The drum solos themselves are the band engine's (band/perform.test.ts, the invariant suite

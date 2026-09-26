@@ -1,4 +1,4 @@
-import type { SoloistTradeBars, SoloistTradeWith } from './songbook/types.js';
+import type { SoloistTradeBars, SoloistTradeChoruses, SoloistTradeWith } from './songbook/types.js';
 import type { VisualizerQueuedEvent } from './visualizer/visualizer-events.js';
 
 /**
@@ -928,6 +928,8 @@ export interface SoloistState {
     readonly tradeWith: SoloistTradeWith;
     /** How many bars a traded turn lasts: 2, 4 or 8. */
     readonly tradeBars: SoloistTradeBars;
+    /** How many traded choruses before the head returns; 0 keeps trading forever. */
+    readonly tradeChoruses: SoloistTradeChoruses;
     /**
      * #1062 — RUNTIME-DERIVED trade-silencing layer, never the user's own
      * setting. The soloist-trade block in `conductor.ts` toggles this (not

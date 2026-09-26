@@ -421,6 +421,49 @@ describe('Songbook codecs (#1044)', () => {
         }
     });
 
+    it('round-trips tradeChoruses, defaults it absent, and rejects out-of-range values', () => {
+        const plain = makeChartDocument();
+        const decoded = validateChartDocument(plain);
+        expect(decoded.kind).toBe('ok');
+        if (decoded.kind === 'ok') {
+            // Absent reads as undefined here too — the default of 2 is applied by the state
+            // layer (`public/state/instruments.ts`), not the codec.
+            expect(decoded.value.chart.band.soloist.tradeChoruses).toBeUndefined();
+        }
+
+        for (const choruses of [0, 1, 2, 3, 4] as const) {
+            const trading = makeChartDocument();
+            trading.chart.band.soloist.tradeWith = 'drums';
+            trading.chart.band.soloist.tradeBars = 4;
+            trading.chart.band.soloist.tradeChoruses = choruses;
+            const traded = validateChartDocument(trading);
+            expect(traded.kind, `choruses ${choruses}`).toBe('ok');
+            if (traded.kind === 'ok') {
+                expect(traded.value.chart.band.soloist.tradeChoruses).toBe(choruses);
+            }
+        }
+
+        for (const choruses of [5, -1, 2.5]) {
+            const bad = makeChartDocument() as unknown as {
+                chart: { band: { soloist: Record<string, unknown> } };
+            };
+            bad.chart.band.soloist.tradeWith = 'drums';
+            bad.chart.band.soloist.tradeBars = 4;
+            bad.chart.band.soloist.tradeChoruses = choruses;
+            const result = validateChartDocument(bad);
+            expect(result.kind, `choruses ${choruses}`).toBe('invalid');
+            if (result.kind !== 'invalid') {
+                continue;
+            }
+            expect(result.issues).toContainEqual(
+                expect.objectContaining({
+                    path: '$.chart.band.soloist.tradeChoruses',
+                    code: 'invalid-value',
+                }),
+            );
+        }
+    });
+
     it('rejects unknown groove lanes and path-unsafe pack ids', () => {
         const candidate = makeChartDocument() as any;
         candidate.chart.band.groove.pattern[0].name = 'Cowbell';

@@ -9,7 +9,9 @@
  * first N bars as a grid, for reading a groove without a DAW; `--show=P` prints pass P instead
  * of the first (the lead's head is pass 0, its solo choruses passes 1–3).
  * `--lead` turns the lead on, on its style's instrument or the one named. `--trade=lead:4` or
- * `--trade=drums:2` trades with the player after the head (pass 1 onwards).
+ * `--trade=drums:2` trades with the player after the head (pass 1 onwards); a third field,
+ * `--trade=drums:4:2`, sets how many traded choruses before the head returns (absent keeps
+ * trading forever).
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -135,6 +137,7 @@ for (const chart of charts) {
                 ? {
                       with: args.trade.split(':')[0] as 'lead' | 'drums',
                       bars: Number(args.trade.split(':')[1] ?? 4) as 2 | 4 | 8,
+                      choruses: args.trade.split(':')[2] ? Number(args.trade.split(':')[2]) : null,
                   }
                 : null,
         };
