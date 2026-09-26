@@ -371,12 +371,20 @@ export class BandHost {
             return;
         }
         // Resume from the engine's own memory at that barline, so the new bars follow on
-        // from the bars actually played (voicing, bass register, a pushed chord).
+        // from the bars actually played (voicing, bass register, a pushed chord). `origin`
+        // carries the bar this pass truly began on (defaulting to the window it already had,
+        // for the first resume of a pass), so the new tail's own first bar is still treated as
+        // a continuation — it still crashes into a section arrival or a phrase fill's answer —
+        // not the fresh start a bare `from` would read as (`planBars`'s `PassWindow.origin`).
         const tail = performPass(timeline, settings, {
             pass: current.pass,
             looping: true,
             memory: current.snapshots[cutoffBar],
-            window: { ...current.window, from: cutoffBar },
+            window: {
+                ...current.window,
+                from: cutoffBar,
+                origin: current.window.origin ?? current.window.from,
+            },
         });
         const cutoff = timeline.bars[cutoffBar].start;
         this.change = { segment: current, tick: cutoff };

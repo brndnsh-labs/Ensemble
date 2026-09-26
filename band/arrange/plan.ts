@@ -67,6 +67,16 @@ export interface PassWindow {
     /** The bar that follows the window when the performance loops (a practice loop wraps to
      * its own start; a play-from-here pass wraps to the top of the song). */
     wrapTo: number;
+    /**
+     * The bar this PASS actually began on — not necessarily `from`. A fresh pass (a full pass
+     * from the top, a practice loop's own lap, a play-from-here start) has nothing before it,
+     * so this defaults to `from`. A pass resumed mid-flight by a settings change
+     * (`BandHost.update()`) carries the original pass's own origin forward instead, so its own
+     * first bar (now `from`) is still a continuation, not a fresh start: it still crashes into
+     * a section arrival or answers a phrase fill if the form says so, exactly as the
+     * uninterrupted pass would have.
+     */
+    origin?: number;
 }
 
 export function fullWindow(timeline: Timeline): PassWindow {
@@ -89,6 +99,8 @@ export function planBars(
     }: { pass: number; looping: boolean; window: PassWindow; drumSolos?: boolean },
 ): BarPlan[] {
     const { bars } = timeline;
+    // Where this pass truly began, for `first`/`before`/`priorFill` below — see `PassWindow`.
+    const origin = window.origin ?? window.from;
     // The player trades over the whole song (a pass resumed at a barline still is one); a
     // practice loop keeps its band. Trading with the soloist needs it on; trading with the
     // drummer needs the drums on and a drummer who can solo in this style.
@@ -110,25 +122,24 @@ export function planBars(
             bars[index].visit.lanes.drums !== false
         );
     };
-    // The fill bar `index` would get on `onPass`, worked out from the form alone (never from
-    // `plans`), so a bar outside this call's own window — the one right before a resumed pass,
-    // or the last bar of the pass before — can still be asked. Mirrors the bar-i fill logic
-    // below, but `index` need not be in `window`.
+    // The fill bar `index` would get on `onPass`, worked out from the form alone — the ONE
+    // rule for a bar inside this call's own window (bar `i`, in the loop below) and one
+    // outside it (its predecessor, when a resumed pass or a fresh pass's own origin needs it),
+    // so the two can't drift apart. "Last bar" is window-relative (`window.to - 1`), not the
+    // song's own last bar: a practice loop's own lap-end gets its big fill on the loop's own
+    // last bar, whatever the song's length.
     const fillAt = (index: number, onPass: number): Fill => {
         const bar = bars[index];
-        const isLastOfSong = index === bars.length - 1;
+        const isLast = index === window.to - 1;
         const role = leadRole(timeline, index, onPass, trade);
-        if ((!looping && isLastOfSong) || (role.kind === 'trade' && role.with === 'drums')) {
+        if ((!looping && isLast) || (role.kind === 'trade' && role.with === 'drums')) {
             // Trading with the drummer, his turn is a solo, not a fill; the true end of a
             // non-looping song plays a held ending instead.
             return 'none';
         }
-        const next = isLastOfSong ? (looping ? bars[window.wrapTo] : null) : bars[index + 1];
+        const next = isLast ? (looping ? bars[window.wrapTo] : null) : bars[index + 1];
         const visitEnd = bar.barInVisit === bar.visit.barCount - 1;
-        if (
-            (visitEnd || (isLastOfSong && looping)) &&
-            !(next && bar.visit.seamless && !isLastOfSong)
-        ) {
+        if ((visitEnd || (isLast && looping)) && !(next && bar.visit.seamless && !isLast)) {
             return 'section';
         }
         if (bar.phrase.bar === bar.phrase.length - 1 && bar.phrase.index % 2 === 1) {
@@ -180,40 +191,41 @@ export function planBars(
             lanes.comp = false;
         }
         const ending = !looping && isLast;
-        let fill: Fill = 'none';
-        // Trading with the drummer, the trade is its own fill: his turn is a solo, and he
-        // hands yours back with a crash.
-        if (!ending && !(lead.kind === 'trade' && lead.with === 'drums')) {
-            if ((visitEnd || (isLast && looping)) && !(next && bar.visit.seamless && !isLast)) {
-                // The end of a section — or of a practice loop's lap — gets the big fill.
-                fill = 'section';
-            } else if (bar.phrase.bar === bar.phrase.length - 1 && bar.phrase.index % 2 === 1) {
-                // Every other phrase ends with a small one (bars 8, 16…), not every phrase.
-                fill = 'phrase';
-            }
-        }
-        // The very top of the whole performance, not of this call's own window: a pass resumed
-        // mid-song is a continuation, not a fresh start, so its first bar still arrives with a
-        // crash if the form says so (the same "index `0`, not `window.from`" fix as `fillAt`
-        // and `before`/`drummerAlone` below — a section repeat's own arrival bar lost its crash
-        // on resume before this read the true song position instead of the window's).
-        const first = i === 0 && pass === 0;
+        // `fillAt` already carries the "trading with the drummer, or the true end of a
+        // non-looping song, gets no fill" guard (the same `isLast`/`looping`/`lead` this bar
+        // just computed), so bar `i`'s own fill is just its own answer — the loop and the
+        // lookup below can't disagree because they're the same function.
+        const fill = fillAt(i, pass);
+        // The bar this PASS truly began on (`origin`), not this call's own window: a pass
+        // resumed by a settings change (`BandHost.update()`) is a continuation of one already
+        // under way, so its own first bar still arrives with a crash if the form says so. A
+        // genuinely fresh start (play-from-here, a practice loop's own first lap) has nothing
+        // before it and keeps the old suppression — its origin defaults to its own `from`.
+        const first = i === origin && pass === 0;
         // The drummer's own turn opens with the kick under his statement, not a crash: the
         // crash is the band coming back in.
         const arrival = bar.barInVisit === 0 && !bar.visit.seamless && !first && !drumsTurn;
-        // A crash marks an arrival: a new section, or the downbeat after a phrase fill once
-        // the band is past quiet energy. Read the previous bar's fill from the form (`fillAt`),
-        // not from `plans` — a pass resumed here has no plan for the bar before its own window,
-        // and even a full pass replans from scratch every time round, so `plans[i - 1]` is
-        // undefined at the top of every pass but the very first.
-        const priorFill =
-            i > 0 ? fillAt(i - 1, pass) : pass > 0 ? fillAt(bars.length - 1, pass - 1) : 'none';
+        // A crash marks an arrival: a new section, or the downbeat after a phrase fill once the
+        // band is past quiet energy — the previous bar's fill, in performance order. Past the
+        // origin, that's bar `i - 1` on this same pass, read from the form (`fillAt`) rather
+        // than `plans`: a bar can sit outside this call's own window (a resumed pass's
+        // predecessor, or a fresh window's own predecessor, which was never played), and even
+        // one inside the window has no `plans` entry yet the first time the loop reaches it. AT
+        // the origin: on pass 0 nothing played before it; on a later pass, the bar that played
+        // right before it is the PREVIOUS pass's own last bar, which — having looped to reach
+        // this pass at all — `fillAt` always answers 'section' for (`isLast && looping` alone
+        // forces it, before phrase parity is even asked), so it can never afterFill. Hardcoded
+        // rather than asked, since the current call's own `looping` (which could by now be
+        // false, the render's own final pass) isn't the previous pass's.
+        const priorFill: Fill = i > origin ? fillAt(i - 1, pass) : pass === 0 ? 'none' : 'section';
         const afterFill = priorFill === 'phrase' && energy >= 0.5;
-        // The band comes back in on a crash after the drummer's four.
-        // Read from the form, not the previous plan, so a pass resumed here still crashes; the
-        // bar before the first is the last bar of the pass before.
+        // The band comes back in on a crash after the drummer's four. Read from the form, not
+        // the previous plan, so a pass resumed here still crashes; the same origin rule as
+        // `first`/`priorFill` above governs what "before" means at the start of this call.
         const before =
-            i > 0 ? drummerAlone(i - 1, pass) : pass > 0 && drummerAlone(bars.length - 1, pass - 1);
+            i > origin
+                ? drummerAlone(i - 1, pass)
+                : pass > 0 && drummerAlone(window.to - 1, pass - 1);
         const afterDrums = before && !drumsTurn;
         plans[i] = {
             energy,
