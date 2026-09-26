@@ -211,6 +211,22 @@ describe('a real v1 share link', () => {
         expect(document.chart.band.groove.lastSmartGenre).toBe('Bossa');
     });
 
+    // v1 applied a linked genre through the picker's pipeline, which sets the genre's swing.
+    // A link carries no swing of its own: without this a Jazz link played straight eighths.
+    it("brings the genre's feel: a Jazz or Blues link swings, a Rock link doesn't", () => {
+        const feelOf = (genre: string) =>
+            chartOf(open(`?prog=${encodeURIComponent('Dm7 | G7')}&genre=${genre}`)).chart.band
+                .groove;
+        expect(feelOf('Jazz')).toMatchObject({ swing: 60, swingSub: '8th' });
+        expect(feelOf('Blues')).toMatchObject({ swing: 90, swingSub: '8th' });
+        // The feel-spelled genre the share writer emits resolves the same way.
+        expect(feelOf('Bossa%20Nova')).toMatchObject({ swing: 0, swingSub: '16th' });
+        expect(feelOf('Rock')).toMatchObject({ swing: 0, swingSub: '8th' });
+        // No genre (or an unknown one) keeps the old fallback: straight.
+        expect(chartOf(open('?prog=I%20%7C%20IV')).chart.band.groove.swing).toBe(0);
+        expect(feelOf('Polka').swing).toBe(0);
+    });
+
     it("prefers `s` over `prog`, the way v1's own `loadFromUrl` resolves the pair", () => {
         const search = `${shareQuery([section({ label: 'Head', value: 'C7 | F7' })], {})}&prog=${encodeURIComponent('I | IV')}`;
         const document = chartOf(open(search));

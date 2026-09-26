@@ -41,6 +41,7 @@
  * own, never one derived from the sender's bytes.
  */
 
+import { resolveGenre, SMART_GENRES } from '../../../public/data/smart-genres.js';
 import { stripDangerousChars } from '../../../public/sanitize.js';
 import { validateChartDocument } from '../../../public/songbook/codec.js';
 import type { ChartContent, ChartDocument } from '../../../public/songbook/types.js';
@@ -232,6 +233,7 @@ function linkSections(
  * right baseline for a chart arriving from another device.
  */
 function linkSession(params: URLSearchParams): Record<string, unknown> {
+    const genre = resolveGenre(params.get('genre'));
     return {
         key: params.get('key') ?? undefined,
         timeSignature: params.get('ts') ?? undefined,
@@ -241,7 +243,17 @@ function linkSession(params: URLSearchParams): Record<string, unknown> {
         // The share writer emits the FEEL; older and hand-written links carry the genre
         // NAME. `resolveGenre` (via `sessionBand`) accepts either keyspace, which is the
         // same tolerance `loadFromUrl` grew in #1200.
-        groove: { genreFeel: params.get('genre') ?? undefined },
+        //
+        // The genre brings its feel with it. v1 applied a linked genre through the genre
+        // picker's own pipeline (`SET_GENRE_FEEL` with `SMART_GENRES`), which set the swing;
+        // a session record carries no swing of its own, so without these a `genre=Jazz` link
+        // opened with `sessionBand`'s swing fallback of 0 and played straight eighths.
+        groove: {
+            genreFeel: params.get('genre') ?? undefined,
+            ...(genre
+                ? { swing: SMART_GENRES[genre.name].swing, swingSub: SMART_GENRES[genre.name].sub }
+                : {}),
+        },
     };
 }
 
