@@ -15,6 +15,14 @@ export type WorkspacePreferencesSchemaVersion = typeof WORKSPACE_PREFERENCES_SCH
 export type ChartNotation = 'roman' | 'name' | 'nns';
 export type SoloistMode = 'monophonic' | 'guitar';
 export type SoloistTradeMode = 'manual' | 'sections' | 'loops';
+/**
+ * Trading with the player on the band engine: who the band trades with ('off' when it doesn't)
+ * and how many bars a turn lasts. Distinct from the old engine's `SoloistTradeMode`, which
+ * switches the soloist on and off by section or loop.
+ */
+export type SoloistTradeWith = 'off' | 'soloist' | 'drums';
+export type SoloistTradeBars = 2 | 4 | 8;
+export const SOLOIST_TRADE_BARS: readonly SoloistTradeBars[] = [2, 4, 8];
 export const CHART_GROOVE_PATTERN_LANE_NAMES = [
     'Kick',
     'Snare',
@@ -90,6 +98,10 @@ export interface ChartSoloist extends ChartLaneMix {
     autoMode: boolean;
     phrasingIntensity: number;
     tradeMode: SoloistTradeMode;
+    /** Absent (a chart saved before trading, or not trading) reads as 'off'. */
+    tradeWith?: SoloistTradeWith;
+    /** Absent reads as 4. */
+    tradeBars?: SoloistTradeBars;
 }
 
 export interface ChartHarmony extends ChartLaneMix {

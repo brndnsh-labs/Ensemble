@@ -3,12 +3,13 @@
  *
  *   npm run band:render -- --chart=blues --style=jazz --bpm=140 [--seed=x] [--passes=2]
  *                          [--intensity=0.8] [--comp=guitar] [--off=bass] [--out=tmp/band]
- *                          [--print=8] [--lead[=guitar]] [--show=1]
+ *                          [--print=8] [--lead[=guitar]] [--show=1] [--trade=drums:4]
  *
  * `--chart=all --style=all` renders every fixture in every style. `--print=N` prints the
  * first N bars as a grid, for reading a groove without a DAW; `--show=P` prints pass P instead
- * of the first (the lead's head is pass 0, its solo choruses passes 1–3, jazz's fours pass 4).
- * `--lead` turns the lead on, on its style's instrument or the one named.
+ * of the first (the lead's head is pass 0, its solo choruses passes 1–3).
+ * `--lead` turns the lead on, on its style's instrument or the one named. `--trade=lead:4` or
+ * `--trade=drums:2` trades with the player after the head (pass 1 onwards).
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -130,6 +131,12 @@ for (const chart of charts) {
                 comp: !args.off?.includes('comp'),
                 lead: leadOn,
             },
+            trade: args.trade
+                ? {
+                      with: args.trade.split(':')[0] as 'lead' | 'drums',
+                      bars: Number(args.trade.split(':')[1] ?? 4) as 2 | 4 | 8,
+                  }
+                : null,
         };
         const all: BandEvent[] = [];
         let memory: PassMemory | undefined;

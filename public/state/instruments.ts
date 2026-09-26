@@ -71,6 +71,9 @@ export const soloist = deepSignal<SoloistState>({
     reverb: INSTRUMENT_REVERB_DEFAULTS.soloist,
     phrasingIntensity: 0.5,
     tradeMode: 'manual',
+    // Trading with the player on the band engine (`BandSettings.trade`): off, or the partner.
+    tradeWith: 'off',
+    tradeBars: 4,
     // #1062 — runtime-derived trade-silencing layer; see the SoloistState
     // field doc in types.ts. Never the user's `enabled` setting.
     tradeSilenced: false,
@@ -185,6 +188,8 @@ const SOLOIST_FIELD_ROUTES: Record<string, SoloistFieldRoute> = {
     reverb: { kind: 'config', key: 'reverb' },
     phrasingIntensity: { kind: 'config', key: 'phrasingIntensity' },
     tradeMode: { kind: 'config', key: 'tradeMode' },
+    tradeWith: { kind: 'config', key: 'tradeWith' },
+    tradeBars: { kind: 'config', key: 'tradeBars' },
     tradeSilenced: { kind: 'config', key: 'tradeSilenced' },
 
     // --- Session (top-level) ---

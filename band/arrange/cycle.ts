@@ -1,14 +1,16 @@
 /**
- * The performance cycle: what each time through the song is for once the lead plays, decided
- * from where a bar sits in the performance. The arrangement plan carries the answer to every
- * lane (`BarPlan.lead`), so the lead, the drummer and the rhythm section agree on it.
+ * The performance cycle: what each time through the song is for, decided from where a bar
+ * sits in the performance. The arrangement plan carries the answer to every lane
+ * (`BarPlan.lead`), so the lead, the drummer and the rhythm section agree on it.
  *
  * The first time through, the lead plays the head. Looping, it solos for three choruses and
- * brings the head back on the fourth: head, solo, solo, solo, head… A style that trades fours
- * plays the fours before the head comes back: one chorus of them, or two when the chorus has
- * an odd number of phrases (a 12-bar blues trades across 24 bars), so the horn always takes
- * the first four and the drummer the last.
+ * brings the head back on the fourth: head, solo, solo, solo, head…
+ *
+ * When the player trades (`BandSettings.trade`), every time through after the head is traded
+ * instead: the band and the player take turns, a fixed number of bars each, the band first so
+ * the player has a phrase to answer. The turns run on across the choruses.
  */
+import type { TradeSettings } from '../core/types.js';
 import type { Bar, Timeline } from '../form/timeline.js';
 
 export type LeadRole =
@@ -18,78 +20,116 @@ export type LeadRole =
           kind: 'solo';
           /** Which chorus of the solo arc, 1–3. */
           chorus: 1 | 2 | 3;
-          /** The fours come next: the third chorus hands on to them instead of winding down. */
-          toFours?: boolean;
       }
     | {
           kind: 'trade';
-          /** Whose turn this phrase is: the lead's, or the drummer's (the band lays out). */
-          turn: 'lead' | 'drums';
+          /** Who the player trades with. */
+          with: TradeSettings['with'];
+          /** Whose turn it is: the band's (the soloist's, or the drummer's alone) or yours. */
+          turn: 'band' | 'you';
+          /** The turn's first bar (a bar index), its length in bars, and this bar's place in it. */
+          from: number;
+          bars: number;
+          at: number;
       };
 
-/** How many passes one head-and-solos cycle lasts, without fours. */
+/** How many passes one head-and-solos cycle lasts. */
 export const CYCLE = 4;
 
 const isIntro = (bar: Bar) => /^intro/i.test(bar.visit.label.trim());
 
-/** The lead's phrase slots in one time through the song (the band's intro isn't one). */
-function slotCount(timeline: Timeline): number {
-    return timeline.bars.filter((bar) => bar.phrase.bar === 0 && !isIntro(bar)).length;
-}
-
-/** How many choruses of fours a style that trades plays: enough for an even number of fours. */
-function fourChoruses(timeline: Timeline): number {
-    return slotCount(timeline) % 2 === 0 ? 1 : 2;
-}
-
-/** The cycle's length in passes: head, three solo choruses, and the fours if `trades`. */
-export function cycleLength(timeline: Timeline, trades: boolean): number {
-    return trades ? CYCLE + fourChoruses(timeline) : CYCLE;
-}
-
 /**
- * The lead's job at bar `index` on `pass`. `trades` adds the fours to the cycle. Every bar
- * of a phrase slot gets the same answer, so any barline can resume it.
+ * The lead's job at bar `index` on `pass`. With `trade`, every pass after the first is traded.
+ * Every bar of a slot or a turn gets the same answer, so any barline can resume it.
  */
 export function leadRole(
     timeline: Timeline,
     index: number,
     pass: number,
-    trades: boolean,
+    trade: TradeSettings | null,
 ): LeadRole {
     const bar = timeline.bars[index];
     // An intro is the band's; the lead comes in after it.
     if (isIntro(bar)) {
         return { kind: 'rest' };
     }
-    const cycle = pass % cycleLength(timeline, trades);
-    if (cycle >= CYCLE) {
-        return { kind: 'trade', turn: tradeTurn(timeline, index, cycle - CYCLE) };
+    if (trade && pass > 0) {
+        return tradeRole(timeline, index, pass, trade);
     }
-    const chorus = (cycle === 0 ? 1 : cycle) as 1 | 2 | 3;
-    const solo = {
-        kind: 'solo' as const,
-        chorus,
-        ...(trades && cycle === 3 ? { toFours: true } : {}),
-    };
+    const cycle = pass % CYCLE;
     // A section written as a solo is one, even the first time through.
     if (/^solo/i.test(bar.visit.label.trim())) {
-        return solo;
+        return { kind: 'solo', chorus: cycle === 0 ? 1 : (cycle as 1 | 2 | 3) };
     }
-    return cycle === 0 ? { kind: 'head' } : solo;
+    return cycle === 0 ? { kind: 'head' } : { kind: 'solo', chorus: cycle as 1 | 2 | 3 };
+}
+
+/** One chorus's turns, as runs of bar indices; and, for each bar, its turn and place in it. */
+interface Turns {
+    count: number;
+    of: Map<number, { turn: number; from: number; bars: number; at: number }>;
+}
+
+const TURNS = new WeakMap<Timeline, Map<number, Turns>>();
+
+/**
+ * A chorus cut into turns of `length` bars, counted from the top (the intro is the band's).
+ * A turn never spans an intro (a D.C. can replay one mid-form): the bars before it end on a
+ * short turn. A chorus that doesn't divide evenly ends on one too. Computed once per chart.
+ */
+function turnsOf(timeline: Timeline, length: number): Turns {
+    const byLength = TURNS.get(timeline) ?? new Map<number, Turns>();
+    TURNS.set(timeline, byLength);
+    const cached = byLength.get(length);
+    if (cached) {
+        return cached;
+    }
+    const runs: number[][] = [];
+    let current: number[] = [];
+    for (const bar of timeline.bars) {
+        if (isIntro(bar)) {
+            current = [];
+            continue;
+        }
+        if (!current.length || current.length === length) {
+            current = [];
+            runs.push(current);
+        }
+        current.push(bar.index);
+    }
+    const of = new Map<number, { turn: number; from: number; bars: number; at: number }>();
+    runs.forEach((bars, turn) => {
+        bars.forEach((index, at) => {
+            of.set(index, { turn, from: bars[0], bars: bars.length, at });
+        });
+    });
+    const turns = { count: runs.length, of };
+    byLength.set(length, turns);
+    return turns;
 }
 
 /**
- * Whose four it is: the slots alternate through the fours, the horn first. There is always
- * an even number of them, so the drummer takes the last and sets up the head.
+ * The turn bar `index` falls in. The alternation runs on across choruses, the band taking the
+ * first turn after the head.
  */
-function tradeTurn(timeline: Timeline, index: number, chorus: number): 'lead' | 'drums' {
-    let slot = chorus * slotCount(timeline) - 1;
-    for (let i = 0; i <= index; i++) {
-        const bar = timeline.bars[i];
-        if (bar.phrase.bar === 0 && !isIntro(bar)) {
-            slot++;
-        }
+function tradeRole(
+    timeline: Timeline,
+    index: number,
+    pass: number,
+    trade: TradeSettings,
+): LeadRole {
+    const turns = turnsOf(timeline, trade.bars);
+    const place = turns.of.get(index);
+    if (!place) {
+        return { kind: 'rest' };
     }
-    return slot % 2 === 0 ? 'lead' : 'drums';
+    const turn = (pass - 1) * turns.count + place.turn;
+    return {
+        kind: 'trade',
+        with: trade.with,
+        turn: turn % 2 === 0 ? 'band' : 'you',
+        from: place.from,
+        bars: place.bars,
+        at: place.at,
+    };
 }
