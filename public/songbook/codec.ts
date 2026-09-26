@@ -33,6 +33,7 @@ import {
     type CodecDecodeResult,
     type CodecEncodeResult,
     type CodecIssue,
+    SOLOIST_TRADE_BARS,
     WORKSPACE_PREFERENCES_SCHEMA_VERSION,
     type WorkspaceAppearancePreferences,
     type WorkspaceMidiPreferences,
@@ -54,6 +55,7 @@ const THEME_MODES = new Set(['auto', 'light', 'dark']);
 const NOTATIONS = new Set(['roman', 'name', 'nns']);
 const SOLOIST_MODES = new Set(['monophonic', 'guitar']);
 const SOLOIST_TRADE_MODES = new Set(['manual', 'sections', 'loops']);
+const SOLOIST_TRADE_WITH = new Set(['off', 'soloist', 'drums']);
 const SECTION_INSTRUMENTS = ['groove', 'bass', 'chords', 'harmony', 'soloist'] as const;
 const PROTOTYPE_MEMBER_NAMES = new Set(Object.getOwnPropertyNames(Object.prototype));
 const GROOVE_PATTERN_LANE_NAMES = new Set<string>(CHART_GROOVE_PATTERN_LANE_NAMES);
@@ -516,20 +518,35 @@ function validateBass(ctx: ValidationContext, candidate: unknown, path: string):
 }
 
 function validateSoloist(ctx: ValidationContext, candidate: unknown, path: string): ChartSoloist {
-    const record = ctx.object(candidate, path, [
-        'enabled',
-        'voice',
-        'autoSound',
-        'style',
-        'preset',
-        'octave',
-        'volume',
-        'reverb',
-        'mode',
-        'autoMode',
-        'phrasingIntensity',
-        'tradeMode',
-    ]);
+    const record = ctx.object(
+        candidate,
+        path,
+        [
+            'enabled',
+            'voice',
+            'autoSound',
+            'style',
+            'preset',
+            'octave',
+            'volume',
+            'reverb',
+            'mode',
+            'autoMode',
+            'phrasingIntensity',
+            'tradeMode',
+        ],
+        ['tradeWith', 'tradeBars'],
+    );
+    const tradeWith = optionalStringField(ctx, record, 'tradeWith', path, {
+        min: 1,
+        max: 16,
+        predicate: (value) => SOLOIST_TRADE_WITH.has(value),
+        message: 'Unknown soloist trade partner',
+    }) as ChartSoloist['tradeWith'];
+    const tradeBars = optionalNumberField(ctx, record, 'tradeBars', path, 2, 8, true);
+    if (tradeBars !== undefined && !SOLOIST_TRADE_BARS.includes(tradeBars as 2 | 4 | 8)) {
+        ctx.issue(pathFor(path, 'tradeBars'), 'invalid-value', 'A trade lasts 2, 4 or 8 bars');
+    }
     return {
         ...validateLaneMix(ctx, record, path),
         style: stringField(ctx, record, 'style', path, {
@@ -559,6 +576,8 @@ function validateSoloist(ctx: ValidationContext, candidate: unknown, path: strin
             allowed: SOLOIST_TRADE_MODES,
             message: 'Unknown soloist trade mode',
         }) as ChartSoloist['tradeMode'],
+        ...(tradeWith === undefined ? {} : { tradeWith }),
+        ...(tradeBars === undefined ? {} : { tradeBars: tradeBars as ChartSoloist['tradeBars'] }),
     };
 }
 

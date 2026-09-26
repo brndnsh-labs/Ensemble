@@ -44,7 +44,8 @@ The ground-up replacement for the generative engine, the default since 2026-09-2
 | `band/perform.ts` | The engine: one pass of the song, lanes in order, then feel. | `performPass` |
 | `band/form/timeline.ts` | SemanticScore → performed bars in ticks (form, holds, N.C., fermatas, meters, phrases). | `compileTimeline`, `secondsAt` |
 | `band/theory/chord.ts` | The one chord authority: symbol → `ChordFacts` (tones, family, guides, scale). | `parseChord`, `chordPcs` |
-| `band/arrange/plan.ts` | Per-bar energy, lanes, fills, crashes, ending. | `planBars`, `energyTier` |
+| `band/arrange/cycle.ts` | What each pass is for: head, solo choruses, or turns traded with the player. | `leadRole`, `CYCLE` |
+| `band/arrange/plan.ts` | Per-bar energy, lanes, fills, crashes, ending, the lead's role. | `planBars`, `energyTier` |
 | `band/feel/feel.ts` | The timing law: swing geometry, lane lean, seeded character. | `applyFeel` |
 | `band/styles/index.ts` | Style registry; each style is one file (`rock.ts`, `jazz.ts`, `funk.ts`, `bossa.ts`, `blues.ts`, `reggae.ts`, `country.ts`, `hiphop.ts`, `disco.ts`, `neosoul.ts`, `metal.ts`, `skapunk.ts`, `acoustic.ts`): feel + drums, bass and comp (keyboard and guitar) idioms, and a lead book where the style has one. | `STYLES`, `feelFor` |
 | `band/players/` | Shared idiom machinery: `drums/kit.ts`, `bass/line.ts`, `comp/idiom.ts`, `grid.ts`. | `drumIdiom`, `compIdiom`, `strums`, `bassNote` |
