@@ -107,6 +107,28 @@ test('an old v1 share link opens as an unsaved draft; Keep a copy persists it an
     await expect(page.locator('main.home')).toContainText('Shared song');
 });
 
+// A link names a genre but carries no swing: it must swing the way picking that genre does.
+// The Blues starter was made by picking Blues, and plays the 'Blues Shuffle' preset's 100.
+test("a linked genre swings like the picked genre: a Blues link's swing is the Blues starter's", async ({
+    page,
+}) => {
+    const swingOf = async () => {
+        await page.getByRole('button', { name: 'Feel and mix', exact: true }).click();
+        const swing = await page.getByLabel('Swing', { exact: true }).inputValue();
+        const grid = await page.getByLabel('Swing grid', { exact: true }).inputValue();
+        await page.getByRole('button', { name: 'Close feel' }).click();
+        return { swing, grid };
+    };
+    await page.goto(appUrl());
+    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
+    const picked = await swingOf();
+    expect(picked).toEqual({ swing: '100', grid: '8th' });
+
+    await page.goto(appUrl(`?prog=${encodeURIComponent('C7 | F7 | C7 | G7')}&genre=Blues`));
+    await expect(page.getByRole('heading', { name: 'Shared song' })).toBeVisible();
+    expect(await swingOf()).toEqual(picked);
+});
+
 test('a garbage v1 link says so and leaves the songbook working', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
