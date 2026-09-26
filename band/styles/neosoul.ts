@@ -828,8 +828,9 @@ const neoLead = leadIdiom({
 export const neosoul: Style = {
     id: 'neosoul',
     name: 'Neo-Soul',
-    // Swung sixteenths at 30: the offbeat sixteenth at 55% of its pair, an MPC swing of 55 —
-    // Dilla's lazy lilt, the old engine's Neo-Soul setting. The band leans well behind the
+    // Swung sixteenths at 45: the offbeat sixteenth at ~57% of its pair, an MPC swing of 57 —
+    // Dilla's lazy lilt. The old Neo-Soul drum preset's value, which Brandon passed by ear
+    // (2026-09-26) over the 30 this style was first tuned at. The band leans well behind the
     // drums, the deepest pocket in the palette: the Rhodes 25 ms back (the old engine's
     // GENRE_POCKET), the bass deeper still at 32 ms (that 25 plus the old engine's bass
     // residual, 5 + 5 × energy, at verse energy). Humanize at 60 (±5.4 ms of settled
@@ -838,7 +839,7 @@ export const neosoul: Style = {
     // smearing the beat. Bass 32 + 5.4 stays inside the old engine's 40 ms floor.
     // The lead drags with the Rhodes, 25 ms back (a singer's lazy phrasing), and no deeper:
     // the bass is the pocket's bottom and the deepest lean.
-    feel: { swing: 30, swingGrid: 16, lean: { bass: 32, comp: 25, lead: 25 }, humanize: 60 },
+    feel: { swing: 45, swingGrid: 16, lean: { bass: 32, comp: 25, lead: 25 }, humanize: 60 },
     drums: neoDrums,
     bass: neoBass,
     comp: { keyboard: neoKeys, guitar: neoGuitar },

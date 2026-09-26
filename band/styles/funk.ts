@@ -294,9 +294,11 @@ const funkLead = leadIdiom({
 export const funk: Style = {
     id: 'funk',
     name: 'Funk',
-    // Straight sixteenths, bass and keys a touch *ahead* — funk pushes on the One.
+    // Sixteenths with a trace of swing (15: the offbeat at ~52% of its pair, the old Funk
+    // drum preset's value and what the app has always played), bass and keys a touch
+    // *ahead* — funk pushes on the One.
     // The horn rides on top of the pocket, right on the grid while the rhythm section pushes.
-    feel: { swing: 0, swingGrid: 16, lean: { bass: -5, comp: -3, lead: 0 }, humanize: 25 },
+    feel: { swing: 15, swingGrid: 16, lean: { bass: -5, comp: -3, lead: 0 }, humanize: 25 },
     drums: funkDrums,
     bass: funkBass,
     comp: { keyboard: funkKeys, guitar: funkGuitar },

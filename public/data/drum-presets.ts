@@ -6,8 +6,6 @@ const S28 = '0000000000000000000000000000';
 const S24 = '000000000000000000000000';
 
 const BASE_PRESET = {
-    swing: 0,
-    sub: '8th',
     Kick: S16,
     Snare: S16,
     HiHat: S16,
@@ -152,7 +150,6 @@ const PRESET_OVERRIDES = {
     },
     House: {
         category: 'Electronic',
-        sub: '16th',
         Kick: [2, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0],
         Snare: [0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0],
         HiHat: [0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 2, 0],
@@ -202,7 +199,6 @@ const PRESET_OVERRIDES = {
     },
     'House (2-Bar)': {
         category: 'Electronic',
-        sub: '16th',
         measures: 2,
         Kick: [
             2, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 2,
@@ -243,8 +239,6 @@ const PRESET_OVERRIDES = {
     },
     'Hip Hop': {
         category: 'Soul/R&B',
-        swing: 25,
-        sub: '16th',
         Kick: [2, 0, 0, 0, 0, 0, 0, 0, 0, 2, 1, 0, 0, 0, 0, 0],
         Snare: [0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0],
         HiHat: [2, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 1],
@@ -276,8 +270,6 @@ const PRESET_OVERRIDES = {
     },
     Funk: {
         category: 'Soul/Funk',
-        swing: 15,
-        sub: '16th',
         measures: 2,
         variations: [
             {
@@ -386,8 +378,6 @@ const PRESET_OVERRIDES = {
     },
     'Neo-Soul': {
         category: 'Soul/R&B',
-        swing: 45,
-        sub: '16th',
         measures: 2,
         variations: [
             {
@@ -479,7 +469,6 @@ const PRESET_OVERRIDES = {
     },
     Trap: {
         category: 'Soul/R&B',
-        sub: '16th',
         Kick: [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 1, 0, 0],
         Snare: [0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0],
         HiHat: [2, 1, 1, 2, 1, 1, 2, 1, 2, 1, 1, 2, 1, 1, 2, 1],
@@ -505,7 +494,6 @@ const PRESET_OVERRIDES = {
     },
     'Blues Shuffle': {
         category: 'Blues',
-        swing: 100,
         Kick: [2, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 1, 0],
         Snare: [0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0],
         HiHat: [2, 0, 1, 0, 2, 0, 1, 0, 2, 0, 1, 0, 2, 0, 1, 0],
@@ -544,8 +532,6 @@ const PRESET_OVERRIDES = {
     },
     Reggae: {
         category: 'World/Latin',
-        swing: 20,
-        sub: '16th',
         Kick: [0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0],
         Snare: [0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0],
         HiHat: [2, 0, 1, 0, 2, 0, 1, 0, 2, 0, 1, 0, 2, 0, 1, 0],
@@ -580,7 +566,6 @@ const PRESET_OVERRIDES = {
     },
     Acoustic: {
         category: 'Pop/Rock',
-        swing: 15,
         Kick: [2, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
         Snare: [0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0],
         HiHat: [1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0],
@@ -624,7 +609,6 @@ const PRESET_OVERRIDES = {
     },
     'Country (Two-Step)': {
         category: 'Country/Folk',
-        swing: 55,
         Kick: [2, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0],
         Snare: [0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0],
         HiHat: [1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0],
@@ -642,7 +626,6 @@ const PRESET_OVERRIDES = {
     },
     'Metal (Speed)': {
         category: 'Rock/Metal',
-        sub: '16th',
         Kick: [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2],
         Snare: [0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0],
         HiHat: [1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0],
@@ -667,7 +650,6 @@ const PRESET_OVERRIDES = {
     },
     DnB: {
         category: 'Electronic',
-        sub: '16th',
         Kick: [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 1, 0, 0],
         Snare: [0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0],
         HiHat: [2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1],
@@ -690,7 +672,6 @@ const PRESET_OVERRIDES = {
     },
     Disco: {
         category: 'Soul/Funk',
-        sub: '16th',
         Kick: [2, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0],
         Snare: [0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0],
         HiHat: [1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0],
@@ -748,7 +729,6 @@ const PRESET_OVERRIDES = {
     },
     Jazz: {
         category: 'Jazz',
-        swing: 60,
         measures: 2,
         variations: [
             {
@@ -868,7 +848,6 @@ const PRESET_OVERRIDES = {
     },
     'Bossa Nova': {
         category: 'World/Latin',
-        sub: '16th',
         measures: 2,
         Kick: [
             2, 0, 0, 0, 0, 0, 2, 0, 2, 0, 0, 0, 0, 0, 2, 0, 2, 0, 0, 0, 0, 0, 2, 0, 2, 0, 0, 0, 0,

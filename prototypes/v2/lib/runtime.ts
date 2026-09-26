@@ -87,6 +87,7 @@ import {
     validateDocument,
 } from './documents';
 import { checkPlayable } from './engine-mode';
+import { genreSwing } from './genre-swing';
 import { masterVolumePreference, rememberMasterVolume } from './session';
 import {
     initializeSounds,
@@ -968,7 +969,13 @@ export async function setGenre(
     }
     const wasPlaying = getState().playback.isPlaying;
     const previous = captureSessionContent();
-    const payload = { genreName: name, ...SMART_GENRES[name] };
+    // The genre's swing is its band style's (`genreSwing`), the one swing authority.
+    const swing = genreSwing(name);
+    const payload = {
+        genreName: name,
+        ...SMART_GENRES[name],
+        ...(swing ? { swing: swing.swing, sub: swing.swingSub } : null),
+    };
     // Captured before anything can stop the transport, so a Stop pressed during
     // preparation is still detectable as a cancellation further down.
     const intent = playIntent;
@@ -996,12 +1003,6 @@ export async function setGenre(
         // Wait for the barline that plays it, so the switch reads as pending until it is
         // heard. A Stop inside the wait leaves nothing half-changed: the feel is committed.
         await awaitBandChange();
-        if (payload.drum && getState().groove.lastDrumPreset !== payload.drum) {
-            // The commit fires its drum preset without awaiting it (it carries the chart's
-            // swing, `loadDrumPreset`). Settle that here so the document the caller captures
-            // next cannot pair the new feel with the outgoing genre's.
-            await loadDrumPreset(payload.drum);
-        }
     } catch (error) {
         // A Stop that landed while we were preparing cancels the change outright:
         // the musician asked for silence, not for a band that resurrects itself.
