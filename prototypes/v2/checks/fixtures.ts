@@ -94,8 +94,22 @@ export const test = base.extend<Record<never, never>, { previewServer: string }>
     // device that opened the Feel sheet once would read. Only when UNSET — an explicit write
     // (the Feel sheet checkbox, `count-in.spec.ts`'s own subject) must survive a reload within
     // the same test, not get silently put back on the next navigation.
+    //
+    // A cheap, suite-wide CSP net (#1395): `window.__cspViolations` collects every
+    // `securitypolicyviolation` event this page fires, on every navigation (`addInitScript`
+    // reruns per document). Nothing reads it mid-test — `checks/csp.spec.ts` is the one spec that
+    // asserts on it deliberately — but the fixture checks it after EVERY test, so a policy that
+    // is one source too narrow fails whichever spec first exercises that path, not just the
+    // dedicated CSP spec. Best-effort: a page already closed or navigated away by the test's own
+    // teardown is not a CSP failure, so a lost evaluation is swallowed rather than asserted on.
     page: async ({ page }, use) => {
         await page.addInitScript(() => {
+            (window as unknown as { __cspViolations: string[] }).__cspViolations = [];
+            window.addEventListener('securitypolicyviolation', (event) => {
+                (window as unknown as { __cspViolations: string[] }).__cspViolations.push(
+                    `${event.violatedDirective} blocked ${event.blockedURI}`,
+                );
+            });
             try {
                 if (localStorage.getItem('ensemble-v2-preview:count-in') === null) {
                     localStorage.setItem('ensemble-v2-preview:count-in', '0');
@@ -105,6 +119,12 @@ export const test = base.extend<Record<never, never>, { previewServer: string }>
             }
         });
         await use(page);
+        const violations = await page
+            .evaluate(
+                () => (window as unknown as { __cspViolations?: string[] }).__cspViolations ?? [],
+            )
+            .catch(() => []);
+        expect(violations, 'no CSP violation should fire during this test').toEqual([]);
     },
 });
 
