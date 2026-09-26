@@ -450,3 +450,155 @@ describe('keeping both refuses to invent a resolution', () => {
         expect(queue[0].status).toBe('conflict');
     });
 });
+
+describe('keeping mine as a new song with an EMPTY queue (#1362)', () => {
+    /** A bare `'deleted'` candidate: the account tombstoned `DOC` with nothing queued to refuse. */
+    function tombstoned(active = false) {
+        return book.reconcile(
+            scope,
+            { kind: 'deleted', documentId: DOC, revision: 'cloud-9' },
+            { active },
+        );
+    }
+
+    it('sources from a draft newer than the saved record — the draft wins', async () => {
+        await saveAndConfirm('Set list', 'cloud-1', null);
+        await book.recover(scope, 'writer-1', chart('My words', DOC, 0), 0);
+        expect(await tombstoned()).toBe('retained-deleted');
+
+        const resolution = await book.keepBoth(scope, DOC);
+        if (resolution === 'none') {
+            throw new Error('Expected a resolution.');
+        }
+        expect(resolution.conflict).toBe('gone');
+        expect(resolution.adopted).toBe(null);
+        expect(resolution.document.title).toBe('My words — kept');
+        // Nothing up there to mirror, and the candidate that described the divergence is settled.
+        expect(await book.read(scope, DOC)).toBe(null);
+        expect(await book.remoteCandidate(scope, DOC)).toBe(null);
+        expect(await savedIds()).toEqual([resolution.documentId]);
+    });
+
+    it('sources from the saved record when the only draft is STALE — the record wins (#1362 patch review P1)', async () => {
+        await saveAndConfirm('Set list', 'cloud-1', null);
+        // Deliberately far before the save above committed. `recover()` always stamps "now", so a
+        // genuinely stale row needs a raw write — this is what a leftover #1299-era row, or clock
+        // skew against a downloaded `updatedAt`, looks like.
+        await putRawDraft({
+            ownerId: OWNER,
+            documentId: DOC,
+            writerId: 'writer-1',
+            document: chart('Stale words', DOC, 0),
+            baseRevision: 0,
+            capturedAt: '2000-01-01T00:00:00.000Z',
+        });
+        expect(await tombstoned()).toBe('retained-deleted');
+
+        const resolution = await book.keepBoth(scope, DOC);
+        if (resolution === 'none') {
+            throw new Error('Expected a resolution.');
+        }
+        // The SAVED record's own title survives, never the superseded draft's: picking the stale
+        // draft here would carry OLDER music forward while this same transaction deletes the
+        // newer saved record — the exact regression `liveDraft` exists to prevent.
+        expect(resolution.document.title).toBe('Set list — kept');
+    });
+
+    it('picks the newest of several live drafts, not merely the last one written', async () => {
+        await saveAndConfirm('Set list', 'cloud-1', null);
+        // Comfortably past `saveAndConfirm`'s real "now" `updatedAt`, so all three are live — the
+        // point under test is which of three LIVE rows wins, not liveness itself (that is the
+        // stale-draft test above). The newest by date is written SECOND, never last, so a bug
+        // that simply took whichever row the loop or the store handed back last would not
+        // accidentally pass this.
+        await putRawDraft({
+            ownerId: OWNER,
+            documentId: DOC,
+            writerId: 'writer-1',
+            document: chart('Middle words', DOC, 0),
+            baseRevision: 0,
+            capturedAt: '9999-01-10T00:00:00.000Z',
+        });
+        await putRawDraft({
+            ownerId: OWNER,
+            documentId: DOC,
+            writerId: 'writer-2',
+            document: chart('Newest words', DOC, 0),
+            baseRevision: 0,
+            capturedAt: '9999-01-12T00:00:00.000Z',
+        });
+        await putRawDraft({
+            ownerId: OWNER,
+            documentId: DOC,
+            writerId: 'writer-3',
+            document: chart('Oldest live words', DOC, 0),
+            baseRevision: 0,
+            capturedAt: '9999-01-09T00:00:00.000Z',
+        });
+        expect(await tombstoned()).toBe('retained-deleted');
+
+        const resolution = await book.keepBoth(scope, DOC);
+        if (resolution === 'none') {
+            throw new Error('Expected a resolution.');
+        }
+        expect(resolution.document.title).toBe('Newest words — kept');
+    });
+
+    it('sources from the only draft when there is no saved record at all', async () => {
+        // No `saveAndConfirm` at all: this document has never been committed, only drafted — the
+        // shape `commitDeleted` can still hold on a live draft alone.
+        await book.recover(scope, 'writer-1', chart('Only ever drafted', DOC, 0), null);
+        expect(await book.read(scope, DOC)).toBe(null);
+        expect(await tombstoned()).toBe('retained-deleted');
+
+        const resolution = await book.keepBoth(scope, DOC);
+        if (resolution === 'none') {
+            throw new Error('Expected a resolution.');
+        }
+        expect(resolution.document.title).toBe('Only ever drafted — kept');
+        expect(await savedIds()).toEqual([resolution.documentId]);
+        expect(await book.drafts(scope, DOC)).toEqual([]);
+        const moved = await book.drafts(scope, resolution.documentId);
+        expect(moved).toHaveLength(1);
+        expect(moved[0].document.title).toBe('Only ever drafted');
+    });
+
+    it('reports `none` with no saved record and no draft either — nothing here to keep', async () => {
+        // `active: true` is what holds a record `commitDeleted` never actually mirrored: a chart
+        // open with no saved record and no draft under it either.
+        expect(await tombstoned(true)).toBe('retained-deleted');
+        expect(await book.keepBoth(scope, DOC)).toBe('none');
+    });
+
+    it('never resolves an `unsupported` candidate this way, queue empty or not', async () => {
+        await saveAndConfirm('Set list', 'cloud-1', null);
+        await book.recover(scope, 'writer-1', chart('My words', DOC, 0), 0);
+        expect(
+            await book.reconcile(scope, {
+                kind: 'unsupported',
+                documentId: DOC,
+                revision: 'cloud-12',
+                body: { schemaVersion: 99, id: DOC },
+                reason: 'needs-app-update',
+            }),
+        ).toBe('unsupported');
+
+        expect(await book.keepBoth(scope, DOC)).toBe('none');
+        // Nothing moved: the saved record, the draft and the candidate are all exactly as they
+        // were — an unsupported body is a fact about the cloud's document, never a divergence
+        // this call settles.
+        expect((await book.read(scope, DOC))?.document.title).toBe('Set list');
+        expect(await book.drafts(scope, DOC)).toHaveLength(1);
+        expect((await book.remoteCandidate(scope, DOC))?.kind).toBe('unsupported');
+    });
+
+    it('settles once, and a second call reports `none`', async () => {
+        await saveAndConfirm('Set list', 'cloud-1', null);
+        await book.recover(scope, 'writer-1', chart('My words', DOC, 0), 0);
+        expect(await tombstoned()).toBe('retained-deleted');
+
+        const first = await book.keepBoth(scope, DOC);
+        expect(first).not.toBe('none');
+        expect(await book.keepBoth(scope, DOC)).toBe('none');
+    });
+});

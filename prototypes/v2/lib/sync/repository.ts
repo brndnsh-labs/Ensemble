@@ -289,6 +289,85 @@ function operations<T>(
     );
 }
 
+/**
+ * The half of `AccountSongbook.keepBoth` its two routes into a fresh identity share (#1362): mint
+ * the local line under `freshDocumentId` from `source`'s bytes and title, as an ordinary queued
+ * create (`base: { revision: null }`, local revision 0), and move every retained draft for
+ * `documentId` onto it. A row this build cannot validate is left in place rather than moved —
+ * preserved, not moved, and never a reason to abort the resolution.
+ *
+ * Deliberately does NOT touch the original id — the refused-Save route (adopt the remote version,
+ * or drop the id entirely) and the bare-`deleted`-candidate route (always drop it) settle that
+ * differently, and folding a third branch in here would be the exact kind of shared code that
+ * grows an `if` for every future caller. The caller finishes the transaction.
+ *
+ * Extracted rather than left duplicated (#1362 patch review P2): the two call sites had drifted
+ * once already — the newer one sourced its content without the older one's `liveDraft` filter,
+ * which is exactly the class of bug one shared function makes structurally impossible to repeat.
+ */
+function keepMineAsNewSong(
+    tx: Pick<Transaction<never>, 'table'>,
+    scope: AccountScope,
+    documentId: string,
+    freshDocumentId: string,
+    operationId: string,
+    rows: Draft[],
+    source: ChartDocument,
+): ChartDocument {
+    const now = new Date().toISOString();
+    // `createdAt` is carried: this is the same piece of music under a new identity, not a song
+    // written today. `updatedAt` moves, because this IS a new commit and the songbook orders by
+    // it. The title is marked, mirroring `save(copy)`'s `— copy`: after a resolution both lines
+    // sit in the songbook under the name the musician gave the song, and two rows spelled
+    // identically is not a resolution anybody can act on.
+    const carried = snapshot({
+        ...source,
+        id: freshDocumentId,
+        title: `${source.title.slice(0, 150)} — kept`,
+        revision: 0,
+        createdAt: source.createdAt,
+        updatedAt: now,
+    });
+    tx.table('songs').put({
+        ownerId: scope.ownerId,
+        documentId: freshDocumentId,
+        document: carried,
+        remoteRevision: null,
+    } satisfies SavedSong);
+    tx.table('operations').add({
+        ownerId: scope.ownerId,
+        documentId: freshDocumentId,
+        operationId,
+        localRevision: carried.revision,
+        snapshot: carried,
+        base: { revision: null },
+        wireBody: null,
+        status: 'queued',
+    } satisfies SaveOperation);
+    for (const row of rows) {
+        let moved: Draft;
+        try {
+            const draft = savedDraft(row, scope, documentId);
+            moved = {
+                ...draft,
+                documentId: freshDocumentId,
+                document: snapshot({ ...draft.document, id: freshDocumentId }),
+                // The experiment is unchanged; what it is an experiment ON is the create above,
+                // so its base is that revision — always 0, because the create is always a create.
+                baseRevision: carried.revision,
+            };
+        } catch {
+            // One row this build cannot validate must not abort the only exit from a terminal
+            // conflict. It is left where it is rather than moved or destroyed: unreadable here
+            // is not the same as worthless, and nothing else has a copy.
+            continue;
+        }
+        tx.table('drafts').delete([scope.ownerId, documentId, moved.writerId]);
+        tx.table('drafts').put(moved);
+    }
+    return carried;
+}
+
 /** Isolated foundation, not connected to guest UI or an authenticated transport yet. */
 export class AccountSongbook {
     private readonly database: AccountDatabase;
@@ -945,6 +1024,23 @@ export class AccountSongbook {
      *
      * `'none'` when the queue holds no refused Save: whoever was looking at the banner is a moment
      * stale, and reporting that is better than inventing a resolution.
+     *
+     * **One more shape resolves here, with an EMPTY queue (#1362).** A bare `'deleted'` candidate —
+     * the account tombstoned this id while a live draft or the chart merely open on the stand held
+     * it, with nothing ever queued to refuse — is the one case besides a refused Save this call
+     * still settles: it mints the same fresh-id/marked-title line (`keepMineAsNewSong`, shared with
+     * the refused-Save route below) and drops the original the same way that route's `'gone'`
+     * branch does. There is no queue here, so the content it carries is the newest LIVE draft —
+     * `liveDraft`'s own rule, the same one a candidate row's very existence already depended on —
+     * when one exists (an unsaved experiment is what "Keep mine" means; a STALE row older than the
+     * saved record is not eligible as the source, or this would silently carry OLDER music forward
+     * while deleting the newer saved record in the same transaction), and the saved record
+     * otherwise (a chart merely left open, with nothing typed). With no saved record at all
+     * (`commitDeleted` can hold one on a live draft alone), the newest live draft is the only
+     * possible source — `liveDraft` counts every draft as live against a null record — and `'none'`
+     * only when there is truly nothing to keep. A non-empty queue with nothing refused in it is
+     * untouched by this addition and answers `'none'` exactly as before, because that song has an
+     * ordinary Save still in flight, which a pass — not this resolution — is what settles it.
      */
     async keepBoth(scope: AccountScope, documentId: string): Promise<KeepBothResolution | 'none'> {
         scope = copyScope(scope);
@@ -963,7 +1059,133 @@ export class AccountSongbook {
                         // on.
                         const refused = queue.find((operation) => operation.status === 'conflict');
                         if (!refused) {
-                            return tx.finish('none');
+                            // #1362 — the one case an EMPTY queue can still resolve here: a bare
+                            // `'deleted'` candidate, the account tombstoned this id while a live
+                            // draft or the chart merely open on the stand held it, and nothing was
+                            // ever queued to refuse. The stand's banner offers the same "Keep mine
+                            // as a new song" action for it as for a refused `'gone'` conflict, and
+                            // this is what makes that button do something rather than silently
+                            // finding no refused head. A non-empty queue with nothing refused in it
+                            // is left exactly as before — an ordinary Save still in flight, which a
+                            // pass resolves on its own.
+                            if (queue.length > 0) {
+                                return tx.finish('none');
+                            }
+                            tx.read(
+                                tx.table('meta').get(candidateKey(scope.ownerId, documentId)),
+                                (row: RemoteCandidate | undefined) => {
+                                    let candidate: RemoteCandidate | null = null;
+                                    try {
+                                        candidate = row
+                                            ? savedCandidate(row, scope, documentId)
+                                            : null;
+                                    } catch {
+                                        candidate = null;
+                                    }
+                                    if (candidate?.kind !== 'deleted') {
+                                        return tx.finish('none');
+                                    }
+                                    tx.read(
+                                        tx.table('songs').get([scope.ownerId, documentId]),
+                                        (savedRow: SavedSong | undefined) => {
+                                            // No saved record is a real shape here — `commitDeleted`
+                                            // can hold a candidate on a live draft alone (#1362
+                                            // patch review P2) — so this is `null`, never a reason
+                                            // to bail before the draft search below has a chance.
+                                            let song: SavedSong | null = null;
+                                            if (savedRow) {
+                                                try {
+                                                    song = savedSong(savedRow, scope, documentId);
+                                                } catch {
+                                                    // An unreadable record is not a verdict: with
+                                                    // it null every draft would read as live, even
+                                                    // one it supersedes, and settling here would
+                                                    // drop the candidate that explains the row.
+                                                    // Leave everything as it is.
+                                                    return tx.finish('none');
+                                                }
+                                            }
+                                            // There is no queue here, so the source is not a queue
+                                            // tail — it is the newest LIVE draft (#1362 patch
+                                            // review P1: `liveDraft` decides eligibility, not
+                                            // merely `capturedAt` order. A row captured BEFORE the
+                                            // saved record's own `updatedAt` is superseded BY that
+                                            // record, and picking it while deleting the newer
+                                            // saved record in the same transaction would silently
+                                            // carry OLDER music forward and lose the current one).
+                                            // With no saved record at all, `liveDraft` counts every
+                                            // draft as live, so this is also the only route to a
+                                            // source in that shape.
+                                            let newestDraft: Draft | null = null;
+                                            for (const row of rows) {
+                                                let draft: Draft;
+                                                try {
+                                                    draft = savedDraft(row, scope, documentId);
+                                                } catch {
+                                                    // Left where it is; the move loop inside
+                                                    // `keepMineAsNewSong` decides the same row's
+                                                    // fate again.
+                                                    continue;
+                                                }
+                                                if (!liveDraft(draft, song)) {
+                                                    continue;
+                                                }
+                                                if (
+                                                    !newestDraft ||
+                                                    draft.capturedAt > newestDraft.capturedAt
+                                                ) {
+                                                    newestDraft = draft;
+                                                }
+                                            }
+                                            const source =
+                                                newestDraft?.document ?? song?.document ?? null;
+                                            if (!source) {
+                                                // No saved record AND no live draft: there is
+                                                // truly nothing here to keep. The offer was a
+                                                // moment stale, exactly like the ordinary `'none'`
+                                                // above.
+                                                return tx.finish('none');
+                                            }
+                                            const carried = keepMineAsNewSong(
+                                                tx,
+                                                scope,
+                                                documentId,
+                                                freshDocumentId,
+                                                operationId,
+                                                rows,
+                                                source,
+                                            );
+                                            // The candidate row described this divergence, and it
+                                            // is settled either way.
+                                            tx.table('meta').delete(
+                                                candidateKey(scope.ownerId, documentId),
+                                            );
+                                            if (song) {
+                                                // Nothing up there to mirror: the candidate IS the
+                                                // tombstone. Same cleanup as the refused `'gone'`
+                                                // branch below. Deleting a key that was never
+                                                // written — no saved record existed — is a safe
+                                                // no-op.
+                                                tx.table('songs').delete([
+                                                    scope.ownerId,
+                                                    documentId,
+                                                ]);
+                                                tx.table('meta').delete(
+                                                    deletionKey(scope.ownerId, documentId),
+                                                );
+                                            }
+                                            tx.finish({
+                                                conflict: 'gone',
+                                                documentId: freshDocumentId,
+                                                document: carried,
+                                                operationId,
+                                                adopted: null,
+                                            });
+                                        },
+                                    );
+                                },
+                            );
+                            return;
                         }
                         // `refused` came out of this queue, so it is not empty, and `operations()`
                         // sorted it — the last entry is the newest bytes this device committed.
@@ -982,76 +1204,21 @@ export class AccountSongbook {
                                     // way out of one. It stays exactly where it is, and is read
                                     // below as saying nothing about the id.
                                 }
-                                const now = new Date().toISOString();
-                                // `createdAt` is carried: this is the same piece of music under a
-                                // new identity, not a song written today. `updatedAt` moves,
-                                // because this IS a new commit and the songbook orders by it.
-                                //
-                                // The title is marked, mirroring `save(copy)`'s `— copy`: after a
-                                // `version` refusal BOTH lines sit in the songbook under the name
-                                // the musician gave the song, and two rows spelled identically is
-                                // not a resolution anybody can act on.
-                                const carried = snapshot({
-                                    ...latest,
-                                    id: freshDocumentId,
-                                    title: `${latest.title.slice(0, 150)} — kept`,
-                                    revision: 0,
-                                    createdAt: latest.createdAt,
-                                    updatedAt: now,
-                                });
-                                tx.table('songs').put({
-                                    ownerId: scope.ownerId,
-                                    documentId: freshDocumentId,
-                                    document: carried,
-                                    remoteRevision: null,
-                                } satisfies SavedSong);
-                                tx.table('operations').add({
-                                    ownerId: scope.ownerId,
-                                    documentId: freshDocumentId,
-                                    operationId,
-                                    localRevision: carried.revision,
-                                    snapshot: carried,
-                                    base: { revision: null },
-                                    wireBody: null,
-                                    status: 'queued',
-                                } satisfies SaveOperation);
                                 for (const operation of queue) {
                                     tx.table('operations').delete([
                                         scope.ownerId,
                                         operation.operationId,
                                     ]);
                                 }
-                                for (const row of rows) {
-                                    let moved: Draft;
-                                    try {
-                                        const draft = savedDraft(row, scope, documentId);
-                                        moved = {
-                                            ...draft,
-                                            documentId: freshDocumentId,
-                                            document: snapshot({
-                                                ...draft.document,
-                                                id: freshDocumentId,
-                                            }),
-                                            // The experiment is unchanged; what it is an
-                                            // experiment ON is the create above, so its base is
-                                            // that revision — always 0, because the create is
-                                            // always a create.
-                                            baseRevision: carried.revision,
-                                        };
-                                    } catch {
-                                        // One row this build cannot validate must not abort the
-                                        // only exit from a terminal conflict. It is left where it
-                                        // is rather than moved or destroyed: unreadable here is
-                                        // not the same as worthless, and nothing else has a copy.
-                                        continue;
-                                    }
-                                    tx.table('drafts').delete([
-                                        scope.ownerId,
-                                        documentId,
-                                        moved.writerId,
-                                    ]);
-                                    tx.table('drafts').put(moved);
-                                }
+                                const carried = keepMineAsNewSong(
+                                    tx,
+                                    scope,
+                                    documentId,
+                                    freshDocumentId,
+                                    operationId,
+                                    rows,
+                                    latest,
+                                );
                                 // A `version` or `deleted` observation described a divergence this
                                 // call has just settled. An `unsupported` one did not: it is this
                                 // device's only copy of a body it cannot read, and it is a fact

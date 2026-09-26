@@ -4,6 +4,7 @@ import {
     REMOTE_UPDATE_MESSAGES,
     V1_IMPORT_ACCOUNT_MESSAGES,
 } from '../lib/account/messages';
+import type { RemoteCandidateKind } from '../lib/account/sync-loop';
 import { arrangementOf, genreOf } from '../lib/documents';
 import { v1OfferDeclines } from '../lib/import-v1';
 import type { ChartDocument } from '../lib/runtime';
@@ -69,14 +70,16 @@ interface SongbookProps {
     /** Turns the account surfaces back on for this device, in place, with no reload. */
     onEnableAccounts: () => void;
     /**
-     * The account songs a newer version is waiting for (#1310) — `reconcile` preserved a remote
-     * advance rather than applying it over this device's unsaved work. Document ids, marked in the
-     * list so the state is visible from the one place a musician can see the whole library; the
-     * choice itself lives on the stand, where the song's own text is.
+     * The account songs `reconcile` preserved a remote observation for rather than applying it over
+     * this device's unsaved work (#1310, widened #1362 to the `'deleted'`/`'unsupported'` kinds
+     * that used to have no surface at all). Document id plus kind — the id decides WHICH row, the
+     * kind decides which of the three sentences it gets — marked in the list so the state is
+     * visible from the one place a musician can see the whole library; the choice itself (for the
+     * one adoptable kind) lives on the stand, where the song's own text is.
      *
      * Always empty for a guest songbook, which no account can advance underneath.
      */
-    newerInAccount: readonly string[];
+    remoteCandidates: readonly { id: string; kind: RemoteCandidateKind }[];
     /** The card at the top: the last-opened song (with any recovered draft), else a starter. */
     featured: ChartDocument | null;
     /** True when `featured` is the song the musician last had open. */
@@ -101,7 +104,7 @@ export function Songbook({
     accountFallback,
     accountsOff,
     onEnableAccounts,
-    newerInAccount,
+    remoteCandidates,
     featured,
     continued,
     busy,
@@ -115,9 +118,9 @@ export function Songbook({
     onImportV1,
     onDismissV1,
 }: SongbookProps) {
-    // A set, not `includes`: both this list and the account library are capped at 2,000, and the
+    // A map, not `.find`: both this list and the account library are capped at 2,000, and the
     // pair of them scanned against each other is the one place that product would be paid for.
-    const newer = new Set(newerInAccount);
+    const remoteCandidateKinds = new Map(remoteCandidates.map((row) => [row.id, row.kind]));
     return (
         <main className="home">
             <div className="home-intro">
@@ -232,45 +235,73 @@ export function Songbook({
                         <tbody>
                             {songs
                                 .filter((s) => s.title.toLowerCase().includes(search.toLowerCase()))
-                                .map((s) => (
-                                    <tr className="song-row" key={s.id}>
-                                        <td>
-                                            <button
-                                                className="song-link"
-                                                disabled={busy}
-                                                onClick={() => onOpenSong(s.id)}
-                                            >
-                                                <span className="song-glyph">♪</span>
-                                                <span>
-                                                    <span className="song-name">{s.title}</span>
-                                                    <span className="song-detail">
-                                                        {genreOf(s)} ·{' '}
-                                                        {accountLibrary
-                                                            ? 'In your account'
-                                                            : 'Saved locally'}
-                                                    </span>
-                                                    {/* #1310 — said here as well as on the stand
-                                                        because this is the only surface that shows
-                                                        the whole library at once, and the song it
-                                                        is about may not be the one open. */}
-                                                    {newer.has(s.id) && (
-                                                        <span
-                                                            className="song-marker"
-                                                            data-testid="song-newer-in-account"
-                                                        >
-                                                            {REMOTE_UPDATE_MESSAGES.marker}
+                                .map((s) => {
+                                    const candidateKind = remoteCandidateKinds.get(s.id) ?? null;
+                                    return (
+                                        <tr className="song-row" key={s.id}>
+                                            <td>
+                                                <button
+                                                    className="song-link"
+                                                    disabled={busy}
+                                                    onClick={() => onOpenSong(s.id)}
+                                                >
+                                                    <span className="song-glyph">♪</span>
+                                                    <span>
+                                                        <span className="song-name">{s.title}</span>
+                                                        <span className="song-detail">
+                                                            {genreOf(s)} ·{' '}
+                                                            {accountLibrary
+                                                                ? 'In your account'
+                                                                : 'Saved locally'}
                                                         </span>
-                                                    )}
-                                                </span>
-                                            </button>
-                                        </td>
-                                        <td className="song-key">
-                                            {arrangementOf(s).key}
-                                            {arrangementOf(s).isMinor ? 'm' : ''}
-                                        </td>
-                                        <td className="hide-mobile">{s.chart.performance.bpm}</td>
-                                    </tr>
-                                ))}
+                                                        {/* #1310, widened #1362 — said here as well
+                                                            as on the stand because this is the only
+                                                            surface that shows the whole library at
+                                                            once, and the song it is about may not be
+                                                            the one open. One row, one kind: a row is
+                                                            never marked for more than one candidate
+                                                            at a time. */}
+                                                        {candidateKind === 'version' && (
+                                                            <span
+                                                                className="song-marker"
+                                                                data-testid="song-newer-in-account"
+                                                            >
+                                                                {REMOTE_UPDATE_MESSAGES.marker}
+                                                            </span>
+                                                        )}
+                                                        {candidateKind === 'deleted' && (
+                                                            <span
+                                                                className="song-marker"
+                                                                data-testid="song-deleted-in-account"
+                                                            >
+                                                                {
+                                                                    REMOTE_UPDATE_MESSAGES.deletedMarker
+                                                                }
+                                                            </span>
+                                                        )}
+                                                        {candidateKind === 'unsupported' && (
+                                                            <span
+                                                                className="song-marker"
+                                                                data-testid="song-unsupported-in-account"
+                                                            >
+                                                                {
+                                                                    REMOTE_UPDATE_MESSAGES.unsupportedMarker
+                                                                }
+                                                            </span>
+                                                        )}
+                                                    </span>
+                                                </button>
+                                            </td>
+                                            <td className="song-key">
+                                                {arrangementOf(s).key}
+                                                {arrangementOf(s).isMinor ? 'm' : ''}
+                                            </td>
+                                            <td className="hide-mobile">
+                                                {s.chart.performance.bpm}
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
                         </tbody>
                     </table>
                     <p className="offline-note">

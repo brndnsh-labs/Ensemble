@@ -18,7 +18,11 @@
 
 import { useEffect, useSyncExternalStore } from 'react';
 import type { SessionState } from '../../lib/account/session';
-import { accountSync, type SyncSnapshot } from '../../lib/account/sync-loop';
+import {
+    accountSync,
+    type RemoteCandidateKind,
+    type SyncSnapshot,
+} from '../../lib/account/sync-loop';
 import { type Progress, projectSyncStatus, type StatusFacts } from '../../lib/sync/status';
 
 // Module scope keeps both references stable across renders, which is what `useSyncExternalStore`
@@ -155,6 +159,12 @@ export interface SyncStatusProps {
      * because the observation beside it describes the wrong library.
      */
     foreign: boolean;
+    /**
+     * The remote candidate `reconcile` preserved for the OPEN chart, if any (#1362) — the same
+     * value the stand's banner reads (`standCandidate?.kind`). Read only to correct the cloud
+     * fact below; the chip otherwise knows nothing about candidates.
+     */
+    candidateKind: RemoteCandidateKind | null;
     sync: SyncSnapshot;
 }
 
@@ -166,6 +176,7 @@ export function SyncStatus({
     shell,
     sounds,
     foreign,
+    candidateKind,
     sync,
 }: SyncStatusProps) {
     const observation = sync.observation;
@@ -187,15 +198,26 @@ export function SyncStatus({
     });
     const songs = counted('Songs', view.offline.documents);
     const soundFiles = counted('Sounds', view.offline.sounds);
+    // #1362 — `status.ts` reads the record's stale `remoteRevision`, never a candidate: a download
+    // that preserves a `'deleted'` candidate beside a HELD record (`commitDeleted`) never clears
+    // the record's own `remoteRevision`, on purpose — that field is what the record used to mirror,
+    // and a download does not get to edit the held record it declined to overwrite. So a clean
+    // mirror of a now-tombstoned song still projects as `'confirmed'`, and this is the one place
+    // that is corrected: the SAME words the refused-Save `'gone'` conflict already uses, because it
+    // is the same fact ("your account no longer has this song") reached by a different route.
+    const cloudLabel =
+        candidateKind === 'deleted' && view.cloud.status === 'confirmed'
+            ? CLOUD_LABELS.gone
+            : view.cloud.status === 'refused'
+              ? CLOUD_REFUSAL_LABELS[view.cloud.refused ?? 'refused']
+              : CLOUD_LABELS[view.cloud.status];
     return (
         <div className="sync-status" data-testid="sync-status">
             <span className="sync-fact" data-testid="sync-local">
                 {LOCAL_LABELS[view.local.status]}
             </span>
             <span className="sync-fact" data-testid="sync-cloud">
-                {view.cloud.status === 'refused'
-                    ? CLOUD_REFUSAL_LABELS[view.cloud.refused ?? 'refused']
-                    : CLOUD_LABELS[view.cloud.status]}
+                {cloudLabel}
                 {view.cloud.status === 'queued' && view.cloud.pendingCount !== null
                     ? ` (${view.cloud.pendingCount})`
                     : ''}
