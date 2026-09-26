@@ -836,6 +836,21 @@ html [hidden] {
 .more-band {
     margin-left: 3px;
 }
+/* Trade sits by the Soloist chip: hollow while off (the arrow isn't a muted lane, so it isn't
+   struck through), filled with the turn length while the band is trading with you. */
+.trade-toggle {
+    flex: 0 0 auto;
+    margin-left: -2px;
+}
+.trade-toggle.off span.label {
+    text-decoration: none;
+}
+.trade-note {
+    margin: 6px 0 0;
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.4;
+}
 .workspace-body {
     display: flex;
     flex: 1;
@@ -1715,6 +1730,9 @@ dialog textarea {
         height: 29px;
         width: 27px;
         margin: 0;
+    }
+    .trade-toggle {
+        flex: 0 0 auto;
     }
     .chart-scroll {
         padding: 17px 19px 32px;
