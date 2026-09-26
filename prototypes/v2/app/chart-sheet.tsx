@@ -1,6 +1,6 @@
 import type { SemanticScore } from '@engine/songbook/score-types';
 import type { ChartNotation } from '@engine/songbook/types';
-import { useRef } from 'react';
+import { type MouseEvent as ReactMouseEvent, useEffect, useRef, useState } from 'react';
 import { arrangementOf } from '../lib/documents';
 import type { ChartBlock, ChartChord, ChartMeasure } from '../lib/lead-sheet';
 import type { ChartDocument } from '../lib/runtime';
@@ -63,6 +63,9 @@ interface ChartSheetProps {
     playbackActive: boolean;
     totalBars: number;
     onToggleLoop: (sectionId: string | undefined) => void;
+    /** Section tap menu's "Start here" (#1417) — jumps playback to the section's first
+     * performed bar, starting it if stopped. */
+    onStartHere: (sectionId: string | undefined) => void;
     onEditSection: (block: ChartBlock) => void;
     onEditBar: (measure: ChartMeasure) => void;
     onAudition: (globalIndex: number) => void;
@@ -82,16 +85,72 @@ export function ChartSheet({
     playbackActive,
     totalBars,
     onToggleLoop,
+    onStartHere,
     onEditSection,
     onEditBar,
     onAudition,
 }: ChartSheetProps) {
     // Long-press bookkeeping for the section-letter loop gesture: the pending
     // timer so pointerup/leave/cancel can cancel it, and a suppression flag so
-    // the click that follows a fired long-press doesn't also fire the (reserved
-    // for #937) plain-tap handler.
+    // the click that follows a fired long-press doesn't also fire the plain-tap
+    // handler below (the section menu, #1417).
     const sectionLoopPress = useRef<number | null>(null);
     const suppressSectionTap = useRef(false);
+    // A plain tap opens this small menu (#1417) instead of the long-press/'L' loop
+    // toggle above, which it leaves untouched. One menu for the whole sheet, not
+    // one per section: cheaper, and only one can be open at a time anyway.
+    const [sectionMenu, setSectionMenu] = useState<{
+        id: string;
+        label: string;
+        top: number;
+        left: number;
+    } | null>(null);
+    const sectionMenuRef = useRef<HTMLDivElement>(null);
+    const sectionMenuTrigger = useRef<HTMLButtonElement | null>(null);
+
+    useEffect(() => {
+        if (!sectionMenu) {
+            return;
+        }
+        const first = sectionMenuRef.current?.querySelector<HTMLElement>('[role="menuitem"]');
+        first?.focus();
+        function closeOnOutsideClick(event: PointerEvent) {
+            if (!sectionMenuRef.current?.contains(event.target as Node)) {
+                setSectionMenu(null);
+            }
+        }
+        function closeOnEscape(event: KeyboardEvent) {
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                setSectionMenu(null);
+                sectionMenuTrigger.current?.focus();
+            }
+        }
+        document.addEventListener('pointerdown', closeOnOutsideClick);
+        document.addEventListener('keydown', closeOnEscape);
+        return () => {
+            document.removeEventListener('pointerdown', closeOnOutsideClick);
+            document.removeEventListener('keydown', closeOnEscape);
+        };
+    }, [sectionMenu]);
+
+    function openSectionMenu(event: ReactMouseEvent<HTMLButtonElement>, block: ChartBlock) {
+        if (!block.id) {
+            return;
+        }
+        const rect = event.currentTarget.getBoundingClientRect();
+        sectionMenuTrigger.current = event.currentTarget;
+        setSectionMenu({
+            id: block.id,
+            label: block.label || 'A',
+            top: rect.bottom + 6,
+            left: rect.left,
+        });
+    }
+    function closeSectionMenu() {
+        setSectionMenu(null);
+        sectionMenuTrigger.current?.focus();
+    }
     const notation = arrangementOf(current).notation;
     let barNumber = 0;
     return (
@@ -105,11 +164,13 @@ export function ChartSheet({
                             aria-pressed={loopedSectionId === block.id}
                             aria-label={`Section ${block.label || 'A'} · hold to practice-loop`}
                             aria-keyshortcuts="L"
+                            aria-haspopup="menu"
+                            aria-expanded={sectionMenu?.id === block.id}
                             onPointerDown={() => {
                                 // A long-press whose click never arrived (a
                                 // touch released off-target) must not leave
-                                // the flag set and swallow the NEXT tap —
-                                // which #937 will make meaningful.
+                                // the flag set and swallow the NEXT tap, which
+                                // opens the section menu below.
                                 suppressSectionTap.current = false;
                                 if (sectionLoopPress.current !== null) {
                                     window.clearTimeout(sectionLoopPress.current);
@@ -138,23 +199,24 @@ export function ChartSheet({
                                     sectionLoopPress.current = null;
                                 }
                             }}
-                            onClick={() => {
+                            onClick={(event) => {
                                 // A long-press above already acted and set
                                 // this flag; swallow the click that follows
-                                // it so the plain tap stays a no-op.
+                                // it so it doesn't ALSO open the menu.
                                 if (suppressSectionTap.current) {
                                     suppressSectionTap.current = false;
                                     return;
                                 }
-                                // Plain tap is intentionally a no-op: this
-                                // gesture is reserved for the banked #937
-                                // conductor lens ("lead, don't play"). Don't
-                                // wire a handler here for anything else.
+                                // A plain tap opens the section menu (#1417):
+                                // "Loop this section"/"Start here". Enter/Space
+                                // reach the same handler (native button
+                                // semantics), so no separate key handling here.
+                                openSectionMenu(event, block);
                             }}
                             onKeyDown={(e) => {
                                 // Long-press has no keyboard equivalent, so
-                                // 'l'/'L' is the keyboard path to the same
-                                // toggle. Enter/Space stay reserved for #937.
+                                // 'l'/'L' stays the keyboard path straight to
+                                // the loop toggle, bypassing the menu.
                                 if (e.key === 'l' || e.key === 'L') {
                                     e.preventDefault();
                                     onToggleLoop(block.id);
@@ -429,6 +491,38 @@ export function ChartSheet({
                 <span>Tap a chord to hear it while stopped.</span>
                 <span>{totalBars} bars · repeats continuously</span>
             </div>
+            {sectionMenu && (
+                <div
+                    ref={sectionMenuRef}
+                    role="menu"
+                    aria-label={`Section ${sectionMenu.label}`}
+                    className="popover section-menu"
+                    style={{ position: 'fixed', top: sectionMenu.top, left: sectionMenu.left }}
+                >
+                    <button
+                        type="button"
+                        role="menuitem"
+                        className="option"
+                        onClick={() => {
+                            onToggleLoop(sectionMenu.id);
+                            closeSectionMenu();
+                        }}
+                    >
+                        {loopedSectionId === sectionMenu.id ? 'Stop looping' : 'Loop this section'}
+                    </button>
+                    <button
+                        type="button"
+                        role="menuitem"
+                        className="option"
+                        onClick={() => {
+                            onStartHere(sectionMenu.id);
+                            closeSectionMenu();
+                        }}
+                    >
+                        Start here
+                    </button>
+                </div>
+            )}
         </article>
     );
 }

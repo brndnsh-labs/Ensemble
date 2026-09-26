@@ -87,6 +87,25 @@ export const test = base.extend<Record<never, never>, { previewServer: string }>
     baseURL: async ({ previewServer }, use) => {
         await use(previewServer);
     },
+    // Count-in (#1417) is device-local and defaults ON, so a fresh guest device would get one
+    // bar of clicks before every Play — real product behavior, but it would push back the
+    // first note/highlight/audio sample in every OTHER spec in this suite that presses Play
+    // without being about count-in at all. Seed the preference OFF here, the same way a real
+    // device that opened the Feel sheet once would read. Only when UNSET — an explicit write
+    // (the Feel sheet checkbox, `count-in.spec.ts`'s own subject) must survive a reload within
+    // the same test, not get silently put back on the next navigation.
+    page: async ({ page }, use) => {
+        await page.addInitScript(() => {
+            try {
+                if (localStorage.getItem('ensemble-v2-preview:count-in') === null) {
+                    localStorage.setItem('ensemble-v2-preview:count-in', '0');
+                }
+            } catch {
+                // Best effort, like the app's own preference reads/writes.
+            }
+        });
+        await use(page);
+    },
 });
 
 const API_DIR = path.resolve(__dirname, '../../v2-api');

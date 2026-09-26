@@ -93,6 +93,36 @@ export interface Loop {
     to: number;
 }
 
+/** One bar of count-in clicks: pure and audio-free, so it's unit-testable on its own. */
+export interface CountInPlan {
+    /** Seconds from the count-in's own start to each click — same length as the bar's pulses. */
+    times: number[];
+    /** Same accent scheme `BandHost`'s per-segment metronome uses: 1000 Hz on the downbeat,
+     * 800/600 by role otherwise. */
+    freqs: number[];
+    /** The bar's own length in seconds at `bpm` — how long the count-in runs, and so exactly
+     * how much the first real bar is pushed back from the moment Play was pressed. */
+    seconds: number;
+}
+
+/**
+ * One bar of clicks in the timeline's bar `fromBar`, at `bpm` — the chart's own meter and
+ * tempo, not a fixed 4/4. Goes through `secondsAt` like every other time computation here, so
+ * a fermata or tempo change elsewhere in the song can't skew a bar that has none of its own.
+ */
+export function countInPlan(timeline: Timeline, bpm: number, fromBar: number): CountInPlan {
+    const bar = timeline.bars[fromBar];
+    const barStart = secondsAt(timeline, bar.start, bpm);
+    const times = bar.meter.pulses.map(
+        (offset) => secondsAt(timeline, bar.start + offset, bpm) - barStart,
+    );
+    const freqs = bar.meter.pulses.map((_offset, i) =>
+        i === 0 ? 1000 : bar.meter.roles[i] === 'strong' ? 800 : 600,
+    );
+    const seconds = secondsAt(timeline, bar.start + bar.meter.barTicks, bpm) - barStart;
+    return { times, freqs, seconds };
+}
+
 function hz(midi: number): number {
     return 440 * 2 ** ((midi - 69) / 12);
 }
@@ -232,6 +262,14 @@ export class BandHost {
     private nextPass = 0;
     /** The barline where the last settings change is first heard, while it is still to come. */
     private change: { segment: Segment; tick: number } | null = null;
+    /** The one-bar count-in scheduled by `start()`, while it is still sounding. */
+    private countIn: {
+        start: number;
+        end: number;
+        times: number[];
+        /** Its clicks, scheduled up to a bar ahead: a Stop mid-count silences the rest. */
+        clicks: OscillatorNode[];
+    } | null = null;
 
     constructor(options: HostOptions) {
         this.options = options;
@@ -259,7 +297,20 @@ export class BandHost {
         }
     }
 
-    start(settings: BandSettings, bpm: number, fromTick = 0, loop: Loop | null = null): void {
+    /**
+     * `countIn` is one bar of clicks before the first segment, requested only by a fresh Play
+     * from stopped (`runtime.ts`'s `startBand`) and gated there on the `playback.countIn`
+     * preference — every other caller (a loop wrap's own `append`, `update`'s barline swap,
+     * `setScore`'s restart, a mid-song resume) passes nothing and gets the default `false`, so
+     * the chart's first bar starts on the beat it always did.
+     */
+    start(
+        settings: BandSettings,
+        bpm: number,
+        fromTick = 0,
+        loop: Loop | null = null,
+        countIn = false,
+    ): void {
         const audio = this.audio;
         if (!this.timeline || !audio) {
             throw new Error('The band has no chart or no audio yet.');
@@ -275,7 +326,18 @@ export class BandHost {
         this.nextPass = 0;
         this.resumeBar = null;
         const window = loop ? this.loopWindow(loop) : this.songWindow(this.barAt(fromTick));
-        this.append(window, audio.currentTime + 0.1, undefined);
+        let segmentStart = audio.currentTime + 0.1;
+        if (countIn) {
+            const plan = countInPlan(this.timeline, bpm, window.from);
+            const countInStart = segmentStart;
+            segmentStart = countInStart + plan.seconds;
+            const state = this.options.state();
+            const clicks = plan.times.map((offset, i) =>
+                this.click(audio, state, countInStart + offset, plan.freqs[i]),
+            );
+            this.countIn = { start: countInStart, end: segmentStart, times: plan.times, clicks };
+        }
+        this.append(window, segmentStart, undefined);
         this.timer = setInterval(() => this.pump(), TIMER_MS);
         this.pump();
     }
@@ -402,6 +464,31 @@ export class BandHost {
         return segment ? this.tickAt(segment, now) : null;
     }
 
+    /**
+     * The count-in beat sounding now (0-based: "1" is beat 0), or null when no count-in is
+     * running — either stopped, past it into the song, or `start()` was never asked for one.
+     * The chart shouldn't advance while this is non-null: `songTick()` already returns null for
+     * the same window, since the first segment's `start` is the moment the count-in ends.
+     */
+    countingInBeat(): number | null {
+        const audio = this.audio;
+        const countIn = this.countIn;
+        if (!audio || !countIn) {
+            return null;
+        }
+        const now = audio.currentTime;
+        if (now < countIn.start || now >= countIn.end) {
+            return null;
+        }
+        let beat = 0;
+        for (let i = 0; i < countIn.times.length; i++) {
+            if (countIn.start + countIn.times[i] <= now) {
+                beat = i;
+            }
+        }
+        return beat;
+    }
+
     /** The whole song, once through with an ending, for export. */
     render(settings: BandSettings): { events: BandEvent[]; timeline: Timeline } {
         if (!this.timeline) {
@@ -415,6 +502,15 @@ export class BandHost {
 
     private halt(): void {
         this.change = null;
+        // A Stop inside the count-in: its later clicks are already scheduled, so cancel them.
+        for (const osc of this.countIn?.clicks ?? []) {
+            try {
+                osc.stop();
+            } catch {
+                // Already ended, or never started in a stubbed context: nothing left to silence.
+            }
+        }
+        this.countIn = null;
         if (this.timer) {
             clearInterval(this.timer);
             this.timer = null;
@@ -575,21 +671,33 @@ export class BandHost {
                 }
                 segment.clicked = tick;
                 const freq = i === 0 ? 1000 : bar.meter.roles[i] === 'strong' ? 800 : 600;
-                const osc = audio.createOscillator();
-                const gain = audio.createGain();
-                osc.connect(gain);
-                const graph = state.playback.audioGraph as { master?: { gain: AudioNode } } | null;
-                gain.connect(graph?.master?.gain ?? audio.destination);
-                osc.frequency.setValueAtTime(freq, time);
-                gain.gain.setValueAtTime(0.15, time);
-                gain.gain.exponentialRampToValueAtTime(0.001, time + 0.05);
-                osc.start(time);
-                osc.stop(time + 0.05);
-                osc.onended = () => {
-                    gain.disconnect();
-                    osc.disconnect();
-                };
+                this.click(audio, state, time, freq);
             });
         }
+    }
+
+    /** One metronome beep — the count-in (`start()`) and the per-segment click above share it,
+     * so a count-in bar sounds exactly like the click track it leads into. */
+    private click(
+        audio: AudioContext,
+        state: EnsembleState,
+        time: number,
+        freq: number,
+    ): OscillatorNode {
+        const osc = audio.createOscillator();
+        const gain = audio.createGain();
+        osc.connect(gain);
+        const graph = state.playback.audioGraph as { master?: { gain: AudioNode } } | null;
+        gain.connect(graph?.master?.gain ?? audio.destination);
+        osc.frequency.setValueAtTime(freq, time);
+        gain.gain.setValueAtTime(0.15, time);
+        gain.gain.exponentialRampToValueAtTime(0.001, time + 0.05);
+        osc.start(time);
+        osc.stop(time + 0.05);
+        osc.onended = () => {
+            gain.disconnect();
+            osc.disconnect();
+        };
+        return osc;
     }
 }
