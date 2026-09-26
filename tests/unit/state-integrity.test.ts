@@ -109,10 +109,9 @@ describe('State Integrity Audit', () => {
             // AND no listener — genuinely inert. Removed in #1166; don't re-add an exception
             // without pointing at the consumer that justifies it.
             const exceptions = [
-                // Fires on every dispatch it's mixed into a chord-progression rebuild
-                // (`chords-engine.ts`'s `validateProgression`) so the v2 runtime's single
-                // generic `subscribe()` listener re-renders — genuinely no reducer `case`
-                // anywhere, by design, not an unwired signal.
+                // Dispatched from `chords-engine.ts`'s `validateProgression` purely so the
+                // v2 runtime's single generic `subscribe()` listener re-renders — genuinely
+                // no reducer `case` anywhere, by design, not an unwired signal.
                 'PROG_VALIDATED',
             ];
 
