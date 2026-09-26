@@ -30,8 +30,6 @@
         "test:coverage": "npx vitest run --coverage",
         "test:bench": "npx vitest run --config vitest.bench.config.ts tests/bench",
         "test:loop": "node scripts/test-loop.ts",
-        "drums:report": "tsx scripts/evaluate-groove.ts",
-        "ensemble:report": "tsx scripts/evaluate-ensemble.ts",
         "mix:report": "tsx scripts/mix-report.ts",
         "mix:diff": "tsx scripts/mix-diff.ts",
         "mix:analyze": "tsx scripts/mix-analyze.ts",

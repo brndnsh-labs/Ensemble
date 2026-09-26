@@ -13,10 +13,8 @@ import { togglePower } from '../../../public/controllers/instrument-controller.j
 import { validateProgression } from '../../../public/engine/chords-engine.js';
 import { dispatch, getState } from '../../../public/state.js';
 import { ACTIONS } from '../../../public/types.js';
-import * as WorkerClient from '../../../public/worker-client.js';
 
 vi.mock('../../../public/telemetry.js', () => ({ track: vi.fn() }));
-vi.mock('../../../public/worker-client.js', () => ({ flushWorker: vi.fn(), syncWorker: vi.fn() }));
 vi.mock('../../../public/engine/engine.js', () => ({
     killAllPianoNotes: vi.fn(),
     killBassBus: vi.fn(),
@@ -60,12 +58,5 @@ describe('bass toggle re-voices the comp (#1313)', () => {
         togglePower('bass');
         expect(bass.enabled).toBe(true);
         expect(getState().arranger.progression.map(rootSounds)).toEqual([false, false]);
-    });
-
-    it('ships the re-voiced progression to the worker before flushing', () => {
-        togglePower('bass');
-        const synced = WorkerClient.syncWorker.mock.invocationCallOrder[0];
-        const flushed = WorkerClient.flushWorker.mock.invocationCallOrder[0];
-        expect(synced).toBeLessThan(flushed);
     });
 });

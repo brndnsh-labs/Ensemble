@@ -16,7 +16,6 @@ import { getChordDetails, validateProgression } from '../../../public/engine/cho
 
 // Mock dependencies
 vi.mock('../../../public/ui.js', () => ({ ui: {} }));
-vi.mock('../../../public/worker-client.js', () => ({ syncWorker: vi.fn() }));
 
 describe('Harmonic Fuzz Testing', () => {
     beforeEach(() => {

@@ -36,21 +36,6 @@
 export const MUTE_ATTENUATION = 0.85;
 
 /**
- * True when `muted` marks a **non-note** — the chords lanes' boolean `true`, used for
- * CC carriers with no pitch. Ghost comp articulations carry their own reduced velocity
- * and `muted: false`, so a sentinel must never be forwarded as a note.
- *
- * Deliberately `=== true`, not `typeof muted === 'boolean'`: those same lanes write
- * `muted: false` on perfectly ordinary audible notes, so a check keyed on the boolean
- * *type* would silently drop them. And deliberately not truthiness either, which is
- * the bug this module exists to prevent — a numeric `1` is a palm-muted bass note that
- * genuinely sounds, and it must reach MIDI attenuated rather than not at all.
- */
-export function isSilentSentinel(muted: number | boolean | undefined): boolean {
-    return muted === true;
-}
-
-/**
  * Normalize either meaning to a 0..1 amount: a boolean maps to its extremes, a number
  * clamps (an out-of-range value would otherwise drive gain negative through the
  * `1 - amount * MUTE_ATTENUATION` below — anything above ~1.176 does).

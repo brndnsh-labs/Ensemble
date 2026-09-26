@@ -34,6 +34,17 @@ describe('Platform Utilities', () => {
         loopSpy.mockRestore();
     });
 
+    // The unlock must not depend on anything calling `initPlatform()` at load: the old
+    // engine's scheduler was the only caller, and deleting it silently lost the iOS unlock.
+    it('unlocks with a silent track even when nothing initialized the platform', async () => {
+        vi.resetModules();
+        const playSpy = vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined);
+        const fresh = await import('../../../public/platform.js');
+        fresh.unlockAudio();
+        expect(playSpy).toHaveBeenCalledTimes(1);
+        playSpy.mockRestore();
+    });
+
     it('should handle missing Audio constructor', () => {
         const originalAudio = global.Audio;
         delete global.Audio;

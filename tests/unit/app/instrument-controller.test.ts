@@ -9,7 +9,6 @@ import * as ChordsEngine from '../../../public/engine/chords-engine.js';
 import * as Engine from '../../../public/engine/engine.js';
 import { dispatch, getState } from '../../../public/state.js';
 import { ACTIONS } from '../../../public/types.js';
-import * as WorkerClient from '../../../public/worker-client.js';
 
 const { makeSoloistMock } = await vi.hoisted(
     async () => await import('../../utils/mock-soloist.js'),
@@ -41,11 +40,6 @@ vi.mock('../../../public/engine/chords-engine.js', () => ({
 
 vi.mock('../../../public/engine/synth-drums.js', () => ({
     loadDrumKit: vi.fn().mockResolvedValue(true),
-}));
-
-vi.mock('../../../public/worker-client.js', () => ({
-    flushWorker: vi.fn(),
-    syncWorker: vi.fn(),
 }));
 
 vi.mock('../../../public/state/persistence.js', () => ({
@@ -251,7 +245,7 @@ describe('Instrument Controller', () => {
     });
 
     describe('flushBuffers', () => {
-        it('should clear all buffers and call flushWorker', () => {
+        it('should clear all buffers and silence every lane', () => {
             const state = getState();
             state.bass.buffer.size = 1;
 
@@ -262,8 +256,6 @@ describe('Instrument Controller', () => {
             expect(Engine.killBassNote).toHaveBeenCalled();
             expect(Engine.killSoloistNote).toHaveBeenCalled();
             expect(Engine.killDrumNote).toHaveBeenCalled();
-
-            expect(WorkerClient.flushWorker).toHaveBeenCalled();
             expect(Engine.restoreGains).toHaveBeenCalled();
         });
     });
@@ -278,7 +270,6 @@ describe('Instrument Controller', () => {
             });
             expect(Engine.killAllPianoNotes).toHaveBeenCalled();
             expect(Engine.killChordBus).toHaveBeenCalled();
-            expect(WorkerClient.syncWorker).toHaveBeenCalled();
             expect(mockTrack).toHaveBeenCalledWith('instrument_toggled', {
                 instrument: 'chords',
             });
@@ -309,9 +300,9 @@ describe('Instrument Controller', () => {
         });
 
         // #1313 — chord voicings are baked at parse time and depend on whether a bass
-        // line is sounding, so a bass toggle must re-voice BEFORE the worker sync, and
-        // the flush must come last and cover every re-voiced lane (refreshArrangerUI's order).
-        it('re-voices the progression on a bass toggle: validate -> sync -> flush re-voiced lanes', () => {
+        // line is sounding, so a bass toggle must re-voice, and the flush must cover every
+        // re-voiced lane.
+        it('re-voices the progression on a bass toggle, then flushes the re-voiced lanes', () => {
             InstrumentController.togglePower('bass');
 
             const order = (fn) => fn.mock.invocationCallOrder[0];
@@ -323,10 +314,8 @@ describe('Instrument Controller', () => {
             expect(passedState.arranger).toBeDefined();
             expect(order(dispatch)).toBeLessThan(order(ChordsEngine.validateProgression));
             expect(order(ChordsEngine.validateProgression)).toBeLessThan(
-                order(WorkerClient.syncWorker),
+                order(Engine.killAllPianoNotes),
             );
-            expect(order(WorkerClient.syncWorker)).toBeLessThan(order(WorkerClient.flushWorker));
-            expect(WorkerClient.flushWorker).toHaveBeenCalledTimes(1);
             // The comp and pads read the re-voiced progression too...
             expect(Engine.killAllPianoNotes).toHaveBeenCalled();
             expect(Engine.killHarmonyNote).toHaveBeenCalled();

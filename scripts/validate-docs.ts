@@ -87,8 +87,6 @@ const DOCS_TO_SCAN = [
     '.github/SECURITY.md',
     '.github/CODE_OF_CONDUCT.md',
     'docs/README.md',
-    'docs/guides/WORKER_CONTRACT.md',
-    'docs/guides/ENSEMBLE_COORDINATION.md',
     'docs/guides/REFERENCE_TUNING.md',
     'docs/guides/PERFORMANCE_GUIDELINES.md',
     'tests/README.md',
@@ -140,79 +138,12 @@ const VALID_LINK_PREFIXES = [
     'scripts/',
 ];
 
-const REGISTER_DOCS = [
-    'CLAUDE.md',
-    'docs/guides/WORKER_CONTRACT.md',
-    'docs/guides/ENSEMBLE_COORDINATION.md',
-];
-
 /**
  * @param {string} filePath
  * @returns {string}
  */
 function readText(filePath) {
     return fs.readFileSync(filePath, 'utf-8');
-}
-
-/**
- * @param {string} configContent
- * @returns {string[]}
- */
-/**
- * @param {string} engineContent
- * @returns {{
- *   bassMin: number,
- *   bassMax: number,
- *   chordMin: number,
- *   chordMax: number,
- *   soloFloor: number,
- *   soloClampMin: number,
- *   soloClampMax: number
- * }}
- */
-function extractRegisterSlotting(engineContent) {
-    const slottingStart = engineContent.indexOf('export function enforceRegisterSlotting');
-    const slottingContent = slottingStart >= 0 ? engineContent.slice(slottingStart) : engineContent;
-    const bassMatch = /case 'bass':[\s\S]*?smoothOctaveClamp\(midi,\s*(\d+),\s*(\d+)/.exec(
-        slottingContent,
-    );
-    const chordMatch = /case 'chords':[\s\S]*?smoothOctaveClamp\(midi,\s*(\d+),\s*(\d+)/.exec(
-        slottingContent,
-    );
-    const soloMatch =
-        /case 'soloist':[\s\S]*?if \(midi < (\d+)\)[\s\S]*?smoothOctaveClamp\(midi,\s*(\d+),\s*(\d+)/.exec(
-            slottingContent,
-        );
-
-    if (!bassMatch || !chordMatch || !soloMatch) {
-        throw new Error('Unable to extract register slotting rules from coordination-engine.ts');
-    }
-
-    return {
-        bassMin: Number(bassMatch[1]),
-        bassMax: Number(bassMatch[2]),
-        chordMin: Number(chordMatch[1]),
-        chordMax: Number(chordMatch[2]),
-        soloFloor: Number(soloMatch[1]),
-        soloClampMin: Number(soloMatch[2]),
-        soloClampMax: Number(soloMatch[3]),
-    };
-}
-
-/**
- * @param {string} docPath
- * @param {RegExp} pattern
- * @param {string} message
- * @returns {boolean}
- */
-function ensureDocPattern(docPath, pattern, message) {
-    const content = readText(docPath);
-    const normalizedContent = content.replace(/\s+/g, ' ');
-    if (pattern.test(content) || pattern.test(normalizedContent)) {
-        return false;
-    }
-    console.error(`❌ [${docPath}] ${message}`);
-    return true;
 }
 
 /**
@@ -291,39 +222,6 @@ function allowsDocRelativeLinks(docDir) {
  */
 function docLinkExists(cleanPath, docDir) {
     return fs.existsSync(cleanPath) || fs.existsSync(path.resolve(docDir, cleanPath));
-}
-
-function validateRegisterSlottingDocs() {
-    let hasError = false;
-    const slotting = extractRegisterSlotting(readText('public/engine/coordination-engine.ts'));
-    const rangeSep = '(?:[–-]|to)';
-
-    for (const docPath of REGISTER_DOCS) {
-        hasError =
-            ensureDocPattern(
-                docPath,
-                new RegExp(`Bass[^\\n]*${slotting.bassMin}\\s*${rangeSep}\\s*${slotting.bassMax}`),
-                `Missing live bass slot ${slotting.bassMin}-${slotting.bassMax}.`,
-            ) || hasError;
-        hasError =
-            ensureDocPattern(
-                docPath,
-                new RegExp(
-                    `Chords(?:\\/Harmony)?[^\\n]*${slotting.chordMin}\\s*${rangeSep}\\s*${slotting.chordMax}`,
-                ),
-                `Missing live chord slot ${slotting.chordMin}-${slotting.chordMax}.`,
-            ) || hasError;
-        hasError =
-            ensureDocPattern(
-                docPath,
-                new RegExp(
-                    `Soloist(?=[^\\n]*${slotting.soloFloor})(?=[^\\n]*${slotting.soloClampMin}\\s*${rangeSep}\\s*${slotting.soloClampMax})`,
-                ),
-                `Missing live soloist clamp behavior (${slotting.soloFloor} floor, ${slotting.soloClampMin}-${slotting.soloClampMax} priority lane).`,
-            ) || hasError;
-    }
-
-    return hasError;
 }
 
 function validateDocs() {
@@ -436,10 +334,6 @@ function validateDocs() {
             }
         }
     }
-
-    console.log('🔍 Phase 3: Checking Semantic Drift...');
-
-    hasError = validateRegisterSlottingDocs() || hasError;
 
     if (hasError) {
         console.log('\n❌ Documentation validation FAILED.');

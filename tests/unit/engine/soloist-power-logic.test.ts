@@ -36,7 +36,6 @@ vi.mock('../../../public/state.js', () => {
 
 // Mock dependencies
 vi.mock('../../../public/state/persistence.js', () => ({ saveCurrentState: vi.fn() }));
-vi.mock('../../../public/worker-client.js', () => ({ syncWorker: vi.fn(), flushWorker: vi.fn() }));
 vi.mock('../../../public/engine/engine.js', () => ({
     restoreGains: vi.fn(),
     killSoloistNote: vi.fn(),

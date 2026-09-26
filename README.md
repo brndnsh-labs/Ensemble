@@ -52,7 +52,6 @@ Run `npm run validate` and the app suite before opening a PR. Musical changes sh
 
 **Analysis & audit tooling:**
 
-- `npm run ensemble:report -- --genre=Jazz --seeds=ALPHA,BETA` — compact multi-seed ensemble audit as JSON.
 - `npm run mix:report -- --jsonl --scene=jazz-ride --seeds=ALPHA,BETA` — rendered-audio metrics as JSONL for a multi-seed scene sweep. It builds and serves the app itself. `--write-wav=tmp/mix-render` also drops one `.wav` per scene/stem/seed so renders can be auditioned without the live app.
 - `npm run --silent mix:diff -- before.json after.json` — compares two `mix:report --json` outputs and flags stems whose dynamics or spectral balance moved past a threshold (defaults: ±1.5 dB, ±5% spectral, ±1.5 spikes/sec).
 - `npm run --silent audition-link -- --scene=jazz-ride --seed=ALPHA` — builds a link that opens a named scene's chart, key, meter, tempo and genre in the app (the v2 dev server by default). See [`docs/guides/listening-gate-tools.md`](docs/guides/listening-gate-tools.md).
