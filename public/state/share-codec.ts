@@ -13,8 +13,9 @@
  * runs one way only, share-codec → sanitize, never back).
  */
 
-import { TIME_SIGNATURES } from '../config.js';
+import { KEY_ORDER, TIME_SIGNATURES } from '../config.js';
 import { escapeHTML, stripDangerousChars } from '../sanitize.js';
+import { normalizeKey } from '../utils.js';
 import type { Section } from './arranger.js';
 
 /**
@@ -99,6 +100,12 @@ export function compressSections(sections: Section[]): string {
  * Strictly decompresses a Base64 section payload. Callers that need to reject
  * invalid persisted records use the null result instead of fabricating data.
  */
+/** A share-URL section key as `validateSections` accepts it: a normalized KEY_ORDER member, else ''. */
+function safeSectionKey(raw: string): string {
+    const key = normalizeKey(raw);
+    return KEY_ORDER.includes(key) ? key : '';
+}
+
 export function tryDecompressSections(str: string): Section[] | null {
     try {
         if (!str || typeof str !== 'string') {
@@ -140,16 +147,11 @@ export function tryDecompressSections(str: string): Section[] | null {
                 id: generateId(),
                 label: safeLabel,
                 value: safeValue,
-                key: typeof s.k === 'string' ? escapeHTML(s.k) : '',
+                // Same keyspace as `validateSections` (#1132): a normalized KEY_ORDER member,
+                // else ''. An unchecked key would carry 'constructor' and friends into state.
+                key: typeof s.k === 'string' ? safeSectionKey(s.k) : '',
                 isMinor: typeof s.m === 'number' ? s.m === 1 : undefined,
                 repeat: Math.min(Math.max(1, parseInt(s.r, 10) || 1), 64), // Clamp repeats
-                // Membership, not just length (#1258). `decompressSections`'s output goes
-                // straight into state with no `validateSections` pass, so this is the ONLY
-                // guard on the `?s=` path — and '__proto__' (9), 'toString' (8) and
-                // 'valueOf' (7) all slipped under a `length < 10` check. TIME_SIGNATURES is
-                // null-prototype now so the consequence is already neutralized downstream,
-                // but two readers of one field disagreeing on its keyspace is the defect:
-                // `validateSections` requires table membership, so this should too.
                 // Membership, not just length (#1258). `decompressSections`'s output goes
                 // straight into state with no `validateSections` pass, so this is the ONLY
                 // guard on the `?s=` path — and '__proto__' (9), 'toString' (8) and
