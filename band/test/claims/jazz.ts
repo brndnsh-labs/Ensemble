@@ -70,14 +70,21 @@ export const jazz = defineClaims({
             ],
         },
         {
-            take: { lead: 'trades' },
+            take: { trade: { with: 'drums', bars: 4 } },
             claims: [
-                ['tradeLeadPlays', 0.95, 1, 'the horn plays each of its fours through'],
+                ['tradeYourTurn', 1, 1, 'your four are yours: no sax, and the band keeps time'],
                 ['tradeBandLaysOut', 1, 1, "the drummer's four are the drums alone"],
-                ['tradeDrumsSolo', 0.95, 1, 'a solo, not the time, with the foot on 2 and 4'],
+                ['tradeDrumsSolo', 0.95, 1, 'a solo, not the time, with the foot still going'],
                 ['tradeDrumMotif', 0.9, 1, "the drummer's idea comes back an eighth later"],
                 ['tradeDrumVerbatim', 0, 0.1, 'developed, not repeated'],
                 ['tradeBackOnCrash', 1, 1, 'the band comes back in on a crash'],
+            ],
+        },
+        {
+            take: { trade: { with: 'lead', bars: 4 } },
+            claims: [
+                ['tradeLeadPlays', 0.95, 1, 'the sax plays each of its fours through'],
+                ['tradeYourTurn', 1, 1, 'then it lays out, and the band keeps comping for you'],
                 ['leadShortShare', 0.6, 0.95, 'bebop lines in its fours'],
             ],
         },
@@ -85,9 +92,7 @@ export const jazz = defineClaims({
             take: { lead: 'solo' },
             claims: [
                 ['leadLongBreath', 0, 0.12, 'breaths, not gaps: two empty bars are rare'],
-                // 0.198: the third chorus's last phrase keeps the heat for the fours instead of
-                // winding down (it did, at 0.2+, before jazz traded).
-                ['leadRestShare', 0.18, 0.5, 'the solo breathes between phrases'],
+                ['leadRestShare', 0.2, 0.5, 'the solo breathes between phrases'],
                 ['leadShortShare', 0.6, 0.95, 'bebop: running eighth-note lines'],
                 ['leadChordToneOnBeats', 0.72, 1, 'chord tones on the beats of a run'],
                 ['leadChangeGuideTones', 0.6, 1, 'changes land on guide tones'],

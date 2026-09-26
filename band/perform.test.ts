@@ -1,5 +1,5 @@
-import { CYCLE, cycleLength, leadRole } from './arrange/cycle.js';
-import { DEFAULT_SETTINGS, type PitchedNote, PPQ } from './core/types.js';
+import { leadRole } from './arrange/cycle.js';
+import { DEFAULT_SETTINGS, type PitchedNote, PPQ, type TradeSettings } from './core/types.js';
 import { chordAt, compileTimeline } from './form/timeline.js';
 import { performPass } from './perform.js';
 import { FIXTURES, score } from './test/scores.js';
@@ -160,94 +160,131 @@ describe('comp instruments', () => {
     });
 });
 
-describe('trading fours', () => {
+describe('trading with the player', () => {
     const lanes = { drums: true, bass: true, comp: true, lead: true };
     const jazz = { ...DEFAULT_SETTINGS, style: 'jazz' as const, lanes, lead: 'sax' as const };
+    const fours = (w: TradeSettings['with']): TradeSettings => ({ with: w, bars: 4 });
     type Timeline = ReturnType<typeof compileTimeline>;
-    const turns = (timeline: Timeline, pass: number) =>
+    type Events = ReturnType<typeof performPass>['events'];
+    /** One letter per turn: B the band's, Y yours, - no trade. */
+    const turns = (timeline: Timeline, pass: number, trade: TradeSettings) =>
         timeline.bars
-            .filter((bar) => bar.phrase.bar === 0)
-            .map((bar) => {
-                const role = leadRole(timeline, bar.index, pass, true);
-                return role.kind === 'trade' ? (role.turn === 'lead' ? 'L' : 'D') : '-';
-            })
+            .map((bar) => leadRole(timeline, bar.index, pass, trade))
+            .map((role, i) =>
+                role.kind !== 'trade'
+                    ? i === 0
+                        ? '-'
+                        : ''
+                    : role.from !== i
+                      ? ''
+                      : role.turn === 'band'
+                        ? 'B'
+                        : 'Y',
+            )
             .join('');
-    const drummers = (timeline: Timeline, pass: number) =>
+    const drummerBars = (timeline: Timeline, pass: number) =>
         timeline.bars
             .filter((bar) => {
-                const role = leadRole(timeline, bar.index, pass, true);
-                return role.kind === 'trade' && role.turn === 'drums';
+                const role = leadRole(timeline, bar.index, pass, fours('drums'));
+                return role.kind === 'trade' && role.turn === 'band';
             })
             .map((bar) => bar.index);
+    const soundingIn = (events: Events, timeline: Timeline, index: number, lane: string) => {
+        const bar = timeline.bars[index];
+        const end = bar.start + bar.meter.barTicks;
+        return events.filter(
+            (e) => e.lane === lane && e.tick < end && e.tick + (e as PitchedNote).dur > bar.start,
+        );
+    };
     const rhythmChanges = compileTimeline(FIXTURES.rhythmChanges);
     const blues = compileTimeline(FIXTURES.blues);
+    const popSong = compileTimeline(FIXTURES.popSong);
 
-    it('trades horn first and drummer last, over two choruses when the chorus is odd', () => {
-        expect(cycleLength(rhythmChanges, true)).toBe(CYCLE + 1);
-        expect(turns(rhythmChanges, CYCLE)).toBe('LDLDLDLD');
-        // A 12-bar blues is three fours: it trades across 24 bars.
-        expect(cycleLength(blues, true)).toBe(CYCLE + 2);
-        expect(turns(blues, CYCLE)).toBe('LDL');
-        expect(turns(blues, CYCLE + 1)).toBe('DLD');
-        expect(leadRole(blues, 0, CYCLE + 2, true).kind).toBe('head');
-        expect(cycleLength(blues, false)).toBe(CYCLE);
+    it('trades after the head, the band first, on the form, running on across choruses', () => {
+        expect(turns(rhythmChanges, 0, fours('lead'))).toBe('-');
+        expect(turns(rhythmChanges, 1, fours('lead'))).toBe('BYBYBYBY');
+        // A 12-bar blues is three fours: the next chorus starts where the last left off.
+        expect(turns(blues, 1, fours('lead'))).toBe('BYB');
+        expect(turns(blues, 2, fours('lead'))).toBe('YBY');
+        expect(turns(blues, 1, { with: 'lead', bars: 2 })).toBe('BYBYBY');
+        expect(turns(blues, 1, { with: 'lead', bars: 8 })).toBe('BY');
+        // The intro is the band's; the turns start on the verse.
+        const role = leadRole(popSong, 4, 1, fours('lead'));
+        expect(leadRole(popSong, 0, 1, fours('lead')).kind).toBe('rest');
+        expect(role.kind === 'trade' && role.from).toBe(4);
     });
 
-    it("leaves the drummer's four to the drums, even an organ's held chord", () => {
-        const bars = drummers(rhythmChanges, CYCLE);
+    it("with the soloist: it plays the band's turns and lays out for yours", () => {
+        const trade = fours('lead');
+        const { events } = performPass(
+            rhythmChanges,
+            { ...jazz, trade },
+            { pass: 1, looping: true },
+        );
+        for (const bar of rhythmChanges.bars) {
+            const role = leadRole(rhythmChanges, bar.index, 1, trade);
+            const lead = soundingIn(events, rhythmChanges, bar.index, 'lead');
+            if (role.kind === 'trade' && role.turn === 'you') {
+                expect(lead, `bar ${bar.index}`).toEqual([]);
+                expect(events.some((e) => e.lane === 'bass' && e.bar === bar.index)).toBe(true);
+            }
+        }
+        expect(events.some((e) => e.lane === 'lead')).toBe(true);
+    });
+
+    it("with the drummer: his turns are the drums alone, even an organ's held chord", () => {
+        const bars = drummerBars(rhythmChanges, 1);
+        expect(bars.length).toBeGreaterThan(0);
         for (const seed of ['a', 'b', 'c', 'd']) {
             const { events } = performPass(
                 rhythmChanges,
-                { ...jazz, seed, comp: 'organ' },
-                { pass: CYCLE, looping: true },
+                { ...jazz, seed, comp: 'organ', trade: fours('drums') },
+                { pass: 1, looping: true },
             );
+            expect(events.some((e) => e.lane === 'lead')).toBe(false);
             for (const index of bars) {
-                const bar = rhythmChanges.bars[index];
-                const end = bar.start + bar.meter.barTicks;
-                const sounding = events.filter(
-                    (e) => e.lane !== 'drums' && e.tick < end && e.tick + e.dur > bar.start,
+                const others = events.filter(
+                    (e) =>
+                        e.lane !== 'drums' && soundingIn([e], rhythmChanges, index, e.lane).length,
                 );
-                expect(sounding, `seed ${seed} bar ${index}`).toEqual([]);
+                expect(others, `seed ${seed} bar ${index}`).toEqual([]);
             }
         }
     });
 
-    it('lets nothing ring across the barline into fours that open with the drummer', () => {
-        // The blues' second chorus of fours opens with the drums; so does nothing else, but
-        // the solo chorus before the fours ends into the horn. Both boundaries are checked.
-        for (const pass of [CYCLE - 1, CYCLE]) {
-            for (const seed of 'abcdefghijklmnop') {
-                for (const comp of ['piano', 'organ'] as const) {
-                    const { events } = performPass(
-                        blues,
-                        { ...jazz, seed, comp, intensity: 0.8 },
-                        { pass, looping: true },
-                    );
-                    const opensWithDrums = turns(blues, pass + 1)[0] === 'D';
-                    const over = events.filter(
-                        (e) => e.lane !== 'drums' && e.tick + e.dur > blues.ticks,
-                    );
-                    if (opensWithDrums) {
-                        expect(over, `pass ${pass} seed ${seed} ${comp}`).toEqual([]);
-                    }
+    it('lets nothing ring from the head into the drummer taking the first turn', () => {
+        for (const seed of 'abcdefghijklmnop') {
+            for (const comp of ['piano', 'organ'] as const) {
+                const { events } = performPass(
+                    blues,
+                    { ...jazz, seed, comp, intensity: 0.8, trade: fours('drums') },
+                    { pass: 0, looping: true },
+                );
+                const over = events.filter(
+                    (e) => e.lane !== 'drums' && e.tick + e.dur > blues.ticks,
+                );
+                expect(over, `seed ${seed} ${comp}`).toEqual([]);
+            }
+        }
+    });
+
+    it('resumes at any barline of a traded pass exactly as the full pass', () => {
+        for (const trade of [fours('drums'), fours('lead'), { with: 'lead', bars: 2 } as const]) {
+            for (const pass of [1, 2]) {
+                const settings = { ...jazz, trade };
+                const full = performPass(rhythmChanges, settings, { pass, looping: true });
+                for (const from of [5, 6, 12, 13]) {
+                    const resumed = performPass(rhythmChanges, settings, {
+                        pass,
+                        looping: true,
+                        memory: full.snapshots[from],
+                        window: { from, to: rhythmChanges.bars.length, wrapTo: 0 },
+                    });
+                    expect(
+                        JSON.stringify(resumed.events),
+                        `${trade.with} ${trade.bars}s pass ${pass} from ${from}`,
+                    ).toBe(JSON.stringify(full.events.filter((e) => e.bar >= from)));
                 }
-            }
-        }
-    });
-
-    it('resumes at any barline of the fours and around them exactly as the full pass', () => {
-        for (const pass of [CYCLE, CYCLE + 1, CYCLE + 3]) {
-            const full = performPass(rhythmChanges, jazz, { pass, looping: true });
-            for (const from of [5, 6, 12, 13]) {
-                const resumed = performPass(rhythmChanges, jazz, {
-                    pass,
-                    looping: true,
-                    memory: full.snapshots[from],
-                    window: { from, to: rhythmChanges.bars.length, wrapTo: 0 },
-                });
-                expect(JSON.stringify(resumed.events), `pass ${pass} from ${from}`).toBe(
-                    JSON.stringify(full.events.filter((e) => e.bar >= from)),
-                );
             }
         }
     });
@@ -259,39 +296,54 @@ describe('trading fours', () => {
                     { label: 'A', bars: 'Dm7 | G7 | Cmaj7 | C6 | Dm7 | G7 | Cmaj7 | C6', meter },
                 ]),
             );
-            const pass = CYCLE;
             const time = performPass(timeline, jazz, { pass: 1, looping: true }).events;
-            const fours = performPass(timeline, jazz, { pass, looping: true }).events;
-            const foot = (events: typeof time, bar: number) =>
+            const traded = performPass(
+                timeline,
+                { ...jazz, trade: fours('drums') },
+                { pass: 1, looping: true },
+            ).events;
+            const foot = (events: Events, bar: number) =>
                 events
                     .filter((e) => e.lane === 'drums' && e.piece === 'hatPedal' && e.bar === bar)
                     .map((e) => e.tick);
-            const bars = drummers(timeline, pass);
+            const bars = drummerBars(timeline, 1);
             expect(bars.length, meter).toBeGreaterThan(0);
             for (const bar of bars) {
-                expect(foot(fours, bar), `${meter} bar ${bar}`).toEqual(foot(time, bar));
+                expect(foot(traded, bar), `${meter} bar ${bar}`).toEqual(foot(time, bar));
             }
         }
     });
 
-    it('trades only with the lead on, over the whole song, in a style that trades', () => {
-        const bars = drummers(rhythmChanges, CYCLE);
+    it("doesn't trade in a practice loop, without its partner, or where the drummer can't solo", () => {
+        const plain = performPass(rhythmChanges, jazz, { pass: 1, looping: true }).events;
         const cases = [
-            { settings: { ...jazz, lanes: { ...lanes, lead: false } }, window: undefined },
-            { settings: jazz, window: { from: 0, to: 8, wrapTo: 0 } },
-            { settings: { ...jazz, style: 'bossa' as const }, window: undefined },
+            {
+                settings: { ...jazz, trade: fours('lead'), lanes: { ...lanes, lead: false } },
+                window: undefined,
+            },
+            {
+                settings: { ...jazz, trade: fours('drums'), lanes: { ...lanes, drums: false } },
+                window: undefined,
+            },
+            { settings: { ...jazz, trade: fours('drums') }, window: { from: 0, to: 8, wrapTo: 0 } },
+            {
+                settings: { ...jazz, style: 'bossa' as const, trade: fours('drums') },
+                window: undefined,
+            },
         ];
         for (const { settings, window } of cases) {
             const { events } = performPass(rhythmChanges, settings, {
-                pass: CYCLE,
+                pass: 1,
                 looping: true,
                 window,
             });
-            const played = bars.filter((i) => !window || i < window.to);
+            const bars = drummerBars(rhythmChanges, 1).filter((i) => !window || i < window.to);
             expect(
-                played.every((i) => events.some((e) => e.lane === 'bass' && e.bar === i)),
-                settings.style,
+                bars.every((i) => events.some((e) => e.lane === 'bass' && e.bar === i)),
+                JSON.stringify(settings.trade) + settings.style,
             ).toBe(true);
         }
+        // And with the soloist on but no trade, pass 1 is a solo chorus as before.
+        expect(plain.some((e) => e.lane === 'lead')).toBe(true);
     });
 });

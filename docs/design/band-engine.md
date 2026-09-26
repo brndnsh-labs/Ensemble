@@ -147,23 +147,30 @@ expression devices take turns rather than stack; one peak note per cycle.
     the head can return.
   - An intro is the band's: the lead enters after it. A section labelled Solo is a solo on any
     pass.
-  - **Trading fours** (`Style.trades`; jazz). After the third solo chorus come the fours,
-    then the head: head, solo, solo, solo, fours, head… The phrase slots alternate between
-    the lead and the drummer, horn first and drummer last, so the drummer's four set up the
-    head. A chorus with an odd number of slots trades across two choruses (a 12-bar blues
-    trades over 24 bars: L D L, D L D). The third solo chorus doesn't wind down before the
-    fours; the exchange keeps its heat. On the drummer's turn the bass, the comp and the lead
-    lay out, and the drum idiom plays a solo in place of the time (`DrumBook.trade`), over
-    the time's own hi-hat foot, in any meter. The jazz drummer states a two-beat motif on the
-    one (the band has just dropped out), displaces it by an eighth onto the toms, plays it as
-    accents in a stream of eighths, then runs home down the three toms, louder as he goes, to
-    a shot on the "and" of 4. The band comes back in on a crash. The lead's four are one
-    phrase played through to an arrival, busy and a little high, never the cycle's peak.
-    Nothing rings into the drummer's four: the organ's hold stops, the comp doesn't
-    anticipate into it and the bass doesn't approach it, including across the barline into
-    the next pass (`performPass` takes the wrap bar's lanes from the next pass's plan). A
-    practice loop doesn't trade, and neither does a band without its lead; a pass resumed
-    at a barline (a settings change) does.
+  - **Trading with the player** (`BandSettings.trade`, DECISION 2026-09-25). The player
+    picks who to trade with and how long each turn is: 2, 4 or 8 bars. After the head, every
+    time through is traded: the band first (so the player has a phrase to answer), then you,
+    the turns counted from the top of each chorus (the intro is the band's) and running on
+    across choruses (a 12-bar blues in fours: B Y B, Y B Y).
+    - **With the soloist:** it plays the band's turns, one phrase played through to an
+      arrival (busy, or calmer in a spacious style), and lays out for yours while the band
+      keeps comping.
+    - **With the drummer** (a style whose drum idiom solos, `DrumBook.trade`; jazz): the bass
+      and comp lay out for his turn and comp for yours; the soloist is silent throughout (you
+      are the soloist). He solos over the time's own hi-hat foot, in any meter: a two-beat
+      motif stated on the one, displaced by an eighth onto the toms, played as accents in a
+      stream of eighths, then a run home down the three toms, louder as it goes, to a shot on
+      the "and" of 4 (eights say it twice; twos are a statement and the run home). The band
+      comes back on a crash.
+    - Nothing rings into the drummer's turn: the organ's hold stops, the comp doesn't
+      anticipate into it and the bass doesn't approach it, including across the barline
+      into the next pass (`performPass` takes the wrap bar's lanes from the next pass's plan).
+    - No trading in a practice loop, without the partner (the soloist off, or the drums off),
+      or with the drummer in a style whose drummer doesn't solo. A pass resumed at a barline
+      (a settings change) trades exactly as the full pass.
+    - Why it isn't automatic: an earlier cut had the band trade fours with the drummer on
+      its own after three solo choruses. Brandon's call: the band dropping out unasked doesn't
+      fit a practice app. Trading is something the player asks for.
   - The cycle is the arrangement's (`arrange/cycle.ts`): the plan carries each bar's lead role
     (`BarPlan.lead`), so the lead, the drummer and the rhythm section agree on whose turn it
     is.

@@ -54,6 +54,11 @@ export interface Idiom<E, M> {
      * never held). Absent everywhere else: an organ holds.
      */
     percussive?: boolean;
+    /**
+     * A drum idiom that can take a solo when the player trades with the drummer
+     * (`DrumBook.trade`). Absent, trading with the drums isn't offered in the style.
+     */
+    solos?: boolean;
     init(): M;
     play(ctx: BarContext, memory: M): { events: E[]; memory: M };
 }
@@ -98,9 +103,4 @@ export interface Style {
      * the style has no lead yet and the lane stays silent.
      */
     lead?: { idiom: PitchedIdiom; prefers: LeadInstrument };
-    /**
-     * The lead trades fours with the drummer: a chorus of them before the head comes back
-     * (`arrange/cycle.ts`). The drum idiom plays the drummer's turns (`DrumBook.trade`).
-     */
-    trades?: boolean;
 }

@@ -324,10 +324,12 @@ function soloPlan(
     const rng = ctx.rng(`solo:${ctx.pass}:${slotStart}`, 'song');
     const tier = energyTier(ctx.plan.energy);
     const trade = role.kind === 'trade';
+    // A trade's turn sets its length; a solo phrase is the form's.
+    const length = role.kind === 'trade' ? role.bars : first.phrase.length;
     const arc =
         role.kind === 'trade'
-            ? tradeArc(tier)
-            : soloArc(role.chorus, ctx.timeline, slotStart, tier, role.toFours);
+            ? tradeArc(tier, book.space)
+            : soloArc(role.chorus, ctx.timeline, slotStart, tier);
     const [lo, hi] = ctx.lead.range;
     // The peak's top note: the instrument's top, or the book's reach above home.
     const home = homeOf(ctx, book);
@@ -337,13 +339,13 @@ function soloPlan(
     // chords), else the phrase just played.
     const atThisSlot = memory.phrases[slotStart];
     const previousPhrase =
-        atThisSlot && atThisSlot.kinds.length === first.phrase.length ? atThisSlot : memory.phrase;
+        atThisSlot && atThisSlot.kinds.length === length ? atThisSlot : memory.phrase;
     if (
         previousPhrase &&
         !trade &&
         !arc.peak &&
         !arc.windDown &&
-        previousPhrase.kinds.length === first.phrase.length &&
+        previousPhrase.kinds.length === length &&
         rng.chance(book.loop ?? 0)
     ) {
         return {
@@ -389,7 +391,7 @@ function soloPlan(
         arc.peak || trade
             ? (['line', 'line', 'line', 'end'] as BarKind[])
             : rng.weighted(choices.length ? choices : SOLO_SHAPES.mid);
-    const kinds = fitShape(shape, first.phrase.length);
+    const kinds = fitShape(shape, length);
     // The opening cell: develop the last phrase's motif (its rhythm and its intervals, moved
     // onto the new chord), or say something new.
     let opening = rng.pick(book.cells[arc.density]);
@@ -802,7 +804,11 @@ function planSlot(
     phrase: PhraseMemory | null;
     phrases: Record<number, PhraseMemory>;
 } {
-    if (role.kind === 'rest' || (role.kind === 'trade' && role.turn === 'drums')) {
+    // The player's turn, or trading with the drummer (the player is the soloist): no lead.
+    if (
+        role.kind === 'rest' ||
+        (role.kind === 'trade' && (role.with === 'drums' || role.turn === 'you'))
+    ) {
         return {
             notes: [],
             motif: memory.motif,
@@ -928,12 +934,14 @@ export function leadIdiom(book: LeadBook): PitchedIdiom {
         }),
         play(ctx: BarContext, memory: LeadMemory) {
             const { bar } = ctx;
-            const slotStart = bar.index - bar.phrase.bar;
+            // A trade's slot is its turn; otherwise a phrase of the form.
+            const role = ctx.plan.lead;
+            const slotStart = role.kind === 'trade' ? role.from : bar.index - bar.phrase.bar;
             const slot = `${ctx.pass}:${slotStart}`;
             let next = memory;
             if (memory.slot !== slot) {
                 // The arrangement decided the slot's job; every bar of a slot has the same one.
-                const planned = planSlot(ctx, book, slotStart, ctx.plan.lead, memory);
+                const planned = planSlot(ctx, book, slotStart, role, memory);
                 next = {
                     ...memory,
                     slot,

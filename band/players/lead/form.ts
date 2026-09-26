@@ -3,7 +3,7 @@
  * the arrangement's (`arrange/cycle.ts`); this is what a solo phrase slot is asked to do.
  *
  * The three solo choruses are one arc — low and sparse, developing, the cycle's one peak —
- * and the last phrase of the third winds down so the head (or the fours) can come in.
+ * and the last phrase of the third winds down so the head can come back in.
  */
 import type { EnergyTier } from '../../arrange/plan.js';
 import type { Timeline } from '../../form/timeline.js';
@@ -38,7 +38,6 @@ export function soloArc(
     timeline: Timeline,
     slotStart: number,
     energy: EnergyTier,
-    toFours = false,
 ): Arc {
     const bars = timeline.bars;
     const slotLength = bars[slotStart].phrase.length;
@@ -63,11 +62,7 @@ export function soloArc(
             windDown: false,
         };
     } else if (lastSlot && bars.length > slotLength) {
-        // Before the head, the last phrase comes down; before the fours it keeps the heat
-        // for the exchange (the drummer's last four set up the head instead).
-        arc = toFours
-            ? { density: 'busy', register: 2, peak: false, windDown: false }
-            : { density: 'mid', register: 0, peak: false, windDown: true };
+        arc = { density: 'mid', register: 0, peak: false, windDown: true };
     } else {
         // The peak is the phrase before the wind-down (or the only phrase of a short chart).
         const peak = secondLast || bars.length <= slotLength;
@@ -78,13 +73,14 @@ export function soloArc(
 }
 
 /**
- * A trade: four bars to say something, straight in, after the drummer's four (or before
- * them). Busy and a little high, the whole slot played through to an arrival, never the
- * peak: the cycle's one peak stays in the third solo chorus.
+ * A trade: the soloist's turn to say something, straight in, and then the player answers. A
+ * little high, the whole turn played through to an arrival; busy unless the style is a
+ * spacious one (`space`, neo-soul and reggae), and a notch calmer at low energy.
  */
-export function tradeArc(energy: EnergyTier): Arc {
+export function tradeArc(energy: EnergyTier, space: number): Arc {
+    const density: Density = space >= 0.35 ? 'mid' : 'busy';
     return {
-        density: energy === 'low' ? 'mid' : 'busy',
+        density: energy === 'low' ? shift(density, -1) : density,
         register: 2,
         peak: false,
         windDown: false,

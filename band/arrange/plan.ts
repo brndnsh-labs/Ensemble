@@ -85,21 +85,25 @@ export function planBars(
         pass,
         looping,
         window,
-        trades = false,
-    }: { pass: number; looping: boolean; window: PassWindow; trades?: boolean },
+        drumSolos = false,
+    }: { pass: number; looping: boolean; window: PassWindow; drumSolos?: boolean },
 ): BarPlan[] {
     const { bars } = timeline;
-    // Fours are traded over the whole song (a pass resumed at a barline still is one); a
-    // practice loop keeps its band. Only a lead that is playing trades.
-    const trading =
-        trades && settings.lanes.lead && window.to === bars.length && window.wrapTo === 0;
-    // Whether the drummer has bar `index` of `pass` to himself: his turn, in a bar the lead
-    // would play (a section written without the lead is the band's).
+    // The player trades over the whole song (a pass resumed at a barline still is one); a
+    // practice loop keeps its band. Trading with the soloist needs it on; trading with the
+    // drummer needs the drums on and a drummer who can solo in this style.
+    const wanted = settings.trade ?? null;
+    const trade =
+        wanted &&
+        window.to === bars.length &&
+        window.wrapTo === 0 &&
+        (wanted.with === 'lead' ? settings.lanes.lead : settings.lanes.drums && drumSolos)
+            ? wanted
+            : null;
+    // Whether the drummer has bar `index` of `pass` to himself: his turn in a trade.
     const drummerAlone = (index: number, onPass: number) => {
-        const role = leadRole(timeline, index, onPass, trading);
-        return (
-            role.kind === 'trade' && role.turn === 'drums' && bars[index].visit.lanes.lead !== false
-        );
+        const role = leadRole(timeline, index, onPass, trade);
+        return role.kind === 'trade' && role.with === 'drums' && role.turn === 'band';
     };
     // A song that loops earns a little more each time round — capped, so the fourth chorus
     // is fuller than the first but the band never runs away from the player.
@@ -126,17 +130,23 @@ export function planBars(
         for (const lane of ['drums', 'bass', 'comp', 'lead'] as const) {
             lanes[lane] = settings.lanes[lane] && bar.visit.lanes[lane] !== false;
         }
-        const lead = leadRole(timeline, i, pass, trading);
-        const drumsTurn = lanes.lead && drummerAlone(i, pass);
+        const lead = leadRole(timeline, i, pass, trade);
+        const drumsTurn = lanes.drums && drummerAlone(i, pass);
+        if (lead.kind === 'trade' && (lead.with === 'drums' || lead.turn === 'you')) {
+            // Your turn is yours: the soloist lays out (and trading with the drummer, you are
+            // the soloist throughout).
+            lanes.lead = false;
+        }
         if (drumsTurn) {
+            // The drummer's turn is his alone.
             lanes.bass = false;
             lanes.comp = false;
-            lanes.lead = false;
         }
         const ending = !looping && isLast;
         let fill: Fill = 'none';
-        // A trade is its own fill: the drummer's four are a solo, and the lead's run into it.
-        if (!ending && lead.kind !== 'trade') {
+        // Trading with the drummer, the trade is its own fill: his turn is a solo, and he
+        // hands yours back with a crash.
+        if (!ending && !(lead.kind === 'trade' && lead.with === 'drums')) {
             if ((visitEnd || (isLast && looping)) && !(next && bar.visit.seamless && !isLast)) {
                 // The end of a section — or of a practice loop's lap — gets the big fill.
                 fill = 'section';

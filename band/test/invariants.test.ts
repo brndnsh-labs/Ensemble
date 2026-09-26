@@ -5,7 +5,7 @@
  * sound like the genre" claims live in `critique.test.ts`.
  */
 
-import { cycleLength } from '../arrange/cycle.js';
+import { CYCLE } from '../arrange/cycle.js';
 import {
     type BandEvent,
     type BandSettings,
@@ -13,6 +13,7 @@ import {
     DEFAULT_SETTINGS,
     type PitchedNote,
     type StyleId,
+    type TradeSettings,
 } from '../core/types.js';
 import { MAX_CHARACTER_MS } from '../feel/feel.js';
 import { compileTimeline, type Timeline } from '../form/timeline.js';
@@ -169,9 +170,9 @@ describe.each(STYLE_IDS)('%s invariants', (styleId) => {
 });
 
 /**
- * The lead through a whole cycle — the head, three solo choruses (and a chorus of fours, for
- * a style that trades), the head again — on every fixture: each pass keeps every rule, and
- * the head comes back note for note.
+ * The lead through a whole cycle — the head, three solo choruses, the head again — on every
+ * fixture: each pass keeps every rule, and the head comes back note for note. Then trading:
+ * with the soloist in fours and twos, and with the drummer where the style's drummer solos.
  */
 describe.each(STYLE_IDS.filter((id) => STYLES[id].lead))('%s lead', (styleId) => {
     const style = STYLES[styleId];
@@ -189,7 +190,7 @@ describe.each(STYLE_IDS.filter((id) => STYLES[id].lead))('%s lead', (styleId) =>
                 };
                 const lean = feelFor(style, COMP_INSTRUMENTS[settings.comp].family).lean;
                 const heads: string[] = [];
-                const cycle = cycleLength(timeline, Boolean(style.trades));
+                const cycle = CYCLE;
                 let memory: PassMemory | undefined;
                 for (let pass = 0; pass <= cycle; pass++) {
                     const result = performPass(timeline, settings, { pass, looping: true, memory });
@@ -218,6 +219,35 @@ describe.each(STYLE_IDS.filter((id) => STYLES[id].lead))('%s lead', (styleId) =>
                 }
                 if (heads[0] !== heads[1]) {
                     problems.push(`${seed}: the head changed when it came back`);
+                }
+                const trades: TradeSettings[] = [
+                    { with: 'lead', bars: 4 },
+                    { with: 'lead', bars: 2 },
+                    ...(style.drums.solos
+                        ? ([
+                              { with: 'drums', bars: 4 },
+                              { with: 'drums', bars: 8 },
+                          ] as const)
+                        : []),
+                ];
+                for (const trade of trades) {
+                    let traded: PassMemory | undefined;
+                    for (let pass = 0; pass < 3; pass++) {
+                        const result = performPass(
+                            timeline,
+                            { ...settings, trade },
+                            { pass, looping: true, memory: traded },
+                        );
+                        traded = result.memory;
+                        checkPass(
+                            timeline,
+                            result.events,
+                            lean,
+                            settings,
+                            `${seed}/trade ${trade.with} ${trade.bars}/pass${pass}`,
+                            problems,
+                        );
+                    }
                 }
             }
             expect(problems.slice(0, 10), `${styleId}/${name}`).toEqual([]);

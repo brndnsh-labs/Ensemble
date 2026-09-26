@@ -51,8 +51,9 @@ export function performPass(
     const lead = style.lead?.idiom;
     const leadProfile = LEAD_INSTRUMENTS[settings.lead];
     const window = options.window ?? fullWindow(timeline);
-    const trades = Boolean(style.trades && lead);
-    const plans = planBars(timeline, settings, { ...options, window, trades });
+    // Trading with the drummer needs a drummer who can solo in this style.
+    const drumSolos = Boolean(style.drums.solos);
+    const plans = planBars(timeline, settings, { ...options, window, drumSolos });
     // Where the pass wraps, the next bar belongs to the next pass, whose lanes can differ (the
     // fours may open with the drummer alone): what it plays is taken from that pass's plan.
     const wrapPlan = options.looping
@@ -60,7 +61,7 @@ export function performPass(
               pass: options.pass + 1,
               looping: true,
               window: { ...window, from: window.wrapTo },
-              trades,
+              drumSolos,
           })[window.wrapTo]
         : undefined;
     const memory: PassMemory = options.memory

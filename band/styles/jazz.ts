@@ -38,7 +38,8 @@ const TRADE_MOTIFS = ['xx.x', 'x.xx', 'x..x', 'xxx.'];
 const TOMS = ['tomHigh', 'tomMid', 'tomLow'] as const;
 
 /**
- * The drummer's four, bebop style (Max Roach, Philly Joe Jones). The first bar states a
+ * The drummer's turn when the player trades with him, bebop style (Max Roach, Philly Joe
+ * Jones), written for fours and fitted to twos and eights. The first bar states a
  * two-beat motif on the snare, answered on the toms, with the kick on the one as the band
  * drops out. The middle bars develop it: displaced by an eighth and moved to the toms, then
  * as accents in a stream of eighths. The last bar states it once more and runs home down the
@@ -62,12 +63,14 @@ function jazzTrade(ctx: BarContext, bar: number, length: number, tier: EnergyTie
         line.push(...'.'.repeat(total));
     }
     const hit = tier === 'low' ? 'o' : 'x';
+    // In fours: statement, displaced, stream, home. Eights say it twice over; twos are a
+    // statement and the run home.
     const role =
         bar === length - 1
             ? 'home'
-            : bar === 0
+            : bar % 4 === 0
               ? 'state'
-              : bar === length - 2
+              : bar % 4 === 2 || bar === length - 2
                 ? 'stream'
                 : 'displace';
     // A displaced bar plays the motif an eighth late; its first stroke is still the accent.
@@ -568,6 +571,4 @@ export const jazz: Style = {
     comp: { keyboard: jazzKeys, guitar: jazzGuitar },
     prefers: 'piano',
     lead: { idiom: jazzLead, prefers: 'sax' },
-    // After the solos, the horn trades fours with the drummer before the head comes back.
-    trades: true,
 };
