@@ -4,16 +4,103 @@ A short tour of the tooling that reduces friction on the synth-audit
 "listening gate" — the human step where the assistant can't tell whether
 a sound is actually good and the user has to use their ear.
 
-All three commands operate on the same `OfflineAudioContext` pipeline
-already used by `npm run mix:report`. None of them replace the ear; they
-only shorten the loop around it.
+Every render-based command here sits on one pipeline, `npm run mix:report`. None of them
+replaces the ear; they only shorten the loop around it.
 
-`mix:report` renders inside the app itself: unless `--no-build`, it builds `prototypes/v2` at
-`ENSEMBLE_V2_BASE=/` with `NEXT_PUBLIC_RENDER_BRIDGE=1` (`next build --webpack`
-+ `scripts/offline.mjs`), serves `prototypes/v2/out`, and drives the engine
-through `window.ensemble` (`public/render-bridge.ts`). That build overwrites
-the same `out/` the v2 Playwright suite serves, so rebuild before trusting
-that suite after a mix report.
+## What a render is: the band engine (since 2026-09-25)
+
+The tools render **the band engine** (`band/`), the engine every page plays. The old
+worker engine (`?engine=old`) is no longer reachable from them.
+
+- **The music is composed in node.** `scripts/band-scene.ts` turns each scene into a
+  semantic score (its sections' `|`-separated bars, in the chart editor's bar syntax), runs
+  `compileTimeline`, then `performPass` once per `--loops` chorus, each pass remembering the
+  one before and the last one playing the ending — the stand looping the song, then stopping.
+- **The audio is rendered in the app.** Unless `--no-build`, `mix:report` builds
+  `prototypes/v2` at `ENSEMBLE_V2_BASE=/` with `NEXT_PUBLIC_RENDER_BRIDGE=1`
+  (`next build --webpack` + `scripts/offline.mjs`, which copies the sample packs), serves
+  `prototypes/v2/out`, and drives Chromium. The page's render bridge
+  (`prototypes/v2/lib/render-bridge.ts`, on `window.ensemble`) hands the events to
+  `renderBandPasses` (`lib/band-export.ts`) — the same offline render, through the same
+  `playBandEvent` voice mapping, as the app's WAV/stem export — and returns raw channels plus
+  a dispatch tap (every event with the time, length and level its voice was handed).
+  Metrics are measured in the page; the report is built in node (`mix-report-utils.ts`).
+- **That build overwrites the same `out/` the v2 Playwright suite serves**, so rebuild
+  (`npm run build --prefix prototypes/v2`) before trusting that suite after a mix report. A
+  normal build compiles the bridge out: grep `out/` for `ensemble-band-render-bridge` — it
+  appears only in a bridge build.
+
+**Scene → band settings.** Style from the scene's `genreFeel` (one of the 13; anything else
+is refused). Energy: `intensity`, held for the whole render (default 0.7). Seed:
+`<sceneId>:<seed>` for the band, and the same string seeds `Math.random` for the voices' own
+humanising, so a render repeats. Lanes: all on, unless `includeDrums`/`includeBass`/
+`includeChords`/`includeSoloist` is `false`. Sounds: every lane plays **the synth** unless a
+scene pins one (`voices: [{ module, voice: 'pack:<id>' }]`, modules `groove`, `bass`,
+`chords`, `soloist`). The comp instrument is the scene's `comp`, else the instrument the
+pinned chords sound names (`pack:nylon-guitar` → nylon grips, the stand's own rule, from
+`lib/band-voices.ts`), else the style's; the lead instrument likewise (`lead`, the soloist
+pack, the style's). `swing` and `humanize` are optional overrides; left out, the style's own
+feel plays.
+
+**Stems.** The band's lanes: `drums`, `bass`, `chords` (the comp), `soloist` (the lead), each
+alone, plus `full+solo` (the whole band) and `full` (the band with the lead lane off, as a
+musician practising hears it — the comp plays differently when it has a lead to answer). The
+solo stems are cut from the whole-band performance, as the app's stem export cuts them. The
+ids keep their old names so reports, `mix:diff` baselines and `--stems=` filters still read.
+**There is no `harmony` stem**: the band has no harmony lane.
+
+**Dropped in the port, and why.**
+
+- Old-engine scene fields are accepted and ignored — `drumPreset`, `complexity`,
+  `chordStyle`/`bassStyle`/`soloistStyle`/`harmonyStyle`, `density`, `includeHarmony` — the
+  band has no such setting (a style is a genre's whole identity). A `harmony` voice pin is
+  dropped for the same reason.
+- The old loop-arc intensity broadcast (`loopArcMultiplier` on `bandIntensity` per loop) is
+  gone: the band plans its own form, and a scene's energy is held fixed.
+- `mix:verify`'s intent → dispatch parity block (below) and the `intentEvents` /
+  `sharedCatchEvents` streams in the event dump: old-engine stages with no band counterpart.
+- The `harmony` findings (voice cap, retriggers, sharp edges, top-end air) and the `harmony`
+  entry in `--cohesion`'s sample band.
+
+## `npm run mix:report`
+
+Prints, per scene and seed, a per-stem table (peak/RMS/crest, transients, schedule pressure,
+spectral probes, stereo) and a `Findings:` line. The scene header names what played:
+`style jazz · comp piano · lead sax`.
+
+```bash
+npm run mix:report                                  # the four default scenes
+npm run mix:report -- --scene=jazz-ride --seeds=ALPHA,BETA
+npm run --silent mix:report -- --json --scene=funk-pocket > report.json
+```
+
+The default scenes are `rock-backbeat`, `blues-shuffle`, `jazz-ride`, `funk-pocket`
+(`DEFAULT_MIX_REPORT_SCENES`). The schedule columns come from the dispatch tap, over the first
+pass: `maxVoices` (most notes sounding at once), `retriggers` (a pitch struck again before it
+ended), `steals` (a note landing with the stem's `voiceLimit` already sounding).
+
+### `--calibrate-pack=<module>:<packId>` — sample-pack gain calibration
+
+Renders the pack's lane twice per scene and seed — once on the synth, once on the pack — and
+prints the RMS difference and the gain that sets the pack's RMS to the synth's, against the
+catalog `gain` in `public/data/sound-packs.ts`. Modules: `groove` (drums stem), `bass`,
+`chords` (the comp), `soloist` (the lead); anything else is refused before the build.
+
+```bash
+npm run mix:report -- --calibrate-pack=chords:grand
+npm run mix:report -- --calibrate-pack=bass:upright-bass --scene=funk-pocket
+```
+
+Both legs play **the same performance**: the pack decides the instrument the band plays for
+both (a `pack:nylon-guitar` calibration plays nylon grips on the synth leg too), so the only
+difference is the sound. A pack that fails to load prints `✗ … failed to load` and exits 1 —
+the render never passes the synth fallback off as pack evidence.
+
+### `--cohesion` — all-synth vs all-sample band
+
+Renders `full+solo` on every lane's synth, on the sample band (`COHESION_SAMPLE_BAND`: grand,
+alto sax, acoustic kit; bass stays synth), and on the sample band with reverb sends zeroed, and
+prints side-ratio, crest and the reverb's wetness. One performance for all three legs.
 
 ## `npm run mix:report -- --write-wav=<dir>`
 
@@ -33,34 +120,30 @@ mono) and `sideRatio` (fraction of energy in the side channel, 0 = mono, ~0.5
 = maximally wide). Useful for catching mixes that have shrunk to the center
 without anyone noticing.
 
-Pass `--loops=N` (default 1) to render each scene through N choruses. The
-offline render bumps `playback.currentLoopCount` on each loop boundary so
-the soloist's chorus-evolution machinery (Loop 0 head → Loop 1 themed →
-Loop 2+ exploratory) actually expresses. Each stem then reports per-loop
-RMS in dB (`loopDb` column) and an `arc` classification: `flat` (under
-1.5 dB swing), `front-loaded`, `building`, `arc`, `dip`, `irregular`. The
-old default render of a single loop was silently testing only the
-"Loop 0" head behavior — this surfaces the rest of the architecture.
+Pass `--loops=N` (default 1) to render each scene through N choruses: band passes, each
+remembering the one before, so the lead's form expresses (its head on pass 0, three solo
+choruses as one arc, the head again on the fifth). Each stem then reports per-loop RMS in dB
+(`loopDb` column) and an `arc` classification: `flat` (under 1.5 dB swing), `front-loaded`,
+`building`, `arc`, `dip`, `irregular`.
 
 ### `--scenes-from=<file.json>` — render externally supplied scenes
 
 Renders a JSON array of scene objects (shaped like the `DEFAULT_MIX_REPORT_SCENES`
-entries in `scripts/mix-report-utils.ts`) instead of the built-in catalog.
-Required per scene: `id`, `genreFeel`, `bpm`, `key`, and a non-empty `sections`
-array whose entries carry a `value` progression string (`'A7 | D7 | …'`).
-`label` defaults to the id, `intensity`/`complexity` to 0.7/0.6,
-`drumPreset` to `Basic Rock`, `timeSignature` to `4/4`; `findingThresholds`
-falls back to the genre-agnostic defaults. Unknown fields pass through
-untouched, so an external spec's own metadata rides along. Mutually exclusive
-with `--scene`/`--scenes`/`--focus-from`.
+entries in `scripts/mix-report-utils.ts`, fields as in the settings list above) instead of
+the built-in catalog. Required per scene: `id`, `genreFeel`, `bpm`, `key`, and a non-empty
+`sections` array whose entries carry a `value` progression string (`'A7 | D7 | …'`, the
+chart editor's bar syntax, so `C:2 G7:2` splits a bar). `label` defaults to the id,
+`intensity` to 0.7, `timeSignature` to `4/4`; `findingThresholds` falls back to the
+genre-agnostic defaults. Unknown fields pass through untouched, so an external spec's own
+metadata rides along. Mutually exclusive with `--scene`/`--scenes`/`--focus-from`.
 
 This is the fixture-factory entry point for the songsiknow analysis harness
 (#1349): combined with `--write-wav` + `--write-events` it renders per-stem
 audio whose musical truth (the event stream + the scene spec) is known by
-construction. Note the render is *musically* deterministic per seed — the
-events JSON is byte-identical across runs — but WAVs can differ by ±2 LSB of
-int16 (OfflineAudioContext float jitter), so fixture consumers should
-render-once-and-freeze rather than re-render and expect byte equality.
+construction. The render is *musically* deterministic per seed — the band's events are
+byte-identical across runs — but WAVs can differ by a few LSB of int16 (OfflineAudioContext
+float jitter), so fixture consumers should render-once-and-freeze rather than re-render and
+expect byte equality.
 
 ```bash
 npm run mix:report -- --scenes-from=/path/to/scenes.json \
@@ -163,8 +246,8 @@ the WAV renders it was measured against stay disposable under `tmp/references/`.
 
 ## `npm run --silent mix:verify -- --scene=<id>`
 
-Reconciles the **scheduled note events** against the **rendered audio** for the
-same seed, and prints a per-stem table. This is the one tool here the assistant
+Reconciles the **band's events, as their voices received them** against the **rendered
+audio** for the same seed, and prints a per-stem table. This is the one tool here the assistant
 can read directly: it answers audible-fact questions in text, without an ear.
 
 ```bash
@@ -185,36 +268,33 @@ checks in `scripts/audio-verify.ts` over each stem:
 | median deviation | per-note timing against the grid after latency removal (pocket as a number, not a feel) |
 | vel→peak r | whether the loudest hit of each attack reaches the output at the level its velocity asked for |
 | pitch confirmed | harmonic energy at the expected f0 vs its semitone neighbors (monophonic, resolvable pitches only) |
-| intent → dispatch | existence parity between the generated note buffers and the scheduler's dispatch tap (see below) |
-| QUIET (intended) | attacks whose events are all deliberately attenuated (`levelScale ≤ 0.2` — the 0.15 palm-mute floor plus margin, kept tight so a half-muted dropped note still reads MISSED) and show no rise — excluded from the match-rate denominator, printed so the exclusion is never silent |
+| QUIET (intended) | attacks whose events are all deliberately attenuated (`levelScale ≤ 0.2` — the old engine's 0.15 palm-mute floor plus margin, kept tight so a half-muted dropped note still reads MISSED; the band's muted bass note carries 0.2775, `muteGain(0.85)`, so it is *not* excluded — see the blind spots) and show no rise — excluded from the match-rate denominator, printed so the exclusion is never silent |
 
-**The two-stage claim (#1351).** The table above proves *dispatch → PCM*; the
-`intent → dispatch` block proves the stage before it: every pitched note the
-engine *generated* (snapshotted from the lane buffers before the scheduler
-consumes them) must surface at a dispatch site with the same track + midi in the
-same step bin (±1 bin absorbs humanization/swing). This is what catches the class
-where audio dispatch and the visualizer tap sit behind the *same* gate, so a
-dropped note vanishes from both and the old single-stage check read clean. Audible
-chord ghosts now participate as ordinary reduced-velocity intents (#938), so dropping
-one reports `MISSING`. Boolean `muted: true` and CC-only carriers (`midi: 0`) are
-explicit non-notes and are excluded deliberately; drums never enter the buffers, so
-a drums stem prints `NOT VERIFIABLE` here rather than fabricated intent.
+**No intent → dispatch stage on the band engine.** The old engine generated notes into
+lane buffers that a scheduler later consumed behind its own gates, so #1351 added an
+`intent → dispatch` parity block to catch a note dropped between the two. The band is one
+event stream: `performPass` produces it and the render hands every event to
+`playBandEvent` — the event dump *is* the dispatch tap — so there is no stage between them
+to reconcile, and the block (and the dump's `intentEvents`) was removed with the port.
+Everything the band decided is checked against the audio by the table above.
 
 **`--json`** prints the full structured results instead of the table: per stem,
-everything above plus `intentParity` and a per-attack `attacks` array
+everything above plus a per-attack `attacks` array
 (`step`/`time`/`midis`/`level`/`attenuated`/`present`/`riseDb`/`peak`) — so a
 story can group musical positions and assert rendered relationships (intensity
 ladders, The-One-vs-pop salience) without scraping text.
 `scripts/scenes/funk-bass-ladder.json` is the standing fixture for exactly that:
 a 3-rung intensity ladder × {synth, `pack:upright-bass`} funk-bass scene set
 (external scenes can pin lane voices via a `voices` array — event capture stays
-on, unlike the `--calibrate-pack` voice-override path).
+on, unlike the `--calibrate-pack` voice-override path). Its old-engine fields
+(`drumPreset`, `complexity`, `includeHarmony`) are ignored on the band.
 
 **Scope limit, stated deliberately.** The events and the audio come from the same
 code path, so `mix:verify` cannot catch a bad *musical decision* — only a decision
-that failed to become sound. Musical-decision claims stay gated by
-`tests/standards/`. What it adds is the half those tests structurally cannot
-reach: a critique test passes on velocity math while the render buries the note.
+that failed to become sound. Musical-decision claims stay gated by the band's
+critique and invariant suites (`band/test/`). What it adds is the half those tests
+structurally cannot reach: a claim passes on velocity math while the render buries
+the note.
 
 **It emits no verdict.** Every metric it cannot measure prints as
 `NOT VERIFIABLE: <metric> — <reason>` rather than being quietly omitted, and there
@@ -245,7 +325,9 @@ satisfies the bass note's evidence. Measured — muting the bass lane entirely o
   presence detection cannot see it.** `mix:verify` measures a band-energy *rise*
   across the onset, and a note 17 dB below the ongoing tail does not produce one.
   Confirmed by instrumenting the render: 161 scheduled notes → 161 voices built and
-  started, zero early returns.
+  started, zero early returns. (That measurement is the old engine's. The band's funk
+  bass has the same class: its muted notes play at `muteGain(0.85)` = 0.2775 and are 13
+  of the 13 misses on `funk-pocket`; see the band measurement below.)
 
   Two traps this exposed, both worth knowing before trusting a MISSED report:
   **(1)** ~~the bass visualizer payload omits velocity, so the tool cannot tell an
@@ -317,18 +399,23 @@ diffs two renders. (Enabling `--write-events` perturbs the output by ~7e-5 dB,
 an order of magnitude *inside* that floor, which is how it was confirmed to be a
 passive tap rather than something that changes the render.)
 
-Implementation note worth knowing before extending it: the **dispatch** stream is
-captured by switching the visualizer event queue **on** in the render clone
-(`--write-events`), not by reading the note buffers. The buffers hold
-pre-humanization times and contain no drums at all (drums are generated live in
-`scheduleGlobalEvent`); `queueVisualizerNoteEvent` fires at every lane's real
-schedule site with the actual play time, which is what a ±25 ms match needs.
-Since #1351 the sidecar *also* snapshots those buffers as `intentEvents` (grid
-time, authored velocity, mute payload) right before each loop's consumption —
-the two streams are what `intent → dispatch` reconciles, and `events` remains a
-compatibility alias for `dispatchEvents`. UI-facing `velocity` stays exactly as
-it was (drums, chords); the audit fields ride alongside and cost nothing when
-event capture is off (they sit inside the existing `vizState.enabled` gates).
+Implementation note worth knowing before extending it: the **dispatch** stream is the
+render bridge's tap (`onSchedule` in `renderBandPasses`), one entry per event, taken at
+the moment it is handed to its voice — render-absolute time with the feel layer's
+`offsetMs` included (the ±25 ms match needs the real play time), written length,
+`velocity` (MIDI velocity / 127), `renderVelocity` (the scalar the voice received,
+`bandEventLevel` in `band-host.ts`), `levelScale` (a muted bass note's mute gain) and the
+bar. A drum hit carries its General MIDI key as `midi`, and its `piece`. `events` remains a
+compatibility alias for `dispatchEvents` (`mix:ab` reads it), and the dump says
+`engine: "band"`.
+
+**Measured on the band (2026-09-25, `funk-pocket`/`MIX_AUDIT`):** bass 44 of 57
+attacks matched — all 13 misses are muted notes (level 0.12–0.13, i.e. `levelScale`
+0.2775), the documented quiet-note-under-a-tail class; drums 106/113 (the misses are
+one hat per bar, step 5); chords 36/36; soloist 28/28 with pitch confirmed 100%. Every
+stem also reports one UNSCHEDULED onset at 0.040 s flagged `click?`: it is a 1 LSB
+(−90.3 dBFS) floor that starts ~20–40 ms into every render, before the first note — the
+onset detector's ratio test on near-silence, not an audible click.
 
 ## `npm run --silent mix:spectro -- --scene=<id>`
 
@@ -543,21 +630,21 @@ harness. `tmp/` is gitignored, which is what lets the rendered output survive th
 checkout. The tool refuses a dirty tree, never stashes, and restores the original ref
 in a `finally`.
 
-## Share modal → Download .wav
+## Song menu → Export audio
 
-In addition to the CLI tools above, the in-app **Share & Export** modal
-now has a "Download .wav" button next to the existing MIDI export. It
-renders the user's current arrangement (with whatever instruments,
-styles, and intensity are dialed in) through the same
-`OfflineAudioContext` path as `mix:report`, and triggers a browser
-download.
+In addition to the CLI tools above, the song menu's **Export audio (mix)** and **Export
+audio (stems)** render the current chart through `renderBandPasses` — the same offline
+render `mix:report` measures — and download WAVs. A stem renders its lane even when that
+lane is off live (the lead is off by default): the render opens the bus of every lane that
+has events in it.
 
 This is the workflow path for handing a clip to another model
 (Gemini, GPT, etc.) for a second-opinion listen — no API integration
 required, just drag the file into another chat.
 
-Implementation: `public/export/audio-export.ts` + the shared
-`public/engine/wav-encoder.ts`.
+Implementation: `prototypes/v2/lib/band-export.ts` + the shared
+`public/engine/wav-encoder.ts` (`?engine=old` still exports through
+`public/export/audio-export.ts`).
 
 The encoder quantizes with a **round** against a symmetric `0x8000` scale (clamped at
 `+0x7fff`), which makes `int16 → float → int16` the exact identity for all 65 536

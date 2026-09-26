@@ -217,9 +217,9 @@ export const DEFECT_PLACEMENT = {
  * see the drop" is never partly explained by a second defect in the same panel.
  */
 const STEM_PREFERENCE: Record<DefectType, readonly string[]> = {
-    'mute-region': ['bass', 'chords', 'soloist', 'harmony', 'drums'],
+    'mute-region': ['bass', 'chords', 'soloist', 'drums'],
     click: ['full', 'full+solo', 'drums', 'bass'],
-    'drop-lane': ['chords', 'harmony', 'soloist', 'bass'],
+    'drop-lane': ['chords', 'soloist', 'bass'],
     'flatten-accents': ['drums', 'bass', 'chords'],
 };
 

@@ -42,10 +42,8 @@ export const DEFAULT_MIX_REPORT_SCENES = [
         id: 'rock-backbeat',
         label: 'Rock Backbeat',
         genreFeel: 'Rock',
-        drumPreset: 'Basic Rock',
         bpm: 118,
         intensity: 0.72,
-        complexity: 0.58,
         key: 'C',
         sections: [
             {
@@ -66,10 +64,8 @@ export const DEFAULT_MIX_REPORT_SCENES = [
         id: 'blues-shuffle',
         label: 'Blues Shuffle',
         genreFeel: 'Blues',
-        drumPreset: 'Blues Shuffle',
         bpm: 96,
         intensity: 0.7,
-        complexity: 0.6,
         key: 'C',
         sections: [
             {
@@ -90,10 +86,8 @@ export const DEFAULT_MIX_REPORT_SCENES = [
         id: 'jazz-ride',
         label: 'Jazz Ride',
         genreFeel: 'Jazz',
-        drumPreset: 'Jazz',
         bpm: 138,
         intensity: 0.64,
-        complexity: 0.55,
         key: 'C',
         sections: [
             {
@@ -128,10 +122,8 @@ export const DEFAULT_MIX_REPORT_SCENES = [
         id: 'funk-pocket',
         label: 'Funk Pocket',
         genreFeel: 'Funk',
-        drumPreset: 'Funk',
         bpm: 104,
         intensity: 0.78,
-        complexity: 0.66,
         key: 'E',
         sections: [
             {
@@ -150,48 +142,52 @@ export const DEFAULT_MIX_REPORT_SCENES = [
     },
 ];
 
+/**
+ * The stems a report renders: the band's lanes (drums, bass, comp, lead — there is no harmony
+ * lane), each alone, plus two mixes. `performance` names which performance of the scene a stem
+ * is cut from (`scripts/band-scene.ts`): `band` is the whole band with the lead playing, as the
+ * app's stem export renders it; `bed` is the same band with the lead lane off, so `full` is the
+ * backing a musician practises with (the comp plays differently when it has a lead to answer).
+ * The ids keep their pre-band names (`chords` is the comp, `soloist` the lead) so reports,
+ * `mix:diff` baselines and the other tools' stem filters keep reading. `schedule.voiceLimit`
+ * is the voice count `voiceLimitPressureCount` counts against: a six-string grip for the comp.
+ */
 export const MIX_REPORT_STEMS = [
     {
         id: 'full',
-        label: 'Full Mix',
-        enabled: { drums: true, bass: true, chords: true, harmony: true, soloist: false },
-        schedule: { modules: ['bass', 'chords', 'harmony'], voiceLimit: 8 },
+        label: 'Full Mix (no lead)',
+        performance: 'bed',
+        lanes: ['drums', 'bass', 'comp'],
+        schedule: { lanes: ['bass', 'comp'], voiceLimit: 7 },
     },
     {
         id: 'full+solo',
-        label: 'Full Mix + Soloist',
-        enabled: { drums: true, bass: true, chords: true, harmony: true, soloist: true },
-        schedule: { modules: ['bass', 'chords', 'harmony', 'soloist'], voiceLimit: 9 },
+        label: 'Full Mix + Lead',
+        performance: 'band',
+        lanes: ['drums', 'bass', 'comp', 'lead'],
+        schedule: { lanes: ['bass', 'comp', 'lead'], voiceLimit: 8 },
     },
-    {
-        id: 'drums',
-        label: 'Drums',
-        enabled: { drums: true, bass: false, chords: false, harmony: false, soloist: false },
-        schedule: null,
-    },
+    { id: 'drums', label: 'Drums', performance: 'band', lanes: ['drums'], schedule: null },
     {
         id: 'bass',
         label: 'Bass',
-        enabled: { drums: false, bass: true, chords: false, harmony: false, soloist: false },
-        schedule: { modules: ['bass'], voiceLimit: 1 },
+        performance: 'band',
+        lanes: ['bass'],
+        schedule: { lanes: ['bass'], voiceLimit: 1 },
     },
     {
         id: 'chords',
-        label: 'Chords',
-        enabled: { drums: false, bass: false, chords: true, harmony: false, soloist: false },
-        schedule: { modules: ['chords'], voiceLimit: 5 },
-    },
-    {
-        id: 'harmony',
-        label: 'Harmony',
-        enabled: { drums: false, bass: false, chords: false, harmony: true, soloist: false },
-        schedule: { modules: ['harmony'], voiceLimit: 3 },
+        label: 'Comp',
+        performance: 'band',
+        lanes: ['comp'],
+        schedule: { lanes: ['comp'], voiceLimit: 6 },
     },
     {
         id: 'soloist',
-        label: 'Soloist',
-        enabled: { drums: false, bass: false, chords: false, harmony: false, soloist: true },
-        schedule: { modules: ['soloist'], voiceLimit: 1 },
+        label: 'Lead',
+        performance: 'band',
+        lanes: ['lead'],
+        schedule: { lanes: ['lead'], voiceLimit: 1 },
     },
 ];
 
@@ -372,17 +368,16 @@ export function resolveMixReportCliOptions(argv = []) {
         focusLimit: Math.max(1, Math.floor(readNumberOption(options, 'focus-limit', 3))),
         noBuild: readBooleanOption(options, 'no-build', false),
         writeWav: readStringOption(options, 'write-wav', '') || null,
-        // `--write-events=<dir>` → dump each stem's scheduled note events (post-
-        // humanization play times, every lane including drums) beside the WAVs, so
-        // `mix:verify` can reconcile what the engine decided to play against what
-        // the render actually produced. Capture requires the visualizer event queue,
-        // which the render clone otherwise disables.
+        // `--write-events=<dir>` → dump each stem's band events as their voices received
+        // them (render-absolute times, feel offsets included, every lane including drums)
+        // beside the WAVs, so `mix:verify` can reconcile what the band played against
+        // what the render actually produced.
         writeEvents: readStringOption(options, 'write-events', '') || null,
-        // Render each scene through N loops of its progression so the
-        // soloist's chorus-evolution architecture (Loop 0 head → Loop 1
-        // themed → Loop 2+ exploratory) actually expresses. The per-loop
-        // RMS arc gets reported per stem so front-loaded / arc-shaped /
-        // flat intensity trajectories surface as hard numbers.
+        // Render each scene through N choruses (band passes, each remembering the one
+        // before, the last playing the ending), so the lead's form expresses: its head on
+        // pass 0, three solo choruses, the head again on pass 4. The per-loop RMS arc
+        // gets reported per stem so front-loaded / arc-shaped / flat intensity
+        // trajectories surface as hard numbers.
         loops: Math.max(1, Math.floor(readNumberOption(options, 'loops', 1))),
         // `--calibrate-pack=<module>:<packId>` → run a paired synth-vs-pack
         // render for that lane and print suggested gain instead of the report.
@@ -394,13 +389,12 @@ export function resolveMixReportCliOptions(argv = []) {
     };
 }
 
-// The lanes the `--cohesion` "all-sample" band routes to a pack (bass has no
-// pack → stays synth). Mirrors the auto-follow intent: one representative
-// sampled voice per lane. Shared so the renderer and any test agree.
+// The lanes the `--cohesion` "all-sample" band routes to a pack (bass stays
+// synth, as it did before the band engine). One representative sampled voice per
+// band lane — there is no harmony lane. Shared so the renderer and any test agree.
 export const COHESION_SAMPLE_BAND = [
     { module: 'chords', voice: 'pack:grand' },
     { module: 'soloist', voice: 'pack:sax-alto' },
-    { module: 'harmony', voice: 'pack:strings-ensemble' },
     { module: 'groove', voice: 'pack:acoustic-kit' },
 ];
 
@@ -479,6 +473,17 @@ export function formatCohesionReport(cohesion) {
 export const CALIBRATE_PACK_USAGE =
     '--calibrate-pack=<module>:<packId> (e.g. --calibrate-pack=chords:grand)';
 
+/**
+ * The stem that isolates the lane of each module a pack can be calibrated on's lane: `groove` is the drums, `chords` the
+ * comp, `soloist` the lead. `harmony` is not here — the band has no harmony lane.
+ */
+export const CALIBRATION_STEM = {
+    groove: 'drums',
+    bass: 'bass',
+    chords: 'chords',
+    soloist: 'soloist',
+};
+
 export function parseCalibratePack(raw) {
     const value = String(raw || '').trim();
     if (!value) {
@@ -487,6 +492,12 @@ export function parseCalibratePack(raw) {
     const [module, packId] = value.split(':').map((part) => part.trim());
     if (!module || !packId) {
         throw new Error(`expected ${CALIBRATE_PACK_USAGE}; got "${raw}"`);
+    }
+    // Refused up front, before a build: an unknown module used to surface only after the render.
+    if (!Object.hasOwn(CALIBRATION_STEM, module)) {
+        throw new Error(
+            `--calibrate-pack: "${module}" is not a band lane's module (one of ${Object.keys(CALIBRATION_STEM).join(', ')})`,
+        );
     }
     return { module, packId };
 }
@@ -639,7 +650,6 @@ export function parseExternalScenes(text, sourcePath = 'scenes file') {
         return {
             label: id,
             intensity: 0.7,
-            complexity: 0.6,
             ...scene,
             id,
             sections,
@@ -719,7 +729,6 @@ export function summarizeRenderedFindings(stems, thresholds = DEFAULT_FINDING_TH
     const drums = stems.drums;
     const bass = stems.bass;
     const chords = stems.chords;
-    const harmony = stems.harmony;
     const soloist = stems.soloist;
     const notes = [];
 
@@ -745,10 +754,6 @@ export function summarizeRenderedFindings(stems, thresholds = DEFAULT_FINDING_TH
         notes.push('chords carry most of the low-mid harmonic body');
     }
 
-    if (harmony?.rmsDb > -80 && harmony.probes?.air > (chords?.probes?.air || 0) * 0.9) {
-        notes.push('harmony contributes meaningful top-end air');
-    }
-
     const fullReference = fullWithSolo || full;
     if (soloist && fullReference) {
         if (soloist.rmsDb < fullReference.rmsDb - 8) {
@@ -758,22 +763,6 @@ export function summarizeRenderedFindings(stems, thresholds = DEFAULT_FINDING_TH
         } else {
             notes.push('soloist sits forward of the bed at a lead level');
         }
-    }
-
-    if ((harmony?.schedule?.voiceLimitPressureCount || 0) > 0) {
-        notes.push(
-            `harmony exceeds the 3-voice live cap ${harmony.schedule.voiceLimitPressureCount} times`,
-        );
-    }
-
-    if ((harmony?.schedule?.sameMidiOverlapCount || 0) > 0) {
-        notes.push(
-            `harmony retriggers the same pitch before release ${harmony.schedule.sameMidiOverlapCount} times`,
-        );
-    }
-
-    if ((harmony?.transients?.maxDelta || 0) > 0.08 || (harmony?.transients?.spikeRate || 0) > 6) {
-        notes.push('harmony stem shows sharp waveform edges worth auditing');
     }
 
     // Architectural-bias findings, calibrated 2026-05-24 against pro reference
@@ -789,7 +778,7 @@ export function summarizeRenderedFindings(stems, thresholds = DEFAULT_FINDING_TH
         }
     }
 
-    const allStems = [full, fullWithSolo, drums, bass, chords, harmony, soloist].filter(Boolean);
+    const allStems = [full, fullWithSolo, drums, bass, chords, soloist].filter(Boolean);
     const maxAir = allStems.reduce((max, s) => Math.max(max, s.probes?.air || 0), 0);
     if (allStems.length > 0 && maxAir < airMin) {
         notes.push(
@@ -884,6 +873,7 @@ export function buildRenderedMixReport({ sceneRuns, options, source = { kind: 'm
             genreFeel: sceneRun.genreFeel,
             bpm: sceneRun.bpm,
             intensity: sceneRun.intensity,
+            band: sceneRun.band ?? null,
             source: sceneRun.source || 'default',
             seeds,
             aggregate: buildSceneAggregate(seeds),

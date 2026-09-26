@@ -2,10 +2,13 @@
 import { describe, expect, it } from 'vitest';
 import {
     buildRenderedMixReport,
+    CALIBRATION_STEM,
     COHESION_SAMPLE_BAND,
     DEFAULT_MIX_REPORT_SCENES,
     formatCohesionReport,
+    formatPackCalibration,
     formatRenderedMixReport,
+    parseCalibratePack,
     parseEnsembleAuditInput,
     parseExternalScenes,
     resolveMixReportCliOptions,
@@ -112,7 +115,9 @@ describe('mix report utilities', () => {
         const scene = scenes[0];
         expect(scene.label).toBe('blues-a-shuffle');
         expect(scene.intensity).toBe(0.7);
-        expect(scene.complexity).toBe(0.6);
+        // No old-engine field is invented; one the file carries still rides along.
+        expect(scene.complexity).toBeUndefined();
+        expect(scene.drumPreset).toBe('Blues Shuffle');
         expect(scene.timeSignature).toBe('4/4');
         expect(scene.seedNote).toBe('fixture metadata rides along');
         expect(scene.sections[0].id).toBe('blues-a-shuffle-s0');
@@ -274,28 +279,9 @@ describe('mix report utilities', () => {
                                         centroid: 1180,
                                     },
                                 }),
-                                harmony: createStemMetrics({
+                                soloist: createStemMetrics({
                                     rmsDb: -27.5,
-                                    schedule: {
-                                        eventCount: 12,
-                                        maxNotesPerStep: 4,
-                                        overLimitSteps: 1,
-                                        maxSimultaneousVoices: 4,
-                                        sameMidiOverlapCount: 2,
-                                        voiceLimitPressureCount: 1,
-                                        minOnsetGapMs: 82,
-                                    },
-                                    transients: {
-                                        maxDelta: 0.091,
-                                        spikeRate: 6.7,
-                                    },
-                                    probes: {
-                                        sub: 0.03,
-                                        lowMid: 0.1,
-                                        presence: 0.11,
-                                        air: 0.09,
-                                        centroid: 1860,
-                                    },
+                                    schedule: null,
                                 }),
                             },
                         },
@@ -325,9 +311,7 @@ describe('mix report utilities', () => {
             seed: 'FOCUS_B',
             issueScore: 7,
         });
-        expect(report.scenes[0].seeds[0].findings).toContain(
-            'harmony stem shows sharp waveform edges worth auditing',
-        );
+        expect(report.scenes[0].seeds[0].findings).toContain('soloist gets buried behind the bed');
 
         const lines = formatRenderedMixReport(report, { jsonl: true })
             .trim()
@@ -413,7 +397,6 @@ describe('mix report utilities', () => {
                 drums: lowAir(0.002),
                 bass: lowAir(0.0),
                 chords: lowAir(0.003),
-                harmony: lowAir(0.008),
                 soloist: lowAir(0.001),
             });
             expect(findings.some((n) => n.includes('no stem owns the air band'))).toBe(true);
@@ -499,7 +482,7 @@ describe('mix report utilities', () => {
         it('flags when only the bed (full) is mono even if full+solo passes', () => {
             // Realistic post-S1 case: soloist bus pans +0.25 so adding the
             // soloist lifts the +solo stem above the floor while the bed
-            // stem (drums + bass + chords + harmony only) stays narrow.
+            // stem (drums + bass + chords, no lead) stays narrow.
             // Owner asked for both numbers in the finding line.
             const findings = summarizeRenderedFindings({
                 full: createStemMetrics({
@@ -630,11 +613,11 @@ describe('mix report utilities', () => {
             for (const entry of COHESION_SAMPLE_BAND) {
                 expect(entry.voice).toMatch(/^pack:/);
             }
-            // ...and bass is deliberately absent (no bass pack exists yet).
+            // ...bass is deliberately absent (it stays synth), and there is no harmony
+            // lane to route: the band's lanes are drums, bass, comp and lead.
             expect(modules).not.toContain('bass');
-            expect(modules).toEqual(
-                expect.arrayContaining(['chords', 'soloist', 'harmony', 'groove']),
-            );
+            expect(modules).not.toContain('harmony');
+            expect(modules).toEqual(expect.arrayContaining(['chords', 'soloist', 'groove']));
         });
 
         it('formats the synth→sample comparison with side-ratio, crest, and wetness', () => {
@@ -675,6 +658,44 @@ describe('mix report utilities', () => {
                 ],
             });
             expect(out).toContain('—'); // null metrics render as em-dash, no crash
+        });
+    });
+
+    describe('pack calibration (--calibrate-pack)', () => {
+        it('takes a band lane module and a pack id, and refuses a module with no lane', () => {
+            expect(parseCalibratePack('')).toBeNull();
+            expect(parseCalibratePack('chords:grand')).toEqual({
+                module: 'chords',
+                packId: 'grand',
+            });
+            expect(Object.keys(CALIBRATION_STEM)).toEqual(['groove', 'bass', 'chords', 'soloist']);
+            expect(() => parseCalibratePack('harmony:strings-ensemble')).toThrow(
+                /not a band lane's module/,
+            );
+            // A prototype key is not a module (the #1266 TABLE[untrusted] rule).
+            expect(() => parseCalibratePack('constructor:grand')).toThrow(/not a band lane/);
+            expect(() => parseCalibratePack('true')).toThrow(/--calibrate-pack=<module>:<packId>/);
+        });
+
+        it('suggests the gain that sets pack RMS to synth RMS', () => {
+            const out = formatPackCalibration({
+                module: 'chords',
+                packId: 'grand',
+                currentGain: 2,
+                rows: [
+                    {
+                        sceneId: 'jazz-ride',
+                        seed: 'A',
+                        synthRmsDb: -20,
+                        packRmsDb: -26,
+                        synthCentroid: 1000,
+                        packCentroid: 1100,
+                    },
+                ],
+            });
+            // 2 × 10^(6/20) ≈ 3.991
+            expect(out).toContain('suggested gain:        3.991×');
+            expect(out).toContain('OFF BASELINE — pack is quieter than synth by 6.00 dB');
         });
     });
 });

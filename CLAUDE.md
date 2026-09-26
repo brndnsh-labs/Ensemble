@@ -126,7 +126,7 @@ One runtime per page, independent of React mounts. `initialize()` starts the log
 - **Sanctioned (real-time hot paths):** `public/engine/scheduler-core.ts` and the `synth-*.ts` family — direct audio param writes for scheduling and synthesis. Also `public/controllers/app-controller.ts`'s BPM reschedule (`nextNoteTime`/`unswungNextNoteTime`) and `public/controllers/instrument-controller.ts`'s `flushBuffer()` voice-continuity writes, which are the same real-time class outside the engine dir.
 - **Sanctioned exception (init-only):** `public/engine/engine.ts` `initAudio()`, `public/engine/audio-recovery.ts` — one-shot audio-graph setup that runs before any dispatch subscriber exists.
 - **Sanctioned exception (pre-mount only):** `public/state/state-hydration.ts`'s `hydrateState`/`loadFromUrl` — written to run before any reactive listener is attached. Since #1358 no app code calls them (v2 opens charts from its own songbook and imports only this file's validators), so extend them only with a live caller in hand.
-- **Sanctioned exception (detached render clone):** `public/export/audio-export.ts`'s `cloneStateForRender` output and `scripts/mix-report.ts`'s inline clone. These write a throwaway copy of the state tree for an offline render — dispatching would write the *live* slices and corrupt the running app mid-export. `public/engine/chords-engine.ts`'s `validateProgression` belongs here too: it writes `arranger.progression` on **its passed-in `state`**, which is the live tree on the main path and a detached clone on the export path, so a dispatch there would silently corrupt live state during an offline stem render.
+- **Sanctioned exception (detached render clone):** `public/export/audio-export.ts`'s `cloneStateForRender` output, and the clone `prototypes/v2/lib/band-export.ts`'s `renderBandPasses` renders from (written by it and by the render bridge's `prepare` hook). These write a throwaway copy of the state tree for an offline render — dispatching would write the *live* slices and corrupt the running app mid-export. `public/engine/chords-engine.ts`'s `validateProgression` belongs here too: it writes `arranger.progression` on **its passed-in `state`**, which is the live tree on the main path and a detached clone on the export path, so a dispatch there would silently corrupt live state during an offline stem render.
 - **Everything else routes through reducers.** Any site not in the four categories above must dispatch.
 
 Enforced by `npm run check-mutations` over `public/**/*.{ts,tsx}` — it catches the bare, cast (`(slice as Mutable<…>).f =`), and aliased-handle assignment idioms, treating a `@direct-mutation`/`@worker-mutation` marker anywhere in the statement as the exemption. The skip list is **content-based, not path-based**: a file is exempt only if it *declares* a slice (contains `deepSignal<`), plus `*reducer*` by name. That deliberately keeps the non-slice plumbing that lives alongside the slices (`state/state-effects.ts`, `state/state-hydration.ts`, `state/history.ts`, `state/persistence.ts`, `state/share-codec.ts`) inside the guard — a blanket `state/` path skip would exempt them the moment they moved into that directory. Two known limits: **`scripts/` is not in scope** (it has its own unmigrated sites), and **array-method mutation is invisible** to an assignment-based guard — `state/history.ts`'s `arranger.history.push/shift/pop` is unmarked and unenforced.
@@ -141,6 +141,14 @@ event stream (`.mid`, WAV). Read `band/CLAUDE.md` and `docs/design/band-engine.m
 it. `?engine=old` still plays the old worker pipeline below, for comparison, until #1404 retires
 it; the Musical Logic sections that name `public/engine` files describe that old engine.
 
+The listening-gate tools (`npm run mix:report` and `mix:ab`/`mix:verify`/`mix:spectro`/`mix:plant`
+built on it) render the band engine: `scripts/band-scene.ts` composes each scene in node
+(`compileTimeline` → `performPass`), and `prototypes/v2/lib/render-bridge.ts` renders the events
+in the app through `renderBandPasses` (`lib/band-export.ts`, the export's own offline render) on
+`window.ensemble`. The v2 runtime installs the bridge only in a build made with
+`NEXT_PUBLIC_RENDER_BRIDGE=1`, which `mix:report` makes for itself; a production build compiles it
+out. See `docs/guides/listening-gate-tools.md`.
+
 ### Generative Engine Pipeline (worker thread) — the old engine, `?engine=old`
 
 - `public/worker-client.ts` — main-thread bridge; sends full snapshots (`getSyncState()`) or deltas (`syncWorker()`).
@@ -148,9 +156,8 @@ it; the Musical Logic sections that name `public/engine` files describe that old
 - `public/midi-export-worker.ts` — owns one detached MIDI export in a fresh module-worker realm.
 - `public/engine/scheduler-core.ts` — real-time scheduler consuming worker buffers; timing is based on `playback.audio.currentTime`, not UI clocks.
 - Musical engines: `soloist-phrase-first.ts`, `bass-engine.ts`, `accompaniment.ts`, `chords-engine.ts`, `harmonies.ts`, `grooves/` (13 genre strategies).
-- `public/render-bridge.ts` — `installRenderBridge()` puts engine internals on `window.ensemble` for the listening-gate tools (`scripts/mix-report.ts` and the `mix:ab`/`mix:verify`/`plant-defects` scripts built on it). The v2 runtime installs it only in a build made with `NEXT_PUBLIC_RENDER_BRIDGE=1`, which `mix:report` makes for itself; a production build compiles it out.
 
-There is no visualizer any more. `vizState` and `public/visualizer/visualizer-events.ts` survive only because `scheduler-core.ts` queues note events through them, which `mix:report`'s event capture reads (it enables `vizState` in its render clone).
+There is no visualizer any more. `vizState` and `public/visualizer/visualizer-events.ts` survive only because the old engine's `scheduler-core.ts` queues note events through them; since the listening-gate tools moved to the band engine nothing turns `vizState` on, and both go with the old engine (#1404).
 
 ### UI (`prototypes/v2/app/`)
 

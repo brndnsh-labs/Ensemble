@@ -1728,34 +1728,3 @@ export const ACTIONS = {
     PROG_VALIDATED: 'PROG_VALIDATED',
     DRUM_PRESET_LOADED: 'DRUM_PRESET_LOADED',
 } as const satisfies { readonly [K in keyof ActionPayloadMap]-?: K };
-
-/**
- * The offline-render bridge `installRenderBridge()` puts on `window` (render-bridge.ts).
- * Augmented globally so callers can read the fields without `window as any` casts.
- */
-declare global {
-    interface Window {
-        // The signatures here mirror the runtime helpers installed by
-        // installRenderBridge(). The dispatch surface stays on the same canonical
-        // action contract as production callers; Playwright specs may remain
-        // runtime-oriented, but typed app/devtools consumers cannot escape it.
-        ensemble?: {
-            dispatch: Dispatch;
-            getState: () => EnsembleState;
-            ACTIONS: typeof ACTIONS;
-            validateProgression: (state: EnsembleState, dispatch?: Dispatch) => unknown;
-            scheduleGlobalEvent: (...args: any[]) => any;
-            calculateStepDuration: (step: number, bpm: number, ts: any, groove: any) => number;
-            getEffectiveMeterAtStep: (arranger: any, step: number) => any;
-            initAudio: (state: EnsembleState) => unknown;
-            loadDrumPreset: (name: string) => unknown;
-            generateNotesForStep: (...args: any[]) => any;
-            generateSessionSeed: (...args: any[]) => SoloistSessionSeed;
-            generateSoloistAccents: (...args: any[]) => Record<number, any>;
-            loopArcMultiplier: (loopCount: number, loopLimit: number) => number;
-            ensurePackLoaded: (audio: BaseAudioContext, packId: string) => Promise<void>;
-            getPackZones: (packId: string) => unknown[] | null;
-            isPackLoaded: (packId: string) => boolean;
-        };
-    }
-}

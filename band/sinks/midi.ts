@@ -15,8 +15,8 @@ import type { Timeline } from '../form/timeline.js';
 import { COMP_INSTRUMENTS } from '../players/comp/instruments.js';
 import { LEAD_INSTRUMENTS } from '../players/lead/instruments.js';
 
-/** General MIDI percussion keys. */
-const GM_DRUMS: Record<DrumPiece, number> = {
+/** General MIDI percussion keys. Also the key the listening-gate tools' event dumps give a hit. */
+export const GM_DRUMS: Record<DrumPiece, number> = {
     kick: 36,
     snare: 38,
     ghost: 38,
