@@ -92,6 +92,11 @@ export interface Answer {
      * under the singer); without it the hand simply doesn't play (a pianist's short stabs).
      */
     hold?: boolean;
+    /**
+     * The fewest strikes lay-out leaves in a bar: a comper who is down to the chord's
+     * arrival alone has stopped keeping time (a sparse figure thins to nothing otherwise).
+     */
+    keep?: number;
 }
 
 /** A breath worth answering: a dotted quarter without the lead (in sixteenths). */
@@ -386,7 +391,8 @@ function answerLead(
             hit.early ||
             firsts.has(hit) ||
             !sounding[hit.step] ||
-            !rng.chance(book.answer.layOut)
+            !rng.chance(book.answer.layOut) ||
+            planned.filter((h) => !h.muted && !h.early).length <= (book.answer.keep ?? 0)
         ) {
             continue;
         }

@@ -1597,6 +1597,28 @@ export const METRICS = {
         return mean(inBreath) - mean(underLine);
     },
     /**
+     * Share of the lead's bars where the comp strikes once or not at all: a comper down to
+     * the chord's arrival has stopped keeping time, however well it answers.
+     */
+    compThinBars: (takes) => {
+        let bars = 0;
+        let thin = 0;
+        for (const { timeline: t, events } of takes) {
+            const lead = leadNotes(events);
+            const strikes = events.filter((e) => e.lane === 'comp' && !(e as PitchedNote).muted);
+            for (const index of new Set(lead.map((l) => l.bar))) {
+                const bar = t.bars[index];
+                const end = bar.start + bar.meter.barTicks;
+                const count = new Set(
+                    strikes.filter((e) => e.tick >= bar.start && e.tick < end).map((e) => e.tick),
+                ).size;
+                bars++;
+                thin += count <= 1 ? 1 : 0;
+            }
+        }
+        return ratio(thin, bars);
+    },
+    /**
      * Comp strikes per sixteenth while a lead note sounds, in the bars it plays: how far the
      * comp thins under the line. A floor keeps the time; a ceiling proves it leans back.
      */
