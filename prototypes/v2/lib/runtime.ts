@@ -1,6 +1,5 @@
 import {
     type BandSettings,
-    type CompInstrument,
     compileTimeline,
     DEFAULT_SETTINGS,
     type LeadInstrument,
@@ -82,6 +81,14 @@ import { auditionMidis, type BandChart, bandChart, sectionSteps, slotAt } from '
 import { renderBandMixToWav, renderBandStemsToWav } from './band-export';
 import { BandHost } from './band-host';
 import {
+    AUTO_VOICE_FOR_STYLE,
+    COMP_FOR_VOICE,
+    LEAD_FOR_VOICE,
+    STYLE_FOR_GENRE,
+    VOICE_FOR_COMP,
+    VOICE_FOR_LEAD,
+} from './band-voices';
+import {
     type ChartDocument,
     type DocumentContent,
     scoreArrangementView,
@@ -134,65 +141,6 @@ let currentScore: SemanticScore | null = null;
 // checks read the same flag.
 /** One sixteenth in band ticks: the old engine's step, so step maps convert exactly. */
 const STEP_TICKS = PPQ / 4;
-/**
- * The band engine's style for each of the 13 canonical genres (all native). A lookup by a
- * persisted genre name is guarded with `Object.hasOwn`.
- */
-const STYLE_FOR_GENRE: Record<string, StyleId> = {
-    Rock: 'rock',
-    Jazz: 'jazz',
-    Funk: 'funk',
-    Bossa: 'bossa',
-    Blues: 'blues',
-    'Neo-Soul': 'neosoul',
-    Disco: 'disco',
-    'Hip Hop': 'hiphop',
-    Reggae: 'reggae',
-    Acoustic: 'acoustic',
-    Country: 'country',
-    Metal: 'metal',
-    'Ska-Punk': 'skapunk',
-};
-/** The chords-lane sound for each comp instrument (what the band's Auto sound selects). */
-const VOICE_FOR_COMP: Record<CompInstrument, InstrumentVoice> = {
-    piano: 'pack:grand',
-    rhodes: 'pack:rhodes',
-    organ: 'pack:hammond-organ',
-    clav: 'pack:clavinet',
-    guitar: 'pack:electric-guitar-clean',
-    nylon: 'pack:nylon-guitar',
-};
-/**
- * How the band plays the sound on the chords lane: a guitar sound gets guitar grips and
- * strums, the organ holds, the rest are keyboards. Any other sound (the synth) is a piano.
- */
-const COMP_FOR_VOICE: Record<string, CompInstrument> = Object.assign(Object.create(null), {
-    ...Object.fromEntries(Object.entries(VOICE_FOR_COMP).map(([comp, voice]) => [voice, comp])),
-    'pack:electric-guitar-rhythm': 'guitar',
-    'pack:electric-guitar-driven': 'guitar',
-});
-/**
- * A native style whose Auto sound is not its comp instrument's default sound. Metal's comp is
- * the guitar book, but heard through the crunch pack (the old engine's #698): power chords are
- * what a *distorted* guitar plays, and on the clean pack they sound thin. The sound is the
- * app's business, so it lives here rather than on the engine's `Style`; `COMP_FOR_VOICE` still
- * maps the pack back to the guitar book.
- */
-const AUTO_VOICE_FOR_STYLE: Partial<Record<StyleId, InstrumentVoice>> = {
-    metal: 'pack:electric-guitar-rhythm',
-};
-/** The lead's instruments as the soloist lane's sounds. The built-in lead voice is a trumpet. */
-const VOICE_FOR_LEAD: Record<LeadInstrument, InstrumentVoice> = {
-    sax: 'pack:sax-alto',
-    trumpet: 'synth',
-    guitar: 'pack:electric-guitar-clean',
-    overdrive: 'pack:electric-guitar-driven',
-    nylon: 'pack:nylon-guitar',
-};
-const LEAD_FOR_VOICE: Record<string, LeadInstrument> = Object.assign(
-    Object.create(null),
-    Object.fromEntries(Object.entries(VOICE_FOR_LEAD).map(([lead, voice]) => [voice, lead])),
-);
 /** On the band engine, a native style with a lead picks its lead instrument's sound. */
 function bandAutoLead(genre: string | undefined): InstrumentVoice | null {
     const style = STYLE_IDS.find((id) => STYLES[id].name === genre);
