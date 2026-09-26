@@ -22,6 +22,7 @@ import {
     secondsAt,
     type Timeline,
 } from '@band/index';
+import { muteGain } from '@engine/engine/mute-contract';
 import { playBassNote } from '@engine/engine/synth-bass';
 import { playNote } from '@engine/engine/synth-chords';
 import { playDrumSound } from '@engine/engine/synth-drums';
@@ -97,9 +98,32 @@ function hz(midi: number): number {
 }
 
 /**
+ * The level one `BandEvent` is played at: the scalar its voice receives and, for a
+ * palm-muted bass note, the gain the voice's mute leaves behind (`muteGain`, the shared mute
+ * contract). `playBandEvent` plays every event at exactly this level; the render bridge's
+ * dispatch tap (`render-bridge.ts`) reports it, so `mix:verify` measures the level the voice
+ * was actually asked for.
+ */
+export function bandEventLevel(event: BandEvent): { level: number; levelScale?: number } {
+    if (event.lane === 'drums') {
+        // The drum voices take roughly 0–1.2 (an accent sits a little over 1).
+        return { level: (event.velocity / 127) * 1.2 };
+    }
+    if (event.lane === 'bass') {
+        const level = (event.velocity / 127) * 1.1;
+        return event.muted ? { level, levelScale: muteGain(BASS_MUTE) } : { level };
+    }
+    if (event.lane === 'lead') {
+        return { level: (event.velocity / 127) * 1.1 };
+    }
+    return { level: (event.velocity / 127) * (event.palm ? 0.7 : 0.8) };
+}
+
+/**
  * Turns one `BandEvent` into sound through today's voices and sample packs — the single
- * place both the live host (`BandHost.sound` below) and the offline WAV/stem export
- * (`prototypes/v2/lib/band-export.ts`) call, so an exported mix matches what was heard live.
+ * place both the live host (`BandHost.sound` below) and the offline render
+ * (`renderBandPasses` in `prototypes/v2/lib/band-export.ts`, behind the WAV/stem export and
+ * the listening-gate tools) call, so an exported mix matches what was heard live.
  * `durationSeconds` and `chordSize` are the two things a caller can't derive from the event
  * alone: a drum hit has no written length, and a comp note's per-voice gain depends on how
  * many other comp notes share its tick (both callers compute these from their own tick→time
@@ -114,9 +138,9 @@ export function playBandEvent(
     chordSize: number,
     legato = false,
 ): void {
+    const { level } = bandEventLevel(event);
     if (event.lane === 'drums') {
-        // The drum voices take roughly 0–1.2 (an accent sits a little over 1).
-        playDrumSound(state, DRUM_NAMES[event.piece], time, (event.velocity / 127) * 1.2);
+        playDrumSound(state, DRUM_NAMES[event.piece], time, level);
         return;
     }
     if (event.lane === 'bass') {
@@ -125,7 +149,7 @@ export function playBandEvent(
             hz(event.midi),
             time,
             durationSeconds,
-            (event.velocity / 127) * 1.1,
+            level,
             event.muted ? BASS_MUTE : 0,
         );
         return;
@@ -139,7 +163,7 @@ export function playBandEvent(
             hz(event.midi),
             time,
             durationSeconds,
-            (event.velocity / 127) * 1.1,
+            level,
             -(event.bendIn ?? 0),
             'scalar',
             legato,
@@ -159,7 +183,7 @@ export function playBandEvent(
           : durationSeconds;
     playNote(state, hz(event.midi), time, length, {
         muted: event.muted,
-        vol: (event.velocity / 127) * (event.palm ? 0.7 : 0.8),
+        vol: level,
         instrument: (state.chords as { instrument?: string }).instrument || 'Piano',
         numVoices: chordSize,
     });

@@ -219,7 +219,11 @@ before it is needed.
 
 Audio (WAV/stem) export renders `BandHost.render()`'s events offline (`lib/band-export.ts`)
 through `playBandEvent`, the same voice mapping `BandHost` schedules live with, feel offsets
-included. A stem export renders drums, bass, chords (the comp) and soloist (the lead).
+included. A stem export renders drums, bass, chords (the comp) and soloist (the lead), each lane's bus
+open even when that lane is off live. The listening-gate tools (`mix:report` and the tools on
+it) render through the same function, `renderBandPasses`: they compose a scene in node
+(`scripts/band-scene.ts`) and hand the events to the page's render bridge
+(`lib/render-bridge.ts`), so what they measure is what the export writes.
 `app/band-lanes.ts`'s `visibleLanes` drops harmony from every lane-driven control (transport
 mute chips, the Sounds panel). The `.mid` export is the same stream through `band/sinks/midi.ts`:
 the song once through with its ending, a lead track only when the lead played.
