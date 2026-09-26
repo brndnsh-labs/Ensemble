@@ -1097,10 +1097,12 @@ export class AccountSongbook {
                                                 try {
                                                     song = savedSong(savedRow, scope, documentId);
                                                 } catch {
-                                                    // Unreadable is not a source and not a record
-                                                    // this call may drop either; the draft search
-                                                    // below is this call's only way to a source.
-                                                    song = null;
+                                                    // An unreadable record is not a verdict: with
+                                                    // it null every draft would read as live, even
+                                                    // one it supersedes, and settling here would
+                                                    // drop the candidate that explains the row.
+                                                    // Leave everything as it is.
+                                                    return tx.finish('none');
                                                 }
                                             }
                                             // There is no queue here, so the source is not a queue

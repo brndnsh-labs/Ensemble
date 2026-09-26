@@ -517,7 +517,7 @@ describe('keeping mine as a new song with an EMPTY queue (#1362)', () => {
             writerId: 'writer-1',
             document: chart('Middle words', DOC, 0),
             baseRevision: 0,
-            capturedAt: '2031-01-10T00:00:00.000Z',
+            capturedAt: '9999-01-10T00:00:00.000Z',
         });
         await putRawDraft({
             ownerId: OWNER,
@@ -525,7 +525,7 @@ describe('keeping mine as a new song with an EMPTY queue (#1362)', () => {
             writerId: 'writer-2',
             document: chart('Newest words', DOC, 0),
             baseRevision: 0,
-            capturedAt: '2031-01-12T00:00:00.000Z',
+            capturedAt: '9999-01-12T00:00:00.000Z',
         });
         await putRawDraft({
             ownerId: OWNER,
@@ -533,7 +533,7 @@ describe('keeping mine as a new song with an EMPTY queue (#1362)', () => {
             writerId: 'writer-3',
             document: chart('Oldest live words', DOC, 0),
             baseRevision: 0,
-            capturedAt: '2031-01-09T00:00:00.000Z',
+            capturedAt: '9999-01-09T00:00:00.000Z',
         });
         expect(await tombstoned()).toBe('retained-deleted');
 
