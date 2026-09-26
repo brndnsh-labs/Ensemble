@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import type { Page } from '@playwright/test';
 import type { ChartDocument } from '../lib/documents';
+import { expectVisitsFollowForm } from './chart-visits';
 import { appUrl, test as base, expect } from './fixtures';
 
 const test = base.extend<{ disconnect: () => Promise<void> }>({
@@ -247,14 +248,14 @@ for (const study of [
             });
         });
         await page.getByRole('button', { name: 'Start playback', exact: true }).click();
+        // Two whole laps and the start of a third. The painted pointer is a SAMPLE of the
+        // performance, so a chord can be missed at a busy moment (the lap wrap, on CI
+        // WebKit); the matcher forgives a couple of dropped samples, never a wrong visit.
         await expect
-            .poll(() => visits.length, { timeout: 15_000 })
-            .toBeGreaterThan(study.visits.length);
+            .poll(() => visits.length, { timeout: 30_000 })
+            .toBeGreaterThan(study.visits.length * 2);
         await page.getByRole('button', { name: 'Stop playback', exact: true }).click();
-        expect(visits.slice(0, study.visits.length + 1)).toEqual([
-            ...study.visits,
-            study.visits[0],
-        ]);
+        expectVisitsFollowForm(visits, study.visits);
         await expect(page.locator('.bar')).toHaveCount(3);
     });
 }

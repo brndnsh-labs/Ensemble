@@ -26,6 +26,14 @@ flake (measure its fail-rate, classify it, and append an entry here).
 
 ## Registry
 
+### 🟢 `prototypes/v2/checks/ireal-import.spec.ts` — "multi-chord repeated bars imports and highlights exact performed visits on the compact stand"
+
+- **Class:** e2e-timing (DOM sampling, not the band).
+- **Symptom:** `v2-suite (rest, webkit-phone)` on PR #1415: the recorded visits ended `…F@32-48, Dm@8-12` where the wrap back to `C@0-8` was expected. The band played the C; the stand never painted it.
+- **Root cause:** the painted pointer is a sample. The runtime publishes the sounding chord off a 50ms interval and React paints it, so a main-thread stall at the lap wrap (the busiest moment) can skip a short chord entirely, here a half-bar C at 240 BPM. The check demanded an exact sequence. It is the same flake class the old engine's semantic-playback check had solved with a drop-tolerant matcher, deleted with it in #1413.
+- **Fix (2026-09-26):** that matcher, `expectVisitsFollowForm`, now lives in `prototypes/v2/checks/chart-visits.ts`, with its own self-test (`chart-visits.spec.ts`). It forgives at most two dropped samples, and still fails a wrong chord, a wrong span, an out-of-order visit, a missed wrap, or a chord no lap reaches. The iReal check waits for two whole laps and asserts through it.
+- **Last seen:** 2026-09-26 (PR #1415).
+
 ### 🟢 `prototypes/v2/checks/semantic-chart.spec.ts` — "semantic revision conflicts keep both takes, and unsupported imports never create a partial song"
 
 - **Class:** e2e-timing — but the race is in the **app**, not the test.

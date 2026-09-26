@@ -91,6 +91,17 @@ export const jazz = defineClaims({
         {
             take: { lead: 'solo' },
             claims: [
+                // Ablations measured on the solo take (answer off / no lay-out / no fill / no
+                // floor): thin bars 0.19 (0.23 / 0.19 / 0.23 / 0.39), breath density 1.15 (0.87 /
+                // 1.10 / 0.91 / 1.36), answers 0.48 (0.28 / 0.51 / 0.25 / 0.48), lift +3.1
+                // (-5.0 / 2.4 / 2.2 / 3.1), line density 0.113 (0.119 / 0.119 / 0.113 / 0.096).
+                // The first cut (lay-out 0.6, fill 0.7, no floor) left 41% of bars with one
+                // strike and Brandon heard it thin (#1404 item 33).
+                ['compThinBars', 0, 0.21, 'the time is kept: a bar of one strike is rare'],
+                ['compBreathDensity', 1.1, 2, "the comper talks in the soloist's breaths"],
+                ['compAnswersBreaths', 0.4, 0.7, 'a stab of its own in most of them, not all'],
+                ['compAnswerLift', 1, 12, 'an answer speaks up in the hole'],
+                ['compLineDensity', 0.1, 0.116, 'a little thinner under the line'],
                 ['leadLongBreath', 0, 0.12, 'breaths, not gaps: two empty bars are rare'],
                 ['leadRestShare', 0.2, 0.5, 'the solo breathes between phrases'],
                 ['leadShortShare', 0.6, 0.95, 'bebop: running eighth-note lines'],

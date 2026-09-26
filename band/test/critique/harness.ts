@@ -238,6 +238,66 @@ function onsetsByBar(t: Timeline, events: BandEvent[], lane: 'bass' | 'comp') {
 
 export type Metric = (takes: Take[]) => number;
 
+/** The lead's breaths inside the bars it plays: silent runs of a dotted quarter or more. */
+function leadBreaths({ timeline: t, events }: Take): [number, number][] {
+    const lead = leadNotes(events);
+    const out: [number, number][] = [];
+    for (const index of new Set(lead.map((l) => l.bar))) {
+        const bar = t.bars[index];
+        const count = Math.round(bar.meter.barTicks / STEP);
+        const sounding = (s: number) => {
+            const from = bar.start + s * STEP;
+            return lead.some((l) => l.tick < from + STEP && l.tick + l.dur > from);
+        };
+        for (let s = 0; s < count; ) {
+            if (sounding(s)) {
+                s++;
+                continue;
+            }
+            let end = s;
+            while (end < count && !sounding(end)) {
+                end++;
+            }
+            if (end - s >= 6) {
+                out.push([bar.start + s * STEP, bar.start + end * STEP]);
+            }
+            s = end;
+        }
+    }
+    return out;
+}
+
+/**
+ * The comp's strikes (one note per strike) that are neither a chord's first strike nor a push
+ * into a change: the ones a comper chooses, which is where an answer shows.
+ */
+function answerStrikes({ timeline: t, events }: Take): PitchedNote[] {
+    const byTick = new Map<number, PitchedNote>();
+    for (const e of events) {
+        if (e.lane === 'comp' && !(e as PitchedNote).muted && !byTick.has(e.tick)) {
+            byTick.set(e.tick, e as PitchedNote);
+        }
+    }
+    const strikes = [...byTick.values()].sort((a, b) => a.tick - b.tick);
+    const chosen = new Set(strikes);
+    for (const span of t.spans) {
+        if (!span.chord) {
+            continue;
+        }
+        // Its first strike, or a push up to an eighth ahead of it.
+        const first = strikes.find((c) => c.tick >= span.start - 2 * STEP && c.tick < span.end);
+        if (first) {
+            chosen.delete(first);
+        }
+        for (const c of strikes) {
+            if (c.tick >= span.end - 2 * STEP && c.tick < span.end) {
+                chosen.delete(c);
+            }
+        }
+    }
+    return [...chosen];
+}
+
 export const METRICS = {
     /**
      * Share of the drummer's bars in a chorus of fours in which nothing but the drums sounds:
@@ -1651,6 +1711,142 @@ export const METRICS = {
             }
         }
         return ratio(hit, n);
+    },
+    /**
+     * How much busier the comp is in the lead's breaths (a dotted quarter or more without it,
+     * inside a bar it plays) than under its notes: comp strikes per sixteenth in the breaths
+     * over strikes per sixteenth under the line. Above 1, the comp talks in the holes.
+     */
+    compBreathDensity: (takes) => {
+        let breathSteps = 0;
+        let breathStrikes = 0;
+        let lineSteps = 0;
+        let lineStrikes = 0;
+        for (const { timeline: t, events } of takes) {
+            const lead = leadNotes(events);
+            const strikes = new Set(
+                events
+                    .filter((e) => e.lane === 'comp' && !(e as PitchedNote).muted)
+                    .map((e) => e.tick),
+            );
+            for (const index of new Set(lead.map((l) => l.bar))) {
+                const bar = t.bars[index];
+                const count = Math.round(bar.meter.barTicks / STEP);
+                const sounding = Array.from({ length: count }, (_, s) => {
+                    const from = bar.start + s * STEP;
+                    return lead.some((l) => l.tick < from + STEP && l.tick + l.dur > from);
+                });
+                for (let s = 0; s < count; ) {
+                    let end = s;
+                    while (end < count && sounding[end] === sounding[s]) {
+                        end++;
+                    }
+                    const hits = [...strikes].filter(
+                        (tick) => tick >= bar.start + s * STEP && tick < bar.start + end * STEP,
+                    ).length;
+                    if (sounding[s]) {
+                        lineSteps += end - s;
+                        lineStrikes += hits;
+                    } else if (end - s >= 6) {
+                        breathSteps += end - s;
+                        breathStrikes += hits;
+                    }
+                    s = end;
+                }
+            }
+        }
+        return ratio(
+            breathStrikes / Math.max(1, breathSteps),
+            lineStrikes / Math.max(1, lineSteps),
+        );
+    },
+    /**
+     * Of the breaths the lead takes inside a bar it plays (a dotted quarter or more without
+     * it), the share the comp answers in: a strike that isn't a chord's first or a push, which
+     * would be there anyway.
+     */
+    compAnswersBreaths: (takes) => {
+        let n = 0;
+        let answered = 0;
+        for (const take of takes) {
+            const answers = answerStrikes(take);
+            for (const [from, to] of leadBreaths(take)) {
+                n++;
+                answered += answers.some((c) => c.tick >= from && c.tick < to) ? 1 : 0;
+            }
+        }
+        return ratio(answered, n);
+    },
+    /**
+     * How much louder the comp's answers in the lead's breaths are than its strikes under the
+     * line (mean velocity, same kind of strike: not a chord's first, not a push).
+     */
+    compAnswerLift: (takes) => {
+        const inBreath: number[] = [];
+        const underLine: number[] = [];
+        for (const take of takes) {
+            const breaths = leadBreaths(take);
+            const lead = leadNotes(take.events);
+            for (const c of answerStrikes(take)) {
+                if (breaths.some(([from, to]) => c.tick >= from && c.tick < to)) {
+                    inBreath.push(c.velocity);
+                } else if (lead.some((l) => l.tick <= c.tick && c.tick < l.tick + l.dur)) {
+                    underLine.push(c.velocity);
+                }
+            }
+        }
+        const mean = (v: number[]) => (v.length ? v.reduce((a, b) => a + b, 0) / v.length : 0);
+        return mean(inBreath) - mean(underLine);
+    },
+    /**
+     * Share of the lead's bars where the comp strikes once or not at all: a comper down to
+     * the chord's arrival has stopped keeping time, however well it answers.
+     */
+    compThinBars: (takes) => {
+        let bars = 0;
+        let thin = 0;
+        for (const { timeline: t, events } of takes) {
+            const lead = leadNotes(events);
+            const strikes = events.filter((e) => e.lane === 'comp' && !(e as PitchedNote).muted);
+            for (const index of new Set(lead.map((l) => l.bar))) {
+                const bar = t.bars[index];
+                const end = bar.start + bar.meter.barTicks;
+                const count = new Set(
+                    strikes.filter((e) => e.tick >= bar.start && e.tick < end).map((e) => e.tick),
+                ).size;
+                bars++;
+                thin += count <= 1 ? 1 : 0;
+            }
+        }
+        return ratio(thin, bars);
+    },
+    /**
+     * Comp strikes per sixteenth while a lead note sounds, in the bars it plays: how far the
+     * comp thins under the line. A floor keeps the time; a ceiling proves it leans back.
+     */
+    compLineDensity: (takes) => {
+        let steps = 0;
+        let strikes = 0;
+        for (const { timeline: t, events } of takes) {
+            const lead = leadNotes(events);
+            const ticks = new Set(
+                events
+                    .filter((e) => e.lane === 'comp' && !(e as PitchedNote).muted)
+                    .map((e) => e.tick),
+            );
+            for (const index of new Set(lead.map((l) => l.bar))) {
+                const bar = t.bars[index];
+                const count = Math.round(bar.meter.barTicks / STEP);
+                for (let s = 0; s < count; s++) {
+                    const from = bar.start + s * STEP;
+                    if (lead.some((l) => l.tick < from + STEP && l.tick + l.dur > from)) {
+                        steps++;
+                        strikes += [...ticks].some((x) => x >= from && x < from + STEP) ? 1 : 0;
+                    }
+                }
+            }
+        }
+        return ratio(strikes, steps);
     },
     /** Share of sixteenths left silent inside the bars the lead plays in: its inner space. */
     leadInnerSpace: (takes) => {
