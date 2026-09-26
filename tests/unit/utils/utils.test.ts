@@ -3,7 +3,11 @@ import { describe, expect, it } from 'vitest';
 import { TIME_SIGNATURES } from '../../../public/config.js';
 import { clampFreq, createSoftClipCurve } from '../../../public/engine/audio-graph-utils.js';
 import { formatUnicodeSymbols } from '../../../public/sanitize.js';
-import { compressSections, decompressSections } from '../../../public/state/share-codec.js';
+import { compressSections, tryDecompressSections } from '../../../public/state/share-codec.js';
+
+/** A valid payload's sections (a rejected one reads as none). */
+const decompressSections = (str: string) => tryDecompressSections(str) ?? [];
+
 import {
     getFrequency,
     getMidi,
@@ -273,7 +277,7 @@ describe('Utility Functions', () => {
             expect(decompressed[0].id).not.toBe('1');
         });
 
-        // why (#1258): `decompressSections`'s output goes straight into state with no
+        // why (#1258): the decoder's output went straight into state with no
         // `validateSections` pass, so its section-meter guard is the only one on the `?s=`
         // path — and it checked LENGTH, not membership, so '__proto__' (9 chars),
         // 'toString' (8) and 'valueOf' (7) all slipped under `length < 10`. Two readers of

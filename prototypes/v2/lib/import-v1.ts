@@ -15,13 +15,12 @@
  * 2. It reads the raw strings itself instead of going through v1's `storage.get`,
  *    which returns `[]` for BOTH "absent" and "unreadable" — a corrupt profile must
  *    be reported, never silently read as an empty library.
- * 3. It never calls v1's `hydrateState()`: that writes the live state slices (and,
- *    on a mixer-version bump, calls `saveCurrentState()`). Instead it reuses v1's own
- *    exported normalizers (`clamp`, `validateSections`, `normalizeSoloistPreset`, …)
+ * 3. It writes no live state. v1's own reader (`hydrateState()`, deleted with v1's
+ *    load/save layer in #1424) wrote the live slices; this module instead reuses v1's
+ *    validation rules (`clamp`, `validateSections`, … in `public/state/state-hydration.ts`)
  *    so an imported song is what v1 ITSELF would have loaded from those bytes —
- *    including the retired soloist presets and the numeric `density`/`swingSub` a
- *    pre-#1257 share link persisted, both of which a real profile still holds and
- *    neither of which the songbook codec would accept raw.
+ *    including the numeric `swingSub` a pre-#1257 share link persisted, which a real
+ *    profile still holds and the songbook codec would not accept raw.
  *
  * Every candidate then goes through the canonical `validateChartDocument`, so nothing
  * lands in the songbook that the rest of the app cannot open. Conversion is per item:
@@ -645,10 +644,11 @@ function codecSafeSections(sections: Array<Record<string, unknown>>): ChartSecti
  * pattern and preset) are not brought over, because nothing plays them any more. The lane
  * styles follow the genre when the chart opens.
  *
- * Every field that is brought over mirrors the matching line in `hydrateSavedState`,
- * including its migrations: the #856 Auto-phrasing default and the mixer-version reset that
- * returns volumes/reverbs to defaults for a pre-#1257 save. Anything this file decides
- * differently from v1 is a codec requirement, and says so.
+ * Every field that is brought over mirrors what v1's own reader (`hydrateSavedState`, gone
+ * since #1424) did with it, including its migrations: the #856 Auto-phrasing default and the
+ * mixer-version reset that returns volumes/reverbs to defaults for a pre-#1257 save. The
+ * v1-import suite pins that agreement against a frozen capture of v1's reader. Anything this
+ * file decides differently from v1 is a codec requirement, and says so.
  */
 function sessionBand(
     saved: Record<string, unknown>,
@@ -776,7 +776,6 @@ function content(source: V1Source, context: V1ImportContext): ChartContent | str
                 notation: (typeof notation === 'string' && NOTATIONS.includes(notation)
                     ? notation
                     : 'roman') as ChartContent['arrangement']['notation'],
-                lastChordPreset: sanitizeDisplayString(saved.lastChordPreset, 'Pop (Standard)'),
             },
             performance: sessionPerformance(saved, context),
             band: sessionBand(saved, context),
@@ -797,11 +796,6 @@ function content(source: V1Source, context: V1ImportContext): ChartContent | str
             grouping: context.grouping,
             isMinor: !!source.record.isMinor,
             notation: 'roman',
-            // `title` (the document field) allows up to 200 chars, matching `findV1Data`'s
-            // own sanitize call; `lastChordPreset` is a DIFFERENT codec field capped at 100
-            // (#1274 P2-6) — reusing `source.title` unsliced here failed the whole song for
-            // any name past 100 chars even though the title itself was perfectly valid.
-            lastChordPreset: source.title.slice(0, 100),
         },
         performance: context.performance,
         band: context.band,

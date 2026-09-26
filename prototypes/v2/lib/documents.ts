@@ -50,7 +50,6 @@ export function scoreArrangementView(score: SemanticScore): ChartContent['arrang
         notation: score.notation,
         timeSignature: score.meter,
         grouping: score.grouping,
-        lastChordPreset: 'Songbook',
         sections: score.sections.map(
             ({ measures: _measures, meter, grouping: _grouping, ...section }) => ({
                 ...section,

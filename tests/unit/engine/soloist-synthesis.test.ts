@@ -117,7 +117,6 @@ describe('Soloist Synthesis', () => {
         vi.clearAllMocks();
         soloist.audio.activeVoices = [];
         soloist.mode = 'monophonic';
-        soloist.preset = 'trumpet';
         playback.audio.currentTime = 10;
     });
 

@@ -112,13 +112,13 @@ describe('Chord Synthesis', () => {
         playback.heldNotes.clear();
     });
 
-    it('should use a PeriodicWave for the "Piano" instrument', () => {
+    it('should use a PeriodicWave for the piano voice', () => {
         // The reworked Piano voice no longer drives its body through a single
         // PeriodicWave oscillator. The PeriodicWave now lives in the velocity
         // "bright" layer (createBrightWave): at this velocity the bright layer
         // blooms in, so a PeriodicWave is created and applied to one of the
         // voice's oscillators (additive-body partials use plain sines).
-        playNote(getState(), 440, 10, 1.0, { instrument: 'Piano' });
+        playNote(getState(), 440, 10, 1.0);
 
         expect(playback.audio.createPeriodicWave).toHaveBeenCalled();
         const oscsWithWave = playback.audio.createOscillator.mock.results.filter(
@@ -128,7 +128,7 @@ describe('Chord Synthesis', () => {
     });
 
     it('should apply a randomized strum offset based on index', () => {
-        playNote(getState(), 440, 10, 1.0, { index: 2, instrument: 'Piano' });
+        playNote(getState(), 440, 10, 1.0, { index: 2 });
 
         const osc = playback.audio.createOscillator.mock.results[0].value;
         const startTime = osc.frequency.setValueAtTime.mock.calls[0][1];
@@ -139,16 +139,9 @@ describe('Chord Synthesis', () => {
     });
 
     it('should create a hammer strike noise layer for Piano', () => {
-        playNote(getState(), 440, 10, 1.0, { instrument: 'Piano' });
+        playNote(getState(), 440, 10, 1.0);
 
         expect(playback.audio.createBufferSource).toHaveBeenCalled();
-    });
-
-    it('should use a simple triangle wave for the "Warm" instrument', () => {
-        playNote(getState(), 440, 10, 1.0, { instrument: 'Warm' });
-
-        const osc = playback.audio.createOscillator.mock.results[0].value;
-        expect(osc.type).toBe('triangle');
     });
 
     it('should implement chord scratch synthesis', () => {
@@ -161,7 +154,7 @@ describe('Chord Synthesis', () => {
 
     it('should hold notes when sustain is active', () => {
         playback.sustainActive = true;
-        playNote(getState(), 440, 10, 1.0, { instrument: 'Piano' });
+        playNote(getState(), 440, 10, 1.0);
 
         expect(playback.heldNotes.size).toBe(1);
     });
@@ -169,7 +162,7 @@ describe('Chord Synthesis', () => {
     it('should pop the oldest note when heldNotes exceeds 64 limit', () => {
         playback.sustainActive = true;
         for (let i = 0; i < 65; i++) {
-            playNote(getState(), 440 + i, 10 + i * 0.1, 1.0, { instrument: 'Piano' });
+            playNote(getState(), 440 + i, 10 + i * 0.1, 1.0);
         }
         expect(playback.heldNotes.size).toBe(64);
     });
@@ -177,7 +170,7 @@ describe('Chord Synthesis', () => {
     it('should release held notes when sustain is deactivated', () => {
         playback.sustainActive = true;
         for (let i = 0; i < 3; i++) {
-            playNote(getState(), 440 + i, 10, 1.0, { instrument: 'Piano' });
+            playNote(getState(), 440 + i, 10, 1.0);
         }
 
         expect(playback.heldNotes.size).toBe(3);
@@ -196,7 +189,7 @@ describe('Chord Synthesis', () => {
 
     it('should kill all piano notes immediately', () => {
         playback.sustainActive = true;
-        playNote(getState(), 440, 10, 1.0, { instrument: 'Piano' });
+        playNote(getState(), 440, 10, 1.0);
 
         killAllPianoNotes(getState());
 
@@ -228,7 +221,7 @@ describe('Chord Synthesis', () => {
     // partial-oscillator assertion below.
     it('should build a per-partial additive body on non-muted Piano notes', () => {
         // No WaveShaper in the reworked voice at all.
-        playNote(getState(), 440, 10, 1.0, { instrument: 'Piano' });
+        playNote(getState(), 440, 10, 1.0);
         expect(playback.audio.createWaveShaper).not.toHaveBeenCalled();
 
         // The additive body builds several sine partial oscillators. Beyond the
@@ -248,14 +241,14 @@ describe('Chord Synthesis', () => {
     describe('#707 B1 — synth chord voice release handle', () => {
         it('returns a handle with release() for the (no-pedal) synth Piano voice', () => {
             playback.sustainActive = false;
-            const handle = playNote(getState(), 440, 10, 1.0, { instrument: 'Piano' });
+            const handle = playNote(getState(), 440, 10, 1.0);
             expect(handle).not.toBeNull();
             expect(typeof handle.release).toBe('function');
         });
 
         it('release() eases the body to silence and pulls in the oscillator stop', () => {
             playback.sustainActive = false;
-            const handle = playNote(getState(), 440, 10, 1.0, { instrument: 'Piano' });
+            const handle = playNote(getState(), 440, 10, 1.0);
             const oscs = playback.audio.createOscillator.mock.results.map((r) => r.value);
             const gains = playback.audio.createGain.mock.results.map((r) => r.value);
             const stopsBefore = oscs.reduce((s, o) => s + o.stop.mock.calls.length, 0);
@@ -276,13 +269,6 @@ describe('Chord Synthesis', () => {
             // pending body envelope before easing it to 0 — both observable here.
             expect(stopsAfter).toBeGreaterThan(stopsBefore);
             expect(cancelsAfter).toBeGreaterThan(cancelsBefore);
-        });
-
-        it('returns a release handle for the legacy Warm voice too', () => {
-            playback.sustainActive = false;
-            const handle = playNote(getState(), 440, 10, 1.0, { instrument: 'Warm' });
-            expect(handle).not.toBeNull();
-            expect(typeof handle.release).toBe('function');
         });
     });
 });

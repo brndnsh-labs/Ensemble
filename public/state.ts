@@ -49,33 +49,6 @@ export function buildArrangerSyncPayload(arranger: ArrangerState) {
     };
 }
 
-export { arranger, playback };
-
-// Persistence Helpers
-export const storage = {
-    get: (key: string): any => {
-        if (typeof localStorage === 'undefined' || !localStorage?.getItem) {
-            return [];
-        }
-        try {
-            return JSON.parse(localStorage.getItem(`ensemble_${key}`) || '[]');
-        } catch (e) {
-            console.error(`[State] Failed to load ${key} from storage:`, e);
-            return [];
-        }
-    },
-    save: (key: string, val: any): void => {
-        if (typeof localStorage === 'undefined' || !localStorage?.setItem) {
-            return;
-        }
-        try {
-            localStorage.setItem(`ensemble_${key}`, JSON.stringify(val));
-        } catch (e) {
-            console.warn(`[State] Failed to save ${key} to storage:`, e);
-        }
-    },
-};
-
 // --- Event Bus / State Manager ---
 
 type StateListener = (

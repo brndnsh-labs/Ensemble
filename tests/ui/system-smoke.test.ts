@@ -197,12 +197,6 @@ vi.mock('../../public/engine/engine.js', () => ({
     getVisualTime: () => 0,
 }));
 
-vi.mock('../../public/state/persistence.js', () => ({
-    saveCurrentState: vi.fn(),
-    loadSavedState: vi.fn(),
-    debounceSaveState: vi.fn(),
-}));
-
 import { getState } from '../../public/state.js';
 
 const { arranger, playback } = getState();

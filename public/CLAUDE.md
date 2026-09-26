@@ -4,8 +4,7 @@ Since #1358 `public/` is a library, not an app: the v2 music stand (`prototypes/
 through the `@engine/*` alias, and `prototypes/v2/lib/runtime.ts` is its one main-thread host.
 The main-thread plumbing layer: `state.ts` + the `state/*.ts` family — the `deepSignal`
 slices plus the non-slice plumbing that sits beside them (`state/state-effects.ts`,
-`state/state-hydration.ts`, `state/history.ts`, `state/persistence.ts`,
-`state/share-codec.ts`) — the `controllers/*.ts` family
+`state/state-hydration.ts`, `state/history.ts`, `state/share-codec.ts`) — the `controllers/*.ts` family
 (`controllers/app-controller.ts`, `controllers/arranger-controller.ts`,
 `controllers/instrument-controller.ts`, …), and
 `config.ts`. Only the slice files are exempt from `npm run check-mutations`; the
@@ -19,7 +18,7 @@ top-level field as `document`/`preferences`/`runtime-derived` for persistence �
 `docs/design/write-ownership.md`, that classification doubles as a write rule: a `document`/
 `preferences` field is written only by UI dispatch or hydration, never by a runtime system
 (conductor, trade block, worker). See that doc's precedent list (`conductorVelocity`,
-`tradeSilenced`, `isInstrumentActiveAtStep`) before adding a new dispatch site that touches an
+`isInstrumentActiveAtStep`) before adding a new dispatch site that touches an
 existing document field from an engine/conductor path.
 
 ## Effects & reactivity (`state/state-effects.ts`)
@@ -28,12 +27,10 @@ existing document field from an engine/conductor path.
    dispatch.** During playback the runtime's playhead publishes `chords.lastActiveChordIndex`
    at every chord change (`followPlayhead`), and the band's own settings sync (`syncBand`) runs
    on every dispatch too. A **debounced** effect hung off `handleEffects` gets its timer reset
-   on every one of those — starved, not just deferred.
-   The persistence save (`debounceSaveState`) already solves this with a denylist
-   (`TRANSIENT_PERSIST_ACTIONS` at the top of `state-effects.ts`) — persist-by-default, with the
-   high-frequency per-step actions explicitly excluded. Any *new* debounced/coalesced subscriber
-   effect needs its own equivalent exclusion list; don't assume the persistence denylist covers
-   it, since it's scoped to "does this change a persisted field," not "is this high-frequency."
+   on every one of those — starved, not just deferred. A *new* debounced/coalesced subscriber
+   effect needs an exclusion list for the high-frequency actions. v1's session save solved it
+   that way (a `TRANSIENT_PERSIST_ACTIONS` denylist) until it was deleted with v1's load/save
+   layer (#1424); nothing debounced hangs off `handleEffects` today.
 
 8. **Audio-up side effects belong on `initAudio()` (`engine.ts`), not on the
    `ACTIONS.INIT_AUDIO` dispatch.** Since #1358 nothing dispatches `ACTIONS.INIT_AUDIO` at all

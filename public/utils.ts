@@ -393,7 +393,7 @@ export function getStepInfo(
 // out in #1179 so nothing DOM-shaped can drift back into this worker-safe module.
 //
 // encodeBase64Unicode / decodeBase64Unicode / compressSections /
-// decompressSections / generateId live in `public/state/share-codec.ts` —
+// tryDecompressSections / generateId live in `public/state/share-codec.ts` —
 // persistence + share-URL wire format, also #1179.
 //
 // createPRNG lives in `public/engine/hash-utils.ts` beside its `stringHash33`

@@ -69,11 +69,11 @@ export function isChordDensity(value: unknown): value is ChordDensity {
 
 /**
  * The `?bnd=` share-URL wire payload — the base64'd JSON v1's `compressBandSettings`
- * emitted (its writer went with the v1 shell, #1358) and `decompressBandSettings`
- * (`state/state-hydration.ts`) reads back. Keys are deliberately terse; the URL carried
- * them on every share link.
+ * emitted (its writer went with the v1 shell, #1358) and v1's `decompressBandSettings` read
+ * back (gone with v1's load/save layer, #1424). `npm run audition-link` still writes it.
+ * Keys are deliberately terse; the URL carried them on every share link.
  *
- * WHY THIS EXISTS (#1264). `decompressBandSettings` used to return `any`, so every
+ * WHY THIS EXISTS (#1264). v1's `decompressBandSettings` used to return `any`, so every
  * `band.*` read was untyped and `Object.assign(slice, {...})` accepted it even where
  * the slice field was a narrowed union. Writer/reader keyspace drift was therefore
  * invisible to `tsc`, and the only way to find it was by hand, one field at a time —
@@ -277,8 +277,6 @@ export interface ArrangerState {
     readonly history: string[];
     /** ID of the last edited section. */
     readonly lastInteractedSectionId: string;
-    /** Name of the last loaded chord preset. */
-    readonly lastChordPreset: string;
     /** ID of a section that was programmatically mutated. */
     readonly mutatedSectionId: string | null;
     /** Whether the arrangement has been manually modified. */
@@ -409,10 +407,6 @@ export interface ChordState {
     readonly volume: number;
     /** Reverb send amount. */
     readonly reverb: number;
-    /** Base MIDI octave for voicing. */
-    readonly octave: number;
-    /** Voicing density ('thin', 'standard', 'rich'). */
-    readonly density: ChordDensity;
     /** Index of the currently playing chord (UI). */
     readonly lastActiveChordIndex: number | null;
     /** Index of the last scheduled chord (Internal). */
@@ -421,8 +415,6 @@ export interface ChordState {
     readonly buffer: Map<number, any>;
     /** 16-bit mask of the current comping pattern. */
     readonly rhythmicMask: number;
-    /** Optional instrument name. */
-    readonly instrument?: string;
 }
 
 export interface BassState {
@@ -442,8 +434,6 @@ export interface BassState {
     readonly lastPlayedFreq: number | null;
     /** Map of scheduled notes from the worker. */
     readonly buffer: Map<number, any>;
-    /** Base MIDI octave. */
-    readonly octave: number;
     /** Playing style ID (e.g., 'walking', 'funk'). */
     readonly style: string;
     /** Counter for "busy" playing periods. */
@@ -874,8 +864,7 @@ export interface SoloistAudio {
 }
 
 export interface SoloistState {
-    // === Configuration (user-settable, persisted) — flat at the top of the
-    // slice to preserve persistence / hydration / UI / worker-sync compat.
+    // === Configuration (user-settable) — flat at the top of the slice. ===
 
     /** Whether the soloist is active. */
     readonly enabled: boolean;
@@ -883,9 +872,6 @@ export interface SoloistState {
     readonly voice: InstrumentVoice;
     /** Sound-source mode: Auto (follow genre) vs pinned to `voice` (#675). */
     readonly autoSound: boolean;
-    /** The synth sound profile. Consolidated to 'trumpet' (2026-05-23 mix-pass);
-     *  field retained as a string for save/share compat with legacy values. */
-    readonly preset: string;
     /** The soloist mode ('monophonic' or 'guitar'; unknown values normalize to monophonic). */
     readonly mode: string;
     /** #856 — Auto phrasing mode: when true, `mode` is derived from the lead
@@ -893,40 +879,19 @@ export interface SoloistState {
     readonly autoMode: boolean;
     /** Optional playing style (e.g. 'jazz', 'blues', 'smart'). */
     readonly style?: string;
-    /** Base MIDI octave. */
-    readonly octave: number;
     /** Mix volume (0.0 - 1.0). */
     readonly volume: number;
     /** Reverb level. */
     readonly reverb: number;
-    /** Slider for how dynamic/articulated the phrasing is. */
-    readonly phrasingIntensity: number;
-    /** Probability of playing double stops. */
-    /** The old engine's trade block: the soloist on and off by 'sections' or 'loops'. */
-    readonly tradeMode: string;
     /** Trading with the player on the band engine: 'off', 'soloist' or 'drums'. */
     readonly tradeWith: SoloistTradeWith;
     /** How many bars a traded turn lasts: 2, 4 or 8. */
     readonly tradeBars: SoloistTradeBars;
     /** How many traded choruses before the head returns; 0 keeps trading forever. */
     readonly tradeChoruses: SoloistTradeChoruses;
-    /**
-     * #1062 — RUNTIME-DERIVED trade-silencing layer, never the user's own
-     * setting. The soloist-trade block in `conductor.ts` toggles this (not
-     * `enabled`) at each section/loop boundary while `tradeMode` is active;
-     * `isInstrumentActiveAtStep` (`section-overrides.ts`) composes it with
-     * `enabled` at READ time, mirroring how `playback.conductorVelocity`
-     * combines with a lane's own volume without ever being assigned onto it.
-     * Classified `runtime-derived` in `songbook/state-ownership.ts` — never
-     * persisted, never encoded into share URLs.
-     */
-    readonly tradeSilenced: boolean;
-    // `motifTracking` and `pinnedProfile` were removed in #866 — both were inert
-    // after the legacy soloist engine's retirement (epic #10). `complexity` went
-    // the same way in #1070: #1167 rewired its slider to `phrasingIntensity` and
-    // left the field behind with zero writers and zero readers. Old persisted /
-    // share-URL payloads carrying any of them are dropped on load via the
-    // deprecated-key skip in `applySoloistPayload` (state/instruments.ts).
+    // `motifTracking` and `pinnedProfile` were removed in #866, `complexity` in #1070, and
+    // `preset`, `octave`, `phrasingIntensity`, `tradeMode` and `tradeSilenced` in #1424:
+    // the old engine's settings, which nothing reads since the band engine replaced it.
 
     // === Engine runtime (per-playback, transient) ===
     readonly session: SoloistSession;
@@ -1178,8 +1143,6 @@ export interface GlobalContext {
      * never see it.
      */
     readonly motifBarIntensity?: number;
-    /** Global complexity level (0.0 - 1.0). */
-    readonly complexity: number;
     /** Whether the intensity automatically drifts over time. */
     readonly autoIntensity: boolean;
     /** Whether the metronome is active. */
@@ -1225,23 +1188,10 @@ export interface GlobalContext {
     /** Dynamic velocity modifier (0.0-1.0) applied by Conductor. */
     readonly conductorVelocity: number;
     /**
-     * Auto-conductor's computed chord density for the current band intensity,
-     * or `null` before the conductor has ever run. `chords.density` is the
-     * user's own `document`-owned field (persisted, shareable — see
-     * `songbook/state-ownership.ts`); the conductor must never write it
-     * directly (#1064 — it used to, and clobbered/persisted the user's own
-     * choice). Generation readers compose at READ time —
-     * `playback.conductorDensity ?? chords.density` — mirroring how
-     * `conductorVelocity` above combines with a lane's own value without ever
-     * being assigned onto it.
-     */
-    readonly conductorDensity: ChordDensity | null;
-    /**
      * Auto-conductor's computed harmony complexity for the current band
      * intensity/ending state, or `null` before the conductor has ever run.
-     * `harmony.complexity` is the user's own `document`-owned field — same
-     * READ-time composition and same #1064 rationale as `conductorDensity`
-     * above.
+     * `harmony.complexity` is the user's own `document`-owned field, never
+     * written by the conductor (#1064); readers compose the two at READ time.
      */
     readonly conductorHarmonyComplexity: number | null;
     /** Master output volume. */
@@ -1388,8 +1338,6 @@ export interface ActionPayloadSetGenreFeel {
 export interface ActionPayloadUpdateConductorDecision {
     velocity?: number;
     intent?: Partial<PlaybackIntent>;
-    /** Written into `playback.conductorDensity`, never `chords.density` (#1064). */
-    density?: ChordDensity | null;
     /** Written into `playback.conductorHarmonyComplexity`, never `harmony.complexity` (#1064). */
     harmonyComplexity?: number | null;
     feel?: string;
@@ -1458,15 +1406,10 @@ type AtLeastOne<T> = {
  */
 export type ActionPayloadUpdateSB = AtLeastOne<{
     enabled: boolean;
-    preset: string;
     mode: string;
     style: string;
-    octave: number;
     volume: number;
     reverb: number;
-    phrasingIntensity: number;
-    tradeMode: string;
-    tradeSilenced: boolean;
     sessionSeed: SoloistSessionSeed | null;
     sessionSteps: number;
     phraseCount: number;
@@ -1509,7 +1452,6 @@ export type ActionPayloadUpdateGB = Partial<GrooveState>;
 export interface ActionPayloadMap {
     SET_PARAM: ActionPayloadSetParam;
     SET_BAND_INTENSITY: number;
-    SET_COMPLEXITY: number;
     SET_AUTO_INTENSITY: boolean;
     UPDATE_CONDUCTOR_DECISION: ActionPayloadUpdateConductorDecision;
     SHOW_TOAST: ActionPayloadShowToast | string;
@@ -1586,7 +1528,6 @@ export const ACTIONS = {
     // --- Global / Conductor ---
     SET_PARAM: 'SET_PARAM',
     SET_BAND_INTENSITY: 'SET_BAND_INTENSITY',
-    SET_COMPLEXITY: 'SET_COMPLEXITY',
     SET_AUTO_INTENSITY: 'SET_AUTO_INTENSITY',
     UPDATE_CONDUCTOR_DECISION: 'UPDATE_CONDUCTOR_DECISION',
     SHOW_TOAST: 'SHOW_TOAST',

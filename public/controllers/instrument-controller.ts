@@ -145,7 +145,6 @@ export function togglePower(type: string): void {
             dispatch(ACTIONS.SET_PARAM, { module: 'soloist', param: 'isYielding', value: false });
         } else {
             // Turning OFF: Reset flags
-            dispatch(ACTIONS.SET_PARAM, { module: 'soloist', param: 'tradeMode', value: 'manual' });
             dispatch(ACTIONS.SET_PARAM, { module: 'soloist', param: 'isYielding', value: false });
             dispatch(ACTIONS.SET_PARAM, {
                 module: 'soloist',

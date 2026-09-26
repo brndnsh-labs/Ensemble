@@ -69,8 +69,7 @@ let hasError = false;
 // state writers. It is deliberately CONTENT-based, not path-based: a blanket
 // `state/` path skip silently exempts every non-slice module that happens to
 // live alongside the slices (`state/state-hydration.ts`, `state/history.ts`,
-// `state/persistence.ts`, `state/share-codec.ts` — consumers that must
-// dispatch, one of them carrying nine `@direct-mutation` markers). Keying on
+// `state/share-codec.ts` — consumers that must dispatch). Keying on
 // `deepSignal<` is self-maintaining in both directions: a new slice is exempt
 // the moment it declares its signal, and a new non-slice landing in `state/`
 // is scanned from the moment it lands.

@@ -438,7 +438,6 @@ export function captureContent(): ChartContent {
             grouping: a.grouping,
             isMinor: a.isMinor,
             notation: a.notation,
-            lastChordPreset: a.lastChordPreset,
         },
         performance: {
             bpm: p.bpm,
@@ -815,11 +814,9 @@ export function setMetronome(enabled: boolean): void {
 
 /**
  * `preferences`-owned: persists to its own device-local key (`session.ts`)
- * immediately, independent of the chart's own Save — mirrors v1's
- * `debounceSaveState` persisting `masterVolume` outside the chart-dirty flow
- * (`state/persistence.ts`). The live bus ramp itself is `state-effects.ts`'s
- * `SET_PARAM(masterVolume)` case, run by the `handleEffects` call already wired
- * into this module's dispatch subscriber.
+ * immediately, independent of the chart's own Save. The live bus ramp itself is
+ * `state-effects.ts`'s `SET_PARAM(masterVolume)` case, run by the `handleEffects` call
+ * already wired into this module's dispatch subscriber.
  */
 export function setMasterVolume(value: number): void {
     dispatch(ACTIONS.SET_PARAM, { module: 'playback', param: 'masterVolume', value });
@@ -932,8 +929,16 @@ function apply(content: DocumentContent): void {
     param('arranger', 'scorePlan', null);
     currentScore = score;
     bandView = view;
-    for (const [key, value] of Object.entries(arrangement)) {
-        param('arranger', key, value);
+    // By name, like the band below: an old chart's legacy `lastChordPreset` is read by nothing.
+    for (const key of [
+        'sections',
+        'key',
+        'timeSignature',
+        'grouping',
+        'isMinor',
+        'notation',
+    ] as const) {
+        param('arranger', key, arrangement[key]);
     }
     const { performance, band } = content;
     param('arranger', 'seed', performance.seed);
@@ -1272,7 +1277,6 @@ export function audition(index: number): void {
     for (const frequency of freqs) {
         playNote(state, frequency, state.playback.audio.currentTime, 0.65, {
             vol: 0.12,
-            instrument: 'Piano',
             ignoreSustain: true,
         });
     }

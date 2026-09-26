@@ -14,7 +14,6 @@ vi.mock('../../../public/state.js', () => {
         bass: { enabled: true },
         soloist: makeSoloistMock({
             enabled: false,
-            tradeMode: 'manual',
             buffer: new Map(),
             lastPlayedFreq: null,
         }),
@@ -35,7 +34,6 @@ vi.mock('../../../public/state.js', () => {
 });
 
 // Mock dependencies
-vi.mock('../../../public/state/persistence.js', () => ({ saveCurrentState: vi.fn() }));
 vi.mock('../../../public/engine/engine.js', () => ({
     restoreGains: vi.fn(),
     killSoloistNote: vi.fn(),
@@ -49,30 +47,14 @@ describe('Soloist Power Logic', () => {
     beforeEach(() => {
         const state = getState();
         state.soloist.enabled = false;
-        state.soloist.tradeMode = 'manual';
         vi.clearAllMocks();
     });
 
-    it('should toggle enabled state normally in manual mode', () => {
+    it('toggles the soloist on and off', () => {
         togglePower('soloist');
         expect(getState().soloist.enabled).toBe(true);
 
         togglePower('soloist');
         expect(getState().soloist.enabled).toBe(false);
-        expect(getState().soloist.tradeMode).toBe('manual');
-    });
-
-    it('should clear tradeMode when turning power OFF from an active trade mode', () => {
-        const state = getState();
-        state.soloist.enabled = true;
-        state.soloist.tradeMode = 'sections';
-
-        // Turn OFF
-        togglePower('soloist');
-
-        expect(state.soloist.enabled).toBe(false);
-        // CRITICAL: If it stayed in 'sections', it would appear Yellow.
-        // We want it OFF (Gray), so it should reset to 'manual'.
-        expect(state.soloist.tradeMode).toBe('manual');
     });
 });

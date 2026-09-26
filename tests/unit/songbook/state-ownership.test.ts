@@ -1,88 +1,10 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-    LEGACY_PERSISTED_FIELD_OWNERSHIP,
-    STATE_OWNERSHIP_MANIFEST,
-} from '../../../public/songbook/state-ownership.js';
+import { describe, expect, it } from 'vitest';
+import { STATE_OWNERSHIP_MANIFEST } from '../../../public/songbook/state-ownership.js';
 
-const { captured, mockState } = vi.hoisted(() => ({
-    captured: { value: null as Record<string, unknown> | null },
-    mockState: {
-        arranger: {
-            sections: [],
-            key: 'C',
-            timeSignature: '4/4',
-            grouping: null,
-            isMinor: false,
-            notation: 'roman',
-            lastChordPreset: 'Pop (Standard)',
-            seed: 'ABC123',
-            randomizeSeed: true,
-        },
-        playback: {
-            bpm: 100,
-            palette: 'after-hours',
-            mode: 'auto',
-            complexity: 0.3,
-            metronome: false,
-            visualFlash: false,
-            qualityColors: true,
-            countIn: true,
-            applyPresetSettings: false,
-            sessionTimer: 5,
-            songMode: true,
-            autoIntensity: true,
-            masterVolume: 0.4,
-        },
-        chords: {},
-        bass: {},
-        soloist: {},
-        harmony: {},
-        groove: { instruments: [], sectionSeedMap: {} },
-        vizState: { enabled: false },
-        midi: {},
-    },
-}));
-
-vi.mock('../../../public/state.js', () => ({
-    getState: () => mockState,
-    storage: {
-        save: (_key: string, value: Record<string, unknown>) => {
-            captured.value = value;
-        },
-    },
-}));
-
-import { saveCurrentState } from '../../../public/state/persistence.js';
-
-const NESTED_LEGACY_BLOCKS = new Set(['chords', 'bass', 'soloist', 'harmony', 'groove', 'midi']);
-
-function emittedLegacyPaths(payload: Record<string, unknown>): string[] {
-    const paths: string[] = [];
-    for (const [key, value] of Object.entries(payload)) {
-        if (NESTED_LEGACY_BLOCKS.has(key) && value && typeof value === 'object') {
-            for (const nestedKey of Object.keys(value)) {
-                paths.push(`${key}.${nestedKey}`);
-            }
-        } else {
-            paths.push(key);
-        }
-    }
-    return paths.sort();
-}
-
+// The manifest's completeness is a compile-time guard (`satisfies` in state-ownership.ts); this
+// suite pins the classification decisions themselves. Its other half — classifying every field
+// v1's session writer emitted — went with that writer (#1424).
 describe('Songbook state ownership manifest (#1044)', () => {
-    beforeEach(() => {
-        captured.value = null;
-        saveCurrentState();
-    });
-
-    it('classifies every field emitted by the untouched legacy writer with no stale entries', () => {
-        expect(captured.value).not.toBeNull();
-        const emitted = emittedLegacyPaths(captured.value as Record<string, unknown>);
-        const classified = Object.keys(LEGACY_PERSISTED_FIELD_OWNERSHIP).sort();
-        expect(classified).toEqual(emitted);
-    });
-
     it('records the settled ownership decisions exactly once', () => {
         expect(STATE_OWNERSHIP_MANIFEST.arranger.notation).toBe('document');
         for (const lane of ['chords', 'bass', 'soloist', 'harmony', 'groove'] as const) {

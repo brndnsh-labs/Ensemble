@@ -8,7 +8,7 @@ import {
     TIME_SIGNATURES,
 } from '../config.js';
 import type { renderScorePlayback } from '../songbook/score-playback.js';
-import type { Chord, Dispatch, FormattedChordNames, Mutable } from '../types.js';
+import type { Chord, ChordDensity, Dispatch, FormattedChordNames, Mutable } from '../types.js';
 import { ACTIONS } from '../types.js';
 import { getFrequency, normalizeKey } from '../utils.js';
 import { spellPitchClass } from './note-spelling.js';
@@ -22,6 +22,19 @@ export type { FormattedChordNames };
 const ROMAN_REGEX = /^([#b])?(III|II|IV|I|VII|VI|V|iii|ii|iv|i|vii|vi|v)/;
 const NNS_REGEX = /^([#b])?([1-7])/;
 const NOTE_REGEX = /^([A-G][#b]?)/i;
+
+/**
+ * Where a parsed chord's keyboard voicing is anchored (MIDI 65, the F above middle C): the
+ * key's root octave and the inversion search's home register. It was the chords slice's
+ * `octave` default, which nothing changed once v1's settings went (#1424).
+ */
+const COMP_ANCHOR_MIDI = 65;
+
+/**
+ * The voicing density a parsed chord is built at. It was the chords slice's `density`
+ * default: the old engine's conductor and v1's settings were its only other writers (#1424).
+ */
+const COMP_DENSITY: ChordDensity = 'standard';
 
 /**
  * Can this text be a chord ROOT — a roman numeral, a Nashville number, or a note name?
@@ -536,7 +549,6 @@ function dedupeMidis(midis: number[]): number[] {
 }
 
 export function getBestInversion(
-    state: any,
     rootMidi: number,
     intervals: number[],
     previousMidis: number[],
@@ -551,8 +563,7 @@ export function getBestInversion(
         enableVoiceLeading = false,
         quality,
     } = options;
-    const { chords } = state;
-    const homeAnchor = anchor || chords.octave || 60;
+    const homeAnchor = anchor || COMP_ANCHOR_MIDI;
 
     // Organ needs more aggressive correction back to the anchor to avoid mud
     const registerPullWeight = style === 'organ' ? 0.8 : 0.6;
@@ -1140,14 +1151,9 @@ function parseProgressionPart(
     bassActive = Boolean(state.bass?.enabled),
     startsSection = true,
 ): { chords: Chord[]; finalMidis: number[] } {
-    const { chords, groove } = state;
-    // #1064 — the auto-conductor's runtime-derived density mirror wins when
-    // present; it is never assigned onto `chords.density` (the user's own
-    // document-owned field) directly. Composed here at READ time, mirroring
-    // how `playback.conductorVelocity` combines with a lane's own value.
-    const effectiveDensity: string = state.playback?.conductorDensity ?? chords.density;
+    const { groove } = state;
     const parsed: Chord[] = [];
-    const baseOctave = Math.floor(chords.octave / 12) * 12;
+    const baseOctave = Math.floor(COMP_ANCHOR_MIDI / 12) * 12;
     const keyRootMidi = baseOctave + KEY_ORDER.indexOf(normalizeKey(key));
 
     const barParts = input.split(/(\|)/);
@@ -1288,7 +1294,7 @@ function parseProgressionPart(
                     state,
                     quality,
                     is7th,
-                    effectiveDensity,
+                    COMP_DENSITY,
                     groove.genreFeel,
                     bassActive,
                 );
@@ -1304,9 +1310,9 @@ function parseProgressionPart(
                 const vlGenre = groove.genreFeel;
                 const enableVoiceLeading =
                     vlGenre === 'Jazz' || vlGenre === 'Bossa Nova' || vlGenre === 'Blues';
-                let currentMidis = getBestInversion(state, rootMidi, intervals, lastMidis, {
+                let currentMidis = getBestInversion(rootMidi, intervals, lastMidis, {
                     isPivot,
-                    anchor: chords.octave,
+                    anchor: COMP_ANCHOR_MIDI,
                     min: pianoMin,
                     max: 84,
                     enableVoiceLeading,

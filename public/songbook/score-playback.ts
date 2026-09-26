@@ -218,6 +218,5 @@ export function scoreArrangement(score: SemanticScore, plan = prepareScorePlayba
         grouping: score.grouping,
         notation: score.notation,
         sections: plan.sections.map((entry) => entry.section),
-        lastChordPreset: 'Songbook',
     };
 }

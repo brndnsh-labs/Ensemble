@@ -1,7 +1,7 @@
 // @ts-nocheck
 import { describe, expect, it } from 'vitest';
 import { escapeHTML } from '../../../public/sanitize.js';
-import { decompressSections, tryDecompressSections } from '../../../public/state/share-codec.js';
+import { tryDecompressSections } from '../../../public/state/share-codec.js';
 
 describe('Security: Data Integrity & Sanitization', () => {
     describe('HTML Sanitization (escapeHTML)', () => {
@@ -40,14 +40,7 @@ describe('Security: Data Integrity & Sanitization', () => {
         });
     });
 
-    describe('Safe Deserialization (decompressSections)', () => {
-        it('should handle malformed JSON gracefully', () => {
-            const badBase64 = btoa('{{{{');
-            const result = decompressSections(badBase64);
-            expect(result).toHaveLength(1);
-            expect(result[0].label).toBe('Intro');
-        });
-
+    describe('Safe Deserialization (tryDecompressSections)', () => {
         it('exposes decode failures to strict persisted-data callers', () => {
             expect(tryDecompressSections(btoa('{{{{'))).toBeNull();
             for (const invalidSections of ['[null]', '[1]', '["x"]', '[[]]']) {
@@ -62,7 +55,7 @@ describe('Security: Data Integrity & Sanitization', () => {
             const binString = Array.from(bytes, (byte) => String.fromCodePoint(byte)).join('');
             const encoded = btoa(binString);
 
-            const result = decompressSections(encoded);
+            const result = tryDecompressSections(encoded);
             expect(result.length).toBeLessThanOrEqual(500);
         });
 
@@ -71,7 +64,7 @@ describe('Security: Data Integrity & Sanitization', () => {
             const json = JSON.stringify(malicious);
             const encoded = btoa(json);
 
-            const result = decompressSections(encoded);
+            const result = tryDecompressSections(encoded);
 
             expect(result[0].label).not.toContain('<script>');
             expect(result[0].label).toContain('&lt;script&gt;');
@@ -84,7 +77,7 @@ describe('Security: Data Integrity & Sanitization', () => {
             const json = JSON.stringify(sections);
             const encoded = btoa(json);
 
-            const result = decompressSections(encoded);
+            const result = tryDecompressSections(encoded);
             expect(result[0].value).toBe("Don't Stop");
             expect(result[0].label).toBe('R&amp;B');
         });

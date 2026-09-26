@@ -137,7 +137,6 @@ describe('Soloist Legato Articulation', () => {
     });
 
     it('should use a gentler attack for legato notes (trumpet)', () => {
-        soloist.preset = 'trumpet';
         playSoloNote(getState(), 440, 100, 0.5, 0.5, 0, 'scalar', true);
 
         const voice = soloist.audio.activeVoices[0];
@@ -150,7 +149,6 @@ describe('Soloist Legato Articulation', () => {
     });
 
     it('should use normal attack (0.02s) for non-legato trumpet', () => {
-        soloist.preset = 'trumpet';
         playSoloNote(getState(), 440, 100, 0.5, 0.5, 0, 'scalar', false);
 
         const voice = soloist.audio.activeVoices[0];

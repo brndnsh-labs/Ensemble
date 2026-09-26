@@ -36,11 +36,6 @@ vi.mock('../../../public/engine/synth-drums.js', () => ({
     loadDrumKit: vi.fn().mockResolvedValue(true),
 }));
 
-vi.mock('../../../public/state/persistence.js', () => ({
-    saveCurrentState: vi.fn(),
-    debounceSaveState: vi.fn(),
-}));
-
 vi.mock('../../../public/state.js', () => {
     const mockState = {
         playback: { step: 10, bpm: 120, bandIntensity: 0.5, complexity: 0.5, autoIntensity: false },

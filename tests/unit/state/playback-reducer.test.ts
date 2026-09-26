@@ -29,9 +29,6 @@ describe('Playback Reducer', () => {
         playbackReducer({ type: ACTIONS.SET_BAND_INTENSITY, payload: 0.9 });
         expect(playback.bandIntensity).toBe(0.9);
 
-        playbackReducer({ type: ACTIONS.SET_COMPLEXITY, payload: 0.1 });
-        expect(playback.complexity).toBe(0.1);
-
         playbackReducer({ type: ACTIONS.SET_AUTO_INTENSITY, payload: false });
         expect(playback.autoIntensity).toBe(false);
 
@@ -138,30 +135,26 @@ describe('Playback Reducer', () => {
         expect(playback.intent.anticipation).toBe(0.8);
     });
 
-    it('#1064 — UPDATE_CONDUCTOR_DECISION writes the runtime-derived density/complexity mirrors', () => {
-        expect(playback.conductorDensity).toBeNull();
+    it('#1064 — UPDATE_CONDUCTOR_DECISION writes the runtime-derived complexity mirror', () => {
         expect(playback.conductorHarmonyComplexity).toBeNull();
 
         playbackReducer({
             type: ACTIONS.UPDATE_CONDUCTOR_DECISION,
-            payload: { density: 'rich', harmonyComplexity: 0.9 },
+            payload: { harmonyComplexity: 0.9 },
         });
 
-        expect(playback.conductorDensity).toBe('rich');
         expect(playback.conductorHarmonyComplexity).toBe(0.9);
     });
 
-    it('#1064 — RESET_STATE clears the conductor density/complexity mirrors', () => {
+    it('#1064 — RESET_STATE clears the conductor complexity mirror', () => {
         playbackReducer({
             type: ACTIONS.UPDATE_CONDUCTOR_DECISION,
-            payload: { density: 'thin', harmonyComplexity: 0.1 },
+            payload: { harmonyComplexity: 0.1 },
         });
-        expect(playback.conductorDensity).toBe('thin');
         expect(playback.conductorHarmonyComplexity).toBe(0.1);
 
         playbackReducer({ type: ACTIONS.RESET_STATE, payload: undefined });
 
-        expect(playback.conductorDensity).toBeNull();
         expect(playback.conductorHarmonyComplexity).toBeNull();
     });
 
@@ -196,7 +189,6 @@ describe('Playback Reducer', () => {
                 theme: 'light',
                 wakeLock: { lock: true },
                 bandIntensity: 0.8,
-                complexity: 0.9,
                 autoIntensity: false,
                 metronome: true,
                 applyPresetSettings: true,

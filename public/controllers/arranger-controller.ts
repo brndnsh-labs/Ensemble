@@ -3,46 +3,13 @@ import { transformRelativeProgression, validateProgression } from '../engine/cho
 import { restoreGains } from '../engine/engine.js';
 import { transposeChordText } from '../engine/transpose.js';
 import { pushHistory } from '../state/history.js';
-import { saveCurrentState } from '../state/persistence.js';
-import { compressSections, generateId } from '../state/share-codec.js';
+import { generateId } from '../state/share-codec.js';
 import { dispatch, getState, stateMap } from '../state.js';
 import type { Chord, Section, SectionInstrumentKey } from '../types.js';
 import { ACTIONS } from '../types.js';
 import { showToast } from '../ui.js';
 import { normalizeKey } from '../utils.js';
 import { flushBuffers } from './instrument-controller.js';
-
-export function saveProgression(): void {
-    const { arranger } = getState();
-    const name = prompt(
-        'Name your chord progression:',
-        arranger.lastChordPreset || 'My Progression',
-    );
-    if (!name) {
-        return;
-    }
-
-    let userPresets: any[] = [];
-    try {
-        userPresets = JSON.parse(localStorage.getItem('ensemble_userPresets') || '[]');
-        if (!Array.isArray(userPresets)) {
-            userPresets = [];
-        }
-    } catch (e) {
-        console.warn('[State] Failed to parse ensemble_userPresets from storage:', e);
-    }
-    const newPreset = {
-        name: name.substring(0, 32),
-        sections: compressSections(arranger.sections),
-        isMinor: arranger.isMinor,
-        timestamp: Date.now(),
-    };
-
-    userPresets.push(newPreset);
-    localStorage.setItem('ensemble_userPresets', JSON.stringify(userPresets));
-    window.dispatchEvent(new Event('storage_sync'));
-    showToast(`Saved "${name}" to library`);
-}
 
 export function validateAndAnalyze(): void {
     validateProgression(stateMap);
@@ -56,24 +23,14 @@ function clearChordPresetHighlight(): void {
 /**
  * The canonical "arrangement changed — resync everything" sequence. Any UI that
  * mutates the progression/meter/key should end in this single call rather than
- * hand-copying the steps (the divergence #1128 consolidated).
- *
- * #1144 — saveCurrentState() stays here (not folded into the #1127
- * chokepoint's caller-side dispatch). It used to be load-bearing for exactly
- * one caller: `history.ts` `undo()` restored the sections array with a direct
- * `@direct-mutation` write and no preceding dispatch, so the chokepoint never
- * fired for it and this was the only save undo got. #1180 migrated that
- * restore to `dispatch(SET_PARAM, …)`, so the chokepoint now fires for undo
- * too and this save is redundant-but-harmless for EVERY caller. Kept
- * deliberately as the belt to the debounce's suspenders — removing it would
- * make persistence depend solely on a debounced effect that the auto-conductor
- * can starve during playback (see public/CLAUDE.md §7).
+ * hand-copying the steps (the divergence #1128 consolidated). It saves nothing:
+ * v1's session save went with its load/save layer (#1424), and v2 saves a chart
+ * only when the musician asks (`prototypes/v2/lib/runtime.ts`'s `captureContent`).
  */
 export function refreshArrangerUI(): void {
     validateAndAnalyze();
     flushBuffers();
     restoreGains(stateMap);
-    saveCurrentState();
 }
 
 export function onSectionUpdate(id: string, field: string, value: any): void {
@@ -135,8 +92,6 @@ export function onSectionUpdate(id: string, field: string, value: any): void {
     }
     validateAndAnalyze();
     flushBuffers();
-    // #1144 — no immediate save: the SET_PARAM dispatches above (sections/
-    // isDirty) already schedule the #1127 chokepoint's debounced save.
 }
 
 export function onSectionDelete(id: string): void {

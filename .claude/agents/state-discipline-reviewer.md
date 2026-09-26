@@ -12,10 +12,9 @@ You do not edit code. You read, grep, reason, and report.
 
 1. **All state writes flow through `dispatch(ACTIONS.TYPE, payload)`.** State slices live in `public/state/{playback,arranger,groove,instruments,midi,visualizer,conductor}.ts`, each a `deepSignal` with a reducer keyed on `ACTIONS.*`. The reducer is the only legitimate writer.
 
-2. **`@direct-mutation` is a narrow exception, not an escape hatch.** The marker trails the statement (`// @direct-mutation`). It is sanctioned in exactly the four categories of `CLAUDE.md` § `@direct-mutation` policy — that section is the authority, and every marker site in `public/` today fits one of them:
+2. **`@direct-mutation` is a narrow exception, not an escape hatch.** The marker trails the statement (`// @direct-mutation`). It is sanctioned in exactly the three categories of `CLAUDE.md` § `@direct-mutation` policy — that section is the authority, and every marker site in `public/` today fits one of them:
    - **Real-time hot paths.** The `synth-*.ts` voices' audio-param writes, `app-controller.ts`'s BPM reschedule (`playback.nextNoteTime`, `unswungNextNoteTime`) and `instrument-controller.ts`'s `flushBuffer()` voice-continuity writes, where dispatch overhead would cause an audible glitch.
    - **Init-only.** `engine.ts` `initAudio()` and `engine/audio-recovery.ts` — one-shot audio-graph setup that runs before any dispatch subscriber exists.
-   - **Pre-mount.** `state-hydration.ts`'s `hydrateState`/`loadFromUrl`, written to run before any reactive listener is attached (no app caller since #1358).
    - **Detached render clone.** `prototypes/v2/lib/band-export.ts`'s render clone and `chords-engine.ts`'s `validateProgression` on its passed-in `state` — dispatching there would write the live slices mid-export.
 
    **`@worker-mutation`** — the old engine's marker for writes to its worker's copy of the tree. The worker is gone (#1404), so a new one is always wrong.
@@ -64,7 +63,7 @@ A `@direct-mutation` or `@worker-mutation` marker on a call site that doesn't fi
 - **A new `@worker-mutation` marker.** The old engine's worker is gone (#1404); no site should use it.
 - **Redundant writes around a marker**: the same field written twice in adjacent lines (e.g. cast-assign followed by `Object.assign`), or a `@direct-mutation` write immediately followed by a `dispatch` for the same field. Either the marker is unnecessary (the dispatch alone would work) or the dispatch is unnecessary (the direct write was load-bearing). Both forms together is a code smell that usually means a half-finished refactor.
 
-Verify by asking: which of the four categories does this fit, and can I state it in one sentence? If not, flag.
+Verify by asking: which of the three categories does this fit, and can I state it in one sentence? If not, flag.
 
 ### NON-ATOMIC DISPATCH
 
@@ -94,7 +93,7 @@ Style-level: a `Mutable<typeof x>` cast pattern that's inconsistent with the sur
 
 1. **Triage the diff.** Identify which slices are touched and which severity classes are plausible.
 2. **Grep for the patterns.** `grep -rn "@direct-mutation" public/` to inventory marker sites. `grep -rn "<sliceName>\." prototypes/v2/app/ prototypes/v2/lib/ public/controllers/` and `grep -rln "@engine/state" prototypes/v2/` to find UI-side writes and bypasses. `grep -n "dispatch(" <changed-file>` to count dispatches per function.
-3. **Verify the category fit.** For each `@direct-mutation` or `@worker-mutation` marker in the diff, name which of the four categories it fits. Real-time hot path? Init-only? Pre-mount? Detached render clone? If you can't name one in a sentence, flag as DIRECT-MUTATION ABUSE.
+3. **Verify the category fit.** For each `@direct-mutation` or `@worker-mutation` marker in the diff, name which of the three categories it fits. Real-time hot path? Init-only? Detached render clone? If you can't name one in a sentence, flag as DIRECT-MUTATION ABUSE.
 4. **Cross-check the band's read.** For a new slice field the band should hear, confirm `syncBand`/`bandSettings` in `runtime.ts` reads it.
 5. **Run typecheck if uncertain.** `npm run typecheck` will catch some shape mismatches but won't catch discipline violations — it's a sanity check, not a substitute.
 

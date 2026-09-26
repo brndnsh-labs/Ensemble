@@ -27,10 +27,6 @@ vi.mock('../../../public/controllers/instrument-controller.js', () => ({
     flushBuffers: vi.fn(),
 }));
 
-vi.mock('../../../public/state/persistence.js', () => ({
-    saveCurrentState: vi.fn(),
-}));
-
 describe('History / Undo System', () => {
     beforeEach(() => {
         vi.clearAllMocks();
