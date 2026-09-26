@@ -122,6 +122,18 @@ export interface BandSettings {
     humanize: number | null;
     /** Free-form seed text; the same seed always plays the same performance. */
     seed: string;
+    /**
+     * Trading with the player: after the head, the band takes turns with you, `bars` at a
+     * time, the band first. `with: 'lead'` trades with the soloist (it lays out for your
+     * turn, the band keeps comping); `with: 'drums'` trades with the drummer (the band lays
+     * out for his solo, and comps for yours). Absent, the band doesn't trade.
+     */
+    trade?: TradeSettings | null;
+}
+
+export interface TradeSettings {
+    with: 'lead' | 'drums';
+    bars: 2 | 4 | 8;
 }
 
 export const DEFAULT_SETTINGS: BandSettings = {

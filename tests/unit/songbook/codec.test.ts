@@ -384,6 +384,43 @@ describe('Songbook codecs (#1044)', () => {
         );
     });
 
+    it('reads trading as optional: absent is off, and only real partners and lengths pass', () => {
+        const plain = makeChartDocument();
+        const decoded = validateChartDocument(plain);
+        expect(decoded.kind).toBe('ok');
+        if (decoded.kind === 'ok') {
+            expect(decoded.value.chart.band.soloist.tradeWith).toBeUndefined();
+        }
+
+        const trading = makeChartDocument();
+        trading.chart.band.soloist.tradeWith = 'drums';
+        trading.chart.band.soloist.tradeBars = 8;
+        const traded = validateChartDocument(trading);
+        expect(traded.kind).toBe('ok');
+        if (traded.kind === 'ok') {
+            expect(traded.value.chart.band.soloist).toMatchObject({
+                tradeWith: 'drums',
+                tradeBars: 8,
+            });
+        }
+
+        const bad = makeChartDocument() as unknown as {
+            chart: { band: { soloist: Record<string, unknown> } };
+        };
+        bad.chart.band.soloist.tradeWith = 'piano';
+        bad.chart.band.soloist.tradeBars = 3;
+        const result = validateChartDocument(bad);
+        expect(result.kind).toBe('invalid');
+        if (result.kind !== 'invalid') {
+            return;
+        }
+        for (const path of ['$.chart.band.soloist.tradeWith', '$.chart.band.soloist.tradeBars']) {
+            expect(result.issues).toContainEqual(
+                expect.objectContaining({ path, code: 'invalid-value' }),
+            );
+        }
+    });
+
     it('rejects unknown groove lanes and path-unsafe pack ids', () => {
         const candidate = makeChartDocument() as any;
         candidate.chart.band.groove.pattern[0].name = 'Cowbell';
