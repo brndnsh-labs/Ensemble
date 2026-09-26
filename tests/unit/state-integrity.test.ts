@@ -70,11 +70,13 @@ describe('State Integrity Audit', () => {
             // which is exactly how `ACTIONS.INIT_AUDIO` read as "dispatched" for years
             // after #1358 deleted its only real caller — nothing but its own handler case
             // ever mentioned it again. `\s*` spans a wrapped multi-line call
-            // (`dispatch(\n    ACTIONS.SET_SONG_SEED,` — see runtime.ts). A listener file
-            // (state-effects.ts) is NOT excluded here: it has genuine `dispatch(ACTIONS.…)`
-            // call sites of its own (e.g. `SET_SOLOIST_MODE`, which has no other caller),
-            // and this pattern already can't match its `case` arms.
-            const dispatchRegex = new RegExp(`dispatch\\(\\s*ACTIONS\\.${key}\\b`);
+            // (`dispatch(\n    ACTIONS.SET_SONG_SEED,` — see runtime.ts). `(?:\?\.)?` covers
+            // an optional-chained caller (`dispatch?.(ACTIONS.PROG_VALIDATED)` in
+            // chords-engine.ts, where `dispatch` is an optional callback param). A listener
+            // file (state-effects.ts) is NOT excluded here: it has genuine
+            // `dispatch(ACTIONS.…)` call sites of its own (e.g. `SET_SOLOIST_MODE`, which
+            // has no other caller), and this pattern already can't match its `case` arms.
+            const dispatchRegex = new RegExp(`dispatch(?:\\?\\.)?\\(\\s*ACTIONS\\.${key}\\b`);
             const isDispatched = fileContents.some((f) => {
                 if (isSlice(f) || f.path === TYPES_FILE) {
                     return false;
@@ -91,20 +93,26 @@ describe('State Integrity Audit', () => {
                 return handlerRegex.test(f.content);
             });
 
-            // Special exceptions for actions that might be dynamically generated or used in ways this regex misses.
-            // Notification-only signals (no reducer case): HYDRATE, TOAST_EXPIRED, FLASH_EXPIRED,
-            // VIS_RESET, VIS_UPDATE, PROG_VALIDATED, DRUM_PRESET_LOADED — observed by listeners
-            // (state-effects, worker-client) rather than handled in slices.
-            // REL_KEY_TOGGLE and TRANSPOSE were on this list too, but had no reducer arm AND no
-            // listener — genuinely inert. Removed in #1166; don't re-add an exception without
-            // pointing at the consumer that justifies it.
+            // Special exceptions for actions this regex genuinely can't detect. Every entry
+            // here must point at a real, live consumer this scan structurally cannot see —
+            // not a stand-in for "hasn't been checked." #1381 re-audited the whole list:
+            // HYDRATE, VIS_RESET and VIS_UPDATE had zero references anywhere outside
+            // `types.ts` (the last reader, the old engine's worker/visualizer scheduler,
+            // went with it — #1404) and were deleted outright, action and all, rather than
+            // kept exempted. TOAST_EXPIRED, FLASH_EXPIRED and SET_AUTO_INTENSITY came off
+            // this list too: TOAST_EXPIRED and SET_AUTO_INTENSITY already had a real
+            // `dispatch(ACTIONS.…)` call and a real `case ACTIONS.…:` handler and never
+            // needed the exemption; FLASH_EXPIRED's handler in `playback.ts` was a bare
+            // `case 'FLASH_EXPIRED':` string literal instead of `case ACTIONS.FLASH_EXPIRED:`
+            // — fixed to match the rest of the file's style, which is what let it come off
+            // too. REL_KEY_TOGGLE and TRANSPOSE were on this list too, but had no reducer arm
+            // AND no listener — genuinely inert. Removed in #1166; don't re-add an exception
+            // without pointing at the consumer that justifies it.
             const exceptions = [
-                'HYDRATE',
-                'TOAST_EXPIRED',
-                'FLASH_EXPIRED',
-                'SET_AUTO_INTENSITY',
-                'VIS_RESET',
-                'VIS_UPDATE',
+                // Fires on every dispatch it's mixed into a chord-progression rebuild
+                // (`chords-engine.ts`'s `validateProgression`) so the v2 runtime's single
+                // generic `subscribe()` listener re-renders — genuinely no reducer `case`
+                // anywhere, by design, not an unwired signal.
                 'PROG_VALIDATED',
             ];
 

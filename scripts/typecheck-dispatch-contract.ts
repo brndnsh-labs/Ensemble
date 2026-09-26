@@ -32,6 +32,16 @@ function assertDispatchContract(): void {
 
     // @ts-expect-error — SET_GENRE_FEEL rejects a field of the wrong type.
     dispatch(ACTIONS.SET_GENRE_FEEL, { swing: 'fast' });
+
+    // A widened `Record<string, unknown>` (e.g. a value threaded through generic
+    // plumbing) cannot silently satisfy an action with required fields — every
+    // one of SET_GENRE_FEEL's fields is optional, so `Record<string, unknown>`
+    // is (surprisingly) structurally assignable to it; SET_INSTRUMENT_VOICE's
+    // required `module`/`voice` make this a genuine test.
+    const looseInstrumentVoice: Record<string, unknown> = { module: 'chords', voice: 'synth' };
+
+    // @ts-expect-error — broad records cannot bypass a known-field contract.
+    dispatch(ACTIONS.SET_INSTRUMENT_VOICE, looseInstrumentVoice);
 }
 
 void assertDispatchContract;

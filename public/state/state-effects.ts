@@ -143,8 +143,6 @@ export function handleEffects(
     context: HandleEffectsContext,
 ): void {
     const { dispatch } = context;
-    // No HYDRATE case: this subscriber isn't attached until after boot hydration
-    // already dispatched it, so boot-time effects (theme, etc.) run directly from main.ts.
     switch (action.type) {
         case ACTIONS.SET_INSTRUMENT_VOICE: {
             const payload = action.payload;

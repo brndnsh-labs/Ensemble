@@ -1340,11 +1340,8 @@ export interface ActionPayloadMap {
      * `{ start, end }` are absolute steps within `[0, totalSteps)`.
      */
     SET_PRACTICE_LOOP: { start: number; end: number } | null;
-    HYDRATE?: undefined;
     TOAST_EXPIRED: string;
     FLASH_EXPIRED?: undefined;
-    VIS_RESET?: undefined;
-    VIS_UPDATE?: unknown;
     PROG_VALIDATED?: undefined;
 }
 
@@ -1399,10 +1396,7 @@ export const ACTIONS = {
     SET_PRACTICE_LOOP: 'SET_PRACTICE_LOOP',
 
     // --- Signal-only / Lifecycle (payload-less notifications) ---
-    HYDRATE: 'HYDRATE',
     TOAST_EXPIRED: 'TOAST_EXPIRED',
     FLASH_EXPIRED: 'FLASH_EXPIRED',
-    VIS_RESET: 'VIS_RESET',
-    VIS_UPDATE: 'VIS_UPDATE',
     PROG_VALIDATED: 'PROG_VALIDATED',
 } as const satisfies { readonly [K in keyof ActionPayloadMap]-?: K };
