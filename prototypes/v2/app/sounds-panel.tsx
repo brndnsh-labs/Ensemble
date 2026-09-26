@@ -1,39 +1,9 @@
-import {
-    BASS_STYLES,
-    CHORD_STYLES,
-    HARMONY_STYLES,
-    SOLOIST_STYLES,
-} from '@engine/data/instrument-styles';
-import type { ChordDensity } from '@engine/types';
 import type { RefObject } from 'react';
 import { useEffect, useRef, useState } from 'react';
-import { BAND_ENGINE } from '../lib/engine-mode';
 import type { ChartDocument } from '../lib/runtime';
 import { allSoundsSizeMB, packsForInstrument } from '../lib/sounds';
 import { type Lane, visibleLanes } from './band-lanes';
 import { whenClosed } from './dialog-close';
-
-/** The one style-picker list each style-bearing lane has (#1275). Groove/drums
- * has no `style` field on `ChartGroove` and no entry in `instrument-styles.ts` —
- * drums route by drum preset/genre feel instead, so it is deliberately absent. */
-const STYLE_OPTIONS: Partial<Record<Lane, { id: string; name: string }[]>> = {
-    chords: CHORD_STYLES,
-    bass: BASS_STYLES,
-    harmony: HARMONY_STYLES,
-    soloist: SOLOIST_STYLES,
-};
-
-const DENSITY_OPTIONS: { value: ChordDensity; label: string }[] = [
-    { value: 'thin', label: 'Thin (3 notes)' },
-    { value: 'standard', label: 'Standard (4 notes)' },
-    { value: 'rich', label: 'Rich (5+ notes)' },
-];
-
-const SOLOIST_MODE_OPTIONS = [
-    { value: 'auto', label: 'Auto' },
-    { value: 'monophonic', label: 'Monophonic' },
-    { value: 'guitar', label: 'Guitar' },
-] as const;
 
 interface RangeSettingProps {
     label: string;
@@ -103,9 +73,6 @@ interface SoundsPanelProps {
     onChooseSound: (lane: Lane, value: string) => void;
     onVolume: (lane: Lane, value: number) => void;
     onReverb: (lane: Lane, value: number) => void;
-    onStyle: (lane: Lane, value: string) => void;
-    onDensity: (value: ChordDensity) => void;
-    onSoloistMode: (mode: 'auto' | 'monophonic' | 'guitar') => void;
 }
 
 export function SoundsPanel({
@@ -123,9 +90,6 @@ export function SoundsPanel({
     onChooseSound,
     onVolume,
     onReverb,
-    onStyle,
-    onDensity,
-    onSoloistMode,
 }: SoundsPanelProps) {
     return (
         <dialog
@@ -180,7 +144,6 @@ export function SoundsPanel({
             <div className="sound-choices">
                 {visibleLanes.map(([lane, label]) => {
                     const band = current.chart.band[lane];
-                    const styleOptions = STYLE_OPTIONS[lane];
                     return (
                         <div className="sound-lane" key={lane}>
                             <h3>{label}</h3>
@@ -222,79 +185,6 @@ export function SoundsPanel({
                                     }
                                 </small>
                             </label>
-                            {/* The band engine plays each genre's own idioms (docs/design/
-                                band-engine.md): the old engine's per-lane style pickers, chord
-                                density and soloist mode have nothing to set there. */}
-                            {styleOptions && 'style' in band && !BAND_ENGINE && (
-                                <label>
-                                    {label} style
-                                    <select
-                                        aria-label={`${label} style`}
-                                        value={band.style}
-                                        disabled={busy}
-                                        onChange={(event) => onStyle(lane, event.target.value)}
-                                    >
-                                        {/* A style outside the picker list (e.g. Acoustic's
-                                            genre-routed 'arp', #1257) is still selected and
-                                            named, never silently swapped for the first option. */}
-                                        {!styleOptions.some((entry) => entry.id === band.style) && (
-                                            <option value={band.style}>{band.style}</option>
-                                        )}
-                                        {styleOptions.map((entry) => (
-                                            <option key={entry.id} value={entry.id}>
-                                                {entry.name}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </label>
-                            )}
-                            {lane === 'chords' && !BAND_ENGINE && (
-                                <label>
-                                    Chords density
-                                    <select
-                                        aria-label="Chords density"
-                                        value={current.chart.band.chords.density}
-                                        disabled={busy}
-                                        onChange={(event) =>
-                                            onDensity(event.target.value as ChordDensity)
-                                        }
-                                    >
-                                        {DENSITY_OPTIONS.map((entry) => (
-                                            <option key={entry.value} value={entry.value}>
-                                                {entry.label}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </label>
-                            )}
-                            {lane === 'soloist' && !BAND_ENGINE && (
-                                <label>
-                                    Soloist mode
-                                    <select
-                                        aria-label="Soloist mode"
-                                        value={
-                                            current.chart.band.soloist.autoMode
-                                                ? 'auto'
-                                                : current.chart.band.soloist.mode
-                                        }
-                                        disabled={busy}
-                                        onChange={(event) =>
-                                            onSoloistMode(
-                                                event.target.value as
-                                                    | 'auto'
-                                                    | 'monophonic'
-                                                    | 'guitar',
-                                            )
-                                        }
-                                    >
-                                        {SOLOIST_MODE_OPTIONS.map((entry) => (
-                                            <option key={entry.value} value={entry.value}>
-                                                {entry.label}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </label>
-                            )}
                             <RangeSetting
                                 label={`${label} volume`}
                                 ariaLabel={`${label} volume`}

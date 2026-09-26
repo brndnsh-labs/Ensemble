@@ -1592,7 +1592,6 @@ export interface ActionPayloadMap {
     TOGGLE_PLAY: undefined;
     SET_BPM: number | string;
     SET_STYLE: ActionPayloadSetStyle;
-    SET_DENSITY: string;
     SET_VOLUME: ActionPayloadSetVolume;
     SET_REVERB: ActionPayloadSetReverb;
     SET_SOLOIST_MODE: string;
@@ -1681,7 +1680,6 @@ export const ACTIONS = {
 
     // --- Instrument Settings ---
     SET_STYLE: 'SET_STYLE',
-    SET_DENSITY: 'SET_DENSITY',
     SET_VOLUME: 'SET_VOLUME',
     SET_REVERB: 'SET_REVERB',
     SET_SOLOIST_MODE: 'SET_SOLOIST_MODE',

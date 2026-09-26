@@ -1,7 +1,6 @@
 import { KEY_ORDER } from '@engine/config';
 import { Fragment } from 'react';
 import { arrangementOf } from '../lib/documents';
-import { BAND_ENGINE } from '../lib/engine-mode';
 import { type ChartDocument, GENRE_NAMES } from '../lib/runtime';
 import { type Lane, visibleLanes } from './band-lanes';
 import { TempoControl } from './tempo-control';
@@ -120,7 +119,7 @@ export function TransportBar({
                         </button>
                         {/* Trading sits by the soloist it's about; it shows the turn length
                             while on, so a musician can see the band will leave them room. */}
-                        {BAND_ENGINE && key === 'soloist' && (
+                        {key === 'soloist' && (
                             <button
                                 type="button"
                                 className={`band-toggle trade-toggle ${trading ? 'on' : 'off'}`}

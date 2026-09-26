@@ -593,7 +593,7 @@ export function bootstrapChordAudit({
         genreFeel: genre,
     });
     dispatch(ACTIONS.SET_STYLE, { module: 'chords', style });
-    dispatch(ACTIONS.SET_DENSITY, density);
+    dispatch(ACTIONS.SET_PARAM, { module: 'chords', param: 'density', value: density });
     dispatch(ACTIONS.SET_BPM, bpm);
     dispatch(ACTIONS.SET_BAND_INTENSITY, intensity);
     dispatch(ACTIONS.SET_COMPLEXITY, complexity);

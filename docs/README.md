@@ -31,7 +31,7 @@ This folder groups the living documentation for Ensemble.
 - [`docs/guides/bundle-hygiene.md`](guides/bundle-hygiene.md) — reusable recipes for bundle-size work (budgets-as-baselines, DCE expectations, pre-flight grep for "orphaned" musical content, knip blind spots, code-splitting discipline, defense-in-depth hygiene). Extracted from the completed bundle audit.
 - [`docs/design/ensemble-v2-auth-threat-model.md`](design/ensemble-v2-auth-threat-model.md) — account authentication controls, residual risks and the outstanding proxy verification gate (#1192).
 - [`docs/design/ensemble-v2-document-authorization-review.md`](design/ensemble-v2-document-authorization-review.md) — stage-3 exit gate (#1204): independent authorization/IDOR review of the owner-bound document API, its exit receipt and residual risks.
-- [`docs/design/band-engine.md`](design/band-engine.md) — DECISION 2026-09-23/25: the ground-up band engine (`band/`), the default since the 2026-09-25 cutover (`?engine=old` plays the old engine).
+- [`docs/design/band-engine.md`](design/band-engine.md) — DECISION 2026-09-23/25: the ground-up band engine (`band/`), the default since the 2026-09-25 cutover, and the only engine the app runs.
 - [`docs/design/ensemble-v2-rollout.md`](design/ensemble-v2-rollout.md) — DECISION 2026-09-15: v2 becomes the site; immutable images on docker04, core-parity bar, hard cut of v1, five phased milestones.
 - [`tests/README.md`](../tests/README.md) — test-suite conventions.
 - [`docs/agents/`](agents/) — repo config read by the general-purpose engineering skills: [`issue-tracker.md`](agents/issue-tracker.md), [`triage-labels.md`](agents/triage-labels.md) (triage roles mapped onto `status:*`), [`domain.md`](agents/domain.md) (where the glossary and decisions live).

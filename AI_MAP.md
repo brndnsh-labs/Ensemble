@@ -34,7 +34,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/midi-export-worker.ts` | One-shot MIDI export worker entry; owns a fresh module realm and detached generation state for each export. | worker message handler |
 | `public/telemetry.ts` | Production-only, privacy-safe Umami analytics boundary. | `initializeTelemetry`, `track` |
 
-## Band Engine (`band/`, the default engine; `?engine=old` plays the old one)
+## Band Engine (`band/`, the engine the app plays)
 
 The ground-up replacement for the generative engine, the default since 2026-09-25; see `docs/design/band-engine.md` and `band/CLAUDE.md`.
 
@@ -60,7 +60,7 @@ The ground-up replacement for the generative engine, the default since 2026-09-2
 | `prototypes/v2/lib/render-bridge.ts` | The listening-gate tools' page side, on `window.ensemble`: renders band events it is handed through `renderBandPasses` on pinned lane sounds, returns channels plus a dispatch tap. Installed by `runtime.ts` only in a `NEXT_PUBLIC_RENDER_BRIDGE=1` build. | `installRenderBridge` |
 | `scripts/band-scene.ts` | The listening-gate tools' node side: a `mix:report` scene → score → `compileTimeline` → `performPass` passes; settings, schedule analysis and the `--write-events` dump. | `performSceneForReport`, `sceneSettings`, `buildEventDump` |
 | `prototypes/v2/lib/band-chart.ts` | The chart sheet's view of a score on the band engine, from the score + band timeline: every written event (holds, N.C., fermatas, off-grid lengths), its performed slots, section loop windows, chord names in all three notations. | `bandChart`, `slotAt`, `chordNames` |
-| `prototypes/v2/lib/engine-mode.ts` | The `BAND_ENGINE` flag (false only under `?engine=old`) and `checkPlayable`, the one capability check every open/edit/import path asks (band: valid + timeline compiles; old engine: `prepareScorePlayback`). | `BAND_ENGINE`, `checkPlayable` |
+| `prototypes/v2/lib/engine-mode.ts` | `checkPlayable`, the one capability check every open/edit/import path asks: the score is valid and its timeline compiles. | `checkPlayable` |
 
 ## State Management (Domain Slices)
 
@@ -71,7 +71,7 @@ The ground-up replacement for the generative engine, the default since 2026-09-2
 | `public/state/groove.ts` | Genre, intensity, and drum kit selection. | `groove` |
 | `public/state/instruments.ts` | Per-instrument synthesis parameters. | `bass`, `soloist`, `harmony` |
 | `public/state/midi.ts` | WebMIDI routing and local muting state. | `midi` |
-| `public/state/visualizer.ts` | `vizState.enabled`: whether the scheduler queues visualizer note events (no visualizer ships; only the old engine's scheduler, `?engine=old`, reads it). | `vizState` |
+| `public/state/visualizer.ts` | `vizState.enabled`: whether the scheduler queues visualizer note events (no visualizer ships; only the old engine's scheduler reads it, and the app no longer runs it). | `vizState` |
 | `public/state/conductor.ts` | Macro-arc, intensity drift, and form iteration state. | `conductor` |
 | `public/state/share-codec.ts` | Share-URL / preset wire format: Unicode-safe Base64 + the minified section payload, plus the section-id generator deserialization mints. Main thread only. | `compressSections`, `decompressSections`, `encodeBase64Unicode`, `generateId` |
 | `public/state/state-effects.ts` | Cross-module state side effects (Inversion of Control). | `handleEffects` |
@@ -243,7 +243,7 @@ account sync. Per-surface ownership is the navigation table in `prototypes/v2/CL
 | `public/platform.ts` | Browser hacks (WakeLock, Audio Unlock). |
 | `public/utils.ts` | Worker-safe musical/math primitives: pitch conversion + the step/meter timing core. No DOM, no Web Audio, no persistence. | `getFrequency`, `getStepInfo` |
 | `public/sanitize.ts` | Main-thread string sanitization and display formatting (HTML escaping, dangerous-char stripping, ♯/♭ glyphs). | `escapeHTML`, `stripDangerousChars`, `formatUnicodeSymbols` |
-| `public/visualizer/visualizer-events.ts` | Note-event contract the scheduler queues when `vizState.enabled`; kept because the old engine's scheduler (`?engine=old`) still queues through it. | `queueVisualizerNoteEvent`, `VisualizerQueuedEvent` |
+| `public/visualizer/visualizer-events.ts` | Note-event contract the scheduler queues when `vizState.enabled`; kept only because the old engine's scheduler, which the app no longer runs, queues through it. | `queueVisualizerNoteEvent`, `VisualizerQueuedEvent` |
 
 ## Infrastructure & Lifecycle (Internal)
 
