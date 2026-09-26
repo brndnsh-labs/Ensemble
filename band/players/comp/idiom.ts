@@ -31,6 +31,8 @@ const TIE_STEPS = 2;
 
 interface CompMemory {
     voicing: number[] | null;
+    /** Where the last lead note heard ends (a tick): a note held over the barline. */
+    leadUntil?: number;
     /** The chord the hand last struck (its symbol), for an instrument that holds it. */
     chord?: string | null;
     /** The next bar's first chord was already played as an anticipation. */
@@ -68,7 +70,39 @@ export interface CompBook {
      * as written, short, instead of pressing once per chord and holding (the reggae bubble).
      */
     percussive?: boolean;
+    /**
+     * A conversational comp answers the lead (see `Answer`). A book without one is a groove:
+     * its figure is the part, lead or no lead.
+     */
+    answer?: Answer;
 }
+
+/**
+ * How a comper converses with a soloist: out of the way while the line moves, in the holes
+ * when it breathes. Only a style whose comp is a conversation (jazz, a Rhodes, a blues
+ * pianist) has one; a strummed or chopped groove keeps its figure under the lead.
+ */
+export interface Answer {
+    /** Chance that a strike under a sounding lead note lays out (never a chord's arrival). */
+    layOut: number;
+    /** Chance of a stab in a breath the lead leaves that the figure left empty. */
+    fill: number;
+    /**
+     * A strike that lays out lets the one before ring on instead (a Rhodes holds its chord
+     * under the singer); without it the hand simply doesn't play (a pianist's short stabs).
+     */
+    hold?: boolean;
+    /**
+     * The fewest strikes lay-out leaves in a bar: a comper who is down to the chord's
+     * arrival alone has stopped keeping time (a sparse figure thins to nothing otherwise).
+     */
+    keep?: number;
+}
+
+/** A breath worth answering: a dotted quarter without the lead (in sixteenths). */
+const BREATH_STEPS = 6;
+/** How much louder a strike answering the lead plays: it speaks up in the hole. */
+const ANSWER_LIFT = 8;
 
 export function compIdiom(book: CompBook): PitchedIdiom {
     return {
@@ -213,6 +247,7 @@ export function compIdiom(book: CompBook): PitchedIdiom {
             });
             planned.sort((a, b) => a.step - b.step);
             const legato = ctx.instrument.legato && !book.percussive;
+            const leadUntil = answerLead(ctx, book, planned, spans, memory, legato);
             if (legato) {
                 // An organist holds a chord and presses again only when it changes: the comping
                 // rhythm is for a struck instrument, and re-pressing a held organ chord on every
@@ -290,10 +325,148 @@ export function compIdiom(book: CompBook): PitchedIdiom {
             const struck = planned.filter((h) => !h.muted).at(-1)?.chord.symbol ?? memory.chord;
             return {
                 events,
-                memory: { voicing: prev, pushed, chord: endsInRest ? null : (struck ?? null) },
+                memory: {
+                    voicing: prev,
+                    pushed,
+                    chord: endsInRest ? null : (struck ?? null),
+                    ...(leadUntil !== undefined ? { leadUntil } : {}),
+                },
             };
         },
     };
+}
+
+type Planned = Hit & { chord: ChordFacts; early?: boolean };
+
+/**
+ * The comp answers the lead, in place on the bar's planned hits: a strike under a note the
+ * lead is sounding may lay out, and a breath the lead leaves gets a strike, the figure's own
+ * (played up) or a stab on the offbeat after the lead lets go. A chord's first strike is
+ * never dropped, so every chord is still struck. Returns where the last lead note heard ends, for
+ * the next bars; with no lead, nothing changes and nothing is drawn.
+ */
+function answerLead(
+    ctx: BarContext,
+    book: CompBook,
+    planned: Planned[],
+    spans: ReturnType<typeof spanSteps>,
+    memory: CompMemory,
+    legato: boolean,
+): number | undefined {
+    const lead = ctx.heard.lead;
+    const { bar } = ctx;
+    const carried = memory.leadUntil !== undefined && memory.leadUntil > bar.start;
+    // A bar the lead sits out right after it played is a breath too (the classic place to
+    // answer); one further on is the lead resting by form (an intro), with nothing to answer.
+    const recent =
+        memory.leadUntil !== undefined && memory.leadUntil > bar.start - bar.meter.barTicks;
+    const leadUntil = lead.length ? Math.max(...lead.map((n) => n.tick + n.dur)) : memory.leadUntil;
+    // An organ holds its chords (its presses are the arrivals), and a groove keeps its figure.
+    if (!book.answer || legato || (!lead.length && !recent)) {
+        return leadUntil;
+    }
+    const total = barSteps(bar);
+    const sounding: boolean[] = Array.from({ length: total }, (_, s) => {
+        const from = at(bar, s);
+        const to = from + STEP;
+        return (
+            (carried && (memory.leadUntil ?? 0) > from) ||
+            lead.some((n) => n.tick < to && n.tick + n.dur > from)
+        );
+    });
+    const rng = ctx.rng('answer');
+    // Each chord's first strike stays, wherever the figure puts it (a reverse Charleston
+    // strikes on the "and"): the comp may skip beats, never a chord.
+    const firsts = new Set(
+        spans.flatMap(({ span }) => {
+            const first = planned.find((h) => !h.muted && h.chord === span.chord);
+            return first ? [first] : [];
+        }),
+    );
+    // Out of the way while the line moves.
+    for (let i = planned.length - 1; i >= 0; i--) {
+        const hit = planned[i];
+        if (
+            hit.muted ||
+            hit.early ||
+            firsts.has(hit) ||
+            !sounding[hit.step] ||
+            !rng.chance(book.answer.layOut) ||
+            planned.filter((h) => !h.muted && !h.early).length <= (book.answer.keep ?? 0)
+        ) {
+            continue;
+        }
+        planned.splice(i, 1);
+        if (book.answer.hold) {
+            // A held-chord instrument leans back rather than going quiet: the strike before
+            // (the same chord) rings on through the one it gave up.
+            const before = planned
+                .slice(0, i)
+                .reverse()
+                .find((h) => !h.muted && h.chord === hit.chord);
+            if (before) {
+                before.length = Math.max(before.length, hit.step + hit.length - before.step);
+            }
+        }
+    }
+    // Where a chord changes, the eighth before it belongs to the new chord (a push), so a
+    // stab there would strike the old one: the last span's end is the next bar's chord.
+    const pushZone = (x: number) =>
+        spans.some(({ to }) => x >= to - TIE_STEPS && x < to && to < total) ||
+        x >= total - TIE_STEPS;
+    // A breath that began in the bar before (the lead let go before the barline) counts its
+    // silence there too, so a phrase end across the barline is heard as one breath.
+    const before =
+        !carried && memory.leadUntil !== undefined
+            ? Math.max(0, Math.round((bar.start - memory.leadUntil) / STEP))
+            : 0;
+    // In the holes when it breathes.
+    for (let s = 0; s < total; ) {
+        if (sounding[s]) {
+            s++;
+            continue;
+        }
+        let end = s;
+        while (end < total && !sounding[end]) {
+            end++;
+        }
+        if (end - s + (s === 0 ? before : 0) >= BREATH_STEPS) {
+            // A chord's own first strike isn't an answer (it would be there anyway), nor is a
+            // push, which is the figure's own accent.
+            const inside = planned.filter(
+                (h) => !h.muted && !h.early && !firsts.has(h) && h.step >= s && h.step < end,
+            );
+            if (inside.length) {
+                inside[0].velocity += ANSWER_LIFT;
+            } else if (rng.chance(book.answer.fill)) {
+                // On the first offbeat eighth at least an eighth after the lead lets go, a
+                // quarter clear of the strikes already there (an "and" straight after a
+                // struck beat is a stutter, not an answer), and never on a change's push.
+                const step = Array.from({ length: end - s }, (_, k) => s + k).find(
+                    (x) =>
+                        x % 4 === 2 &&
+                        (s === 0 || x >= s + 2) &&
+                        !pushZone(x) &&
+                        !planned.some((h) => Math.abs(h.step - x) < 4),
+                );
+                const chord =
+                    step === undefined
+                        ? null
+                        : spans.find(({ from, to }) => step >= from && step < to)?.span.chord;
+                if (step !== undefined && chord) {
+                    planned.push({
+                        step,
+                        length: Math.min(2, end - step),
+                        velocity: 84 + ANSWER_LIFT,
+                        chord,
+                    });
+                    planned.sort((a, b) => a.step - b.step);
+                }
+            }
+        }
+        s = end;
+    }
+    return leadUntil;
 }
 
 // ================================================================ guitars

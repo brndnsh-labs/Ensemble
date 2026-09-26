@@ -99,6 +99,11 @@ export const blues = defineClaims({
         {
             take: { lead: 'solo' },
             claims: [
+                // The blues figure leaves little room for a stab of its own, so the piano answers by
+                // laying out under the licks: breath density 1.02 (0.86 with the answer off), line
+                // density 0.132 (0.157).
+                ['compBreathDensity', 0.95, 2, "call and response: the piano in the guitar's gaps"],
+                ['compLineDensity', 0.1, 0.145, 'the piano thins under the licks'],
                 ['leadLongBreath', 0, 0.12, 'breaths, not gaps: two empty bars are rare'],
                 ['leadRestShare', 0.2, 0.5, 'the solo leaves space between licks'],
                 ['leadChordToneOnBeats', 0.75, 1, 'blue notes pass; the beats are the chord'],
