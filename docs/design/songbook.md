@@ -23,6 +23,8 @@ field list. That arrangement has three structural problems:
    `validateSections`; `arranger.grouping` and `complexity` were never written. A field's
    presence in hydration is not by itself proof that it belongs in a document: the current
    `bandIntensity` is realized auto-conductor state and deliberately remains runtime-only.
+   *(Amended 2026-09-26, #1404: no conductor writes it any more. The band shapes its own
+   energy, so the level is now the player's choice, saved per chart as `performance.energy`.)*
 2. **One payload mixes different lifetimes.** Musical content, device choices, visual
    preferences, session-start defaults, and runtime state do not all belong to a song.
 3. **The storage shape is doing three jobs.** It is simultaneously a crash-recovery snapshot,

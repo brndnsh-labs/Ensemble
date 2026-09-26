@@ -35,7 +35,6 @@ vi.mock('../../../public/state.js', async (importOriginal) => {
 });
 
 vi.mock('../../../public/controllers/instrument-controller.js', () => ({
-    loadDrumPreset: vi.fn(),
     togglePower: vi.fn(),
 }));
 

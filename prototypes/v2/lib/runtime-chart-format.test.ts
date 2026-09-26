@@ -7,7 +7,7 @@
  * next capture writes none of them, so it sheds them on its next save. Genre is stored once, by
  * name; energy rides the chart.
  */
-import { validateChartDocument } from '@engine/songbook/codec';
+import { validateChartDocument, writtenSettings } from '@engine/songbook/codec';
 import type { ChartDocument } from '@engine/songbook/types';
 import { describe, expect, it } from 'vitest';
 import { captureContent, captureDocument, load, state } from './runtime';
@@ -166,6 +166,26 @@ describe('opening an old chart and capturing it again', () => {
         const written = captureDocument(oldChart());
         load(written);
         expect(captureDocument(written)).toEqual(written);
+    });
+
+    it('reads as the same chart once written today, so an old chart undone by hand is not an edit', () => {
+        // The stand's dirty check compares charts as written today (`written` in ensemble.tsx):
+        // the stored copy keeps its legacy fields until the next Save, a capture never has them.
+        const asWritten = (chart: ChartDocument['chart']) =>
+            JSON.stringify({ ...chart, ...writtenSettings(chart) });
+        const stored = oldChart();
+        load(stored);
+        expect(asWritten(captureDocument(stored).chart)).toBe(asWritten(stored.chart));
+        expect(JSON.stringify(captureDocument(stored).chart)).not.toBe(
+            JSON.stringify(stored.chart),
+        );
+
+        // A chart saved while trading, before the head-return setting existed: an absent
+        // count reads as the default, on both sides.
+        const trading = oldChart();
+        Object.assign(trading.chart.band.soloist, { tradeWith: 'drums', tradeBars: 4 });
+        load(trading);
+        expect(asWritten(captureDocument(trading).chart)).toBe(asWritten(trading.chart));
     });
 
     it('derives the lane styles from the genre, not from the chart or the one open before', () => {

@@ -6,7 +6,6 @@
         "dist",
         "tests",
         "scripts",
-        "**/drum-presets.ts",
         "**/chord-presets.ts",
         "**/smart-genres.ts",
         "**/soloist-config.ts"

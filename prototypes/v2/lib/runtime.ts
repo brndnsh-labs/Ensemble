@@ -797,6 +797,12 @@ export function setBandIntensity(value: number): void {
 /** Auto energy: the band shapes it over the form itself. */
 export function setAutoIntensity(auto: boolean): void {
     dispatch(ACTIONS.SET_AUTO_INTENSITY, auto);
+    if (auto) {
+        // Auto saves no level (`energy: 'auto'`), and a chart opened on auto starts at the
+        // default (`apply`). The voices still read the level while on auto, so reset it here too:
+        // what plays after ticking Auto is what plays when the chart is reopened.
+        setBandIntensity(DEFAULT_ENERGY);
+    }
 }
 
 /**

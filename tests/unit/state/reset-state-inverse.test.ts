@@ -219,15 +219,6 @@ function poison(fresh: Record<string, any>): string[] {
 
         if (NESTED_SLICES.includes(key) && value && typeof value === 'object') {
             for (const [sub, subValue] of Object.entries(value)) {
-                // `pattern` is derived from `groove.instruments`, not a `groove.pattern`
-                // field — poison the lanes it is built from. `RESET_STATE` blanks them
-                // with `inst.steps.fill(0)`.
-                if (key === 'groove' && sub === 'pattern') {
-                    for (const inst of state.groove.instruments) {
-                        inst.steps[0] = 9;
-                    }
-                    continue;
-                }
                 if (!(sub in state[key])) {
                     unreached.push(`${key}.${sub}`);
                     continue;

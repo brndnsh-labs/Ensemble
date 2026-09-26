@@ -35,6 +35,7 @@ import {
     type CodecDecodeResult,
     type CodecEncodeResult,
     type CodecIssue,
+    DEFAULT_SOLOIST_TRADE_CHORUSES,
     SOLOIST_TRADE_BARS,
     type SoloistTradeMode,
     WORKSPACE_PREFERENCES_SCHEMA_VERSION,
@@ -857,13 +858,14 @@ export function writtenSettings(content: Pick<ChartContent, 'performance' | 'ban
                 ...writtenMix(soloist),
                 mode: soloist.mode,
                 autoMode: soloist.autoMode,
-                // Written only while trading, as `captureContent` does.
-                ...(trading ? { tradeWith: soloist.tradeWith } : {}),
-                ...(trading && soloist.tradeBars !== undefined
-                    ? { tradeBars: soloist.tradeBars }
-                    : {}),
-                ...(trading && soloist.tradeChoruses !== undefined
-                    ? { tradeChoruses: soloist.tradeChoruses }
+                // Written only while trading, as `captureContent` does — with the same defaults
+                // `apply` reads an absent turn length or head-return count as.
+                ...(trading
+                    ? {
+                          tradeWith: soloist.tradeWith,
+                          tradeBars: soloist.tradeBars ?? 4,
+                          tradeChoruses: soloist.tradeChoruses ?? DEFAULT_SOLOIST_TRADE_CHORUSES,
+                      }
                     : {}),
             },
             groove: {

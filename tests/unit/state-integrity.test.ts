@@ -95,7 +95,6 @@ describe('State Integrity Audit', () => {
                 'VIS_RESET',
                 'VIS_UPDATE',
                 'PROG_VALIDATED',
-                'DRUM_PRESET_LOADED',
             ];
 
             if (!isDispatched && !exceptions.includes(key)) {

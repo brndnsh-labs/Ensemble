@@ -58,7 +58,7 @@ function toStored(display: number, max: 1 | 100): number {
  * A range input that only commits once per gesture (pointer-up or a keyboard nudge),
  * never on every intermediate `input` event — the same contract as `sounds-panel.tsx`'s
  * `RangeSetting`, generalized here with `max` so it covers both the 0-1 fields shown as
- * a percent (band intensity, complexity, master volume) and the natively-0-100 fields
+ * a percent (band intensity, master volume) and the natively-0-100 fields
  * (swing, humanize) with one component instead of two near-duplicates.
  */
 function RangeSetting({ label, ariaLabel, value, max, disabled, onCommit }: RangeSettingProps) {

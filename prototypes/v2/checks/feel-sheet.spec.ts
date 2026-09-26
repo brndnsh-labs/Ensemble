@@ -163,7 +163,7 @@ test("energy (auto intensity, band intensity) is the chart's own: it dirties the
 
     const autoIntensity = page.getByLabel('Auto intensity', { exact: true });
     const bandIntensity = page.getByLabel('Band intensity', { exact: true });
-    // A starter saved before energy rode the chart plays on auto.
+    // A starter is seeded on auto (`energy: 'auto'`), at the default level.
     await expect(autoIntensity).toBeChecked();
     await expect(bandIntensity).toBeDisabled();
     await expect(bandIntensity).toHaveValue('35');

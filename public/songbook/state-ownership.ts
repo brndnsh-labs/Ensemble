@@ -261,6 +261,8 @@ export const LEGACY_PERSISTED_FIELD_OWNERSHIP = {
     sessionTimer: 'preferences',
     songMode: 'preferences',
     vizEnabled: 'preferences',
+    // v1's local-storage payload, as v1 owned it. v2 saves it with the chart (the manifest's
+    // `playback.autoIntensity: 'document'`, #1404).
     autoIntensity: 'runtime-derived',
     masterVolume: 'preferences',
     mixerVersion: 'runtime-derived',
