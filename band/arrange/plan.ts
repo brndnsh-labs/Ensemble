@@ -103,7 +103,12 @@ export function planBars(
     // Whether the drummer has bar `index` of `pass` to himself: his turn in a trade.
     const drummerAlone = (index: number, onPass: number) => {
         const role = leadRole(timeline, index, onPass, trade);
-        return role.kind === 'trade' && role.with === 'drums' && role.turn === 'band';
+        return (
+            role.kind === 'trade' &&
+            role.with === 'drums' &&
+            role.turn === 'band' &&
+            bars[index].visit.lanes.drums !== false
+        );
     };
     // A song that loops earns a little more each time round — capped, so the fourth chorus
     // is fuller than the first but the band never runs away from the player.
@@ -132,9 +137,14 @@ export function planBars(
         }
         const lead = leadRole(timeline, i, pass, trade);
         const drumsTurn = lanes.drums && drummerAlone(i, pass);
-        if (lead.kind === 'trade' && (lead.with === 'drums' || lead.turn === 'you')) {
-            // Your turn is yours: the soloist lays out (and trading with the drummer, you are
-            // the soloist throughout).
+        if (lead.kind === 'trade' && lead.turn === 'you') {
+            // Your turn is yours: the soloist lays out.
+            lanes.lead = false;
+        }
+        if (wanted?.with === 'drums' && pass > 0) {
+            // Asking to trade with the drummer makes you the soloist after the head, even where
+            // the trade can't happen (a practice loop, the drums off, a drummer who doesn't
+            // solo): the band's soloist never plays over you.
             lanes.lead = false;
         }
         if (drumsTurn) {
@@ -157,7 +167,9 @@ export function planBars(
         }
         const first = i === window.from && pass === 0;
         const prevPlan = plans[i - 1];
-        const arrival = bar.barInVisit === 0 && !bar.visit.seamless && !first;
+        // The drummer's own turn opens with the kick under his statement, not a crash: the
+        // crash is the band coming back in.
+        const arrival = bar.barInVisit === 0 && !bar.visit.seamless && !first && !drumsTurn;
         // A crash marks an arrival: a new section, or the downbeat after a phrase fill once
         // the band is past quiet energy.
         const afterFill = prevPlan?.fill === 'phrase' && energy >= 0.5;

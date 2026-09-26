@@ -314,6 +314,109 @@ describe('trading with the player', () => {
         }
     });
 
+    it('never lets a turn span an intro a D.C. brings back mid-form', () => {
+        const timeline = compileTimeline(
+            score([
+                { label: 'Intro', bars: 'C | G | C | G' },
+                {
+                    label: 'A',
+                    bars: 'C | F | G | C | Am | Dm | G | C',
+                    end: { 7: [{ kind: 'fine', label: 'Fine' }] },
+                },
+                {
+                    label: 'B',
+                    bars: 'F | F | G | G',
+                    end: {
+                        3: [
+                            {
+                                kind: 'jump',
+                                from: 'start',
+                                destination: { kind: 'fine', label: 'Fine' },
+                                repeats: 'skip',
+                            },
+                        ],
+                    },
+                },
+            ]),
+        );
+        for (const bars of [4, 8] as const) {
+            for (const bar of timeline.bars) {
+                const role = leadRole(timeline, bar.index, 2, { with: 'lead', bars });
+                if (role.kind !== 'trade') {
+                    continue;
+                }
+                const turn = timeline.bars.slice(role.from, role.from + role.bars);
+                expect(
+                    turn.every((b) => !/^intro/i.test(b.visit.label)),
+                    `${bars}s bar ${bar.index}`,
+                ).toBe(true);
+                expect(role.from + role.at).toBe(bar.index);
+            }
+        }
+    });
+
+    it('replans a turn when the trade changes in the middle of it', () => {
+        // Fours, then eights from bar 2: the soloist's eight-bar turn (bars 0-7) plays on
+        // after the change instead of stopping where the four-bar plan ended.
+        const four = { ...jazz, trade: fours('lead') };
+        const eights = { ...jazz, trade: { with: 'lead', bars: 8 } as const };
+        const played = performPass(rhythmChanges, four, { pass: 1, looping: true });
+        const resumed = performPass(rhythmChanges, eights, {
+            pass: 1,
+            looping: true,
+            memory: played.snapshots[2],
+            window: { from: 2, to: rhythmChanges.bars.length, wrapTo: 0 },
+        });
+        const leadBars = new Set(resumed.events.filter((e) => e.lane === 'lead').map((e) => e.bar));
+        expect([4, 5, 6].some((bar) => leadBars.has(bar))).toBe(true);
+    });
+
+    it('keeps the soloist out after the head whenever you asked to trade with the drummer', () => {
+        const wanted = { ...jazz, trade: fours('drums') };
+        const cases = [
+            { settings: wanted, window: { from: 0, to: 8, wrapTo: 0 } },
+            { settings: { ...wanted, style: 'bossa' as const }, window: undefined },
+            { settings: { ...wanted, lanes: { ...lanes, drums: false } }, window: undefined },
+        ];
+        for (const { settings, window } of cases) {
+            const { events } = performPass(rhythmChanges, settings, {
+                pass: 1,
+                looping: true,
+                window,
+            });
+            expect(
+                events.some((e) => e.lane === 'lead'),
+                settings.style,
+            ).toBe(false);
+        }
+    });
+
+    it("opens the drummer's turn on the kick, and brings the band back on the crash", () => {
+        const { events } = performPass(
+            rhythmChanges,
+            { ...jazz, trade: fours('drums') },
+            { pass: 1, looping: true },
+        );
+        const crashOn = (bar: number) =>
+            events.some(
+                (e) =>
+                    e.lane === 'drums' &&
+                    e.piece === 'crash' &&
+                    e.bar === bar &&
+                    Math.abs(e.tick - rhythmChanges.bars[bar].start) < 60,
+            );
+        for (const bar of drummerBars(rhythmChanges, 1).filter((b) => {
+            const role = leadRole(rhythmChanges, b, 1, fours('drums'));
+            return role.kind === 'trade' && role.at === 0;
+        })) {
+            expect(crashOn(bar), `drummer bar ${bar}`).toBe(false);
+            const after = bar + 4;
+            if (after < rhythmChanges.bars.length) {
+                expect(crashOn(after), `band back at bar ${after}`).toBe(true);
+            }
+        }
+    });
+
     it("doesn't trade in a practice loop, without its partner, or where the drummer can't solo", () => {
         const plain = performPass(rhythmChanges, jazz, { pass: 1, looping: true }).events;
         const cases = [

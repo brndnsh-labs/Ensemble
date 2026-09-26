@@ -16,6 +16,8 @@ interface TradeSheetProps {
     busy: boolean;
     /** Who this feel's band can trade with: the drummer solos only in some styles. */
     partners: { soloist: boolean; drums: boolean };
+    /** Why the band can't trade as asked right now (`runtime.tradeBlocked`), or null. */
+    blocked: 'soloist-off' | 'drums-off' | 'drummer-no-solo' | null;
     onClose: () => void;
     onChange: (tradeWith: SoloistTradeWith, bars: SoloistTradeBars) => void;
 }
@@ -30,13 +32,13 @@ export function TradeSheet({
     current,
     busy,
     partners,
+    blocked,
     onClose,
     onChange,
 }: TradeSheetProps) {
     const soloist = current.chart.band.soloist;
     const tradeWith = soloist.tradeWith ?? 'off';
     const bars = soloist.tradeBars ?? 4;
-    const drumsUnavailable = tradeWith === 'drums' && !partners.drums;
     return (
         <dialog
             className="feel-panel trade-panel"
@@ -73,18 +75,22 @@ export function TradeSheet({
                             <option value="drums" disabled={!partners.drums}>
                                 {partners.drums
                                     ? 'The drummer'
-                                    : 'The drummer (jazz only, for now)'}
+                                    : "The drummer (this feel's drummer doesn't solo yet)"}
                             </option>
                         </select>
                     </label>
                     <p className="trade-note">
-                        {tradeWith === 'soloist'
-                            ? 'The soloist plays a phrase, then lays out while the band comps for yours.'
-                            : tradeWith === 'drums'
-                              ? drumsUnavailable
-                                  ? "This feel's drummer doesn't solo yet, so the band plays on as usual."
-                                  : 'The band drops out for the drummer’s solo, then comps for yours.'
-                              : 'The band plays the whole song with you.'}
+                        {blocked === 'soloist-off'
+                            ? 'Paused: the soloist is off. Turn it on to trade with it.'
+                            : blocked === 'drums-off'
+                              ? 'Paused: the drums are off. Turn them on to trade with the drummer.'
+                              : blocked === 'drummer-no-solo'
+                                ? "Paused: this feel's drummer doesn't solo yet. The band plays on, and leaves the soloing to you."
+                                : tradeWith === 'soloist'
+                                  ? 'The soloist plays a phrase, then lays out while the band comps for yours.'
+                                  : tradeWith === 'drums'
+                                    ? 'The band drops out for the drummer’s solo, then comps for yours.'
+                                    : 'The band plays the whole song with you.'}
                     </p>
                 </div>
                 <div className="feel-group">

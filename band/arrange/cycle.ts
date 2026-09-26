@@ -27,9 +27,10 @@ export type LeadRole =
           with: TradeSettings['with'];
           /** Whose turn it is: the band's (the soloist's, or the drummer's alone) or yours. */
           turn: 'band' | 'you';
-          /** The turn's first bar (a bar index) and its length in bars. */
+          /** The turn's first bar (a bar index), its length in bars, and this bar's place in it. */
           from: number;
           bars: number;
+          at: number;
       };
 
 /** How many passes one head-and-solos cycle lasts. */
@@ -63,11 +64,53 @@ export function leadRole(
     return cycle === 0 ? { kind: 'head' } : { kind: 'solo', chorus: cycle as 1 | 2 | 3 };
 }
 
+/** One chorus's turns, as runs of bar indices; and, for each bar, its turn and place in it. */
+interface Turns {
+    count: number;
+    of: Map<number, { turn: number; from: number; bars: number; at: number }>;
+}
+
+const TURNS = new WeakMap<Timeline, Map<number, Turns>>();
+
 /**
- * The turn bar `index` falls in. Turns are counted in bars from the top of each chorus (the
- * intro is the band's), so they sit on the form: fours start on bars 1, 5, 9… A chorus that
- * doesn't divide evenly ends on a short turn. The alternation runs on across choruses, the
- * band taking the first turn after the head.
+ * A chorus cut into turns of `length` bars, counted from the top (the intro is the band's).
+ * A turn never spans an intro (a D.C. can replay one mid-form): the bars before it end on a
+ * short turn. A chorus that doesn't divide evenly ends on one too. Computed once per chart.
+ */
+function turnsOf(timeline: Timeline, length: number): Turns {
+    const byLength = TURNS.get(timeline) ?? new Map<number, Turns>();
+    TURNS.set(timeline, byLength);
+    const cached = byLength.get(length);
+    if (cached) {
+        return cached;
+    }
+    const runs: number[][] = [];
+    let current: number[] = [];
+    for (const bar of timeline.bars) {
+        if (isIntro(bar)) {
+            current = [];
+            continue;
+        }
+        if (!current.length || current.length === length) {
+            current = [];
+            runs.push(current);
+        }
+        current.push(bar.index);
+    }
+    const of = new Map<number, { turn: number; from: number; bars: number; at: number }>();
+    runs.forEach((bars, turn) => {
+        bars.forEach((index, at) => {
+            of.set(index, { turn, from: bars[0], bars: bars.length, at });
+        });
+    });
+    const turns = { count: runs.length, of };
+    byLength.set(length, turns);
+    return turns;
+}
+
+/**
+ * The turn bar `index` falls in. The alternation runs on across choruses, the band taking the
+ * first turn after the head.
  */
 function tradeRole(
     timeline: Timeline,
@@ -75,17 +118,18 @@ function tradeRole(
     pass: number,
     trade: TradeSettings,
 ): LeadRole {
-    const playing = timeline.bars.filter((bar) => !isIntro(bar)).map((bar) => bar.index);
-    const at = playing.indexOf(index);
-    const turnInChorus = Math.floor(at / trade.bars);
-    const turnsPerChorus = Math.ceil(playing.length / trade.bars);
-    const turn = (pass - 1) * turnsPerChorus + turnInChorus;
-    const first = turnInChorus * trade.bars;
+    const turns = turnsOf(timeline, trade.bars);
+    const place = turns.of.get(index);
+    if (!place) {
+        return { kind: 'rest' };
+    }
+    const turn = (pass - 1) * turns.count + place.turn;
     return {
         kind: 'trade',
         with: trade.with,
         turn: turn % 2 === 0 ? 'band' : 'you',
-        from: playing[first],
-        bars: Math.min(trade.bars, playing.length - first),
+        from: place.from,
+        bars: place.bars,
+        at: place.at,
     };
 }

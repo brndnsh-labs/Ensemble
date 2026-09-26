@@ -836,11 +836,15 @@ html [hidden] {
 .more-band {
     margin-left: 3px;
 }
-/* Trade sits by the Soloist chip: hollow while off (the arrow isn't a muted lane, so it isn't
-   struck through), filled with the turn length while the band is trading with you. */
+/* Trade sits by the Soloist chip: hollow while off or paused (the arrow isn't a muted lane,
+   so it isn't struck through), filled with the turn length while the band trades with you.
+   One fixed width in every state, so turning it on never reflows the chips (#1210), and a
+   full tap target clear of the Soloist chip. */
 .trade-toggle {
     flex: 0 0 auto;
-    margin-left: -2px;
+    justify-content: center;
+    width: 44px;
+    min-height: 32px;
 }
 .trade-toggle.off span.label {
     text-decoration: none;
@@ -1733,6 +1737,8 @@ dialog textarea {
     }
     .trade-toggle {
         flex: 0 0 auto;
+        width: 40px;
+        min-height: 36px;
     }
     .chart-scroll {
         padding: 17px 19px 32px;

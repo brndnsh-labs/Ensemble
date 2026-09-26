@@ -3396,12 +3396,14 @@ export default function Ensemble() {
                             change(() => runtime.setEnabled(key, !current.chart.band[key].enabled))
                         }
                         onTrade={() => setTradeMenu(true)}
+                        tradeBlocked={runtime.tradeBlocked()}
                     />
                     <TradeSheet
                         dialogRef={tradeDialog}
                         current={current}
                         busy={busy}
                         partners={runtime.tradePartners()}
+                        blocked={runtime.tradeBlocked()}
                         onClose={() => setTradeMenu(false)}
                         onChange={(tradeWith, bars) =>
                             change(() => runtime.setTrade(tradeWith, bars))

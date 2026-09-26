@@ -52,6 +52,17 @@ test('trading with the soloist is chosen by the soloist, saved with the chart an
     expect(soloist.tradeWith).toBe('soloist');
     expect(soloist.tradeBars).toBe(2);
 
+    // The soloist off: the chart still asks to trade, but the band can't, and the button and
+    // the sheet say so rather than claiming a trade.
+    await page.getByRole('button', { name: 'Soloist', exact: true }).click();
+    const paused = page.getByRole('button', { name: 'Trade: 2 bars with the soloist, paused' });
+    await expect(paused).toHaveClass(/\boff\b/);
+    await paused.click();
+    await expect(sheet.getByText('Paused: the soloist is off.')).toBeVisible();
+    await sheet.getByRole('button', { name: 'Close trade' }).click();
+    await page.getByRole('button', { name: 'Soloist', exact: true }).click();
+    await expect(trade).toHaveClass(/\bon\b/);
+
     // Off again: the chart saves as it did before trading existed.
     await trade.click();
     await sheet.getByLabel('Trade with').selectOption('off');
@@ -62,7 +73,12 @@ test('trading with the soloist is chosen by the soloist, saved with the chart an
     expect(off.tradeBars).toBeUndefined();
 });
 
-test('a jazz band trades with the drummer and plays without errors', async ({ page }) => {
+// The drum solos themselves are the band engine's (band/perform.test.ts, the invariant suite
+// and the jazz claims); this proves the control offers the drummer where he solos and that
+// starting the band with the trade set is clean.
+test('a jazz band offers trading with the drummer, and starts cleanly with it set', async ({
+    page,
+}) => {
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     await page.goto(appUrl());

@@ -116,7 +116,7 @@ export function drumIdiom(book: DrumBook): DrumIdiom {
                     ? {
                           ...book.trade(
                               ctx,
-                              role.kind === 'trade' ? bar.index - role.from : 0,
+                              role.kind === 'trade' ? role.at : 0,
                               role.kind === 'trade' ? role.bars : 1,
                               tier,
                           ),

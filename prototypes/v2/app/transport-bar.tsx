@@ -18,6 +18,8 @@ interface TransportBarProps {
     onToggleLane: (lane: Lane) => void;
     /** Opens the Trade sheet (the band engine only): trading turns with the band. */
     onTrade: () => void;
+    /** Set when the chart asks to trade but the band can't right now (`runtime.tradeBlocked`). */
+    tradeBlocked: string | null;
 }
 
 export function TransportBar({
@@ -31,9 +33,13 @@ export function TransportBar({
     onFeel,
     onToggleLane,
     onTrade,
+    tradeBlocked,
 }: TransportBarProps) {
     const trade = current.chart.band.soloist.tradeWith ?? 'off';
     const tradeBars = current.chart.band.soloist.tradeBars ?? 4;
+    // Filled only while the band really trades; asked for but blocked, it stays hollow.
+    const trading = trade !== 'off' && !tradeBlocked;
+    const partner = trade === 'soloist' ? 'soloist' : 'drummer';
     return (
         <div className="transport-bar">
             <div className="transport-cluster">
@@ -117,12 +123,15 @@ export function TransportBar({
                         {BAND_ENGINE && key === 'soloist' && (
                             <button
                                 type="button"
-                                className={`band-toggle trade-toggle ${trade === 'off' ? 'off' : 'on'}`}
+                                className={`band-toggle trade-toggle ${trading ? 'on' : 'off'}`}
                                 disabled={busy}
+                                aria-haspopup="dialog"
                                 aria-label={
                                     trade === 'off'
                                         ? 'Trade'
-                                        : `Trade: ${tradeBars} bars with the ${trade === 'soloist' ? 'soloist' : 'drummer'}`
+                                        : trading
+                                          ? `Trade: ${tradeBars} bars with the ${partner}`
+                                          : `Trade: ${tradeBars} bars with the ${partner}, paused`
                                 }
                                 title="Trade with the band"
                                 onClick={onTrade}

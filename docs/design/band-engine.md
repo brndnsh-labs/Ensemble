@@ -151,23 +151,32 @@ expression devices take turns rather than stack; one peak note per cycle.
     picks who to trade with and how long each turn is: 2, 4 or 8 bars. After the head, every
     time through is traded: the band first (so the player has a phrase to answer), then you,
     the turns counted from the top of each chorus (the intro is the band's) and running on
-    across choruses (a 12-bar blues in fours: B Y B, Y B Y).
-    - **With the soloist:** it plays the band's turns, one phrase played through to an
-      arrival (busy, or calmer in a spacious style), and lays out for yours while the band
-      keeps comping.
+    across choruses (a 12-bar blues in fours: B Y B, Y B Y). A turn never spans an intro (a
+    D.C. can bring one back mid-form); the bars before it end on a short turn. The head doesn't
+    come back while trading: every time through after the first is traded, which is what a
+    practice session wants (a deliberate choice; "trade N choruses, then the head" is open).
+    - **With the soloist:** it plays the band's turns, phrases of four played through to an
+      arrival (eights are two phrases, the arrival between them the breath; busy, or calmer
+      in a spacious style), and lays out for yours while the band keeps comping.
     - **With the drummer** (a style whose drum idiom solos, `DrumBook.trade`; jazz): the bass
       and comp lay out for his turn and comp for yours; the soloist is silent throughout (you
       are the soloist). He solos over the time's own hi-hat foot, in any meter: a two-beat
       motif stated on the one, displaced by an eighth onto the toms, played as accents in a
       stream of eighths, then a run home down the three toms, louder as it goes, to a shot on
-      the "and" of 4 (eights say it twice; twos are a statement and the run home). The band
-      comes back on a crash.
+      the "and" of 4 (eights say it twice; twos are a statement and the run home). His turn
+      opens on the kick under the statement, never a crash, even on a section downbeat; the
+      crash is the band coming back. Asking to trade with the drummer makes you the soloist
+      after the head even where the trade can't happen (a practice loop, the drums off, a
+      drummer who doesn't solo): the band's soloist never plays over you.
     - Nothing rings into the drummer's turn: the organ's hold stops, the comp doesn't
       anticipate into it and the bass doesn't approach it, including across the barline
       into the next pass (`performPass` takes the wrap bar's lanes from the next pass's plan).
     - No trading in a practice loop, without the partner (the soloist off, or the drums off),
-      or with the drummer in a style whose drummer doesn't solo. A pass resumed at a barline
-      (a settings change) trades exactly as the full pass.
+      or with the drummer in a style whose drummer doesn't solo; the Trade control shows the
+      trade as paused, and says why (`runtime.tradeBlocked`, mirroring the plan's gate). A pass
+      resumed at a barline (a settings change) trades exactly as the full pass, and changing
+      the trade mid-turn replans the turn (the lead keys a trade's plan by its shape).
+    - `.mid` and WAV export render the first time through, so they never contain a trade.
     - Why it isn't automatic: an earlier cut had the band trade fours with the drummer on
       its own after three solo choruses. Brandon's call: the band dropping out unasked doesn't
       fit a practice app. Trading is something the player asks for.

@@ -269,13 +269,17 @@ function scoreForBand(): SemanticScore {
     return bandScore.score;
 }
 
-function bandSettings(): BandSettings {
-    const { groove, bass, chords, soloist, playback } = getState();
+/** The band style the chart's genre plays. */
+function bandStyle(): StyleId {
+    const genre = getState().groove.lastSmartGenre;
     // A persisted genre string indexes this table: guard with hasOwn (the #1266 rule), so
     // 'constructor' or a retired key can't read an Object prototype member as a style.
-    const style = Object.hasOwn(STYLE_FOR_GENRE, groove.lastSmartGenre)
-        ? STYLE_FOR_GENRE[groove.lastSmartGenre]
-        : 'rock';
+    return Object.hasOwn(STYLE_FOR_GENRE, genre) ? STYLE_FOR_GENRE[genre] : 'rock';
+}
+
+function bandSettings(): BandSettings {
+    const { groove, bass, chords, soloist, playback } = getState();
+    const style = bandStyle();
     return {
         style,
         lanes: {
@@ -858,9 +862,23 @@ export function setTrade(tradeWith: SoloistTradeWith, bars: SoloistTradeBars): v
  * the style's drummer can take a solo.
  */
 export function tradePartners(): { soloist: boolean; drums: boolean } {
-    const genre = getState().groove.lastSmartGenre;
-    const style = Object.hasOwn(STYLE_FOR_GENRE, genre) ? STYLE_FOR_GENRE[genre] : 'rock';
-    return { soloist: true, drums: Boolean(STYLES[style].drums.solos) };
+    return { soloist: true, drums: Boolean(STYLES[bandStyle()].drums.solos) };
+}
+
+/**
+ * Why the band can't trade the way the chart asks, or null when it can (or isn't asked to).
+ * Mirrors the gate in `planBars` (band/arrange/plan.ts), so the Trade control never claims a
+ * trade the band won't play.
+ */
+export function tradeBlocked(): 'soloist-off' | 'drums-off' | 'drummer-no-solo' | null {
+    const { soloist, groove } = getState();
+    if (soloist.tradeWith === 'soloist') {
+        return soloist.enabled ? null : 'soloist-off';
+    }
+    if (soloist.tradeWith === 'drums') {
+        return !groove.enabled ? 'drums-off' : tradePartners().drums ? null : 'drummer-no-solo';
+    }
+    return null;
 }
 
 /** Soloist phrasing mode — mirrors `InstrumentSettings.tsx`'s Auto/Monophonic/Guitar group. */

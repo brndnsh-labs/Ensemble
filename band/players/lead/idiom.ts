@@ -385,12 +385,17 @@ function soloPlan(
                 (opensSolo || s.slice(-2).join() !== 'rest,rest'),
         )
         .map(([s, w]) => [s, w * room ** s.filter((k) => k === 'rest').length] as const);
-    // The peak climbs through its whole slot; a trade plays its four through to an arrival
-    // (the drummer's silence is the space).
-    const shape =
-        arc.peak || trade
-            ? (['line', 'line', 'line', 'end'] as BarKind[])
-            : rng.weighted(choices.length ? choices : SOLO_SHAPES.mid);
+    // The peak climbs through its whole slot.
+    // A trade is phrases of four, each played through to an arrival: eights are two phrases
+    // with the arrival between them as the breath, twos a line and its arrival.
+    const shape = trade
+        ? Array.from(
+              { length },
+              (_, k): BarKind => (k % 4 === 3 || k === length - 1 ? 'end' : 'line'),
+          )
+        : arc.peak
+          ? (['line', 'line', 'line', 'end'] as BarKind[])
+          : rng.weighted(choices.length ? choices : SOLO_SHAPES.mid);
     const kinds = fitShape(shape, length);
     // The opening cell: develop the last phrase's motif (its rhythm and its intervals, moved
     // onto the new chord), or say something new.
@@ -937,7 +942,12 @@ export function leadIdiom(book: LeadBook): PitchedIdiom {
             // A trade's slot is its turn; otherwise a phrase of the form.
             const role = ctx.plan.lead;
             const slotStart = role.kind === 'trade' ? role.from : bar.index - bar.phrase.bar;
-            const slot = `${ctx.pass}:${slotStart}`;
+            // A trade's turn is keyed by its shape too, so changing the trade mid-turn replans
+            // it rather than keeping a plan made for another length (or for a solo chorus).
+            const slot =
+                role.kind === 'trade'
+                    ? `${ctx.pass}:t${role.from}:${role.bars}:${role.turn}:${role.with}`
+                    : `${ctx.pass}:${slotStart}`;
             let next = memory;
             if (memory.slot !== slot) {
                 // The arrangement decided the slot's job; every bar of a slot has the same one.
