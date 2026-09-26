@@ -568,6 +568,10 @@ npm run --silent mix:ab -- --identity=HEAD --scene=funk-pocket   # measure the n
 git bisect start bad good && git bisect run npm run --silent mix:ab -- --scene=funk-pocket --refs=HEAD~1..HEAD
 ```
 
+Each ref renders with its own harness, so a ref from before these tools moved to the band engine
+(2026-09-25) renders the old engine: comparing across that boundary measures the engine swap,
+not your change. Compare refs on the same side of it.
+
 Per stem it reports total residual RMS, **residual per bar** (so the change is
 addressable — "bass, bar 3"), the note-level event delta, and writes the residual
 itself as a WAV so `mix:spectro --from=<dir>` renders a difference spectrogram.
@@ -575,19 +579,21 @@ itself as a WAV so `mix:spectro --from=<dir>` renders a difference spectrogram.
 ### The floor is measured, not zero — do not "fix" this
 
 **The renderer is not bit-reproducible.** Two renders of the same ref, same seed,
-same bundle differ. Measured across three renders of `funk-pocket` / `MIX_AUDIT`:
+same bundle differ. Measured on the band engine (2026-09-25, `--identity=HEAD` @ 3d449ab1,
+`funk-pocket` / `MIX_AUDIT`):
 
 | stem | residual RMS | max abs diff |
 | :- | -: | -: |
-| full | **−99.0 dBFS** | 2 LSB |
-| full+solo | −99.2 | 2 |
-| bass | −100.5 | 2 |
-| drums | −102.9 | 2 |
-| harmony | −105.0 | 1 |
-| chords | −107.3 | 1 |
-| soloist (silent) | −Inf (byte-identical) | 0 |
+| full+solo | **−99.9 dBFS** | 6 LSB |
+| full | −100.4 | 2 LSB |
+| bass | −101.2 | 2 LSB |
+| chords | −105.5 | 1 LSB |
+| drums | −106.0 | 7 LSB |
+| soloist | −111.4 | 1 LSB |
 
-Only the **silent** stem is bit-identical, and that is the tell: the nondeterminism
+The event delta was empty on every stem (the band's events are identical run to run). On
+the old engine (three renders @ d44dee78) the worst stem was −99.0 dBFS and its silent
+soloist stem was byte-identical — the tell: the nondeterminism
 scales with signal, which is float summation-order variation in Chromium's
 `OfflineAudioContext` — not anything structural or musical. It is inaudible and not
 fixable from this repo.
@@ -602,7 +608,8 @@ rule's intent (never report noise as signal) in a form that is achievable.
 ### Validated against a known change
 
 A bar-localized positive control (bass muted across bars 3–4, on a throwaway commit)
-produced exactly the localization the tool exists to provide:
+produced exactly the localization the tool exists to provide (measured on the old engine,
+hence its `harmony` stem):
 
 ```
 bass       residual  -34.6 dBFS   ABOVE THRESHOLD by 55.4 dB
