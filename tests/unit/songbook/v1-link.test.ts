@@ -211,14 +211,18 @@ describe('a real v1 share link', () => {
         expect(document.chart.band.groove.lastSmartGenre).toBe('Bossa');
     });
 
-    // v1 applied a linked genre through the picker's pipeline, which sets the genre's swing.
-    // A link carries no swing of its own: without this a Jazz link played straight eighths.
-    it("brings the genre's feel: a Jazz or Blues link swings, a Rock link doesn't", () => {
+    // v1 applied a linked genre through the picker's pipeline, which sets the genre's swing and
+    // then its drum preset's (`loadDrumPreset`), as the v2 picker still does. A link carries no
+    // swing of its own: without this a Jazz link played straight eighths.
+    it("brings the swing picking the genre gives: its drum preset's", () => {
         const feelOf = (genre: string) =>
             chartOf(open(`?prog=${encodeURIComponent('Dm7 | G7')}&genre=${genre}`)).chart.band
                 .groove;
         expect(feelOf('Jazz')).toMatchObject({ swing: 60, swingSub: '8th' });
-        expect(feelOf('Blues')).toMatchObject({ swing: 90, swingSub: '8th' });
+        // The 'Blues Shuffle' preset's 100 wins over the genre table's 90, and the two-step's
+        // 55 over Country's 30, exactly as they do when the genre is picked.
+        expect(feelOf('Blues')).toMatchObject({ swing: 100, swingSub: '8th' });
+        expect(feelOf('Country')).toMatchObject({ swing: 55, swingSub: '8th' });
         // The feel-spelled genre the share writer emits resolves the same way.
         expect(feelOf('Bossa%20Nova')).toMatchObject({ swing: 0, swingSub: '16th' });
         expect(feelOf('Rock')).toMatchObject({ swing: 0, swingSub: '8th' });
