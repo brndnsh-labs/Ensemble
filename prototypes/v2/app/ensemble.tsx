@@ -322,6 +322,10 @@ export default function Ensemble() {
     const working = useRef(false);
     const [error, setError] = useState('');
     const [message, setMessage] = useState('');
+    // An audition/share link's `?autoplay=1` (#1382): browsers block audio before a gesture,
+    // so this arms one instead of playing immediately — the shared-link effect sets it, and
+    // the gesture effect below clears it on the first pointer or key event anywhere on the page.
+    const [pendingAutoplay, setPendingAutoplay] = useState(false);
     const [editing, setEditing] = useState(false);
     const [sectionId, setSectionId] = useState('');
     const [buffers, setBuffers] = useState(new Map<string, string>());
@@ -824,9 +828,14 @@ export default function Ensemble() {
             if (older.kind === 'ok') {
                 openSharedDraft(
                     older.document,
-                    'Opened from an older shared link · not saved yet',
+                    older.autoplay
+                        ? 'Opened from an older shared link · not saved yet · tap anywhere to play'
+                        : 'Opened from an older shared link · not saved yet',
                     true,
                 );
+                if (older.autoplay) {
+                    setPendingAutoplay(true);
+                }
             } else {
                 setError("This older link couldn't be opened");
             }
@@ -849,6 +858,51 @@ export default function Ensemble() {
             alive = false;
         };
     }, [ready, template]);
+    // `startPlayback` is a component-scope function declaration, a new reference every render;
+    // listing it would re-arm the listeners on every render while a link's autoplay is
+    // pending, the same convention the shared-link effect above documents for `openSharedDraft`.
+    // biome-ignore lint/correctness/useExhaustiveDependencies: see above.
+    useEffect(() => {
+        // An armed `?autoplay=1` link (#1382): browsers block audio before a user gesture, so
+        // this waits for the first one anywhere on the page — a click/tap or a key press,
+        // exactly what pressing Play itself would supply — then starts the band the same way
+        // Play does and disarms itself. `{ once: true }` on each listener means whichever
+        // fires first already removed itself; the cleanup below catches the other.
+        if (!pendingAutoplay) {
+            return;
+        }
+        const start = (event: Event) => {
+            setPendingAutoplay(false);
+            const target = event.target;
+            // The gesture landed on Play itself (`data-play-toggle`, `transport-bar.tsx`):
+            // disarm and let the button's OWN `onClick` start playback. Calling
+            // `startPlayback()` here too raced that click — `runtime.toggle()` can resolve
+            // inside the ~100ms between a tap's `pointerdown` and its `click`, so by the time
+            // `onPlayToggle` ran `isPlaying` already read true and it called `runtime.stop()`,
+            // starting and immediately stopping the band on the very tap meant to start it.
+            if (target instanceof Element && target.closest('[data-play-toggle]')) {
+                return;
+            }
+            startPlayback();
+        };
+        // `capture: true` so a nested handler's `stopPropagation` on the way up can't
+        // swallow the gesture before this sees it — this listener only ever reads the
+        // event, never acts on behalf of whatever it landed on.
+        window.addEventListener('pointerdown', start, { once: true, capture: true });
+        window.addEventListener('keydown', start, { once: true, capture: true });
+        return () => {
+            window.removeEventListener('pointerdown', start, { capture: true });
+            window.removeEventListener('keydown', start, { capture: true });
+        };
+    }, [pendingAutoplay]);
+    // Disarms autoplay the moment the band is playing by ANY means — including the Play
+    // button's own click a moment after the branch above deferred to it — so a later stray
+    // tap/key elsewhere on the page can never reach `startPlayback()` a second time.
+    useEffect(() => {
+        if (playing) {
+            setPendingAutoplay(false);
+        }
+    }, [playing]);
     useEffect(() => {
         // #1274 — look for v1 data only once the songbook is ready: guest startup owns
         // the critical path, and nothing here may delay or block it. A profile whose v1
@@ -1389,6 +1443,24 @@ export default function Ensemble() {
             setPlaybackPending(false);
             setSoundProgress('');
         }
+    }
+    /**
+     * Start the band playing — `TransportBar`'s Play button when it isn't already playing, and
+     * an armed `?autoplay=1` link's gesture handler below (#1382). One function so the two
+     * callers can't drift: an autoplay link is otherwise indistinguishable from a musician
+     * pressing Play themselves.
+     */
+    function startPlayback() {
+        void run(async () => {
+            const next = updateChart();
+            setEditing(false);
+            setShowControls(false);
+            setSoundMenu(false);
+            await runtime.toggle(setSoundProgress);
+            setPlaying(runtime.state().playback.isPlaying);
+            setSoundsOffline(await soundsAvailableOffline(next.chart));
+            setSoundProgress('');
+        });
     }
     /**
      * The ONE writer of the stand's binding (#1311 patch review R1/R5): the synchronous ref an
@@ -3425,16 +3497,7 @@ export default function Ensemble() {
                                 setPlaybackPending(false);
                                 return;
                             }
-                            void run(async () => {
-                                const next = updateChart();
-                                setEditing(false);
-                                setShowControls(false);
-                                setSoundMenu(false);
-                                await runtime.toggle(setSoundProgress);
-                                setPlaying(runtime.state().playback.isPlaying);
-                                setSoundsOffline(await soundsAvailableOffline(next.chart));
-                                setSoundProgress('');
-                            });
+                            startPlayback();
                         }}
                         onFeel={() => setFeelMenu(true)}
                         onTempo={(value) => change(() => runtime.setTempo(value))}

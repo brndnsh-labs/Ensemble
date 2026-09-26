@@ -50,14 +50,16 @@ interface CliArgs {
 
 // The v2 stand's dev server (`npm --prefix prototypes/v2 run dev`) at its default `/v2` base.
 // Since the cutover (#1357) the v2 stand opens these links through its old-link reader
-// (`prototypes/v2/lib/v1-link.ts`, #1279), which takes the chart, key, meter, tempo and genre
-// and drops the rest — see `V2_DROPPED`.
+// (`prototypes/v2/lib/v1-link.ts`, #1279), which takes the chart, key, meter, tempo, genre,
+// `int` and `bnd` (DECISION 2026-09-26, #1382) and starts playback on `autoplay=1` after the
+// first gesture. `?seed=` stays inert (v2 re-rolls it on play) — that one was never part of
+// `V2_DROPPED`, since it is a documented no-op rather than an unread field.
 const DEFAULT_BASE_URL = 'http://localhost:3100/v2/';
 
-// Link fields the v2 stand does not read yet: `int`, the part switches (the `bnd` payload) and
-// `autoplay`. The link still carries them, but the audition plays at the chart's own intensity
-// with every part on, and the listener presses play.
-const V2_DROPPED = ['int', 'bnd', 'autoplay'];
+// Link fields the v2 stand does not read. Empty since #1382 (`int`, `bnd` and `autoplay`
+// joined the supported set); kept as a named mechanism for the next field this script grows
+// before the reader does.
+const V2_DROPPED: string[] = [];
 
 function parseParts(flag: string, value: string): Part[] {
     return value
@@ -252,6 +254,14 @@ export function buildAuditionLink(scene: SceneShape, args: CliArgs): string {
     const dropped = V2_DROPPED.filter((name) => params.has(name));
     if (dropped.length > 0) {
         process.stderr.write(`note: the v2 stand ignores ${dropped.join(', ')} in this link\n`);
+    }
+    // The band engine has no harmony lane (docs/design/band-engine.md) and no v2 surface
+    // shows a control to mute one, so switching it here has nothing to attach to — unlike the
+    // other three `SWITCHABLE_PARTS`, which the v2 reader does honor (#1382).
+    if ((args.on || []).includes('harmony') || (args.off || []).includes('harmony')) {
+        process.stderr.write(
+            "note: the v2 stand has no harmony lane; this link's harmony switch has no effect\n",
+        );
     }
     const base = args.baseUrl.endsWith('/') ? args.baseUrl : `${args.baseUrl}/`;
     return `${base}?${params.toString()}`;

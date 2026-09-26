@@ -8,7 +8,10 @@
  * hostile payloads are hand-written, because no writer produces them.
  *
  * Best-effort by decision (2026-09-15): chords, key, meter and tempo are the promise, and
- * that is what is asserted. `bnd` is not read at all — see `lib/v1-link.ts`.
+ * that is what is asserted. `int` and `bnd`'s part switches ARE read, as of DECISION
+ * 2026-09-26 (#1382) — see the `int, bnd and autoplay` describe block below, and
+ * `lib/v1-link.ts`'s module doc for what of `bnd` still isn't (style/octave/volume/reverb,
+ * density, and the harmony flag, which has no lane left to apply to).
  */
 import { describe, expect, it } from 'vitest';
 import { stripAccountsParam } from '../../../prototypes/v2/lib/account/feature.js';
@@ -18,7 +21,7 @@ import {
     stripV1ShareParams,
 } from '../../../prototypes/v2/lib/v1-link.js';
 import type { ChartContent } from '../../../public/songbook/types.js';
-import { compressSections } from '../../../public/state/share-codec.js';
+import { compressSections, encodeBase64Unicode } from '../../../public/state/share-codec.js';
 import type { Section } from '../../../public/types.js';
 
 /**
@@ -153,9 +156,10 @@ describe('a real v1 share link', () => {
         expect(performance.bpm).toBe(96);
         expect(band.groove.genre).toBe('Blues');
         // The old engine's `comp` and `style` land nowhere: a chart no longer carries either,
-        // and the lane styles follow the genre (DECISION 2026-09-26). `int` doesn't either,
-        // since it cannot say whether the sender was on auto energy.
-        expect(performance).toEqual({ bpm: 96, seed: '', randomizeSeed: true, energy: 'auto' });
+        // and the lane styles follow the genre (DECISION 2026-09-26). `int` DOES land, as a
+        // pinned `ChartPerformance.energy` (DECISION 2026-09-26, #1382) — see the `withEnergy`
+        // suite below for the auto-vs-fixed reasoning.
+        expect(performance).toEqual({ bpm: 96, seed: '', randomizeSeed: true, energy: 0.4 });
         expect(band.chords).not.toHaveProperty('style');
         expect(band).not.toHaveProperty('harmony');
         // Not a library entry and not an import: a fresh id, never `v1-session` or a
@@ -247,6 +251,54 @@ describe('a real v1 share link', () => {
         expect(document.chart.arrangement.sections[0].value).toBe('I | IV | V | I');
         expect(document.chart.arrangement.key).toBe('G');
         expect(document.chart.performance.bpm).toBe(88);
+    });
+});
+
+/** A `bnd` payload string — the same envelope `npm run audition-link`'s `buildBandParam`
+ * writes, minified here to just the fields each test cares about. */
+function bnd(payload: Record<string, unknown>): string {
+    return encodeBase64Unicode(JSON.stringify(payload));
+}
+
+describe('int, bnd and autoplay (#1382)', () => {
+    it('pins energy to a clamped `int`, instead of the auto BASE carries', () => {
+        expect(chartOf(open('?prog=C&int=0.8')).chart.performance.energy).toBe(0.8);
+        // Out of v1's own 0-1 range: clamped, not rejected.
+        expect(chartOf(open('?prog=C&int=5')).chart.performance.energy).toBe(1);
+        expect(chartOf(open('?prog=C&int=-3')).chart.performance.energy).toBe(0);
+    });
+
+    it('ignores a malformed `int` rather than pinning a level nobody asked for', () => {
+        expect(chartOf(open('?prog=C&int=not-a-number')).chart.performance.energy).toBe('auto');
+        expect(chartOf(open('?prog=C')).chart.performance.energy).toBe('auto');
+    });
+
+    it('switches the named lanes from `bnd`, leaving the rest at the genre default', () => {
+        const document = chartOf(
+            open(`?prog=C&genre=Jazz&bnd=${bnd({ s: { e: 1 }, c: { e: 0 } })}`),
+        );
+        expect(document.chart.band.soloist.enabled).toBe(true);
+        expect(document.chart.band.chords.enabled).toBe(false);
+        // Not named: the Jazz genre's own default survives untouched.
+        expect(document.chart.band.bass.enabled).toBe(true);
+    });
+
+    it('ignores `bnd.h` (harmony): the band has no harmony lane to apply it to', () => {
+        const document = chartOf(open(`?prog=C&bnd=${bnd({ h: { e: 1 } })}`));
+        expect(document.chart.band).not.toHaveProperty('harmony');
+    });
+
+    it('ignores a malformed or oversized `bnd` rather than throwing or muting by accident', () => {
+        expect(chartOf(open('?prog=C&bnd=not-base64!!!')).chart.band.chords.enabled).toBe(true);
+        expect(chartOf(open(`?prog=C&bnd=${'A'.repeat(200000)}`)).chart.band.chords.enabled).toBe(
+            true,
+        );
+    });
+
+    it('reports `autoplay` only when the link asked for it', () => {
+        expect(open('?prog=C&autoplay=1')).toMatchObject({ kind: 'ok', autoplay: true });
+        expect(open('?prog=C')).toMatchObject({ kind: 'ok', autoplay: false });
+        expect(open('?prog=C&autoplay=0')).toMatchObject({ kind: 'ok', autoplay: false });
     });
 });
 

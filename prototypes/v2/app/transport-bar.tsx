@@ -53,6 +53,12 @@ export function TransportBar({
                     // text) is what every existing check's `getByRole` locator keys on, and
                     // pressing Stop must read the same during the count-in as during the song.
                     aria-label={playbackActive ? 'Stop playback' : 'Start playback'}
+                    // A stable, non-visual hook for `app/ensemble.tsx`'s autoplay gesture
+                    // listener (#1382 patch review): it needs to tell "the gesture that armed
+                    // autoplay landed on Play itself" apart from "anywhere else", without
+                    // matching on the aria-label text above (which flips with playback state)
+                    // or the `play-button` class (a styling hook, not a behavioral contract).
+                    data-play-toggle=""
                     disabled={busy && !playbackActive}
                     onClick={onPlayToggle}
                 >
