@@ -3425,9 +3425,6 @@ export default function Ensemble() {
                         }}
                         onVolume={(lane, value) => change(() => runtime.setVolume(lane, value))}
                         onReverb={(lane, value) => change(() => runtime.setReverb(lane, value))}
-                        onStyle={(lane, value) => change(() => runtime.setStyle(lane, value))}
-                        onDensity={(value) => change(() => runtime.setDensity(value))}
-                        onSoloistMode={(mode) => change(() => runtime.setSoloistMode(mode))}
                     />
                     <FeelSheet
                         dialogRef={feelDialog}
@@ -3438,7 +3435,6 @@ export default function Ensemble() {
                         onSwing={(value) => change(() => runtime.setSwing(value))}
                         onSwingSub={(sub) => change(() => runtime.setSwingSub(sub))}
                         onHumanize={(value) => change(() => runtime.setHumanize(value))}
-                        onComplexity={(value) => change(() => runtime.setComplexity(value))}
                         onBandIntensity={(value) =>
                             change(() => {
                                 runtime.setBandIntensity(value);

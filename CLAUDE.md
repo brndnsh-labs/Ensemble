@@ -106,7 +106,7 @@ deterministic evidence, not a substitute for the `Needs-ear` gate.
 
 ## Architecture
 
-Ensemble is a browser-based "virtual band" PWA. One app, two layers: the music stand in `prototypes/v2/` (React, Next static export — the only UI) and the library it compiles from `public/` — deep-signal state slices, the Web Audio engine and voices, the songbook codecs, and the old worker-based generator (`?engine=old`). The band that plays is `band/` (below).
+Ensemble is a browser-based "virtual band" PWA. One app, two layers: the music stand in `prototypes/v2/` (React, Next static export — the only UI) and the library it compiles from `public/` — deep-signal state slices, the Web Audio engine and voices, the songbook codecs, and the old worker-based generator (no longer run by the app; being deleted, #1404). The band that plays is `band/` (below).
 
 ### Runtime bootstrap (`prototypes/v2/lib/runtime.ts`)
 
@@ -138,8 +138,8 @@ Enforced by `npm run check-mutations` over `public/**/*.{ts,tsx}` — it catches
 Every page plays the ground-up band engine: `band/` is a pure, deterministic `performPass` over the
 score's timeline, driven live by `prototypes/v2/lib/band-host.ts` and exported through the same
 event stream (`.mid`, WAV). Read `band/CLAUDE.md` and `docs/design/band-engine.md` before touching
-it. `?engine=old` still plays the old worker pipeline below, for comparison, until #1404 retires
-it; the Musical Logic sections that name `public/engine` files describe that old engine.
+it. The app no longer runs the old worker pipeline below (`?engine=old` is gone); its code is
+deleted next (#1404). The Musical Logic sections that name `public/engine` files describe it.
 
 The listening-gate tools (`npm run mix:report` and `mix:ab`/`mix:verify`/`mix:spectro`/`mix:plant`
 built on it) render the band engine: `scripts/band-scene.ts` composes each scene in node
@@ -149,7 +149,7 @@ in the app through `renderBandPasses` (`lib/band-export.ts`, the export's own of
 `NEXT_PUBLIC_RENDER_BRIDGE=1`, which `mix:report` makes for itself; a production build compiles it
 out. See `docs/guides/listening-gate-tools.md`.
 
-### Generative Engine Pipeline (worker thread) — the old engine, `?engine=old`
+### Generative Engine Pipeline (worker thread) — the old engine, no longer run
 
 - `public/worker-client.ts` — main-thread bridge; sends full snapshots (`getSyncState()`) or deltas (`syncWorker()`).
 - `public/logic-worker.ts` — orchestrates live note generation, buffer fills, and resolution handling.

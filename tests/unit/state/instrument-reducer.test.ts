@@ -45,11 +45,6 @@ describe('Instrument Reducer', () => {
         });
     });
 
-    it('should set density for chords', () => {
-        instrumentReducer({ type: ACTIONS.SET_DENSITY, payload: 'rich' });
-        expect(chords.density).toBe('rich');
-    });
-
     it('should set volume and reverb for modules', () => {
         instrumentReducer({ type: ACTIONS.SET_VOLUME, payload: { module: 'chords', value: 0.8 } });
         expect(chords.volume).toBe(0.8);

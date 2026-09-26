@@ -22,10 +22,8 @@ async function importFile(page: Page, document: ChartDocumentV2) {
 }
 
 /**
- * A chart the old engine refuses — a held bar, an N.C. bar, and a last bar of half-note
- * triplets whose final chord carries a fermata — opens, draws, plays and loops on the band
- * engine, the default, while the old engine (`?engine=old`) still turns it away with its own
- * message.
+ * A chart the old engine refused — a held bar, an N.C. bar, and a last bar of half-note
+ * triplets whose final chord carries a fermata — opens, draws, plays and loops on the band.
  */
 test('the band engine opens and plays holds, N.C., fermatas and off-grid lengths', async ({
     page,
@@ -34,15 +32,11 @@ test('the band engine opens and plays holds, N.C., fermatas and off-grid lengths
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
 
-    // Author a plain four-bar song on the old engine, then write the semantics the bar editor
-    // can't type.
-    await page.goto(appUrl('?engine=old'));
+    // Author a plain four-bar song, then write the semantics the bar editor can't type.
+    await page.goto(appUrl());
     await page.getByRole('button', { name: '＋ New song', exact: true }).click();
     await editorRevealed(page);
     await page.getByLabel('Song title').fill('Held and free');
-    // The old engine offers no way to author a fermata at all — the old engine refuses any chart
-    // that carries one, so the control is gated out entirely, not merely hidden per-bar.
-    await expect(page.getByLabel('Fermata (hold the last chord)', { exact: true })).toHaveCount(0);
     for (const [i, text] of ['C', 'F', 'G7', 'C'].entries()) {
         await page.getByLabel('Chords in this bar').fill(text);
         if (i < 3) {
@@ -67,15 +61,7 @@ test('the band engine opens and plays holds, N.C., fermatas and off-grid lengths
     held.title = 'Held and free (semantics)';
     const ids = bars.map((bar) => bar.id);
 
-    // The old engine refuses it with its current message, and nothing is saved.
-    await importFile(page, held);
-    await expect(page.locator('.error-banner')).toContainText(
-        'holds, N.C., fermatas and alternate chords cannot be played yet',
-    );
-
-    // The band engine opens it and draws each event the way the chart reads.
-    await page.goto(appUrl());
-    await expect(page.getByRole('button', { name: '＋ New song', exact: true })).toBeVisible();
+    // The band opens it and draws each event the way the chart reads.
     await importFile(page, held);
     await expect(page.locator('.song-title')).toHaveText('Held and free (semantics)');
     await expect(page.locator('.error-banner')).toHaveCount(0);

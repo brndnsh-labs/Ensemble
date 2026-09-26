@@ -91,42 +91,6 @@ test('Export audio (mix) downloads a valid WAV of plausible duration, and the li
     expect(after).toBe(before);
 });
 
-test('Export audio (stems) downloads one WAV per instrument lane', async ({ page }, testInfo) => {
-    // Five sequential full offline renders (`renderStemsToWav`), each its own
-    // `OfflineAudioContext` — five times the single mix export's real work
-    // (also comfortably slower than its default 45s here), hence the wide
-    // budget (matches `foundation.spec.ts`'s heaviest per-lane-catalog test).
-    test.setTimeout(240_000);
-    // The old engine's five stems, harmony included; the band engine's four are
-    // `band-audio-export.chromium.spec.ts`'s. This retires with the old engine (#1404).
-    await page.goto(appUrl('?engine=old'));
-    await page.getByRole('button', { name: blue }).click();
-    await page.getByRole('button', { name: 'Song actions' }).click();
-
-    // public/export/audio-export.ts's STEM_INSTRUMENTS order. `renderStemsToWav`
-    // downloads all 5 in a tight synchronous loop (`downloadExportResult` per
-    // result, no awaits between clicks) — five separate `waitForEvent('download')`
-    // calls all resolve to the SAME first event (Node's EventEmitter invokes every
-    // currently-registered listener on one `emit`, not one listener per emit), so
-    // this accumulates them off a single persistent listener instead.
-    const instruments = ['soloist', 'bass', 'chords', 'harmony', 'drums'];
-    const downloads: import('@playwright/test').Download[] = [];
-    page.on('download', (event) => downloads.push(event));
-    await page.getByRole('button', { name: 'Export audio (stems)' }).click();
-    await expect.poll(() => downloads.length, { timeout: 220_000 }).toBe(instruments.length);
-    const events = downloads;
-    const names = events.map((event) => event.suggestedFilename()).sort();
-    expect(names).toEqual(
-        instruments.map((instrument) => `Blue pocket-stem-${instrument}.wav`).sort(),
-    );
-    for (const [i, event] of events.entries()) {
-        const dest = testInfo.outputPath(`stem-${i}.wav`);
-        await event.saveAs(dest);
-        const wav = parseWav(await readFile(dest));
-        expect(wav.durationSeconds).toBeGreaterThan(ONE_LOOP_SECONDS);
-    }
-});
-
 test('Export audio during playback does not stop or glitch the band', async ({ page }) => {
     // Same single-render cost as the plain mix export test above (this
     // environment has shown real variance on that one too), plus the offline
