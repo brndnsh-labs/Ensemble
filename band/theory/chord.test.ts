@@ -103,4 +103,23 @@ describe('chord facts', () => {
             }
         }
     });
+
+    // #1343: the old engine dropped the written b6 of iReal's min7b6 / min9b6 and then offered
+    // a dorian natural 6 a semitone above it. The band keeps the b6, `chordScale` hears it as
+    // aeolian on any degree, and `reconcile` would displace a template's 6 behind that.
+    it.each(['-b6', 'mb6', 'min7b6', 'min9b6'])(
+        '%s keeps its b6 and never offers the natural 6, on every root in both modes',
+        (quality) => {
+            const roots = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
+            for (const key of [C, { tonic: 0, minor: true }]) {
+                for (const root of roots) {
+                    const symbol = `${root}${quality}`;
+                    const chord = facts(symbol, key);
+                    expect(chord.intervals.map(mod12), symbol).toContain(8);
+                    expect(chord.scale, symbol).toContain(8);
+                    expect(chord.scale, symbol).not.toContain(9);
+                }
+            }
+        },
+    );
 });
