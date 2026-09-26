@@ -141,10 +141,11 @@ export function planBars(
             // Your turn is yours: the soloist lays out.
             lanes.lead = false;
         }
-        if (wanted?.with === 'drums' && pass > 0) {
-            // Asking to trade with the drummer makes you the soloist after the head, even where
-            // the trade can't happen (a practice loop, the drums off, a drummer who doesn't
-            // solo): the band's soloist never plays over you.
+        if (wanted?.with === 'drums' && leadRole(timeline, i, pass, wanted).kind !== 'head') {
+            // Asking to trade with the drummer makes you the soloist for every pass but a
+            // returned head, even where the trade can't happen (a practice loop, the drums
+            // off, a drummer who doesn't solo): the band's soloist never plays over you, but
+            // it does play the head when it comes back.
             lanes.lead = false;
         }
         if (drumsTurn) {

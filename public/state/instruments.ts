@@ -74,6 +74,8 @@ export const soloist = deepSignal<SoloistState>({
     // Trading with the player on the band engine (`BandSettings.trade`): off, or the partner.
     tradeWith: 'off',
     tradeBars: 4,
+    // How many traded choruses before the head returns; 0 keeps trading forever.
+    tradeChoruses: 2,
     // #1062 — runtime-derived trade-silencing layer; see the SoloistState
     // field doc in types.ts. Never the user's `enabled` setting.
     tradeSilenced: false,
@@ -190,6 +192,7 @@ const SOLOIST_FIELD_ROUTES: Record<string, SoloistFieldRoute> = {
     tradeMode: { kind: 'config', key: 'tradeMode' },
     tradeWith: { kind: 'config', key: 'tradeWith' },
     tradeBars: { kind: 'config', key: 'tradeBars' },
+    tradeChoruses: { kind: 'config', key: 'tradeChoruses' },
     tradeSilenced: { kind: 'config', key: 'tradeSilenced' },
 
     // --- Session (top-level) ---

@@ -38,13 +38,15 @@ import {
 import { transposeChordText } from '@engine/engine/transpose';
 import { proposeLegacyScoreConversion } from '@engine/songbook/legacy-score';
 import type { SemanticScore } from '@engine/songbook/score-types';
-import type {
-    ChartContent,
-    ChartLaneMix,
-    ChartNotation,
-    SoloistMode,
-    SoloistTradeBars,
-    SoloistTradeWith,
+import {
+    type ChartContent,
+    type ChartLaneMix,
+    type ChartNotation,
+    DEFAULT_SOLOIST_TRADE_CHORUSES,
+    type SoloistMode,
+    type SoloistTradeBars,
+    type SoloistTradeChoruses,
+    type SoloistTradeWith,
 } from '@engine/songbook/types';
 import { dispatch, getState, subscribe } from '@engine/state';
 import {
@@ -235,6 +237,7 @@ function bandSettings(): BandSettings {
                 : {
                       with: soloist.tradeWith === 'soloist' ? 'lead' : 'drums',
                       bars: soloist.tradeBars,
+                      choruses: soloist.tradeChoruses === 0 ? null : soloist.tradeChoruses,
                   },
     };
 }
@@ -432,7 +435,11 @@ export function captureContent(): ChartContent {
                 // Written only while trading, so a chart that never traded saves as before.
                 ...(s.tradeWith === 'off'
                     ? {}
-                    : { tradeWith: s.tradeWith, tradeBars: s.tradeBars }),
+                    : {
+                          tradeWith: s.tradeWith,
+                          tradeBars: s.tradeBars,
+                          tradeChoruses: s.tradeChoruses,
+                      }),
             },
             harmony: { ...mix(h), style: h.style, octave: h.octave, complexity: h.complexity },
             groove: {
@@ -653,11 +660,17 @@ export function setReverb(module: InstrumentModule, value: number): void {
 }
 
 /**
- * Trading with the player (the band engine's `BandSettings.trade`): who the band trades with
- * and how long a turn is. Trading with the soloist turns it on: it is the one you trade with.
+ * Trading with the player (the band engine's `BandSettings.trade`): who the band trades with,
+ * how long a turn is, and how many traded choruses before the head returns (0 keeps trading
+ * forever). Trading with the soloist turns it on: it is the one you trade with.
  */
-export function setTrade(tradeWith: SoloistTradeWith, bars: SoloistTradeBars): void {
+export function setTrade(
+    tradeWith: SoloistTradeWith,
+    bars: SoloistTradeBars,
+    choruses: SoloistTradeChoruses,
+): void {
     param('soloist', 'tradeBars', bars);
+    param('soloist', 'tradeChoruses', choruses);
     param('soloist', 'tradeWith', tradeWith);
     if (tradeWith === 'soloist' && !getState().soloist.enabled) {
         togglePower('soloist');
@@ -839,6 +852,11 @@ function apply(content: DocumentContent): void {
     // Nor may trading: a chart saved without it doesn't trade.
     param('soloist', 'tradeWith', content.band.soloist.tradeWith ?? 'off');
     param('soloist', 'tradeBars', content.band.soloist.tradeBars ?? 4);
+    param(
+        'soloist',
+        'tradeChoruses',
+        content.band.soloist.tradeChoruses ?? DEFAULT_SOLOIST_TRADE_CHORUSES,
+    );
     param(
         'groove',
         'instruments',

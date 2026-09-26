@@ -23,6 +23,13 @@ export type SoloistTradeMode = 'manual' | 'sections' | 'loops';
 export type SoloistTradeWith = 'off' | 'soloist' | 'drums';
 export type SoloistTradeBars = 2 | 4 | 8;
 export const SOLOIST_TRADE_BARS: readonly SoloistTradeBars[] = [2, 4, 8];
+/**
+ * How many traded choruses before the head returns. `0` keeps trading forever (the original
+ * behavior, before this setting existed) — the band engine's `TradeSettings.choruses` reads
+ * that as `null`. Absent (a chart saved before this setting) reads as 2.
+ */
+export type SoloistTradeChoruses = 0 | 1 | 2 | 3 | 4;
+export const DEFAULT_SOLOIST_TRADE_CHORUSES: SoloistTradeChoruses = 2;
 export const CHART_GROOVE_PATTERN_LANE_NAMES = [
     'Kick',
     'Snare',
@@ -102,6 +109,8 @@ export interface ChartSoloist extends ChartLaneMix {
     tradeWith?: SoloistTradeWith;
     /** Absent reads as 4. */
     tradeBars?: SoloistTradeBars;
+    /** Absent reads as 2. See `SoloistTradeChoruses`. */
+    tradeChoruses?: SoloistTradeChoruses;
 }
 
 export interface ChartHarmony extends ChartLaneMix {
