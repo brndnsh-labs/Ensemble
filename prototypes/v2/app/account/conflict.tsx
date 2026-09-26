@@ -34,7 +34,9 @@
  *   but the preserved kind is `'deleted'`: the account tombstoned this id while local work held it.
  *   There is no version to take, so this shares `gone`'s action instead of `candidate`'s — "Keep
  *   mine as a new song" — which `AccountSongbook.keepBoth` now also settles for a bare `'deleted'`
- *   candidate with an empty queue, sourced from the saved record rather than a refused Save.
+ *   candidate with an empty queue rather than a refused Save, sourced from the newest LIVE draft
+ *   when one holds the record and the saved document otherwise (`liveDraft`'s own rule decides
+ *   which — never simply the newest by clock).
  * - `candidate-unsupported` (#1362) — a body this build cannot read, from a newer schema. Nothing
  *   here is ever adoptable and nothing here is ever a local divergence to keep a second copy of —
  *   there is exactly one honest sentence ("update the app") and no button, because no action here
