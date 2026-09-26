@@ -1,34 +1,22 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { groove, grooveReducer as grooveReducerImpl } from '../../../public/state/groove.js';
-import { ACTIONS, type Mutable } from '../../../public/types.js';
-
-const mutableGroove = groove as Mutable<typeof groove>;
+import { ACTIONS } from '../../../public/types.js';
+import { resetAllStateForTest } from '../../utils/reset-state.js';
 
 // Tests call grooveReducer with 1-2 args; production signature requires 2 (action object + optional playback).
 const grooveReducer = grooveReducerImpl as (action: any, playback?: any) => any;
 
 describe('Groove Reducer', () => {
     beforeEach(() => {
-        grooveReducer({ type: ACTIONS.RESET_STATE, payload: undefined });
+        resetAllStateForTest();
     });
 
-    it('should reset to default values', () => {
-        mutableGroove.volume = 0.9;
-        grooveReducer({ type: ACTIONS.RESET_STATE, payload: undefined });
-        expect(groove.volume).toBe(1.0);
-        expect(groove.genreFeel).toBe('Rock');
-    });
-
-    it('#791: clears the section-seed memo on RESET_STATE and on SET_SONG_SEED', () => {
+    it('#791: clears the section-seed memo on SET_SONG_SEED', () => {
         // sectionSeedMap is a memo of deriveSectionSeed(sectionId, songSeed);
         // it must be invalidated whenever the song seed changes so stale,
         // wrong-seed groove markers never linger.
-        mutableGroove.sectionSeedMap = { s1: 0.42 };
+        (groove as any).sectionSeedMap = { s1: 0.42 };
         grooveReducer({ type: ACTIONS.SET_SONG_SEED, payload: 'A1B2C3' });
-        expect(groove.sectionSeedMap).toEqual({});
-
-        mutableGroove.sectionSeedMap = { s2: 0.7 };
-        grooveReducer({ type: ACTIONS.RESET_STATE, payload: undefined });
         expect(groove.sectionSeedMap).toEqual({});
     });
 

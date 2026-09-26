@@ -122,9 +122,14 @@ const KNOWN_HARMONY_STYLES: ReadonlySet<string> = new Set(HARMONY_STYLES.map((s)
  * load/save layer, #1424; the songbook codec's legacy-field validation reads them now.)
  *
  * Unlike chords, none of these three unions in a genre-routed value. Within
- * `public/`, `SET_STYLE` is only ever dispatched for `module: 'chords'`, and the
- * genre tables route bass and soloist at *read* time (`resolveMappedStyle` /
- * `resolveSoloistStyle`) without ever writing the resolved key back to the slice.
+ * `public/`, a `style` write for bass/soloist/harmony reaches the slice only
+ * through `SET_GENRE_FEEL` (bulk, genre-driven) or a loaded chart's own data —
+ * never an arbitrary per-lane value (the old dedicated `ACTIONS.SET_STYLE`,
+ * which was `module: 'chords'`-only in practice, was deleted in #1381; nothing
+ * dispatched it — the live generic `SET_PARAM` write path could theoretically
+ * target any lane, but nothing does for these three). The genre tables route
+ * bass and soloist at *read* time (`resolveMappedStyle` / `resolveSoloistStyle`)
+ * without ever writing the resolved key back to the slice.
  * (`scripts/ensemble-analysis-utils.ts` does drive all four lanes, but only with
  * values already in these lists — checked, not assumed.) So the picker list
  * genuinely is the whole keyspace here — see `isKnownChordStyle` above for why

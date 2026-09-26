@@ -5,11 +5,7 @@ import {
     __resetPackCacheForTest,
     markPackInstalled,
 } from '../../public/engine/instrument-registry.js';
-import {
-    handleEffects,
-    reconcileUrlGenreOnBoot,
-    resolveAutoVoices,
-} from '../../public/state/state-effects.js';
+import { reconcileUrlGenreOnBoot, resolveAutoVoices } from '../../public/state/state-effects.js';
 import { dispatch, getState } from '../../public/state.js';
 import { ACTIONS, type InstrumentModule } from '../../public/types.js';
 import { enterGenre } from '../utils/genre-entry.js';
@@ -236,9 +232,14 @@ describe.each(PLAYER_SOURCE_ROUTES)('%s explicit %s source', (genre, style, pack
         if (genre === 'Neo-Soul') {
             expect(state.chords.voice).toBe('pack:rhodes');
         }
-        const payload = { module: 'chords', style };
-        dispatch(ACTIONS.SET_STYLE, payload);
-        handleEffects({ type: ACTIONS.SET_STYLE, payload }, state, { dispatch });
+        // #1381 — ACTIONS.SET_STYLE (and its handleEffects case) was deleted: nothing
+        // dispatched it in production (v2 has no manual per-instrument style picker;
+        // `style` only ever changes via SET_GENRE_FEEL or a loaded chart's own data).
+        // The write goes through the live SET_PARAM path instead, and resolveAutoVoices
+        // — genuinely called directly after a chart load in `runtime.ts`'s `load()` —
+        // is invoked the same way here rather than through the deleted effect case.
+        dispatch(ACTIONS.SET_PARAM, { module: 'chords', param: 'style', value: style });
+        resolveAutoVoices(state, genre, dispatch);
         expect(state.chords.voice).toBe(`pack:${pack}`);
         expect(state.chords.autoSound).toBe(true);
         markPackInstalled(pack, false);

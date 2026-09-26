@@ -1,24 +1,6 @@
 import { dispatch, getState } from '../state.js';
-import type { Mutable, Palette, ThemeMode } from '../types.js';
+import type { Mutable } from '../types.js';
 import { ACTIONS } from '../types.js';
-
-/** Choose the color-palette identity. The App-level resolver picks up the
- *  state change and rewrites `<html data-palette>`. */
-export function setPalette(palette: Palette): void {
-    const { playback } = getState();
-    if (palette !== playback.palette) {
-        dispatch(ACTIONS.SET_PARAM, { module: 'playback', param: 'palette', value: palette });
-    }
-}
-
-/** Choose the light/dark preference ('auto' follows the OS). The App-level
- *  resolver picks up the state change and rewrites `<html data-mode>`. */
-export function setMode(mode: ThemeMode): void {
-    const { playback } = getState();
-    if (mode !== playback.mode) {
-        dispatch(ACTIONS.SET_PARAM, { module: 'playback', param: 'mode', value: mode });
-    }
-}
 
 export function setBpm(
     val: string | number,

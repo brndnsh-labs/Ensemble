@@ -32,14 +32,13 @@ existing document field from an engine/conductor path.
    that way (a `TRANSIENT_PERSIST_ACTIONS` denylist) until it was deleted with v1's load/save
    layer (#1424); nothing debounced hangs off `handleEffects` today.
 
-8. **Audio-up side effects belong on `initAudio()` (`engine.ts`), not on the
-   `ACTIONS.INIT_AUDIO` dispatch.** Since #1358 nothing dispatches `ACTIONS.INIT_AUDIO` at all
-   (v1's Sounds panel was its only dispatcher); only its `state-effects.ts` case remains. Every
+8. **Audio-up side effects belong on `initAudio()` (`engine.ts`), never on a dispatched
+   action.** `ACTIONS.INIT_AUDIO` (v1's Sounds panel was its only dispatcher) and its
+   `state-effects.ts` case were deleted in #1381 — nothing dispatched it since #1358. Every
    way audio comes up — the v2 runtime's `toggle()` and `audition()`, and the offline export —
    calls `initAudio(state)` directly. Anything that must run
    "whenever audio is live" (e.g. pack loading, #666) has to hook `initAudio()` itself, gated
-   `if (!usingOfflineContext && playback.audio)` so offline render/export contexts are excluded
-   — wiring it into the `INIT_AUDIO` case means it never runs.
+   `if (!usingOfflineContext && playback.audio)` so offline render/export contexts are excluded.
 
 ## Offline-render clones
 

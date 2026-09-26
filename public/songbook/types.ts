@@ -1,17 +1,8 @@
-import type {
-    ChordDensity,
-    InstrumentVoice,
-    Palette,
-    SectionInstrumentKey,
-    SwingSub,
-    ThemeMode,
-} from '../types.js';
+import type { ChordDensity, InstrumentVoice, SectionInstrumentKey, SwingSub } from '../types.js';
 
 export const CHART_DOCUMENT_SCHEMA_VERSION = 1 as const;
-export const WORKSPACE_PREFERENCES_SCHEMA_VERSION = 1 as const;
 
 export type ChartDocumentSchemaVersion = typeof CHART_DOCUMENT_SCHEMA_VERSION;
-export type WorkspacePreferencesSchemaVersion = typeof WORKSPACE_PREFERENCES_SCHEMA_VERSION;
 export type ChartNotation = 'roman' | 'name' | 'nns';
 export type SoloistMode = 'monophonic' | 'guitar';
 export type SoloistTradeMode = 'manual' | 'sections' | 'loops';
@@ -213,51 +204,6 @@ export interface ChartDocument {
     updatedAt: string;
     revision: number;
     chart: ChartContent;
-}
-
-export interface WorkspaceAppearancePreferences {
-    palette: Palette;
-    mode: ThemeMode;
-    visualFlash: boolean;
-    qualityColors: boolean;
-    visualizerEnabled: boolean;
-}
-
-export interface WorkspacePracticePreferences {
-    countIn: boolean;
-    applyPresetSettings: boolean;
-    sessionTimer: number;
-    songMode: boolean;
-    rampBpmPerLoop: number;
-    rampStartPct: number;
-}
-
-export interface WorkspaceMidiPreferences {
-    enabled: boolean;
-    selectedOutputId: string | null;
-    inputEnabled: boolean;
-    selectedInputId: string | null;
-    chordsChannel: number;
-    bassChannel: number;
-    soloistChannel: number;
-    harmonyChannel: number;
-    drumsChannel: number;
-    chordsOctave: number;
-    bassOctave: number;
-    soloistOctave: number;
-    harmonyOctave: number;
-    drumsOctave: number;
-    latency: number;
-    muteLocal: boolean;
-    velocitySensitivity: number;
-}
-
-export interface WorkspacePreferences {
-    schemaVersion: WorkspacePreferencesSchemaVersion;
-    appearance: WorkspaceAppearancePreferences;
-    practice: WorkspacePracticePreferences;
-    masterVolume: number;
-    midi: WorkspaceMidiPreferences;
 }
 
 export interface CodecIssue {

@@ -16,10 +16,12 @@ import { describe, expect, it } from 'vitest';
  * `soloist.tradeSilenced` (gone with the old engine's trade block, #1424;
  * the band engine's trading never touches `enabled` either).
  *
- * This test statically scans every dispatch of `ACTIONS.UPDATE_SB` and
- * `ACTIONS.SET_PARAM` under `public/` for a payload that would write
- * `enabled` on a literal `soloist`/`sb` module target, and fails if any new
- * one shows up outside the sanctioned manual-toggle site.
+ * This test statically scans every dispatch of `ACTIONS.SET_PARAM` under
+ * `public/` for a payload that would write `enabled` on a literal
+ * `soloist`/`sb` module target, and fails if any new one shows up outside the
+ * sanctioned manual-toggle site. (`ACTIONS.UPDATE_SB`, the old multi-key batch
+ * form this test also used to scan, was deleted in #1381 — nothing dispatched
+ * it, so that half of the guard was permanently vacuous.)
  */
 
 const PUBLIC_DIR = path.resolve(__dirname, '../../../public');
@@ -44,84 +46,7 @@ function getFiles(dir: string, files: string[] = []): string[] {
 // changes shape.
 const MANUAL_TOGGLE_FILE = 'controllers/instrument-controller.ts';
 
-/** Extract the balanced `{...}` or bare-identifier argument text following a marker. */
-function extractCallArg(content: string, callStart: number): string | null {
-    // callStart points at the character right after the marker's trailing comma,
-    // i.e. the start of the argument expression.
-    let i = callStart;
-    while (i < content.length && /\s/.test(content[i])) {
-        i++;
-    }
-    if (content[i] === '{') {
-        let depth = 0;
-        const start = i;
-        for (; i < content.length; i++) {
-            if (content[i] === '{') {
-                depth++;
-            } else if (content[i] === '}') {
-                depth--;
-                if (depth === 0) {
-                    return content.slice(start, i + 1);
-                }
-            }
-        }
-        return null;
-    }
-    // Bare identifier: read up to the closing `)`.
-    const end = content.indexOf(')', i);
-    return end === -1 ? null : content.slice(i, end).trim();
-}
-
-/** Resolve a bare identifier to its declaration's initializer text (brace/paren-aware, stops at a depth-0 `;`). */
-function resolveIdentifierInit(content: string, identifier: string): string | null {
-    const declRegex = new RegExp(`\\b(?:const|let)\\s+${identifier}\\s*(?::[^=]+)?=`);
-    const match = declRegex.exec(content);
-    if (!match) {
-        return null;
-    }
-    let i = match.index + match[0].length;
-    const start = i;
-    let depth = 0;
-    for (; i < content.length; i++) {
-        const c = content[i];
-        if (c === '{' || c === '(' || c === '[') {
-            depth++;
-        } else if (c === '}' || c === ')' || c === ']') {
-            depth--;
-        } else if (c === ';' && depth <= 0) {
-            break;
-        }
-    }
-    return content.slice(start, i);
-}
-
 describe('#1062 — soloist.enabled ownership guard', () => {
-    it('no UPDATE_SB dispatch payload writes `enabled`', () => {
-        const files = getFiles(PUBLIC_DIR).filter((f) => !f.endsWith('types.ts'));
-        const violations: string[] = [];
-
-        for (const file of files) {
-            const content = fs.readFileSync(file, 'utf8');
-            const marker = /dispatch\(\s*ACTIONS\.UPDATE_SB\s*,/g;
-            for (let m = marker.exec(content); m !== null; m = marker.exec(content)) {
-                const argText = extractCallArg(content, m.index + m[0].length);
-                if (!argText) {
-                    continue;
-                }
-                let payloadText = argText;
-                if (/^[A-Za-z_$][\w$]*$/.test(argText)) {
-                    // Bare identifier — resolve its declaration in the same file.
-                    payloadText = resolveIdentifierInit(content, argText) ?? '';
-                }
-                if (/\benabled\s*:/.test(payloadText)) {
-                    violations.push(`${path.relative(PUBLIC_DIR, file)}: ${argText}`);
-                }
-            }
-        }
-
-        expect(violations, 'UPDATE_SB payload(s) writing `enabled`').toEqual([]);
-    });
-
     it('no SET_PARAM dispatch targets a literal soloist/sb module with param "enabled"', () => {
         const files = getFiles(PUBLIC_DIR).filter((f) => !f.endsWith('types.ts'));
         const violations: string[] = [];

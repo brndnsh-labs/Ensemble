@@ -1,4 +1,4 @@
-import { deepSignal } from 'deepsignal';
+import { deepSignal } from 'deepsignal/core';
 import type { Action, GlobalContext, GrooveState, Mutable } from '../types.js';
 import { ACTIONS, isSwingSub } from '../types.js';
 
@@ -68,47 +68,12 @@ export function isGrooveModule(module: unknown): boolean {
 export function grooveReducer(action: Action, playback: GlobalContext): boolean {
     const g = groove as Mutable<typeof groove>;
     switch (action.type) {
-        case ACTIONS.UPDATE_GB:
-            for (const key in action.payload) {
-                if (Object.hasOwn(groove, key)) {
-                    (groove as any)[key] = (action.payload as any)[key];
-                }
-            }
-            return true;
         case ACTIONS.SET_PARAM:
             if (isGrooveModule(action.payload.module)) {
                 (groove as Record<string, unknown>)[action.payload.param] = action.payload.value;
                 return true;
             }
             break;
-        case ACTIONS.RESET_STATE:
-            g.enabled = true;
-            g.voice = 'synth';
-            g.autoSound = true;
-            g.volume = 1.0;
-            g.reverb = 0.2;
-            g.swing = 0;
-            g.swingSub = '8th';
-            g.genreFeel = 'Rock';
-            g.lastSmartGenre = 'Rock';
-            // #1244 — hydrateState()'s corrupt-payload fallback dispatches RESET_STATE
-            // expecting a genuinely fresh session, so a field hydration can write from
-            // the persisted payload has to be restored here or it survives the reset.
-            g.humanize = 20;
-            g.orchestrationMap = null;
-            g.fillMap = null;
-            g.accentMap = null;
-            // #791: RESET_STATE previously left sectionSeedMap frozen from the
-            // first-ever play while the song seed re-rolled — an incoherent
-            // partial re-randomization. Clear it with its sibling seed maps so a
-            // reset truly starts the groove memory fresh.
-            g.sectionSeedMap = {};
-            g.seedTimelineStartStep = 0;
-            g.lastHatGain = null;
-            g.lastSampledHatVoice = null;
-            g.lastRideGain = null;
-            g.lastCrashGain = null;
-            return true;
         case ACTIONS.SET_SWING:
             g.swing = action.payload;
             return true;

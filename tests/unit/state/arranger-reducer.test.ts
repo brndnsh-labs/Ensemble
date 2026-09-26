@@ -1,21 +1,13 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { arranger, arrangerReducer } from '../../../public/state/arranger.js';
 import { ACTIONS, type Mutable } from '../../../public/types.js';
+import { resetAllStateForTest } from '../../utils/reset-state.js';
 
 const mutableArranger = arranger as Mutable<typeof arranger>;
 
 describe('Arranger Reducer', () => {
     beforeEach(() => {
-        arrangerReducer({ type: ACTIONS.RESET_STATE, payload: undefined });
-    });
-
-    it('should reset to default values', () => {
-        mutableArranger.key = 'Eb';
-        mutableArranger.notation = 'name';
-        arrangerReducer({ type: ACTIONS.RESET_STATE, payload: undefined });
-        expect(arranger.key).toBe('C');
-        expect(arranger.notation).toBe('roman');
-        expect(arranger.sections.length).toBe(1);
+        resetAllStateForTest();
     });
 
     it('should set notation style', () => {
@@ -23,25 +15,22 @@ describe('Arranger Reducer', () => {
         expect(arranger.notation).toBe('nns');
     });
 
-    it('clears authored grouping whenever an action changes the meter', () => {
-        mutableArranger.grouping = [2, 3];
-        arrangerReducer({ type: ACTIONS.SET_TIME_SIGNATURE, payload: '7/8' });
-        expect(arranger.grouping).toBeNull();
-
+    // #1381 — ACTIONS.SET_TIME_SIGNATURE was deleted (nothing dispatched it); the live
+    // meter write goes through generic SET_PARAM, which replicates the same
+    // clears-grouping-on-meter-change behavior (`meterChanged` in arranger.ts).
+    it('clears authored grouping whenever SET_PARAM changes the meter', () => {
+        mutableArranger.timeSignature = '4/4';
         mutableArranger.grouping = [3, 2];
         arrangerReducer({
             type: ACTIONS.SET_PARAM,
-            payload: { module: 'arranger', param: 'timeSignature', value: '4/4' },
+            payload: { module: 'arranger', param: 'timeSignature', value: '7/8' },
         });
         expect(arranger.grouping).toBeNull();
     });
 
-    it('preserves authored grouping when a meter action is a no-op', () => {
+    it('preserves authored grouping when a meter SET_PARAM is a no-op', () => {
         mutableArranger.timeSignature = '5/4';
         mutableArranger.grouping = [2, 3];
-
-        arrangerReducer({ type: ACTIONS.SET_TIME_SIGNATURE, payload: '5/4' });
-        expect(arranger.grouping).toEqual([2, 3]);
 
         arrangerReducer({
             type: ACTIONS.SET_PARAM,

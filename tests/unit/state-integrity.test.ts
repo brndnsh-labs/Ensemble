@@ -47,22 +47,6 @@ const isSlice = (f) => /deepSignal</.test(f.content);
 // The effect listener handles actions with `case` arms outside any slice.
 const HANDLER_FILES = ['state-effects.ts'];
 
-/**
- * Actions left with no dispatcher when v1's load/save layer went (#1424): v1's readers
- * dispatched these, and `state-effects.ts`'s save denylist named the `UPDATE_*` family. #1381
- * deletes each (with its reducer arms) or records why it stays, and then empties this list —
- * it is a hand-off, not an exemption, so don't add to it.
- */
-const UNDISPATCHED_SINCE_1424 = [
-    'RESET_STATE',
-    'SET_MIDI_CONFIG',
-    'SET_SESSION_TIMER',
-    'SET_MODAL_OPEN',
-    'UPDATE_SB',
-    'UPDATE_HB',
-    'UPDATE_GB',
-    'UPDATE_CONDUCTOR_DECISION',
-];
 const isHandlerFile = (f) => isSlice(f) || HANDLER_FILES.some((h) => f.path.endsWith(h));
 
 // Extract ACTIONS keys from public/types.js
@@ -79,8 +63,18 @@ describe('State Integrity Audit', () => {
         const unusedInHandler = [];
 
         actionKeys.forEach((key) => {
-            // Check for ACTIONS.KEY usage (dispatched/referenced outside slices)
-            const dispatchRegex = new RegExp(`\\bACTIONS\\.${key}\\b`);
+            // Check for an actual `dispatch(ACTIONS.KEY` call site — not just the bare
+            // substring `ACTIONS.KEY` anywhere in a non-slice file. The looser substring
+            // match let a listener's `case ACTIONS.KEY:` HANDLER arm (state-effects.ts is
+            // a listener, not a slice, so it wasn't excluded here) count as a dispatch,
+            // which is exactly how `ACTIONS.INIT_AUDIO` read as "dispatched" for years
+            // after #1358 deleted its only real caller — nothing but its own handler case
+            // ever mentioned it again. `\s*` spans a wrapped multi-line call
+            // (`dispatch(\n    ACTIONS.SET_SONG_SEED,` — see runtime.ts). A listener file
+            // (state-effects.ts) is NOT excluded here: it has genuine `dispatch(ACTIONS.…)`
+            // call sites of its own (e.g. `SET_SOLOIST_MODE`, which has no other caller),
+            // and this pattern already can't match its `case` arms.
+            const dispatchRegex = new RegExp(`dispatch\\(\\s*ACTIONS\\.${key}\\b`);
             const isDispatched = fileContents.some((f) => {
                 if (isSlice(f) || f.path === TYPES_FILE) {
                     return false;
@@ -114,11 +108,7 @@ describe('State Integrity Audit', () => {
                 'PROG_VALIDATED',
             ];
 
-            if (
-                !isDispatched &&
-                !exceptions.includes(key) &&
-                !UNDISPATCHED_SINCE_1424.includes(key)
-            ) {
+            if (!isDispatched && !exceptions.includes(key)) {
                 unusedInDispatch.push(key);
             }
             if (!isHandled && !exceptions.includes(key)) {

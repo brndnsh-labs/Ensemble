@@ -1,6 +1,6 @@
-import type { DeepSignal } from '../../../node_modules/deepsignal/dist/deepsignal';
+import type { DeepSignal } from '../../../node_modules/deepsignal/core/dist/deepsignal-core';
 
-export * from '../../../node_modules/deepsignal/dist/deepsignal';
+export * from '../../../node_modules/deepsignal/core/dist/deepsignal-core';
 
 /**
  * The runtime preserves the input object's public interface: DOM/Web Audio

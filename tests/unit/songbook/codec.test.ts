@@ -2,15 +2,12 @@ import { describe, expect, it } from 'vitest';
 import {
     chartGenre,
     decodeChartDocument,
-    decodeWorkspacePreferences,
     encodeChartDocument,
-    encodeWorkspacePreferences,
     validateChartDocument,
-    validateWorkspacePreferences,
     writtenSettings,
 } from '../../../public/songbook/codec.js';
 import { SONGBOOK_MAX_SECTIONS } from '../../../public/songbook/structural-limits.js';
-import type { ChartDocument, WorkspacePreferences } from '../../../public/songbook/types.js';
+import type { ChartDocument } from '../../../public/songbook/types.js';
 
 /**
  * A chart saved before the chart-format decision (2026-09-26): it carries every field the old
@@ -127,47 +124,6 @@ function makeChartDocument(): ChartDocument {
     };
 }
 
-function makeWorkspacePreferences(): WorkspacePreferences {
-    return {
-        schemaVersion: 1,
-        appearance: {
-            palette: 'forest',
-            mode: 'dark',
-            visualFlash: true,
-            qualityColors: true,
-            visualizerEnabled: false,
-        },
-        practice: {
-            countIn: true,
-            applyPresetSettings: false,
-            sessionTimer: 20,
-            songMode: true,
-            rampBpmPerLoop: 6,
-            rampStartPct: 0.7,
-        },
-        masterVolume: 0.46,
-        midi: {
-            enabled: true,
-            selectedOutputId: 'output-device-1',
-            inputEnabled: true,
-            selectedInputId: 'input-device-1',
-            chordsChannel: 1,
-            bassChannel: 2,
-            soloistChannel: 3,
-            harmonyChannel: 4,
-            drumsChannel: 10,
-            chordsOctave: 1,
-            bassOctave: -1,
-            soloistOctave: 0,
-            harmonyOctave: 1,
-            drumsOctave: 0,
-            latency: -12,
-            muteLocal: true,
-            velocitySensitivity: 1.4,
-        },
-    };
-}
-
 describe('Songbook codecs (#1044)', () => {
     it('round-trips every nested ChartDocument field through JSON unchanged', () => {
         const document = makeChartDocument();
@@ -181,38 +137,19 @@ describe('Songbook codecs (#1044)', () => {
         expect(decoded).toEqual({ kind: 'ok', value: document });
     });
 
-    it('round-trips every nested WorkspacePreferences field through JSON unchanged', () => {
-        const preferences = makeWorkspacePreferences();
-        const encoded = encodeWorkspacePreferences(preferences);
-        expect(encoded.kind).toBe('ok');
-        if (encoded.kind !== 'ok') {
-            return;
-        }
-
-        const decoded = decodeWorkspacePreferences(encoded.json);
-        expect(decoded).toEqual({ kind: 'ok', value: preferences });
-    });
-
-    it('returns detached typed values without mutating either candidate', () => {
+    it('returns a detached typed value without mutating the candidate', () => {
         const document = makeChartDocument();
-        const preferences = makeWorkspacePreferences();
         const documentBefore = structuredClone(document);
-        const preferencesBefore = structuredClone(preferences);
 
         const documentResult = validateChartDocument(document);
-        const preferencesResult = validateWorkspacePreferences(preferences);
         expect(document).toEqual(documentBefore);
-        expect(preferences).toEqual(preferencesBefore);
         expect(documentResult.kind).toBe('ok');
-        expect(preferencesResult.kind).toBe('ok');
-        if (documentResult.kind !== 'ok' || preferencesResult.kind !== 'ok') {
+        if (documentResult.kind !== 'ok') {
             return;
         }
 
         documentResult.value.chart.arrangement.sections[0].label = 'Changed result';
-        preferencesResult.value.midi.chordsChannel = 16;
         expect(document.chart.arrangement.sections[0].label).toBe('A');
-        expect(preferences.midi.chordsChannel).toBe(1);
     });
 
     it('rejects the complete current candidate instead of returning a partial document', () => {
@@ -246,19 +183,6 @@ describe('Songbook codecs (#1044)', () => {
             schemaVersion: 12,
             source,
         });
-    });
-
-    it('preserves an unsupported future preferences object as a detached source value', () => {
-        const source = {
-            schemaVersion: 4,
-            futurePreference: { nested: ['keep-me'] },
-        };
-        const result = validateWorkspacePreferences(source);
-        expect(result).toEqual({ kind: 'future-version', schemaVersion: 4, source });
-        if (result.kind !== 'future-version') {
-            return;
-        }
-        expect(result.source).not.toBe(source);
     });
 
     it('accepts exactly 500 sections and rejects section 501', () => {
@@ -303,73 +227,6 @@ describe('Songbook codecs (#1044)', () => {
                 '$.chart.performance.transportStep',
             ]),
         );
-    });
-
-    /**
-     * #1314 — `practiceMode` was retired from the app. It is still listed in
-     * `validatePractice`'s OPTIONAL keys, and deliberately not read, so that the workspace
-     * documents users already saved keep loading while the key itself is dropped on the way
-     * in and never written again. These three cases are the whole contract.
-     */
-    describe('retired practiceMode key (#1314)', () => {
-        it.each([true, false])(
-            'accepts a legacy document carrying practiceMode: %s and drops the key',
-            (legacy) => {
-                const candidate = makeWorkspacePreferences() as any;
-                candidate.practice.practiceMode = legacy;
-
-                const result = validateWorkspacePreferences(candidate);
-                expect(result.kind).toBe('ok');
-                if (result.kind !== 'ok') {
-                    return;
-                }
-                expect(Object.hasOwn(result.value.practice, 'practiceMode')).toBe(false);
-                // The rest of the practice block survives untouched.
-                expect(result.value.practice).toEqual(makeWorkspacePreferences().practice);
-
-                // And a round-trip through the encoder strips it from the JSON as well —
-                // `encodeValidated` stringifies what the validator BUILDS, not its input.
-                const encoded = encodeWorkspacePreferences(candidate);
-                expect(encoded.kind).toBe('ok');
-                if (encoded.kind !== 'ok') {
-                    return;
-                }
-                expect(encoded.json).not.toContain('practiceMode');
-                expect(decodeWorkspacePreferences(encoded.json)).toEqual({
-                    kind: 'ok',
-                    value: makeWorkspacePreferences(),
-                });
-            },
-        );
-
-        it('accepts a document that omits practiceMode (every new save)', () => {
-            const candidate = makeWorkspacePreferences();
-            expect(Object.hasOwn(candidate.practice, 'practiceMode')).toBe(false);
-
-            const result = validateWorkspacePreferences(candidate);
-            expect(result.kind).toBe('ok');
-        });
-
-        it('still rejects an unknown key in the same block', () => {
-            // The guard was made tolerant of ONE named legacy key, not loosened: anything
-            // else in the practice block is still an unknown field.
-            const candidate = makeWorkspacePreferences() as any;
-            candidate.practice.practiceMode = true; // tolerated
-            candidate.practice.practiceModeX = true; // not
-            candidate.practice.rehearsalMode = false; // not
-
-            const result = validateWorkspacePreferences(candidate);
-            expect(result.kind).toBe('invalid');
-            if (result.kind !== 'invalid') {
-                return;
-            }
-            expect(result.issues.map((issue) => issue.path)).toEqual(
-                expect.arrayContaining(['$.practice.practiceModeX', '$.practice.rehearsalMode']),
-            );
-            expect(result.issues.map((issue) => issue.path)).not.toContain(
-                '$.practice.practiceMode',
-            );
-        });
     });
 
     it('rejects a genre name and engine feel that describe different genres', () => {

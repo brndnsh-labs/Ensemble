@@ -1,13 +1,7 @@
 // @ts-nocheck
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { setBpm } from '../../../public/controllers/app-controller.js';
-import { validateProgression } from '../../../public/engine/chords-engine.js';
-import {
-    initAudio,
-    restoreGains,
-    syncBusReverbSend,
-    syncBusVolume,
-} from '../../../public/engine/engine.js';
+import { syncBusReverbSend, syncBusVolume } from '../../../public/engine/engine.js';
 import {
     __resetPackCacheForTest,
     markPackInstalled,
@@ -23,7 +17,6 @@ vi.mock('../../../public/controllers/app-controller.js', () => ({
     setBpm: vi.fn(),
 }));
 vi.mock('../../../public/engine/engine.js', () => ({
-    initAudio: vi.fn(),
     restoreGains: vi.fn(),
     syncBusReverbSend: vi.fn(),
     syncBusVolume: vi.fn(),
@@ -39,11 +32,6 @@ describe('State Effects Handler', () => {
             playback: { isPlaying: false, toasts: [], theme: 'dark' },
         };
         dispatch = vi.fn();
-    });
-
-    it('should call validateProgression on section-related actions', () => {
-        handleEffects({ type: ACTIONS.SET_SECTIONS, payload: {} }, stateMap, { dispatch });
-        expect(validateProgression).toHaveBeenCalledWith(stateMap, dispatch);
     });
 
     it('should call setBpm on SET_BPM action', () => {
@@ -202,16 +190,6 @@ describe('State Effects Handler', () => {
             dispatch,
         });
         expect(syncBusVolume).not.toHaveBeenCalled();
-    });
-
-    it('should call restoreGains on RESTORE_GAINS action', () => {
-        handleEffects({ type: ACTIONS.RESTORE_GAINS, payload: {} }, stateMap, { dispatch });
-        expect(restoreGains).toHaveBeenCalledWith(stateMap);
-    });
-
-    it('should call initAudio on INIT_AUDIO action', () => {
-        handleEffects({ type: ACTIONS.INIT_AUDIO, payload: {} }, stateMap, { dispatch });
-        expect(initAudio).toHaveBeenCalledWith(stateMap);
     });
 
     it('should set toast expiration on SHOW_TOAST', () => {
