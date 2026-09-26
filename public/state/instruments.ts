@@ -233,12 +233,21 @@ const SOLOIST_FIELD_ROUTES: Record<string, SoloistFieldRoute> = {
  * `motifTracking` / `pinnedProfile` in #866 (the legacy engine's retirement, epic
  * #10), and `complexity` in #1070 (dead since #1167 rewired the slider to
  * `phrasingIntensity` — zero writers, zero readers, absent from
- * `buildSoloistSyncPayload`). Old persisted sessions / share-URLs may still carry
- * them; we drop them on load rather than letting the unknown-key fall-through
- * resurrect them as stray top-level fields. Compat shim — keep entries here so
- * stale payloads load cleanly.
+ * `buildSoloistSyncPayload`), and the old engine's settings `preset`, `octave`,
+ * `phrasingIntensity`, `tradeMode` and `tradeSilenced` in #1424. A stray payload
+ * carrying one is dropped rather than letting the unknown-key fall-through
+ * resurrect it as a stray top-level field. Keep entries here.
  */
-const DEPRECATED_SOLOIST_KEYS = new Set(['motifTracking', 'pinnedProfile', 'complexity']);
+const DEPRECATED_SOLOIST_KEYS = new Set([
+    'motifTracking',
+    'pinnedProfile',
+    'complexity',
+    'preset',
+    'octave',
+    'phrasingIntensity',
+    'tradeMode',
+    'tradeSilenced',
+]);
 
 /**
  * Apply a flat-keyed soloist payload to the nested state shape. Unknown keys

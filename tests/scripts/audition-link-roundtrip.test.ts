@@ -1,8 +1,8 @@
 // A generated audition link is only useful if the app's REAL link reader reads it back as the
 // scenario that was asked for — a param the reader silently ignores yields a link that plays
 // something else with no error. The reader is the v2 stand's old-link path
-// (`prototypes/v2/lib/v1-link.ts`, #1279); v1's own `loadFromUrl` went with its load/save layer
-// (#1424). What that reader does not take yet (`int`, `bnd`, `autoplay`) is #1382.
+// (`prototypes/v2/lib/v1-link.ts`, #1279, which reads `int`, `bnd` and `autoplay` since #1382);
+// v1's own `loadFromUrl` went with its load/save layer (#1424).
 import { describe, expect, it } from 'vitest';
 import { openV1ShareLink } from '../../prototypes/v2/lib/v1-link.js';
 import type { ChartContent } from '../../public/songbook/types.js';
@@ -38,12 +38,12 @@ function open(...argv: string[]) {
     if (outcome.kind !== 'ok') {
         throw new Error(`the link did not open: ${outcome.kind}`);
     }
-    return outcome.document.chart;
+    return { chart: outcome.document.chart, autoplay: outcome.autoplay };
 }
 
 describe("audition link -> the stand's link reader, round trip", () => {
-    it('restores the progression (accidentals intact), genre, key, tempo and meter', () => {
-        const chart = open(
+    it('restores the progression (accidentals intact), genre, key, tempo, meter and intensity', () => {
+        const { chart, autoplay } = open(
             '--prog=Cm7 | Cm7#5 | C+ | Cm(b6)',
             '--genre=Neo-Soul',
             '--key=Eb',
@@ -58,5 +58,24 @@ describe("audition link -> the stand's link reader, round trip", () => {
         expect(chart.arrangement.key).toBe('Eb');
         expect(chart.performance.bpm).toBe(92);
         expect(chart.arrangement.timeSignature).toBe('6/8');
+        expect(chart.performance.energy).toBeCloseTo(0.8);
+        // Audition links arm playback by default.
+        expect(autoplay).toBe(true);
+    });
+
+    it('switches parts without disturbing the ones it left alone', () => {
+        const { chart } = open(
+            '--prog=C | C+ | C6 | C7',
+            '--genre=Jazz',
+            '--on=soloist',
+            '--off=bass',
+        );
+        expect(chart.band.soloist.enabled).toBe(true);
+        expect(chart.band.bass.enabled).toBe(false);
+        expect(chart.band.chords.enabled).toBe(true);
+    });
+
+    it('leaves playback unarmed with --no-autoplay', () => {
+        expect(open('--prog=C | F', '--genre=Rock', '--no-autoplay').autoplay).toBe(false);
     });
 });

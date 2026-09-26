@@ -453,6 +453,21 @@ describe('round-tripping a real v1 session', () => {
         });
     });
 
+    it('bounds a hostile seed, top-level or in the pre-#791 nested soloist slot', () => {
+        const withSeed = (fields: Record<string, unknown>) =>
+            convert(JSON.stringify({ ...JSON.parse(untouched), ...fields })).chart.performance.seed;
+        expect(withSeed({ seed: 'a'.repeat(500) })).toHaveLength(64);
+        expect(withSeed({ seed: '<script>' })).toBe('script');
+        expect(withSeed({ seed: { evil: 1 } })).toBe('');
+        expect(withSeed({ seed: 'blue-note-42' })).toBe('blue-note-42');
+        // The nested fallback is bounded the same way, and the top-level seed wins over it.
+        const soloist = JSON.parse(untouched).soloist;
+        expect(withSeed({ seed: '', soloist: { ...soloist, seed: 'b'.repeat(500) } })).toHaveLength(
+            64,
+        );
+        expect(withSeed({ seed: 'top', soloist: { ...soloist, seed: 'nested' } })).toBe('top');
+    });
+
     it("brings over only what the band honours: none of the old engine's settings (2026-09-26)", () => {
         const { performance, band } = convert(tunedBand).chart;
         // v1 held all of these (styles, octaves, density, phrasing, the harmony lane, the

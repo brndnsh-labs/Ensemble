@@ -8,6 +8,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { TIME_SIGNATURES } from '../../../public/config.js';
+import { normalizeSongSeed } from '../../../public/sanitize.js';
 import {
     clamp,
     normalizeSwingSub,
@@ -197,5 +198,20 @@ describe('validateSections: the additive section fields (#1029)', () => {
         const [section] = validateSections([{ id: 'legacy', label: 'Legacy', value: 'I' }]);
         expect(section).not.toHaveProperty('targetIntensity');
         expect(section).not.toHaveProperty('instruments');
+    });
+});
+
+// #1258/#1266 — one bound for the song seed, shared by every reader of it: the v1 import
+// (`import-v1.ts`), the songbook codec and the `SET_SONG_SEED` reducer (`arranger.ts`). An
+// oversized seed was a hashing-cost and data-hygiene problem carried forward indefinitely.
+describe('normalizeSongSeed', () => {
+    it('bounds, strips and type-checks an untrusted seed', () => {
+        expect(normalizeSongSeed('a'.repeat(500))).toHaveLength(64);
+        expect(normalizeSongSeed('<script>')).toBe('script');
+        expect(normalizeSongSeed({ evil: 1 })).toBe('');
+    });
+
+    it('keeps a legitimate seed (the accept direction)', () => {
+        expect(normalizeSongSeed('blue-note-42')).toBe('blue-note-42');
     });
 });
