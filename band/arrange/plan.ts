@@ -7,6 +7,7 @@
 
 import type { BandSettings, Lane } from '../core/types.js';
 import type { Bar, Timeline } from '../form/timeline.js';
+import { type LeadRole, leadRole } from './cycle.js';
 
 export type Fill = 'none' | 'phrase' | 'section';
 
@@ -20,6 +21,11 @@ export interface BarPlan {
     crash: boolean;
     /** The final bar of a performance that does not loop: play a held ending. */
     ending: boolean;
+    /**
+     * The lead's job in this bar (`arrange/cycle.ts`). On the drummer's turn in a chorus of
+     * fours, the drums play alone.
+     */
+    lead: LeadRole;
 }
 
 // Section roles by label. Unknown labels (A, B, Head…) sit at the middle.
@@ -75,9 +81,16 @@ export function fullWindow(timeline: Timeline): PassWindow {
 export function planBars(
     timeline: Timeline,
     settings: BandSettings,
-    { pass, looping, window }: { pass: number; looping: boolean; window: PassWindow },
+    {
+        pass,
+        looping,
+        window,
+        trades = false,
+    }: { pass: number; looping: boolean; window: PassWindow; trades?: boolean },
 ): BarPlan[] {
     const { bars } = timeline;
+    // Fours are traded over the whole song: a practice loop keeps its band.
+    const trading = trades && window.from === 0 && window.to === bars.length;
     // A song that loops earns a little more each time round — capped, so the fourth chorus
     // is fuller than the first but the band never runs away from the player.
     const passLift = Math.min(pass, 3) * 0.03;
@@ -103,9 +116,18 @@ export function planBars(
         for (const lane of ['drums', 'bass', 'comp', 'lead'] as const) {
             lanes[lane] = settings.lanes[lane] && bar.visit.lanes[lane] !== false;
         }
+        // Only a lead that is playing trades: without it, the band plays the chorus.
+        const lead = leadRole(timeline, i, pass, trading && lanes.lead);
+        const drumsTurn = lead.kind === 'trade' && lead.turn === 'drums';
+        if (drumsTurn) {
+            lanes.bass = false;
+            lanes.comp = false;
+            lanes.lead = false;
+        }
         const ending = !looping && isLast;
         let fill: Fill = 'none';
-        if (!ending) {
+        // A trade is its own fill: the drummer's four are a solo, and the lead's run into it.
+        if (!ending && lead.kind !== 'trade') {
             if ((visitEnd || (isLast && looping)) && !(next && bar.visit.seamless && !isLast)) {
                 // The end of a section — or of a practice loop's lap — gets the big fill.
                 fill = 'section';
@@ -120,7 +142,17 @@ export function planBars(
         // A crash marks an arrival: a new section, or the downbeat after a phrase fill once
         // the band is past quiet energy.
         const afterFill = prevPlan?.fill === 'phrase' && energy >= 0.5;
-        plans[i] = { energy, lanes, fill, crash: arrival || afterFill || ending, ending };
+        // The band comes back in on a crash after the drummer's four.
+        const afterDrums =
+            prevPlan?.lead.kind === 'trade' && prevPlan.lead.turn === 'drums' && !drumsTurn;
+        plans[i] = {
+            energy,
+            lanes,
+            fill,
+            crash: arrival || afterFill || afterDrums || ending,
+            ending,
+            lead,
+        };
     }
     return plans;
 }

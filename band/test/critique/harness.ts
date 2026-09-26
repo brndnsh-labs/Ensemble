@@ -6,6 +6,8 @@
  *
  * Swing is forced straight here so positions read on the grid; `feel.test.ts` owns swing.
  */
+
+import { CYCLE, cycleLength, leadRole } from '../../arrange/cycle.js';
 import {
     type BandEvent,
     type CompInstrument,
@@ -17,7 +19,6 @@ import {
 import { chordAt, compileTimeline, type Timeline } from '../../form/timeline.js';
 import { type PassMemory, performPass } from '../../perform.js';
 import { STEP } from '../../players/grid.js';
-import { CYCLE } from '../../players/lead/form.js';
 import { STYLES } from '../../styles/index.js';
 import { chordPcs, fifthOf } from '../../theory/chord.js';
 import { mod12 } from '../../theory/pitch.js';
@@ -38,13 +39,16 @@ export function perform(
     intensity: number | null = null,
     comp: CompInstrument = 'piano',
     bass = true,
-    lead?: 'head' | 'solo',
+    lead?: 'head' | 'solo' | 'trades',
 ): Take[] {
     const takes: Take[] = [];
     const lanes = { ...DEFAULT_SETTINGS.lanes, bass, lead: lead !== undefined };
     const instrument = STYLES[style].lead?.prefers ?? DEFAULT_SETTINGS.lead;
-    // The lead's form spans a cycle: the head is pass 0, the solo choruses passes 1–3.
-    const passes = lead ? CYCLE : 2;
+    // The lead's form spans a cycle: the head is pass 0, the solo choruses passes 1–3, and a
+    // style that trades plays its fours on pass 4.
+    const passes = lead ? cycleLength(Boolean(STYLES[style].trades)) : 2;
+    const judged = (pass: number) =>
+        lead === 'head' ? pass === 0 : lead === 'solo' ? pass > 0 && pass < CYCLE : pass === CYCLE;
     for (const chart of CHARTS) {
         const timeline = compileTimeline(FIXTURES[chart]);
         for (const seed of SEEDS) {
@@ -62,7 +66,7 @@ export function perform(
                 settings.lanes = lanes;
                 const result = performPass(timeline, settings, { pass, looping: true, memory });
                 memory = result.memory;
-                if (!lead || (lead === 'head') === (pass === 0)) {
+                if (!lead || judged(pass)) {
                     takes.push({ timeline, events: result.events, pass });
                 }
             }
@@ -133,7 +137,30 @@ function compChords(events: BandEvent[]): Map<number, PitchedNote[]> {
 const stepOf = (t: Timeline, e: BandEvent) => Math.round((e.tick - t.bars[e.bar].start) / STEP);
 const ratio = (hits: number, total: number) => (total ? hits / total : 0);
 
-/** Bars a groove metric should judge: 4/4, no fill, not a section's first bar (crash). */
+// ---------------------------------------------------------------- trade helpers
+/** The drums a solo is played on (the snare's ghosts aren't strokes of the idea). */
+const STROKES = ['snare', 'tomHigh', 'tomMid', 'tomLow'];
+
+/**
+ * A chorus of fours in a take, as slots: each phrase slot's bars and whose turn it is. Only
+ * meaningful on a `lead: 'trades'` take (the trading chorus of a style that trades).
+ */
+function tradeSlots(take: Take): { turn: 'lead' | 'drums'; bars: number[] }[] {
+    const t = take.timeline;
+    const slots: { turn: 'lead' | 'drums'; bars: number[] }[] = [];
+    t.bars.forEach((bar, i) => {
+        const role = leadRole(t, i, take.pass ?? 0, true);
+        if (role.kind !== 'trade') {
+            return;
+        }
+        if (bar.phrase.bar === 0 || !slots.length) {
+            slots.push({ turn: role.turn, bars: [] });
+        }
+        slots[slots.length - 1].bars.push(i);
+    });
+    return slots;
+}
+
 function grooveBars(t: Timeline, events: BandEvent[]) {
     return t.bars.filter((b) => {
         if (b.meter.name !== '4/4') {
@@ -184,6 +211,96 @@ function onsetsByBar(t: Timeline, events: BandEvent[], lane: 'bass' | 'comp') {
 export type Metric = (takes: Take[]) => number;
 
 export const METRICS = {
+    /** Share of the drummer's bars in a chorus of fours with no bass, comp or lead at all. */
+    tradeBandLaysOut: (takes) => {
+        let bars = 0;
+        let alone = 0;
+        for (const take of takes) {
+            for (const slot of tradeSlots(take).filter((s) => s.turn === 'drums')) {
+                for (const bar of slot.bars) {
+                    bars++;
+                    alone += take.events.some((e) => e.lane !== 'drums' && e.bar === bar) ? 0 : 1;
+                }
+            }
+        }
+        return ratio(alone, bars);
+    },
+    /** Share of the lead's turns in a chorus of fours in which it plays. */
+    tradeLeadPlays: (takes) => {
+        let turns = 0;
+        let played = 0;
+        for (const take of takes) {
+            for (const slot of tradeSlots(take).filter((s) => s.turn === 'lead')) {
+                turns++;
+                played += take.events.some((e) => e.lane === 'lead' && slot.bars.includes(e.bar))
+                    ? 1
+                    : 0;
+            }
+        }
+        return ratio(played, turns);
+    },
+    /**
+     * Share of the drummer's bars that are a solo, not the time: no ride, at least three
+     * strokes on the snare and toms, and the hi-hat foot still on 2 and 4 (the form is kept).
+     */
+    tradeDrumsSolo: (takes) => {
+        let bars = 0;
+        let solo = 0;
+        for (const take of takes) {
+            for (const slot of tradeSlots(take).filter((s) => s.turn === 'drums')) {
+                for (const bar of slot.bars) {
+                    const at = (pieces: string[]) =>
+                        drumSteps(take.timeline, take.events, bar, pieces);
+                    const foot = at(['hatPedal']);
+                    const total = Math.round(take.timeline.bars[bar].meter.barTicks / STEP);
+                    // 2 and 4: every other beat, in any meter.
+                    const kept = Array.from({ length: Math.ceil(total / 8) }, (_, k) => 4 + k * 8)
+                        .filter((step) => step < total)
+                        .every((step) => foot.has(step));
+                    bars++;
+                    solo += at(['ride']).size === 0 && at(STROKES).size >= 3 && kept ? 1 : 0;
+                }
+            }
+        }
+        return ratio(solo, bars);
+    },
+    /**
+     * Share of the drummer's fours (four bars or more) whose second bar restates the first
+     * bar's rhythm, on whichever drums: the solo has an idea and develops it.
+     */
+    tradeDrumMotif: (takes) => {
+        let turns = 0;
+        let restated = 0;
+        const rhythm = (take: Take, bar: number) =>
+            [...drumSteps(take.timeline, take.events, bar, STROKES)].sort((a, b) => a - b).join();
+        for (const take of takes) {
+            for (const slot of tradeSlots(take).filter(
+                (s) => s.turn === 'drums' && s.bars.length >= 4,
+            )) {
+                turns++;
+                restated += rhythm(take, slot.bars[0]) === rhythm(take, slot.bars[1]) ? 1 : 0;
+            }
+        }
+        return ratio(restated, turns);
+    },
+    /** Share of the lead's turns after the drummer's that come in on a crash. */
+    tradeBackOnCrash: (takes) => {
+        let entries = 0;
+        let crashed = 0;
+        for (const take of takes) {
+            const slots = tradeSlots(take);
+            slots.forEach((slot, k) => {
+                if (slot.turn !== 'lead' || slots[k - 1]?.turn !== 'drums') {
+                    return;
+                }
+                entries++;
+                crashed += drumSteps(take.timeline, take.events, slot.bars[0], ['crash']).has(0)
+                    ? 1
+                    : 0;
+            });
+        }
+        return ratio(crashed, entries);
+    },
     snareBackbeat: (takes) => {
         let n = 0;
         let hit = 0;
@@ -1626,8 +1743,8 @@ export interface TakeSpec {
     comp?: CompInstrument;
     intensity?: number;
     bass?: boolean;
-    /** Judge the lead: its head (the first pass) or its solo choruses (passes 1–3). */
-    lead?: 'head' | 'solo';
+    /** Judge the lead: its head (the first pass), its solo choruses (passes 1–3) or its fours. */
+    lead?: 'head' | 'solo' | 'trades';
 }
 
 type MetricName = keyof typeof METRICS;

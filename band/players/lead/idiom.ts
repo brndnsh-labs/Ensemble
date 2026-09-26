@@ -4,6 +4,7 @@
  * first bar and kept in memory, so the lead can resume at any barline; the rest of the slot's
  * bars just play what was planned.
  */
+import type { LeadRole } from '../../arrange/cycle.js';
 import { energyTier } from '../../arrange/plan.js';
 import type { Rng } from '../../core/random.js';
 import type { PitchedNote } from '../../core/types.js';
@@ -12,7 +13,7 @@ import type { BarContext, PitchedIdiom } from '../../styles/types.js';
 import { type ChordFacts, chordPcs } from '../../theory/chord.js';
 import { mod12 } from '../../theory/pitch.js';
 import { barSteps, dyn, STEP } from '../grid.js';
-import { type Density, type LeadRole, leadRole, soloArc } from './form.js';
+import { type Density, soloArc, tradeArc } from './form.js';
 import { type Contour, type LinePalette, type Onset, targetsOf, voiceLine } from './line.js';
 
 /** What a bar of a phrase does: carries the line, ends it on an arrival, or breathes. */
@@ -315,13 +316,18 @@ function soloPlan(
     ctx: BarContext,
     book: LeadBook,
     slotStart: number,
-    chorus: 1 | 2 | 3,
+    role: Extract<LeadRole, { kind: 'solo' | 'trade' }>,
     memory: LeadMemory,
 ): SlotPlan {
     const { bars } = ctx.timeline;
     const first = bars[slotStart];
     const rng = ctx.rng(`solo:${ctx.pass}:${slotStart}`, 'song');
-    const arc = soloArc(chorus, ctx.timeline, slotStart, energyTier(ctx.plan.energy));
+    const tier = energyTier(ctx.plan.energy);
+    const trade = role.kind === 'trade';
+    const arc =
+        role.kind === 'trade'
+            ? tradeArc(tier)
+            : soloArc(role.chorus, ctx.timeline, slotStart, tier);
     const [lo, hi] = ctx.lead.range;
     // The peak's top note: the instrument's top, or the book's reach above home.
     const home = homeOf(ctx, book);
@@ -334,6 +340,7 @@ function soloPlan(
         atThisSlot && atThisSlot.kinds.length === first.phrase.length ? atThisSlot : memory.phrase;
     if (
         previousPhrase &&
+        !trade &&
         !arc.peak &&
         !arc.windDown &&
         previousPhrase.kinds.length === first.phrase.length &&
@@ -356,12 +363,14 @@ function soloPlan(
     }
     // The solo's opening statement may leave two bars of room after it; nothing else does.
     const opensSolo =
-        chorus === 1 && (slotStart === 0 || /^intro/i.test(bars[slotStart - 1].visit.label));
+        role.kind === 'solo' &&
+        role.chorus === 1 &&
+        (slotStart === 0 || /^intro/i.test(bars[slotStart - 1].visit.label));
     // Now and then (the book's `space`) a phrase takes a roomier shape than its density — but
     // the two-bar breath stays the opening statement's, and a phrase after an empty bar comes
     // straight in.
     const roomier =
-        !arc.peak && !arc.windDown && arc.density !== 'sparse' && rng.chance(book.space);
+        !trade && !arc.peak && !arc.windDown && arc.density !== 'sparse' && rng.chance(book.space);
     const density = roomier ? DENSITY_ORDER[DENSITY_ORDER.indexOf(arc.density) - 1] : arc.density;
     // The book's `space` weights the shapes both ways: each empty bar a shape leaves counts
     // (space / 0.25) times over, so a relentless book (metal, 0.12) all but never breathes a
@@ -374,9 +383,12 @@ function soloPlan(
                 (opensSolo || s.slice(-2).join() !== 'rest,rest'),
         )
         .map(([s, w]) => [s, w * room ** s.filter((k) => k === 'rest').length] as const);
-    const shape = arc.peak
-        ? (['line', 'line', 'line', 'end'] as BarKind[])
-        : rng.weighted(choices.length ? choices : SOLO_SHAPES.mid);
+    // The peak climbs through its whole slot; a trade plays its four through to an arrival
+    // (the drummer's silence is the space).
+    const shape =
+        arc.peak || trade
+            ? (['line', 'line', 'line', 'end'] as BarKind[])
+            : rng.weighted(choices.length ? choices : SOLO_SHAPES.mid);
     const kinds = fitShape(shape, first.phrase.length);
     // The opening cell: develop the last phrase's motif (its rhythm and its intervals, moved
     // onto the new chord), or say something new.
@@ -790,7 +802,7 @@ function planSlot(
     phrase: PhraseMemory | null;
     phrases: Record<number, PhraseMemory>;
 } {
-    if (role.kind === 'rest') {
+    if (role.kind === 'rest' || (role.kind === 'trade' && role.turn === 'drums')) {
         return {
             notes: [],
             motif: memory.motif,
@@ -803,7 +815,7 @@ function planSlot(
     if (role.kind === 'head') {
         voiced = voiceHead(ctx, book, slotStart);
     } else {
-        const plan = soloPlan(ctx, book, slotStart, role.chorus, memory);
+        const plan = soloPlan(ctx, book, slotStart, role, memory);
         voiced = voiceSolo(ctx, book, slotStart, plan, role);
     }
     const { onsets, pitches, plan } = voiced;
@@ -873,7 +885,7 @@ function planSlot(
         .map((o, i) => (o.bar === 0 ? pitches[i] : null))
         .filter((m) => m !== null);
     const motif =
-        role.kind === 'solo' && plan.cells[0] && opening.length
+        role.kind !== 'head' && plan.cells[0] && opening.length
             ? {
                   cell: plan.cells[0],
                   contour: plan.contour,
@@ -883,7 +895,7 @@ function planSlot(
     // Two empty bars at the end of a slot are a rest already: the next slot plays.
     const trailing = plan.kinds.length - 1 - plan.kinds.map((k) => k !== 'rest').lastIndexOf(true);
     const phrase: PhraseMemory | null =
-        role.kind === 'solo'
+        role.kind !== 'head'
             ? {
                   kinds: plan.kinds,
                   cells: plan.cells,
@@ -896,7 +908,7 @@ function planSlot(
               }
             : memory.phrase;
     const phrases =
-        role.kind === 'solo' && phrase
+        role.kind !== 'head' && phrase
             ? { ...memory.phrases, [slotStart]: phrase }
             : memory.phrases;
     return { notes, motif, trailing, phrase, phrases };
@@ -920,8 +932,8 @@ export function leadIdiom(book: LeadBook): PitchedIdiom {
             const slot = `${ctx.pass}:${slotStart}`;
             let next = memory;
             if (memory.slot !== slot) {
-                const role = leadRole(ctx.timeline.bars[slotStart], ctx.pass);
-                const planned = planSlot(ctx, book, slotStart, role, memory);
+                // The arrangement decided the slot's job; every bar of a slot has the same one.
+                const planned = planSlot(ctx, book, slotStart, ctx.plan.lead, memory);
                 next = {
                     ...memory,
                     slot,

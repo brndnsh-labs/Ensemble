@@ -4,6 +4,8 @@
  * These are the rules no amount of musical taste may break — the idiom-specific "does it
  * sound like the genre" claims live in `critique.test.ts`.
  */
+
+import { cycleLength } from '../arrange/cycle.js';
 import {
     type BandEvent,
     type BandSettings,
@@ -18,7 +20,6 @@ import { type PassMemory, performPass } from '../perform.js';
 import { isPlayable } from '../players/comp/fretboard.js';
 import { COMP_INSTRUMENTS } from '../players/comp/instruments.js';
 import { STEP } from '../players/grid.js';
-import { CYCLE } from '../players/lead/form.js';
 import { LEAD_INSTRUMENTS } from '../players/lead/instruments.js';
 import { feelFor, STYLE_IDS, STYLES } from '../styles/index.js';
 import type { Feel } from '../styles/types.js';
@@ -168,8 +169,9 @@ describe.each(STYLE_IDS)('%s invariants', (styleId) => {
 });
 
 /**
- * The lead through a whole cycle — the head, three solo choruses, the head again — on every
- * fixture: each pass keeps every rule, and the head comes back note for note.
+ * The lead through a whole cycle — the head, three solo choruses (and a chorus of fours, for
+ * a style that trades), the head again — on every fixture: each pass keeps every rule, and
+ * the head comes back note for note.
  */
 describe.each(STYLE_IDS.filter((id) => STYLES[id].lead))('%s lead', (styleId) => {
     const style = STYLES[styleId];
@@ -187,8 +189,9 @@ describe.each(STYLE_IDS.filter((id) => STYLES[id].lead))('%s lead', (styleId) =>
                 };
                 const lean = feelFor(style, COMP_INSTRUMENTS[settings.comp].family).lean;
                 const heads: string[] = [];
+                const cycle = cycleLength(Boolean(style.trades));
                 let memory: PassMemory | undefined;
-                for (let pass = 0; pass <= CYCLE; pass++) {
+                for (let pass = 0; pass <= cycle; pass++) {
                     const result = performPass(timeline, settings, { pass, looping: true, memory });
                     memory = result.memory;
                     checkPass(
@@ -199,7 +202,7 @@ describe.each(STYLE_IDS.filter((id) => STYLES[id].lead))('%s lead', (styleId) =>
                         `${seed}/pass${pass}`,
                         problems,
                     );
-                    if (pass % CYCLE === 0) {
+                    if (pass % cycle === 0) {
                         heads.push(
                             JSON.stringify(
                                 result.events

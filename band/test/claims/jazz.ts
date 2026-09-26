@@ -70,6 +70,17 @@ export const jazz = defineClaims({
             ],
         },
         {
+            take: { lead: 'trades' },
+            claims: [
+                ['tradeLeadPlays', 0.95, 1, 'the horn takes every one of its fours'],
+                ['tradeBandLaysOut', 1, 1, "the drummer's four are the drums alone"],
+                ['tradeDrumsSolo', 0.95, 1, 'a solo, not the time, with the foot on 2 and 4'],
+                ['tradeDrumMotif', 0.9, 1, 'the drummer states an idea and plays it again'],
+                ['tradeBackOnCrash', 1, 1, 'the band comes back in on a crash'],
+                ['leadShortShare', 0.6, 0.95, 'bebop lines in its fours'],
+            ],
+        },
+        {
             take: { lead: 'solo' },
             claims: [
                 ['leadLongBreath', 0, 0.12, 'breaths, not gaps: two empty bars are rare'],

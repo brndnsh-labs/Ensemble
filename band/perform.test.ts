@@ -1,3 +1,4 @@
+import { CYCLE, leadRole } from './arrange/cycle.js';
 import { DEFAULT_SETTINGS, type PitchedNote, PPQ } from './core/types.js';
 import { chordAt, compileTimeline } from './form/timeline.js';
 import { performPass } from './perform.js';
@@ -155,6 +156,63 @@ describe('comp instruments', () => {
                     );
                 }
             }
+        }
+    });
+});
+
+describe('trading fours', () => {
+    const timeline = compileTimeline(FIXTURES.rhythmChanges);
+    const lanes = { drums: true, bass: true, comp: true, lead: true };
+    const jazz = { ...DEFAULT_SETTINGS, style: 'jazz' as const, lanes, lead: 'sax' as const };
+    const drummers = timeline.bars
+        .filter((bar) => {
+            const role = leadRole(timeline, bar.index, CYCLE, true);
+            return role.kind === 'trade' && role.turn === 'drums';
+        })
+        .map((bar) => bar.index);
+    const bandIn = (events: ReturnType<typeof performPass>['events'], bar: number) =>
+        events.some((e) => e.lane === 'bass' && e.bar === bar);
+
+    it("leaves the drummer's four to the drums, even an organ's held chord", () => {
+        expect(drummers.length).toBeGreaterThan(0);
+        for (const seed of ['a', 'b', 'c', 'd']) {
+            const { events } = performPass(
+                timeline,
+                { ...jazz, seed, comp: 'organ' },
+                { pass: CYCLE, looping: true },
+            );
+            for (const index of drummers) {
+                const bar = timeline.bars[index];
+                const end = bar.start + bar.meter.barTicks;
+                const sounding = events.filter(
+                    (e) =>
+                        (e.lane === 'bass' || e.lane === 'comp') &&
+                        e.tick < end &&
+                        e.tick + e.dur > bar.start,
+                );
+                expect(sounding, `seed ${seed} bar ${index}`).toEqual([]);
+                expect(events.some((e) => e.lane === 'lead' && e.bar === index)).toBe(false);
+            }
+        }
+    });
+
+    it('trades only with the lead on, over the whole song, in a style that trades', () => {
+        const cases = [
+            { settings: { ...jazz, lanes: { ...lanes, lead: false } }, window: undefined },
+            { settings: jazz, window: { from: 0, to: 8, wrapTo: 0 } },
+            { settings: { ...jazz, style: 'bossa' as const }, window: undefined },
+        ];
+        for (const { settings, window } of cases) {
+            const { events } = performPass(timeline, settings, {
+                pass: CYCLE,
+                looping: true,
+                window,
+            });
+            const played = drummers.filter((i) => !window || i < window.to);
+            expect(
+                played.every((i) => bandIn(events, i)),
+                settings.style,
+            ).toBe(true);
         }
     });
 });

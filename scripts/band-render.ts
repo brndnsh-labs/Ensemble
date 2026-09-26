@@ -7,8 +7,8 @@
  *
  * `--chart=all --style=all` renders every fixture in every style. `--print=N` prints the
  * first N bars as a grid, for reading a groove without a DAW; `--show=P` prints pass P instead
- * of the first (the lead's head is pass 0, its solo choruses passes 1–3). `--lead` turns the
- * lead on, on its style's instrument or the one named.
+ * of the first (the lead's head is pass 0, its solo choruses passes 1–3, jazz's fours pass 4).
+ * `--lead` turns the lead on, on its style's instrument or the one named.
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';

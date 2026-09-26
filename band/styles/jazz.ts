@@ -17,13 +17,13 @@ import {
     place,
 } from '../players/bass/line.js';
 import { compIdiom, type Hit } from '../players/comp/idiom.js';
-import { drumIdiom } from '../players/drums/kit.js';
-import { dyn, pulses, spanSteps } from '../players/grid.js';
+import { drumIdiom, type Lines } from '../players/drums/kit.js';
+import { barSteps, dyn, pulses, spanSteps } from '../players/grid.js';
 import { leadIdiom } from '../players/lead/idiom.js';
 import { bebopScale, guideTones, restingTones } from '../players/lead/palette.js';
 import { type ChordFacts, fifthOf } from '../theory/chord.js';
 import { mod12 } from '../theory/pitch.js';
-import type { PitchedIdiom, Style } from './types.js';
+import type { BarContext, PitchedIdiom, Style } from './types.js';
 
 // ================================================================ drums
 // The ride carries the time ("spang-spang-a-lang", swung by the feel pass); hi-hat foot
@@ -31,6 +31,92 @@ import type { PitchedIdiom, Style } from './types.js';
 // Swung-eighth offbeats and beat 3 only: the "a" sixteenths would land between triplet
 // positions once the feel pass swings them, and read as flams.
 const JAZZ_COMP_SPOTS = [2, 6, 8, 10, 14];
+
+/**
+ * The drummer's four, bebop style (Max Roach, Philly Joe Jones): a two-beat motif stated,
+ * moved around the kit, developed, then a run home that sets up whoever comes in next. The
+ * hi-hat foot stays on 2 and 4 throughout, so the form is never lost. Swung eighths only,
+ * for the same reason as the comping (a sixteenth would flam once swung).
+ */
+// Two beats of swung eighths, each with an offbeat in it: a quarter-note motif marches.
+const TRADE_MOTIFS = ['xx.x', 'x.xx', 'x..x', '.xxx', 'xxx.', '.x.x', '.xx.'];
+
+function jazzTrade(ctx: BarContext, bar: number, length: number, tier: EnergyTier): Lines {
+    const total = barSteps(ctx.bar);
+    const slotStart = ctx.bar.index - bar;
+    // One motif for the whole four: it is the solo's idea.
+    const motif = ctx.rng(`trade:${ctx.pass}:${slotStart}`, 'song').pick(TRADE_MOTIFS);
+    const rng = ctx.rng('trade');
+    const lines: Record<'snare' | 'tomHigh' | 'tomMid' | 'tomLow' | 'kick' | 'hatPedal', string[]> =
+        {
+            snare: [],
+            tomHigh: [],
+            tomMid: [],
+            tomLow: [],
+            kick: [],
+            hatPedal: [],
+        };
+    for (const line of Object.values(lines)) {
+        line.push(...'.'.repeat(total));
+    }
+    const hit = tier === 'low' ? 'o' : 'x';
+    const last = bar === length - 1;
+    // The bar before the run home develops the idea; the ones between restate it on the toms.
+    const develops = !last && bar > 0 && bar === length - 2;
+    for (let e = 0; e * 2 < total; e++) {
+        const step = e * 2;
+        const half = Math.floor(e / 4);
+        const on = motif[e % 4] === 'x';
+        const accent = on && e % 4 === motif.indexOf('x');
+        if (last && half >= 1) {
+            // The run home: down the toms on the eighths, to a snare-and-kick shot on the "and"
+            // of the last beat; the crash on the next downbeat is the arrival.
+            const place = (step - 8) / Math.max(2, total - 10);
+            const tom = place < 0.34 ? 'tomHigh' : place < 0.67 ? 'tomMid' : 'tomLow';
+            if (step === total - 2) {
+                lines.snare[step] = 'X';
+                lines.kick[step] = 'X';
+            } else if (on || rng.chance(0.6)) {
+                lines[tom][step] = hit;
+            }
+            continue;
+        }
+        if (develops) {
+            // The motif as accents in a stream of eighths, the accents doubled on the kick.
+            lines.snare[step] = on ? 'X' : 'g';
+            if (accent) {
+                lines.kick[step] = 'x';
+            }
+            continue;
+        }
+        if (!on) {
+            // Between the motif's hits the left hand keeps talking, softly, as energy rises.
+            if (rng.chance(tier === 'low' ? 0 : tier === 'mid' ? 0.3 : 0.5)) {
+                lines.snare[step] = 'g';
+            }
+            continue;
+        }
+        if (bar === 0) {
+            // Stated on the snare, answered on the toms.
+            lines[half % 2 === 0 ? 'snare' : 'tomHigh'][step] = accent ? 'X' : hit;
+        } else {
+            // Moved around the kit: high tom, then the low toms answer.
+            lines[half % 2 === 0 ? 'tomHigh' : rng.chance(0.5) ? 'tomMid' : 'tomLow'][step] = accent
+                ? 'X'
+                : hit;
+        }
+        if (accent && rng.chance(0.4)) {
+            lines.kick[step] = 'o';
+        }
+    }
+    // The foot on 2 and 4 (every other beat in any meter).
+    for (let beat = 1; beat * 4 < total; beat += 2) {
+        lines.hatPedal[beat * 4] = 'x';
+    }
+    return Object.fromEntries(
+        Object.entries(lines).map(([piece, line]) => [piece, line.join('')]),
+    ) as Lines;
+}
 
 const jazzDrums = drumIdiom({
     name: 'jazz ride',
@@ -72,6 +158,7 @@ const jazzDrums = drumIdiom({
         const kick = `${'.'.repeat(steps - 2)}x.`;
         return { snare: snare.join(''), kick, ride: 'x'.padEnd(steps, '.') };
     },
+    trade: jazzTrade,
 });
 
 // ================================================================ bass
@@ -468,4 +555,6 @@ export const jazz: Style = {
     comp: { keyboard: jazzKeys, guitar: jazzGuitar },
     prefers: 'piano',
     lead: { idiom: jazzLead, prefers: 'sax' },
+    // After the solos, the horn trades fours with the drummer before the head comes back.
+    trades: true,
 };

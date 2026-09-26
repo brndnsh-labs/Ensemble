@@ -6,7 +6,7 @@
  * hears what the earlier ones played (`heard`), so the comp can answer the lead. That is the whole coordination model: data
  * flowing one way, not a blackboard every lane writes.
  */
-import { fullWindow, type PassWindow, planBars } from './arrange/plan.js';
+import { type BarPlan, fullWindow, type PassWindow, planBars } from './arrange/plan.js';
 import { rng } from './core/random.js';
 import type { BandEvent, BandSettings, DrumHit, Lane, PitchedNote } from './core/types.js';
 import { applyFeel } from './feel/feel.js';
@@ -51,7 +51,11 @@ export function performPass(
     const lead = style.lead?.idiom;
     const leadProfile = LEAD_INSTRUMENTS[settings.lead];
     const window = options.window ?? fullWindow(timeline);
-    const plans = planBars(timeline, settings, { ...options, window });
+    const plans = planBars(timeline, settings, {
+        ...options,
+        window,
+        trades: Boolean(style.trades && lead),
+    });
     const memory: PassMemory = options.memory
         ? { ...options.memory }
         : {
@@ -129,7 +133,8 @@ export function performPass(
 
     const yielded = instrument.family === 'keyboard' ? yieldToLead(events) : events;
     const fermatas = holdFermatas(yielded, timeline, plans);
-    const held = instrument.legato && !comp.percussive ? sustain(fermatas, timeline) : fermatas;
+    const held =
+        instrument.legato && !comp.percussive ? sustain(fermatas, timeline, plans) : fermatas;
     const felt = applyFeel(held, timeline, feelFor(style, instrument.family), {
         ...settings,
         strumMs: instrument.strumMs,
@@ -198,10 +203,12 @@ function yieldToLead(events: BandEvent[]): BandEvent[] {
  * barlines too — the idioms play one bar at a time, so this is done once over the pass. It
  * lets go at an N.C., which is a rest for the whole band.
  */
-function sustain(events: BandEvent[], timeline: Timeline): BandEvent[] {
+function sustain(events: BandEvent[], timeline: Timeline, plans: BarPlan[]): BandEvent[] {
     const strikes = [
         ...new Set(events.filter((e) => e.lane === 'comp' && !e.muted).map((e) => e.tick)),
     ].sort((a, b) => a - b);
+    // A bar the comp sits out (a tacet section, the drummer's four) is silence, not a hold.
+    const tacet = timeline.bars.filter((bar) => plans[bar.index]?.lanes.comp === false);
     const until = new Map<number, number>();
     strikes.forEach((tick, i) => {
         const next = strikes[i + 1];
@@ -209,7 +216,8 @@ function sustain(events: BandEvent[], timeline: Timeline): BandEvent[] {
             return;
         }
         const rest = timeline.spans.find((s) => !s.chord && s.start > tick && s.start < next);
-        until.set(tick, rest ? rest.start : next);
+        const out = tacet.find((bar) => bar.start > tick && bar.start < next);
+        until.set(tick, Math.min(rest ? rest.start : next, out ? out.start : next));
     });
     return events.map((e) => {
         const end = e.lane === 'comp' && !e.muted ? until.get(e.tick) : undefined;

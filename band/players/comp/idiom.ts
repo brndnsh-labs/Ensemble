@@ -160,6 +160,8 @@ export function compIdiom(book: CompBook): PitchedIdiom {
                         !span.fermata &&
                         // The final chord lands on its downbeat, never early.
                         !ctx.next?.plan.ending &&
+                        // Nor into a bar the comp sits out (the drummer's four).
+                        ctx.next?.plan.lanes.comp !== false &&
                         rng.chance(book.push[tier]);
                     if (anticipates && nextFirst?.chord) {
                         target = nextFirst.chord;

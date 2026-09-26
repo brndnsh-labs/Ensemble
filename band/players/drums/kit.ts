@@ -25,6 +25,12 @@ export interface DrumBook {
     timekeeper: DrumPiece[];
     /** How many sixteenths a section fill / phrase fill takes at each tier. */
     fillLength: Record<'phrase' | 'section', Record<EnergyTier, number>>;
+    /**
+     * The drummer's turn in a chorus of fours (`Style.trades`): bar `bar` of a solo `length`
+     * bars long, written over the whole bar in place of the time. Absent, the style doesn't
+     * trade.
+     */
+    trade?(ctx: BarContext, bar: number, length: number, tier: EnergyTier): Lines;
 }
 
 function composeFromCells(ctx: BarContext, tier: EnergyTier, book: DrumBook): Lines {
@@ -97,9 +103,13 @@ export function drumIdiom(book: DrumBook): DrumIdiom {
                 return { events, memory: null };
             }
             const tier = energyTier(plan.energy);
-            let lines = isCommonTime(bar)
-                ? book.groove(ctx, tier)
-                : composeFromCells(ctx, tier, book);
+            const soloing = plan.lead.kind === 'trade' && plan.lead.turn === 'drums';
+            let lines =
+                soloing && book.trade
+                    ? book.trade(ctx, bar.phrase.bar, bar.phrase.length, tier)
+                    : isCommonTime(bar)
+                      ? book.groove(ctx, tier)
+                      : composeFromCells(ctx, tier, book);
             const fillStep = fillStart(ctx, book);
             if (fillStep !== null) {
                 const fill = book.fill(ctx, total - fillStep, ctx.rng('fill'));

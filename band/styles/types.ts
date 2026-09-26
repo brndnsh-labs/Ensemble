@@ -98,4 +98,9 @@ export interface Style {
      * the style has no lead yet and the lane stays silent.
      */
     lead?: { idiom: PitchedIdiom; prefers: LeadInstrument };
+    /**
+     * The lead trades fours with the drummer: a chorus of them before the head comes back
+     * (`arrange/cycle.ts`). The drum idiom plays the drummer's turns (`DrumBook.trade`).
+     */
+    trades?: boolean;
 }

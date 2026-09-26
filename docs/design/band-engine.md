@@ -147,6 +147,20 @@ expression devices take turns rather than stack; one peak note per cycle.
     the head can return.
   - An intro is the band's: the lead enters after it. A section labelled Solo is a solo on any
     pass.
+  - **Trading fours** (`Style.trades`; jazz). After the third solo chorus comes a chorus of
+    fours, then the head: head, solo, solo, solo, fours, head… The chorus's phrase slots
+    alternate between the lead and the drummer, counted back from the last so the drummer
+    always takes the last four and sets up the head. On the drummer's turn the bass, the comp
+    and the lead lay out, and the drum idiom plays a solo in place of the time
+    (`DrumBook.trade`): the jazz drummer states a two-beat motif, moves it around the kit,
+    develops it as accents in a stream of eighths, then runs home down the toms to a shot on
+    the "and" of 4, with the hi-hat foot on 2 and 4 throughout. The band comes back in on a
+    crash. The lead's four are one phrase played through to an arrival, busy and a little
+    high, never the cycle's peak. A practice loop doesn't trade, and neither does a band
+    without its lead.
+  - The cycle is the arrangement's (`arrange/cycle.ts`): the plan carries each bar's lead role
+    (`BarPlan.lead`), so the lead, the drummer and the rhythm section agree on whose turn it
+    is.
 - **Phrases, and the space between them.** Each four-bar phrase of the timeline is a slot the
   lead plays in or rests in. A phrase is planned whole at its first bar and kept in memory, so
   any barline can resume it. Most slots leave room: a phrase plays two or three bars and
