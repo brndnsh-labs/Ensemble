@@ -143,3 +143,30 @@ test('changing the key of a measure-less chart while it plays restarts the band 
     await page.getByRole('button', { name: 'Stop playback', exact: true }).click();
     expect(errors).toEqual([]);
 });
+
+// iOS (16 and older, ringer on silent) plays Web Audio only after a media element has played:
+// Play must start the silent looping track (`unlockAudio` in `public/platform.ts`). Only the old
+// engine's scheduler ever set that track up at load, so deleting it silently lost the unlock.
+test('Play starts the silent audio track that unlocks iOS audio', async ({ page }) => {
+    await page.addInitScript(() => {
+        const w = window as unknown as { __silentPlays: number };
+        w.__silentPlays = 0;
+        const play = HTMLMediaElement.prototype.play;
+        HTMLMediaElement.prototype.play = function (this: HTMLMediaElement) {
+            if (this.src.startsWith('data:audio/wav')) {
+                w.__silentPlays++;
+            }
+            return play.call(this);
+        };
+    });
+    await page.goto(appUrl());
+    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
+    await page.getByRole('button', { name: 'Start playback', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Stop playback', exact: true })).toBeEnabled();
+    await expect
+        .poll(() =>
+            page.evaluate(() => (window as unknown as { __silentPlays: number }).__silentPlays),
+        )
+        .toBeGreaterThan(0);
+    await page.getByRole('button', { name: 'Stop playback', exact: true }).click();
+});

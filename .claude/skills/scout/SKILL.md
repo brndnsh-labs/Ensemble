@@ -85,8 +85,8 @@ This is a client-only PWA: no auth, no payments, no server. The real surface is 
 ### `perf` — performance, *floor-aware*
 Speedups must keep playback glitch-free on weak hardware — a synthetic bench can't hear an audio
 dropout. **The split that decides everything — which side of the audio path is it on?**
-- **Real-time audio path** (`scheduler-core.ts`, the `synth-*.ts` voices, the logic/visualizer
-  workers, `tick-logic`) → **hard brake, never `burndown`.** A regression here is an audible glitch
+- **Real-time audio path** (the band host's scheduling in `prototypes/v2/lib/band-host.ts`, the
+  `synth-*.ts` voices) → **hard brake, never `burndown`.** A regression here is an audible glitch
   or a dropped buffer. File **with the by-ear / weak-device caveat written in**, route to
   `orchestrator-inline` / `musical-engine-implementer` + the matching reviewer, leave off
   `burndown` (often `needs-ear`). Model `frontier` for synth/worker/audio-lifecycle work and open

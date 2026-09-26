@@ -199,7 +199,7 @@ All `public/` source is `.ts`/`.tsx` (migration complete May 2026). `tsconfig.js
 
 ### Critique claims (`band/test/`)
 
-The **Definition of Done** for musicality. Each style's claims (`band/test/claims/<style>.ts`) are statistical ranges the critique harness measures (`band/test/critique.test.ts`); the invariant suite (`band/test/invariants/`) holds every style to the band's laws. When you change a style or a player, run them — never replace a range with a rigid snapshot. `band/CLAUDE.md` has the details. The old engine's critique suite in `tests/standards/` went with it; what remains there are genre and routing guards.
+The **Definition of Done** for musicality. Each style's claims (`band/test/claims/<style>.ts`) are statistical ranges the critique harness measures (`band/test/critique.test.ts`); the invariant suite (in `band/test/`) holds every style to the band's laws. When you change a style or a player, run them — never replace a range with a rigid snapshot. `band/CLAUDE.md` has the details. The old engine's critique suite in `tests/standards/` went with it; what remains there are genre and routing guards, a disco piano critique and the security ledger.
 
 ### Vitest (logic / unit / integration)
 

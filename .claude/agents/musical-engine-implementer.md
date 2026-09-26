@@ -28,16 +28,11 @@ Motif and phrase decisions key off `barIndex`, `sectionId`, `sessionSeed`. Raw `
 ### State-mock override pattern
 When adding a state field that production writes every call, also add a top-level override slot so tests can mock the value without it being clobbered. Read order: `topLevel || nested || default`. See `feedback-state-mock-vs-production-override` in user memory.
 
-### Register slotting
-Bass 23–57. Chords/Harmony 52–84. Soloist priority 60–90 (clamp only below MIDI 52). Verify new generators respect `enforceRegisterSlotting` in `logic-worker.ts`. Don't introduce voices outside these ranges without explicitly extending the slot in `coordination-engine.ts`.
-
-### Coordination context
-- Producer order in `tick-logic.ts:241-362` is soloist → bass → chords/harmony. A consumer reading a field BEFORE its producer runs sees the previous tick's value (or zero).
-- New fields go in `createCoordinationContext` (`coordination-engine.ts`) with both a default value AND a writer in `updateCoordinationContext`.
-- If a field is read by the worker, it must cross `syncWorker` properly. After ANY context-shape change, the `worker-contract-reviewer` runs on the diff — design for that.
+### The band engine
+The musical engine is `band/` (the old worker-based generator was deleted, #1404). Read `band/CLAUDE.md` and `docs/design/band-engine.md` first: register slots (bass 23–57, keyboard comp 52–84), lane order (drums → bass → lead → comp, sharing `heard`), determinism (`rng(seed, …keys)`), and the claims/invariant suite that is the Definition of Done.
 
 ### Direct mutation discipline
-State writes flow through `dispatch(ACTIONS.TYPE, payload)`. The `// @direct-mutation` exception is ONLY for real-time audio hot paths in `scheduler-core.ts` and `synth-*.ts`. Don't use it elsewhere — `state-discipline-reviewer` runs on the diff.
+State writes flow through `dispatch(ACTIONS.TYPE, payload)`. The `// @direct-mutation` exception is ONLY for the sanctioned categories in the root CLAUDE.md (real-time audio in `synth-*.ts`, init-only, detached render clones). Don't use it elsewhere — `state-discipline-reviewer` runs on the diff.
 
 ### Critique tests are the Definition of Done
 Statistical ranges, not binary snapshots. If your change replaces a range with a rigid equality on a generative output, that is almost always wrong — except when the engine is deterministic by construction (bossa-bass, country two-step, blast-beat motifs), in which case strict `===` is correct.

@@ -14,8 +14,8 @@
  * bass one: the obvious fix (give the exporter live's `[0,1]` clamp) turned out
  * to propagate a truncation rather than share a curve, and "match live" is
  * ill-defined for bass because the synth and sampled voices disagree with each
- * other. The reasoning and the measurements live at the bass branch in
- * `_writeNotesToTrack` (`midi-worker-logic.ts`).
+ * other. (The old engine's `.mid` exporter, where that reasoning lived, was deleted with it,
+ * #1404.)
  *
  * #1331 closed that gap from the other end: rather than teaching the exporter
  * live's truncation, live dropped it. The bass velocity **domain** is now

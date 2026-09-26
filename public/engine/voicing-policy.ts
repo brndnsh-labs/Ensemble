@@ -1,7 +1,7 @@
 import type { EnsembleState } from '../types.js';
 
 // Keyed by the runtime `groove.genreFeel` (smart-genres.ts `feel`), never a UI
-// genre name — pinned by tests/standards/genre-feel-canon-guard.test.ts (#1208).
+// genre name (#1208).
 // #1208: 'Swing' removed — never a canonical feel (Jazz carries the swing
 // idiom), so the key could never match and was dead weight, not behavior.
 const BASS_SPACE_FEELS = new Set([
@@ -25,8 +25,8 @@ const BASS_SPACE_FEELS = new Set([
     //      triads (major or minor) keep their root. (#1216 originally also sent
     //      plain minor triads rootless with an invented b7, Am -> "Am7" = C-E-G;
     //      #1313 reversed that for every feel here — see shouldUseRootlessVoicing.)
-    //      Two knock-ons, both already accepted for the six feels above:
-    //      `shouldPreferGroundedVoicing` re-admits the
+    //      Two knock-ons, both already accepted for the six feels above: the old
+    //      engine's grounded-voicing rule re-admitted the
     //      root on identity-losing qualities (halfdim/dim/alt) for Reggae, and
     //      the soloist's voicing-derived `chordMask` treats the root as a
     //      non-chord-tone on 7th-family chords — see engine/CLAUDE.md #6; bend

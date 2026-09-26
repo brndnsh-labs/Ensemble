@@ -170,10 +170,8 @@ function isSafeSectionId(id: unknown): id is string {
  * Deliberately NOT null-prototyped, though that is the reflex the rest of this
  * file would suggest. It would be theatre here: this map's prototype is rebuilt as
  * a plain object twice over before any consumer sees it — `grooveReducer` assigns a
- * fresh `{}` on `SET_SONG_SEED` (which `state-effects.ts` fires on the FIRST
- * `TOGGLE_PLAY`, because `randomizeSeed` defaults true) and on `RESET_STATE`, and
- * `toRaw` in `worker-client.ts` copies every synced object into a plain `{}` before
- * `postMessage`. A null prototype would also silently drop the field out of
+ * fresh `{}` on `SET_SONG_SEED` (which the runtime fires on the first play, because
+ * `randomizeSeed` defaults true) and on `RESET_STATE`. A null prototype would also silently drop the field out of
  * deepsignal's reactive graph, since its proxy predicate is
  * `SUPPORTED.has(value.constructor)` and a null-prototype object has no
  * `.constructor`.

@@ -439,9 +439,6 @@ export const STYLE_CONFIG: Record<string, StyleConfig> = Object.keys(STYLE_OVERR
  * Keys are FEELS. The two that diverge from their picker name ('Bossa Nova',
  * 'Ska') are reconciled by the naming authority in `data/smart-genres.ts` — see
  * the GENRE-NAMING AUTHORITY block there rather than restating the alias here.
- *
- * Exported for the #1130 genreFeel-routing completeness guard
- * (tests/standards/genre-feel-canon-guard.test.ts).
  */
 const GENRE_STYLE_MAPPING: Record<string, string> = {
     Rock: 'rock',
