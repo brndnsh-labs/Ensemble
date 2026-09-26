@@ -2,7 +2,7 @@
 name: done
 description: Ship a Ensemble story — commit the reviewed work, push, open a PR that Closes #<n>, and (for a safe story) queue server-side auto-merge; a judgment-call story's PR is left for Brandon's manual merge. Done = the issue closes on merge. Plan-first. Usage `/done #<n>`. Use after /review (+ /patch) pass clean.
 ---
-<!-- cycle:rendered template=skills/done.md.tmpl hash=8ae8b449b55c — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/done.md.tmpl hash=c0ef7c9733a9 — managed by the-cycle; edit the template, not this file -->
 
 # /done #<n> — ship a story
 
@@ -66,7 +66,7 @@ the exact commit, PR, CI, and merge commands governed by §6/§8.
     truthful: `gh issue edit "<n>" --remove-label "status:ready,status:in-progress,status:in-review,status:needs-decision,status:needs-ear,status:blocked" && gh issue edit "<n>" --add-label "status:in-review"`.
 11. **Post a one-line issue comment** linking the PR: `gh issue comment "<n>" --body "<text>"`
 12. **Land it — the auto-merge decision (§5 + §6):**
-    - **Safe story** — none of §5's always-brake classes (Track `synth` and genuinely-subjective musical work (no critique-test oracle for the idiom, the Needs-ear stop), destructive data ops (drops/rewrites persisted sessions, share-URL schema, preset data, or a state-slice migration that breaks saved state), the state/worker contract (a `@direct-mutation` outside the sanctioned categories, a half-synced worker field)) → **queue the
+    - **Safe story** — none of §5's always-brake classes (Track `synth` and genuinely-subjective musical work (no critique-test oracle for the idiom, the Needs-ear stop), destructive data ops (drops/rewrites persisted sessions, share-URL schema, preset data, or a state-slice migration that breaks saved state), the state contract (a `@direct-mutation` outside the sanctioned categories)) → **queue the
       server-side merge** (§6). No polling, no background job: the forge holds it until the
       required checks pass.
       ```bash

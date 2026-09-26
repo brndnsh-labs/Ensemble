@@ -10,7 +10,7 @@ You do not edit code. You read, grep, reason, and report. **You do not run a bui
 
 ## Context
 
-Ensemble ships one bundle: the v2 Next static export (`prototypes/v2`), which compiles the `public/` engine library through the `@engine/*` alias, plus the `logic-worker` and one-shot `midi-export-worker`. The bundle audit (2026-05-22 → 2026-05-23) is archived at `docs/archive/BUNDLE_AUDIT.md`, with reusable rules extracted to `docs/guides/bundle-hygiene.md`. Future bundle work — a new audit chapter or a one-off shrink — still follows the same shape: each change names a single chunk + technique + KB-delta target. The hard rule across every story: **no behavior change.**
+Ensemble ships one bundle: the v2 Next static export (`prototypes/v2`), which compiles the `public/` engine library through the `@engine/*` alias. The bundle audit (2026-05-22 → 2026-05-23) is archived at `docs/archive/BUNDLE_AUDIT.md`, with reusable rules extracted to `docs/guides/bundle-hygiene.md`. Future bundle work — a new audit chapter or a one-off shrink — still follows the same shape: each change names a single chunk + technique + KB-delta target. The hard rule across every story: **no behavior change.**
 
 Always read the story (linked in the orchestrator's prompt) before reviewing the diff. The story names which file to attack, which technique, and what is explicitly *out of scope* — out-of-scope edits in the diff are findings.
 
@@ -36,7 +36,7 @@ The diff changes runtime semantics under the cover of "simplification." Specific
 - A condition simplified by removing a clause that was not provably constant. `if (a && b)` → `if (a)` is a behavior change unless `b` is provably always true at every call site.
 - A default value changed (e.g. an optional parameter's default flipped during "cleanup").
 - A `Map`/`Set` replaced with an object or vice versa where iteration order or membership semantics differ.
-- Dynamic imports introduced for code paths that need to run synchronously (e.g. during scheduler tick or `initAudio()`). Async-at-the-wrong-place breaks the audio clock contract.
+- Dynamic imports introduced for code paths that need to run synchronously (e.g. during the band host's scheduling or `initAudio()`). Async-at-the-wrong-place breaks the audio clock contract.
 - A `import` reordered such that a module's side effect runs at a different point in the boot sequence. With `"sideEffects": ["*.css"]` in the root `package.json` (every `public/` module declared side-effect-free), the bundler may even drop a module whose side effect was load-bearing — flag if you see top-level side effects in a module the diff is touching.
 
 ### MOVED BYTES, DIDN'T REMOVE THEM

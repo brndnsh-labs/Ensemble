@@ -2,7 +2,7 @@
 name: cycle
 description: Run the full Ensemble story loop on one issue or a chain — composes /implement → /review → /patch → /done (→ optional /deploy-test), interrupting only on a judgment call. Usage `/cycle #<n>` · `/cycle next` · `/cycle next --until-blocked` · add `--deploy`.
 ---
-<!-- cycle:rendered template=skills/cycle.md.tmpl hash=bd93e932d8c3 — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/cycle.md.tmpl hash=32b1225f70cd — managed by the-cycle; edit the template, not this file -->
 
 # /cycle — full loop on one story or a chain
 
@@ -23,7 +23,7 @@ absent.** It expands §6/§8's delivery mechanics without displacing DOCTRINE's 
 **Interrupt Brandon only when you hit a judgment call** — something you can't responsibly
 decide yourself. Run hands-off for self-contained, gate-verifiable, non-destructive work. When a
 judgment call surfaces you stop *there*, at the decision — not pre-emptively. The always-brake set
-is §5: Track `synth` and genuinely-subjective musical work (no critique-test oracle for the idiom, the Needs-ear stop), destructive data ops (drops/rewrites persisted sessions, share-URL schema, preset data, or a state-slice migration that breaks saved state), the state/worker contract (a `@direct-mutation` outside the sanctioned categories, a half-synced worker field). Surface those even when the cycle could proceed. Everything else runs
+is §5: Track `synth` and genuinely-subjective musical work (no critique-test oracle for the idiom, the Needs-ear stop), destructive data ops (drops/rewrites persisted sessions, share-URL schema, preset data, or a state-slice migration that breaks saved state), the state contract (a `@direct-mutation` outside the sanctioned categories). Surface those even when the cycle could proceed. Everything else runs
 unattended.
 
 ## Forms
@@ -123,7 +123,7 @@ from a reviewer without parsing actual findings — empty findings is valid, *mi
 
 Read the issue's `track:*` label; it sets the loop's tail:
 - **musical** → DoD is the **critique test** (run it, read the Critique Report); reviewer
-  `music-theory-reviewer` (+ state/worker if those changed). Safe → auto-merge on green.
+  `music-theory-reviewer` (+ `state-discipline-reviewer` if state changed). Safe → auto-merge on green.
 - **synth** → DoD is a **human listen on the deployed test build**; reviewer `synth-graph-reviewer`
   (graph hygiene only). Pick these up freely — the loop runs the same as any other Track right up
   to the gate. `/done` builds + opens the PR, then **deploys the branch to test** (`/deploy-test`,

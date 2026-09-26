@@ -1,8 +1,8 @@
 ---
 name: review
-description: Review the current uncommitted Ensemble diff. Inspects git status + diff --stat to route reviewers — an inline correctness pass for any non-trivial change, plus `/security-review` whenever the diff touches an always-brake surface (Track `synth` and genuinely-subjective musical work (no critique-test oracle for the idiom, the Needs-ear stop), destructive data ops (drops/rewrites persisted sessions, share-URL schema, preset data, or a state-slice migration that breaks saved state), the state/worker contract (a `@direct-mutation` outside the sanctioned categories, a half-synced worker field)), and optionally a second-model angle on a meaty diff. Presents the reviewer plan before running. Does NOT change Status — review happens within status:in-progress. Use after /implement, before /done.
+description: Review the current uncommitted Ensemble diff. Inspects git status + diff --stat to route reviewers — an inline correctness pass for any non-trivial change, plus `/security-review` whenever the diff touches an always-brake surface (Track `synth` and genuinely-subjective musical work (no critique-test oracle for the idiom, the Needs-ear stop), destructive data ops (drops/rewrites persisted sessions, share-URL schema, preset data, or a state-slice migration that breaks saved state), the state contract (a `@direct-mutation` outside the sanctioned categories)), and optionally a second-model angle on a meaty diff. Presents the reviewer plan before running. Does NOT change Status — review happens within status:in-progress. Use after /implement, before /done.
 ---
-<!-- cycle:rendered template=skills/review.md.tmpl hash=7070ec5a5572 — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/review.md.tmpl hash=e7c5d8c38caa — managed by the-cycle; edit the template, not this file -->
 
 # /review — review the uncommitted tree
 
@@ -36,7 +36,7 @@ story stays `status:in-progress` through review and patch.
    | Any non-trivial code change | the **inline correctness pass** — the orchestrator reviews the diff itself, across the angles a heavyweight reviewer would cover (logic, edges, error paths, contracts, invariants). Match depth to risk. Tests **alongside** prod code stay supporting cast — review the behavior change; the prod diff is the subject. **Plus the spec axis** (below), reported separately. |
    | **Track `synth` and genuinely-subjective musical work (no critique-test oracle for the idiom, the Needs-ear stop)** | **`/security-review`** *in addition* — non-optional here (§5). Reason about this flow's specific threat model, not just generic categories. |
    | **destructive data ops (drops/rewrites persisted sessions, share-URL schema, preset data, or a state-slice migration that breaks saved state)** | **`/security-review`** *in addition* — non-optional here (§5). Reason about this flow's specific threat model, not just generic categories. |
-   | **the state/worker contract (a `@direct-mutation` outside the sanctioned categories, a half-synced worker field)** | **`/security-review`** *in addition* — non-optional here (§5). Reason about this flow's specific threat model, not just generic categories. |
+   | **the state contract (a `@direct-mutation` outside the sanctioned categories)** | **`/security-review`** *in addition* — non-optional here (§5). Reason about this flow's specific threat model, not just generic categories. |
    | A **test-only** diff | the **test-quality lens** (below) — the tests *are* the deliverable. |
    | A meaty diff built by the default model | optionally a **second-model angle** (below). |
    | Docs only (`*.md`) and/or config, no application code | the **editorial lens** (below) — never "skipping review." |
@@ -87,10 +87,10 @@ story stays `status:in-progress` through review and patch.
    - `prototypes/v2/CLAUDE.md` — the app: delivery, trust boundaries, per-surface ownership,
      verification gates.
    - `band/CLAUDE.md` — the band engine: its design laws, claims and critique harness.
-   - `public/CLAUDE.md` — effects/reactivity, practice-loop step framing, build identity and
-     build-time flags.
+   - `public/CLAUDE.md` — effects/reactivity, offline-render clones, build identity and
+     build-time flags, the metronome product constraint, config-semantics migrations.
    - `public/engine/CLAUDE.md` — the voices, sample packs and the audio graph.
-   - `tests/CLAUDE.md` — critique-harness shape, determinism/seeding, mocking, Playwright imports.
+   - `tests/CLAUDE.md` — statistical-claim traps, determinism/seeding, mocking, Playwright imports.
 
    ### Weighing a finding from these reviewers
 

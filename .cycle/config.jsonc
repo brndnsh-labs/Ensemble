@@ -83,7 +83,7 @@
     "milestones": []
   },
   "routing": {
-    "model": "`frontier` | `balanced` | `economy` via the `model/*` label (default `frontier` when untagged). The labels are provider-neutral routing tiers: `frontier` = Codex Sol / Claude Opus for ambiguous design, independent diagnosis, §5 brake surfaces, and deceptively complex concurrency or state/worker work; `balanced` = Codex Terra / Claude Sonnet for bounded but non-trivial implementation, including critique-test-verifiable musical work; `economy` = Codex Luna / Claude Haiku for precise, safe, S-sized mechanical work with an existing test seam and centralized verification. **Model never gates autonomy** (§5) — it only picks the executor's model.",
+    "model": "`frontier` | `balanced` | `economy` via the `model/*` label (default `frontier` when untagged). The labels are provider-neutral routing tiers: `frontier` = Codex Sol / Claude Opus for ambiguous design, independent diagnosis, §5 brake surfaces, and deceptively complex concurrency or state work; `balanced` = Codex Terra / Claude Sonnet for bounded but non-trivial implementation, including critique-test-verifiable musical work; `economy` = Codex Luna / Claude Haiku for precise, safe, S-sized mechanical work with an existing test seam and centralized verification. **Model never gates autonomy** (§5) — it only picks the executor's model.",
     "executor_default": "orchestrator-inline"
   },
   "gates": {
@@ -113,7 +113,7 @@
   "brakes": [
     "Track `synth` and genuinely-subjective musical work (no critique-test oracle for the idiom, the Needs-ear stop)",
     "destructive data ops (drops/rewrites persisted sessions, share-URL schema, preset data, or a state-slice migration that breaks saved state)",
-    "the state/worker contract (a `@direct-mutation` outside the sanctioned categories, a half-synced worker field)"
+    "the state contract (a `@direct-mutation` outside the sanctioned categories)"
   ],
   "branch": {
     // main is server-protected, and unlike every other repo in this fleet that is

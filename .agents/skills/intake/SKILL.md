@@ -2,7 +2,7 @@
 name: intake
 description: The front door to the backlog — turn a plain-English idea into an actionable Ensemble issue. Interviews Brandon in frontier rounds — every question askable now, each led by a recommended answer — until the issue is genuinely implementable, then drafts it, classifies it, and files it. Plan-first — always shows the shaped issue before writing. Shares /scout's filing mechanics (DOCTRINE §10). Usage `/intake <the idea>` (or bare, and it'll ask).
 ---
-<!-- cycle:rendered template=skills/intake.md.tmpl hash=1b7b3999dc7d — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/intake.md.tmpl hash=9e8bf5597606 — managed by the-cycle; edit the template, not this file -->
 
 # /intake — turn an idea into an actionable issue
 
@@ -72,7 +72,7 @@ and wait for the reply.
    - **Acceptance — the load-bearing one.** What does "done" look like, verifiably? If that's
      fuzzy, this is the question to ask.
    - **Scope boundary** — what's explicitly *not* in this? Keeps it small and stops creep.
-   - **Does it touch a §5 always-brake surface** (Track `synth` and genuinely-subjective musical work (no critique-test oracle for the idiom, the Needs-ear stop), destructive data ops (drops/rewrites persisted sessions, share-URL schema, preset data, or a state-slice migration that breaks saved state), the state/worker contract (a `@direct-mutation` outside the sanctioned categories, a half-synced worker field))? If so, say so plainly in the
+   - **Does it touch a §5 always-brake surface** (Track `synth` and genuinely-subjective musical work (no critique-test oracle for the idiom, the Needs-ear stop), destructive data ops (drops/rewrites persisted sessions, share-URL schema, preset data, or a state-slice migration that breaks saved state), the state contract (a `@direct-mutation` outside the sanctioned categories))? If so, say so plainly in the
      drafted body — it still files normally, but `/cycle` will pause there for a human call
      regardless of how the issue reads.
    - **Is it actually a decision, not a task** (no work happens until a direction is picked)? If

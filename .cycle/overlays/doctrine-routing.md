@@ -3,20 +3,21 @@ of Done and the reviewer set:
 
 | Track | DoD | Reviewer | Merge |
 | --- | --- | --- | --- |
-| **musical** | a critique test in `tests/standards/` (statistical ranges, an automated oracle) | `music-theory-reviewer` | auto-merge on green; audible-but-theory-provable work ships `verify-by-ear` (§5); only genuinely-subjective feel is a `status:needs-ear` hard stop |
+| **musical** | the style's critique claims in `band/test/claims/<style>.ts`, measured by `band/test/critique.test.ts` (statistical ranges, an automated oracle) | `music-theory-reviewer` | auto-merge on green; audible-but-theory-provable work ships `verify-by-ear` (§5); only genuinely-subjective feel is a `status:needs-ear` hard stop |
 | **synth** | a human listen on the deployed test build — `/done` deploys the branch to test and runs the verdict check-in right there, no automated oracle | `synth-graph-reviewer` (graph hygiene only, not "does it sound good") | **always `status:needs-ear`** at the merge gate — "Works" merges immediately, "Haven't checked" parks it |
 | **bundle** | a measured KB delta (the v2 export, `prototypes/v2/out/_next/static/`) **and** the full suite green (behavior-preserving) | `bundle-hygiene-reviewer` | auto-merge on green |
 | **ui** | the v2 suite + `npm run typecheck` green, no new generative behavior/synth voice/bundle-shrink claim | `state-discipline-reviewer` if it touches state, else `/code-review` | auto-merge on green; pair with `verify-by-ear` if it routes audible voices (routing an already-approved voice isn't itself a synth hard stop) |
 
 **Executors** (`agent/*`, sanity-checked against what the issue touches):
-- `musical-engine-implementer` — generative engine behavior (`public/engine/**`,
-  `public/state/**` engine slices); follows the repo's musical patterns (final-stage
-  multiplier, deterministic phrasing, register slotting, coordination-context discipline).
+- `musical-engine-implementer` — band engine behavior (`band/**`: styles, players, feel,
+  theory); follows the repo's musical patterns (final-stage
+  multiplier, deterministic phrasing, register slotting).
 - `critique-test-author` — when the deliverable **is** a new/tightened critique test
   (not a one-line threshold bump an engine implementer can do inline).
 - `orchestrator-inline` — default for frontier/small/taste stories, for audio-DSP/synthesis
-  voices (`synth-*.ts`, `initAudio()`, `reverb.ts`, `synth-utils.ts`, scheduler audio-graph
-  wiring), and for finicky infra (state-slice schema, worker sync contract, hydration) —
+  voices (`synth-*.ts`, `initAudio()`, `reverb.ts`, `synth-utils.ts`, the band host's
+  scheduling in `prototypes/v2/lib/band-host.ts`), and for finicky infra (state-slice schema,
+  hydration, the account/sync contract) —
   anywhere a cold agent re-derives brittle detail and ships latent bugs.
 - `claude` — general UI, non-engine `public/**`, mechanical work.
 

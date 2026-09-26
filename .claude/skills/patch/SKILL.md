@@ -2,7 +2,7 @@
 name: patch
 description: Address /review findings on the uncommitted Ensemble diff. Reads the most-recent review output from context, triages (fix-now is the DEFAULT for any finding about this diff — P0/P1/bounded-P2; escalate to Brandon if it needs a decision or is too big), presents a fix plan, then patches inline — no agent spawn, the orchestrator already holds the diff + findings. Re-runs the gates after. Use after /review, before /done. Plan-first.
 ---
-<!-- cycle:rendered template=skills/patch.md.tmpl hash=b340c6db7a60 — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/patch.md.tmpl hash=ccc94282e689 — managed by the-cycle; edit the template, not this file -->
 
 # /patch — address reviewer findings
 
@@ -23,7 +23,7 @@ stays in progress.
    | Triage | Criteria | Action |
    |---|---|---|
    | **Fix now (DEFAULT)** | Any finding about the diff under review — P0, P1, **or a bounded P2** (mechanical, or a small/localized change). This is the default, not the exception. | patch inline this turn |
-   | **Escalate to Brandon** | A real finding that (a) needs a design call (§5 — Track `synth` and genuinely-subjective musical work (no critique-test oracle for the idiom, the Needs-ear stop), destructive data ops (drops/rewrites persisted sessions, share-URL schema, preset data, or a state-slice migration that breaks saved state), the state/worker contract (a `@direct-mutation` outside the sanctioned categories, a half-synced worker field), or any genuinely ambiguous call), or (b) is large / cross-cutting / would balloon the diff | stop; surface it; **on Brandon's nod** open a `finding` issue (`gh issue create --title "<title>" --body "<body>" --label "finding"`) and/or recommend `/implement #<n>` with a fix-focused prompt — **never silently shelve a real finding** |
+   | **Escalate to Brandon** | A real finding that (a) needs a design call (§5 — Track `synth` and genuinely-subjective musical work (no critique-test oracle for the idiom, the Needs-ear stop), destructive data ops (drops/rewrites persisted sessions, share-URL schema, preset data, or a state-slice migration that breaks saved state), the state contract (a `@direct-mutation` outside the sanctioned categories), or any genuinely ambiguous call), or (b) is large / cross-cutting / would balloon the diff | stop; surface it; **on Brandon's nod** open a `finding` issue (`gh issue create --title "<title>" --body "<body>" --label "finding"`) and/or recommend `/implement #<n>` with a fix-focused prompt — **never silently shelve a real finding** |
    | **New idea** | A genuinely *new* idea/feature surfaced during review — not a flaw in this code | **note it to Brandon**; don't open an issue unprompted |
 
    **Bias to fix now.** Deferring a real finding to a list is the thing we're eliminating — the

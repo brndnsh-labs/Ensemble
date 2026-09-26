@@ -1,4 +1,4 @@
-<!-- cycle:rendered template=DOCTRINE.md.tmpl hash=cd0cf4306100 — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=DOCTRINE.md.tmpl hash=98e00d6d78f1 — managed by the-cycle; edit the template, not this file -->
 # Pipeline doctrine (shared)
 
 Single source of truth for the rules the Ensemble work-loop skills share. A skill that says
@@ -85,11 +85,11 @@ skill at `/cycle` time, from what the diff actually touches, not at filing time.
   surfaces last night's finds freshest-first.
 - **`area:*`** — surface tags inferring the executor when `agent/*` is unset:
   `area:soloist`, `area:bass`, `area:drums`, `area:chords`, `area:harmony`,
-  `area:groove`, `area:synth`, `area:state`, `area:worker`, `area:ui`, `area:infra`.
+  `area:groove`, `area:synth`, `area:state`, `area:ui`, `area:infra`.
 
 ## §3 Routing
 
-- **Model:** `frontier` | `balanced` | `economy` via the `model/*` label (default `frontier` when untagged). The labels are provider-neutral routing tiers: `frontier` = Codex Sol / Claude Opus for ambiguous design, independent diagnosis, §5 brake surfaces, and deceptively complex concurrency or state/worker work; `balanced` = Codex Terra / Claude Sonnet for bounded but non-trivial implementation, including critique-test-verifiable musical work; `economy` = Codex Luna / Claude Haiku for precise, safe, S-sized mechanical work with an existing test seam and centralized verification. **Model never gates autonomy** (§5) — it only picks the executor's model.
+- **Model:** `frontier` | `balanced` | `economy` via the `model/*` label (default `frontier` when untagged). The labels are provider-neutral routing tiers: `frontier` = Codex Sol / Claude Opus for ambiguous design, independent diagnosis, §5 brake surfaces, and deceptively complex concurrency or state work; `balanced` = Codex Terra / Claude Sonnet for bounded but non-trivial implementation, including critique-test-verifiable musical work; `economy` = Codex Luna / Claude Haiku for precise, safe, S-sized mechanical work with an existing test seam and centralized verification. **Model never gates autonomy** (§5) — it only picks the executor's model.
 - **Executor:** **`orchestrator-inline` by default** — the main thread builds directly,
   keeping accumulated context. **Spawn parallel agents only for
   independent mechanical work** (the same change across several files); keep shared-file edits
@@ -99,7 +99,7 @@ skill at `/cycle` time, from what the diff actually touches, not at filing time.
     itself (logic, edges, error paths, contracts, invariants). The heavyweight `/code-review` is
     **human-triggered** — the loop cannot invoke it; offer it on a large or risky diff and leave
     the call to Brandon.
-  - **`/security-review`** — **additionally**, whenever the diff touches Track `synth` and genuinely-subjective musical work (no critique-test oracle for the idiom, the Needs-ear stop), destructive data ops (drops/rewrites persisted sessions, share-URL schema, preset data, or a state-slice migration that breaks saved state), the state/worker contract (a `@direct-mutation` outside the sanctioned categories, a half-synced worker field).
+  - **`/security-review`** — **additionally**, whenever the diff touches Track `synth` and genuinely-subjective musical work (no critique-test oracle for the idiom, the Needs-ear stop), destructive data ops (drops/rewrites persisted sessions, share-URL schema, preset data, or a state-slice migration that breaks saved state), the state contract (a `@direct-mutation` outside the sanctioned categories).
   - A **second-model angle** (a different model family or tier from the implementer) is a cheap
     way to catch same-prior blind spots on a meaty diff.
 
@@ -108,20 +108,21 @@ of Done and the reviewer set:
 
 | Track | DoD | Reviewer | Merge |
 | --- | --- | --- | --- |
-| **musical** | a critique test in `tests/standards/` (statistical ranges, an automated oracle) | `music-theory-reviewer` | auto-merge on green; audible-but-theory-provable work ships `verify-by-ear` (§5); only genuinely-subjective feel is a `status:needs-ear` hard stop |
+| **musical** | the style's critique claims in `band/test/claims/<style>.ts`, measured by `band/test/critique.test.ts` (statistical ranges, an automated oracle) | `music-theory-reviewer` | auto-merge on green; audible-but-theory-provable work ships `verify-by-ear` (§5); only genuinely-subjective feel is a `status:needs-ear` hard stop |
 | **synth** | a human listen on the deployed test build — `/done` deploys the branch to test and runs the verdict check-in right there, no automated oracle | `synth-graph-reviewer` (graph hygiene only, not "does it sound good") | **always `status:needs-ear`** at the merge gate — "Works" merges immediately, "Haven't checked" parks it |
 | **bundle** | a measured KB delta (the v2 export, `prototypes/v2/out/_next/static/`) **and** the full suite green (behavior-preserving) | `bundle-hygiene-reviewer` | auto-merge on green |
 | **ui** | the v2 suite + `npm run typecheck` green, no new generative behavior/synth voice/bundle-shrink claim | `state-discipline-reviewer` if it touches state, else `/code-review` | auto-merge on green; pair with `verify-by-ear` if it routes audible voices (routing an already-approved voice isn't itself a synth hard stop) |
 
 **Executors** (`agent/*`, sanity-checked against what the issue touches):
-- `musical-engine-implementer` — generative engine behavior (`public/engine/**`,
-  `public/state/**` engine slices); follows the repo's musical patterns (final-stage
-  multiplier, deterministic phrasing, register slotting, coordination-context discipline).
+- `musical-engine-implementer` — band engine behavior (`band/**`: styles, players, feel,
+  theory); follows the repo's musical patterns (final-stage
+  multiplier, deterministic phrasing, register slotting).
 - `critique-test-author` — when the deliverable **is** a new/tightened critique test
   (not a one-line threshold bump an engine implementer can do inline).
 - `orchestrator-inline` — default for frontier/small/taste stories, for audio-DSP/synthesis
-  voices (`synth-*.ts`, `initAudio()`, `reverb.ts`, `synth-utils.ts`, scheduler audio-graph
-  wiring), and for finicky infra (state-slice schema, worker sync contract, hydration) —
+  voices (`synth-*.ts`, `initAudio()`, `reverb.ts`, `synth-utils.ts`, the band host's
+  scheduling in `prototypes/v2/lib/band-host.ts`), and for finicky infra (state-slice schema,
+  hydration, the account/sync contract) —
   anywhere a cold agent re-derives brittle detail and ships latent bugs.
 - `claude` — general UI, non-engine `public/**`, mechanical work.
 
@@ -170,9 +171,9 @@ zsh: an unquoted `$cmd` holding a command string never word-splits, so a loop ov
 exits 127 on every one — "never ran", which a piped `tail` reports as a pass.
 
 **Track-specific DoD on top of the gates:**
-- **musical** → run the matching critique test
-  (`npx vitest run tests/standards/<…>-critique.test.ts`) and read its Critique Report
-  for balance. A new musical bias without a passing critique test is not done.
+- **musical** → run the band critique for the style
+  (`npx vitest run band/test/critique.test.ts -t <style>`) and read its report for balance.
+  A new musical bias without a passing critique claim is not done.
 - **synth** → the human listen on the deployed test build IS the gate — `/done` deploys
   the branch at the gate itself, not a local harness.
 - **bundle** → a measured KB delta **and** the full suite green.
@@ -201,7 +202,7 @@ executor's model. What gates a pause is a **judgment call**.
 **Stop and surface — the always-brake set:**
 - **Track `synth` and genuinely-subjective musical work (no critique-test oracle for the idiom, the Needs-ear stop)** — Brandon wants to *see* these even when the cycle could proceed.
 - **destructive data ops (drops/rewrites persisted sessions, share-URL schema, preset data, or a state-slice migration that breaks saved state)** — Brandon wants to *see* these even when the cycle could proceed.
-- **the state/worker contract (a `@direct-mutation` outside the sanctioned categories, a half-synced worker field)** — Brandon wants to *see* these even when the cycle could proceed.
+- **the state contract (a `@direct-mutation` outside the sanctioned categories)** — Brandon wants to *see* these even when the cycle could proceed.
 - A review finding needs a **design decision**, is **P0**, or **contradicts a memory note**.
 - An **implementation choice is genuinely ambiguous** with no obvious default — surface options +
   a recommendation, don't guess.
@@ -419,25 +420,22 @@ through that path — same target and arguments, with no weakened authentication
 that retry fails, `gh` is unauthenticated, the API rejects the authenticated request, or no allowed
 escalation path exists. Never loop, guess tracker state, or substitute cached data.
 
-- **Routing is all labels, in one namespace-per-dimension scheme** (the Projects v2 board was
-  retired 2026-08-05; before that the first three lived as board fields, and under Forgejo
-  before that they were label namespaces again):
+- **Routing is all labels, in one namespace-per-dimension scheme:**
   - `status:*` — loop state, one at a time: `status:ready` · `status:in-progress` ·
     `status:in-review` · `status:needs-decision` · `status:needs-ear` · `status:blocked`.
     Written with `gh issue edit`; every write clears the whole set first, so they can't overlap.
   - `track:*` — musical · synth · bundle · ui. **The load-bearing routing dimension here**: it
     picks the DoD, reviewer, and merge behavior (see doctrine-routing).
-  - `lens:*` — code-review · music-theory · synth-graph · state-discipline · worker-contract ·
-    bundle-hygiene · test-quality · practice-ux · audio-stems-reviewer · both.
+  - `lens:*` — code-review · music-theory · synth-graph · state-discipline · bundle-hygiene ·
+    test-quality · practice-ux · audio-stems-reviewer · both.
   - Static attributes, unchanged: `size/*`, `model/*`, `agent/*`, `area:*`, plus the bare
     `backlog` · `finding` · `bug` · `burndown` · `verify-by-ear` markers. `/next`'s size
     tiebreak reads the `size/*` label.
   - Every one of these is read straight off `gh issue list --json labels` — **one call returns
     the work and all of its routing.** A label that doesn't exist in the repo makes `gh` fail
-    loudly, which is the intended behavior: the board it replaced misrouted in silence.
-- **There is no "not on the board" state any more.** An open issue is in the queue by
-  definition; the only question is whether it carries a `status:*` label yet. One with none is
-  the untriaged pile, not a lost item.
+    loudly, which is the intended behavior.
+- An open issue is in the queue by definition; the only question is whether it carries a
+  `status:*` label yet. One with none is the untriaged pile, not a lost item.
 - The real done-signal is `issue close`. There is no `status:done` — a closed issue is what
   means shipped here, and a second marker would only go stale against it.
 - **Issue numbers are continuous across the Forgejo era, up to #935.** Ensemble began on

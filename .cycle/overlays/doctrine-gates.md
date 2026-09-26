@@ -16,9 +16,9 @@ zsh: an unquoted `$cmd` holding a command string never word-splits, so a loop ov
 exits 127 on every one — "never ran", which a piped `tail` reports as a pass.
 
 **Track-specific DoD on top of the gates:**
-- **musical** → run the matching critique test
-  (`npx vitest run tests/standards/<…>-critique.test.ts`) and read its Critique Report
-  for balance. A new musical bias without a passing critique test is not done.
+- **musical** → run the band critique for the style
+  (`npx vitest run band/test/critique.test.ts -t <style>`) and read its report for balance.
+  A new musical bias without a passing critique claim is not done.
 - **synth** → the human listen on the deployed test build IS the gate — `/done` deploys
   the branch at the gate itself, not a local harness.
 - **bundle** → a measured KB delta **and** the full suite green.
