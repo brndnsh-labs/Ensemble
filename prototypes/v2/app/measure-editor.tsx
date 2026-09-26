@@ -12,7 +12,6 @@ import type {
     SemanticScore,
 } from '@engine/songbook/score-types';
 import { type Ref, useEffect, useId, useImperativeHandle, useRef, useState } from 'react';
-import { BAND_ENGINE } from '../lib/engine-mode';
 import { applyMeasureForm, type FormDraft, readMeasureForm } from '../lib/form-editing';
 import { defaultGrouping, groupingsFor, groupingText, parseGrouping } from '../lib/grouping';
 import { FormControls } from './form-controls';
@@ -41,7 +40,7 @@ interface BarDraft {
     text: string;
     context: ScoreContext;
     form: FormDraft | null;
-    /** Band engine only; the old engine (`?engine=old`) cannot play a fermata at all. */
+    /** Whether the bar's last chord holds (a fermata). */
     fermata: boolean;
 }
 
@@ -104,7 +103,7 @@ function stripFermata(event: ScoreEvent): ScoreEvent {
 
 /**
  * `printChordBar` (score-text.ts) refuses to print any event that carries a `fermata` key at
- * all, by design: the flag is editor state, not text. On the band engine, strip it from the LAST
+ * all, by design: the flag is editor state, not text. Strip it from the LAST
  * event so the bar's chords stay editable text — `commit()`'s `withFermata` reapplies it once
  * the text is re-parsed, so a text edit can never silently drop it. A fermata anywhere but the
  * last event is a placement the toggle cannot represent (iReal import is the only source of
@@ -123,9 +122,7 @@ function editableText(measure: ScoreMeasure, meter: string): string | null {
         return null;
     }
     try {
-        const events = BAND_ENGINE
-            ? printableEvents(measure.content.events)
-            : measure.content.events;
+        const events = printableEvents(measure.content.events);
         const printed = printChordBar(events, meter);
         const durations = measure.content.events.map((event) => event.duration.join('/'));
         // Most bars need no duration syntax. Unequal lengths remain visible and lossless.
@@ -472,23 +469,19 @@ export function MeasureEditor({
                         Type chords separated by spaces, like C Dm G7. They share the bar equally;
                         set different lengths below.
                     </p>
-                    {BAND_ENGINE && (
-                        // Band engine only (docs/design/band-engine.md): the band engine holds the
-                        // chord through a stretched span with drums crashing; the old engine
-                        // refuses any chart carrying a fermata, so default mode offers no way to
-                        // author one.
-                        <label className="measure-editor-toggle">
-                            <input
-                                type="checkbox"
-                                checked={draft.fermata}
-                                disabled={disabled}
-                                onChange={(event) =>
-                                    updateDraft({ ...draft, fermata: event.target.checked })
-                                }
-                            />
-                            <span>Fermata (hold the last chord)</span>
-                        </label>
-                    )}
+                    {/* The band holds a fermata's chord through a stretched span with the drums
+                        crashing (docs/design/band-engine.md). */}
+                    <label className="measure-editor-toggle">
+                        <input
+                            type="checkbox"
+                            checked={draft.fermata}
+                            disabled={disabled}
+                            onChange={(event) =>
+                                updateDraft({ ...draft, fermata: event.target.checked })
+                            }
+                        />
+                        <span>Fermata (hold the last chord)</span>
+                    </label>
                     {rows.length > 0 && (
                         <fieldset className="measure-editor-lengths" disabled={disabled}>
                             <legend>

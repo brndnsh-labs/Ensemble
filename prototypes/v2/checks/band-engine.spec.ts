@@ -2,15 +2,15 @@ import { appUrl, editorRevealed, expect, test } from './fixtures';
 
 declare global {
     interface Window {
-        __band: { oldEngineNotes: number; audibleSamples: number; armed: boolean };
+        __band: { workers: number; audibleSamples: number; armed: boolean };
     }
 }
 
 /**
- * The band engine (docs/design/band-engine.md) plays by default, instead of the worker
- * generator. This proves the switch end to end on the real stand: sound reaches the
- * speakers, the chart pointer follows the form round the loop, the old worker generates
- * nothing, and Stop stops — with no page errors along the way. The lead (the soloist lane,
+ * The band engine (docs/design/band-engine.md) plays the stand. This proves it end to end:
+ * sound reaches the speakers, the chart pointer follows the form round the loop, no worker
+ * starts (the old engine's generator ran in one), and Stop stops — with no page errors along
+ * the way. The lead (the soloist lane,
  * off by default) is switched on, so its head plays too.
  */
 test('the band engine plays the chart round the loop and stops', async ({ page }) => {
@@ -18,16 +18,12 @@ test('the band engine plays the chart round the loop and stops', async ({ page }
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     await page.addInitScript(() => {
-        window.__band = { oldEngineNotes: 0, audibleSamples: 0, armed: false };
+        window.__band = { workers: 0, audibleSamples: 0, armed: false };
         const NativeWorker = window.Worker;
         window.Worker = class extends NativeWorker {
             constructor(url: string | URL, options?: WorkerOptions) {
                 super(url, options);
-                this.addEventListener('message', (event: MessageEvent<{ type: string }>) => {
-                    if (window.__band.armed && event.data?.type === 'notes') {
-                        window.__band.oldEngineNotes++;
-                    }
-                });
+                window.__band.workers++;
             }
         };
         // Branch an analyser off the final output, as the semantic-playback check does.
@@ -112,6 +108,38 @@ test('the band engine plays the chart round the loop and stops', async ({ page }
 
     const evidence = await page.evaluate(() => window.__band);
     expect(evidence.audibleSamples, 'the band should reach the speakers').toBeGreaterThan(0);
-    expect(evidence.oldEngineNotes, 'the old generator should stay idle').toBe(0);
+    expect(evidence.workers, 'no worker should start: the old generator is retired').toBe(0);
+    expect(errors).toEqual([]);
+});
+
+// The band reads its chart when it starts. A measure-less chart's key change while playing
+// (the starters are measure-less) must reach it: the song restarts from the top in the new
+// key, as a measure-based chart's does, instead of playing on in the old one.
+test('changing the key of a measure-less chart while it plays restarts the band in the new key', async ({
+    page,
+}) => {
+    test.setTimeout(60_000);
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    await page.goto(appUrl());
+    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
+    const tempo = page.getByLabel('Tempo', { exact: true });
+    await tempo.fill('240');
+    await tempo.press('Enter');
+    const activeBar = () =>
+        page
+            .locator('.sheet .bar')
+            .evaluateAll((bars) =>
+                bars.findIndex((bar) => bar.getAttribute('data-active') === 'true'),
+            );
+    await page.getByRole('button', { name: 'Start playback', exact: true }).click();
+    await expect.poll(activeBar, { timeout: 20_000, intervals: [50] }).toBeGreaterThanOrEqual(3);
+
+    await page.getByLabel('Key', { exact: true }).selectOption('D');
+    await expect(page.locator('.sheet .bar').first().locator('.chord')).toHaveText(['D7']);
+    // Back to the top: the first bar lit after the change is bar 1, not the next bar on.
+    await expect.poll(activeBar, { timeout: 5_000, intervals: [25] }).toBe(0);
+    await expect(page.getByRole('button', { name: 'Stop playback', exact: true })).toBeEnabled();
+    await page.getByRole('button', { name: 'Stop playback', exact: true }).click();
     expect(errors).toEqual([]);
 });

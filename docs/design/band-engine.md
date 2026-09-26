@@ -3,13 +3,13 @@
 **Status:** the default engine since the cutover (DECISION 2026-09-25, Brandon), after all 13
 genres' rhythm sections and leads passed his ear on `feat/band-engine` (DECISION 2026-09-23).
 **Replaces:** the generative engine in `public/engine/` (worker, scheduler, conductor, per-lane
-generators) and its critique suite. `?engine=old` still plays the old engine, for comparison,
-until it is retired (#1404).
+generators) and its critique suite. The app no longer runs the old engine (`?engine=old` was
+removed); its code is deleted next (#1404).
 
 **The cutover (2026-09-25).** The band engine plays every page. Controls the band has nothing
 to set are hidden on it: the per-lane style pickers, chord density, soloist mode, complexity
-and the harmony lane. Their document fields are kept as written, so a chart opened with
-`?engine=old` plays as it did. Live MIDI out was not a cutover item, since v2 never exposed it.
+and the harmony lane, and since the old engine stopped running they are gone from the app.
+Their document fields are kept as written. Live MIDI out was not a cutover item, since v2 never exposed it.
 
 ## Decision
 
@@ -200,10 +200,8 @@ expression devices take turns rather than stack; one peak note per cycle.
 
 ## The live host (`prototypes/v2/lib/band-host.ts`)
 
-The runtime's play, stop and resume paths go through `startBand`/`stopBand` instead of
-`TOGGLE_PLAY` (unless `?engine=old`), so the old worker never starts and its callbacks are
-ignored. The
-host keeps a queue of *segments*, one pass of the song or one lap of a practice loop each, and
+The runtime's play, stop and resume paths go through `startBand`/`stopBand`; the old worker
+never starts. The host keeps a queue of *segments*, one pass of the song or one lap of a practice loop each, and
 schedules everything due in the next 150 ms on a 25 ms timer.
 - **Tempo** re-anchors the clock.
 - **Style, intensity, lanes, swing, humanize and the comp instrument** regenerate the pass from

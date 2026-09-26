@@ -142,7 +142,7 @@ local browser projects and never deploys.
   The open song replaces the branding header; Sounds opens over the score without displacing it.
   Playback automatically focuses the chart, hiding editing/save chrome while leaving transport,
   tempo, key, feel and mutes visible. Show controls restores the setup actions without stopping.
-  Playback highlights use the existing scheduler's lookahead (not a new musical clock); manual
+  Playback highlights follow the band host's own clock (`lib/band-host.ts`); manual
   wheel/touch/keyboard browsing suspends following until explicitly resumed.
 - Stage mode (#1208) is the dark music-stand theme: the Stage button in the song header stays
   reachable while the chart is focused. The palette is one set of `light-dark()` tokens picked

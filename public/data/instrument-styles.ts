@@ -64,7 +64,7 @@ export const SOLOIST_STYLES: StyleEntry[] = [
     { id: 'acoustic', name: 'Acoustic', category: 'Country/Folk' },
 ];
 
-export const HARMONY_STYLES: StyleEntry[] = [
+const HARMONY_STYLES: StyleEntry[] = [
     { id: 'smart', name: 'Smart (Auto)', category: 'Experimental' },
     { id: 'horns', name: 'Horns (Stabs)', category: 'Modern' },
     { id: 'strings', name: 'Strings (Pads)', category: 'Classical/Trad' },

@@ -8,7 +8,7 @@ import type {
     Mutable,
     SoloistState,
 } from '../types.js';
-import { ACTIONS, isChordDensity } from '../types.js';
+import { ACTIONS } from '../types.js';
 
 export type { BassState, ChordState, HarmonyState, SoloistState };
 
@@ -451,13 +451,6 @@ export function instrumentReducer(action: Action): boolean {
         case ACTIONS.SET_STYLE:
             if (instrumentStateMap[action.payload.module]) {
                 instrumentStateMap[action.payload.module].style = action.payload.style;
-            }
-            return true;
-        case ACTIONS.SET_DENSITY:
-            // #1264 — see the SET_SWING_SUB note in `groove.ts`: untyped payload,
-            // unrecognized value ignored rather than defaulted.
-            if (isChordDensity(action.payload)) {
-                c.density = action.payload;
             }
             return true;
         case ACTIONS.SET_VOLUME:

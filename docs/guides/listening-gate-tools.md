@@ -10,7 +10,7 @@ replaces the ear; they only shorten the loop around it.
 ## What a render is: the band engine (since 2026-09-25)
 
 The tools render **the band engine** (`band/`), the engine every page plays. The old
-worker engine (`?engine=old`) is no longer reachable from them.
+worker engine no longer runs in the app.
 
 - **The music is composed in node.** `scripts/band-scene.ts` turns each scene into a
   semantic score (its sections' `|`-separated bars, in the chart editor's bar syntax), runs
@@ -650,8 +650,7 @@ This is the workflow path for handing a clip to another model
 required, just drag the file into another chat.
 
 Implementation: `prototypes/v2/lib/band-export.ts` + the shared
-`public/engine/wav-encoder.ts` (`?engine=old` still exports through
-`public/export/audio-export.ts`).
+`public/engine/wav-encoder.ts`.
 
 The encoder quantizes with a **round** against a symmetric `0x8000` scale (clamped at
 `+0x7fff`), which makes `int16 → float → int16` the exact identity for all 65 536

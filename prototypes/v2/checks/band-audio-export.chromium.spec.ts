@@ -83,8 +83,8 @@ test('Export audio (mix) works on the band engine and downloads a valid WAV', as
     // a wide band, not an exact swing-adjusted sum (this suite doesn't fix the new-song tempo).
     expect(wav.durationSeconds).toBeGreaterThan(1);
     expect(wav.durationSeconds).toBeLessThan(30);
-    // No page error along the way (a thrown BAND_ENGINE branch would surface as the menu's
-    // own error banner, not a page crash, so check that too).
+    // No error along the way (a thrown export would surface as the menu's own error banner,
+    // not a page crash, so check that too).
     await expect(page.locator('.error-banner')).toHaveCount(0);
 });
 
