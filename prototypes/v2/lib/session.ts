@@ -70,6 +70,32 @@ export function rememberMasterVolume(value: number): void {
     }
 }
 
+const COUNT_IN = 'ensemble-v2-preview:count-in';
+
+/**
+ * Device-local practice preference — `playback.countIn` is `preferences`-owned in
+ * `STATE_OWNERSHIP_MANIFEST` (a player habit, not part of any one chart), so it persists here,
+ * the same way `masterVolumePreference` above does rather than riding a saved chart or a share
+ * link. `null` means "no preference recorded yet" — the caller falls back to the engine's own
+ * default (`true`, matching v1's).
+ */
+export function countInPreference(): boolean | null {
+    try {
+        const stored = localStorage.getItem(COUNT_IN);
+        return stored === null ? null : stored === '1';
+    } catch {
+        return null;
+    }
+}
+
+export function rememberCountIn(value: boolean): void {
+    try {
+        localStorage.setItem(COUNT_IN, value ? '1' : '0');
+    } catch {
+        // The live toggle still applies for this session; only the memory is lost.
+    }
+}
+
 const V1_IMPORT = 'ensemble-v2-preview:v1-import';
 /**
  * What this device has already done about one v1 item's exact bytes.

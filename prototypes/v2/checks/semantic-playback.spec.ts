@@ -233,11 +233,15 @@ test('section practice loop (#1211) confines playback and clears on release, Esc
     await expect(page.locator('.section-loop.active')).toHaveCount(0);
 
     // The keyboard path to the same toggle: a long-press has no keyboard
-    // equivalent, so 'L' on the focused label is the accessible route in.
-    // Enter must stay inert — that gesture is banked for #937.
+    // equivalent, so 'L' on the focused label is the accessible route in,
+    // straight to the toggle — bypassing the section menu (#1422) Enter opens
+    // (native button semantics; the menu itself is `section-menu.spec.ts`'s).
     await sectionA.focus();
     await page.keyboard.press('Enter');
+    await expect(page.getByRole('menu', { name: 'Section A' })).toBeVisible();
     await expect(sectionA).toHaveAttribute('aria-pressed', 'false');
+    await page.keyboard.press('Escape');
+    await expect(sectionA).toBeFocused();
     await page.keyboard.press('l');
     await expect(sectionA).toHaveAttribute('aria-pressed', 'true');
     await expect(page.locator('.section-loop.active')).toHaveCount(1);

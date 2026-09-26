@@ -9,7 +9,9 @@
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
+    countInPreference,
     hasDeclinedV1Import,
+    rememberCountIn,
     rememberV1Import,
     rememberV1ImportDecline,
     rememberV1SessionMark,
@@ -37,6 +39,18 @@ Object.defineProperty(window, 'localStorage', {
 
 beforeEach(() => {
     store.clear();
+});
+
+describe('the count-in preference (#1422)', () => {
+    it('is unset on a fresh device, so the caller falls back to the engine default', () => {
+        expect(countInPreference()).toBeNull();
+    });
+    it('round-trips true and false', () => {
+        rememberCountIn(true);
+        expect(countInPreference()).toBe(true);
+        rememberCountIn(false);
+        expect(countInPreference()).toBe(false);
+    });
 });
 
 describe('v1 import ledger', () => {

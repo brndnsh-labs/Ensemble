@@ -36,6 +36,38 @@ and WebKit, including aborted transactions, competing connections, lost response
 switches, corrupted bytes and offline Save ordering. These are storage contract tests, not
 an end-to-end cloud-service or physical iPhone acceptance claim.
 
+## Analytics (#1389)
+
+`lib/telemetry.ts` loads the homelab's own Umami (`umami.brndn.zip`) only in a production build
+(`NEXT_PUBLIC_TELEMETRY=1`, set for the one `ensemble-web` image released to both prod and
+ensembletest) on the canonical host (`ensemble.brndn.zip`) — the hostname check is what keeps
+ensembletest silent, since it runs that same image. Never on dev, the Playwright export, or a
+render-bridge build. `data-do-not-track="true"`, `autoTrack`/`autoPageview` off, `referrerPolicy:
+strict-origin`; every payload's `url` is the bare `location.pathname` and `referrer` is always
+`''` — v2 carries a shared chart in the `#chart=` fragment, so neither the query string nor the
+hash ever crosses the telemetry boundary. The tracker is optional and its queue is bounded: a
+blocked or failed script never affects the app, and it is not precached by the service worker, so
+an offline visit sends nothing.
+
+The event vocabulary is allow-listed and typed (`TelemetryEventData` in `lib/telemetry.ts`) —
+never a chart title, chord content, account id or email:
+
+| Event | Data | Where |
+| :- | :- | :- |
+| `session_class` | `{ device }` | Once per boot, alongside the pageview |
+| `play_started` | — | The band actually starts (`lib/runtime.ts`'s `startBand`) |
+| `genre_changed` | `{ genre }` | The transport bar's `onGenre` handler (`app/ensemble.tsx`) — deliberately not inside `runtime.setGenre` itself, which `lib/starters.ts` also calls directly to build its one-time sample charts on a fresh device |
+| `part_toggled` | `{ part }` | `runtime.setEnabled` |
+| `chart_opened` | `{ source: songbook \| import }` | `openSong`, and after an import lands |
+| `chart_created` | — | `newSong` |
+| `chart_imported` | `{ format: ireal \| v1 \| file }` | The iReal import dialog, the v1 importer, a dropped `.ensemble`/`.json` file |
+| `share_created` | — | Copying a `#chart=` link |
+| `share_opened` | `{ legacy }` | Opening a `#chart=` or an older v1 `?s=`/`?prog=` link |
+| `account_signed_in` / `account_registered` | — | The sign-in dialog, on success — no identifiers |
+| `sync_conflict_shown` | — | The refused-Save/candidate banner above the stand |
+| `midi_exported` | — | `runtime.exportMidi` |
+| `wav_exported` | `{ stems }` | `runtime.exportAudio` |
+
 ## Run and verify
 
 From the repository root, install the existing engine dependencies with `npm ci`, then:

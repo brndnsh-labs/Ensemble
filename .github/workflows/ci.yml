@@ -444,6 +444,12 @@ jobs:
       # The cutover build: the stand at the site root, not at /v2. This is the ONE value that
       # changes what gets built (prototypes/v2/scripts/base-path.mjs, #1354).
       ENSEMBLE_V2_BASE: /
+      # #1389 — this is the ONE build baked into the `ensemble-web` tag released to BOTH prod
+      # and ensembletest, so the flag can't (and doesn't need to) differ per host: it only rules
+      # out dev, the Playwright export (`v2-suite` below never sets it) and a render-bridge
+      # build. `lib/telemetry.ts` pairs it with a canonical-hostname check, which is what keeps
+      # ensembletest silent even though it runs this exact same image.
+      NEXT_PUBLIC_TELEMETRY: '1'
     steps:
       - uses: actions/checkout@v7
 

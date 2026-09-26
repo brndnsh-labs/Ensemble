@@ -26,10 +26,10 @@ This map provides a quick reference for AI agents to understand the responsibili
 | Path | Responsibility | Key Exports / Symbols |
 | :--- | :--- | :--- |
 | `prototypes/v2/lib/runtime.ts` | The app's one engine host: the dispatch subscriber (`handleEffects` + `syncBand`), chart load/rebuild, the band's transport and exports. The only v2 file that calls `dispatch`/`getState`. | `initialize`, `toggle`, `stop` |
+| `prototypes/v2/lib/telemetry.ts` | Production-only, privacy-safe Umami analytics boundary (#1389) — UI-host code, not engine library, so it lives here rather than in `public/`. | `initializeTelemetry`, `track` |
 | `public/state.ts` | Central Redux-like state store. | `getState`, `dispatch`, `subscribe` |
 | `public/types.ts` | Global Action constants and shared types. | `ACTIONS` |
 | `public/controllers/app-controller.ts` | BPM updates with in-flight scheduler rescheduling (called from `state-effects.ts`), plus v1's palette/mode setters (no app caller since #1358). | `setBpm`, `setPalette`, `setMode` |
-| `public/telemetry.ts` | Production-only, privacy-safe Umami analytics boundary. | `initializeTelemetry`, `track` |
 
 ## Band Engine (`band/`, the engine the app plays)
 

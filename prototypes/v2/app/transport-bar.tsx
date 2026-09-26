@@ -9,6 +9,9 @@ interface TransportBarProps {
     current: ChartDocument;
     busy: boolean;
     playbackActive: boolean;
+    /** The count-in beat sounding now (0-based: 0 shows "1"), or null when not counting in
+     * (#1422). The chart itself doesn't move during this window; the play button does. */
+    countInBeat: number | null;
     onPlayToggle: () => void;
     onTempo: (bpm: number) => void;
     onKey: (key: string) => void;
@@ -25,6 +28,7 @@ export function TransportBar({
     current,
     busy,
     playbackActive,
+    countInBeat,
     onPlayToggle,
     onTempo,
     onKey,
@@ -44,11 +48,15 @@ export function TransportBar({
             <div className="transport-cluster">
                 <button
                     className="play-button"
+                    // The accessible name stays exactly Start/Stop playback through the
+                    // count-in — only the glyph changes — since `aria-label` (not the visible
+                    // text) is what every existing check's `getByRole` locator keys on, and
+                    // pressing Stop must read the same during the count-in as during the song.
                     aria-label={playbackActive ? 'Stop playback' : 'Start playback'}
                     disabled={busy && !playbackActive}
                     onClick={onPlayToggle}
                 >
-                    {playbackActive ? '■' : '▶'}
+                    {countInBeat !== null ? countInBeat + 1 : playbackActive ? '■' : '▶'}
                 </button>
                 <TempoControl
                     key={current.id}

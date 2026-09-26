@@ -67,6 +67,7 @@ import { start } from '../lib/starters';
 import type { SavedSong } from '../lib/sync/protocol';
 import type { KeepBothResolution } from '../lib/sync/repository';
 import type { Progress } from '../lib/sync/status';
+import { initializeTelemetry, track } from '../lib/telemetry';
 import { hasV1SharePayload, openV1ShareLink, stripV1ShareParams } from '../lib/v1-link';
 import { AccountEntry } from './account/account-entry';
 import { AccountPage } from './account/account-page';
@@ -222,6 +223,7 @@ function feelSnapshot(): FeelSnapshot {
         bandIntensity: playback.bandIntensity,
         metronome: playback.metronome,
         masterVolume: playback.masterVolume,
+        countIn: playback.countIn,
     };
 }
 
@@ -325,6 +327,9 @@ export default function Ensemble() {
     const [playing, setPlaying] = useState(false);
     const [playbackPending, setPlaybackPending] = useState(false);
     const [active, setActive] = useState<number | null>(null);
+    // The count-in beat sounding now (0-based), or null when not counting in (#1422) — cheap
+    // enough to ride the same 60ms poll `playing`/`active` already use, no new interval.
+    const [countInBeat, setCountInBeat] = useState<number | null>(null);
     // #1211 — id of the section a practice loop is armed/running on, or null.
     // Polled alongside playing/active below; the engine is the source of truth.
     const [loopedSectionId, setLoopedSectionId] = useState<string | null>(null);
@@ -594,6 +599,13 @@ export default function Ensemble() {
      */
     const standBanner: 'none' | 'version' | 'gone' | 'candidate' =
         conflict !== 'none' ? conflict : standCandidate !== null ? 'candidate' : 'none';
+    // #1389 — once per transition into a shown banner (not once per render it stays up, and not
+    // for the songbook screen's own re-renders, which don't hold a `standBanner` at all).
+    useEffect(() => {
+        if (standBanner !== 'none') {
+            track('sync_conflict_shown');
+        }
+    }, [standBanner]);
     /**
      * The songs the songbook marks (#1310). Ids only: the list needs to know WHICH rows, and the
      * revision beside each one is the stand's business — it is what an adoption is compared
@@ -666,6 +678,10 @@ export default function Ensemble() {
     const focused = playbackActive && !showControls && !editing;
 
     useEffect(() => {
+        // #1389 — a real production visit only; no-op everywhere else (dev, ensembletest, the
+        // Playwright export). Independent of `start()`'s engine boot below, so a slow/failed
+        // boot never delays or blocks the (optional, best-effort) pageview.
+        initializeTelemetry();
         let alive = true;
         start()
             .then((result) => {
@@ -685,6 +701,7 @@ export default function Ensemble() {
             setPlaying(state.playback.isPlaying);
             setActive(state.playback.isPlaying ? state.chords.lastActiveChordIndex : null);
             setLoopedSectionId(runtime.loopedSection());
+            setCountInBeat(state.playback.isCountingIn ? state.playback.countInBeat : null);
         }, 60);
         const preventLoss = (event: BeforeUnloadEvent) => {
             if (volatileDrafts.current.size || pendingText.current) {
@@ -740,7 +757,8 @@ export default function Ensemble() {
         // own recovery keys), and `lastOpened`/`rememberSong` are left alone since this
         // isn't a library entry yet. "Keep a copy" (`keepSharedCopy`) is what turns it into
         // one.
-        const openSharedDraft = (link: ChartDocument, note: string) => {
+        const openSharedDraft = (link: ChartDocument, note: string, legacy: boolean) => {
+            track('share_opened', { legacy });
             const document = withFollowFeel(link);
             runtime.load(document);
             setSaved(null);
@@ -795,7 +813,11 @@ export default function Ensemble() {
             );
             consumeLink();
             if (older.kind === 'ok') {
-                openSharedDraft(older.document, 'Opened from an older shared link · not saved yet');
+                openSharedDraft(
+                    older.document,
+                    'Opened from an older shared link · not saved yet',
+                    true,
+                );
             } else {
                 setError("This older link couldn't be opened");
             }
@@ -807,7 +829,7 @@ export default function Ensemble() {
                 return;
             }
             if (document) {
-                openSharedDraft(document, 'Opened from a shared link · not saved yet');
+                openSharedDraft(document, 'Opened from a shared link · not saved yet', false);
             } else {
                 setError(
                     'This link could not be opened. It may be corrupted or made with a different version of the app.',
@@ -1629,6 +1651,18 @@ export default function Ensemble() {
         }
         setLoopedSectionId(runtime.loopedSection());
     }
+    // Section tap menu's "Start here" (#1422): jump playback to a section's first performed
+    // bar, same `id`-may-be-undefined guard as `toggleSectionLoop` above.
+    function startHereSection(id: string | undefined) {
+        if (!id) {
+            return;
+        }
+        void run(async () => {
+            await runtime.startSection(id, setSoundProgress);
+            setLoopedSectionId(runtime.loopedSection());
+            setSoundProgress('');
+        });
+    }
     function revealEditor(id = sectionId) {
         runtime.stop();
         setSectionId(id);
@@ -1875,6 +1909,7 @@ export default function Ensemble() {
         const candidate = updateChart();
         const encoded = await encodeChartLink(candidate);
         const url = `${window.location.origin}${window.location.pathname}${encoded}`;
+        track('share_created');
         if (navigator.clipboard?.writeText) {
             try {
                 await navigator.clipboard.writeText(url);
@@ -2539,6 +2574,7 @@ export default function Ensemble() {
                 throw new Error('Song no longer exists.');
             }
             await open(document);
+            track('chart_opened', { source: 'songbook' });
         });
     }
     async function save(copy = false) {
@@ -2616,6 +2652,7 @@ export default function Ensemble() {
             const created = await storeSave(document, null, { owner: null, stand: false });
             await refreshSongs();
             await open(created);
+            track('chart_created');
             revealEditor(arrangementOf(created).sections[0].id);
         });
     }
@@ -2721,6 +2758,9 @@ export default function Ensemble() {
              * pointer to the account page is still on screen and is the way through.
              */
             const landed = [...outcome.imported, ...outcome.updated].map((song) => song.id);
+            if (landed.length > 0) {
+                track('chart_imported', { format: 'v1' });
+            }
             const gate = adoptGate.current;
             if (
                 landed.length > 0 &&
@@ -3229,6 +3269,8 @@ export default function Ensemble() {
                         );
                         await refreshSongs();
                         await open(result);
+                        track('chart_imported', { format: 'file' });
+                        track('chart_opened', { source: 'import' });
                     });
                 }}
             />
@@ -3252,6 +3294,16 @@ export default function Ensemble() {
                         );
                         await refreshSongs();
                         await open(result);
+                        // Both `irealbook`/`irealb` decode the same iReal Pro format; the
+                        // telemetry vocabulary tracks the format, not the decoder variant.
+                        track('chart_imported', {
+                            format:
+                                checked.schemaVersion === 2 &&
+                                checked.importSource?.format?.startsWith('ireal')
+                                    ? 'ireal'
+                                    : 'file',
+                        });
+                        track('chart_opened', { source: 'import' });
                     }}
                 />
             )}
@@ -3356,6 +3408,7 @@ export default function Ensemble() {
                         current={current}
                         busy={busy}
                         playbackActive={playbackActive}
+                        countInBeat={countInBeat}
                         onPlayToggle={() => {
                             if (runtime.state().playback.isPlaying || playbackPending) {
                                 runtime.stop();
@@ -3387,7 +3440,14 @@ export default function Ensemble() {
                             )
                         }
                         onGenre={(genre) =>
-                            change(() => runtime.setGenre(genre, setSoundProgress), true)
+                            change(async () => {
+                                // Tracked HERE, not inside `runtime.setGenre` (#1389): this is
+                                // the transport bar's real call site, so it only fires on an
+                                // actual musician gesture — never during `lib/starters.ts`'s
+                                // one-time sample seeding, which calls `setGenre` directly.
+                                await runtime.setGenre(genre, setSoundProgress);
+                                track('genre_changed', { genre });
+                            }, true)
                         }
                         onToggleLane={(key) =>
                             change(() => runtime.setEnabled(key, !current.chart.band[key].enabled))
@@ -3474,6 +3534,12 @@ export default function Ensemble() {
                                 setFeel((f) => ({ ...f, masterVolume: value }));
                             })
                         }
+                        onCountIn={(enabled) =>
+                            change(() => {
+                                runtime.setCountIn(enabled);
+                                setFeel((f) => ({ ...f, countIn: enabled }));
+                            })
+                        }
                         onNotation={(notation) => change(() => runtime.setNotation(notation))}
                     />
                     <div className={`workspace-body ${editing ? 'editing' : ''}`}>
@@ -3520,6 +3586,7 @@ export default function Ensemble() {
                                 playbackActive={playbackActive}
                                 totalBars={totalBars}
                                 onToggleLoop={toggleSectionLoop}
+                                onStartHere={startHereSection}
                                 onEditSection={(block) => {
                                     if (current.schemaVersion === 2) {
                                         setMeasureId(block.measures[0]?.chords[0]?.measureId ?? '');

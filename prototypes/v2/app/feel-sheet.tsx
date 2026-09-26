@@ -29,6 +29,9 @@ export interface FeelSnapshot {
     bandIntensity: number;
     metronome: boolean;
     masterVolume: number;
+    /** One bar of clicks before a fresh Play (#1422) — `preferences`-owned like
+     * `masterVolume` above, not part of `ChartDocument['chart']` either. */
+    countIn: boolean;
 }
 
 interface RangeSettingProps {
@@ -107,6 +110,7 @@ interface FeelSheetProps {
     onAutoIntensity: (auto: boolean) => void;
     onMetronome: (enabled: boolean) => void;
     onMasterVolume: (value: number) => void;
+    onCountIn: (enabled: boolean) => void;
     onNotation: (notation: ChartNotation) => void;
 }
 
@@ -123,6 +127,7 @@ export function FeelSheet({
     onAutoIntensity,
     onMetronome,
     onMasterVolume,
+    onCountIn,
     onNotation,
 }: FeelSheetProps) {
     const arrangement = arrangementOf(current);
@@ -225,6 +230,15 @@ export function FeelSheet({
                             onChange={(event) => onMetronome(event.target.checked)}
                         />
                         <span>Metronome</span>
+                    </label>
+                    <label className="feel-toggle">
+                        <input
+                            type="checkbox"
+                            checked={feel.countIn}
+                            disabled={busy}
+                            onChange={(event) => onCountIn(event.target.checked)}
+                        />
+                        <span>Count-in</span>
                     </label>
                 </div>
                 <div className="feel-group">

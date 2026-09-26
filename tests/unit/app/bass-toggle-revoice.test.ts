@@ -14,7 +14,6 @@ import { validateProgression } from '../../../public/engine/chords-engine.js';
 import { dispatch, getState } from '../../../public/state.js';
 import { ACTIONS } from '../../../public/types.js';
 
-vi.mock('../../../public/telemetry.js', () => ({ track: vi.fn() }));
 vi.mock('../../../public/engine/engine.js', () => ({
     killAllPianoNotes: vi.fn(),
     killBassBus: vi.fn(),
