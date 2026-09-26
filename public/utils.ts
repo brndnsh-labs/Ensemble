@@ -38,9 +38,13 @@ export function clamp01(x: number): number {
 
 /**
  * Normalizes a note name (e.g., C# to Db) based on the project's map.
+ *
+ * `Object.hasOwn`, not `MAP[k] || k` (#1132): `ENHARMONIC_MAP` is a plain literal, so
+ * `MAP['constructor']` is the `Object` constructor — a truthy hit that broke the `string`
+ * return contract for any caller handed an untrusted key.
  */
 export function normalizeKey(k: string): string {
-    return (ENHARMONIC_MAP as Record<string, string>)[k] || k;
+    return Object.hasOwn(ENHARMONIC_MAP, k) ? (ENHARMONIC_MAP as Record<string, string>)[k] : k;
 }
 
 /**

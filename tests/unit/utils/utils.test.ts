@@ -187,6 +187,15 @@ describe('Utility Functions', () => {
             expect(normalizeKey('E#')).toBe('F');
             expect(normalizeKey('Fb')).toBe('E');
         });
+
+        // #1132: the map is a plain literal, so an unguarded `MAP[k] || k` returned the
+        // Object constructor for 'constructor' — a function in a string-typed result.
+        it.each(['constructor', 'toString', '__proto__', 'hasOwnProperty'])(
+            'returns an inherited-property name %s unchanged, as a string',
+            (bad) => {
+                expect(normalizeKey(bad)).toBe(bad);
+            },
+        );
     });
 
     describe('transposeKeyName', () => {
@@ -280,6 +289,30 @@ describe('Utility Functions', () => {
                 expect(decompressSections(compressed)[0].timeSignature).toBe('');
             },
         );
+
+        // #1132: the `?s=` reader must agree with `validateSections` on the key's keyspace —
+        // a normalized KEY_ORDER member, else ''.
+        it.each(['constructor', '__proto__', 'toString', 'H', '<b>C</b>'])(
+            'drops a section key of %s on the ?s= path',
+            (bad) => {
+                const compressed = compressSections([
+                    { id: '1', label: 'Verse', value: 'C', key: bad },
+                ]);
+
+                expect(decompressSections(compressed)[0].key).toBe('');
+            },
+        );
+
+        it('keeps a valid section key, normalized like validateSections (the accept direction)', () => {
+            const compressed = compressSections([
+                { id: '1', label: 'A', value: 'C', key: 'Eb' },
+                { id: '2', label: 'B', value: 'C', key: 'C#' },
+            ]);
+            const [a, b] = decompressSections(compressed);
+
+            expect(a.key).toBe('Eb');
+            expect(b.key).toBe('Db');
+        });
 
         it('still preserves a valid section timeSignature (the accept direction)', () => {
             const compressed = compressSections([
