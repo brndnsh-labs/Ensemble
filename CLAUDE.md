@@ -10,7 +10,7 @@ Operational guide for AI agents working in the Ensemble codebase. Claude Code au
 - **docs/README.md** — living documentation index.
 - **docs/VISION.md** — product direction and open work.
 - **docs/archive/ARCHITECTURE_FOLLOWUPS.md** — archived (May 2026): the TS-migration follow-up tracker, all items shipped. Useful historical context for *why* recent architectural decisions were made.
-- **docs/guides/** — deep-dive guides (worker contract, coordination & register slotting, performance, reference tuning, musical-engine patterns, bundle hygiene, listening-gate tools).
+- **docs/guides/** — deep-dive guides (performance, reference tuning, musical-engine patterns, bundle hygiene, listening-gate tools).
 
 If any guide drifts from live code/config, prefer live and update the docs.
 
@@ -45,7 +45,7 @@ releases it: the CI `deploy` job publishes no files at all any more — it relea
 **One app.** Since #1358 `public/` is not an app: it is the engine/state/songbook library that
 `prototypes/v2` imports through the `@engine/*` alias (`prototypes/v2/next.config.mjs`). The only
 UI is `prototypes/v2/app/` (React, Next static export); don't add UI to `public/`. The
-engine/state/worker rules below are about `public/` and bind every caller of it.
+engine/state rules below are about `public/` and bind every caller of it.
 
 ## Mandatory Checklist (before any change)
 
@@ -105,11 +105,11 @@ deterministic evidence, not a substitute for the `Needs-ear` gate.
 
 ## Architecture
 
-Ensemble is a browser-based "virtual band" PWA. One app, two layers: the music stand in `prototypes/v2/` (React, Next static export — the only UI) and the library it compiles from `public/` — deep-signal state slices, the Web Audio engine and voices, the songbook codecs, and the old worker-based generator (no longer run by the app; being deleted, #1404). The band that plays is `band/` (below).
+Ensemble is a browser-based "virtual band" PWA. One app, two layers: the music stand in `prototypes/v2/` (React, Next static export — the only UI) and the library it compiles from `public/` — deep-signal state slices, the Web Audio engine and voices, and the songbook codecs. The band that plays is `band/` (below).
 
 ### Runtime bootstrap (`prototypes/v2/lib/runtime.ts`)
 
-One runtime per page, independent of React mounts. `initialize()` seeds the installed sounds, subscribes to dispatches so `handleEffects()` and `syncBand()` (the band host's settings) run on every one, then `rebuild()`s: `validateProgression` → `analyzeFormUI` → `flushBuffers()`. No logic worker runs (the old engine's, retiring in #1404). Play, stop and the exports go through the band host (`lib/band-host.ts`). The React shell (`prototypes/v2/app/ensemble.tsx`) owns documents and hands the runtime authored content; it never writes engine state. v1's `hydrateState()` is not part of this path — v2 opens charts from its own songbook, and `public/state/persistence.ts` is swapped for a no-op at compile time (the `NormalModuleReplacementPlugin` in `prototypes/v2/next.config.mjs` → `lib/legacy-persistence.ts`).
+One runtime per page, independent of React mounts. `initialize()` seeds the installed sounds, subscribes to dispatches so `handleEffects()` and `syncBand()` (the band host's settings) run on every one, then `rebuild()`s: `validateProgression` → `analyzeFormUI` → `flushBuffers()`. No logic worker runs. Play, stop and the exports go through the band host (`lib/band-host.ts`). The React shell (`prototypes/v2/app/ensemble.tsx`) owns documents and hands the runtime authored content; it never writes engine state. v1's `hydrateState()` is not part of this path — v2 opens charts from its own songbook, and `public/state/persistence.ts` is swapped for a no-op at compile time (the `NormalModuleReplacementPlugin` in `prototypes/v2/next.config.mjs` → `lib/legacy-persistence.ts`).
 
 ### State (`public/state.ts`, `public/state/`)
 
@@ -227,7 +227,7 @@ Scheduled work is tracked in **GitHub issues** on `brndnsh-labs/Ensemble` (publi
 
 **Issue numbers `#N` are continuous up to #935.** Ensemble started on GitHub, moved to Forgejo in 2026-07 — where the counter *continued* rather than restarting — and came back on 2026-08-04 via a repo transfer that kept all 224 issues and 710 PRs at their original numbers. So a bare `#N` in an old commit or doc resolves correctly for **N ≤ 935**. Only the Forgejo-only window (#936–#1355) is renumbered; that map lives in homelab-maintenance `migration-maps/Ensemble-issue-map.tsv`. Only the **8 issues still open** at migration carried over to GitHub — those are the map's rows. Everything **closed** in that window stayed behind, readable in the read-only archive repo `git.brndn.zip/brandon/Ensemble-archive` (private + archived; `brandon/Ensemble` itself is now a pull mirror with its issue tracker disabled, so look in `-archive`, not there). So an unmapped `#N` in 936–1355 is archive provenance, not a live GitHub link.
 
-**Autonomy posture (DOCTRINE §5/§6):** the pipeline runs **full-auto** — well-specified, gate-verifiable, non-destructive stories build → branch → PR → **auto-merge to `main`** (CI-gated, via `gh pr merge --auto --squash` — GitHub holds the merge until the required `checks`, `e2e-tests` and `v2-checks` contexts pass; no client-side polling) without a per-step nod. It **stops and surfaces** on a judgment call: a **synth or by-ear** story (the listening gate is a hard human stop → `Needs-ear`), a destructive data op (persisted sessions / share-URL schema / preset data / state migration), a state-or-worker-contract design call, a P0 finding, or a genuinely ambiguous choice. A merge to `main` **is** a prod deploy: `main` is continuously deployed to `ensemble.brndn.zip` by the CI `deploy` job once those three contexts and the two image builds pass on the merged commit (DOCTRINE §6). Because `Needs-ear`/synth work is a *pre-merge* stop, nothing un-auditioned ships. Since the cutover (#1357) a deploy is a container-tag release, so the break-glass path is a re-run of that job (`workflow_dispatch` on `main`) and an immediate rollback is the previous `ensemble-web` tag on the box. The normal correction is still roll-forward via `git revert` → PR.
+**Autonomy posture (DOCTRINE §5/§6):** the pipeline runs **full-auto** — well-specified, gate-verifiable, non-destructive stories build → branch → PR → **auto-merge to `main`** (CI-gated, via `gh pr merge --auto --squash` — GitHub holds the merge until the required `checks`, `e2e-tests` and `v2-checks` contexts pass; no client-side polling) without a per-step nod. It **stops and surfaces** on a judgment call: a **synth or by-ear** story (the listening gate is a hard human stop → `Needs-ear`), a destructive data op (persisted sessions / share-URL schema / preset data / state migration), a state-contract design call, a P0 finding, or a genuinely ambiguous choice. A merge to `main` **is** a prod deploy: `main` is continuously deployed to `ensemble.brndn.zip` by the CI `deploy` job once those three contexts and the two image builds pass on the merged commit (DOCTRINE §6). Because `Needs-ear`/synth work is a *pre-merge* stop, nothing un-auditioned ships. Since the cutover (#1357) a deploy is a container-tag release, so the break-glass path is a re-run of that job (`workflow_dispatch` on `main`) and an immediate rollback is the previous `ensemble-web` tag on the box. The normal correction is still roll-forward via `git revert` → PR.
 
 ## Agent skills
 

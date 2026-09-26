@@ -13,7 +13,7 @@ done
 # e2e (playwright)
 for i in $(seq 1 5); do npx playwright test <path> 2>&1 | tail -3; done
 # ordering-dependence check — run inside the full multi-file batch too
-npx vitest run tests/standards/
+npx vitest run <the suspect file's directory>
 ```
 
 **The decisive signal is variance in the LOGGED values, not pass count** — a test that

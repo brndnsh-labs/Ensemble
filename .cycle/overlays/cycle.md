@@ -2,7 +2,7 @@
 
 Read the issue's `track:*` label; it sets the loop's tail:
 - **musical** → DoD is the **critique test** (run it, read the Critique Report); reviewer
-  `music-theory-reviewer` (+ state/worker if those changed). Safe → auto-merge on green.
+  `music-theory-reviewer` (+ `state-discipline-reviewer` if state changed). Safe → auto-merge on green.
 - **synth** → DoD is a **human listen on the deployed test build**; reviewer `synth-graph-reviewer`
   (graph hygiene only). Pick these up freely — the loop runs the same as any other Track right up
   to the gate. `/done` builds + opens the PR, then **deploys the branch to test** (`/deploy-test`,

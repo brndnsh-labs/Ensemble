@@ -93,8 +93,6 @@ existing document field from an engine/conductor path.
     Grep `data/`, `prototypes/v2/lib/starters.ts` and any `presets.ts`/`fixtures.ts`/`defaults.ts`
     for the changed field; a
     built-in preset's numeric value was tuned under the *old* interpretation and critique tests
-    won't catch a stale one (they drive their own BPM). This bit the compound-meter S1 migration
-    for a full ~10 hours of downstream work before it was heard: code was migrated everywhere,
-    the one built-in compound-meter preset (`chord-presets.ts`) wasn't, and it played 1.5× too
-    fast. Schedule an explicit listen-test on any user-visible preset whose defaults depend on
+    won't catch a stale one (they drive their own BPM) — a missed preset plays at the wrong
+    speed and is only found by ear. Schedule an explicit listen-test on any user-visible preset whose defaults depend on
     the changed semantics.

@@ -2,7 +2,7 @@
 name: flake
 description: Diagnose one flaky Ensemble test. Runs it in isolation N times to measure an empirical fail rate, but decides on VARIANCE not pass-count — byte-identical output across runs means it isn't a flake at all. Classifies against four causes, applies the canonical fix for that class, and registers it. Never seeds or skips to hide a real bug. One flake per invocation. Usage `/flake <test>`.
 ---
-<!-- cycle:rendered template=skills/flake.md.tmpl hash=5c22d60299ef — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/flake.md.tmpl hash=07fd6eb45165 — managed by the-cycle; edit the template, not this file -->
 
 # /flake — diagnose one flaky test
 
@@ -92,7 +92,7 @@ done
 # e2e (playwright)
 for i in $(seq 1 5); do npx playwright test <path> 2>&1 | tail -3; done
 # ordering-dependence check — run inside the full multi-file batch too
-npx vitest run tests/standards/
+npx vitest run <the suspect file's directory>
 ```
 
 **The decisive signal is variance in the LOGGED values, not pass count** — a test that

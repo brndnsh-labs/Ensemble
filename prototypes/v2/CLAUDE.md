@@ -77,8 +77,8 @@ gate evidence. Do not copy old test totals or preview SHAs into a new claim of v
 - Never migrate/delete guest or legacy stores incidentally. Do not cache private API/auth
   responses or personalized HTML in the anonymous app shell. No credentials or chart contents
   in telemetry. Keep local safety, cloud confirmation and verified offline sounds distinct.
-- The band engine (`../../band/`, `lib/band-host.ts`) plays; the app no longer runs the old
-  generators or the worker, and their code goes next (#1404). Unsupported chart
+- The band engine (`../../band/`, `lib/band-host.ts`) plays; the old generators and the
+  worker are gone (#1404). Unsupported chart
   semantics block with an explanation; full iReal compatibility is a target, not today's
   capability.
 - Passkeys plus downloadable recovery code are approved. Hosting, backup/restore operations,
@@ -112,7 +112,7 @@ gate evidence. Do not copy old test totals or preview SHAs into a new claim of v
 | Taking the site root from v1 (#1355) | `scripts/offline.mjs` (root-only fragments + the `out/v2/sw.js` tombstone), `app/layout.tsx`, `app/use-offline-install.ts`, `lib/sounds.ts` (`migrateSoundCacheBase`), `checks/root-handover.chromium.spec.ts` | Everything here is gated on `ENSEMBLE_V2_BASE=/` and does nothing in the `/v2` build, which stays byte-identical apart from its fingerprint. At `/` this app's worker is served from v1's own script URL, so the browser's update check IS the handover: it skips waiting **only** on evidence of v1 (a cache named `ensemble-*`/`workbox-*` that is not in this app's `ensemble-v2-*` namespace — the v2 test is first and by prefix, so `ensemble-v2-sounds-v1` can never match), then deletes v1's caches, claims, and navigates any window v1's page script (`public/pwa.ts`, deleted in #1358) did not already reload. That belt is fired, **never awaited**: `navigate()` resolves when the navigation completes, and an in-scope navigation cannot be dispatched until the worker leaves `activating`, so awaiting it inside `waitUntil` deadlocks the window AND queues every in-scope fetch behind it (measured at 58s; a stand-in that reloads itself hides it completely, which is why `?reload=0` exists). One read of `caches.keys()` at the top of `activate` is both the sweep list and the handover evidence — no module-global, which would not survive the worker being terminated between install and activate. The shell cache namespaces are **split by base**: `ensemble-v2-preview-` is the beta era, `ensemble-v2-root-` is the site, so the tombstone can clear the whole preview namespace with no exception to get wrong. The beta's `/v2/` worker gets a real file at `/v2/sw.js` — a redirect cannot reach it, since a worker script fetch refuses redirects — which forwards its windows (query AND fragment preserved) through `new URL(…, origin)` with an origin re-check, because `/v2//evil.example/x` slices to a protocol-relative URL and would otherwise be an open redirect; a musician who only returns to `/` is covered by the startup belt instead. Downloaded packs are re-keyed rather than evicted, by a background pass AND by a read-through in `asset()` so an offline first load cannot lose the race. The web manifest is root-only and wears v1's identity on purpose. `hosting/README.md` states what #1356's edge config must not break, and the one residual it cannot: an evicted-cache browser keeps v1's registration, offers no evidence, and waits for its last tab to close |
 | Browser evidence | `checks/`, `../../tests/browser/account-songbook.browser.test.ts` | Preview E2E plus real IndexedDB in Chromium/WebKit |
 | Account E2E harness (#1258) | `checks/fixtures.ts` (`accountTest`), `checks/global-setup.ts`, `scripts/serve.mjs` | Opt-in: runs the real API bundle on a throwaway database behind the worker's preview server, one `http://localhost` origin. Name passkey specs `*.chromium.spec.ts` (CDP virtual authenticator); needs `npm ci --prefix prototypes/v2-api` |
-| Server account API (stage 2, #1187+) | `../v2-api/` (sibling, not a subdirectory — see `../v2-api/README.md`) | Standalone Node service, own `package.json`/`node:sqlite` schema; ceremony (#1188), session + HTTP layer (#1189), passkey management + step-up reauth gated by one fresh-authentication predicate (#1190), and single-use recovery codes behind a restricted recovery-only session (#1191) modules land here; #1192 closed, client wiring starts at #1261 |
+| Server account API (stage 2, #1187+) | `../v2-api/` (sibling, not a subdirectory — see `../v2-api/README.md`) | Standalone Node service, own `package.json`/`node:sqlite` schema; ceremony (#1188), session + HTTP layer (#1189), passkey management + step-up reauth gated by one fresh-authentication predicate (#1190), and single-use recovery codes behind a restricted recovery-only session (#1191) modules live here; the client side is the account rows above |
 
 ## Verification and receipt
 
@@ -154,7 +154,7 @@ concurrency, destructive migration or unresolved musical meaning requires fronti
 and any applicable human decision. Escalate when the task exceeds the specified boundary.
 
 Give each fresh session one issue. Pass this guide and that issue, not the whole conversation.
-Use one integration owner: do not run separate Claude and Codex sessions writing this shared
+Use one integration owner: do not run separate Claude and Codex sessions writing the same
 branch concurrently. Parallel work requires verified disjoint files and owner-controlled
 isolation/integration; shared fixtures, configs and the large app component are overlap too.
 

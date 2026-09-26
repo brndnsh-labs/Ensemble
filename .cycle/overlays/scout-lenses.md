@@ -20,14 +20,17 @@ A music tool used **hands-on-instrument, eyes-on-a-chart** — a11y is core UX, 
   `status:needs-decision` fix-pre-drafted, Model `frontier` when the interaction itself needs design.
 
 ### `security` — hardening (the *least* burndown-able lens; deliberately small here)
-This is a client-only PWA: no auth, no payments, no server. The real surface is **untrusted input**
-(share URLs, persisted-session JSON, hydration state) and **dependency CVEs**.
-- **Look for:** `npm audit` CVEs (run it); share-URL / hydration / `localStorage` session parsing
-  that trusts shape without validation (a malformed payload that can crash the app or inject through
-  to the DOM/`innerHTML`); service-worker/`workbox` cache that could serve stale or poisoned assets;
-  any `dangerouslySetInnerHTML`-equivalent or unsanitized user-derived string reaching the DOM.
-- **Where:** `public/state/state-hydration.ts`, share/URL encode-decode, the persisted-session reader,
-  the service worker, anywhere URL/`localStorage` data crosses into state or markup.
+A static PWA plus a small account API (`prototypes/v2-api/`: passkeys, sessions, recovery codes,
+chart sync); no payments. The surface is **untrusted input** (share links, imported v1 data,
+synced chart bodies), **the account boundary**, and **dependency CVEs**.
+- **Look for:** `npm audit` CVEs (run it); share-link / import / chart-codec parsing that trusts
+  shape without validation (a malformed payload that can crash the app or inject through to the
+  DOM); the service worker caching a private API/auth response or personalized HTML; session,
+  step-up or recovery-code checks the server skips; any unsanitized user-derived string reaching
+  the DOM.
+- **Where:** `prototypes/v2/lib/v1-link.ts`, `lib/import-v1.ts`, `public/songbook/` codecs,
+  `lib/account/`, `lib/sync/`, `prototypes/v2-api/src/`, the generated service worker
+  (`prototypes/v2/scripts/offline.mjs`).
 - **Landmines:** a **CVE bump with green gates** is `burndown` (it's `/dep-update`-shaped). A
   **code-level input-parsing change** is a judgment call — file it, route to a human `/cycle` with a
   `/security-review`, **never `burndown`-tag it** (a wrong hardening change is worse than the gap).
@@ -44,7 +47,7 @@ dropout. **The split that decides everything — which side of the audio path is
   `synth-*.ts` voices) → **hard brake, never `burndown`.** A regression here is an audible glitch
   or a dropped buffer. File **with the by-ear / weak-device caveat written in**, route to
   `orchestrator-inline` / `musical-engine-implementer` + the matching reviewer, leave off
-  `burndown` (often `needs-ear`). Model `frontier` for synth/worker/audio-lifecycle work and open
+  `burndown` (often `needs-ear`). Model `frontier` for synth/audio-lifecycle work and open
   design; Model `balanced` for a narrow musical claim with a critique-test oracle.
 - **Off-audio-path + build-measurable** → **`burndown`-eligible**, and this is exactly the **bundle
   Track** — file it `track:bundle`, `lens:bundle-hygiene`. Drop an unused dep, lazy-load a
@@ -52,7 +55,7 @@ dropout. **The split that decides everything — which side of the audio path is
   export (`prototypes/v2/out/_next/static/`) **is** the proof and it never touches the audio
   floor. Pure ones (drop a dep) →
   `burndown`; tradeoff ones (a lazy-load adds a loading state) → `status:needs-decision`-with-fix.
-- **Classify:** audio-path → `track:synth`/`musical`, Model `frontier` for synth/worker lifecycle
+- **Classify:** audio-path → `track:synth`/`musical`, Model `frontier` for synth/audio lifecycle
   or design calls and `balanced` for critique-test-verifiable musical structure, caveat or
   `status:needs-ear`. Off-path → `track:bundle`, Model `economy` for a closed-form deletion or
   `balanced` for non-trivial splitting/memoization, `status:ready` + `burndown` (or Model
@@ -64,8 +67,8 @@ The mechanical-wins lens — where overnight discovery most feeds same-week auto
   (inventory them — the `as Mutable<T>` narrowing trap is real here); `knip` dead-export/dead-file
   flags (`npm run knip`); `jscpd` duplication (`npx jscpd`); drift between parallel modules (two
   near-identical groove/style helpers that should share); stale TODO/FIXME with enough context.
-- **Landmines:** keep each item **bounded and single-area** — "tighten the 4 `any`s in
-  `worker-client.ts`" not "remove all `any`". An unbounded sweep isn't `burndown`-safe. **Engine
+- **Landmines:** keep each item **bounded and single-area** — "tighten the `any`s in one
+  named module" not "remove all `any`". An unbounded sweep isn't `burndown`-safe. **Engine
   hygiene that changes generative behavior is NOT hygiene** — if a "cleanup" could shift a critique
   test, it's a `musical` Track story, not a `burndown` nit.
 - **Classify:** `area:*`, `finding`, Model `economy`, Size `S`, `status:ready` **+ `burndown`** for
@@ -87,9 +90,10 @@ cost. Two faces of one failure: **doc↔code drift** and **undocumented load-bea
   comments/skill docs referencing files/functions/flags that moved (verify they still exist);
   **musical magic numbers the code enforces but doesn't justify** (a probability/offset with no
   `// why` comment — CLAUDE.md requires the intent be documented) → propose encoding the rationale;
-  the canonical-genre-key / alias families (Rock/Shred, Neo-Soul/Neo) drifting from `smart-genres.ts`.
+  the canonical-genre-key / alias family (Neo-Soul/Neo) drifting from `smart-genres.ts`, or a retired
+  phantom key (`Shred`, `Latin`, `Afrobeat`, `Soul`) reappearing.
 - **Where:** the doc tree (`*.md`, `.claude/skills/**`, AI_MAP.md), plus `public/**` comments and the
-  generative engines (`public/engine/**`).
+  band engine (`band/**`).
 - **The split:** **factual sync** (a renamed-file reference, a missing AI_MAP row, a missing
   musical-intent comment) → `burndown` (build/lint-verifiable or doc-only + directionally
   unambiguous). **Interpretive drift** ("is the *doc* wrong or the *code*?") → `status:needs-decision`

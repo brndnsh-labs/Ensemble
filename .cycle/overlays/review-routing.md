@@ -37,10 +37,10 @@
    - `prototypes/v2/CLAUDE.md` — the app: delivery, trust boundaries, per-surface ownership,
      verification gates.
    - `band/CLAUDE.md` — the band engine: its design laws, claims and critique harness.
-   - `public/CLAUDE.md` — effects/reactivity, practice-loop step framing, build identity and
-     build-time flags.
+   - `public/CLAUDE.md` — effects/reactivity, offline-render clones, build identity and
+     build-time flags, the metronome product constraint, config-semantics migrations.
    - `public/engine/CLAUDE.md` — the voices, sample packs and the audio graph.
-   - `tests/CLAUDE.md` — critique-harness shape, determinism/seeding, mocking, Playwright imports.
+   - `tests/CLAUDE.md` — statistical-claim traps, determinism/seeding, mocking, Playwright imports.
 
    ### Weighing a finding from these reviewers
 

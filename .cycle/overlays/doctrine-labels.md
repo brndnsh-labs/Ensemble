@@ -17,4 +17,4 @@
   surfaces last night's finds freshest-first.
 - **`area:*`** — surface tags inferring the executor when `agent/*` is unset:
   `area:soloist`, `area:bass`, `area:drums`, `area:chords`, `area:harmony`,
-  `area:groove`, `area:synth`, `area:state`, `area:worker`, `area:ui`, `area:infra`.
+  `area:groove`, `area:synth`, `area:state`, `area:ui`, `area:infra`.
