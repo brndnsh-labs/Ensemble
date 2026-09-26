@@ -94,8 +94,28 @@ export const test = base.extend<Record<never, never>, { previewServer: string }>
     // device that opened the Feel sheet once would read. Only when UNSET — an explicit write
     // (the Feel sheet checkbox, `count-in.spec.ts`'s own subject) must survive a reload within
     // the same test, not get silently put back on the next navigation.
-    page: async ({ page }, use) => {
+    //
+    // A cheap, suite-wide CSP net (#1395): `window.__cspViolations` collects every
+    // `securitypolicyviolation` event this page fires, on every navigation (`addInitScript`
+    // reruns per document). Nothing reads it mid-test — `checks/csp.spec.ts` is the one spec that
+    // asserts on it deliberately — but the fixture checks it after EVERY test, so a policy that
+    // is one source too narrow fails whichever spec first exercises that path, not just the
+    // dedicated CSP spec. Best-effort: a page already closed or navigated away by the test's own
+    // teardown is not a CSP failure, so a lost evaluation is swallowed rather than asserted on.
+    //
+    // The one deliberate exemption: on WebKit, Playwright's own `page.screenshot()` trips
+    // `style-src-elem` (an inline style the capture driver applies — a `MutationObserver` sees no
+    // `<style>` node the app adds), and it can fire after the screenshot call has returned, so no
+    // time window around the call holds. That exact violation is dropped on WebKit only. Chromium
+    // runs the same export through the same specs and still fails on any inline style the app
+    // ships, so the style policy stays guarded.
+    page: async ({ page, browserName }, use) => {
         await page.addInitScript(() => {
+            const w = window as unknown as { __cspViolations: string[] };
+            w.__cspViolations = [];
+            window.addEventListener('securitypolicyviolation', (event) => {
+                w.__cspViolations.push(`${event.violatedDirective} blocked ${event.blockedURI}`);
+            });
             try {
                 if (localStorage.getItem('ensemble-v2-preview:count-in') === null) {
                     localStorage.setItem('ensemble-v2-preview:count-in', '0');
@@ -105,6 +125,16 @@ export const test = base.extend<Record<never, never>, { previewServer: string }>
             }
         });
         await use(page);
+        const violations = await page
+            .evaluate(
+                () => (window as unknown as { __cspViolations?: string[] }).__cspViolations ?? [],
+            )
+            .catch(() => []);
+        const counted =
+            browserName === 'webkit'
+                ? violations.filter((v) => v !== 'style-src-elem blocked inline')
+                : violations;
+        expect(counted, 'no CSP violation should fire during this test').toEqual([]);
     },
 });
 

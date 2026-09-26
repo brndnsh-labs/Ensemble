@@ -26,7 +26,7 @@ Network egress from the stand is same-origin only for everything but analytics: 
 | v1 browser-data import | `prototypes/v2/lib/import-v1.ts` | **Defended.** Read-only `getItem` view of `ensemble_*`; v1's own normalizers, then the canonical codec; never writes back to a v1 key. **Not separately security-reviewed.** |
 | iReal Pro and chart-file import | `prototypes/v2/lib/import-document.ts`, `app/import-dialog.tsx`, `public/songbook/` parsers | Parsed into the semantic score and validated before use; the original text is kept verbatim as data (`importSource`), never interpreted as markup. **Not separately security-reviewed.** |
 | HTML sinks in the stand | React's default escaping; the one `dangerouslySetInnerHTML` is `app/layout.tsx`'s constant theme script | **Clean.** No user-derived value reaches an HTML sink. |
-| Response headers | `hosting/web/nginx.conf` (`nosniff`, `Referrer-Policy`, `frame-ancestors 'none'`), edge Caddy (HSTS), API `src/http/headers.ts` | **Gap: no script/connect CSP.** The stand ships no `Content-Security-Policy` beyond `frame-ancestors`, and `nginx.conf`'s comment wrongly says the app's own `<meta>` CSP covers it — that meta tag left with v1's `index.html`. Filed as #1395 (F8). |
+| Response headers | `hosting/web/nginx.conf` (`nosniff`, `Referrer-Policy`, `frame-ancestors 'none'`), `prototypes/v2/scripts/offline.mjs` (the `<meta>` CSP), edge Caddy (HSTS), API `src/http/headers.ts` | **Closed (#1395, F8).** `offline.mjs` computes each exported HTML file's inline-script sha256 hashes and injects a `<meta http-equiv="Content-Security-Policy">` as the first thing in `<head>`; nginx still carries `frame-ancestors` (a `<meta>` CSP cannot). |
 | Service worker and offline cache | `prototypes/v2/scripts/offline.mjs` (generated worker), the `/v2/sw.js` tombstone | **Reviewed** in #1355, including the open-redirect fix (origin re-check on the tombstone's forward). The worker excludes `/api` explicitly and never caches private API responses or personalized HTML. |
 | Account-local storage | `prototypes/v2/lib/sync/` (IndexedDB), `lib/account/` | Local owner/generation fence, **not** authentication (`AccountScope`); authorization comes only from the verified server session. Sign-out clears local account data once the server confirms revocation. |
 | Web MIDI | `public/controllers/midi-controller.ts` | **Not exposed in v2** — the stand never calls it. (MIDI *export* is a file download.) |
@@ -36,12 +36,11 @@ Network egress from the stand is same-origin only for everything but analytics: 
 
 ## Findings
 
-**Closed since the 2026-05-30 baseline:** F1 and F2 (the `ManualModal` markdown sink and its metadata injection) were deleted with the v1 UI (#1358). F3 (`npm ci`), F4 (`permissions:`), F5 (headers from the web server) and F6 (deploy as root → forced-command release account) are done.
+**Closed since the 2026-05-30 baseline:** F1 and F2 (the `ManualModal` markdown sink and its metadata injection) were deleted with the v1 UI (#1358). F3 (`npm ci`), F4 (`permissions:`), F5 (headers from the web server) and F6 (deploy as root → forced-command release account) are done. **F8 (#1395)** is done too: a build-time `<meta>` CSP (`prototypes/v2/scripts/offline.mjs`) now carries `script-src`/`connect-src`/`worker-src`/`img-src`/`style-src`/`font-src`/`media-src`/`object-src`/`base-uri`/`form-action`, each inline script allow-listed by its own sha256 hash — a static export has no per-request nonce — and `https://umami.brndn.zip` is the one cross-origin `script-src`/`connect-src` entry, for the analytics tracker (#1389/#1420). `checks/csp.spec.ts` asserts the policy and a zero-violation play-through; `fixtures.ts`'s shared `page` fixture also fails ANY spec that fires a `securitypolicyviolation` event, so the whole suite is the regression net, not just that one file.
 
 **Open:**
 
 - **F7 (Optional) — GitHub Actions pinned to major-version tags.** Unchanged: SHA-pinning third-party actions (`docker/*`, `tailscale/github-action`) is the supply-chain ideal; lower priority for first-party `actions/*`.
-- **F8 (Hardening) — the stand ships no script/connect CSP.** Filed as #1395. A CSP is the second line behind React's escaping; adding one must account for Next's inline bootstrap scripts, the constant theme script, the workers and analytics' `umami.brndn.zip` origin (#1389, live on prod since this landed).
 - **#1132** — the v1-link key hardening above.
 - **#1272** — the disk alert above.
 

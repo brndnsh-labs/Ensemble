@@ -81,6 +81,95 @@ if (atSiteRoot) {
         )}\n`,
     );
 }
+
+// --- Content-Security-Policy: a build-time <meta>, not an nginx header (#1395) -------------
+//
+// Brandon's 2026-09-26 decision on the issue: bake the policy into each exported page here
+// rather than send it as an nginx response header, because the Playwright preview server
+// (scripts/serve.mjs) sets no headers at all — an nginx-only policy would never be exercised
+// by the one suite that checks it. `hosting/web/nginx.conf` keeps `frame-ancestors` (a `<meta>`
+// CSP cannot carry that directive) and its comment now points here instead of claiming the app
+// still carries its own header-shaped policy from v1's deleted `index.html`.
+//
+// A static export has no per-request nonce, so every inline `<script>` (the constant theme
+// script in `app/layout.tsx`, plus the per-page RSC streaming pushes Next itself emits) gets its
+// own sha256 hash instead of `'unsafe-inline'`. Those RSC pushes carry per-page streamed data —
+// `index.html` and `404.html` do not inline the same bytes — so the hash set is computed PER
+// FILE and each page's `<meta>` lists exactly what that page inlines, rather than a repo-wide
+// union that would let one page vouch for a script text it never actually ships.
+const NON_JS_SCRIPT_TYPE =
+    /(^|\s)type\s*=\s*(["'])(?!\2)(?!text\/javascript|application\/javascript|module)/i;
+function extractInlineScripts(html) {
+    const scripts = [];
+    const re = /<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi;
+    for (let match = re.exec(html); match; match = re.exec(html)) {
+        const [, attrs, content] = match;
+        // A `src=` attribute makes it an external script (already covered by `'self'`), and a
+        // non-JS `type` (Next has never emitted one at time of writing, but a JSON data island
+        // would be) is inert markup the HTML parser never executes — neither needs a hash.
+        if (/(^|\s)src\s*=/i.test(attrs) || NON_JS_SCRIPT_TYPE.test(attrs)) {
+            continue;
+        }
+        scripts.push(content);
+    }
+    return scripts;
+}
+function buildCsp(scriptHashes) {
+    return [
+        `default-src 'self'`,
+        // Next's own chunks are same-origin ('self'); the export's inline scripts are the sha256
+        // hashes above. Umami's tracker (#1420, `lib/telemetry.ts`) is the one cross-origin
+        // script the stand ever loads, and only in a production build on the canonical host — a
+        // CSP violation everywhere else is silent, not a hole.
+        [
+            'script-src',
+            "'self'",
+            ...scriptHashes.map((h) => `'sha256-${h}'`),
+            'https://umami.brndn.zip',
+        ].join(' '),
+        // Same-origin only: the account API (`/api/*`, same origin behind Caddy —
+        // `lib/account/api.ts`) and sound-pack downloads (`lib/sounds.ts`). Umami's client posts
+        // events back to the same host its script loaded from.
+        `connect-src 'self' https://umami.brndn.zip`,
+        // The only worker this app registers is its own service worker (this script's `sw.js`),
+        // same-origin. No `Worker`/`AudioWorklet` runs — the band plays on the main-thread
+        // `AudioContext` (`band/CLAUDE.md`; the old logic/MIDI workers are gone, #1404).
+        `worker-src 'self'`,
+        `img-src 'self'`,
+        // `chart-sheet.tsx` sets two runtime-calculated inline `style={{...}}` props (the
+        // section-letter menu's position, a v2-schema measure's `flex` basis), but React applies
+        // those through the CSSOM (`element.style[prop] = value`), and `style-src` does not gate
+        // CSSOM property writes — only `style="..."` attributes already in parsed markup (or a
+        // `setAttribute('style', …)`) and `<style>` elements, neither of which the export
+        // contains. Verified empirically: the full suite (load/open/play/stop across every spec,
+        // via `checks/fixtures.ts`'s violation net) is clean at `'self'`.
+        `style-src 'self'`,
+        `font-src 'self'`,
+        // `public/platform.ts`'s `unlockAudio()` plays a tiny `data:audio/wav;base64,...`
+        // `<audio>` element on every Play — the pre-#1404 engine's iOS (16 and older, ringer on
+        // silent) fix for Web Audio staying muted until a media element has played once. It has
+        // no served URL to allow by origin, so `data:` is the one addition here.
+        `media-src 'self' data:`,
+        `object-src 'none'`,
+        `base-uri 'self'`,
+        `form-action 'self'`,
+    ].join('; ');
+}
+function injectCspMeta(html, csp) {
+    const metaTag = `<meta http-equiv="Content-Security-Policy" content="${csp}">`;
+    // As early in <head> as this export can put it — the very first thing after the opening tag,
+    // ahead of the charset meta, the stylesheet link and every script — so nothing in <head> ever
+    // renders or runs unpolicied.
+    return html.replace(/<head(?=[\s>])[^>]*>/i, (openTag) => `${openTag}${metaTag}`);
+}
+for (const file of (await walk(root)).filter((p) => p.endsWith('.html'))) {
+    const html = await readFile(file, 'utf8');
+    const hashes = extractInlineScripts(html).map((script) =>
+        createHash('sha256').update(script, 'utf8').digest('base64'),
+    );
+    await writeFile(file, injectCspMeta(html, buildCsp(hashes)));
+}
+
 const paths = (await walk(root))
     // `sw.js` and `build.json` are this script's own output. So is the `/v2/` tombstone, which
     // belongs to a scope this worker does not serve and must never be answered from its cache —
