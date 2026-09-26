@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import type { Page } from '@playwright/test';
-import { appUrl, expect, test } from './fixtures';
+import { appUrl, debugScreenshot, expect, test } from './fixtures';
 
 const blue = 'Blue pocket Blues · Saved locally';
 async function openEditor(page: Page) {
@@ -422,7 +422,7 @@ test('Edit chart and Edit section reveal the input across laptop, phone and tabl
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
             true,
         );
-        await page.screenshot({
+        await debugScreenshot(page, {
             path: info.outputPath(`editor-${viewport.width}x${viewport.height}.png`),
         });
     }
@@ -472,7 +472,7 @@ test('the stand scales to its screen, holds still across play/pause and keeps mu
         expect(playing.letter, `play/pause jump @${at.width}x${at.height}`).toBe(idle.letter);
         expect(playing.noOverflow).toBe(true);
         await measure(false);
-        await page.screenshot({
+        await debugScreenshot(page, {
             path: info.outputPath(`stand-${at.width}x${at.height}.png`),
         });
     }
@@ -570,7 +570,7 @@ test('stage mode darkens the stand, persists per device and follows the system w
     );
     // The toggle stays reachable while the chart is focused for playback.
     await expect(stageButton).toBeVisible();
-    await page.screenshot({ path: info.outputPath('stage-mode.png') });
+    await debugScreenshot(page, { path: info.outputPath('stage-mode.png') });
     await page.evaluate(() =>
         document.querySelector('.app-shell')!.classList.remove('performance-focus'),
     );

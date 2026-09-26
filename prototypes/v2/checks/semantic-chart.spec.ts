@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import type { Page } from '@playwright/test';
 import type { ChartDocument } from '../lib/documents';
-import { appUrl, test as base, editorRevealed, expect } from './fixtures';
+import { appUrl, test as base, debugScreenshot, editorRevealed, expect } from './fixtures';
 
 const test = base.extend<{ disconnect: () => Promise<void> }>({
     disconnect: async ({ browserName, context, request }, use) => {
@@ -96,7 +96,7 @@ test('2+1+1 editor saves a source-preserving copy, transposes and reopens offlin
         ['8', '12'],
         ['12', '16'],
     ]);
-    await page.screenshot({ path: info.outputPath('measure-editor.png') });
+    await debugScreenshot(page, { path: info.outputPath('measure-editor.png') });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
         true,
     );

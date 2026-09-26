@@ -3,7 +3,7 @@ import { dirname, resolve } from 'node:path';
 import type { Page } from '@playwright/test';
 import type { ChartDocument } from '../lib/documents';
 import { expectVisitsFollowForm } from './chart-visits';
-import { appUrl, test as base, expect } from './fixtures';
+import { appUrl, test as base, debugScreenshot, expect } from './fixtures';
 
 const test = base.extend<{ disconnect: () => Promise<void> }>({
     disconnect: async ({ browserName, context, request }, use) => {
@@ -91,7 +91,7 @@ test('an iReal HTML preview is inert, explicitly added, transposed, exported and
     expect(await savedDocuments(page)).toEqual(before);
     expect(requests.some((url) => url.includes('import-pixel'))).toBe(false);
     expect(errors).toEqual([]);
-    await page.screenshot({ path: info.outputPath('import-review.png') });
+    await debugScreenshot(page, { path: info.outputPath('import-review.png') });
 
     await dialog.getByRole('button', { name: 'Add to songbook', exact: true }).click();
     await expect(dialog).not.toBeVisible();
@@ -114,7 +114,7 @@ test('an iReal HTML preview is inert, explicitly added, transposed, exported and
     await page.getByRole('button', { name: 'Start playback', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Stop playback', exact: true })).toBeEnabled();
     await expect(page.locator('.chord[aria-current="true"]')).toHaveCount(1);
-    await page.screenshot({ path: info.outputPath('import-stand.png') });
+    await debugScreenshot(page, { path: info.outputPath('import-stand.png') });
     await page.getByRole('button', { name: 'Stop playback', exact: true }).click();
     await page.getByLabel('Key', { exact: true }).selectOption('D');
     await page.getByRole('button', { name: 'Save', exact: true }).click();

@@ -30,6 +30,13 @@ test.describe('Content-Security-Policy (#1395)', () => {
         // Umami (#1420) is the one cross-origin script/connect target the stand ever loads.
         expect(scriptSrc).toContain('https://umami.brndn.zip');
         expect(csp).toContain("connect-src 'self' https://umami.brndn.zip");
+        // React applies chart-sheet.tsx's two runtime-calculated inline `style={{...}}` props
+        // through the CSSOM, which `style-src` does not gate — only `style="..."` attributes in
+        // parsed markup and `<style>` elements, neither of which this export contains. No
+        // 'unsafe-inline' here is therefore a real assertion, not an aspiration.
+        const styleSrc = csp.match(/style-src ([^;]+)/)?.[1] ?? '';
+        expect(styleSrc).not.toContain("'unsafe-inline'");
+        expect(styleSrc).toContain("'self'");
         // A meta CSP cannot carry frame-ancestors at all — that stays an nginx response header
         // (hosting/web/nginx.conf) and must not silently reappear here as a no-op.
         expect(csp).not.toContain('frame-ancestors');

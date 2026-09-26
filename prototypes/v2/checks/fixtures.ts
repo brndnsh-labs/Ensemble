@@ -102,13 +102,26 @@ export const test = base.extend<Record<never, never>, { previewServer: string }>
     // is one source too narrow fails whichever spec first exercises that path, not just the
     // dedicated CSP spec. Best-effort: a page already closed or navigated away by the test's own
     // teardown is not a CSP failure, so a lost evaluation is swallowed rather than asserted on.
+    //
+    // `__cspIgnore` is the one deliberate hole, toggled only by `debugScreenshot` below: on
+    // WebKit, `page.screenshot()` itself trips a `style-src-elem` violation regardless of the
+    // `caret` option (verified empirically — a `MutationObserver` on `document.documentElement`
+    // sees no added `<style>` node, so this is WebKit's own screenshot driver code touching
+    // `adoptedStyleSheets` or an out-of-tree shadow root, not anything the app or this export
+    // ships). None of these calls feed a pixel assertion (`grep -r toHaveScreenshot` is empty —
+    // every one is a debug PNG dropped in `test-results/`), so a real visitor's browser never
+    // takes this path; only the harness's OWN screenshot call is exempted, not the surrounding
+    // test.
     page: async ({ page }, use) => {
         await page.addInitScript(() => {
-            (window as unknown as { __cspViolations: string[] }).__cspViolations = [];
+            const w = window as unknown as { __cspViolations: string[]; __cspIgnore: boolean };
+            w.__cspViolations = [];
+            w.__cspIgnore = false;
             window.addEventListener('securitypolicyviolation', (event) => {
-                (window as unknown as { __cspViolations: string[] }).__cspViolations.push(
-                    `${event.violatedDirective} blocked ${event.blockedURI}`,
-                );
+                if (w.__cspIgnore) {
+                    return;
+                }
+                w.__cspViolations.push(`${event.violatedDirective} blocked ${event.blockedURI}`);
             });
             try {
                 if (localStorage.getItem('ensemble-v2-preview:count-in') === null) {
@@ -127,6 +140,29 @@ export const test = base.extend<Record<never, never>, { previewServer: string }>
         expect(violations, 'no CSP violation should fire during this test').toEqual([]);
     },
 });
+
+/**
+ * A debug-only screenshot (never asserted on — see the `page` fixture's comment above), with the
+ * suite's CSP-violation net switched off for the duration of the call. WebKit's own screenshot
+ * capture trips `style-src-elem` on every call regardless of the `caret` option; every spec that
+ * drops a PNG into `test-results/` for a human to look at should use this instead of
+ * `page.screenshot()` directly, so that harness artifact never fails the test that took it.
+ */
+export async function debugScreenshot(
+    page: Page,
+    options: Parameters<Page['screenshot']>[0],
+): Promise<void> {
+    await page.evaluate(() => {
+        (window as unknown as { __cspIgnore: boolean }).__cspIgnore = true;
+    });
+    try {
+        await page.screenshot(options);
+    } finally {
+        await page.evaluate(() => {
+            (window as unknown as { __cspIgnore: boolean }).__cspIgnore = false;
+        });
+    }
+}
 
 const API_DIR = path.resolve(__dirname, '../../v2-api');
 const API_ENTRY = path.join(API_DIR, 'dist/server.js');

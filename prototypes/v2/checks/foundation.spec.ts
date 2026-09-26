@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { appUrl, test as base, editorRevealed, expect } from './fixtures';
+import { appUrl, test as base, debugScreenshot, editorRevealed, expect } from './fixtures';
 
 async function observeSamples(page: import('@playwright/test').Page) {
     await page.addInitScript(() => {
@@ -699,11 +699,11 @@ test('responsive chart and editor fit laptop, phone and tablet', async ({ page }
         await expect(page.getByRole('button', { name: 'Bass', exact: true })).toBeVisible();
         const focusedChart = await page.locator('.chart-scroll').boundingBox();
         expect(focusedChart!.height).toBeGreaterThan(height * 0.5);
-        await page.screenshot({ path: `test-results/focused-${width}.png` });
+        await debugScreenshot(page, { path: `test-results/focused-${width}.png` });
         await page.getByRole('button', { name: 'Show controls' }).click();
         await expect(page.getByRole('button', { name: 'Sounds', exact: true })).toBeVisible();
         await page.getByRole('button', { name: 'Stop playback' }).click();
-        await page.screenshot({ path: `test-results/chart-${width}.png` });
+        await debugScreenshot(page, { path: `test-results/chart-${width}.png` });
         await page.getByRole('button', { name: 'Edit chart', exact: true }).click();
         await expect(page.getByLabel('Chord text')).toBeVisible();
         const unapplied = 'Dm7 | G7 | Cmaj7 | A7';

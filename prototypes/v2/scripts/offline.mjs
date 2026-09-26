@@ -137,12 +137,13 @@ function buildCsp(scriptHashes) {
         `worker-src 'self'`,
         `img-src 'self'`,
         // `chart-sheet.tsx` sets two runtime-calculated inline `style={{...}}` props (the
-        // section-letter menu's position, a v2-schema measure's `flex` basis) per the root
-        // CLAUDE.md's "inline styles for runtime-calculated values" convention. A static export
-        // has no way to hash a value computed at render time, so this is `'unsafe-inline'`
-        // rather than a hash list — there is no per-value alternative for CSS set through the
-        // CSSOM `style` property.
-        `style-src 'self' 'unsafe-inline'`,
+        // section-letter menu's position, a v2-schema measure's `flex` basis), but React applies
+        // those through the CSSOM (`element.style[prop] = value`), and `style-src` does not gate
+        // CSSOM property writes — only `style="..."` attributes already in parsed markup (or a
+        // `setAttribute('style', …)`) and `<style>` elements, neither of which the export
+        // contains. Verified empirically: the full suite (load/open/play/stop across every spec,
+        // via `checks/fixtures.ts`'s violation net) is clean at `'self'`.
+        `style-src 'self'`,
         `font-src 'self'`,
         // `public/platform.ts`'s `unlockAudio()` plays a tiny `data:audio/wav;base64,...`
         // `<audio>` element on every Play — the pre-#1404 engine's iOS (16 and older, ringer on
