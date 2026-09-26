@@ -118,7 +118,9 @@ export const test = base.extend<Record<never, never>, { previewServer: string }>
             w.__cspViolations = [];
             w.__cspIgnore = false;
             window.addEventListener('securitypolicyviolation', (event) => {
-                if (w.__cspIgnore) {
+                // Only the style directive the screenshot driver trips; anything else inside
+                // the window still counts.
+                if (w.__cspIgnore && event.violatedDirective.startsWith('style-src')) {
                     return;
                 }
                 w.__cspViolations.push(`${event.violatedDirective} blocked ${event.blockedURI}`);
