@@ -25,6 +25,12 @@ export interface DrumBook {
     timekeeper: DrumPiece[];
     /** How many sixteenths a section fill / phrase fill takes at each tier. */
     fillLength: Record<'phrase' | 'section', Record<EnergyTier, number>>;
+    /**
+     * The drummer's turn when the player trades with him: bar `bar` of a solo `length` bars
+     * long, written over the whole bar in place of the time. Absent, the drummer doesn't solo
+     * and trading with the drums isn't offered in the style.
+     */
+    trade?(ctx: BarContext, bar: number, length: number, tier: EnergyTier): Lines;
 }
 
 function composeFromCells(ctx: BarContext, tier: EnergyTier, book: DrumBook): Lines {
@@ -77,6 +83,7 @@ function overlay(base: Lines, fill: Lines, from: number, total: number, keep: Dr
 export function drumIdiom(book: DrumBook): DrumIdiom {
     return {
         name: book.name,
+        solos: Boolean(book.trade),
         init: () => null,
         play(ctx) {
             const { bar, plan } = ctx;
@@ -97,9 +104,25 @@ export function drumIdiom(book: DrumBook): DrumIdiom {
                 return { events, memory: null };
             }
             const tier = energyTier(plan.energy);
-            let lines = isCommonTime(bar)
+            const role = plan.lead;
+            const soloing = role.kind === 'trade' && role.with === 'drums' && role.turn === 'band';
+            const time = isCommonTime(bar)
                 ? book.groove(ctx, tier)
                 : composeFromCells(ctx, tier, book);
+            // A drum solo in a chorus of fours keeps the time's own hi-hat foot, whatever the
+            // meter: the form is never lost.
+            let lines =
+                soloing && book.trade
+                    ? {
+                          ...book.trade(
+                              ctx,
+                              role.kind === 'trade' ? role.at : 0,
+                              role.kind === 'trade' ? role.bars : 1,
+                              tier,
+                          ),
+                          ...(time.hatPedal ? { hatPedal: time.hatPedal } : {}),
+                      }
+                    : time;
             const fillStep = fillStart(ctx, book);
             if (fillStep !== null) {
                 const fill = book.fill(ctx, total - fillStep, ctx.rng('fill'));

@@ -100,9 +100,14 @@ export function bassNote(
 
 /**
  * The chord the line is heading to after this bar's spans: the next bar's first chord,
- * wrapping when the song loops. Null when the next bar starts on N.C. or the song ends.
+ * wrapping when the song loops. Null when the next bar starts on N.C., the song ends, or the
+ * band sits the next bar out (the drummer's four): there is nothing to approach. (A guitar
+ * with no bassist walks into the next chord itself, so the comp alone still counts.)
  */
 export function nextChord(ctx: BarContext): ChordFacts | null {
+    if (ctx.next && !ctx.next.plan.lanes.bass && !ctx.next.plan.lanes.comp) {
+        return null;
+    }
     const first: BarSpan | undefined = ctx.next?.bar.spans[0];
     return first?.chord ?? null;
 }

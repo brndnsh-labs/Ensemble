@@ -1,42 +1,14 @@
 /**
- * The lead's form: what each phrase slot of a pass is for, decided from where it sits in the
- * performance before any note is chosen.
+ * The shape of the lead's solos. Which pass is a head, a solo chorus or a chorus of fours is
+ * the arrangement's (`arrange/cycle.ts`); this is what a solo phrase slot is asked to do.
  *
- * The first time through, the lead plays the head (a tune it writes from the changes). Looping,
- * it solos for three choruses and brings the head back on the fourth: head, solo, solo, solo,
- * head… The three solo choruses are one arc — low and sparse, developing, the cycle's one peak
- * — and the last phrase of the third winds down so the head can come back in.
+ * The three solo choruses are one arc — low and sparse, developing, the cycle's one peak —
+ * and the last phrase of the third winds down so the head can come back in.
  */
 import type { EnergyTier } from '../../arrange/plan.js';
-import type { Bar, Timeline } from '../../form/timeline.js';
+import type { Timeline } from '../../form/timeline.js';
 
 export type Density = 'sparse' | 'mid' | 'busy';
-
-export type LeadRole =
-    | { kind: 'rest' }
-    | { kind: 'head' }
-    | {
-          kind: 'solo';
-          /** Which chorus of the solo arc, 1–3. */
-          chorus: 1 | 2 | 3;
-      };
-
-/** How many passes one head-and-solos cycle lasts. */
-export const CYCLE = 4;
-
-export function leadRole(bar: Bar, pass: number): LeadRole {
-    const label = bar.visit.label.trim();
-    // An intro is the band's; the lead comes in after it.
-    if (/^intro/i.test(label)) {
-        return { kind: 'rest' };
-    }
-    const cycle = pass % CYCLE;
-    // A section written as a solo is one, even the first time through.
-    if (/^solo/i.test(label)) {
-        return { kind: 'solo', chorus: cycle === 0 ? 1 : (cycle as 1 | 2 | 3) };
-    }
-    return cycle === 0 ? { kind: 'head' } : { kind: 'solo', chorus: cycle as 1 | 2 | 3 };
-}
 
 /** What one solo phrase slot is asked to do: how busy, how high, and whether it is the peak. */
 export interface Arc {
@@ -98,4 +70,19 @@ export function soloArc(
     }
     const lift = energy === 'low' ? -1 : energy === 'high' ? 1 : 0;
     return { ...arc, density: shift(arc.density, arc.peak ? Math.max(0, lift) : lift) };
+}
+
+/**
+ * A trade: the soloist's turn to say something, straight in, and then the player answers. A
+ * little high, the whole turn played through to an arrival; busy unless the style is a
+ * spacious one (`space`, neo-soul and reggae), and a notch calmer at low energy.
+ */
+export function tradeArc(energy: EnergyTier, space: number): Arc {
+    const density: Density = space >= 0.35 ? 'mid' : 'busy';
+    return {
+        density: energy === 'low' ? shift(density, -1) : density,
+        register: 2,
+        peak: false,
+        windDown: false,
+    };
 }

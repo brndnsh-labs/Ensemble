@@ -17,13 +17,13 @@ import {
     place,
 } from '../players/bass/line.js';
 import { compIdiom, type Hit } from '../players/comp/idiom.js';
-import { drumIdiom } from '../players/drums/kit.js';
-import { dyn, pulses, spanSteps } from '../players/grid.js';
+import { drumIdiom, type Lines } from '../players/drums/kit.js';
+import { barSteps, dyn, pulses, spanSteps } from '../players/grid.js';
 import { leadIdiom } from '../players/lead/idiom.js';
 import { bebopScale, guideTones, restingTones } from '../players/lead/palette.js';
 import { type ChordFacts, fifthOf } from '../theory/chord.js';
 import { mod12 } from '../theory/pitch.js';
-import type { PitchedIdiom, Style } from './types.js';
+import type { BarContext, PitchedIdiom, Style } from './types.js';
 
 // ================================================================ drums
 // The ride carries the time ("spang-spang-a-lang", swung by the feel pass); hi-hat foot
@@ -31,6 +31,108 @@ import type { PitchedIdiom, Style } from './types.js';
 // Swung-eighth offbeats and beat 3 only: the "a" sixteenths would land between triplet
 // positions once the feel pass swings them, and read as flams.
 const JAZZ_COMP_SPOTS = [2, 6, 8, 10, 14];
+
+// Two beats of swung eighths, each on the beat with an offbeat in it: the statement is
+// heard as the band drops out, so it starts on the one (a displacement moves it off later).
+const TRADE_MOTIFS = ['xx.x', 'x.xx', 'x..x', 'xxx.'];
+const TOMS = ['tomHigh', 'tomMid', 'tomLow'] as const;
+
+/**
+ * The drummer's turn when the player trades with him, bebop style (Max Roach, Philly Joe
+ * Jones), written for fours and fitted to twos and eights. The first bar states a
+ * two-beat motif on the snare, answered on the toms, with the kick on the one as the band
+ * drops out. The middle bars develop it: displaced by an eighth and moved to the toms, then
+ * as accents in a stream of eighths. The last bar states it once more and runs home down the
+ * toms, louder as it goes, to a snare-and-kick shot on the "and" of 4; the crash on the next
+ * downbeat is the band coming back. Swung eighths only, for the same reason as the comping (a
+ * sixteenth would flam once swung). The hi-hat foot is the time's own: the kit keeps it.
+ */
+function jazzTrade(ctx: BarContext, bar: number, length: number, tier: EnergyTier): Lines {
+    const total = barSteps(ctx.bar);
+    const slotStart = ctx.bar.index - bar;
+    // One motif for the whole four: it is the solo's idea.
+    const motif = ctx.rng(`trade:${ctx.pass}:${slotStart}`, 'song').pick(TRADE_MOTIFS);
+    const lines = {
+        snare: [] as string[],
+        tomHigh: [] as string[],
+        tomMid: [] as string[],
+        tomLow: [] as string[],
+        kick: [] as string[],
+    };
+    for (const line of Object.values(lines)) {
+        line.push(...'.'.repeat(total));
+    }
+    const hit = tier === 'low' ? 'o' : 'x';
+    // In fours: statement, displaced, stream, home. Eights say it twice over; twos are a
+    // statement and the run home.
+    const role =
+        bar === length - 1
+            ? 'home'
+            : bar % 4 === 0
+              ? 'state'
+              : bar % 4 === 2 || bar === length - 2
+                ? 'stream'
+                : 'displace';
+    // A displaced bar plays the motif an eighth late; its first stroke is still the accent.
+    const shift = role === 'displace' ? 1 : 0;
+    const runFrom = 8;
+    const run: number[] = [];
+    for (let step = runFrom; step < total - 2; step += 2) {
+        run.push(step);
+    }
+    for (let step = 0; step < total; step += 2) {
+        const e = step / 2;
+        const half = Math.floor(e / 4);
+        const on = motif[(e - shift + 4) % 4] === 'x';
+        const accent = e % 4 === shift;
+        if (role === 'home' && step === total - 2) {
+            lines.snare[step] = 'X';
+            lines.kick[step] = 'X';
+            continue;
+        }
+        if (role === 'home' && step >= runFrom) {
+            // Every eighth, the three toms in turn from high to low, getting louder.
+            const k = run.indexOf(step);
+            lines[TOMS[Math.floor((k * TOMS.length) / run.length)]][step] =
+                tier === 'low' || k < run.length / 2 ? 'o' : 'x';
+            continue;
+        }
+        if (role === 'stream') {
+            // The motif as accents in a stream of eighths, each figure's first doubled by the
+            // kick (a "bomb").
+            lines.snare[step] = on ? 'X' : 'g';
+            if (on && accent) {
+                lines.kick[step] = 'x';
+            }
+            continue;
+        }
+        if (!on) {
+            // Driving hard, the left hand keeps the eighths going softly between the strokes.
+            if (tier === 'high') {
+                lines.snare[step] = 'g';
+            }
+            continue;
+        }
+        // Stated on the snare and answered on the high tom; displaced, it moves to the toms
+        // as a unit, high then the floor tom.
+        const piece =
+            role === 'displace'
+                ? half % 2 === 0
+                    ? 'tomHigh'
+                    : 'tomLow'
+                : half % 2 === 0
+                  ? 'snare'
+                  : 'tomHigh';
+        lines[piece][step] = accent ? 'X' : hit;
+    }
+    if (role === 'state') {
+        // The one, under the statement: the band has just dropped out.
+        lines.kick[0] = 'x';
+    }
+    return Object.fromEntries(
+        Object.entries(lines).map(([piece, line]) => [piece, line.join('')]),
+    ) as Lines;
+}
 
 const jazzDrums = drumIdiom({
     name: 'jazz ride',
@@ -72,6 +174,7 @@ const jazzDrums = drumIdiom({
         const kick = `${'.'.repeat(steps - 2)}x.`;
         return { snare: snare.join(''), kick, ride: 'x'.padEnd(steps, '.') };
     },
+    trade: jazzTrade,
 });
 
 // ================================================================ bass
@@ -348,6 +451,10 @@ const jazzKeys = compIdiom({
     name: 'jazz comp',
     kind: 'rootless',
     push: { low: 0.15, mid: 0.3, high: 0.4 },
+    // The comper and the horn share the space: a strike under a moving line may lay out,
+    // and nearly every breath gets a stab (Wynton Kelly behind a soloist). The figure is
+    // already sparse, so the time stays: never fewer than two strikes a bar.
+    answer: { layOut: 0.6, fill: 0.9, keep: 2 },
     rhythm: (_ctx, span, tier, rng) => jazzComp(span, tier, rng),
 });
 

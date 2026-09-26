@@ -232,6 +232,11 @@ export const neosoul = defineClaims({
         {
             take: { lead: 'solo' },
             claims: [
+                // Answer off / no lay-out: breath density 1.19 (0.92 / 0.93), lift +4.0 (-3.2 /
+                // -; -2.0 with no lift), line density 0.134 (0.172 / 0.172).
+                ['compBreathDensity', 1.05, 2, 'the Rhodes leans back under the line'],
+                ['compAnswerLift', 1, 12, 'and speaks up in its breaths'],
+                ['compLineDensity', 0.1, 0.155, 'held chords under the singer, fewer re-strikes'],
                 ['leadLongBreath', 0, 0.12, 'breaths, not gaps: two empty bars are rare'],
                 ['leadRestShare', 0.22, 0.5, 'space is the style: more room than any other lead'],
                 ['leadThirdBend', 0.12, 0.5, 'a half-step slide into the 3rd, often'],

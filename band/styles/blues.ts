@@ -425,6 +425,9 @@ const bluesKeysRootless = compIdiom({
     // with its colours, and the bass has the root.
     kind: 'rootless',
     push: KEYS_PUSH,
+    // The piano answers the guitar's licks in the space between them (call and response);
+    // the boogie pump below is a groove and keeps its figure.
+    answer: { layOut: 0.45, fill: 0.6 },
     rhythm: (ctx, span, tier) => bluesKeysRhythm(ctx, span, tier),
 });
 

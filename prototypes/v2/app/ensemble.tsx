@@ -87,6 +87,7 @@ import { SongHeader } from './song-header';
 import { SongMenu } from './song-menu';
 import { Songbook } from './songbook';
 import { SoundsPanel } from './sounds-panel';
+import { TradeSheet } from './trade-sheet';
 import { TransportBar } from './transport-bar';
 import { useChartView } from './use-chart-view';
 import { useOfflineInstall } from './use-offline-install';
@@ -338,6 +339,7 @@ export default function Ensemble() {
     const [allSoundsOffline, setAllSoundsOffline] = useState<boolean | null>(null);
     const [soundMenu, setSoundMenu] = useState(false);
     const [feelMenu, setFeelMenu] = useState(false);
+    const [tradeMenu, setTradeMenu] = useState(false);
     // `bandIntensity`/`autoIntensity`/`metronome`/`masterVolume` are not part of
     // `current.chart` (`STATE_OWNERSHIP_MANIFEST`: session-only or a device
     // preference, never a document field) — this is the shell's own reactive mirror
@@ -648,6 +650,7 @@ export default function Ensemble() {
     const adoptRemoteDialogRef = useRef<HTMLDialogElement>(null);
     const soundsDialog = useRef<HTMLDialogElement>(null);
     const feelDialog = useRef<HTMLDialogElement>(null);
+    const tradeDialog = useRef<HTMLDialogElement>(null);
     const file = useRef<HTMLInputElement>(null);
     const scroll = useRef<HTMLDivElement>(null);
     const editPanel = useRef<HTMLElement>(null);
@@ -1284,6 +1287,13 @@ export default function Ensemble() {
             feelDialog.current?.close();
         }
     }, [feelMenu]);
+    useEffect(() => {
+        if (tradeMenu) {
+            tradeDialog.current?.showModal();
+        } else {
+            tradeDialog.current?.close();
+        }
+    }, [tradeMenu]);
     useEffect(() => {
         let alive = true;
         setAllSoundsOffline(null);
@@ -3382,6 +3392,19 @@ export default function Ensemble() {
                         }
                         onToggleLane={(key) =>
                             change(() => runtime.setEnabled(key, !current.chart.band[key].enabled))
+                        }
+                        onTrade={() => setTradeMenu(true)}
+                        tradeBlocked={runtime.tradeBlocked()}
+                    />
+                    <TradeSheet
+                        dialogRef={tradeDialog}
+                        current={current}
+                        busy={busy}
+                        partners={runtime.tradePartners()}
+                        blocked={runtime.tradeBlocked()}
+                        onClose={() => setTradeMenu(false)}
+                        onChange={(tradeWith, bars) =>
+                            change(() => runtime.setTrade(tradeWith, bars))
                         }
                     />
                     <SoundsPanel

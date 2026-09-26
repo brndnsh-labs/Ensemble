@@ -1,3 +1,4 @@
+import type { SoloistTradeBars, SoloistTradeWith } from './songbook/types.js';
 import type { VisualizerQueuedEvent } from './visualizer/visualizer-events.js';
 
 /**
@@ -921,8 +922,12 @@ export interface SoloistState {
     /** Slider for how dynamic/articulated the phrasing is. */
     readonly phrasingIntensity: number;
     /** Probability of playing double stops. */
-    /** Mode for trading fours ('manual', 'auto'). */
+    /** The old engine's trade block: the soloist on and off by 'sections' or 'loops'. */
     readonly tradeMode: string;
+    /** Trading with the player on the band engine: 'off', 'soloist' or 'drums'. */
+    readonly tradeWith: SoloistTradeWith;
+    /** How many bars a traded turn lasts: 2, 4 or 8. */
+    readonly tradeBars: SoloistTradeBars;
     /**
      * #1062 — RUNTIME-DERIVED trade-silencing layer, never the user's own
      * setting. The soloist-trade block in `conductor.ts` toggles this (not
