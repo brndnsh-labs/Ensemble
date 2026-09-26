@@ -122,7 +122,6 @@ describe('Security: URL Parameter Validation', () => {
             expect.objectContaining({
                 genreName: 'Disco',
                 feel: 'Disco',
-                drum: 'Disco',
                 bass: 'disco',
                 soloist: 'disco',
             }),

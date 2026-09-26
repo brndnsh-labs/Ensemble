@@ -91,14 +91,9 @@ export function saveCurrentState(): void {
             swing: groove.swing,
             swingSub: groove.swingSub,
             humanize: groove.humanize,
-            lastDrumPreset: groove.lastDrumPreset,
             genreFeel: groove.genreFeel,
             lastSmartGenre: groove.lastSmartGenre,
             sectionSeedMap: groove.sectionSeedMap,
-            pattern: groove.instruments.map((inst) => ({
-                name: inst.name,
-                steps: [...inst.steps],
-            })),
         },
         midi: {
             enabled: midi.enabled,

@@ -4,7 +4,6 @@ const GENRE_DEFAULTS = {
 };
 
 type GenreOverride = Partial<typeof GENRE_DEFAULTS> & {
-    drum?: string;
     feel?: string;
     bass?: string;
     soloist?: string;
@@ -31,7 +30,6 @@ type GenreOverride = Partial<typeof GENRE_DEFAULTS> & {
  */
 const GENRE_OVERRIDES = {
     Rock: {
-        drum: 'Basic Rock',
         feel: 'Rock',
         bass: 'rock',
         // #592: the Rock genre plays its tailored 'rock' profile (bluesy
@@ -43,7 +41,6 @@ const GENRE_OVERRIDES = {
         soloistMode: 'guitar',
     },
     Jazz: {
-        drum: 'Jazz',
         feel: 'Jazz',
         chord: 'jazz',
         bass: 'quarter',
@@ -52,7 +49,6 @@ const GENRE_OVERRIDES = {
         meters: ['4/4', '3/4', '6/8'], // swing · jazz waltz · All Blues
     },
     Funk: {
-        drum: 'Funk',
         feel: 'Funk',
         chord: 'funk',
         bass: 'funk',
@@ -62,13 +58,11 @@ const GENRE_OVERRIDES = {
         harmony: 'horns',
     },
     Disco: {
-        drum: 'Disco',
         feel: 'Disco',
         bass: 'disco',
         soloist: 'disco',
     },
     'Hip Hop': {
-        drum: 'Hip Hop',
         feel: 'Hip Hop',
         bass: 'hiphop',
         // #555: was 'neo' — the smart key out-prioritized GENRE_STYLE_MAPPING's
@@ -78,7 +72,6 @@ const GENRE_OVERRIDES = {
         soloist: 'hiphop',
     },
     Blues: {
-        drum: 'Blues Shuffle',
         feel: 'Blues',
         chord: 'jazz',
         bass: 'blues',
@@ -87,7 +80,6 @@ const GENRE_OVERRIDES = {
         meters: ['4/4', '12/8', '6/8'], // straight/shuffle · slow blues · All Blues
     },
     'Neo-Soul': {
-        drum: 'Neo-Soul',
         feel: 'Neo-Soul',
         bass: 'neo',
         soloist: 'neo',
@@ -97,7 +89,6 @@ const GENRE_OVERRIDES = {
         harmony: 'strings',
     },
     Reggae: {
-        drum: 'Reggae',
         feel: 'Reggae',
         bass: 'dub',
         // #570: activate the tailored 'reggae' soloist profile (skank/offbeat:
@@ -107,7 +98,6 @@ const GENRE_OVERRIDES = {
         soloist: 'reggae',
     },
     Acoustic: {
-        drum: 'Acoustic',
         feel: 'Acoustic',
         // The chords lane plays a fingerpick arpeggio (the 'arp' style); the
         // strings harmony holds the sustained pad underneath — each instrument
@@ -124,7 +114,6 @@ const GENRE_OVERRIDES = {
         meters: ['4/4', '3/4'], // ballads & waltz-time singer-songwriter
     },
     Bossa: {
-        drum: 'Bossa Nova',
         feel: 'Bossa Nova',
         chord: 'jazz',
         bass: 'bossa',
@@ -132,7 +121,6 @@ const GENRE_OVERRIDES = {
         harmony: 'strings',
     },
     Country: {
-        drum: 'Country (Two-Step)',
         feel: 'Country',
         chord: 'strum-country',
         bass: 'country',
@@ -142,14 +130,12 @@ const GENRE_OVERRIDES = {
         meters: ['4/4', '3/4'], // two-step · country waltz
     },
     Metal: {
-        drum: 'Metal (Speed)',
         feel: 'Metal',
         chord: 'power-metal',
         bass: 'metal',
         soloist: 'metal',
     },
     'Ska-Punk': {
-        drum: 'Ska',
         feel: 'Ska',
         chord: 'ska-upstroke',
         bass: 'walking-ska',

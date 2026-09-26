@@ -75,10 +75,6 @@ export function cloneStateForDetachedGeneration(liveState: EnsembleState): Ensem
         },
         groove: {
             ...liveState.groove,
-            instruments: liveState.groove.instruments.map((instrument) => ({
-                ...instrument,
-                steps: [...instrument.steps],
-            })),
             audioBuffers: {},
             buffer: new Map(),
             lastHatGain: null,

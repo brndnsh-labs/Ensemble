@@ -12,18 +12,11 @@ describe('Groove Reducer', () => {
         grooveReducer({ type: ACTIONS.RESET_STATE, payload: undefined });
     });
 
-    it('should reset to default values and clear instruments', () => {
+    it('should reset to default values', () => {
         mutableGroove.volume = 0.9;
-        groove.instruments[0].steps[0] = 1;
         grooveReducer({ type: ACTIONS.RESET_STATE, payload: undefined });
         expect(groove.volume).toBe(1.0);
         expect(groove.genreFeel).toBe('Rock');
-        expect(groove.instruments[0].steps[0]).toBe(0);
-    });
-
-    it('should set active measure', () => {
-        grooveReducer({ type: ACTIONS.SET_ACTIVE_MEASURE, payload: 2 });
-        expect(groove.currentMeasure).toBe(2);
     });
 
     it('#791: clears the section-seed memo on RESET_STATE and on SET_SONG_SEED', () => {
@@ -97,12 +90,9 @@ describe('Groove Reducer', () => {
                 enabled: false,
                 volume: 0.1,
                 reverb: 0.1,
-                measures: 4,
-                currentMeasure: 1,
                 humanize: 50,
                 swing: 10,
                 swingSub: '16th',
-                lastDrumPreset: 'Jazz Kit',
                 genreFeel: 'Jazz',
                 lastSmartGenre: 'Jazz',
                 pendingGenreFeel: { feel: 'Funk' },
@@ -140,12 +130,12 @@ describe('Groove Reducer', () => {
                     grooveReducer(
                         {
                             type: ACTIONS.SET_PARAM,
-                            payload: { module, param: 'measures', value: 3 },
+                            payload: { module, param: 'humanize', value: 3 },
                         },
                         {},
                     ),
                 ).toBe(true);
-                expect(groove.measures).toBe(3);
+                expect(groove.humanize).toBe(3);
 
                 expect(
                     grooveReducer({ type: ACTIONS.SET_VOLUME, payload: { module, value: 0.42 } }),
@@ -178,7 +168,7 @@ describe('Groove Reducer', () => {
                 expect(
                     instrumentReducer({
                         type: ACTIONS.SET_PARAM,
-                        payload: { module, param: 'measures', value: 99 },
+                        payload: { module, param: 'humanize', value: 99 },
                     } as any),
                 ).toBe(false);
             }
@@ -186,7 +176,7 @@ describe('Groove Reducer', () => {
             // Declining must mean "didn't touch it", not "wrote it and reported false".
             expect(groove.volume).not.toBe(0.99);
             expect(groove.reverb).not.toBe(0.99);
-            expect(groove.measures).not.toBe(99);
+            expect(groove.humanize).not.toBe(99);
         });
 
         it('still routes non-groove modules to instrumentReducer', async () => {

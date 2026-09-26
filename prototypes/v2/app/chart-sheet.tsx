@@ -63,7 +63,7 @@ interface ChartSheetProps {
     playbackActive: boolean;
     totalBars: number;
     onToggleLoop: (sectionId: string | undefined) => void;
-    /** Section tap menu's "Start here" (#1417) — jumps playback to the section's first
+    /** Section tap menu's "Start here" (#1422) — jumps playback to the section's first
      * performed bar, starting it if stopped. */
     onStartHere: (sectionId: string | undefined) => void;
     onEditSection: (block: ChartBlock) => void;
@@ -93,10 +93,10 @@ export function ChartSheet({
     // Long-press bookkeeping for the section-letter loop gesture: the pending
     // timer so pointerup/leave/cancel can cancel it, and a suppression flag so
     // the click that follows a fired long-press doesn't also fire the plain-tap
-    // handler below (the section menu, #1417).
+    // handler below (the section menu, #1422).
     const sectionLoopPress = useRef<number | null>(null);
     const suppressSectionTap = useRef(false);
-    // A plain tap opens this small menu (#1417) instead of the long-press/'L' loop
+    // A plain tap opens this small menu (#1422) instead of the long-press/'L' loop
     // toggle above, which it leaves untouched. One menu for the whole sheet, not
     // one per section: cheaper, and only one can be open at a time anyway.
     const [sectionMenu, setSectionMenu] = useState<{
@@ -207,7 +207,7 @@ export function ChartSheet({
                                     suppressSectionTap.current = false;
                                     return;
                                 }
-                                // A plain tap opens the section menu (#1417):
+                                // A plain tap opens the section menu (#1422):
                                 // "Loop this section"/"Start here". Enter/Space
                                 // reach the same handler (native button
                                 // semantics), so no separate key handling here.

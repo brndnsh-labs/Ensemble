@@ -23,6 +23,8 @@ field list. That arrangement has three structural problems:
    `validateSections`; `arranger.grouping` and `complexity` were never written. A field's
    presence in hydration is not by itself proof that it belongs in a document: the current
    `bandIntensity` is realized auto-conductor state and deliberately remains runtime-only.
+   *(Amended 2026-09-26, #1404: no conductor writes it any more. The band shapes its own
+   energy, so the level is now the player's choice, saved per chart as `performance.energy`.)*
 2. **One payload mixes different lifetimes.** Musical content, device choices, visual
    preferences, session-start defaults, and runtime state do not all belong to a song.
 3. **The storage shape is doing three jobs.** It is simultaneously a crash-recovery snapshot,
@@ -81,9 +83,19 @@ its compatibility payload unchanged without making the new codecs depend on that
 
 | Owner | Canonical fields |
 | :--- | :--- |
-| `ChartDocument` | Sections and overrides; key/mode; meter/grouping; **notation**; tempo; complexity; song seed and policy; genre/feel; authored groove pattern; lane enablement, source choice, style, octave, density, phrasing, **volume, and reverb**. |
+| `ChartDocument` | Sections and overrides; key/mode; meter/grouping; **notation**; tempo; song seed and policy; **genre, stored once by name**; **energy (`'auto'` or a level)**; the soloist's phrasing mode and trading; swing, swing grid and humanize; lane enablement, source choice, **volume, and reverb**. |
 | `WorkspacePreferences` | Palette/mode; visual aids; count-in and practice defaults; output master volume; **session timer and song mode**; MIDI device IDs, latency, local audio muting, octave offsets, velocity sensitivity, and **channel mappings**. |
-| `RuntimeState` / derived | Transport and practice progress; current `bandIntensity`; the current forced-on-at-boot `autoIntensity` behavior; `sectionSeedMap`; generated arranger/worker maps; audio handles; undo and transient UI. Version 1 has no authored starting-intensity or manual-vs-auto field. |
+| `RuntimeState` / derived | Transport and practice progress; the metronome; `sectionSeedMap`; generated arranger/worker maps; audio handles; undo and transient UI. |
+
+**Amended 2026-09-26 (#1404, chart format).** A chart holds the music plus the settings the band
+honours. The old engine's fields — complexity; per-lane style, octave, density and instrument;
+the soloist's preset, octave, phrasing intensity and section trade mode; the whole harmony lane;
+the drum pattern, its measures and preset — are dropped **lazily**: the codec still accepts them
+when a chart is read (and reproduces them exactly, so a Save an older build queued still matches
+its own bytes on the server), but capture never writes them, so each chart sheds them on its next
+save. No stored document is rewritten. The genre, once stored twice (`lastSmartGenre` and
+`genreFeel`), is `groove.genre`; the old pair is read as a fallback (`chartGenre`). Band energy
+moved from runtime state into the chart as `performance.energy`, absent reading as `'auto'`.
 
 `public/songbook/types.ts` owns the semantic version-1 shapes. `public/songbook/codec.ts` validates
 the complete untrusted candidate before returning a detached typed value; unknown future versions

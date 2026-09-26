@@ -1,5 +1,5 @@
 /**
- * The count-in (#1417): one bar of clicks before a fresh Play, at the chart's own tempo and
+ * The count-in (#1422): one bar of clicks before a fresh Play, at the chart's own tempo and
  * meter, that shifts the band's own downbeat back by exactly that bar rather than overlapping
  * it. Pinned here: `countInPlan`'s pure math, and `BandHost.start()`'s use of it — scheduled
  * only when asked, never re-triggered by a loop wrap, and absent entirely when off.

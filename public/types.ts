@@ -312,17 +312,6 @@ export interface ConductorState {
     readonly formIteration: number;
 }
 
-export interface Instrument {
-    /** Instrument name (e.g., 'Kick'). */
-    name: string;
-    /** Display emoji/symbol. */
-    symbol: string;
-    /** Sequencer steps (0=off, 1=on, 2=accent). */
-    steps: number[];
-    /** Whether the instrument is muted. */
-    muted: boolean;
-}
-
 /**
  * Which audio source an instrument uses. `synth` is the in-process synthesized
  * voice (the reworked synth-audit voice — the permanent fallback); a
@@ -343,25 +332,16 @@ export interface GrooveState {
     readonly voice: InstrumentVoice;
     /** Sound-source mode: Auto (follow genre) vs pinned to `voice` (#675). */
     readonly autoSound: boolean;
-    /** List of drum instruments. */
-    readonly instruments: Instrument[];
     /** Volume level. */
     readonly volume: number;
     /** Reverb level. */
     readonly reverb: number;
-    /** Number of measures in the loop (1-8). */
-    readonly measures: number;
-    /** Currently visible measure for editing. */
-    readonly currentMeasure: number;
-    /** Whether to scroll grid during playback. */
     /** Humanization percentage (0-100). */
     readonly humanize: number;
     /** Swing percentage (0-100). */
     readonly swing: number;
     /** Swing subdivision ('8th' or '16th'). */
     readonly swingSub: SwingSub;
-    /** Name of the last loaded drum preset. */
-    readonly lastDrumPreset: string;
     /** Thematic seed for deterministic generation. */
     readonly seed: string;
     /** Cache for decoded drum samples. */
@@ -1549,7 +1529,6 @@ export interface ActionPayloadMap {
     SET_SWING_SUB: string;
     SET_HUMANIZE: number;
     SET_GENRE_FEEL: ActionPayloadSetGenreFeel;
-    SET_ACTIVE_MEASURE: number | string;
     UPDATE_HB: ActionPayloadUpdateHB;
     UPDATE_GB: ActionPayloadUpdateGB;
     SET_SECTIONS: Section[];
@@ -1580,7 +1559,6 @@ export interface ActionPayloadMap {
     VIS_RESET?: undefined;
     VIS_UPDATE?: unknown;
     PROG_VALIDATED?: undefined;
-    DRUM_PRESET_LOADED?: undefined;
 }
 
 /**
@@ -1632,7 +1610,6 @@ export const ACTIONS = {
     SET_SWING_SUB: 'SET_SWING_SUB',
     SET_HUMANIZE: 'SET_HUMANIZE',
     SET_GENRE_FEEL: 'SET_GENRE_FEEL',
-    SET_ACTIVE_MEASURE: 'SET_ACTIVE_MEASURE',
     UPDATE_HB: 'UPDATE_HB',
     UPDATE_GB: 'UPDATE_GB',
 
@@ -1664,5 +1641,4 @@ export const ACTIONS = {
     VIS_RESET: 'VIS_RESET',
     VIS_UPDATE: 'VIS_UPDATE',
     PROG_VALIDATED: 'PROG_VALIDATED',
-    DRUM_PRESET_LOADED: 'DRUM_PRESET_LOADED',
 } as const satisfies { readonly [K in keyof ActionPayloadMap]-?: K };

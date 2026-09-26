@@ -1,5 +1,4 @@
 import { STYLES } from '@band/index';
-import { DRUM_PRESETS } from '@engine/data/drum-presets';
 import { GENRE_NAMES, SMART_GENRES } from '@engine/data/smart-genres';
 import { describe, expect, it } from 'vitest';
 import { STYLE_FOR_GENRE } from './band-voices';
@@ -28,14 +27,11 @@ describe('genreSwing — the band style is the one swing authority', () => {
         expect(genreSwing('constructor')).toBeNull();
     });
 
-    it('leaves no second source: neither the genre table nor a drum preset carries a swing', () => {
+    it('leaves no second source: the genre table carries no swing', () => {
+        // (The old engine's drum presets were the other source; they are gone, 2026-09-26.)
         for (const [name, genre] of Object.entries(SMART_GENRES)) {
             expect(Object.hasOwn(genre, 'swing'), name).toBe(false);
             expect(Object.hasOwn(genre, 'sub'), name).toBe(false);
-        }
-        for (const [name, preset] of Object.entries(DRUM_PRESETS)) {
-            expect(Object.hasOwn(preset, 'swing'), name).toBe(false);
-            expect(Object.hasOwn(preset, 'sub'), name).toBe(false);
         }
     });
 });

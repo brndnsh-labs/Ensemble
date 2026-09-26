@@ -8,29 +8,11 @@ export const groove = deepSignal<GrooveState>({
     enabled: true,
     voice: 'synth',
     autoSound: true,
-    instruments: [
-        { name: 'Kick', symbol: '🥁', steps: new Array(128).fill(0), muted: false },
-        { name: 'Snare', symbol: '👏', steps: new Array(128).fill(0), muted: false },
-        { name: 'HiHat', symbol: '🎩', steps: new Array(128).fill(0), muted: false },
-        { name: 'Open', symbol: '📀', steps: new Array(128).fill(0), muted: false },
-        { name: 'Clave', symbol: '🥢', steps: new Array(128).fill(0), muted: false },
-        { name: 'Conga', symbol: '🪘', steps: new Array(128).fill(0), muted: false },
-        { name: 'Bongo', symbol: '🥁', steps: new Array(128).fill(0), muted: false },
-        { name: 'Perc', symbol: '🪇', steps: new Array(128).fill(0), muted: false },
-        { name: 'Shaker', symbol: '🧂', steps: new Array(128).fill(0), muted: false },
-        { name: 'Guiro', symbol: '🥖', steps: new Array(128).fill(0), muted: false },
-        { name: 'High Tom', symbol: '🪘', steps: new Array(128).fill(0), muted: false },
-        { name: 'Mid Tom', symbol: '🪘', steps: new Array(128).fill(0), muted: false },
-        { name: 'Low Tom', symbol: '🪘', steps: new Array(128).fill(0), muted: false },
-    ],
     volume: 1.0,
     reverb: 0.2,
-    measures: 1,
-    currentMeasure: 0,
     humanize: 20,
     swing: 0,
     swingSub: '8th',
-    lastDrumPreset: 'Basic Rock',
     seed: '',
     audioBuffers: {},
     genreFeel: 'Rock',
@@ -112,13 +94,7 @@ export function grooveReducer(action: Action, playback: GlobalContext): boolean 
             // #1244 — hydrateState()'s corrupt-payload fallback dispatches RESET_STATE
             // expecting a genuinely fresh session, so a field hydration can write from
             // the persisted payload has to be restored here or it survives the reset.
-            // `lastDrumPreset` is the one with teeth: the reset blanks every lane below,
-            // so main.ts sees no drum pattern and feeds this value straight into
-            // loadDrumPreset().
             g.humanize = 20;
-            g.lastDrumPreset = 'Basic Rock';
-            g.measures = 1;
-            g.currentMeasure = 0;
             g.orchestrationMap = null;
             g.fillMap = null;
             g.accentMap = null;
@@ -132,14 +108,6 @@ export function grooveReducer(action: Action, playback: GlobalContext): boolean 
             g.lastSampledHatVoice = null;
             g.lastRideGain = null;
             g.lastCrashGain = null;
-
-            groove.instruments.forEach((inst) => {
-                inst.steps.fill(0);
-                inst.muted = false;
-            });
-            return true;
-        case ACTIONS.SET_ACTIVE_MEASURE:
-            g.currentMeasure = parseInt(String(action.payload), 10);
             return true;
         case ACTIONS.SET_SWING:
             g.swing = action.payload;
@@ -187,13 +155,6 @@ export function grooveReducer(action: Action, playback: GlobalContext): boolean 
                 g.genreFeel = action.payload.feel ?? groove.genreFeel;
                 g.pendingGenreFeel = null;
                 g.lastSmartGenre = action.payload.genreName || groove.lastSmartGenre;
-                // DeepSignal handles nested reactivity, but we still map to ensure fresh references
-                // for any legacy components that might rely on shallow comparison.
-                g.instruments = groove.instruments.map((inst) => ({
-                    ...inst,
-                    steps: [...inst.steps],
-                }));
-
                 if (action.payload.swing !== undefined) {
                     g.swing = action.payload.swing;
                 }

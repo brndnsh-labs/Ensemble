@@ -2,6 +2,7 @@
 
 import { KEY_ORDER } from '@engine/config';
 import { decodeChartLink, encodeChartLink } from '@engine/songbook/chart-link';
+import { writtenSettings } from '@engine/songbook/codec';
 import type { SemanticScore } from '@engine/songbook/score-types';
 import type { InstrumentVoice } from '@engine/types';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -94,8 +95,16 @@ import { useChartView } from './use-chart-view';
 import { useOfflineInstall } from './use-offline-install';
 import { useStageTheme } from './use-stage-theme';
 
+/**
+ * The chart as it would be written today: an old chart's legacy fields (still stored, since
+ * charts shed them lazily on their next save) left out and its genre read once. Comparing this,
+ * not the raw stored chart, keeps a change undone by hand on an old chart from reading as an
+ * edit — which would otherwise hold an account draft against every later remote advance.
+ */
+const written = (chart: ChartDocument['chart']) => ({ ...chart, ...writtenSettings(chart) });
+
 const same = (a: ChartDocument, b: ChartDocument) =>
-    a.title === b.title && JSON.stringify(a.chart) === JSON.stringify(b.chart);
+    a.title === b.title && JSON.stringify(written(a.chart)) === JSON.stringify(written(b.chart));
 
 /**
  * Which songbook the chart on the stand came from — and, for an account chart, WHOSE account
@@ -216,12 +225,11 @@ function heldAccount(): Promise<string | null> {
     return accountSync.heldOwner().catch(() => null);
 }
 
-/** Read the live engine values the Feel sheet needs but `ChartDocument` doesn't carry. */
+/** Read the live engine values the Feel sheet needs but doesn't read off `ChartDocument`. */
 function feelSnapshot(): FeelSnapshot {
     const { playback } = runtime.state();
     return {
         bandIntensity: playback.bandIntensity,
-        autoIntensity: playback.autoIntensity,
         metronome: playback.metronome,
         masterVolume: playback.masterVolume,
         countIn: playback.countIn,
@@ -328,7 +336,7 @@ export default function Ensemble() {
     const [playing, setPlaying] = useState(false);
     const [playbackPending, setPlaybackPending] = useState(false);
     const [active, setActive] = useState<number | null>(null);
-    // The count-in beat sounding now (0-based), or null when not counting in (#1417) — cheap
+    // The count-in beat sounding now (0-based), or null when not counting in (#1422) — cheap
     // enough to ride the same 60ms poll `playing`/`active` already use, no new interval.
     const [countInBeat, setCountInBeat] = useState<number | null>(null);
     // #1211 — id of the section a practice loop is armed/running on, or null.
@@ -345,10 +353,11 @@ export default function Ensemble() {
     const [soundMenu, setSoundMenu] = useState(false);
     const [feelMenu, setFeelMenu] = useState(false);
     const [tradeMenu, setTradeMenu] = useState(false);
-    // `bandIntensity`/`autoIntensity`/`metronome`/`masterVolume` are not part of
-    // `current.chart` (`STATE_OWNERSHIP_MANIFEST`: session-only or a device
-    // preference, never a document field) — this is the shell's own reactive mirror
-    // of the live engine values the Feel sheet reads, refreshed whenever it opens.
+    // `metronome`/`masterVolume` are not part of `current.chart` (`STATE_OWNERSHIP_MANIFEST`:
+    // session-only or a device preference, never a document field) — this is the shell's own
+    // reactive mirror of the live engine values the Feel sheet reads, refreshed whenever it
+    // opens. (Energy is the chart's own, `performance.energy`; `bandIntensity` rides along only
+    // for the slider's resting position while it is on auto.)
     const [feel, setFeel] = useState<FeelSnapshot>(() => feelSnapshot());
     const [showControls, setShowControls] = useState(false);
     const [pendingSound, setPendingSound] = useState<{ lane: string; value: string } | null>(null);
@@ -1300,9 +1309,8 @@ export default function Ensemble() {
     }, [sync.owner, sync.documents, accountDialog, onStand]);
     useEffect(() => {
         if (feelMenu) {
-            // Refreshed on every open: these four fields can drift from what the
-            // sheet last showed (a different song's live session values, or a
-            // conductor tick that moved band intensity while the sheet was closed).
+            // Refreshed on every open: these fields can drift from what the sheet last
+            // showed (a different song opened, which resets the energy level).
             setFeel(feelSnapshot());
             feelDialog.current?.showModal();
         } else {
@@ -1652,7 +1660,7 @@ export default function Ensemble() {
         }
         setLoopedSectionId(runtime.loopedSection());
     }
-    // Section tap menu's "Start here" (#1417): jump playback to a section's first performed
+    // Section tap menu's "Start here" (#1422): jump playback to a section's first performed
     // bar, same `id`-may-be-undefined guard as `toggleSectionLoop` above.
     function startHereSection(id: string | undefined) {
         if (!id) {
@@ -3522,12 +3530,7 @@ export default function Ensemble() {
                                 setFeel((f) => ({ ...f, bandIntensity: value }));
                             })
                         }
-                        onAutoIntensity={(auto) =>
-                            change(() => {
-                                runtime.setAutoIntensity(auto);
-                                setFeel((f) => ({ ...f, autoIntensity: auto }));
-                            })
-                        }
+                        onAutoIntensity={(auto) => change(() => runtime.setAutoIntensity(auto))}
                         onMetronome={(enabled) =>
                             change(() => {
                                 runtime.setMetronome(enabled);

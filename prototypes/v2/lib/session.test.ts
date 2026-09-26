@@ -41,7 +41,7 @@ beforeEach(() => {
     store.clear();
 });
 
-describe('the count-in preference (#1417)', () => {
+describe('the count-in preference (#1422)', () => {
     it('is unset on a fresh device, so the caller falls back to the engine default', () => {
         expect(countInPreference()).toBeNull();
     });

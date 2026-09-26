@@ -65,7 +65,7 @@ The ground-up replacement for the generative engine, the default since 2026-09-2
 | :--- | :--- | :--- |
 | `public/state/playback.ts` | BPM, transport, and volume. | `playback` |
 | `public/state/arranger.ts` | Chords, sections, time signature, and key. | `arranger` |
-| `public/state/groove.ts` | Genre, intensity, and drum kit selection. | `groove` |
+| `public/state/groove.ts` | Genre, swing, humanize and the drum lane's mix. | `groove` |
 | `public/state/instruments.ts` | Per-instrument synthesis parameters. | `bass`, `soloist`, `harmony` |
 | `public/state/midi.ts` | WebMIDI routing and local muting state. | `midi` |
 | `public/state/visualizer.ts` | `vizState.enabled`: whether the scheduler queues visualizer note events (no visualizer ships; only the old engine's scheduler reads it, and the app no longer runs it). | `vizState` |
@@ -80,8 +80,8 @@ The ground-up replacement for the generative engine, the default since 2026-09-2
 
 | Path | Responsibility | Key Exports / Symbols |
 | :--- | :--- | :--- |
-| `public/songbook/types.ts` | Version-1 portable chart and workspace-preference schemas, kept independent of live state slices. | `ChartDocument`, `ChartContent`, `WorkspacePreferences` |
-| `public/songbook/codec.ts` | Pure complete-candidate validation plus JSON encode/decode, including explicit invalid/current/future-version results. | `validateChartDocument`, `decodeChartDocument`, `encodeChartDocument` |
+| `public/songbook/types.ts` | Version-1 portable chart and workspace-preference schemas, kept independent of live state slices. A chart holds the music plus the settings the band honours; the old engine's fields are typed as legacy (read, never written). | `ChartDocument`, `ChartContent`, `ChartEnergy`, `WorkspacePreferences` |
+| `public/songbook/codec.ts` | Pure complete-candidate validation plus JSON encode/decode, including explicit invalid/current/future-version results. Tolerant of an old chart's legacy fields (reproduced byte for byte, never written by capture); reads the genre from `genre` or the legacy name/feel pair. | `validateChartDocument`, `decodeChartDocument`, `encodeChartDocument`, `chartGenre`, `writtenSettings` |
 | `public/songbook/score-types.ts` | Document-v2 authored-score types: exact events, measures, context, repeat and jump directions; isolated preview adoption preserves v1 sources. | `ChartDocumentV2`, `SemanticScore`, `ScoreMeasure`, `ScoreDirection` |
 | `public/songbook/score-duration.ts` | Bounded rational quarter-note arithmetic and exact sixteenth-grid capability checks. | `scoreDuration`, `scoreMeter`, `durationToSteps` |
 | `public/songbook/score-context.ts` | Shared key/mode/meter inheritance and beat-grouping reset for already-validated authored contexts. | `resolveScoreContext` |
@@ -152,7 +152,6 @@ The ground-up replacement for the generative engine, the default since 2026-09-2
 
 | Path | Responsibility | Key Data |
 | :--- | :--- | :--- |
-| `public/data/drum-presets.ts` | Drum patterns and expansion logic. | `DRUM_PRESETS` |
 | `public/data/smart-genres.ts` | High-level genre configurations + the genre-naming authority (canon name ↔ feel ↔ groove strategy key). | `SMART_GENRES`, `canonToFeel`, `feelToCanon`, `GROOVE_STRATEGY_BY_GENRE`, `isLatinGrooveFamily` |
 | `public/data/instrument-styles.ts` | UI menu definitions and shared player availability. | `CHORD_STYLES`, `BASS_STYLES`, `getChordPlayerChoices` |
 | `public/data/sound-packs.ts` | Catalog of installable sample packs, read by v2's `lib/sounds.ts`. | `SOUND_PACKS`, `packsForInstrument` |

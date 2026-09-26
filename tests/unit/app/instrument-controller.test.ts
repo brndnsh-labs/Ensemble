@@ -4,7 +4,6 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as InstrumentController from '../../../public/controllers/instrument-controller.js';
-import { DRUM_PRESETS } from '../../../public/data/drum-presets.js';
 import * as ChordsEngine from '../../../public/engine/chords-engine.js';
 import * as Engine from '../../../public/engine/engine.js';
 import { dispatch, getState } from '../../../public/state.js';
@@ -46,18 +45,11 @@ vi.mock('../../../public/state.js', () => {
     const mockState = {
         playback: { step: 10, bpm: 120, bandIntensity: 0.5, complexity: 0.5, autoIntensity: false },
         groove: {
-            currentMeasure: 0,
-            measures: 1,
             genreFeel: 'Rock',
             enabled: true,
             volume: 0.5,
             swing: 0,
             swingSub: '8th',
-            lastDrumPreset: null,
-            instruments: [
-                { name: 'Kick', steps: new Array(128).fill(0), muted: false },
-                { name: 'Snare', steps: new Array(128).fill(0), muted: false },
-            ],
             buffer: { clear: vi.fn() },
         },
         arranger: {
@@ -119,8 +111,6 @@ vi.mock('../../../public/state.js', () => {
                 if (mockState[module]) {
                     mockState[module][param] = value;
                 }
-            } else if (action === 'SET_ACTIVE_MEASURE') {
-                mockState.groove.currentMeasure = payload;
             }
         }),
         subscribe: vi.fn(),
@@ -132,8 +122,6 @@ describe('Instrument Controller', () => {
         vi.clearAllMocks();
         vi.useFakeTimers();
         const state = getState();
-        state.groove.currentMeasure = 0;
-        state.groove.measures = 1;
         state.chords.enabled = true;
         state.bass.enabled = true;
         state.soloist.enabled = true;
@@ -143,85 +131,6 @@ describe('Instrument Controller', () => {
 
         // Reset buffers
         state.bass.buffer.size = 0;
-    });
-
-    describe('switchMeasure', () => {
-        it('should dispatch SET_ACTIVE_MEASURE if changing measure', () => {
-            InstrumentController.switchMeasure(1);
-            expect(dispatch).toHaveBeenCalledWith(ACTIONS.SET_ACTIVE_MEASURE, 1);
-        });
-
-        it('should not dispatch if measure is the same', () => {
-            InstrumentController.switchMeasure(0);
-            expect(dispatch).not.toHaveBeenCalled();
-        });
-    });
-
-    describe('loadDrumPreset', () => {
-        it.each(['6/8', '12/8'])(
-            'loads compound Blues arrays and silent string defaults in %s',
-            async (meter) => {
-                const state = getState();
-                const originalMeter = state.arranger.timeSignature;
-                const originalInstruments = state.groove.instruments;
-                const catalogBefore = JSON.stringify(DRUM_PRESETS);
-                try {
-                    state.arranger.timeSignature = meter;
-                    state.groove.instruments = ['Kick', 'Snare', 'HiHat', 'Open'].map((name) => ({
-                        name,
-                        steps: new Array(128).fill(2),
-                        muted: false,
-                    }));
-                    const swingBefore = state.groove.swing;
-                    await InstrumentController.loadDrumPreset('Blues Shuffle');
-                    const pulseSteps = meter === '6/8' ? 12 : 24;
-                    for (const instrument of state.groove.instruments) {
-                        const expected =
-                            instrument.name === 'Open'
-                                ? new Array(pulseSteps).fill(0)
-                                : DRUM_PRESETS['Blues Shuffle'][meter][instrument.name];
-                        expect(instrument.steps).toEqual([
-                            ...expected,
-                            ...new Array(128 - expected.length).fill(0),
-                        ]);
-                    }
-                    // A preset carries no swing: the band style is the one authority (#1404).
-                    expect(state.groove.swing).toBe(swingBefore);
-                    expect(state.groove.measures).toBe(1);
-                    expect(JSON.stringify(DRUM_PRESETS)).toBe(catalogBefore);
-                } finally {
-                    state.arranger.timeSignature = originalMeter;
-                    state.groove.instruments = originalInstruments;
-                }
-            },
-        );
-
-        it('decodes nonzero string grids without changing numeric arrays or exceeding the buffer', async () => {
-            const preset = 'String pattern regression';
-            DRUM_PRESETS[preset] = { Kick: '210'.repeat(50), Snare: [2, 0, 1] };
-            try {
-                await InstrumentController.loadDrumPreset(preset);
-                const { instruments } = getState().groove;
-                expect(instruments.find((inst) => inst.name === 'Kick').steps).toEqual(
-                    Array.from({ length: 128 }, (_, index) => [2, 1, 0][index % 3]),
-                );
-                expect(instruments.find((inst) => inst.name === 'Snare').steps).toEqual([
-                    2,
-                    0,
-                    1,
-                    ...new Array(125).fill(0),
-                ]);
-            } finally {
-                delete DRUM_PRESETS[preset];
-            }
-        });
-
-        it('should load a preset and update groove state', async () => {
-            await InstrumentController.loadDrumPreset('Basic Rock');
-            const state = getState();
-            expect(state.groove.lastDrumPreset).toBe('Basic Rock');
-            expect(dispatch).toHaveBeenCalledWith('DRUM_PRESET_LOADED');
-        });
     });
 
     describe('handleTap', () => {

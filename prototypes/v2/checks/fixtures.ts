@@ -87,7 +87,7 @@ export const test = base.extend<Record<never, never>, { previewServer: string }>
     baseURL: async ({ previewServer }, use) => {
         await use(previewServer);
     },
-    // Count-in (#1417) is device-local and defaults ON, so a fresh guest device would get one
+    // Count-in (#1422) is device-local and defaults ON, so a fresh guest device would get one
     // bar of clicks before every Play — real product behavior, but it would push back the
     // first note/highlight/audio sample in every OTHER spec in this suite that presses Play
     // without being about count-in at all. Seed the preference OFF here, the same way a real

@@ -11,18 +11,20 @@
  * the chords, key, meter and tempo are the promise. Everything else the link carries is
  * taken where the converter already reads an equivalent field and skipped where it does not:
  *
- * - `genre`, `style` and `comp` ride along, because `sessionBand`/`sessionPerformance` read
- *   exactly those fields off a v1 session record and this module hands `v1ImportContext` one
- *   built from the query string. They cost a line each.
+ * - `genre` rides along, because `sessionBand` reads exactly that field off a v1 session
+ *   record and this module hands `v1ImportContext` one built from the query string. `style`
+ *   and `comp` (the old engine's chord style and complexity) are not read: a chart no longer
+ *   carries either (DECISION 2026-09-26), and the lane styles follow the genre.
  * - `bnd` (the compressed per-lane band payload) is NOT read. It would need a second
  *   key-space translation — v1's minified `s`/`b`/`c`/`h`/`g` lanes into the session shape
  *   `sessionBand` expects — for settings a listener can re-pick in the Feel sheet. What lands
- *   instead is what v1 ITSELF would load from a session that names only a genre and a chord
- *   style: v1's own hardcoded per-lane defaults, routed by the genre. See `linkSession` for
+ *   instead is what v1 ITSELF would load from a session that names only a genre: v1's own
+ *   hardcoded per-lane defaults, routed by the genre. See `linkSession` for
  *   the short list of fields that genuinely come from the songbook's baseline document.
- * - `int` (band intensity) and `tmr` (session timer) have nowhere to land: `ChartPerformance`
- *   has no field for either. `STATE_OWNERSHIP_MANIFEST` classifies them `runtime-derived` and
- *   `preferences` respectively — neither is document-owned, so a chart cannot carry them.
+ * - `int` (band intensity) and `tmr` (session timer) are not read. A chart does carry its
+ *   energy now (`ChartPerformance.energy`), but v1 sent `int` whether or not its band was on
+ *   auto intensity, so the level alone cannot say which the sender heard; the link opens on
+ *   auto. `tmr` is a device preference, which a chart never carries.
  * - `seed` is accepted by the URL and deliberately ignored: with no `randomizeSeed` in the
  *   record, `sessionPerformance` lands `randomizeSeed: true`, and `state-effects.ts` re-rolls
  *   the song seed on every playback start. Carrying it would be a line that does nothing.
@@ -218,16 +220,16 @@ function linkSections(
 /**
  * The link's session-shaped record: the same field names `saveCurrentState()` writes, so
  * `sessionBand`/`sessionPerformance` read them with no translation. Every value stays the
- * raw string — `clamp`, `resolveGenre` and `isKnownChordStyle` are the validators, and each
- * already takes an untrusted value.
+ * raw string — `clamp` and `resolveGenre` are the validators, and each already takes an
+ * untrusted value.
  *
  * **What this does NOT leave to the songbook's baseline document.** Because a record is always
  * returned, `v1ImportContext` always takes its session branch, so `sessionBand` and
  * `sessionPerformance` overwrite nearly everything with v1's own defaults rather than with
  * `base`'s values. From `base` there survive exactly: `performance.bpm` (and only as the
- * fallback for an unreadable `?bpm=`), `chords.instrument` and `soloist.tradeMode` — the two
- * fields v1 never persisted at all. That is the right result for a link, since it is what v1
- * itself would have loaded from these bytes, but it is not "the songbook's band".
+ * fallback for an unreadable `?bpm=`) and the soloist's trading with the player, which v1
+ * never had. That is the right result for a link, since it is what v1 itself would have
+ * loaded from these bytes, but it is not "the songbook's band".
  *
  * `mixerVersion` is deliberately absent: a share link carries no mixer version, so the
  * converter's own stale-mixer rule resets volumes and reverbs to defaults, which is the
@@ -239,8 +241,6 @@ function linkSession(params: URLSearchParams): Record<string, unknown> {
         key: params.get('key') ?? undefined,
         timeSignature: params.get('ts') ?? undefined,
         bpm: params.get('bpm') ?? undefined,
-        complexity: params.get('comp') ?? undefined,
-        chords: { style: params.get('style') ?? undefined },
         // The share writer emits the FEEL; older and hand-written links carry the genre
         // NAME. `resolveGenre` (via `sessionBand`) accepts either keyspace, which is the
         // same tolerance `loadFromUrl` grew in #1200. A link carries no swing: the genre's

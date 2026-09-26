@@ -4,7 +4,7 @@ import {
     REMOTE_UPDATE_MESSAGES,
     V1_IMPORT_ACCOUNT_MESSAGES,
 } from '../lib/account/messages';
-import { arrangementOf } from '../lib/documents';
+import { arrangementOf, genreOf } from '../lib/documents';
 import { v1OfferDeclines } from '../lib/import-v1';
 import type { ChartDocument } from '../lib/runtime';
 
@@ -147,8 +147,7 @@ export function Songbook({
                                 </span>
                                 <h3>{featured.title}</h3>
                                 <p>
-                                    {featured.chart.band.groove.lastSmartGenre} ·{' '}
-                                    {featured.chart.performance.bpm} BPM ·{' '}
+                                    {genreOf(featured)} · {featured.chart.performance.bpm} BPM ·{' '}
                                     {arrangementOf(featured).key}
                                     {arrangementOf(featured).isMinor ? 'm' : ''}
                                 </p>
@@ -245,7 +244,7 @@ export function Songbook({
                                                 <span>
                                                     <span className="song-name">{s.title}</span>
                                                     <span className="song-detail">
-                                                        {s.chart.band.groove.lastSmartGenre} ·{' '}
+                                                        {genreOf(s)} ·{' '}
                                                         {accountLibrary
                                                             ? 'In your account'
                                                             : 'Saved locally'}
@@ -294,7 +293,7 @@ export function Songbook({
                                 >
                                     <span className="jam-symbol">♭</span>
                                     <span>
-                                        <strong>{s.chart.band.groove.lastSmartGenre}</strong>
+                                        <strong>{genreOf(s)}</strong>
                                         <small>{s.title}</small>
                                     </span>
                                 </button>

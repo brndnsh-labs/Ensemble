@@ -234,7 +234,7 @@ test('section practice loop (#1211) confines playback and clears on release, Esc
 
     // The keyboard path to the same toggle: a long-press has no keyboard
     // equivalent, so 'L' on the focused label is the accessible route in,
-    // straight to the toggle — bypassing the section menu (#1417) Enter opens
+    // straight to the toggle — bypassing the section menu (#1422) Enter opens
     // (native button semantics; the menu itself is `section-menu.spec.ts`'s).
     await sectionA.focus();
     await page.keyboard.press('Enter');

@@ -51,12 +51,6 @@
  */
 
 import { KEY_ORDER, TIME_SIGNATURES } from '../../../public/config.js';
-import {
-    isKnownBassStyle,
-    isKnownChordStyle,
-    isKnownHarmonyStyle,
-    isKnownSoloistStyle,
-} from '../../../public/data/instrument-styles.js';
 import { GENRE_FEELS, resolveGenre } from '../../../public/data/smart-genres.js';
 import { packsForInstrument } from '../../../public/data/sound-packs.js';
 import { stringHash31, stringHash33 } from '../../../public/engine/hash-utils.js';
@@ -64,15 +58,13 @@ import { hydrateVoice } from '../../../public/engine/instrument-registry.js';
 import { resolveSoloistMode } from '../../../public/engine/soloist-mode-policy.js';
 import { isValidTimeSignatureGrouping } from '../../../public/meter.js';
 import { normalizeSongSeed, stripDangerousChars } from '../../../public/sanitize.js';
-import { validateChartDocument } from '../../../public/songbook/codec.js';
-import {
-    CHART_GROOVE_PATTERN_LANE_NAMES,
-    type ChartBand,
-    type ChartContent,
-    type ChartDocument,
-    type ChartGroovePatternLane,
-    type ChartPerformance,
-    type ChartSection,
+import { validateChartDocument, writtenSettings } from '../../../public/songbook/codec.js';
+import type {
+    ChartBand,
+    ChartContent,
+    ChartDocument,
+    ChartPerformance,
+    ChartSection,
 } from '../../../public/songbook/types.js';
 import {
     INSTRUMENT_REVERB_DEFAULTS,
@@ -82,16 +74,11 @@ import { tryDecompressSections } from '../../../public/state/share-codec.js';
 import {
     clamp,
     hydrateAutoSound,
-    normalizeSoloistPreset,
     normalizeSwingSub,
     sanitizeDisplayString,
     validateSections,
 } from '../../../public/state/state-hydration.js';
-import {
-    type InstrumentModule,
-    type InstrumentVoice,
-    isChordDensity,
-} from '../../../public/types.js';
+import type { InstrumentModule, InstrumentVoice } from '../../../public/types.js';
 import { normalizeKey } from '../../../public/utils.js';
 // The one v2-store import here, and only for its TYPE at runtime: a refused write has to be
 // recognised as a collision rather than reported in the store's own editing vocabulary (R7).
@@ -193,10 +180,10 @@ export interface V1Finding {
 export type V1ImportLedger = ReadonlyMap<string, string>;
 
 /**
- * Defaults for the fields a v1 save does not carry: `soloist.tradeMode` and
- * `chords.instrument` (never persisted), plus the whole band for a saved chord
- * progression, which stores only chords. Taken from a document already in the v2
- * songbook — the same baseline `lib/starters.ts` and the iReal import dialog use.
+ * Defaults for the fields a v1 save does not carry: trading with the player (v1 had none),
+ * plus the whole band for a saved chord progression, which stores only chords. Taken from a
+ * document already in the v2 songbook — the same baseline `lib/starters.ts` and the iReal
+ * import dialog use — as a chart is written today (`writtenSettings`).
  */
 export interface V1ImportContext {
     performance: ChartPerformance;
@@ -282,7 +269,6 @@ const PROTOTYPE_MEMBER_NAMES: ReadonlySet<string> = new Set(
  * and two copies of one keyspace is exactly how the v1 readers drifted apart before (#1266).
  */
 export const NOTATIONS = ['roman', 'name', 'nns'];
-const PATTERN_LANE_NAMES: ReadonlySet<string> = new Set(CHART_GROOVE_PATTERN_LANE_NAMES);
 
 /**
  * The bytes a digest is taken over differ by item kind, and deliberately stay that way: the
@@ -507,8 +493,8 @@ export function v1ImportOffer(finding: V1Finding, ledger: V1ImportLedger): V1Fin
  * progression arrives with the band, tempo, key and meter it would have got from v1's
  * own "load this preset" gesture, which replaces the chords and the minor flag and
  * keeps the rest of the session. `base` (a document already in the v2 songbook) is the
- * fallback for a profile with presets but no readable session, and always supplies the
- * two fields v1 never persisted at all: `soloist.tradeMode` and `chords.instrument`.
+ * fallback for a profile with presets but no readable session, and always supplies what v1
+ * never had at all: trading with the player.
  */
 export function v1ImportContext(
     finding: V1Finding,
@@ -516,9 +502,11 @@ export function v1ImportContext(
 ): V1ImportContext {
     const session = finding.sources.find((source) => source.kind === 'session')?.record;
     const timeSignature = signature(session?.timeSignature);
+    // The baseline as a chart is written today: an old base chart's legacy fields stay behind.
+    const setup = writtenSettings(base);
     const context: V1ImportContext = {
-        performance: base.performance,
-        band: base.band,
+        performance: setup.performance,
+        band: setup.band,
         key: chartKey(session?.key),
         timeSignature,
         grouping: grouping(session?.grouping, timeSignature),
@@ -558,16 +546,7 @@ function boolOr(saved: unknown, fallback: boolean): boolean {
     return saved === undefined ? fallback : !!saved;
 }
 
-/**
- * A style key the engine still knows, else the genre-routed `smart` default — the same
- * question v1's persist reader asks (`isKnown*Style`), which matters: a retired key
- * loads as a silently muted instrument, and the codec rejects the document outright.
- */
-function knownStyle(saved: unknown, known: (value: unknown) => boolean): string {
-    return typeof saved === 'string' && known(saved) ? saved : 'smart';
-}
-
-/** Integer fields (octaves, bpm) — v1 clamps to a range but tolerates fractions. */
+/** Integer fields (bpm) — v1 clamps to a range but tolerates fractions. */
 function wholeNumber(saved: unknown, min: number, max: number, fallback: number): number {
     return Math.round(clamp(saved, min, max, fallback));
 }
@@ -660,43 +639,14 @@ function codecSafeSections(sections: Array<Record<string, unknown>>): ChartSecti
 }
 
 /**
- * The drum pattern, filtered to lanes the songbook schema knows. An unknown lane name
- * or an out-of-range step would make the codec reject the ENTIRE song, so drop/round
- * the unrecognisable parts of the groove rather than lose the chart.
- */
-function patternLanes(saved: unknown): ChartGroovePatternLane[] {
-    if (!Array.isArray(saved)) {
-        return [];
-    }
-    const lanes: ChartGroovePatternLane[] = [];
-    const used = new Set<string>();
-    for (const entry of saved.slice(0, 64)) {
-        if (!isPlainRecord(entry) || typeof entry.name !== 'string') {
-            continue;
-        }
-        if (!PATTERN_LANE_NAMES.has(entry.name) || used.has(entry.name)) {
-            continue;
-        }
-        used.add(entry.name);
-        const steps = Array.isArray(entry.steps) ? entry.steps.slice(0, 128) : [];
-        lanes.push({
-            name: entry.name as ChartGroovePatternLane['name'],
-            steps: steps.map((step) =>
-                typeof step === 'number' && Number.isFinite(step)
-                    ? Math.min(2, Math.max(0, Math.round(step)))
-                    : 0,
-            ),
-        });
-    }
-    return lanes;
-}
-
-/**
- * The band a v1 saved session describes, expressed as songbook content.
+ * The band a v1 saved session describes, expressed as songbook content: the settings the
+ * band honours, as a chart is written today (DECISION 2026-09-26). v1's old-engine settings
+ * (lane styles, octaves, chord density, soloist preset and phrasing, the harmony lane, the drum
+ * pattern and preset) are not brought over, because nothing plays them any more. The lane
+ * styles follow the genre when the chart opens.
  *
- * Every field mirrors the matching line in `hydrateSavedState`, including its
- * migrations: the #787 Acoustic `pad` → `arp` chord style, the #856 Auto-phrasing
- * default, the soloist octave's legacy 77/67 values, and the mixer-version reset that
+ * Every field that is brought over mirrors the matching line in `hydrateSavedState`,
+ * including its migrations: the #856 Auto-phrasing default and the mixer-version reset that
  * returns volumes/reverbs to defaults for a pre-#1257 save. Anything this file decides
  * differently from v1 is a codec requirement, and says so.
  */
@@ -709,14 +659,8 @@ function sessionBand(
     const chords = isPlainRecord(saved.chords) ? saved.chords : {};
     const bass = isPlainRecord(saved.bass) ? saved.bass : {};
     const soloist = isPlainRecord(saved.soloist) ? saved.soloist : {};
-    const harmony = isPlainRecord(saved.harmony) ? saved.harmony : {};
     const groove = isPlainRecord(saved.groove) ? saved.groove : {};
-    // #787 — Acoustic's chord default moved 'pad' → 'arp'; a session saved under the
-    // old default would otherwise import as a static pad with no fingerpicking.
-    const chordStyle =
-        groove.genreFeel === 'Acoustic' && chords.style === 'pad' ? 'arp' : chords.style;
-    // Resolved as ONE pair, like the persist and share readers: the codec additionally
-    // rejects a document whose genre name and engine feel describe different genres.
+    // Resolved as ONE pair, like the persist and share readers, then stored once by name.
     const savedGenre =
         resolveGenre(typeof groove.genreFeel === 'string' ? groove.genreFeel : null) ??
         resolveGenre(typeof groove.lastSmartGenre === 'string' ? groove.lastSmartGenre : null);
@@ -729,37 +673,25 @@ function sessionBand(
             : clamp(lane.reverb, 0, 1, INSTRUMENT_REVERB_DEFAULTS[module]);
     return {
         chords: {
-            ...context.band.chords,
             enabled: boolOr(chords.enabled, true),
             voice: laneVoice('chords', chords.voice, coerced),
             autoSound: hydrateAutoSound(chords.autoSound, hydrateVoice(chords.voice)),
-            style: knownStyle(chordStyle, isKnownChordStyle),
-            octave: wholeNumber(chords.octave, 0, 127, 48),
-            density: isChordDensity(chords.density) ? chords.density : 'standard',
             volume: volume(chords),
             reverb: reverb(chords, 'chords'),
         },
         bass: {
-            ...context.band.bass,
             enabled: boolOr(bass.enabled, true),
             voice: laneVoice('bass', bass.voice, coerced),
             autoSound: hydrateAutoSound(bass.autoSound, hydrateVoice(bass.voice)),
-            style: knownStyle(bass.style, isKnownBassStyle),
-            octave: wholeNumber(bass.octave, 0, 127, 36),
             volume: volume(bass),
             reverb: reverb(bass, 'bass'),
         },
         soloist: {
-            ...context.band.soloist,
             enabled: boolOr(soloist.enabled, false),
             voice: laneVoice('soloist', soloist.voice, coerced),
             autoSound: hydrateAutoSound(soloist.autoSound, hydrateVoice(soloist.voice)),
-            style: knownStyle(soloist.style, isKnownSoloistStyle),
-            preset: normalizeSoloistPreset(soloist.preset, 'trumpet') as 'trumpet',
-            octave:
-                soloist.octave === 77 || soloist.octave === 67 || soloist.octave === undefined
-                    ? 72
-                    : wholeNumber(soloist.octave, 0, 127, 72),
+            volume: volume(soloist),
+            reverb: reverb(soloist, 'soloist'),
             mode: resolveSoloistMode(
                 typeof soloist.mode === 'string'
                     ? soloist.mode
@@ -769,40 +701,33 @@ function sessionBand(
             ),
             // #856 — pre-#856 saves have no `autoMode`; default to Auto.
             autoMode: typeof soloist.autoMode === 'boolean' ? soloist.autoMode : true,
-            phrasingIntensity: clamp(soloist.phrasingIntensity, 0, 1, 0.5),
-            volume: volume(soloist),
-            reverb: reverb(soloist, 'soloist'),
-        },
-        harmony: {
-            ...context.band.harmony,
-            enabled: boolOr(harmony.enabled, false),
-            voice: laneVoice('harmony', harmony.voice, coerced),
-            autoSound: hydrateAutoSound(harmony.autoSound, hydrateVoice(harmony.voice)),
-            style: knownStyle(harmony.style, isKnownHarmonyStyle),
-            octave: wholeNumber(harmony.octave, 0, 127, 60),
-            complexity: clamp(harmony.complexity, 0, 1, 0.5),
-            volume: volume(harmony),
-            reverb: reverb(harmony, 'harmony'),
+            // v1 had no trading with the player, so the baseline's own trade setting carries.
+            ...tradeOf(context.band.soloist),
         },
         groove: {
-            ...context.band.groove,
             enabled: boolOr(groove.enabled, true),
             voice: laneVoice('groove', groove.voice, coerced),
             autoSound: hydrateAutoSound(groove.autoSound, hydrateVoice(groove.voice)),
-            // `measures` is not in v1's persisted payload at all, so v1 itself reloads
-            // every session at 1. Mirrored rather than "improved": a 2-measure drum
-            // pattern was already lost on v1's own next reload.
-            measures: wholeNumber(groove.measures, 1, 8, 1),
+            volume: volume(groove),
+            reverb: reverb(groove, 'groove'),
             swing: clamp(groove.swing, 0, 100, 0),
             swingSub: normalizeSwingSub(groove.swingSub),
             humanize: clamp(groove.humanize, 0, 100, 20),
-            lastDrumPreset: sanitizeDisplayString(groove.lastDrumPreset, 'Basic Rock'),
-            genreFeel: genre ? genre.feel : 'Rock',
-            lastSmartGenre: genre ? genre.name : 'Rock',
-            pattern: patternLanes(groove.pattern),
-            volume: volume(groove),
-            reverb: reverb(groove, 'groove'),
+            genre: genre ? genre.name : 'Rock',
         },
+    };
+}
+
+/** A soloist lane's trading settings, only while it trades, as a chart writes them. */
+function tradeOf(soloist: ChartBand['soloist']): Partial<ChartBand['soloist']> {
+    const { tradeWith, tradeBars, tradeChoruses } = soloist;
+    if (tradeWith === undefined || tradeWith === 'off') {
+        return {};
+    }
+    return {
+        tradeWith,
+        ...(tradeBars === undefined ? {} : { tradeBars }),
+        ...(tradeChoruses === undefined ? {} : { tradeChoruses }),
     };
 }
 
@@ -816,13 +741,14 @@ function sessionPerformance(
         // field this import can move audibly, and only for a session v1 itself kept
         // outside the range every other part of the app offers.
         bpm: Math.min(240, Math.max(40, wholeNumber(saved.bpm, 20, 300, context.performance.bpm))),
-        complexity: clamp(saved.complexity, 0, 1, 0.3),
         // Prefer the top-level seed, falling back to the pre-#791 nested one.
         seed:
             normalizeSongSeed(saved.seed) ||
             normalizeSongSeed(isPlainRecord(saved.soloist) ? saved.soloist.seed : undefined) ||
             '',
         randomizeSeed: typeof saved.randomizeSeed === 'boolean' ? saved.randomizeSeed : true,
+        // v1 kept band intensity for the session only; an imported chart lets the band shape it.
+        energy: 'auto',
     };
 }
 

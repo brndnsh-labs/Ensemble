@@ -1,5 +1,4 @@
 import { setBpm } from '../controllers/app-controller.js';
-import { loadDrumPreset } from '../controllers/instrument-controller.js';
 import { autoVoiceForGenre } from '../data/genre-sound-map.js';
 import { SMART_GENRES } from '../data/smart-genres.js';
 import { validateProgression } from '../engine/chords-engine.js';
@@ -30,9 +29,10 @@ import { debounceSaveState } from './persistence.js';
 //   • pure UI ephemera (toasts, flashes)
 //   • worker runtime seed/buffer state (UPDATE_SB/UPDATE_GB)
 //   • the auto-conductor's per-STEP dispatches (SET_BAND_INTENSITY,
-//     UPDATE_CONDUCTOR_DECISION, UPDATE_HB) — bandIntensity/conductorVelocity/
-//     conductorDensity/conductorHarmonyComplexity are all runtime-derived, NOT
-//     persisted (#1064 fixed UPDATE_CONDUCTOR_DECISION/UPDATE_HB writing onto
+//     UPDATE_CONDUCTOR_DECISION, UPDATE_HB) — conductorVelocity/conductorDensity/
+//     conductorHarmonyComplexity are runtime-derived and bandIntensity is not in the
+//     v1 payload (it is a chart's energy now, saved with the chart instead), so none
+//     is persisted here (#1064 fixed UPDATE_CONDUCTOR_DECISION/UPDATE_HB writing onto
 //     the persisted chords.density/harmony.complexity fields directly — this
 //     claim is accurate again now that they don't); autoIntensity defaults ON,
 //     so these fire ~every step during an intensity ramp.
@@ -139,28 +139,21 @@ export function deriveSoloistModeOnBoot(
 type GenreGrooveOverrides = Pick<GrooveState, 'swing' | 'swingSub' | 'humanize'>;
 
 /**
- * Run the side-effect half of SET_GENRE_FEEL and expose its completion to boot.
- * Manual picker changes remain fire-and-forget; URL hydration awaits this before
- * mounting so its first Play cannot race the async drum-preset import (#1000).
+ * Run the side-effect half of SET_GENRE_FEEL: the Auto voices and the soloist's mode. (It
+ * also loaded the old engine's drum preset until the band took the drums, 2026-09-26.)
  */
-async function applyGenreEffects(
+function applyGenreEffects(
     stateMap: EnsembleState,
-    payload: any,
+    payload: { genreName?: string },
     dispatch: HandleEffectsContext['dispatch'],
-): Promise<void> {
-    const drumReady =
-        payload.drum && !stateMap.playback.isPlaying
-            ? loadDrumPreset(payload.drum)
-            : Promise.resolve();
+): void {
     resolveAutoVoices(stateMap, payload.genreName, dispatch);
-    await drumReady;
 }
 
 /**
- * Complete a URL genre's canonical pipeline after the worker subscriber is live.
- * The reducer half already ran pre-mount in loadFromUrl(), before `bnd` overrides;
- * only the async effects run here. A drum preset owns its pattern but not explicit
- * high-fidelity groove controls, so restore those after the preset settles.
+ * Complete a genre change's effects after the reducer half has run: the Auto voices, then any
+ * explicit groove controls to restore over them. `setGenre` (`prototypes/v2/lib/runtime.ts`)
+ * awaits it; it stays async for that caller.
  */
 export async function reconcileUrlGenreOnBoot(
     stateMap: EnsembleState,
@@ -173,7 +166,7 @@ export async function reconcileUrlGenreOnBoot(
         return;
     }
 
-    await applyGenreEffects(stateMap, { genreName, ...config }, dispatch);
+    applyGenreEffects(stateMap, { genreName }, dispatch);
 
     if (grooveOverrides) {
         for (const [param, value] of Object.entries(grooveOverrides)) {
@@ -269,9 +262,9 @@ export function handleEffects(
             break;
         }
         case ACTIONS.SET_GENRE_FEEL: {
-            // #675 — Auto voices + soloist mode, and the async drum preset. URL
-            // boot awaits this same helper through reconcileUrlGenreOnBoot (#1000).
-            void applyGenreEffects(stateMap, action.payload, dispatch);
+            // #675 — Auto voices + soloist mode. `setGenre` runs the same helper through
+            // reconcileUrlGenreOnBoot instead (the v2 runtime skips this case).
+            applyGenreEffects(stateMap, action.payload, dispatch);
             break;
         }
         case ACTIONS.SET_SOLOIST_AUTO_MODE: {

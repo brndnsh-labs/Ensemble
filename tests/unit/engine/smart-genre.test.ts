@@ -35,7 +35,6 @@ vi.mock('../../../public/state.js', async (importOriginal) => {
 });
 
 vi.mock('../../../public/controllers/instrument-controller.js', () => ({
-    loadDrumPreset: vi.fn(),
     togglePower: vi.fn(),
 }));
 
@@ -145,7 +144,6 @@ describe('Smart Genre System', () => {
                 feel: 'Funk',
                 swing: 15,
                 sub: '16th',
-                drum: 'Funk',
                 chord: 'funk',
                 bass: 'funk',
                 soloist: 'blues',
@@ -177,7 +175,6 @@ describe('Smart Genre System', () => {
                 feel: 'Jazz',
                 swing: 60,
                 sub: '8th',
-                drum: 'Jazz',
                 chord: 'jazz',
                 bass: 'quarter',
                 soloist: 'bird',

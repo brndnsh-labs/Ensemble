@@ -1,7 +1,6 @@
 // @ts-nocheck
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { setBpm } from '../../../public/controllers/app-controller.js';
-import { loadDrumPreset } from '../../../public/controllers/instrument-controller.js';
 import { validateProgression } from '../../../public/engine/chords-engine.js';
 import {
     initAudio,
@@ -22,9 +21,6 @@ vi.mock('../../../public/engine/chords-engine.js', () => ({
 }));
 vi.mock('../../../public/controllers/app-controller.js', () => ({
     setBpm: vi.fn(),
-}));
-vi.mock('../../../public/controllers/instrument-controller.js', () => ({
-    loadDrumPreset: vi.fn(),
 }));
 vi.mock('../../../public/engine/engine.js', () => ({
     initAudio: vi.fn(),
@@ -57,20 +53,6 @@ describe('State Effects Handler', () => {
         expect(setBpm).toHaveBeenCalledWith(payload, true, 100);
     });
 
-    it('should call loadDrumPreset on SET_GENRE_FEEL if not playing', () => {
-        const payload = { drum: 'rock' };
-        stateMap.playback.isPlaying = false;
-        handleEffects({ type: ACTIONS.SET_GENRE_FEEL, payload: payload }, stateMap, { dispatch });
-        expect(loadDrumPreset).toHaveBeenCalledWith('rock');
-    });
-
-    it('should NOT call loadDrumPreset on SET_GENRE_FEEL if playing', () => {
-        const payload = { drum: 'rock' };
-        stateMap.playback.isPlaying = true;
-        handleEffects({ type: ACTIONS.SET_GENRE_FEEL, payload: payload }, stateMap, { dispatch });
-        expect(loadDrumPreset).not.toHaveBeenCalled();
-    });
-
     it('reconciles URL genre effects after boot while restoring explicit groove settings (#1000)', async () => {
         __resetPackCacheForTest();
         markPackInstalled('horns-section', true);
@@ -95,7 +77,6 @@ describe('State Effects Handler', () => {
             dispatch,
         );
 
-        expect(loadDrumPreset).toHaveBeenCalledWith('Funk');
         expect(dispatch).toHaveBeenCalledWith(ACTIONS.SET_INSTRUMENT_VOICE, {
             module: 'harmony',
             voice: 'pack:horns-section',

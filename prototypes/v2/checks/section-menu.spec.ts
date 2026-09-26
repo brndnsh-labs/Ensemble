@@ -1,7 +1,7 @@
 import { appUrl, editorRevealed, expect, test } from './fixtures';
 
 /**
- * The section tap menu (#1417): the section letter's plain tap, which used to be a no-op,
+ * The section tap menu (#1422): the section letter's plain tap, which used to be a no-op,
  * now opens "Loop this section" / "Start here". Long-press and the 'L' key still go straight
  * to the loop toggle, unchanged — `semantic-playback.spec.ts`'s long-press test is the proof
  * that gesture still confines playback; this file is about the MENU wiring, not re-proving that.
