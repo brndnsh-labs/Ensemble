@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import type { Page } from '@playwright/test';
 import type { ChartDocument } from '../lib/documents';
-import { appUrl, debugScreenshot, editorRevealed, expect, test } from './fixtures';
+import { appUrl, editorRevealed, expect, test } from './fixtures';
 
 async function start(page: Page, title = 'Guided study') {
     await page.goto(appUrl());
@@ -112,7 +112,7 @@ test('touch-sized ending ranges reject overlap and reverse order before Apply, i
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
         true,
     );
-    await debugScreenshot(page, { path: info.outputPath('guided-endings.png'), fullPage: true });
+    await page.screenshot({ path: info.outputPath('guided-endings.png'), fullPage: true });
     await page.setViewportSize({ width: 820, height: 1180 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
         true,
@@ -120,7 +120,7 @@ test('touch-sized ending ranges reject overlap and reverse order before Apply, i
     await page.setViewportSize({ width: 874, height: 402 });
     await dialog.getByRole('button', { name: 'Apply', exact: true }).scrollIntoViewIfNeeded();
     await expect(dialog.getByRole('button', { name: 'Apply', exact: true })).toBeInViewport();
-    await debugScreenshot(page, {
+    await page.screenshot({
         path: info.outputPath('guided-landscape-actions.png'),
         fullPage: true,
     });

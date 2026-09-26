@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import type { Page } from '@playwright/test';
 import type { ChartDocument } from '../lib/documents';
-import { appUrl, test as base, debugScreenshot, editorRevealed, expect } from './fixtures';
+import { appUrl, test as base, editorRevealed, expect } from './fixtures';
 
 const test = base.extend<{ disconnect: () => Promise<void> }>({
     disconnect: async ({ browserName, context, request }, use) => {
@@ -178,7 +178,7 @@ test('pending forms save atomically from the hidden editor, transpose and reopen
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
         true,
     );
-    await debugScreenshot(page, { path: info.outputPath('form-editor.png'), fullPage: true });
+    await page.screenshot({ path: info.outputPath('form-editor.png'), fullPage: true });
 
     await expect
         .poll(() => page.evaluate(() => navigator.serviceWorker.controller?.scriptURL))
