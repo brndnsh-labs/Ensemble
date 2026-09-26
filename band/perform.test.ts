@@ -1,8 +1,15 @@
 import { leadRole } from './arrange/cycle.js';
 import { fullWindow, planBars } from './arrange/plan.js';
-import { DEFAULT_SETTINGS, type PitchedNote, PPQ, type TradeSettings } from './core/types.js';
+import {
+    type BandSettings,
+    DEFAULT_SETTINGS,
+    type PitchedNote,
+    PPQ,
+    type TradeSettings,
+} from './core/types.js';
 import { chordAt, compileTimeline } from './form/timeline.js';
 import { performPass } from './perform.js';
+import { STYLE_IDS } from './styles/index.js';
 import { FIXTURES, score } from './test/scores.js';
 import { fifthOf } from './theory/chord.js';
 
@@ -53,6 +60,57 @@ describe('performPass windows', () => {
         const strip = (es: typeof whole.events) => JSON.stringify(es.filter((e) => e.bar >= 5));
         expect(strip(tail.events)).toBe(strip(whole.events));
     });
+});
+
+/**
+ * The comp instruments that play a genuinely different book (a keyboard, a sustaining organ, a
+ * picked and a finger-plucked guitar) — rhodes and clav share piano's keyboard book exactly, so
+ * they'd only repeat this same check (`band/test/invariants/suite.ts` narrows the same way).
+ */
+const RESUME_COMPS = ['piano', 'organ', 'guitar', 'nylon'] as const;
+
+describe.each(STYLE_IDS)('%s resume parity', (styleId) => {
+    for (const [name, fixtureScore] of Object.entries(FIXTURES)) {
+        it(`${name} resumes at any barline exactly as the full pass, trading off`, () => {
+            const timeline = compileTimeline(fixtureScore);
+            const failures: string[] = [];
+            for (const comp of RESUME_COMPS) {
+                const settings: BandSettings = {
+                    ...DEFAULT_SETTINGS,
+                    style: styleId,
+                    comp,
+                    seed: 'resume',
+                };
+                // Passes 0–3: the head, then the pass-lift's first three steps (`planBars`'s
+                // `passLift` caps at pass 3) — a resumed pass can land in any of them.
+                for (const pass of [0, 1, 2, 3] as const) {
+                    const full = performPass(timeline, settings, { pass, looping: true });
+                    for (let from = 1; from < timeline.bars.length; from++) {
+                        if (timeline.bars[from].spans.some((s) => s.fermata)) {
+                            // Known gap, not this story's: a fermata bar with nothing played
+                            // before it in the window can't see the bass note it should
+                            // continue from (`holdFermatas` reads this pass's own already-
+                            // generated events for that, not `memory`) — flagged separately,
+                            // not fixed here.
+                            continue;
+                        }
+                        const resumed = performPass(timeline, settings, {
+                            pass,
+                            looping: true,
+                            memory: full.snapshots[from],
+                            window: { from, to: timeline.bars.length, wrapTo: 0 },
+                        });
+                        const expected = JSON.stringify(full.events.filter((e) => e.bar >= from));
+                        const actual = JSON.stringify(resumed.events);
+                        if (actual !== expected) {
+                            failures.push(`${comp} pass ${pass} from ${from}`);
+                        }
+                    }
+                }
+            }
+            expect(failures).toEqual([]);
+        });
+    }
 });
 
 describe('fermatas', () => {

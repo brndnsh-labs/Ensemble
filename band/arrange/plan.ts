@@ -110,6 +110,32 @@ export function planBars(
             bars[index].visit.lanes.drums !== false
         );
     };
+    // The fill bar `index` would get on `onPass`, worked out from the form alone (never from
+    // `plans`), so a bar outside this call's own window — the one right before a resumed pass,
+    // or the last bar of the pass before — can still be asked. Mirrors the bar-i fill logic
+    // below, but `index` need not be in `window`.
+    const fillAt = (index: number, onPass: number): Fill => {
+        const bar = bars[index];
+        const isLastOfSong = index === bars.length - 1;
+        const role = leadRole(timeline, index, onPass, trade);
+        if ((!looping && isLastOfSong) || (role.kind === 'trade' && role.with === 'drums')) {
+            // Trading with the drummer, his turn is a solo, not a fill; the true end of a
+            // non-looping song plays a held ending instead.
+            return 'none';
+        }
+        const next = isLastOfSong ? (looping ? bars[window.wrapTo] : null) : bars[index + 1];
+        const visitEnd = bar.barInVisit === bar.visit.barCount - 1;
+        if (
+            (visitEnd || (isLastOfSong && looping)) &&
+            !(next && bar.visit.seamless && !isLastOfSong)
+        ) {
+            return 'section';
+        }
+        if (bar.phrase.bar === bar.phrase.length - 1 && bar.phrase.index % 2 === 1) {
+            return 'phrase';
+        }
+        return 'none';
+    };
     // A song that loops earns a little more each time round — capped, so the fourth chorus
     // is fuller than the first but the band never runs away from the player.
     const passLift = Math.min(pass, 3) * 0.03;
@@ -166,14 +192,23 @@ export function planBars(
                 fill = 'phrase';
             }
         }
-        const first = i === window.from && pass === 0;
-        const prevPlan = plans[i - 1];
+        // The very top of the whole performance, not of this call's own window: a pass resumed
+        // mid-song is a continuation, not a fresh start, so its first bar still arrives with a
+        // crash if the form says so (the same "index `0`, not `window.from`" fix as `fillAt`
+        // and `before`/`drummerAlone` below — a section repeat's own arrival bar lost its crash
+        // on resume before this read the true song position instead of the window's).
+        const first = i === 0 && pass === 0;
         // The drummer's own turn opens with the kick under his statement, not a crash: the
         // crash is the band coming back in.
         const arrival = bar.barInVisit === 0 && !bar.visit.seamless && !first && !drumsTurn;
         // A crash marks an arrival: a new section, or the downbeat after a phrase fill once
-        // the band is past quiet energy.
-        const afterFill = prevPlan?.fill === 'phrase' && energy >= 0.5;
+        // the band is past quiet energy. Read the previous bar's fill from the form (`fillAt`),
+        // not from `plans` — a pass resumed here has no plan for the bar before its own window,
+        // and even a full pass replans from scratch every time round, so `plans[i - 1]` is
+        // undefined at the top of every pass but the very first.
+        const priorFill =
+            i > 0 ? fillAt(i - 1, pass) : pass > 0 ? fillAt(bars.length - 1, pass - 1) : 'none';
+        const afterFill = priorFill === 'phrase' && energy >= 0.5;
         // The band comes back in on a crash after the drummer's four.
         // Read from the form, not the previous plan, so a pass resumed here still crashes; the
         // bar before the first is the last bar of the pass before.
