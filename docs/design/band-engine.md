@@ -177,7 +177,9 @@ expression devices take turns rather than stack; one peak note per cycle.
   and the blues pianist's rootless comp.
   - Under a sounding lead note, a strike may lay out. Each chord's first strike always stays.
     On the Rhodes (`hold`), the strike before rings on through the one it gave up, so the
-    comp leans back instead of going silent.
+    comp leans back instead of going silent. A sparse figure keeps a floor (`keep`): the
+    jazz piano never lays out below two strikes a bar, or the time goes with it (#1404 item
+    33 heard it thin without one).
   - In a breath of a dotted quarter or more, the figure's own strike is played up. A chord's
     first strike or a push doesn't count: it would be there anyway.
   - If the figure left the breath empty, a stab can land on the first offbeat eighth at
