@@ -115,3 +115,35 @@ test('the band engine plays the chart round the loop and stops', async ({ page }
     expect(evidence.oldEngineNotes, 'the old generator should stay idle').toBe(0);
     expect(errors).toEqual([]);
 });
+
+// The band reads its chart when it starts. A measure-less chart's key change while playing
+// (the starters are measure-less) must reach it: the song restarts from the top in the new
+// key, as a measure-based chart's does, instead of playing on in the old one.
+test('changing the key of a measure-less chart while it plays restarts the band in the new key', async ({
+    page,
+}) => {
+    test.setTimeout(60_000);
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    await page.goto(appUrl());
+    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
+    const tempo = page.getByLabel('Tempo', { exact: true });
+    await tempo.fill('240');
+    await tempo.press('Enter');
+    const activeBar = () =>
+        page
+            .locator('.sheet .bar')
+            .evaluateAll((bars) =>
+                bars.findIndex((bar) => bar.getAttribute('data-active') === 'true'),
+            );
+    await page.getByRole('button', { name: 'Start playback', exact: true }).click();
+    await expect.poll(activeBar, { timeout: 20_000, intervals: [50] }).toBeGreaterThanOrEqual(3);
+
+    await page.getByLabel('Key', { exact: true }).selectOption('D');
+    await expect(page.locator('.sheet .bar').first().locator('.chord')).toHaveText(['D7']);
+    // Back to the top: the first bar lit after the change is bar 1, not the next bar on.
+    await expect.poll(activeBar, { timeout: 5_000, intervals: [25] }).toBe(0);
+    await expect(page.getByRole('button', { name: 'Stop playback', exact: true })).toBeEnabled();
+    await page.getByRole('button', { name: 'Stop playback', exact: true }).click();
+    expect(errors).toEqual([]);
+});
