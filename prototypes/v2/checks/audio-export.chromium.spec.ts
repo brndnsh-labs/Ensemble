@@ -12,8 +12,7 @@ const ONE_LOOP_SECONDS = (STARTER_BARS * STEPS_PER_BAR * 60) / STARTER_BPM / 4;
 /**
  * Chromium-only (see the filename suffix in `playwright.config.ts`'s
  * `chromiumOnly` match): this exercises a real `OfflineAudioContext` render
- * (`renderCurrentSessionToWav`/`renderStemsToWav` in
- * public/export/audio-export.ts), and this repo's only other proof that real
+ * (`renderBandMixToWav` in `lib/band-export.ts`), and this repo's only other proof that real
  * Web Audio behaves under headless automation (`npm run test:browser`,
  * root CLAUDE.md) is Chromium-only too — WebKit's headless Web Audio support
  * under Playwright is unproven here, so this doesn't bet on it.
@@ -78,53 +77,16 @@ test('Export audio (mix) downloads a valid WAV of plausible duration, and the li
     expect(wav.numChannels).toBe(2);
     expect(wav.bitsPerSample).toBe(16);
     // One loop (the default) plus the render's fixed 0.25s lead-in and 2s tail
-    // (`renderClonedStateToWav`) — a wide band, not the exact swing-adjusted sum.
+    // (`renderBandPasses`) — a wide band, not the exact swing-adjusted sum.
     expect(wav.durationSeconds).toBeGreaterThan(ONE_LOOP_SECONDS);
     expect(wav.durationSeconds).toBeLessThan(ONE_LOOP_SECONDS + 10);
 
-    // `renderCurrentSessionToWav` renders from `cloneStateForRender`'s detached
-    // clone (#1278's acceptance): the live arranger/chart must read back
+    // The render runs on a detached state clone (#1278's acceptance): the live chart must read back
     // identical to before the render, not just "the app didn't crash." Read
     // both sides the same way (`innerText`, not the `textContent`-based
     // `toHaveText` matcher) so this compares like with like.
     const after = await page.locator('.sheet').innerText();
     expect(after).toBe(before);
-});
-
-test('Export audio (stems) downloads one WAV per instrument lane', async ({ page }, testInfo) => {
-    // Five sequential full offline renders (`renderStemsToWav`), each its own
-    // `OfflineAudioContext` — five times the single mix export's real work
-    // (also comfortably slower than its default 45s here), hence the wide
-    // budget (matches `foundation.spec.ts`'s heaviest per-lane-catalog test).
-    test.setTimeout(240_000);
-    // The old engine's five stems, harmony included; the band engine's four are
-    // `band-audio-export.chromium.spec.ts`'s. This retires with the old engine (#1404).
-    await page.goto(appUrl('?engine=old'));
-    await page.getByRole('button', { name: blue }).click();
-    await page.getByRole('button', { name: 'Song actions' }).click();
-
-    // public/export/audio-export.ts's STEM_INSTRUMENTS order. `renderStemsToWav`
-    // downloads all 5 in a tight synchronous loop (`downloadExportResult` per
-    // result, no awaits between clicks) — five separate `waitForEvent('download')`
-    // calls all resolve to the SAME first event (Node's EventEmitter invokes every
-    // currently-registered listener on one `emit`, not one listener per emit), so
-    // this accumulates them off a single persistent listener instead.
-    const instruments = ['soloist', 'bass', 'chords', 'harmony', 'drums'];
-    const downloads: import('@playwright/test').Download[] = [];
-    page.on('download', (event) => downloads.push(event));
-    await page.getByRole('button', { name: 'Export audio (stems)' }).click();
-    await expect.poll(() => downloads.length, { timeout: 220_000 }).toBe(instruments.length);
-    const events = downloads;
-    const names = events.map((event) => event.suggestedFilename()).sort();
-    expect(names).toEqual(
-        instruments.map((instrument) => `Blue pocket-stem-${instrument}.wav`).sort(),
-    );
-    for (const [i, event] of events.entries()) {
-        const dest = testInfo.outputPath(`stem-${i}.wav`);
-        await event.saveAs(dest);
-        const wav = parseWav(await readFile(dest));
-        expect(wav.durationSeconds).toBeGreaterThan(ONE_LOOP_SECONDS);
-    }
 });
 
 test('Export audio during playback does not stop or glitch the band', async ({ page }) => {
