@@ -1009,6 +1009,12 @@ export function transpose(delta: number): void {
         return;
     }
     transposeKey(delta);
+    // The band reads its score only when it starts, so a playing band hears the new key only
+    // when it is handed the chart again; `setScore` restarts the song from the top, as a
+    // measure-based chart's key change does (`editScore`).
+    if (band?.playing) {
+        band.setScore(scoreForBand());
+    }
 }
 /**
  * The song's own major/minor (#1375) — `score.isMinor` only, never a section or bar override.
