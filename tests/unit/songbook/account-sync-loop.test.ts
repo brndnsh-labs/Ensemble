@@ -2313,11 +2313,11 @@ describe('the sync loop publishes the remote updates it preserved', () => {
         // The songbook is exactly where this is needed and exactly where nothing is watched.
         expect(loop.getSnapshot().observation).toBe(null);
         expect(loop.getSnapshot().candidates).toEqual([
-            { documentId: 'song-1', revision: 'cloud-9' },
+            { documentId: 'song-1', revision: 'cloud-9', kind: 'version' },
         ]);
     });
 
-    it('publishes only versions — never a tombstone or a body it cannot read', async () => {
+    it('publishes every kind, in document order — not only versions (#1362)', async () => {
         const { api } = fakeApi({ ok: true, value: { kind: 'committed' }, status: 200 });
         const loop = createSyncLoop(
             api,
@@ -2339,12 +2339,15 @@ describe('the sync loop publishes the remote updates it preserved', () => {
 
         await loop.attach(OWNER);
 
-        // "A newer version is in your account" is a sentence about a version. A tombstone is the
-        // account no longer holding the song at all, and an unsupported body is one this build
-        // cannot read — marking either as a newer version would describe a document that does not
-        // exist in the form the marker claims.
+        // Every kind is published (#1362; a `'version'`-only list was the pre-existing gap this
+        // closes). Which of them a surface may say and act on — "A newer version is in your
+        // account" is a sentence about a version alone, and neither a tombstone nor a body this
+        // build cannot read is one — is that surface's call, made by its own reader, not a filter
+        // made here.
         expect(loop.getSnapshot().candidates).toEqual([
-            { documentId: 'song-1', revision: 'cloud-9' },
+            { documentId: 'song-gone', revision: 'cloud-2', kind: 'deleted' },
+            { documentId: 'song-future', revision: 'cloud-3', kind: 'unsupported' },
+            { documentId: 'song-1', revision: 'cloud-9', kind: 'version' },
         ]);
     });
 

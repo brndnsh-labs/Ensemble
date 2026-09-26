@@ -603,15 +603,35 @@ export default function Ensemble() {
             ? (sync.candidates.find((update) => update.documentId === current.id) ?? null)
             : null;
     /**
-     * Which shape the one banner above the stand is in (#1267, #1310), or `'none'`.
+     * The `standCandidate` narrowed to the one kind that is ever adoptable (#1362) — every caller
+     * that offers "Use the account's version" or opens the confirm step in front of it reads THIS,
+     * never the raw `standCandidate`, so a `'deleted'` or `'unsupported'` row can never reach either.
+     */
+    const standVersionCandidate = standCandidate?.kind === 'version' ? standCandidate : null;
+    /**
+     * Which shape the one banner above the stand is in (#1267, #1310, widened #1362), or `'none'`.
      *
      * A refused Save outranks a preserved candidate, and the two genuinely can coexist — a download
      * that met a parked outbox preserves a body beside it. The refusal is the state that blocks
      * every later Save of this song, and it is the one `keepBoth` resolves; the candidate is
      * reachable again the moment it is resolved.
      */
-    const standBanner: 'none' | 'version' | 'gone' | 'candidate' =
-        conflict !== 'none' ? conflict : standCandidate !== null ? 'candidate' : 'none';
+    const standBanner:
+        | 'none'
+        | 'version'
+        | 'gone'
+        | 'candidate'
+        | 'candidate-deleted'
+        | 'candidate-unsupported' =
+        conflict !== 'none'
+            ? conflict
+            : standCandidate === null
+              ? 'none'
+              : standCandidate.kind === 'version'
+                ? 'candidate'
+                : standCandidate.kind === 'deleted'
+                  ? 'candidate-deleted'
+                  : 'candidate-unsupported';
     // #1389 — once per transition into a shown banner (not once per render it stays up, and not
     // for the songbook screen's own re-renders, which don't hold a `standBanner` at all).
     useEffect(() => {
@@ -620,11 +640,14 @@ export default function Ensemble() {
         }
     }, [standBanner]);
     /**
-     * The songs the songbook marks (#1310). Ids only: the list needs to know WHICH rows, and the
-     * revision beside each one is the stand's business — it is what an adoption is compared
-     * against, and a presentational list has nothing to compare.
+     * The songs the songbook marks, and which sentence each row gets (#1310, widened #1362). Ids
+     * and kinds only: the revision beside each one is the stand's business — it is what a `version`
+     * adoption is compared against, and a presentational list has nothing to compare.
      */
-    const candidateIds = sync.candidates.map((update) => update.documentId);
+    const remoteCandidateRows = sync.candidates.map((update) => ({
+        id: update.documentId,
+        kind: update.kind,
+    }));
     // `?? []` is the LIST, not the claim: "we haven't read the account library yet" is carried
     // separately to the songbook as `loading`, so an unread library never renders as an empty one.
     const songs = signedIn ? (accountSongs ?? []) : guestSongs;
@@ -1273,7 +1296,10 @@ export default function Ensemble() {
     // `inAccount` is: the confirm step unmounts when its own question stops existing (a pass
     // adopting the body elsewhere, a Save queued, the chart closed), and an offer left set would
     // spring it open again over the next chart that qualifies.
-    const adoptRemoteOffered = standCandidate !== null;
+    //
+    // Reads `standVersionCandidate`, not `standCandidate` (#1362): this offer is "Use the account's
+    // version", and a `'deleted'` or `'unsupported'` row is never that offer.
+    const adoptRemoteOffered = standVersionCandidate !== null;
     useEffect(() => {
         if (!adoptRemoteOffered) {
             setAdoptRemoteOffer(null);
@@ -3156,6 +3182,9 @@ export default function Ensemble() {
                 // without this the chip would read "Not in your account yet" about a song that
                 // is fully saved in somebody else's library.
                 foreign={standMismatch}
+                // #1362 — the same value the stand's banner reads, so the chip and the banner can
+                // never disagree about which candidate (if any) describes this chart.
+                candidateKind={standCandidate?.kind ?? null}
                 sync={sync}
             />
         ) : null;
@@ -3299,15 +3328,25 @@ export default function Ensemble() {
                     unsavedEdits={dirty}
                     // Each shape shows only its OWN sentence: a refused Keep-both is a fact about
                     // a queue, a refused adoption is a fact about a preserved version, and neither
-                    // explains the other.
-                    failure={standBanner === 'candidate' ? adoptRemoteFailure : keepBothFailure}
+                    // explains the other. `candidate-unsupported` renders no button at all, so it
+                    // has no failure to show either (#1362).
+                    failure={
+                        standBanner === 'candidate'
+                            ? adoptRemoteFailure
+                            : standBanner === 'candidate-unsupported'
+                              ? null
+                              : keepBothFailure
+                    }
                     onKeepBoth={keepBothVersions}
-                    // #1310 — the third shape's action opens the confirm step rather than doing
-                    // anything: this is the one choice here that destroys something. The offer is
-                    // FROZEN here (patch R5), so the answer is about the version on screen now.
+                    // #1310 — the `candidate` shape's action opens the confirm step rather than
+                    // doing anything: this is the one choice here that destroys something. The
+                    // offer is FROZEN here (patch R5) from `standVersionCandidate`, never the raw
+                    // `standCandidate` (#1362) — this handler is wired to `'candidate'` alone
+                    // (`ConflictBanner`'s own routing), but the value it freezes must still never
+                    // be a `'deleted'`/`'unsupported'` row reached by some future caller.
                     onUseAccountVersion={() => {
                         setAdoptRemoteFailure(null);
-                        setAdoptRemoteOffer(standCandidate);
+                        setAdoptRemoteOffer(standVersionCandidate);
                     }}
                 />
             )}
@@ -3414,9 +3453,9 @@ export default function Ensemble() {
                     // ordering being load-bearing.
                     accountsOff={accounts.resolved && !accountsOn}
                     onEnableAccounts={accounts.turnOn}
-                    // #1310 — only the account library can have one waiting; signed out the loop
-                    // publishes none at all, so this is the same empty list either way.
-                    newerInAccount={candidateIds}
+                    // #1310, widened #1362 — only the account library can have one waiting; signed
+                    // out the loop publishes none at all, so this is the same empty list either way.
+                    remoteCandidates={remoteCandidateRows}
                     search={search}
                     onSearch={setSearch}
                     onImport={() => setImporting(true)}
@@ -3964,7 +4003,7 @@ export default function Ensemble() {
                     onClose={() => setSignOutStep(null)}
                 />
             )}
-            {standCandidate !== null && current && (
+            {standVersionCandidate !== null && current && (
                 <AdoptRemoteDialog
                     dialogRef={adoptRemoteDialogRef}
                     title={current.title}

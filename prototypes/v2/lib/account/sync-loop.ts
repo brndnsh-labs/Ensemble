@@ -113,22 +113,32 @@ export interface CloudObservation {
     refused: null | 'too-large' | 'refused';
 }
 
+/** `RemoteOutcome['kind']`, restated here so a reader of this loop's public surface never has to
+ * follow an import into `sync/protocol.ts` to know what a candidate's `kind` can be. */
+export type RemoteCandidateKind = 'version' | 'deleted' | 'unsupported';
+
 /**
- * A remote advance this device preserved BESIDE a held record rather than applying it (#1310) —
- * `reconcile`'s `'candidate'` answer, published so the product can say so.
+ * A remote advance this device preserved BESIDE a held record rather than applying it — either
+ * `reconcile`'s `'candidate'` answer (#1310) or its `'retained-deleted'`/`'unsupported'` ones
+ * (#1362) — published so the product can say so.
  *
- * Only `kind: 'version'` observations are here. A `'deleted'` candidate is a tombstone this device
- * could not apply and an `'unsupported'` one is a body this build cannot read; neither is a newer
- * version of this song to offer, and describing either as one would be a sentence about a document
- * that does not exist in the form it claims. They stay where they are, unmentioned by this surface.
+ * All three `kind`s are here now (#1362; a `'version'`-only list was the pre-existing gap this
+ * closes). Each reader picks what its own surface may say and do with a row, and only ONE thing
+ * differs by kind at the call sites that matter: `kind: 'version'` is the sole adoptable shape —
+ * `AccountSongbook.adoptRemoteVersion` refuses anything else outright — because a `'deleted'`
+ * candidate names an id the account no longer holds at all, and an `'unsupported'` one is a body
+ * this build cannot even read; "offer to replace your song with THIS" would be a sentence about a
+ * document that does not exist in the form it claims, for both. Neither is ever paired with "Use
+ * the account's version".
  *
- * The revision travels with the id because the adoption is a compare-and-swap against it: the
- * musician answers about the version they were shown, never about whichever one a pass has landed
- * since. See `AccountSongbook.adoptRemoteVersion`.
+ * The revision travels with the id because a `version` adoption is a compare-and-swap against it:
+ * the musician answers about the version they were shown, never about whichever one a pass has
+ * landed since. See `AccountSongbook.adoptRemoteVersion`.
  */
 export interface RemoteUpdate {
     documentId: string;
     revision: string;
+    kind: RemoteCandidateKind;
 }
 
 const NO_UPDATES: readonly RemoteUpdate[] = [];
@@ -482,7 +492,9 @@ function sameUpdates(a: readonly RemoteUpdate[], b: readonly RemoteUpdate[]): bo
         a.length === b.length &&
         a.every(
             (update, index) =>
-                update.documentId === b[index].documentId && update.revision === b[index].revision,
+                update.documentId === b[index].documentId &&
+                update.revision === b[index].revision &&
+                update.kind === b[index].kind,
         )
     );
 }
@@ -1061,15 +1073,20 @@ export function createSyncLoop(
         // not a steady state — and it is bounded by `MAX_REMOTE_CANDIDATES` either way. The
         // validation is deliberately kept rather than skipped for speed: an unvalidated row is
         // exactly what must never reach a musician as an offer to replace their song.
+        //
+        // Every kind is published now (#1362) — `version`, `deleted` and `unsupported` alike. Which
+        // of them a surface may say and act on is that surface's call, not a filter made here.
         let candidates = state.candidates;
         try {
             const preserved = await songbook.remoteCandidates(current);
             if (mine !== epoch || token !== observation) {
                 return;
             }
-            candidates = preserved
-                .filter((row) => row.kind === 'version')
-                .map((row) => ({ documentId: row.documentId, revision: row.revision }));
+            candidates = preserved.map((row) => ({
+                documentId: row.documentId,
+                revision: row.revision,
+                kind: row.kind,
+            }));
         } catch {
             // Unreadable is not "none": leaving the last published list alone is the conservative
             // direction, since dropping it would quietly retract a marker nothing has resolved.

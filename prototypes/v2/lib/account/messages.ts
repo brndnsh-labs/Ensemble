@@ -119,21 +119,33 @@ export function failureFromClaim(error: ApiError): AccountFailure {
 }
 
 /**
- * The one sentence a preserved remote advance is said in (#1310).
+ * The one sentence each preserved remote advance is said in, per `kind` (#1310, widened #1362).
  *
- * It is said in two places — the songbook row for that song, and the banner over the stand when it
- * is the chart that is open — and they must be the same words: a musician who sees a row marked one
- * way and then opens it to read something else has to work out whether they are the same fact. Each
- * surface keeps its own surrounding prose (the banner explains the choice, the row has no room to);
- * this is only the claim they share.
+ * Each is said in two places — the songbook row for that song, and the banner over the stand when
+ * it is the chart that is open — and the two must be the same words: a musician who sees a row
+ * marked one way and then opens it to read something else has to work out whether they are the
+ * same fact. Each surface keeps its own surrounding prose (the banner explains the choice, the row
+ * has no room to); this is only the claim they share.
  *
- * "Newer" is a fact about the ACCOUNT's revision line, not about wall-clock time — the contract
- * forbids choosing a winner by timestamp, and nothing here does: it is newer because the account's
- * revision succeeded the one this device mirrors. The word "candidate" is deliberately absent, here
- * and everywhere a musician reads.
+ * `marker` — "Newer" is a fact about the ACCOUNT's revision line, not about wall-clock time — the
+ * contract forbids choosing a winner by timestamp, and nothing here does: it is newer because the
+ * account's revision succeeded the one this device mirrors. The word "candidate" is deliberately
+ * absent, here and everywhere a musician reads.
+ *
+ * `deletedMarker` — the account tombstoned this id while local work held it (#1362). Deliberately
+ * the SAME words `CLOUD_LABELS.gone` and the refused-Save conflict banner already use for "the
+ * account has no such document any more": it is the same fact, reached by a different route (a
+ * download's preservation rule rather than a refused Save), and a musician must not be asked to
+ * work out whether two identically-true sentences mean two different things.
+ *
+ * `unsupportedMarker` — a body this build cannot read at all, from a schema a future update
+ * understands. There is nothing to choose and nothing to keep beside anything: the sentence names
+ * the one fix (update the app) and offers no action, because none exists yet.
  */
 export const REMOTE_UPDATE_MESSAGES = {
     marker: 'A newer version is in your account',
+    deletedMarker: 'No longer in your account',
+    unsupportedMarker: 'Saved by a newer version of Ensemble — update to open it',
 } as const;
 
 /**

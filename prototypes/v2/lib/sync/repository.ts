@@ -945,6 +945,17 @@ export class AccountSongbook {
      *
      * `'none'` when the queue holds no refused Save: whoever was looking at the banner is a moment
      * stale, and reporting that is better than inventing a resolution.
+     *
+     * **One more shape resolves here, with an EMPTY queue (#1362).** A bare `'deleted'` candidate —
+     * the account tombstoned this id while a live draft or the chart merely open on the stand held
+     * it, with nothing ever queued to refuse — is the one case besides a refused Save this call
+     * still settles: it mints the same fresh-id/marked-title line and drops the original the same
+     * way the refused `'gone'` branch does. There is no queue here, so the content it carries is
+     * the newest LIVE DRAFT when one exists (an unsaved experiment is what "Keep mine" means), and
+     * the saved record otherwise (a chart merely left open, with nothing typed). A non-empty queue
+     * with nothing refused in it is untouched by this addition and answers `'none'` exactly as
+     * before, because that song has an ordinary Save still in flight, which a pass — not this
+     * resolution — is what settles it.
      */
     async keepBoth(scope: AccountScope, documentId: string): Promise<KeepBothResolution | 'none'> {
         scope = copyScope(scope);
@@ -963,7 +974,149 @@ export class AccountSongbook {
                         // on.
                         const refused = queue.find((operation) => operation.status === 'conflict');
                         if (!refused) {
-                            return tx.finish('none');
+                            // #1362 — the one case an EMPTY queue can still resolve here: a bare
+                            // `'deleted'` candidate, the account tombstoned this id while a live
+                            // draft or the chart merely open on the stand held it, and nothing was
+                            // ever queued to refuse. The stand's banner offers the same "Keep mine
+                            // as a new song" action for it as for a refused `'gone'` conflict, and
+                            // this is what makes that button do something rather than silently
+                            // finding no refused head. A non-empty queue with nothing refused in it
+                            // is left exactly as before — an ordinary Save still in flight, which a
+                            // pass resolves on its own.
+                            if (queue.length > 0) {
+                                return tx.finish('none');
+                            }
+                            tx.read(
+                                tx.table('meta').get(candidateKey(scope.ownerId, documentId)),
+                                (row: RemoteCandidate | undefined) => {
+                                    let candidate: RemoteCandidate | null = null;
+                                    try {
+                                        candidate = row
+                                            ? savedCandidate(row, scope, documentId)
+                                            : null;
+                                    } catch {
+                                        candidate = null;
+                                    }
+                                    if (candidate?.kind !== 'deleted') {
+                                        return tx.finish('none');
+                                    }
+                                    tx.read(
+                                        tx.table('songs').get([scope.ownerId, documentId]),
+                                        (savedRow: SavedSong | undefined) => {
+                                            if (!savedRow) {
+                                                return tx.finish('none');
+                                            }
+                                            let song: SavedSong;
+                                            try {
+                                                song = savedSong(savedRow, scope, documentId);
+                                            } catch {
+                                                return tx.finish('none');
+                                            }
+                                            const now = new Date().toISOString();
+                                            // There is no queue here, so `latest` is not a queue
+                                            // tail — it is the newest LIVE draft, when one holds
+                                            // the record, and the saved document otherwise. A
+                                            // draft is what "Keep mine" actually means when the
+                                            // divergence is an unsaved experiment rather than a
+                                            // chart merely left open: sourcing from the saved
+                                            // record alone would silently drop the very unsaved
+                                            // words that made this a divergence worth keeping.
+                                            // Validated the same way `keepBoth`'s draft-moving
+                                            // loop below validates each row — an unreadable one
+                                            // is skipped rather than aborting the resolution.
+                                            let newestDraft: Draft | null = null;
+                                            for (const row of rows) {
+                                                try {
+                                                    const draft = savedDraft(
+                                                        row,
+                                                        scope,
+                                                        documentId,
+                                                    );
+                                                    if (
+                                                        !newestDraft ||
+                                                        draft.capturedAt > newestDraft.capturedAt
+                                                    ) {
+                                                        newestDraft = draft;
+                                                    }
+                                                } catch {
+                                                    // Left where it is; the loop below will
+                                                    // decide the same row's fate again.
+                                                }
+                                            }
+                                            const source = newestDraft?.document ?? song.document;
+                                            const carried = snapshot({
+                                                ...source,
+                                                id: freshDocumentId,
+                                                title: `${source.title.slice(0, 150)} — kept`,
+                                                revision: 0,
+                                                createdAt: source.createdAt,
+                                                updatedAt: now,
+                                            });
+                                            tx.table('songs').put({
+                                                ownerId: scope.ownerId,
+                                                documentId: freshDocumentId,
+                                                document: carried,
+                                                remoteRevision: null,
+                                            } satisfies SavedSong);
+                                            tx.table('operations').add({
+                                                ownerId: scope.ownerId,
+                                                documentId: freshDocumentId,
+                                                operationId,
+                                                localRevision: carried.revision,
+                                                snapshot: carried,
+                                                base: { revision: null },
+                                                wireBody: null,
+                                                status: 'queued',
+                                            } satisfies SaveOperation);
+                                            for (const row of rows) {
+                                                let moved: Draft;
+                                                try {
+                                                    const draft = savedDraft(
+                                                        row,
+                                                        scope,
+                                                        documentId,
+                                                    );
+                                                    moved = {
+                                                        ...draft,
+                                                        documentId: freshDocumentId,
+                                                        document: snapshot({
+                                                            ...draft.document,
+                                                            id: freshDocumentId,
+                                                        }),
+                                                        baseRevision: carried.revision,
+                                                    };
+                                                } catch {
+                                                    continue;
+                                                }
+                                                tx.table('drafts').delete([
+                                                    scope.ownerId,
+                                                    documentId,
+                                                    moved.writerId,
+                                                ]);
+                                                tx.table('drafts').put(moved);
+                                            }
+                                            tx.table('meta').delete(
+                                                candidateKey(scope.ownerId, documentId),
+                                            );
+                                            // Nothing up there to mirror: the candidate IS the
+                                            // tombstone. Same cleanup as the refused `'gone'` branch
+                                            // below.
+                                            tx.table('songs').delete([scope.ownerId, documentId]);
+                                            tx.table('meta').delete(
+                                                deletionKey(scope.ownerId, documentId),
+                                            );
+                                            tx.finish({
+                                                conflict: 'gone',
+                                                documentId: freshDocumentId,
+                                                document: carried,
+                                                operationId,
+                                                adopted: null,
+                                            });
+                                        },
+                                    );
+                                },
+                            );
+                            return;
                         }
                         // `refused` came out of this queue, so it is not empty, and `operations()`
                         // sorted it — the last entry is the newest bytes this device committed.

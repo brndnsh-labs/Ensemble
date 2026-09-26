@@ -10,6 +10,7 @@ import {
     saveAs,
     signUp,
     songTitles,
+    uploadOf,
 } from './account-helpers';
 import { expect, accountTest as test } from './fixtures';
 import { addVirtualAuthenticator } from './virtual-authenticator';
@@ -213,6 +214,37 @@ test('offline the delete is disabled with a reason; a lost response retries the 
     await page.context().setOffline(true);
     await page.context().setOffline(false);
     await expect(page.getByTestId('sync-offline')).toContainText('Songs 0/0');
-    await expect(page.getByTestId('sync-cloud')).toHaveText('Saved to your account');
     await expect(page.getByRole('heading', { name: 'Second take', exact: true })).toBeVisible();
+
+    // A `'deleted'` candidate this download preserved (#1362) — the account tombstoned this id
+    // while the chart on the stand held it. The chip must not go on claiming "Saved to your
+    // account": that would be a stale confirmation about a document the cloud no longer has.
+    await expect(page.getByTestId('sync-cloud')).toHaveText(
+        'No longer in your account — this version is still on this device',
+    );
+    const banner = page.getByTestId('conflict-banner');
+    await expect(banner).toHaveAttribute('data-conflict', 'candidate-deleted');
+    await expect(page.getByTestId('conflict-title')).toHaveText('No longer in your account');
+
+    // The songbook marks the row too — the one surface that shows the whole library at once.
+    await backToSongbook(page);
+    await expect(page.getByTestId('song-deleted-in-account')).toHaveText(
+        'No longer in your account',
+    );
+
+    // "Keep mine as a new song" (#1362) settles it: this device's copy survives under a fresh id,
+    // and it is queued to upload as the new song it now is — nothing here is ever offered "Use
+    // the account's version", because the account has no version to offer.
+    await openSong(page, 'Second take');
+    const uploaded = uploadOf(page, 'Second take — kept');
+    await page.getByTestId('conflict-keep-both').click();
+    await uploaded;
+    await expect(
+        page.getByRole('heading', { name: 'Second take — kept', exact: true }),
+    ).toBeVisible();
+    await expect(page.getByTestId('conflict-banner')).toHaveCount(0);
+    await expect(page.getByTestId('sync-cloud')).toHaveText('Saved to your account');
+    await backToSongbook(page);
+    await expect(page.getByTestId('song-deleted-in-account')).toHaveCount(0);
+    await expect(songTitles(page)).toHaveText(['Second take — kept']);
 });
