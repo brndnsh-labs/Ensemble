@@ -661,13 +661,14 @@ const bluesLead = leadIdiom({
 export const blues: Style = {
     id: 'blues',
     name: 'Blues',
-    // A shuffle: swung eighths at 90 (the offbeat at ~65% of the beat, next to a hard
-    // triplet), the old engine's Blues setting and well past jazz's lighter 72. The blues sits
+    // A shuffle: swung eighths at 100, a hard triplet (the offbeat at 67% of the beat), well
+    // past jazz's lighter 60 — the old Blues Shuffle drum preset's value, which Brandon passed
+    // by ear (2026-09-26) over the 90 this style was first tuned at. The blues sits
     // back: the bass a hair behind the drums for weight, the keys further back, lazy. The
     // rhythm guitar's chops sit with the snare, and alone its boogie is the band's bottom, so
     // it leans only as much as the bass.
     feel: {
-        swing: 90,
+        swing: 100,
         swingGrid: 8,
         // The lead sits back like the keys: blues is behind the beat.
         lean: { bass: 2, comp: 6, lead: 8 },

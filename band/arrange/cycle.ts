@@ -6,9 +6,13 @@
  * The first time through, the lead plays the head. Looping, it solos for three choruses and
  * brings the head back on the fourth: head, solo, solo, solo, head…
  *
- * When the player trades (`BandSettings.trade`), every time through after the head is traded
- * instead: the band and the player take turns, a fixed number of bars each, the band first so
- * the player has a phrase to answer. The turns run on across the choruses.
+ * When the player trades (`BandSettings.trade`), the pass after the head is traded instead:
+ * the band and the player take turns, a fixed number of bars each — the soloist trades band
+ * first, the drummer trades you first (jazz convention: you play, the drummer answers). With
+ * `trade.choruses` set, the head returns after that many traded passes and the cycle repeats
+ * (pass 0 = head, passes 1..N traded, pass N+1 = head, …), the alternation restarting fresh at
+ * the top of each block. `null`/`0` choruses keeps trading forever, running the turns on
+ * across every pass instead — the original behavior.
  */
 import type { TradeSettings } from '../core/types.js';
 import type { Bar, Timeline } from '../form/timeline.js';
@@ -39,8 +43,12 @@ export const CYCLE = 4;
 const isIntro = (bar: Bar) => /^intro/i.test(bar.visit.label.trim());
 
 /**
- * The lead's job at bar `index` on `pass`. With `trade`, every pass after the first is traded.
- * Every bar of a slot or a turn gets the same answer, so any barline can resume it.
+ * The lead's job at bar `index` on `pass`. With `trade`, a finite `choruses` wraps `pass` into
+ * blocks of `choruses + 1` passes — block-relative pass 0 (which includes the very first pass,
+ * and every block boundary after it) falls through to the head/solo cycle below exactly as a
+ * non-trading pass would; the rest of the block trades. `null`/`0` choruses never wraps, so
+ * every pass after the first stays a turn. Every bar of a slot or a turn gets the same answer,
+ * so any barline can resume it.
  */
 export function leadRole(
     timeline: Timeline,
@@ -53,10 +61,16 @@ export function leadRole(
     if (isIntro(bar)) {
         return { kind: 'rest' };
     }
-    if (trade && pass > 0) {
-        return tradeRole(timeline, index, pass, trade);
+    const block = trade?.choruses ? trade.choruses + 1 : null;
+    const p = block ? pass % block : pass;
+    if (trade && p > 0) {
+        return tradeRole(timeline, index, p, trade);
     }
-    const cycle = pass % CYCLE;
+    // p === 0: either the real pass 0, or (with a finite chorus count) a block boundary where
+    // the head returns — both read the same way a non-trading pass would, using `p` in place
+    // of `pass` so a block boundary always lands on cycle 0 (head) rather than wherever the
+    // raw pass number happens to fall in the old head/solo-three rotation.
+    const cycle = p % CYCLE;
     // A section written as a solo is one, even the first time through.
     if (/^solo/i.test(bar.visit.label.trim())) {
         return { kind: 'solo', chorus: cycle === 0 ? 1 : (cycle as 1 | 2 | 3) };
@@ -109,13 +123,16 @@ function turnsOf(timeline: Timeline, length: number): Turns {
 }
 
 /**
- * The turn bar `index` falls in. The alternation runs on across choruses, the band taking the
- * first turn after the head.
+ * The turn bar `index` falls in. `blockPass` is 1 at the first traded pass of a trading block
+ * (block-relative with a finite chorus count, the raw pass with keep-trading) — the alternation
+ * runs on from there across the block's choruses, restarting at the top of the next block.
+ * The soloist trades band first (a phrase to answer); the drummer trades you first, jazz
+ * convention: you play your turn, the drummer answers.
  */
 function tradeRole(
     timeline: Timeline,
     index: number,
-    pass: number,
+    blockPass: number,
     trade: TradeSettings,
 ): LeadRole {
     const turns = turnsOf(timeline, trade.bars);
@@ -123,11 +140,13 @@ function tradeRole(
     if (!place) {
         return { kind: 'rest' };
     }
-    const turn = (pass - 1) * turns.count + place.turn;
+    const turn = (blockPass - 1) * turns.count + place.turn;
+    const bandFirst = trade.with !== 'drums';
+    const isBandTurn = bandFirst ? turn % 2 === 0 : turn % 2 === 1;
     return {
         kind: 'trade',
         with: trade.with,
-        turn: turn % 2 === 0 ? 'band' : 'you',
+        turn: isBandTurn ? 'band' : 'you',
         from: place.from,
         bars: place.bars,
         at: place.at,

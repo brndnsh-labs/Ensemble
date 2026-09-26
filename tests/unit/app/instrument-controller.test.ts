@@ -13,11 +13,6 @@ import { ACTIONS } from '../../../public/types.js';
 const { makeSoloistMock } = await vi.hoisted(
     async () => await import('../../utils/mock-soloist.js'),
 );
-const mockTrack = vi.hoisted(() => vi.fn());
-
-vi.mock('../../../public/telemetry.js', () => ({
-    track: mockTrack,
-}));
 
 vi.mock('../../../public/engine/engine.js', () => ({
     killAllPianoNotes: vi.fn(),
@@ -177,6 +172,7 @@ describe('Instrument Controller', () => {
                         steps: new Array(128).fill(2),
                         muted: false,
                     }));
+                    const swingBefore = state.groove.swing;
                     await InstrumentController.loadDrumPreset('Blues Shuffle');
                     const pulseSteps = meter === '6/8' ? 12 : 24;
                     for (const instrument of state.groove.instruments) {
@@ -189,7 +185,8 @@ describe('Instrument Controller', () => {
                             ...new Array(128 - expected.length).fill(0),
                         ]);
                     }
-                    expect(state.groove.swing).toBe(100);
+                    // A preset carries no swing: the band style is the one authority (#1404).
+                    expect(state.groove.swing).toBe(swingBefore);
                     expect(state.groove.measures).toBe(1);
                     expect(JSON.stringify(DRUM_PRESETS)).toBe(catalogBefore);
                 } finally {
@@ -201,7 +198,7 @@ describe('Instrument Controller', () => {
 
         it('decodes nonzero string grids without changing numeric arrays or exceeding the buffer', async () => {
             const preset = 'String pattern regression';
-            DRUM_PRESETS[preset] = { Kick: '210'.repeat(50), Snare: [2, 0, 1], swing: 0 };
+            DRUM_PRESETS[preset] = { Kick: '210'.repeat(50), Snare: [2, 0, 1] };
             try {
                 await InstrumentController.loadDrumPreset(preset);
                 const { instruments } = getState().groove;
@@ -270,9 +267,6 @@ describe('Instrument Controller', () => {
             });
             expect(Engine.killAllPianoNotes).toHaveBeenCalled();
             expect(Engine.killChordBus).toHaveBeenCalled();
-            expect(mockTrack).toHaveBeenCalledWith('instrument_toggled', {
-                instrument: 'chords',
-            });
         });
 
         it('should handle soloist specific phrasing resets when turning on', () => {
@@ -337,7 +331,6 @@ describe('Instrument Controller', () => {
                 param: 'enabled',
                 value: false,
             });
-            expect(mockTrack).not.toHaveBeenCalled();
         });
 
         it('should handle chord/harmony alias names', () => {
@@ -348,9 +341,6 @@ describe('Instrument Controller', () => {
                     module: 'harmony',
                 }),
             );
-            expect(mockTrack).toHaveBeenCalledWith('instrument_toggled', {
-                instrument: 'harmony',
-            });
         });
     });
 });

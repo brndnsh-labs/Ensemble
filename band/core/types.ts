@@ -124,9 +124,11 @@ export interface BandSettings {
     seed: string;
     /**
      * Trading with the player: after the head, the band takes turns with you, `bars` at a
-     * time, the band first. `with: 'lead'` trades with the soloist (it lays out for your
-     * turn, the band keeps comping); `with: 'drums'` trades with the drummer (the band lays
-     * out for his solo, and comps for yours). Absent, the band doesn't trade.
+     * time — the band first when trading with the soloist (`with: 'lead'`: it lays out for
+     * your turn, the band keeps comping), you first when trading with the drummer
+     * (`with: 'drums'`: the band lays out for his solo, and comps for yours) — jazz
+     * convention: you play your turn, and the drummer answers. The head returns after
+     * `choruses` traded passes (`TradeSettings.choruses`); absent, the band doesn't trade.
      */
     trade?: TradeSettings | null;
 }
@@ -134,6 +136,13 @@ export interface BandSettings {
 export interface TradeSettings {
     with: 'lead' | 'drums';
     bars: 2 | 4 | 8;
+    /**
+     * How many traded choruses before the head returns. `null` (or `0`) keeps trading
+     * forever — every pass after the first stays a turn, as before this setting existed.
+     * With a number N, a pass cycle is N+1 passes long: the head, then N traded passes,
+     * repeating for as long as the performance loops.
+     */
+    choruses: number | null;
 }
 
 export const DEFAULT_SETTINGS: BandSettings = {

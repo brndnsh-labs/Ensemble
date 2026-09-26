@@ -54,11 +54,8 @@ test('document-owned feel fields (swing, swing grid, humanize, notation) persist
     const swingGrid = page.getByLabel('Swing grid', { exact: true });
     const humanize = page.getByLabel('Humanize', { exact: true });
     const notation = page.getByLabel('Chord notation', { exact: true });
-    // The Blues starter's genre sets swing/swingSub at creation time
-    // (`SET_GENRE_FEEL`), then its 'Blues Shuffle' drum preset's own `swing: 100`
-    // wins over the genre's raw `swing: 90` (`loadDrumPreset` in
-    // `instrument-controller.ts` runs as the genre-change effect and overwrites
-    // it) — 100 is the real, correct value production applies, not 90.
+    // The Blues starter's genre sets swing/swingSub at creation time: its band
+    // style's shuffle, 100 on the eighths (`genreSwing`, the one swing authority).
     // humanize is the engine default; the starter's own arrangement
     // is authored with 'name' notation.
     await expect(swing).toHaveValue('100');

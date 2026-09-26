@@ -38,13 +38,15 @@ import {
 import { transposeChordText } from '@engine/engine/transpose';
 import { proposeLegacyScoreConversion } from '@engine/songbook/legacy-score';
 import type { SemanticScore } from '@engine/songbook/score-types';
-import type {
-    ChartContent,
-    ChartLaneMix,
-    ChartNotation,
-    SoloistMode,
-    SoloistTradeBars,
-    SoloistTradeWith,
+import {
+    type ChartContent,
+    type ChartLaneMix,
+    type ChartNotation,
+    DEFAULT_SOLOIST_TRADE_CHORUSES,
+    type SoloistMode,
+    type SoloistTradeBars,
+    type SoloistTradeChoruses,
+    type SoloistTradeWith,
 } from '@engine/songbook/types';
 import { dispatch, getState, subscribe } from '@engine/state';
 import {
@@ -85,6 +87,7 @@ import {
     validateDocument,
 } from './documents';
 import { checkPlayable } from './engine-mode';
+import { genreSwing } from './genre-swing';
 import {
     countInPreference,
     masterVolumePreference,
@@ -98,6 +101,7 @@ import {
     seedInstalledSounds,
     validateVoice,
 } from './sounds';
+import { track } from './telemetry';
 
 export type { ChartContent, ChartDocument, StemInstrument };
 export { GENRE_NAMES };
@@ -239,6 +243,7 @@ function bandSettings(): BandSettings {
                 : {
                       with: soloist.tradeWith === 'soloist' ? 'lead' : 'drums',
                       bars: soloist.tradeBars,
+                      choruses: soloist.tradeChoruses === 0 ? null : soloist.tradeChoruses,
                   },
     };
 }
@@ -291,6 +296,7 @@ function startBand(freshPlay = false): void {
         freshPlay && playback.countIn,
     );
     param('playback', 'isPlaying', true);
+    track('play_started');
     playhead ??= setInterval(followPlayhead, 50);
 }
 
@@ -471,7 +477,11 @@ export function captureContent(): ChartContent {
                 // Written only while trading, so a chart that never traded saves as before.
                 ...(s.tradeWith === 'off'
                     ? {}
-                    : { tradeWith: s.tradeWith, tradeBars: s.tradeBars }),
+                    : {
+                          tradeWith: s.tradeWith,
+                          tradeBars: s.tradeBars,
+                          tradeChoruses: s.tradeChoruses,
+                      }),
             },
             harmony: { ...mix(h), style: h.style, octave: h.octave, complexity: h.complexity },
             groove: {
@@ -739,11 +749,17 @@ export function setReverb(module: InstrumentModule, value: number): void {
 }
 
 /**
- * Trading with the player (the band engine's `BandSettings.trade`): who the band trades with
- * and how long a turn is. Trading with the soloist turns it on: it is the one you trade with.
+ * Trading with the player (the band engine's `BandSettings.trade`): who the band trades with,
+ * how long a turn is, and how many traded choruses before the head returns (0 keeps trading
+ * forever). Trading with the soloist turns it on: it is the one you trade with.
  */
-export function setTrade(tradeWith: SoloistTradeWith, bars: SoloistTradeBars): void {
+export function setTrade(
+    tradeWith: SoloistTradeWith,
+    bars: SoloistTradeBars,
+    choruses: SoloistTradeChoruses,
+): void {
     param('soloist', 'tradeBars', bars);
+    param('soloist', 'tradeChoruses', choruses);
     param('soloist', 'tradeWith', tradeWith);
     if (tradeWith === 'soloist' && !getState().soloist.enabled) {
         togglePower('soloist');
@@ -937,6 +953,11 @@ function apply(content: DocumentContent): void {
     param('soloist', 'tradeWith', content.band.soloist.tradeWith ?? 'off');
     param('soloist', 'tradeBars', content.band.soloist.tradeBars ?? 4);
     param(
+        'soloist',
+        'tradeChoruses',
+        content.band.soloist.tradeChoruses ?? DEFAULT_SOLOIST_TRADE_CHORUSES,
+    );
+    param(
         'groove',
         'instruments',
         getState().groove.instruments.map((instrument) => ({
@@ -1048,7 +1069,13 @@ export async function setGenre(
     }
     const wasPlaying = getState().playback.isPlaying;
     const previous = captureSessionContent();
-    const payload = { genreName: name, ...SMART_GENRES[name] };
+    // The genre's swing is its band style's (`genreSwing`), the one swing authority.
+    const swing = genreSwing(name);
+    const payload = {
+        genreName: name,
+        ...SMART_GENRES[name],
+        ...(swing ? { swing: swing.swing, sub: swing.swingSub } : null),
+    };
     // Captured before anything can stop the transport, so a Stop pressed during
     // preparation is still detectable as a cancellation further down.
     const intent = playIntent;
@@ -1063,6 +1090,11 @@ export async function setGenre(
         // dispatch itself — so the state afterwards cannot tell the two paths apart.
         const staged = getState().playback.isPlaying;
         dispatch(ACTIONS.SET_GENRE_FEEL, payload);
+        // #1389 — NOT tracked here: `lib/starters.ts`'s one-time sample seeding calls this
+        // function directly (never through the transport bar) to build its 3 starter charts on
+        // a brand-new device, which would otherwise queue 3 synthetic `genre_changed` events for
+        // every first-time visitor. `app/ensemble.tsx`'s `onGenre` handler — the transport bar's
+        // actual call site — tracks the real, user-driven change instead.
         // While playing, that reducer stages the feel and the band commits it at once
         // (`syncBand`), playing it from its next barline. So this dispatch plus the
         // auto-voice effects are the entire engine change: no teardown, no rebuild, no
@@ -1076,12 +1108,6 @@ export async function setGenre(
         // Wait for the barline that plays it, so the switch reads as pending until it is
         // heard. A Stop inside the wait leaves nothing half-changed: the feel is committed.
         await awaitBandChange();
-        if (payload.drum && getState().groove.lastDrumPreset !== payload.drum) {
-            // The commit fires its drum preset without awaiting it (it carries the chart's
-            // swing, `loadDrumPreset`). Settle that here so the document the caller captures
-            // next cannot pair the new feel with the outgoing genre's.
-            await loadDrumPreset(payload.drum);
-        }
     } catch (error) {
         // A Stop that landed while we were preparing cancels the change outright:
         // the musician asked for silence, not for a band that resurrects itself.
@@ -1124,9 +1150,16 @@ export async function setGenre(
 export function setTempo(bpm: number): void {
     dispatch(ACTIONS.SET_BPM, Math.max(40, Math.min(240, Math.round(bpm))));
 }
+/** `InstrumentModule`'s state-slice name for the drum lane; the telemetry event names it `drums`. */
+const TELEMETRY_PART: Record<
+    InstrumentModule,
+    'drums' | 'bass' | 'chords' | 'harmony' | 'soloist'
+> = { groove: 'drums', bass: 'bass', chords: 'chords', harmony: 'harmony', soloist: 'soloist' };
+
 export function setEnabled(module: InstrumentModule, enabled: boolean): void {
     if (getState()[module].enabled !== enabled) {
         togglePower(module);
+        track('part_toggled', { part: TELEMETRY_PART[module] });
     }
 }
 export function transpose(delta: number): void {
@@ -1274,6 +1307,7 @@ export function exportMidi(filename: string): Promise<void> {
         sampleRate: 0,
         filename: name,
     });
+    track('midi_exported');
     return Promise.resolve();
 }
 
@@ -1332,6 +1366,7 @@ export async function exportAudio(
             return;
         }
         downloadExportResult(result);
+        track('wav_exported', { stems: false });
         return;
     }
     // A stem always renders its lane even if it's muted live, so force every lane on for the
@@ -1354,6 +1389,7 @@ export async function exportAudio(
             for (const result of results) {
                 downloadExportResult(result);
             }
+            track('wav_exported', { stems: true });
         }
     } catch (error) {
         if (!(error instanceof ExportCancelled)) {

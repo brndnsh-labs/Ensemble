@@ -1,6 +1,4 @@
 const GENRE_DEFAULTS = {
-    swing: 0,
-    sub: '16th',
     chord: 'smart',
     harmony: 'smart',
 };
@@ -33,7 +31,6 @@ type GenreOverride = Partial<typeof GENRE_DEFAULTS> & {
  */
 const GENRE_OVERRIDES = {
     Rock: {
-        sub: '8th',
         drum: 'Basic Rock',
         feel: 'Rock',
         bass: 'rock',
@@ -46,8 +43,6 @@ const GENRE_OVERRIDES = {
         soloistMode: 'guitar',
     },
     Jazz: {
-        swing: 60,
-        sub: '8th',
         drum: 'Jazz',
         feel: 'Jazz',
         chord: 'jazz',
@@ -57,7 +52,6 @@ const GENRE_OVERRIDES = {
         meters: ['4/4', '3/4', '6/8'], // swing · jazz waltz · All Blues
     },
     Funk: {
-        swing: 15,
         drum: 'Funk',
         feel: 'Funk',
         chord: 'funk',
@@ -74,7 +68,6 @@ const GENRE_OVERRIDES = {
         soloist: 'disco',
     },
     'Hip Hop': {
-        swing: 25,
         drum: 'Hip Hop',
         feel: 'Hip Hop',
         bass: 'hiphop',
@@ -85,8 +78,6 @@ const GENRE_OVERRIDES = {
         soloist: 'hiphop',
     },
     Blues: {
-        swing: 90,
-        sub: '8th',
         drum: 'Blues Shuffle',
         feel: 'Blues',
         chord: 'jazz',
@@ -96,7 +87,6 @@ const GENRE_OVERRIDES = {
         meters: ['4/4', '12/8', '6/8'], // straight/shuffle · slow blues · All Blues
     },
     'Neo-Soul': {
-        swing: 30,
         drum: 'Neo-Soul',
         feel: 'Neo-Soul',
         bass: 'neo',
@@ -107,7 +97,6 @@ const GENRE_OVERRIDES = {
         harmony: 'strings',
     },
     Reggae: {
-        swing: 20,
         drum: 'Reggae',
         feel: 'Reggae',
         bass: 'dub',
@@ -118,8 +107,6 @@ const GENRE_OVERRIDES = {
         soloist: 'reggae',
     },
     Acoustic: {
-        swing: 15,
-        sub: '8th',
         drum: 'Acoustic',
         feel: 'Acoustic',
         // The chords lane plays a fingerpick arpeggio (the 'arp' style); the
@@ -145,14 +132,6 @@ const GENRE_OVERRIDES = {
         harmony: 'strings',
     },
     Country: {
-        // A country two-step is a STRAIGHT-to-light-shuffle 8th feel (the boom-chick),
-        // not a heavy swing. It previously ran swing:60 on the *16th* grid (default
-        // sub) → a 1.5:1 laid-back-SIXTEENTHS pocket (hip-hop/neo-soul territory) that
-        // lurched against the two-step. Move it to the 8th grid where every other
-        // swung genre lives, with a light lilt (30 → ~1.22:1 8th ratio) — a hair of
-        // country bounce, not the Jazz/Blues shuffle. See swing-ratio-audit.test.ts.
-        swing: 30,
-        sub: '8th',
         drum: 'Country (Two-Step)',
         feel: 'Country',
         chord: 'strum-country',
@@ -170,7 +149,6 @@ const GENRE_OVERRIDES = {
         soloist: 'metal',
     },
     'Ska-Punk': {
-        sub: '8th',
         drum: 'Ska',
         feel: 'Ska',
         chord: 'ska-upstroke',
