@@ -106,9 +106,9 @@ function storageOf(entries: Record<string, string | undefined>) {
 }
 
 /**
- * The v2-side baseline: the band and tempo a document already in the songbook carries.
- * Only the fields v1 never persists (`soloist.tradeMode`, `groove.measures`' companion
- * defaults) are read from it, so the values here are deliberately un-v1-like.
+ * The v2-side baseline: the band and tempo a document already in the songbook carries —
+ * saved before 2026-09-26, so it still holds the old engine's fields, none of which may
+ * reach an import. The values here are deliberately un-v1-like.
  */
 const BASE = {
     performance: { bpm: 100, complexity: 0.3, seed: '', randomizeSeed: true },
@@ -232,21 +232,19 @@ beforeAll(() => {
         param('groove', 'swing', 62);
         param('groove', 'swingSub', '16th');
         param('groove', 'humanize', 35);
-        param('groove', 'lastDrumPreset', 'Funk Break');
         param('groove', 'genreFeel', 'Funk');
         param('groove', 'lastSmartGenre', 'Funk');
-        param(
-            'groove',
-            'instruments',
-            getState().groove.instruments.map((instrument) => ({
-                ...instrument,
-                steps:
-                    instrument.name === 'Kick'
-                        ? instrument.steps.map((_, index) => (index % 8 === 0 ? 1 : 0))
-                        : [...instrument.steps],
-            })),
-        );
     });
+    // v1's writer saved its drum preset and step-sequencer pattern too. The state behind them
+    // is gone (2026-09-26), so this build's copy of the writer can't — but every real v1
+    // profile carries them, so they go into the bytes by hand, shaped as v1 wrote them.
+    const tuned = JSON.parse(tunedBand);
+    tuned.groove.lastDrumPreset = 'Funk Break';
+    tuned.groove.pattern = [
+        { name: 'Kick', steps: Array.from({ length: 128 }, (_, i) => (i % 8 === 0 ? 1 : 0)) },
+        { name: 'Snare', steps: new Array(128).fill(0) },
+    ];
+    tunedBand = JSON.stringify(tuned);
     minorKey = writeSession(() => {
         param('arranger', 'sections', [{ id: 'a', label: 'A', value: 'i | iv | v | i' }]);
         param('arranger', 'key', 'A');
@@ -526,36 +524,57 @@ describe('round-tripping a real v1 session', () => {
         expect(document.chart.arrangement.isMinor).toBe(true);
     });
 
-    it('keeps non-default band voices, styles, volumes and groove feel', () => {
+    it('keeps non-default band voices, volumes and groove feel', () => {
         const { band } = convert(tunedBand).chart;
         expect(band.chords).toMatchObject({
-            style: 'funk',
             voice: 'pack:rhodes',
             autoSound: false,
             volume: 0.62,
-            density: 'rich',
         });
-        expect(band.bass).toMatchObject({ style: 'funk', volume: 0.48, octave: 34 });
-        expect(band.soloist).toMatchObject({
-            enabled: true,
-            style: 'funk',
-            phrasingIntensity: 0.8,
-        });
-        expect(band.harmony).toMatchObject({ enabled: true, complexity: 0.7 });
+        expect(band.bass).toMatchObject({ volume: 0.48 });
+        expect(band.soloist).toMatchObject({ enabled: true });
         expect(band.groove).toMatchObject({
             voice: 'pack:acoustic-kit',
             swing: 62,
             swingSub: '16th',
             humanize: 35,
-            lastDrumPreset: 'Funk Break',
-            genreFeel: 'Funk',
-            lastSmartGenre: 'Funk',
+            genre: 'Funk',
         });
-        // The drum pattern crosses too: a kick on every second beat of the bar.
-        const kick = band.groove.pattern.find((lane) => lane.name === 'Kick');
-        expect(kick?.steps.filter((step) => step === 1).length).toBe(16);
-        // v1 never persists `soloist.tradeMode`, so it comes from the v2 baseline.
-        expect(band.soloist.tradeMode).toBe('manual');
+    });
+
+    it("brings over only what the band honours: none of the old engine's settings (2026-09-26)", () => {
+        const { performance, band } = convert(tunedBand).chart;
+        // v1 held all of these (styles, octaves, density, phrasing, the harmony lane, the
+        // drum preset and its pattern); a chart no longer carries any of them.
+        expect(performance).toEqual({
+            bpm: performance.bpm,
+            seed: performance.seed,
+            randomizeSeed: performance.randomizeSeed,
+            energy: 'auto',
+        });
+        expect(Object.keys(band)).toEqual(['chords', 'bass', 'soloist', 'groove']);
+        expect(Object.keys(band.chords).sort()).toEqual(
+            ['autoSound', 'enabled', 'reverb', 'voice', 'volume'].sort(),
+        );
+        expect(Object.keys(band.bass).sort()).toEqual(
+            ['autoSound', 'enabled', 'reverb', 'voice', 'volume'].sort(),
+        );
+        expect(Object.keys(band.soloist).sort()).toEqual(
+            ['autoMode', 'autoSound', 'enabled', 'mode', 'reverb', 'voice', 'volume'].sort(),
+        );
+        expect(Object.keys(band.groove).sort()).toEqual(
+            [
+                'autoSound',
+                'enabled',
+                'genre',
+                'humanize',
+                'reverb',
+                'swing',
+                'swingSub',
+                'voice',
+                'volume',
+            ].sort(),
+        );
     });
 
     it('round-trips the default untouched session', () => {
@@ -563,7 +582,7 @@ describe('round-tripping a real v1 session', () => {
         expect(document.chart.arrangement.sections.length).toBeGreaterThan(0);
         expect(document.chart.arrangement.key).toBe('C');
         expect(document.chart.performance.bpm).toBe(100);
-        expect(document.chart.band.groove.lastSmartGenre).toBe('Rock');
+        expect(document.chart.band.groove.genre).toBe('Rock');
     });
 
     it('applies v1 hydration rules the songbook codec would otherwise reject', () => {
@@ -582,14 +601,13 @@ describe('round-tripping a real v1 session', () => {
         blob.soloist.octave = 77;
         const { band, performance, arrangement } = convert(JSON.stringify(blob)).chart;
         expect(performance.bpm).toBe(240);
-        expect(band.chords.density).toBe('standard');
-        expect(band.chords.style).toBe('smart');
         expect(band.groove.swingSub).toBe('8th');
-        expect(band.groove).toMatchObject({ genreFeel: 'Rock', lastSmartGenre: 'Rock' });
-        expect(band.bass.style).toBe('smart');
+        expect(band.groove.genre).toBe('Rock');
         expect(band.bass.voice).toBe('synth');
-        expect(band.soloist.preset).toBe('trumpet');
-        expect(band.soloist.octave).toBe(72);
+        // The rest (density, styles, preset, octave) no longer reaches the chart at all, so a
+        // retired value in them can't cost the song either.
+        expect(band.chords).not.toHaveProperty('density');
+        expect(band.soloist).not.toHaveProperty('preset');
         expect(arrangement.sections).toHaveLength(3);
     });
 
@@ -728,10 +746,11 @@ describe('round-tripping a real v1 saved progression', () => {
         const converted = convertV1(preset, v1ImportContext(withBand, BASE));
         expect(converted.kind).toBe('ok');
         const band = converted.kind === 'ok' ? converted.document.chart.band : null;
-        expect(band?.chords).toMatchObject({ style: 'funk', voice: 'pack:rhodes', volume: 0.62 });
-        expect(band?.groove).toMatchObject({ swing: 62, genreFeel: 'Funk' });
-        // Still the only two fields v1 never persisted, so still from the v2 baseline.
-        expect(band?.soloist.tradeMode).toBe('manual');
+        expect(band?.chords).toMatchObject({ voice: 'pack:rhodes', volume: 0.62 });
+        expect(band?.groove).toMatchObject({ swing: 62, genre: 'Funk' });
+        // v1 had no trading with the player, and the baseline doesn't trade.
+        expect(band?.soloist).not.toHaveProperty('tradeWith');
+        expect(band?.soloist).not.toHaveProperty('tradeMode');
 
         const withTempo = findV1Data(
             storageOf({
@@ -977,46 +996,24 @@ describe('agreement with v1 itself', () => {
             live.arranger.sections.map((section) => section.value),
         );
         expect(performance.bpm).toBe(live.playback.bpm);
-        expect(performance.complexity).toBe(live.playback.complexity);
         expect(performance.randomizeSeed).toBe(live.arranger.randomizeSeed);
-        for (const lane of ['chords', 'bass', 'soloist', 'harmony', 'groove'] as const) {
+        for (const lane of ['chords', 'bass', 'soloist', 'groove'] as const) {
             expect(band[lane].enabled).toBe(live[lane].enabled);
             expect(band[lane].voice).toBe(live[lane].voice);
             expect(band[lane].autoSound).toBe(live[lane].autoSound);
             expect(band[lane].volume).toBe(live[lane].volume);
             expect(band[lane].reverb).toBe(live[lane].reverb);
         }
-        expect(band.chords).toMatchObject({
-            style: live.chords.style,
-            octave: live.chords.octave,
-            density: live.chords.density,
-        });
-        expect(band.bass).toMatchObject({ style: live.bass.style, octave: live.bass.octave });
         expect(band.soloist).toMatchObject({
-            style: live.soloist.style,
-            preset: live.soloist.preset,
-            octave: live.soloist.octave,
             mode: live.soloist.mode,
             autoMode: live.soloist.autoMode,
-            phrasingIntensity: live.soloist.phrasingIntensity,
-        });
-        expect(band.harmony).toMatchObject({
-            style: live.harmony.style,
-            octave: live.harmony.octave,
-            complexity: live.harmony.complexity,
         });
         expect(band.groove).toMatchObject({
             swing: live.groove.swing,
             swingSub: live.groove.swingSub,
             humanize: live.groove.humanize,
-            lastDrumPreset: live.groove.lastDrumPreset,
-            genreFeel: live.groove.genreFeel,
-            lastSmartGenre: live.groove.lastSmartGenre,
-            measures: live.groove.measures,
+            genre: live.groove.lastSmartGenre,
         });
-        expect(band.groove.pattern.find((lane) => lane.name === 'Kick')?.steps).toEqual(
-            live.groove.instruments.find((instrument) => instrument.name === 'Kick')?.steps,
-        );
     });
 
     /**

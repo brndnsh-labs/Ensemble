@@ -4,6 +4,9 @@ import { ACTIONS } from '../types.js';
 
 export type { GlobalContext };
 
+/** The band's energy before anyone sets it, and the level a chart on auto energy resets to. */
+export const DEFAULT_BAND_INTENSITY = 0.35;
+
 export const playback = deepSignal<GlobalContext>({
     audio: null,
     audioGraph: null,
@@ -24,7 +27,7 @@ export const playback = deepSignal<GlobalContext>({
     palette: 'after-hours',
     mode: 'auto',
     wakeLock: null,
-    bandIntensity: 0.35,
+    bandIntensity: DEFAULT_BAND_INTENSITY,
     complexity: 0.3,
     autoIntensity: true,
     metronome: false,
@@ -80,7 +83,7 @@ export function playbackReducer(action: Action): boolean {
             p.bpm = 100;
             p.palette = 'after-hours';
             p.mode = 'auto';
-            p.bandIntensity = 0.35;
+            p.bandIntensity = DEFAULT_BAND_INTENSITY;
             p.complexity = 0.3;
             p.autoIntensity = true;
             p.metronome = false;

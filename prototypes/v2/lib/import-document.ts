@@ -1,3 +1,4 @@
+import { writtenSettings } from '@engine/songbook/codec';
 import type { IRealImportResult } from '@engine/songbook/ireal-import';
 import type { ChartDocumentV2 } from '@engine/songbook/score-types';
 import { type ChartDocument, followingFeel, validateDocument } from './documents';
@@ -23,6 +24,9 @@ export function importedDocument(
     }
     checkPlayable(song.score);
     const now = new Date().toISOString();
+    // The band's setup as a chart is written today, so the import doesn't inherit the old
+    // engine's fields from an old base chart.
+    const setup = writtenSettings(base.chart);
     return validateDocument({
         schemaVersion: 2,
         id: crypto.randomUUID(),
@@ -37,8 +41,8 @@ export function importedDocument(
         importSource: { format: result.format, text: result.source },
         chart: {
             score: song.score,
-            performance: { ...base.chart.performance, bpm },
-            band: followingFeel(base.chart.band),
+            performance: { ...setup.performance, bpm },
+            band: followingFeel(setup.band),
         },
     }) as ChartDocumentV2;
 }

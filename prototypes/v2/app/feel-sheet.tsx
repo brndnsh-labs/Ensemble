@@ -19,15 +19,14 @@ const NOTATION_OPTIONS: { value: ChartNotation; label: string }[] = [
 ];
 
 /**
- * The `runtime-derived`/`preferences` fields the sheet shows that are NOT part of
- * `ChartDocument['chart']` (`STATE_OWNERSHIP_MANIFEST`: `bandIntensity`/`autoIntensity`/
- * `metronome` are session-only, `masterVolume` is a device preference) — so, unlike
- * every document field below, the shell has to hand them down separately rather than
- * reading them off `current`.
+ * The live values the sheet shows that are NOT read off `ChartDocument['chart']`
+ * (`STATE_OWNERSHIP_MANIFEST`: `metronome` is session-only, `masterVolume` is a device
+ * preference) — so, unlike every document field below, the shell hands them down separately.
+ * `bandIntensity` is here only for the slider's resting position while the chart's energy is
+ * on auto, when the chart itself names no level (`ChartPerformance.energy`).
  */
 export interface FeelSnapshot {
     bandIntensity: number;
-    autoIntensity: boolean;
     metronome: boolean;
     masterVolume: number;
 }
@@ -128,6 +127,9 @@ export function FeelSheet({
 }: FeelSheetProps) {
     const arrangement = arrangementOf(current);
     const groove = current.chart.band.groove;
+    // The chart's energy (a chart saved before it carried one plays on auto).
+    const energy = current.chart.performance.energy ?? 'auto';
+    const autoEnergy = energy === 'auto';
     const swingDisabled = busy || SWING_DISABLED_METERS.has(arrangement.timeSignature);
     return (
         <dialog
@@ -190,7 +192,7 @@ export function FeelSheet({
                     <label className="feel-toggle">
                         <input
                             type="checkbox"
-                            checked={feel.autoIntensity}
+                            checked={autoEnergy}
                             disabled={busy}
                             onChange={(event) => onAutoIntensity(event.target.checked)}
                         />
@@ -199,9 +201,9 @@ export function FeelSheet({
                     <RangeSetting
                         label="Band intensity"
                         ariaLabel="Band intensity"
-                        value={feel.bandIntensity}
+                        value={autoEnergy ? feel.bandIntensity : energy}
                         max={1}
-                        disabled={busy || feel.autoIntensity}
+                        disabled={busy || autoEnergy}
                         onCommit={onBandIntensity}
                     />
                 </div>
@@ -245,8 +247,8 @@ export function FeelSheet({
                 </div>
             </div>
             <p>
-                Band intensity, auto intensity and the metronome are session settings — they don't
-                save with the chart. Everything else here does.
+                The metronome is a session setting and master volume belongs to this device —
+                neither saves with the chart. Everything else here does.
             </p>
         </dialog>
     );

@@ -24,12 +24,10 @@ vi.mock('../../../public/state.js', () => {
         },
         groove: {
             enabled: true,
-            measures: 1,
             volume: 0.5,
             reverb: 0.2,
             swing: 0,
             humanize: 20,
-            instruments: [],
         },
         chords: { enabled: true, volume: 0.5, reverb: 0.3 },
         bass: { enabled: true, volume: 0.5, reverb: 0.05 },
@@ -679,18 +677,12 @@ describe('Security: Hydration & Storage Resilience', () => {
     // #1244 — a saved payload that is valid JSON but the wrong shape used to throw
     // out of hydrateState(), which runs inside the same `try` as mountComponents()
     // in main.ts. The throw skipped the mount, so the user got a blank page with no
-    // ErrorBoundary and no recovery path. Two layers are covered here: the specific
-    // groove.pattern guard, and the structural fallback that caps the blast radius
-    // of any *other* unguarded field in the function.
+    // ErrorBoundary and no recovery path. Two layers are covered here: a stale
+    // groove.pattern of any shape (no longer read at all, since the old engine's drum
+    // pattern went, 2026-09-26), and the structural fallback that caps the blast
+    // radius of any unguarded field in the function.
     describe('Malformed persisted shapes (#1244)', () => {
         const validSection = { id: '1', label: 'A', value: 'I' };
-
-        /** Give the mock a real drum lane so the inner steps loop is reachable. */
-        function seedInstrument(steps: number[]) {
-            const state = stateModule.getState();
-            state.groove.instruments = [{ name: 'Kick', steps }];
-            return state.groove.instruments[0];
-        }
 
         /**
          * Assert the *guards* handled the payload, not the try/catch fallback.
@@ -702,7 +694,6 @@ describe('Security: Hydration & Storage Resilience', () => {
         }
 
         it('survives a non-array groove.pattern', () => {
-            seedInstrument(new Array(16).fill(0));
             localStorage.setItem(
                 'ensemble_currentState',
                 JSON.stringify({
@@ -720,7 +711,6 @@ describe('Security: Hydration & Storage Resilience', () => {
         });
 
         it('survives an object-shaped groove.pattern from a partial write', () => {
-            seedInstrument(new Array(16).fill(0));
             localStorage.setItem(
                 'ensemble_currentState',
                 JSON.stringify({
@@ -733,49 +723,7 @@ describe('Security: Hydration & Storage Resilience', () => {
             expectNoFallback();
         });
 
-        it('skips an entry whose steps are not an array, leaving the lane untouched', () => {
-            const inst = seedInstrument(new Array(16).fill(0));
-            inst.steps[0] = 1;
-
-            localStorage.setItem(
-                'ensemble_currentState',
-                JSON.stringify({
-                    sections: [validSection],
-                    groove: { pattern: [{ name: 'Kick', steps: 'nope' }] },
-                }),
-            );
-
-            expect(() => hydrateState()).not.toThrow();
-            expectNoFallback();
-            // The guard gates the `fill(0)` as well, so an unreadable saved pattern
-            // preserves the live default rather than blanking the lane to silence.
-            expect(inst.steps[0]).toBe(1);
-        });
-
-        it('tolerates a null entry inside an otherwise valid pattern array', () => {
-            const inst = seedInstrument(new Array(16).fill(0));
-            localStorage.setItem(
-                'ensemble_currentState',
-                JSON.stringify({
-                    sections: [validSection],
-                    groove: { pattern: [null, { name: 'Kick', steps: [1, 0, 1, 0] }] },
-                }),
-            );
-
-            expect(() => hydrateState()).not.toThrow();
-            expectNoFallback();
-            // The valid sibling still applied — the guard rejects bad entries, not the batch.
-            expect(inst.steps[0]).toBe(1);
-            expect(inst.steps[2]).toBe(1);
-        });
-
-        // Control for the three tests above: proves the guards reject only malformed
-        // shapes. Without this, an `Array.isArray` that always returned false would
-        // pass every "does not throw" assertion.
-        it('still hydrates a well-formed pattern', () => {
-            const inst = seedInstrument(new Array(16).fill(0));
-            inst.steps[5] = 1;
-
+        it('ignores a well-formed saved pattern: there is no drum-pattern state to fill', () => {
             localStorage.setItem(
                 'ensemble_currentState',
                 JSON.stringify({
@@ -784,12 +732,9 @@ describe('Security: Hydration & Storage Resilience', () => {
                 }),
             );
 
-            hydrateState();
-
-            expect(inst.steps[0]).toBe(1);
-            expect(inst.steps[3]).toBe(1);
-            // The stale live step outside the saved range was cleared by `fill(0)`.
-            expect(inst.steps[5]).toBe(0);
+            expect(() => hydrateState()).not.toThrow();
+            expectNoFallback();
+            expect(stateModule.getState().groove).not.toHaveProperty('instruments');
         });
 
         // Asserts the fallback is *signalled*, not that the resulting state is

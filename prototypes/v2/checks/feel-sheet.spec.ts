@@ -1,9 +1,10 @@
 import { appUrl, expect, test } from './fixtures';
 
-// #1276 — the Feel & mix sheet: swing/swing grid/humanize/chord notation
-// (document-owned, saved with the chart), master volume (a device preference,
-// persisted independent of Save), and band intensity/auto intensity/metronome
-// (runtime-derived, session-only by design — never saved, never a preference).
+// #1276 — the Feel & mix sheet: swing/swing grid/humanize/chord notation and the
+// chart's energy — auto intensity/band intensity, saved with the chart since the
+// chart-format decision of 2026-09-26 (document-owned), master volume (a device
+// preference, persisted independent of Save), and the metronome (runtime-derived,
+// session-only by design — never saved, never a preference).
 // Mirrors `instrument-settings.spec.ts`'s (#1275) helpers/structure.
 
 async function openFeel(page: import('@playwright/test').Page) {
@@ -128,7 +129,7 @@ test('master volume is a device preference: it persists across reload without Sa
     await expect(page.getByLabel('Master volume', { exact: true })).toHaveValue('75');
 });
 
-test('band intensity, auto intensity and the metronome are session-only: they reset on reload', async ({
+test("energy (auto intensity, band intensity) is the chart's own: it dirties the chart, reverts, and persists through save and reload", async ({
     page,
 }) => {
     await page.goto(appUrl());
@@ -137,27 +138,65 @@ test('band intensity, auto intensity and the metronome are session-only: they re
 
     const autoIntensity = page.getByLabel('Auto intensity', { exact: true });
     const bandIntensity = page.getByLabel('Band intensity', { exact: true });
-    const metronome = page.getByLabel('Metronome', { exact: true });
+    // A starter saved before energy rode the chart plays on auto.
     await expect(autoIntensity).toBeChecked();
     await expect(bandIntensity).toBeDisabled();
     await expect(bandIntensity).toHaveValue('35');
-    await expect(metronome).not.toBeChecked();
 
     await autoIntensity.uncheck();
     await expect(bandIntensity).toBeEnabled();
     await setRange(page, 'Band intensity', 80);
-    await metronome.check();
     await expect(bandIntensity).toHaveValue('80');
-    await expect(metronome).toBeChecked();
     await closeFeel(page);
-    // Session-only fields never make the chart dirty.
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeEnabled();
+
+    // Revert to saved puts the band back on auto.
+    await page.getByRole('button', { name: 'Song actions' }).click();
+    await page.getByRole('button', { name: 'Revert to saved' }).click();
+    await openFeel(page);
+    await expect(autoIntensity).toBeChecked();
+    await expect(bandIntensity).toHaveValue('35');
+
+    // Redo it and save it.
+    await autoIntensity.uncheck();
+    await setRange(page, 'Band intensity', 80);
+    await closeFeel(page);
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
 
     await page.reload();
     await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).first().click();
     await openFeel(page);
+    await expect(page.getByLabel('Auto intensity', { exact: true })).not.toBeChecked();
+    await expect(page.getByLabel('Band intensity', { exact: true })).toBeEnabled();
+    await expect(page.getByLabel('Band intensity', { exact: true })).toHaveValue('80');
+    await closeFeel(page);
+
+    // Another chart opens on its own energy, not this one's.
+    await page.getByRole('button', { name: 'Back to songbook' }).click();
+    await page.getByRole('button', { name: 'Minor swing sketch Jazz · Saved locally' }).click();
+    await openFeel(page);
     await expect(page.getByLabel('Auto intensity', { exact: true })).toBeChecked();
     await expect(page.getByLabel('Band intensity', { exact: true })).toHaveValue('35');
+});
+
+test('the metronome is session-only: it never dirties the chart and resets on reload', async ({
+    page,
+}) => {
+    await page.goto(appUrl());
+    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
+    await openFeel(page);
+
+    const metronome = page.getByLabel('Metronome', { exact: true });
+    await expect(metronome).not.toBeChecked();
+    await metronome.check();
+    await expect(metronome).toBeChecked();
+    await closeFeel(page);
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
+
+    await page.reload();
+    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).first().click();
+    await openFeel(page);
     await expect(page.getByLabel('Metronome', { exact: true })).not.toBeChecked();
 });
 

@@ -1,4 +1,4 @@
-import { validateChartDocument } from '@engine/songbook/codec';
+import { chartGenre, validateChartDocument, writtenSettings } from '@engine/songbook/codec';
 import { validateChartDocumentV2 } from '@engine/songbook/document-v2';
 import { proposeLegacyScoreConversion } from '@engine/songbook/legacy-score';
 import { resolveScoreContext } from '@engine/songbook/score-context';
@@ -9,6 +9,11 @@ import { withSectionMeter } from './song-meter';
 
 export type ChartDocument = LegacyDocument | ChartDocumentV2;
 export type DocumentContent = ChartDocument['chart'];
+
+/** The chart's genre, by name — however the chart stored it (see `chartGenre`). */
+export function genreOf(document: ChartDocument): string {
+    return chartGenre(document.chart.band.groove);
+}
 
 export function validateDocument(candidate: unknown): ChartDocument {
     const legacy = validateChartDocument(candidate);
@@ -67,6 +72,8 @@ export function convertedCopy(document: LegacyDocument): ChartDocumentV2 {
         id: crypto.randomUUID(),
         revision: 0,
         title: `${document.title.slice(0, 140)} — editable copy`,
+        // A new chart, so written as a chart is today: the source's legacy fields stay with it.
+        chart: { ...proposal.value.chart, ...writtenSettings(proposal.value.chart) },
     };
 }
 
@@ -100,15 +107,19 @@ export function withFollowFeel<T extends ChartDocument>(
         return document;
     }
     const band = document.chart.band;
-    const pinned = (Object.keys(band) as Array<keyof typeof band>).filter(
-        (lane) => !band[lane].autoSound && band[lane].voice === 'synth',
-    );
+    const pinned = (Object.keys(band) as Array<keyof typeof band>).filter((lane) => {
+        const mix = band[lane];
+        return mix && !mix.autoSound && mix.voice === 'synth';
+    });
     if (!pinned.length) {
         return document;
     }
     const next = structuredClone(document);
     for (const lane of pinned) {
-        next.chart.band[lane].autoSound = true;
+        const mix = next.chart.band[lane];
+        if (mix) {
+            mix.autoSound = true;
+        }
     }
     return next;
 }
@@ -125,6 +136,8 @@ export function followingFeel<T extends ChartDocument['chart']['band']>(band: T)
 
 /** A fresh four-bar measure chart that borrows `base`'s band and performance setup. Not yet validated. */
 export function blankSong(base: ChartDocument) {
+    // As a chart is written today: an old base chart's legacy fields stay behind.
+    const setup = writtenSettings(base.chart);
     return {
         schemaVersion: 2,
         id: crypto.randomUUID(),
@@ -133,8 +146,8 @@ export function blankSong(base: ChartDocument) {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         chart: {
-            performance: base.chart.performance,
-            band: followingFeel(base.chart.band),
+            performance: setup.performance,
+            band: followingFeel(setup.band),
             score: {
                 key: 'C',
                 isMinor: false,

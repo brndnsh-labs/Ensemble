@@ -2,7 +2,7 @@
 
 import { type IRealImportResult, parseIRealImport } from '@engine/songbook/ireal-import';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { type ChartDocument, validateDocument } from '../lib/documents';
+import { type ChartDocument, genreOf, validateDocument } from '../lib/documents';
 import { checkPlayable } from '../lib/engine-mode';
 import { importedDocument } from '../lib/import-document';
 import { directionLabel } from '../lib/score-labels';
@@ -273,9 +273,9 @@ export function ImportDialog({
                                 />
                             </label>
                             <p>
-                                Uses your current {base.chart.band.groove.genreFeel} band setup.
-                                Export style, tempo, and chorus count are preserved in the source,
-                                not automatically applied.
+                                Uses your current {genreOf(base)} band setup. Export style, tempo,
+                                and chorus count are preserved in the source, not automatically
+                                applied.
                             </p>
                         </>
                     )}

@@ -61,13 +61,54 @@ describe('withFollowFeel', () => {
 });
 
 describe('blankSong', () => {
+    // A template saved before 2026-09-26, still carrying the old engine's fields.
+    const template = {
+        id: 'song',
+        title: 'Song',
+        updatedAt: before,
+        chart: {
+            performance: { bpm: 100, complexity: 0.4, seed: '', randomizeSeed: true },
+            band: {
+                chords: { ...lane('pack:rhodes', false), style: 'jazz', octave: 60 },
+                bass: { ...lane('synth', false), style: 'smart', octave: 38 },
+                soloist: { ...lane('synth', true), mode: 'guitar', autoMode: false },
+                harmony: { ...lane('synth', false), style: 'smart', octave: 60, complexity: 0.5 },
+                groove: {
+                    ...lane('synth', false),
+                    swing: 60,
+                    swingSub: '8th',
+                    humanize: 20,
+                    lastSmartGenre: 'Jazz',
+                    genreFeel: 'Jazz',
+                    pattern: [],
+                },
+            },
+        },
+    } as unknown as ChartDocument;
+
     it('starts every lane on Follow feel whatever its template pinned', () => {
-        const template = song(before, {
-            chords: lane('pack:rhodes', false),
-            bass: lane('synth', false),
-        });
         const created = blankSong(template);
-        expect(Object.values(created.chart.band).map((mix) => mix.autoSound)).toEqual([true, true]);
+        expect(Object.values(created.chart.band).map((mix) => mix.autoSound)).toEqual([
+            true,
+            true,
+            true,
+            true,
+        ]);
         expect(created.chart.band.chords.voice).toBe('pack:rhodes');
+    });
+
+    it("borrows the template's setup as a chart is written today, not its legacy fields", () => {
+        const { performance, band } = blankSong(template).chart;
+        expect(performance).toEqual({ bpm: 100, seed: '', randomizeSeed: true, energy: 'auto' });
+        expect(Object.keys(band)).toEqual(['chords', 'bass', 'soloist', 'groove']);
+        expect(band.chords).toEqual(lane('pack:rhodes', true));
+        expect(band.soloist).toEqual({ ...lane('synth', true), mode: 'guitar', autoMode: false });
+        expect(band.groove).toEqual({
+            ...lane('synth', true),
+            swing: 60,
+            swingSub: '8th',
+            humanize: 20,
+            genre: 'Jazz',
+        });
     });
 });

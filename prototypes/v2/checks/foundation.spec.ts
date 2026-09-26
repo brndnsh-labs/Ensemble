@@ -573,14 +573,10 @@ test('a feel staged for the next bar settles when the musician stops inside it',
     const download = page.waitForEvent('download');
     await page.getByRole('button', { name: 'Export file' }).click();
     const exported = JSON.parse(await readFile((await (await download).path())!, 'utf8'));
-    // Blues would have left feel 'Blues', swing 90 and the 'Blues Shuffle' preset
-    // behind a 'Rock' picker label — one half-changed setup in one document.
-    expect(exported.chart.band.groove).toMatchObject({
-        lastSmartGenre: 'Rock',
-        genreFeel: 'Rock',
-        swing: 0,
-        lastDrumPreset: 'Basic Rock',
-    });
+    // Blues would have left its genre and its swing behind a 'Rock' picker label — one
+    // half-changed setup in one document. The genre is stored once, by name.
+    expect(exported.chart.band.groove).toMatchObject({ genre: 'Rock', swing: 0 });
+    expect(exported.chart.band.groove).not.toHaveProperty('genreFeel');
 });
 
 test('real runtime, local saves, reload recovery and offline playback', async ({

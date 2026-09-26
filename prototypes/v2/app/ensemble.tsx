@@ -215,12 +215,11 @@ function heldAccount(): Promise<string | null> {
     return accountSync.heldOwner().catch(() => null);
 }
 
-/** Read the live engine values the Feel sheet needs but `ChartDocument` doesn't carry. */
+/** Read the live engine values the Feel sheet needs but doesn't read off `ChartDocument`. */
 function feelSnapshot(): FeelSnapshot {
     const { playback } = runtime.state();
     return {
         bandIntensity: playback.bandIntensity,
-        autoIntensity: playback.autoIntensity,
         metronome: playback.metronome,
         masterVolume: playback.masterVolume,
     };
@@ -340,10 +339,11 @@ export default function Ensemble() {
     const [soundMenu, setSoundMenu] = useState(false);
     const [feelMenu, setFeelMenu] = useState(false);
     const [tradeMenu, setTradeMenu] = useState(false);
-    // `bandIntensity`/`autoIntensity`/`metronome`/`masterVolume` are not part of
-    // `current.chart` (`STATE_OWNERSHIP_MANIFEST`: session-only or a device
-    // preference, never a document field) — this is the shell's own reactive mirror
-    // of the live engine values the Feel sheet reads, refreshed whenever it opens.
+    // `metronome`/`masterVolume` are not part of `current.chart` (`STATE_OWNERSHIP_MANIFEST`:
+    // session-only or a device preference, never a document field) — this is the shell's own
+    // reactive mirror of the live engine values the Feel sheet reads, refreshed whenever it
+    // opens. (Energy is the chart's own, `performance.energy`; `bandIntensity` rides along only
+    // for the slider's resting position while it is on auto.)
     const [feel, setFeel] = useState<FeelSnapshot>(() => feelSnapshot());
     const [showControls, setShowControls] = useState(false);
     const [pendingSound, setPendingSound] = useState<{ lane: string; value: string } | null>(null);
@@ -1278,9 +1278,8 @@ export default function Ensemble() {
     }, [sync.owner, sync.documents, accountDialog, onStand]);
     useEffect(() => {
         if (feelMenu) {
-            // Refreshed on every open: these four fields can drift from what the
-            // sheet last showed (a different song's live session values, or a
-            // conductor tick that moved band intensity while the sheet was closed).
+            // Refreshed on every open: these fields can drift from what the sheet last
+            // showed (a different song opened, which resets the energy level).
             setFeel(feelSnapshot());
             feelDialog.current?.showModal();
         } else {
@@ -3462,12 +3461,7 @@ export default function Ensemble() {
                                 setFeel((f) => ({ ...f, bandIntensity: value }));
                             })
                         }
-                        onAutoIntensity={(auto) =>
-                            change(() => {
-                                runtime.setAutoIntensity(auto);
-                                setFeel((f) => ({ ...f, autoIntensity: auto }));
-                            })
-                        }
+                        onAutoIntensity={(auto) => change(() => runtime.setAutoIntensity(auto))}
                         onMetronome={(enabled) =>
                             change(() => {
                                 runtime.setMetronome(enabled);

@@ -70,11 +70,30 @@ export interface ChartArrangement {
     lastChordPreset: string;
 }
 
+/**
+ * The band's energy for this chart: a fixed level (0-1, the band engine's
+ * `BandSettings.intensity`), or `'auto'` to let the band shape it over the form. Absent (a chart
+ * saved before energy was saved with it) reads as `'auto'`.
+ */
+export type ChartEnergy = number | 'auto';
+
+/*
+ * What a chart holds: the music plus the settings the band honours (DECISION 2026-09-26, #1404).
+ * The fields marked "Legacy" belonged to the old worker-based engine, deleted in #1415. They are
+ * still ACCEPTED when a chart is read, so an old saved chart, an account copy or an imported
+ * file opens without error. The codec reproduces them exactly as stored, so a Save an older build
+ * queued still matches its own bytes on the server. Nothing reads them and capture never writes
+ * them, so each chart sheds them on its next save. No stored document is rewritten to drop them.
+ */
+
 export interface ChartPerformance {
     bpm: number;
-    complexity: number;
     seed: string;
     randomizeSeed: boolean;
+    /** Absent reads as `'auto'`. See {@link ChartEnergy}. */
+    energy?: ChartEnergy;
+    /** Legacy (old engine): read, never written. */
+    complexity?: number;
 }
 
 export interface ChartLaneMix {
@@ -86,60 +105,88 @@ export interface ChartLaneMix {
 }
 
 export interface ChartChords extends ChartLaneMix {
-    style: string;
+    /** Legacy (old engine): read, never written. */
+    style?: string;
+    /** Legacy (old engine): read, never written. */
     instrument?: string;
-    octave: number;
-    density: ChordDensity;
+    /** Legacy (old engine): read, never written. */
+    octave?: number;
+    /** Legacy (old engine): read, never written. */
+    density?: ChordDensity;
 }
 
 export interface ChartBass extends ChartLaneMix {
-    style: string;
-    octave: number;
+    /** Legacy (old engine): read, never written. */
+    style?: string;
+    /** Legacy (old engine): read, never written. */
+    octave?: number;
 }
 
 export interface ChartSoloist extends ChartLaneMix {
-    style: string;
-    preset: 'trumpet';
-    octave: number;
+    /** How the built-in lead voice phrases; the synth soloist reads it. */
     mode: SoloistMode;
+    /** On: `mode` follows the lead's sound and the genre rather than staying pinned. */
     autoMode: boolean;
-    phrasingIntensity: number;
-    tradeMode: SoloistTradeMode;
     /** Absent (a chart saved before trading, or not trading) reads as 'off'. */
     tradeWith?: SoloistTradeWith;
     /** Absent reads as 4. */
     tradeBars?: SoloistTradeBars;
     /** Absent reads as 2. See `SoloistTradeChoruses`. */
     tradeChoruses?: SoloistTradeChoruses;
+    /** Legacy (old engine): read, never written. */
+    style?: string;
+    /** Legacy (old engine): read, never written. */
+    preset?: 'trumpet';
+    /** Legacy (old engine): read, never written. */
+    octave?: number;
+    /** Legacy (old engine): read, never written. */
+    phrasingIntensity?: number;
+    /** Legacy (the old engine's section/loop trading): read, never written. */
+    tradeMode?: SoloistTradeMode;
 }
 
+/** Legacy (old engine): the whole lane is read, never written. The band has no harmony lane. */
 export interface ChartHarmony extends ChartLaneMix {
     style: string;
     octave: number;
     complexity: number;
 }
 
+/** Legacy (the old engine's step sequencer): read, never written. */
 export interface ChartGroovePatternLane {
     name: ChartGroovePatternLaneName;
     steps: number[];
 }
 
 export interface ChartGroove extends ChartLaneMix {
-    measures: number;
     swing: number;
     swingSub: SwingSub;
     humanize: number;
-    lastDrumPreset: string;
-    genreFeel: string;
-    lastSmartGenre: string;
-    pattern: ChartGroovePatternLane[];
+    /**
+     * The chart's genre, stored once: a canonical genre NAME (`GENRE_NAMES` in
+     * `public/data/smart-genres.ts`). Absent only in a chart saved before 2026-09-26, which
+     * stored it twice as the legacy `lastSmartGenre`/`genreFeel` pair — so read it through
+     * `chartGenre` (`public/songbook/codec.ts`), never directly.
+     */
+    genre?: string;
+    /** Legacy (old engine): read, never written. */
+    measures?: number;
+    /** Legacy (old engine): read, never written. */
+    lastDrumPreset?: string;
+    /** Legacy: the genre's engine feel. Read as a fallback for `genre`, never written. */
+    genreFeel?: string;
+    /** Legacy: the genre's name. Read as a fallback for `genre`, never written. */
+    lastSmartGenre?: string;
+    /** Legacy (the old engine's step sequencer): read, never written. */
+    pattern?: ChartGroovePatternLane[];
 }
 
 export interface ChartBand {
     chords: ChartChords;
     bass: ChartBass;
     soloist: ChartSoloist;
-    harmony: ChartHarmony;
+    /** Legacy (old engine): read, never written. */
+    harmony?: ChartHarmony;
     groove: ChartGroove;
 }
 

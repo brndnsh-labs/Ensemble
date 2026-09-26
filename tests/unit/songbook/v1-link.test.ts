@@ -27,8 +27,8 @@ import type { Section } from '../../../public/types.js';
  * supposed to carry cannot pass by accidentally matching the fallback.
  */
 const BASE: Pick<ChartContent, 'performance' | 'band'> = {
-    // complexity is deliberately NOT 0.3: that is `sessionPerformance`'s own hardcoded
-    // fallback, and a baseline sharing it would make the fallback assertion below vacuous.
+    // A baseline saved before 2026-09-26, legacy fields and all: none of them may reach the
+    // chart a link opens.
     performance: { bpm: 100, complexity: 0.72, seed: '', randomizeSeed: true },
     band: {
         chords: {
@@ -151,9 +151,13 @@ describe('a real v1 share link', () => {
         expect(arrangement.timeSignature).toBe('4/4');
         expect(arrangement.notation).toBe('name');
         expect(performance.bpm).toBe(96);
-        expect(performance.complexity).toBeCloseTo(0.55);
-        expect(band.groove.lastSmartGenre).toBe('Blues');
-        expect(band.chords.style).toBe('jazz');
+        expect(band.groove.genre).toBe('Blues');
+        // The old engine's `comp` and `style` land nowhere: a chart no longer carries either,
+        // and the lane styles follow the genre (DECISION 2026-09-26). `int` doesn't either,
+        // since it cannot say whether the sender was on auto energy.
+        expect(performance).toEqual({ bpm: 96, seed: '', randomizeSeed: true, energy: 'auto' });
+        expect(band.chords).not.toHaveProperty('style');
+        expect(band).not.toHaveProperty('harmony');
         // Not a library entry and not an import: a fresh id, never `v1-session` or a
         // content-derived `v1-preset-…` one, which belong to `lib/import-v1.ts`.
         expect(document.id).not.toBe('v1-session');
@@ -207,8 +211,10 @@ describe('a real v1 share link', () => {
         );
         expect(document.chart.arrangement.timeSignature).toBe('5/4');
         expect(document.chart.performance.bpm).toBe(125);
-        expect(document.chart.band.groove.genreFeel).toBe('Bossa Nova');
-        expect(document.chart.band.groove.lastSmartGenre).toBe('Bossa');
+        // Stored once, by its canonical name.
+        expect(document.chart.band.groove.genre).toBe('Bossa');
+        expect(document.chart.band.groove).not.toHaveProperty('genreFeel');
+        expect(document.chart.band.groove).not.toHaveProperty('lastSmartGenre');
     });
 
     // A link carries no swing of its own: without the genre's a Jazz link played straight
@@ -296,15 +302,13 @@ describe('a hostile or broken link', () => {
         expect(arrangement.key).toBe('C');
         expect(arrangement.timeSignature).toBe('4/4');
         expect(arrangement.notation).toBe('roman');
-        expect(band.groove.genreFeel).toBe('Rock');
-        expect(band.chords.style).toBe('smart');
+        expect(band.groove.genre).toBe('Rock');
         // v1 tolerated 20–300; the songbook schema is a whole 40–240, so the far end clamps.
         expect(performance.bpm).toBe(240);
-        // v1's OWN default for an unreadable complexity, not the songbook baseline's — the
-        // link always builds a session record, so `sessionPerformance`'s fallback is what
-        // runs here (see `linkSession`'s note on what `base` actually contributes).
-        expect(performance.complexity).toBeCloseTo(0.3);
-        expect(performance.complexity).not.toBeCloseTo(BASE.performance.complexity);
+        // Neither v1's hostile `comp`/`style` nor the baseline's legacy fields land: the
+        // chart is written as a chart is today.
+        expect(performance).not.toHaveProperty('complexity');
+        expect(band.chords).not.toHaveProperty('style');
     });
 
     it('takes an unreadable tempo from the songbook baseline', () => {

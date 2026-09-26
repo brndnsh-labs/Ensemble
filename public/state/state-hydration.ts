@@ -670,21 +670,15 @@ function hydrateSavedState(): void {
                 // persisted the number 8 here (see `normalizeSwingSub`), and an
                 // unguarded passthrough would restore it on every boot forever.
                 swingSub: normalizeSwingSub(savedState.groove.swingSub),
-                measures: clamp(savedState.groove.measures, 1, 8, 1),
                 humanize: clamp(savedState.groove.humanize, 0, 100, 20),
                 // #1181: `followPlayback` (and its even older `autoFollow` alias) removed —
                 // no control has been able to set it since the chart-first migration, so
                 // the reader in Visualizer is now inlined as always-on. Both stale keys are
                 // simply ignored here rather than migrated: an unread extra key in a
                 // persisted payload is harmless, and the next save drops it.
-                // Not allowlisted against DRUM_PRESETS on purpose: `loadDrumPreset`
-                // already guards its own lookup with `Object.hasOwn` (#1244) and is the
-                // field's only consumer beyond display, so the single-read-site half of
-                // the prototype-guard rule applies. Sanitized as a display string.
-                lastDrumPreset: sanitizeDisplayString(
-                    savedState.groove.lastDrumPreset,
-                    'Basic Rock',
-                ),
+                // `lastDrumPreset`, `measures` and the step-sequencer `pattern` are no longer
+                // read: the band plays its own drums, and the old engine's drum-pattern state
+                // is gone (chart-format decision, 2026-09-26).
                 // Both halves come from the one `savedGenre` resolution above, so they
                 // can no longer disagree. `GENRE_FEELS.includes` is kept as the outer
                 // gate for the feel because that list is the engine-facing keyspace.
@@ -692,29 +686,7 @@ function hydrateSavedState(): void {
                     savedGenre && GENRE_FEELS.includes(savedGenre.feel) ? savedGenre.feel : 'Rock',
                 lastSmartGenre: savedGenre?.name || 'Rock',
                 sectionSeedMap: validateSectionSeedMap(savedState.groove.sectionSeedMap),
-                currentMeasure: 0,
             });
-
-            // Array.isArray, not a truthy `.length` check: a persisted payload that
-            // is valid JSON but the wrong shape (a partial write, a rollback across a
-            // schema change) can hand us a string or an object here, whose truthy
-            // `.length` passes the old guard and whose missing `.forEach` then throws.
-            // Same reasoning for `savedInst.steps` — and note it gates the `fill(0)`
-            // too, so an instrument with an unreadable pattern keeps its default steps
-            // rather than being blanked.
-            if (Array.isArray(savedState.groove.pattern) && savedState.groove.pattern.length > 0) {
-                savedState.groove.pattern.forEach((savedInst: any) => {
-                    const inst = groove.instruments.find((i) => i.name === savedInst?.name);
-                    if (inst && Array.isArray(savedInst.steps)) {
-                        inst.steps.fill(0);
-                        savedInst.steps.forEach((v: any, i: number) => {
-                            if (i < 128) {
-                                inst.steps[i] = v;
-                            }
-                        });
-                    }
-                });
-            }
         }
 
         if (savedState.midi) {

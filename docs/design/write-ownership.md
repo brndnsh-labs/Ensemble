@@ -88,6 +88,11 @@ no race to lose.
   nothing here for the conductor to overwrite. The UI still models the ownership boundary
   explicitly, which is the reusable pattern: make it structurally impossible for two authorities
   to reach for the same field at the same time.
+  *Amended 2026-09-26 (#1404):* the conductor went with the old engine, and band energy became
+  the chart's own (`ChartPerformance.energy`), so `bandIntensity`/`autoIntensity` are now
+  `document`-owned. That is safe precisely because no runtime system writes either any more —
+  the user is their only writer. A future system that wants to move the band's energy at runtime
+  needs its own `runtime-derived` field, composed at read time, per §1.
 
 ## 4. Composition with the timing-model law
 

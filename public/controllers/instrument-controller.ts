@@ -16,57 +16,6 @@ import { dispatch, getState, stateMap } from '../state.js';
 import { track } from '../telemetry.js';
 import type { Mutable } from '../types.js';
 import { ACTIONS } from '../types.js';
-import { getStepsPerMeasure } from '../utils.js';
-
-export function switchMeasure(idx: number): void {
-    const { groove } = getState();
-    if (groove.currentMeasure === idx) {
-        return;
-    }
-    dispatch(ACTIONS.SET_ACTIVE_MEASURE, idx);
-}
-
-export async function loadDrumPreset(name: string): Promise<void> {
-    const { groove, arranger } = getState();
-    const { DRUM_PRESETS } = await import('../data/drum-presets.js');
-    // #1244 — an unknown name falls back instead of throwing. This is a public
-    // entrypoint whose main.ts call site passes the *persisted* `lastDrumPreset`,
-    // which a corrupt or rolled-back payload can leave holding anything. The throw
-    // was invisible when it happened: this function is `async` and that call site
-    // neither awaits nor voids it, so a bad name surfaced as an unhandled rejection
-    // and a silently empty drum grid rather than an error anyone could see.
-    // `Object.hasOwn`, not `??` — a name like 'toString' would otherwise resolve to
-    // an inherited prototype member and read as a (nonsense) preset.
-    const presets = DRUM_PRESETS as any;
-    let p: any = Object.hasOwn(presets, name) ? presets[name] : presets['Basic Rock'];
-    if (p[arranger.timeSignature]) {
-        p = { ...p, ...p[arranger.timeSignature] };
-    }
-    const newInstruments = groove.instruments.map((inst) => {
-        const spm = getStepsPerMeasure(arranger.timeSignature);
-        const rawPattern = p[inst.name] || new Array(spm).fill(0);
-        // The catalog mixes numeric hits with compact string grids for default rests.
-        const pattern =
-            typeof rawPattern === 'string' ? Array.from(rawPattern, Number) : rawPattern;
-        const newSteps = new Array(128).fill(0);
-        pattern.forEach((v: any, i: number) => {
-            if (i < 128) {
-                newSteps[i] = v;
-            }
-        });
-        return { ...inst, steps: newSteps };
-    });
-
-    dispatch(ACTIONS.SET_PARAM, { module: 'groove', param: 'lastDrumPreset', value: name });
-    dispatch(ACTIONS.SET_PARAM, { module: 'groove', param: 'measures', value: p.measures || 1 });
-    dispatch(ACTIONS.SET_ACTIVE_MEASURE, 0);
-    dispatch(ACTIONS.SET_PARAM, {
-        module: 'groove',
-        param: 'instruments',
-        value: [...newInstruments],
-    });
-    dispatch(ACTIONS.DRUM_PRESET_LOADED);
-}
 
 let tapTimes: number[] = [];
 

@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import { writtenSettings } from '../../../../public/songbook/codec.js';
 import { digest, snapshot } from '../../../v2/lib/sync/protocol.js';
 import { MAX_SAVE_REQUEST_BYTES } from '../../../v2/lib/sync/request.js';
 import { createWebAuthnConfig, type WebAuthnConfig } from '../../src/auth/config.js';
@@ -149,6 +150,31 @@ describe('POST /api/documents/save (#1202)', () => {
         const row = readDocument(ctx.testDb.db, ctx.accountId, 'doc-1');
         expect(row).toMatchObject({ revision: 'rev-1' });
         expect(JSON.parse(row?.body ?? '{}')).toEqual(snapshot(makeChartDocument('doc-1')));
+    });
+
+    it('commits a chart as the app writes it today: no legacy fields, genre once, energy (#1404)', async () => {
+        ctx = await setUp();
+        const old = makeChartDocument('doc-lean');
+        const written = {
+            ...old,
+            chart: { arrangement: old.chart.arrangement, ...writtenSettings(old.chart) },
+        };
+        const body = freeze({
+            ownerId: ctx.accountId,
+            documentId: 'doc-lean',
+            operationId: 'op-lean',
+            expectedRevision: null,
+            document: written,
+        });
+        const { status } = await save(ctx, body);
+        expect(status).toBe(200);
+        const stored = JSON.parse(
+            readDocument(ctx.testDb.db, ctx.accountId, 'doc-lean')?.body ?? '{}',
+        );
+        expect(stored).toEqual(written);
+        expect(stored.chart.band.groove.genre).toBe('Jazz');
+        expect(stored.chart.band).not.toHaveProperty('harmony');
+        expect(stored.chart.performance.energy).toBe('auto');
     });
 
     it('replaying the same operation id and bytes returns the original result without a second write', async () => {

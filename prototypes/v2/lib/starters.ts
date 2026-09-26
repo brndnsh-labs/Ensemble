@@ -52,7 +52,6 @@ export function start(): Promise<ChartDocument[]> {
                     lane.autoSound = true;
                 }
                 chart.band.soloist.enabled = false;
-                chart.band.harmony.enabled = false;
                 const now = new Date().toISOString();
                 try {
                     await repository.save(

@@ -1,6 +1,6 @@
 import { KEY_ORDER } from '@engine/config';
 import { Fragment } from 'react';
-import { arrangementOf } from '../lib/documents';
+import { arrangementOf, genreOf } from '../lib/documents';
 import { type ChartDocument, GENRE_NAMES } from '../lib/runtime';
 import { type Lane, visibleLanes } from './band-lanes';
 import { TempoControl } from './tempo-control';
@@ -84,7 +84,7 @@ export function TransportBar({
                     id="genre"
                     className="setting-select"
                     disabled={busy}
-                    value={current.chart.band.groove.lastSmartGenre}
+                    value={genreOf(current)}
                     onChange={(e) => onGenre(e.target.value)}
                 >
                     {GENRE_NAMES.map((g) => (

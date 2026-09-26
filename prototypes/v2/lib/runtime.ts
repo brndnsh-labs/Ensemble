@@ -10,11 +10,7 @@ import {
     toMidi,
 } from '@band/index';
 import { transposeKey } from '@engine/controllers/arranger-controller';
-import {
-    flushBuffers,
-    loadDrumPreset,
-    togglePower,
-} from '@engine/controllers/instrument-controller';
+import { flushBuffers, togglePower } from '@engine/controllers/instrument-controller';
 import {
     loopSection as armSectionLoop,
     clearPracticeLoop,
@@ -36,6 +32,7 @@ import {
     stopPlatformAudioAndWakeLock,
 } from '@engine/engine/platform-orchestrator';
 import { transposeChordText } from '@engine/engine/transpose';
+import { chartGenre } from '@engine/songbook/codec';
 import { proposeLegacyScoreConversion } from '@engine/songbook/legacy-score';
 import type { SemanticScore } from '@engine/songbook/score-types';
 import {
@@ -49,6 +46,7 @@ import {
     type SoloistTradeWith,
 } from '@engine/songbook/types';
 import { dispatch, getState, subscribe } from '@engine/state';
+import { DEFAULT_BAND_INTENSITY as DEFAULT_ENERGY } from '@engine/state/playback';
 import {
     deriveSoloistModeOnBoot,
     handleEffects,
@@ -116,7 +114,7 @@ let exportIntent = 0;
 /** Thrown from inside {@link exportAudio}'s stem-progress hook to unwind `renderBandStemsToWav`'s loop the moment a cancel lands, rather than waiting for it to finish every remaining stem. Never escapes {@link exportAudio}. */
 class ExportCancelled extends Error {}
 /** Lanes whose voice follows the feel while they are left on Auto (#675). */
-const AUTO_LANES = ['groove', 'bass', 'chords', 'harmony', 'soloist'] as const;
+const AUTO_LANES = ['groove', 'bass', 'chords', 'soloist'] as const;
 /**
  * Ceiling on waiting for the band to reach the barline that plays a new feel (#1185). One bar
  * at the engine's slowest tempo is ~6s; past this the audio clock is not running
@@ -324,7 +322,6 @@ function syncBand(): void {
             feel?: string;
             swing?: number;
             sub?: string;
-            drum?: string;
         };
         param('groove', 'pendingGenreFeel', null);
         if (payload.feel) {
@@ -335,9 +332,6 @@ function syncBand(): void {
         }
         if (payload.sub === '8th' || payload.sub === '16th') {
             param('groove', 'swingSub', payload.sub);
-        }
-        if (payload.drum) {
-            void loadDrumPreset(payload.drum);
         }
     }
     // The genre-change effect in `public/` picks the old engine's Auto sound; on the band,
@@ -387,17 +381,13 @@ function mix(lane: ChartLaneMix): ChartLaneMix {
     };
 }
 
-/** Explicit semantic projection, never a clone of the live/audio state tree. */
+/**
+ * Explicit semantic projection, never a clone of the live/audio state tree. It writes the music
+ * and the settings the band honours, nothing else (DECISION 2026-09-26): the old engine's fields
+ * are still read from an old chart, but never written, so a chart sheds them on its next save.
+ */
 export function captureContent(): ChartContent {
-    const {
-        arranger: a,
-        playback: p,
-        chords: c,
-        bass: b,
-        soloist: s,
-        harmony: h,
-        groove: g,
-    } = getState();
+    const { arranger: a, playback: p, chords: c, bass: b, soloist: s, groove: g } = getState();
     return clone({
         arrangement: {
             sections: a.sections,
@@ -410,28 +400,17 @@ export function captureContent(): ChartContent {
         },
         performance: {
             bpm: p.bpm,
-            complexity: p.complexity,
             seed: a.seed,
             randomizeSeed: a.randomizeSeed,
+            energy: p.autoIntensity ? 'auto' : p.bandIntensity,
         },
         band: {
-            chords: {
-                ...mix(c),
-                style: c.style,
-                instrument: (c as unknown as { instrument?: string }).instrument,
-                octave: c.octave,
-                density: c.density,
-            },
-            bass: { ...mix(b), style: b.style, octave: b.octave },
+            chords: mix(c),
+            bass: mix(b),
             soloist: {
                 ...mix(s),
-                style: s.style,
-                preset: s.preset,
-                octave: s.octave,
                 mode: s.mode,
                 autoMode: s.autoMode,
-                phrasingIntensity: s.phrasingIntensity,
-                tradeMode: s.tradeMode,
                 // Written only while trading, so a chart that never traded saves as before.
                 ...(s.tradeWith === 'off'
                     ? {}
@@ -441,17 +420,14 @@ export function captureContent(): ChartContent {
                           tradeChoruses: s.tradeChoruses,
                       }),
             },
-            harmony: { ...mix(h), style: h.style, octave: h.octave, complexity: h.complexity },
             groove: {
                 ...mix(g),
-                measures: g.measures,
                 swing: g.swing,
                 swingSub: g.swingSub,
                 humanize: g.humanize,
-                lastDrumPreset: g.lastDrumPreset,
-                genreFeel: g.genreFeel,
-                lastSmartGenre: g.lastSmartGenre,
-                pattern: g.instruments.map((i) => ({ name: i.name, steps: i.steps })),
+                // The genre, stored once, by name. The slice keeps name and feel apart because
+                // the band reads one and the voices the other; the chart needs only the name.
+                genre: g.lastSmartGenre,
             },
         },
     } as ChartContent);
@@ -488,7 +464,6 @@ export function initialize(): Promise<void> {
     if (!boot) {
         boot = (async () => {
             initializeSounds();
-            await loadDrumPreset('Basic Rock');
             // #1405 — before any chart opens, so Follow feel resolves against what this device
             // really holds. Local and bounded (`seedInstalledSounds`); no network.
             await seedInstalledSounds();
@@ -720,23 +695,25 @@ export function setHumanize(value: number): void {
     dispatch(ACTIONS.SET_HUMANIZE, value);
 }
 
-// `playback.bandIntensity`/`autoIntensity`/`metronome` are `runtime-derived` —
-// session-only by design (`docs/design/write-ownership.md` §3), never part of
-// `ChartContent` or a preferences key. A user dispatch onto them is fine (the law
-// only forbids a *runtime system* writing a document/preferences field); they
-// simply reset to their engine defaults on next boot, same as v1.
+// The chart's energy (DECISION 2026-09-26): `playback.bandIntensity`/`autoIntensity` are
+// `document`-owned and ride `captureContent()`'s `performance.energy` (`'auto'` or the level),
+// so, like swing, only the dispatch is needed here; the band re-reads them (`syncBand`). The
+// user is their only writer — no runtime system touches either (write-ownership law).
 
-/** Manual band-energy override; ignored by the engine while `autoIntensity` is on. */
+/** A fixed band energy (0-1); ignored by the band while `autoIntensity` is on. */
 export function setBandIntensity(value: number): void {
     dispatch(ACTIONS.SET_BAND_INTENSITY, value);
 }
 
-/** Hands band energy to the conductor's own ramp, mirroring `InstrumentRail.tsx`. */
+/** Auto energy: the band shapes it over the form itself. */
 export function setAutoIntensity(auto: boolean): void {
     dispatch(ACTIONS.SET_AUTO_INTENSITY, auto);
 }
 
-/** Click track on/off — session-only, like the two above. */
+/**
+ * Click track on/off — `runtime-derived`, session-only by design, never part of `ChartContent`
+ * or a preferences key; it resets to its default on the next boot.
+ */
 export function setMetronome(enabled: boolean): void {
     dispatch(ACTIONS.SET_METRONOME, enabled);
 }
@@ -812,7 +789,7 @@ export async function applyGenreSounds(progress: (text: string) => void): Promis
             await prepareSound(voice.slice(5), progress);
         }
     }
-    for (const module of ['groove', 'bass', 'chords', 'harmony', 'soloist'] as const) {
+    for (const module of AUTO_LANES) {
         dispatch(ACTIONS.SET_INSTRUMENT_VOICE, {
             module,
             voice: recommendedVoice(module),
@@ -821,6 +798,22 @@ export async function applyGenreSounds(progress: (text: string) => void): Promis
     }
     deriveSoloistModeOnBoot(getState(), dispatch);
     rebuild();
+}
+
+/**
+ * Install a chart's genre: the name the band reads (`groove.lastSmartGenre`), the feel the
+ * voices read (`groove.genreFeel`), and the per-lane styles the genre routes — the same values
+ * picking it sets (`SET_GENRE_FEEL`). A chart no longer stores those styles: the app has only
+ * ever set them from the genre, so they follow it on open rather than whatever chart came before.
+ */
+function applyGenre(name: string): void {
+    const genre = SMART_GENRES[name];
+    param('groove', 'lastSmartGenre', name);
+    param('groove', 'genreFeel', genre.feel);
+    param('chords', 'style', genre.chord);
+    param('bass', 'style', genre.bass ?? 'smart');
+    param('soloist', 'style', genre.soloist ?? 'smart');
+    param('harmony', 'style', genre.harmony);
 }
 
 function apply(content: DocumentContent): void {
@@ -836,39 +829,34 @@ function apply(content: DocumentContent): void {
     for (const [key, value] of Object.entries(arrangement)) {
         param('arranger', key, value);
     }
-    param('arranger', 'seed', content.performance.seed);
-    param('arranger', 'randomizeSeed', content.performance.randomizeSeed);
-    param('playback', 'bpm', content.performance.bpm);
-    param('playback', 'complexity', content.performance.complexity);
-    for (const module of ['chords', 'bass', 'soloist', 'harmony', 'groove'] as const) {
-        for (const [key, value] of Object.entries(content.band[module])) {
-            if (key !== 'pattern') {
-                param(module, key, value);
-            }
+    const { performance, band } = content;
+    param('arranger', 'seed', performance.seed);
+    param('arranger', 'randomizeSeed', performance.randomizeSeed);
+    param('playback', 'bpm', performance.bpm);
+    // Energy rides the chart; a chart saved before it did lets the band shape it (auto). A
+    // fixed level is the one the chart names; on auto the level resets to the default, so the
+    // outgoing chart's energy never carries over into this one.
+    const energy = performance.energy ?? 'auto';
+    param('playback', 'autoIntensity', energy === 'auto');
+    param('playback', 'bandIntensity', energy === 'auto' ? DEFAULT_ENERGY : energy);
+    // Only the fields a chart writes are applied, by name: an old chart's legacy fields (see
+    // `ChartBand`) are read by nothing, so they never reach the engine.
+    for (const module of ['chords', 'bass', 'soloist', 'groove'] as const) {
+        const lane = band[module];
+        for (const key of ['enabled', 'voice', 'autoSound', 'volume', 'reverb'] as const) {
+            param(module, key, lane[key]);
         }
     }
-    // Optional legacy source selector must not leak from the outgoing chart.
-    param('chords', 'instrument', content.band.chords.instrument);
-    // Nor may trading: a chart saved without it doesn't trade.
-    param('soloist', 'tradeWith', content.band.soloist.tradeWith ?? 'off');
-    param('soloist', 'tradeBars', content.band.soloist.tradeBars ?? 4);
-    param(
-        'soloist',
-        'tradeChoruses',
-        content.band.soloist.tradeChoruses ?? DEFAULT_SOLOIST_TRADE_CHORUSES,
-    );
-    param(
-        'groove',
-        'instruments',
-        getState().groove.instruments.map((instrument) => ({
-            ...instrument,
-            muted: false,
-            steps: [
-                ...(content.band.groove.pattern.find((p) => p.name === instrument.name)?.steps ||
-                    []),
-            ],
-        })),
-    );
+    param('soloist', 'mode', band.soloist.mode);
+    param('soloist', 'autoMode', band.soloist.autoMode);
+    // A chart saved without trading doesn't trade.
+    param('soloist', 'tradeWith', band.soloist.tradeWith ?? 'off');
+    param('soloist', 'tradeBars', band.soloist.tradeBars ?? 4);
+    param('soloist', 'tradeChoruses', band.soloist.tradeChoruses ?? DEFAULT_SOLOIST_TRADE_CHORUSES);
+    param('groove', 'swing', band.groove.swing);
+    param('groove', 'swingSub', band.groove.swingSub);
+    param('groove', 'humanize', band.groove.humanize);
+    applyGenre(chartGenre(band.groove));
     dispatch(ACTIONS.SET_PRACTICE_LOOP, null);
     dispatch(ACTIONS.SET_START_STEP, 0);
     param('arranger', 'history', []);
