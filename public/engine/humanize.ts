@@ -110,54 +110,6 @@ export function humanizeScale(humanize: number | undefined | null): number {
 }
 
 /**
- * How much of a lane's placement spread applies at a given metric position.
- *
- * why (#1068): human timing is not position-blind. A player's internal clock is
- * anchored at the bar's downbeat and re-anchored at each pulse/beat; deviation
- * grows with distance from the nearest anchor. Downbeats are also where ensemble
- * lock is *heard* — smearing them reads as "the band is sloppy", while the same
- * displacement on an "e"/"a" or an offbeat reads as personal placement (the
- * push/drag that makes a part feel played). So the weights descend toward the
- * strong positions rather than being uniform.
- */
-export const PLACEMENT_WEIGHTS = {
-    /** Bar downbeat — the band's lock point. Tightest. */
-    downbeat: 0.35,
-    /** Group/pulse start (beat 3 of 4/4, the second dotted quarter of 6/8). */
-    pulse: 0.5,
-    /** Any other beat start. */
-    beat: 0.6,
-    /** Offbeats, "e"/"a" subdivisions, pickups — where placement lives. */
-    offbeat: 1.0,
-} as const;
-
-/** The subset of `StepInfo` the position weighting reads. */
-export interface PlacementPosition {
-    readonly isMeasureStart?: boolean;
-    readonly isDownbeat?: boolean;
-    readonly isPulseStart?: boolean;
-    readonly isGroupStart?: boolean;
-    readonly isBeatStart?: boolean;
-}
-
-/** Resolve the placement weight for one step's metric position. */
-export function placementWeight(pos: PlacementPosition | null | undefined): number {
-    if (!pos) {
-        return PLACEMENT_WEIGHTS.offbeat;
-    }
-    if (pos.isMeasureStart || pos.isDownbeat) {
-        return PLACEMENT_WEIGHTS.downbeat;
-    }
-    if (pos.isPulseStart || pos.isGroupStart) {
-        return PLACEMENT_WEIGHTS.pulse;
-    }
-    if (pos.isBeatStart) {
-        return PLACEMENT_WEIGHTS.beat;
-    }
-    return PLACEMENT_WEIGHTS.offbeat;
-}
-
-/**
  * Compose a deterministic integer seed from a note's identity. Distinct
  * `(step, instrument, voiceIndex)` triples map to well-separated seeds, so
  * each instrument — and each voice within it — draws an independent stream.
@@ -232,9 +184,4 @@ export function humanizeColor(seed: number, profile: HumanizeProfile, scale = 1)
         velocityMult: 1 + (rVel - 0.5) * 2 * profile.velSpread * scale,
         detuneCents: (rDetune - 0.5) * 2 * profile.detuneSpread * scale,
     };
-}
-
-/** Cents → frequency ratio, for lanes whose voice takes no `detune` param. */
-export function detuneRatio(cents: number): number {
-    return cents === 0 ? 1 : 2 ** (cents / 1200);
 }

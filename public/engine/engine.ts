@@ -17,12 +17,12 @@ import { MODULE_BUS_KEY, packIdFromVoice } from './instrument-registry.js';
 import { ensurePacksForVoices } from './pack-runtime.js';
 import { createAlgorithmicReverb, REVERB_PRESETS } from './reverb.js';
 import { isInstrumentEverActive } from './section-overrides.js';
-import { killBassNote, playBassNote } from './synth-bass.js';
+import { killBassNote } from './synth-bass.js';
 // Facade: Re-export synthesis logic from specialized modules
-import { killAllPianoNotes, playNote, updateSustain } from './synth-chords.js';
-import { killDrumNote, playDrumSound } from './synth-drums.js';
-import { killHarmonyNote, playHarmonyNote, releaseHarmonyVoicing } from './synth-harmonies.js';
-import { killSoloistNote, playSoloNote } from './synth-soloist.js';
+import { killAllPianoNotes, playNote } from './synth-chords.js';
+import { killDrumNote } from './synth-drums.js';
+import { killHarmonyNote } from './synth-harmonies.js';
+import { killSoloistNote } from './synth-soloist.js';
 
 export {
     killAllPianoNotes,
@@ -30,13 +30,7 @@ export {
     killDrumNote,
     killHarmonyNote,
     killSoloistNote,
-    playBassNote,
-    playDrumSound,
-    playHarmonyNote,
     playNote,
-    playSoloNote,
-    releaseHarmonyVoicing,
-    updateSustain,
 };
 
 let isChromium: boolean | null = null;

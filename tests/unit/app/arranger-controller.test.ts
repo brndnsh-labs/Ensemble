@@ -20,13 +20,11 @@ import {
 } from '../../../public/controllers/arranger-controller.js';
 import { flushBuffers } from '../../../public/controllers/instrument-controller.js';
 import { validateProgression } from '../../../public/engine/chords-engine.js';
-import { analyzeFormUI } from '../../../public/engine/conductor.js';
 import { restoreGains } from '../../../public/engine/engine.js';
 import { pushHistory } from '../../../public/state/history.js';
 import { saveCurrentState } from '../../../public/state/persistence.js';
 import { getState, stateMap } from '../../../public/state.js';
 import { showToast } from '../../../public/ui.js';
-import { syncWorker } from '../../../public/worker-client.js';
 
 vi.mock('../../../public/state.js', () => {
     const mockState = {};
@@ -60,10 +58,6 @@ vi.mock('../../../public/engine/chords-engine.js', () => ({
     }),
 }));
 
-vi.mock('../../../public/engine/conductor.js', () => ({
-    analyzeFormUI: vi.fn(),
-}));
-
 vi.mock('../../../public/engine/engine.js', () => ({
     restoreGains: vi.fn(),
 }));
@@ -82,10 +76,6 @@ vi.mock('../../../public/state/persistence.js', () => ({
 
 vi.mock('../../../public/ui.js', () => ({
     showToast: vi.fn(),
-}));
-
-vi.mock('../../../public/worker-client.js', () => ({
-    syncWorker: vi.fn(),
 }));
 
 vi.mock('../../../public/state/share-codec.js', () => ({
@@ -174,14 +164,9 @@ describe('Arranger Controller', () => {
     });
 
     describe('validateAndAnalyze', () => {
-        it('should validate progression and trigger form analysis', () => {
+        it('should validate the progression', () => {
             validateAndAnalyze();
-            expect(validateProgression).toHaveBeenCalledWith(
-                stateMap,
-                undefined,
-                expect.any(Function),
-            );
-            expect(analyzeFormUI).toHaveBeenCalled();
+            expect(validateProgression).toHaveBeenCalledWith(stateMap);
         });
     });
 
@@ -189,25 +174,9 @@ describe('Arranger Controller', () => {
         it('should trigger the full refresh pipeline', () => {
             refreshArrangerUI();
             expect(validateProgression).toHaveBeenCalled();
-            expect(syncWorker).toHaveBeenCalled();
             expect(flushBuffers).toHaveBeenCalled();
             expect(restoreGains).toHaveBeenCalledWith(stateMap);
             expect(saveCurrentState).toHaveBeenCalled();
-        });
-
-        // #1120 — the load-bearing order guard. This is the canonical resync every
-        // arrangement-mutating UI now delegates to (#1128 consolidated the
-        // hand-copied copies in PresetLibrary/KeySignatureControls onto it), so the
-        // order lives here: syncWorker() must patch the mirrored state BEFORE
-        // flushBuffers() refills the worker's buffers from getSyncState() — else the
-        // ~4-measure primed lookahead is built from the stale pre-swap progression.
-        it('runs validate → syncWorker → flushBuffers in that order (#1120)', () => {
-            refreshArrangerUI();
-            const validateOrder = vi.mocked(validateProgression).mock.invocationCallOrder[0];
-            const syncOrder = vi.mocked(syncWorker).mock.invocationCallOrder[0];
-            const flushOrder = vi.mocked(flushBuffers).mock.invocationCallOrder[0];
-            expect(syncOrder).toBeGreaterThan(validateOrder);
-            expect(flushOrder).toBeGreaterThan(syncOrder);
         });
     });
 
@@ -259,7 +228,7 @@ describe('Arranger Controller', () => {
             onSectionDelete('s1');
             expect(state.arranger.sections.length).toBe(1); // Deleted
             expect(state.arranger.isDirty).toBe(true);
-            expect(syncWorker).toHaveBeenCalled(); // part of refreshArrangerUI
+            expect(flushBuffers).toHaveBeenCalled(); // part of refreshArrangerUI
         });
 
         it('should bypass confirmation for empty or default sections', () => {

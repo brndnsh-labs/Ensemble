@@ -561,40 +561,6 @@ export interface SoloistSessionSeed {
 }
 
 /**
- * #1157 — a digested soloist Q&A window, in ABSOLUTE (monotonic transport)
- * steps. Derived per tick from the session seed by `getQaHangAt`
- * (soloist-phrase-first.ts) and published through the coordination context
- * (`soloistQaHang`) so the comper can answer the question without reading the
- * raw seed. Worker-internal — never crosses to the main thread.
- */
-export interface SoloistQaHang {
-    /** Pitch class (0-11) of the question's hanging tension tone. Development
-     *  preserves non-dovetail questions verbatim modulo octave folding, so the
-     *  PC is depth-stable even though the sounding octave may shift. Questions
-     *  the live engine apex-dovetails (the last hang before a cycle's peak is
-     *  overridden to the money note's neighbor — see the `qaRole === 'question'`
-     *  branch in getSoloistNotePhraseFirst) sound a DIFFERENT pitch than the
-     *  seed pin, so the digest excludes those windows entirely. */
-    pc: number;
-    /** Session-seed-derived salt folded into the comper's participation draw,
-     *  so which questions get answered varies per session instead of being
-     *  chart-frozen. Stable within a session (pure function of the seed). */
-    drawSalt: number;
-    /** Step where the question cadence lands and starts ringing. */
-    hangStartStep: number;
-    /** Step for the comper's echo interjection (~a beat into the hang, always
-     *  strictly before the soloist re-enters). */
-    echoStep: number;
-    /** Step where the soloist re-enters (first sounding answer-half note). */
-    answerEntryStep: number;
-    /** [start, end) of the bar containing the answer cadence — the window where
-     *  a comp top voice may resolve onto a pillar with the soloist. */
-    resolutionBarStart: number;
-    /** Exclusive end of the resolution bar. */
-    resolutionBarEnd: number;
-}
-
-/**
  * One note inside a `MotifSignature`. Captures pitch, position relative to the
  * phrase start, and the cues the response engine needs to paraphrase it.
  */
@@ -1445,18 +1411,6 @@ export interface ActionPayloadUpdateConductorDecision {
     sub?: string;
 }
 
-export interface ActionPayloadTriggerFill {
-    steps: Record<number, unknown>;
-    startStep: number;
-    length: number;
-    crash?: boolean;
-}
-
-export interface ActionPayloadSetGrooveSeed {
-    sectionId: string;
-    seed: number;
-}
-
 export interface ActionPayloadShowToast {
     id?: string;
     message?: string;
@@ -1486,13 +1440,6 @@ export interface ActionPayloadSetMidiConfig {
     inputs?: Array<{ id: string; name: string }>;
     selectedInputId?: string | null;
     inputEnabled?: boolean;
-}
-
-export interface ActionPayloadUpdateConductorState {
-    targetIntensity?: number;
-    stepSize?: number;
-    form?: object | null;
-    formIteration?: number;
 }
 
 export type ActionPayloadUpdateHB = Partial<HarmonyState>;
@@ -1578,13 +1525,10 @@ export interface ActionPayloadMap {
     SET_COMPLEXITY: number;
     SET_AUTO_INTENSITY: boolean;
     UPDATE_CONDUCTOR_DECISION: ActionPayloadUpdateConductorDecision;
-    UPDATE_CONDUCTOR_STATE: ActionPayloadUpdateConductorState;
-    RESET_SESSION: undefined;
     SHOW_TOAST: ActionPayloadShowToast | string;
     TRIGGER_FLASH?: number;
     SET_MODAL_OPEN: ActionPayloadSetModalOpen;
     SET_CHART_LOCKED: boolean;
-    TOGGLE_PLAY: undefined;
     SET_BPM: number | string;
     SET_STYLE: ActionPayloadSetStyle;
     SET_VOLUME: ActionPayloadSetVolume;
@@ -1598,10 +1542,7 @@ export interface ActionPayloadMap {
     SET_SWING_SUB: string;
     SET_HUMANIZE: number;
     SET_GENRE_FEEL: ActionPayloadSetGenreFeel;
-    SET_GENRE_COUNTDOWN: number | null;
     SET_ACTIVE_MEASURE: number | string;
-    SET_GROOVE_SEED: ActionPayloadSetGrooveSeed;
-    TRIGGER_FILL: ActionPayloadTriggerFill;
     UPDATE_HB: ActionPayloadUpdateHB;
     UPDATE_GB: ActionPayloadUpdateGB;
     SET_SECTIONS: Section[];
@@ -1615,7 +1556,6 @@ export interface ActionPayloadMap {
     SET_METRONOME: boolean;
     SET_NOTATION: string;
     SET_SESSION_TIMER: number;
-    SET_ENDING_PENDING: boolean;
     /** Section-practice: seed the step the next play begins from (#1016). */
     SET_START_STEP: number;
     /**
@@ -1664,13 +1604,10 @@ export const ACTIONS = {
     SET_COMPLEXITY: 'SET_COMPLEXITY',
     SET_AUTO_INTENSITY: 'SET_AUTO_INTENSITY',
     UPDATE_CONDUCTOR_DECISION: 'UPDATE_CONDUCTOR_DECISION',
-    UPDATE_CONDUCTOR_STATE: 'UPDATE_CONDUCTOR_STATE',
-    RESET_SESSION: 'RESET_SESSION',
     SHOW_TOAST: 'SHOW_TOAST',
     TRIGGER_FLASH: 'TRIGGER_FLASH',
     SET_MODAL_OPEN: 'SET_MODAL_OPEN',
     SET_CHART_LOCKED: 'SET_CHART_LOCKED',
-    TOGGLE_PLAY: 'TOGGLE_PLAY',
     SET_BPM: 'SET_BPM',
 
     // --- Instrument Settings ---
@@ -1688,10 +1625,7 @@ export const ACTIONS = {
     SET_SWING_SUB: 'SET_SWING_SUB',
     SET_HUMANIZE: 'SET_HUMANIZE',
     SET_GENRE_FEEL: 'SET_GENRE_FEEL',
-    SET_GENRE_COUNTDOWN: 'SET_GENRE_COUNTDOWN',
     SET_ACTIVE_MEASURE: 'SET_ACTIVE_MEASURE',
-    SET_GROOVE_SEED: 'SET_GROOVE_SEED',
-    TRIGGER_FILL: 'TRIGGER_FILL',
     UPDATE_HB: 'UPDATE_HB',
     UPDATE_GB: 'UPDATE_GB',
 
@@ -1707,7 +1641,6 @@ export const ACTIONS = {
     SET_METRONOME: 'SET_METRONOME',
     SET_NOTATION: 'SET_NOTATION',
     SET_SESSION_TIMER: 'SET_SESSION_TIMER',
-    SET_ENDING_PENDING: 'SET_ENDING_PENDING',
     SET_START_STEP: 'SET_START_STEP',
     SET_PRACTICE_LOOP: 'SET_PRACTICE_LOOP',
     RESET_STATE: 'RESET_STATE',

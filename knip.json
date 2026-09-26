@@ -3,16 +3,15 @@
     "workspaces": {
         ".": {
             "entry": [
-                "public/logic-worker.ts",
                 "band/index.ts",
                 "band/**/*.test.ts",
                 "scripts/**/*.ts",
                 "tests/**/*.{test,spec}.ts",
                 "tests/bench/**/*.ts",
-                "tests/scripts/**/*.ts"
+                "tests/scripts/**/*.ts",
+                "tests/utils/seeded-random.ts"
             ],
-            "project": ["public/**/*.ts", "band/**/*.ts", "scripts/**/*.ts", "tests/**/*.ts"],
-            "ignore": ["public/engine/grooves/*.ts"]
+            "project": ["public/**/*.ts", "band/**/*.ts", "scripts/**/*.ts", "tests/**/*.ts"]
         },
         "prototypes/v2": {
             "entry": ["app/**/*.{ts,tsx}", "lib/**/*.ts", "scripts/*.mjs", "checks/**/*.ts"],

@@ -21,7 +21,7 @@ These are non-negotiable in this codebase. Verify each one when relevant:
 
 - **Final-stage weight multipliers dominate.** For weight-based pickers (e.g. `selectPitchAndDevices` in `soloist-pitch-engine.ts`), a new bias must be applied as `weight *= mult` AFTER all additive bonuses, not as a scalar on one factor's `+= bonus`. Additive multipliers get washed out by competing simultaneous biases. If you see a new bias landing on an additive bonus line, flag it.
 - **Deterministic seeded phrasing beats `Math.random()`.** Motif/phrase decisions should key off `barIndex`, `sectionId`, `sessionSeed`. Raw `Math.random()` in generative pitch/rhythm logic is a smell — it breaks critique-test reliability and produces incoherent loops.
-- **Register slotting:** Bass 23–57, Chords/Harmony 52–84, Soloist priority 60–90 (clamp only below MIDI 52). Verify new generators thread `CoordinationContext` and respect `enforceRegisterSlotting` in `logic-worker.ts`.
+- **Register slots:** bass 23–57, keyboard comp 52–84 (`docs/design/band-engine.md`); the band's invariant suite (in `band/test/`) checks every style against its lane ranges.
 - **SRDC framework (soloist):** Statement / Restatement / Departure / Conclusion drive Loop-0 Head adherence, Loop-1 Themed Improv, Loop-2+ Progressive Ornamentation. Phase-aware biases belong at the picker layer reading `phrase.context.srdcState`, with a top-level state override slot for test mocks (read order: `topLevel || nested || default`).
 - **Critique tests are the Definition of Done.** Statistical ranges, not binary snapshots. If a change replaces a range with a rigid equality on a generative output, that is almost always wrong.
 

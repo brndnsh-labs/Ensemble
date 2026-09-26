@@ -19,17 +19,11 @@ vi.mock('../../../public/state/persistence.js', () => ({
     debounceSaveState: vi.fn(),
 }));
 
-vi.mock('../../../public/engine/fills.js', () => ({
-    generateProceduralFill: vi.fn(() => ({})),
-}));
-
 import { clampFreq, createSoftClipCurve } from '../../../public/engine/audio-graph-utils.js';
 import { initAudio } from '../../../public/engine/engine.js';
-import { dispatch, getState } from '../../../public/state.js';
+import { getState } from '../../../public/state.js';
 
 const { playback, chords, bass } = getState();
-
-import { applyConductor } from '../../../public/engine/conductor.js';
 
 describe('DSP & Signal Safety', () => {
     beforeEach(() => {
@@ -112,25 +106,6 @@ describe('DSP & Signal Safety', () => {
         for (let i = 1; i < curve.length; i += 100) {
             expect(curve[i]).toBeGreaterThanOrEqual(curve[i - 1]);
         }
-    });
-
-    it('should adjust master limiter based on band intensity to prevent clipping', () => {
-        initAudio(getState()); // Initialize nodes
-
-        // Low intensity
-        playback.bandIntensity = 0.2;
-        applyConductor(getState(), dispatch);
-        const lowThreshold =
-            playback.audioGraph.master.limiter.threshold.setTargetAtTime.mock.calls[0][0];
-
-        // High intensity
-        playback.bandIntensity = 0.9;
-        applyConductor(getState(), dispatch);
-        const highThreshold =
-            playback.audioGraph.master.limiter.threshold.setTargetAtTime.mock.calls[1][0];
-
-        // High intensity should have a lower threshold (more compression/limiting)
-        expect(highThreshold).toBeLessThan(lowThreshold);
     });
 
     it('should ensure all instrument reverb sends are within safe bounds', () => {

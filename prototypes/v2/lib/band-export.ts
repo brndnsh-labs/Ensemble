@@ -4,10 +4,8 @@
  * same stream through `playBandEvent` (the one event→voice mapping both paths share) against
  * an `OfflineAudioContext`, so an exported mix or stem is exactly what the live band played.
  *
- * Mirrors `public/export/audio-export.ts`'s mechanics for the old engine — a detached state
- * clone driving `initAudio` with an offline context, then `encodeWav` on the rendered buffer —
- * but skips its step-by-step generation entirely: the band engine already produced its events,
- * so this only needs to schedule them.
+ * A detached state clone drives `initAudio` with an offline context, then `encodeWav` packs the
+ * rendered buffer. The band already produced its events, so this only needs to schedule them.
  *
  * `renderBandPasses` is the one offline render of band events: the app's WAV and stem exports
  * below encode it, and the listening-gate tools (`render-bridge.ts`, `scripts/mix-report.ts`)
@@ -17,32 +15,78 @@ import type { BandEvent, Lane, Timeline } from '@band/index';
 import { secondsAt } from '@band/index';
 import { initAudio } from '@engine/engine/engine';
 import { encodeWav } from '@engine/engine/wav-encoder';
-import {
-    type AudioExportOptions,
-    type AudioExportResult,
-    type StemExportOptions,
-    type StemExportResult,
-    type StemInstrument,
-    sanitizeFilename,
-} from '@engine/export/audio-export';
 import { cloneStateForDetachedGeneration } from '@engine/export/detached-generation-state';
 import { getState } from '@engine/state';
 import type { EnsembleState } from '@engine/types';
 import { legatoLeads, playBandEvent } from './band-host';
 
-/** Matches `audio-export.ts`'s `leadIn` — a hair of silence before the first note. */
+/** A hair of silence before the first note. */
 const LEAD_IN_S = 0.25;
-/** Tail after the last pass ends for release/reverb decay, matching `audio-export.ts`'s own `+2`. */
+/** Tail after the last pass ends, for release and reverb decay. */
 const RELEASE_TAIL_S = 2;
 
-/** The band's lanes a stem export can isolate; `StemInstrument`'s `harmony` has no band lane
- * (harmony is not a band role — docs/design/band-engine.md). */
-const STEM_LANE: Partial<Record<StemInstrument, Lane>> = {
+export interface AudioExportOptions {
+    /** Sample rate for the render. Defaults to 44100. */
+    sampleRate?: number;
+    /** Filename hint for the resulting Blob (used by the UI for the download). */
+    filename?: string;
+}
+
+export interface AudioExportResult {
+    blob: Blob;
+    durationSeconds: number;
+    sampleRate: number;
+    filename: string;
+}
+
+/** The stems a chart exports as, named by the app's lanes: one per band lane. */
+export type StemInstrument = 'soloist' | 'bass' | 'chords' | 'drums';
+
+export const STEM_INSTRUMENTS: StemInstrument[] = ['soloist', 'bass', 'chords', 'drums'];
+
+/** The band lane each stem isolates. */
+const STEM_LANE: Record<StemInstrument, Lane> = {
     drums: 'drums',
     bass: 'bass',
     chords: 'comp',
     soloist: 'lead',
 };
+
+export interface StemExportOptions extends AudioExportOptions {
+    /** Called right before each stem starts rendering. */
+    onStemProgress?: (progress: {
+        instrument: StemInstrument;
+        index: number;
+        total: number;
+    }) => void;
+}
+
+export interface StemExportResult extends AudioExportResult {
+    instrument: StemInstrument;
+}
+
+/** A filename safe for any download: letters, digits, spaces, `-_()`, at most 64 characters. */
+export function sanitizeFilename(input: string): string {
+    const cleaned = input
+        .replace(/[^a-zA-Z0-9\s\-_()]/g, '')
+        .substring(0, 64)
+        .trim();
+    return cleaned || 'ensemble-export';
+}
+
+/** Triggers a browser download for an export result, and returns it. */
+export function downloadExportResult(result: AudioExportResult): AudioExportResult {
+    const url = URL.createObjectURL(result.blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = result.filename;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    // Defer revoke so Chromium gets a chance to start the download.
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+    return result;
+}
 
 /** The state module that holds each band lane's bus and sound. */
 const LANE_MODULE = {
@@ -196,8 +240,8 @@ async function renderBandEventsToWav(
     };
 }
 
-/** Downloads-ready mix of one rendered pass — the next-mode sibling of
- * `renderCurrentSessionToWav`. `events`/`timeline` come from `BandHost.render(settings)`. */
+/** A download-ready mix of one rendered pass. `events`/`timeline` come from
+ * `BandHost.render(settings)`. */
 export async function renderBandMixToWav(
     events: BandEvent[],
     timeline: Timeline,
@@ -212,11 +256,8 @@ export async function renderBandMixToWav(
 /**
  * One WAV per requested lane, each rendered from `events` with every other lane's notes
  * filtered out. Unlike the mix, a stem always renders its lane's instrument even if that lane
- * is muted live — callers pass an `events` pass generated with every lane forced on
- * (`renderCurrentSessionToWav`'s sibling contract in `audio-export.ts`'s `renderStemsToWav`,
- * which re-clones state per stem with the target lane forced on instead; the band engine
- * needs only one such pass since lane muting is a settings input, not a state mutation).
- * `harmony` is silently dropped — the band engine has no such lane to render.
+ * is muted live — callers pass an `events` pass generated with every lane forced on (lane
+ * muting is a settings input, so one such pass serves every stem).
  */
 export async function renderBandStemsToWav(
     events: BandEvent[],
@@ -227,14 +268,13 @@ export async function renderBandStemsToWav(
 ): Promise<StemExportResult[]> {
     const sampleRate = opts.sampleRate ?? 44100;
     const baseFilename = sanitizeFilename(opts.filename ?? 'ensemble-export');
-    const bandInstruments = instruments.filter((instrument) => STEM_LANE[instrument]);
-    const total = bandInstruments.length;
+    const total = instruments.length;
     const results: StemExportResult[] = [];
 
     for (let index = 0; index < total; index++) {
-        const instrument = bandInstruments[index];
+        const instrument = instruments[index];
         opts.onStemProgress?.({ instrument, index, total });
-        const lane = STEM_LANE[instrument]!;
+        const lane = STEM_LANE[instrument];
         const filename = `${baseFilename}-stem-${instrument}`;
         const result = await renderBandEventsToWav(
             events.filter((event) => event.lane === lane),

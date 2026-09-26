@@ -66,10 +66,7 @@ export function foldPracticeStep(step: number, pb: PracticeLoopBounds | null | u
  * by `sectionMap` ranges (which are populated by `validateProgression`). Returns
  * `null` when the arranger has no resolved sectionMap yet (e.g. pre-validate).
  */
-export function sectionAtStep(
-    arranger: ArrangerState | null | undefined,
-    step: number,
-): Section | null {
+function sectionAtStep(arranger: ArrangerState | null | undefined, step: number): Section | null {
     if (!arranger) {
         return null;
     }
@@ -108,103 +105,6 @@ export function effectiveTargetIntensity(state: EnsembleState, step: number): nu
     const sec = sectionAtStep(state?.arranger, musicalStep);
     const override = sec?.targetIntensity;
     return typeof override === 'number' ? override : (state?.conductor?.targetIntensity ?? 0.35);
-}
-
-/**
- * The conductor's asymmetric per-step intensity-ramp multipliers — bands "settle
- * in and build," leaning into rises (1.25×) and easing out of drops (0.75×). The
- * single source of truth for BOTH `conductor.ts:updateAutoConductor` (which
- * applies the ramp) and `motifSelectionIntensity` below (which inverts it to
- * recover the bar downbeat). Kept here, not in `conductor.ts`, because `conductor`
- * already imports from this module — putting the shared constant the other way
- * would be a cycle. If the ramp shape is re-tuned (it moved 1.5→1.25 once), change
- * it HERE and both the forward and inverse stay in lockstep.
- */
-export const RAMP_INTENSITY_MULTIPLIER = { up: 1.25, down: 0.75 } as const;
-
-/**
- * The intensity a drum **motif** should be selected from — latched to the
- * current bar's downbeat, NOT the live per-step ramping `bandIntensity`.
- *
- * why (#841): the drum motif index (the kick/snare/hat pattern skeleton) is a
- * function of intensity, recomputed every step. `bandIntensity` ramps smoothly
- * within a section (the conductor moves it ~+0.06/bar toward the section target),
- * so when the ramp crosses a motif tier boundary (rock ≈0.61/0.85) or the 0.35
- * `intensityFloor` MID-BAR, the motif flips and the pattern jumps mid-phrase — a
- * drums-only "skip/stutter" (the seed is sticky per #791, but intensity wasn't).
- * Selecting the motif from the bar-downbeat intensity keeps it constant within a
- * bar; it still "opens up" as energy rises, but only ever AT a bar line (where a
- * real drummer changes patterns) — never mid-bar.
- *
- * We don't store the downbeat value (the live drum path is stateless per step
- * and carries no carryover), so we RECONSTRUCT it from the conductor's ramp:
- * within a non-clamped bar `cur(step) = barStart + perStep·loopStep`, so
- * `barStart = cur − perStep·loopStep` recovers the downbeat value EXACTLY for
- * every step of the bar (perStep and direction are constant within a bar). The
- * one approximate case is the single "settling" bar where the ramp reaches the
- * target mid-bar (then late steps sit at target while reconstruction keeps
- * subtracting) — but barStart there is within one bar's travel (~0.06) of the
- * target, so a residual flip is rare and lands at the section's energy plateau,
- * not on every crossing. A vast improvement over the per-step flip.
- *
- * The conductor reconstruction is main-thread only — it reads `state.conductor`
- * (unsynced to the worker, see `effectiveTargetIntensity`). The live AUDIO path
- * (`scheduler-core.scheduleDrums`) runs main-thread with the conductor present, so
- * that is where this exact reconstruction lands.
- *
- * The conductor-less paths (MIDI export + logic worker, #842) carry only a stale
- * DEFAULT `state.conductor` (present, so truthiness can't flag them; `stepSize`
- * never driven, so the reconstruction above would run on garbage). Those paths set
- * `noLiveConductor` in `runDrumTick`, which latches the bar-downbeat intensity into
- * `playback.motifBarIntensity`; when set, that value is read FIRST here and is
- * authoritative. It is only ever written on those paths, so the live audio / WAV
- * export paths never see it and keep this exact reconstruction. Net: the exported
- * MIDI motif no longer flips mid-bar, and the worker Kick/Snare probes bass locks
- * to match the audible (bar-stable) kit. See the latch site in `runDrumTick`.
- */
-export function motifSelectionIntensity(
-    state: EnsembleState,
-    currentIntensity: number,
-    loopStep: number,
-): number {
-    // `currentIntensity` is the live value the genre strategies use for everything
-    // else this step (passed explicitly rather than re-read from `state.playback`
-    // so the fallback is byte-identical to the genre's own `intensity`, even in
-    // tests that drive intensity through the options bag and not the state snapshot).
-    const cur = currentIntensity;
-    // #842: the conductor-less paths (logic worker + MIDI export) latch the
-    // bar-downbeat intensity into `motifBarIntensity` (in `runDrumTick`, gated on
-    // their `noLiveConductor` flag). When set it is authoritative — it already IS
-    // the bar-stable value, and those paths' `state.conductor` is a stale default
-    // that would mislead the reconstruction below. Only ever written on those
-    // paths, so the live audio / WAV-export paths never see it and fall through.
-    if (state?.playback?.motifBarIntensity != null) {
-        return state.playback.motifBarIntensity;
-    }
-    // No conductor ramp to invert, or manual intensity: use the live value.
-    if (!state?.playback?.autoIntensity || !state?.conductor) {
-        return cur;
-    }
-    const stepSize = Math.abs(state.conductor.stepSize ?? 0);
-    if (stepSize === 0 || loopStep <= 0) {
-        return cur;
-    }
-    const target = effectiveTargetIntensity(state, state.playback.step ?? 0);
-    // Ramp settled — bandIntensity is already stable across the bar.
-    if (Math.abs(cur - target) <= 0.001) {
-        return cur;
-    }
-    // Invert the conductor's asymmetric ramp (shared RAMP_INTENSITY_MULTIPLIER).
-    // Direction is derived from the live position vs target so a stale stepSize
-    // sign can't mislead us.
-    const rampingUp = cur < target;
-    const perStep =
-        stepSize * (rampingUp ? RAMP_INTENSITY_MULTIPLIER.up : RAMP_INTENSITY_MULTIPLIER.down);
-    const barStart = rampingUp ? cur - perStep * loopStep : cur + perStep * loopStep;
-    // The reconstructed downbeat can't sit on the far side of the target (the ramp
-    // is monotonic toward it within a section) nor outside the conductor's clamp.
-    const bounded = rampingUp ? Math.min(barStart, target) : Math.max(barStart, target);
-    return Math.max(0.01, Math.min(1.0, bounded));
 }
 
 /**

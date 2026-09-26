@@ -174,14 +174,6 @@ const setupMinimalDOM = () => {
 };
 
 // Mock dependencies
-vi.mock('../../public/worker-client.js', () => ({
-    syncWorker: vi.fn(),
-    startWorker: vi.fn(),
-    stopWorker: vi.fn(),
-    requestBuffer: vi.fn(),
-    flushWorker: vi.fn(),
-}));
-
 vi.mock('../../public/engine/engine.js', () => ({
     initAudio: vi.fn(),
     playNote: vi.fn(),
@@ -211,14 +203,13 @@ vi.mock('../../public/state/persistence.js', () => ({
     debounceSaveState: vi.fn(),
 }));
 
-import { dispatch, getState } from '../../public/state.js';
+import { getState } from '../../public/state.js';
 
 const { arranger, playback } = getState();
 
 import { addSection, onSectionUpdate } from '../../public/controllers/arranger-controller.js';
 import { validateProgression } from '../../public/engine/chords-engine.js';
 import { initAudio } from '../../public/engine/engine.js';
-import { togglePlay } from '../../public/engine/scheduler-core.js';
 
 describe('System Smoke Test (E2E Workflow)', () => {
     beforeEach(() => {
@@ -260,25 +251,6 @@ describe('System Smoke Test (E2E Workflow)', () => {
         });
 
         global.navigator.wakeLock = { request: vi.fn().mockResolvedValue({ release: vi.fn() }) };
-    });
-
-    it('should complete a full "Song Creation to Playback" cycle without crashing', () => {
-        addSection();
-        expect(arranger.sections.length).toBeGreaterThanOrEqual(1);
-        const sectionId = arranger.sections[0].id;
-
-        onSectionUpdate(sectionId, 'value', 'C | G | Am | F');
-
-        validateProgression(getState());
-        expect(arranger.progression.length).toBeGreaterThan(0);
-
-        togglePlay(getState(), false, dispatch);
-
-        expect(playback.isPlaying).toBe(true);
-        expect(playback.audio).not.toBeNull();
-
-        togglePlay(getState(), false, dispatch);
-        expect(playback.isPlaying).toBe(false);
     });
 
     it('should update the progression when a chord is edited in a section', () => {

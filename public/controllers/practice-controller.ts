@@ -11,9 +11,8 @@
  * and — for looping — `playback.loopStartStep`/`loopEndStep` (the fold window
  * the scheduler + worker confine playback to). The step→musical-position fold
  * lives in `engine/section-overrides.ts` (`foldPracticeStep`); this module only
- * computes the section's step bounds and dispatches. Playback is started via the
- * normal `TOGGLE_PLAY` path so the count-in, seed regeneration, and worker flush
- * all run exactly as a top-of-chart start does.
+ * computes the section's step bounds and dispatches. The band plays the loop from those
+ * bounds (`bandLoop` in `prototypes/v2/lib/runtime.ts`).
  */
 
 import { dispatch, getState } from '../state.js';

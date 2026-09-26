@@ -11,7 +11,6 @@ import { ACTIONS, type Mutable } from '../../../public/types.js';
 const mutableChords = chords as Mutable<typeof chords>;
 const mutableHarmony = harmony as Mutable<typeof harmony>;
 const mutableSoloist = soloist as Mutable<typeof soloist>;
-const mutableSoloistSession = soloist.session as Mutable<typeof soloist.session>;
 
 describe('Instrument Reducer', () => {
     beforeEach(() => {
@@ -95,12 +94,6 @@ describe('Instrument Reducer', () => {
             expect(chords.autoSound).toBe(true);
             expect(soloist.autoSound).toBe(true);
         });
-    });
-
-    it('should handle session resets', () => {
-        mutableSoloistSession.sessionSteps = 100;
-        instrumentReducer({ type: ACTIONS.RESET_SESSION, payload: undefined });
-        expect(soloist.session.sessionSteps).toBe(0);
     });
 
     it('#1064 — UPDATE_CONDUCTOR_DECISION never writes chords.density', () => {

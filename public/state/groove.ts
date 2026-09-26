@@ -168,12 +168,6 @@ export function grooveReducer(action: Action, playback: GlobalContext): boolean 
                 return true;
             }
             return false;
-        case ACTIONS.SET_GROOVE_SEED:
-            if (!groove.sectionSeedMap) {
-                g.sectionSeedMap = {};
-            }
-            g.sectionSeedMap[action.payload.sectionId] = action.payload.seed;
-            return true;
         case ACTIONS.SET_SONG_SEED:
             // #791: sectionSeedMap is a memo of deriveSectionSeed(sectionId,
             // songSeed). When the song seed changes (re-roll on play, the seed
@@ -185,12 +179,6 @@ export function grooveReducer(action: Action, playback: GlobalContext): boolean 
             // survives and the groove reproduces exactly.
             g.sectionSeedMap = {};
             return true;
-        case ACTIONS.SET_GENRE_COUNTDOWN:
-            if (groove.genreSwitchCountdown !== action.payload) {
-                g.genreSwitchCountdown = action.payload;
-                return true;
-            }
-            return false;
         case ACTIONS.SET_GENRE_FEEL:
             if (playback.isPlaying) {
                 g.pendingGenreFeel = action.payload;
@@ -213,13 +201,6 @@ export function grooveReducer(action: Action, playback: GlobalContext): boolean 
                     g.swingSub = action.payload.sub;
                 }
             }
-            return true;
-        case ACTIONS.TRIGGER_FILL:
-            g.fillSteps = action.payload.steps;
-            g.fillActive = true;
-            g.fillStartStep = action.payload.startStep;
-            g.fillLength = action.payload.length;
-            g.pendingCrash = !!action.payload.crash;
             return true;
     }
     return false;

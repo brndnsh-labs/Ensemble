@@ -7,7 +7,7 @@ import { ACTIONS } from '../public/types.js';
  * The function is deliberately never invoked.
  */
 function assertDispatchContract(): void {
-    dispatch(ACTIONS.TOGGLE_PLAY);
+    dispatch(ACTIONS.RESTORE_GAINS);
     dispatch(ACTIONS.SET_BPM, 120);
 
     // @ts-expect-error — unknown action strings are not part of the keyspace.
@@ -20,7 +20,7 @@ function assertDispatchContract(): void {
     dispatch(ACTIONS.SET_BPM, { bpm: 120 });
 
     // @ts-expect-error — payload-less actions reject unrelated payloads.
-    dispatch(ACTIONS.TOGGLE_PLAY, true);
+    dispatch(ACTIONS.RESTORE_GAINS, true);
 
     const unionAction = ACTIONS.SET_BPM as typeof ACTIONS.SET_BPM | typeof ACTIONS.SET_KEY;
 

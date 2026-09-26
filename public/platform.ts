@@ -33,6 +33,11 @@ export function initPlatform(): void {
 }
 
 export function unlockAudio(): void {
+    // Created on first use, so the unlock never depends on something having called
+    // `initPlatform()` at load: the old engine's scheduler did, and nothing else did.
+    if (!state.silentAudio) {
+        initPlatform();
+    }
     if (!state.iosAudioUnlocked && state.silentAudio) {
         state.silentAudio.play().catch(() => {
             /* ignore play error */

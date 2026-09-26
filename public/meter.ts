@@ -153,18 +153,6 @@ function normalizeChartStep(step: number, totalSteps: number | null | undefined)
     return totalSteps && totalSteps > 0 ? ((step % totalSteps) + totalSteps) % totalSteps : step;
 }
 
-/** Reset a repeating rhythmic pattern at a section boundary. */
-export function getSectionPhaseStep(
-    chartStep: number,
-    sectionStart: number,
-    cycleSteps: number,
-): number {
-    if (!Number.isFinite(cycleSteps) || cycleSteps <= 0) {
-        return 0;
-    }
-    return (((chartStep - sectionStart) % cycleSteps) + cycleSteps) % cycleSteps;
-}
-
 /**
  * Resolve one step through the arranger's effective global grouping and one-pass
  * measure map. The returned `ts` is the section meter selected by `stepInfo`, not
