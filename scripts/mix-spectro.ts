@@ -238,7 +238,7 @@ export function requireSingleScene(scenes: readonly string[], remedy: string): s
  * and `readdirSync` order is alphabetical, which puts `bass` above `full`.
  * The mix leads, then lanes low-to-high — the order a mix engineer reads in.
  */
-const PANEL_ORDER = ['full', 'full+solo', 'kick', 'drums', 'bass', 'chords', 'harmony', 'soloist'];
+const PANEL_ORDER = ['full', 'full+solo', 'kick', 'drums', 'bass', 'chords', 'soloist'];
 
 export function orderStems(loaded: LoadedStem[]): LoadedStem[] {
     return [...loaded].sort((a, b) => {

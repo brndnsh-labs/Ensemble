@@ -64,19 +64,17 @@ const REPO_ROOT = path.resolve(import.meta.dirname, '..');
  * **It is not zero, and tightening it back to zero will break the tool.** The
  * renderer is NOT bit-reproducible: Chromium's `OfflineAudioContext` sums floats in
  * an order that varies run to run, so the same ref rendered twice already leaves a
- * residual. Measured three times on `main` @ d44dee78, `funk-pocket`/`MIX_AUDIT`,
- * and confirmed not to be a build artefact (two renders from an identical bundle
- * reproduce it):
+ * residual. Measured on the band engine with `--identity=HEAD` @ 3d449ab1,
+ * `funk-pocket`/`MIX_AUDIT` (the old engine, @ d44dee78, floored at −99.0 dBFS on `full`):
  *
  * | stem            | residual RMS | max abs diff |
  * | :-------------- | -----------: | -----------: |
- * | full            |  −99.0 dBFS  |       2 LSB  |
- * | full+solo       |  −99.2 dBFS  |       2 LSB  |
- * | bass            | −100.5 dBFS  |       2 LSB  |
- * | drums           | −102.9 dBFS  |       2 LSB  |
- * | harmony         | −105.0 dBFS  |       1 LSB  |
- * | chords          | −107.3 dBFS  |       1 LSB  |
- * | soloist (silent)|         −Inf |       0      |
+ * | full+solo       |  −99.9 dBFS  |       6 LSB  |
+ * | full            | −100.4 dBFS  |       2 LSB  |
+ * | bass            | −101.2 dBFS  |       2 LSB  |
+ * | chords          | −105.5 dBFS  |       1 LSB  |
+ * | drums           | −106.0 dBFS  |       7 LSB  |
+ * | soloist         | −111.4 dBFS  |       1 LSB  |
  *
  * −90 dBFS leaves ~9 dB of margin over the worst of those, and is also — to within
  * a dB — the point below which a residual cannot survive being written to the

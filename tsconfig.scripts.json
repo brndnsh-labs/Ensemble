@@ -1,7 +1,15 @@
 {
     "extends": "./tsconfig.json",
     "compilerOptions": {
-        "types": ["node"]
+        "types": ["node"],
+        "paths": {
+            "*": ["./node_modules/*", "./public/*"],
+            // The v2 aliases, for the one v2 `lib/` module a script imports
+            // (`scripts/band-scene.ts` → `prototypes/v2/lib/band-voices.ts`, type-only imports,
+            // so `tsx` erases them at run time). Same mapping as `tsconfig.tests.json`.
+            "@engine/*": ["./public/*"],
+            "@band/*": ["./band/*"]
+        }
     },
     "include": ["scripts/**/*.ts", "env.d.ts"],
     "exclude": ["node_modules", "dist"]
