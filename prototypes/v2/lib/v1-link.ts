@@ -15,16 +15,26 @@
  *   record and this module hands `v1ImportContext` one built from the query string. `style`
  *   and `comp` (the old engine's chord style and complexity) are not read: a chart no longer
  *   carries either (DECISION 2026-09-26), and the lane styles follow the genre.
- * - `bnd` (the compressed per-lane band payload) is NOT read. It would need a second
- *   key-space translation — v1's minified `s`/`b`/`c`/`h`/`g` lanes into the session shape
- *   `sessionBand` expects — for settings a listener can re-pick in the Feel sheet. What lands
- *   instead is what v1 ITSELF would load from a session that names only a genre: v1's own
- *   hardcoded per-lane defaults, routed by the genre. See `linkSession` for
- *   the short list of fields that genuinely come from the songbook's baseline document.
- * - `int` (band intensity) and `tmr` (session timer) are not read. A chart does carry its
- *   energy now (`ChartPerformance.energy`), but v1 sent `int` whether or not its band was on
- *   auto intensity, so the level alone cannot say which the sender heard; the link opens on
- *   auto. `tmr` is a device preference, which a chart never carries.
+ * - `int` (band intensity) IS read (DECISION 2026-09-26, #1382): a link that carries it opens
+ *   with `ChartPerformance.energy` pinned to that level (clamped 0-1) instead of `'auto'`. This
+ *   supersedes the auto-vs-fixed ambiguity noted below for a genuine v1 session (v1 sent `int`
+ *   whether or not its own band was on auto intensity) — `npm run audition-link` is the only
+ *   sender of `int` in practice, and it always means a fixed level: the whole point of pinning
+ *   intensity in a listening-gate link is to audition that exact number.
+ * - `bnd` (the compressed per-lane band payload, `SharedBandPayload`) is read for exactly one
+ *   thing: each lane's `e` (enabled) flag, applied as `ChartBand.<lane>.enabled` on top of
+ *   whatever the genre otherwise sets up. Nothing else in the payload is read — style, octave,
+ *   volume, reverb and chord density stay the genre's own settings, which is what a listener
+ *   re-picks in the Feel/Sounds panels rather than something a link should silently override.
+ *   **`bnd.h` (harmony) is accepted and ignored**: the band engine has no harmony lane
+ *   (`docs/design/band-engine.md`), `ChartBand.harmony` is legacy — read, never written — and
+ *   no v2 surface shows a harmony control to mute (`app/band-lanes.ts`), so there is nothing
+ *   to apply that flag to.
+ * - `autoplay=1` does not start playback itself — browsers block audio before a user gesture
+ *   on the page — but it arms one: the caller (`app/ensemble.tsx`'s shared-link effect) shows
+ *   a small hint ("tap anywhere to play") and starts the band on the next pointer or key
+ *   event, the same gesture Play itself needs. See {@link V1LinkOutcome}'s `autoplay` field.
+ * - `tmr` (session timer) is not read: a device preference, which a chart never carries.
  * - `seed` is accepted by the URL and deliberately ignored: with no `randomizeSeed` in the
  *   record, `sessionPerformance` lands `randomizeSeed: true`, and `state-effects.ts` re-rolls
  *   the song seed on every playback start. Carrying it would be a line that does nothing.
@@ -47,7 +57,8 @@ import { resolveGenre } from '../../../public/data/smart-genres.js';
 import { stripDangerousChars } from '../../../public/sanitize.js';
 import { validateChartDocument } from '../../../public/songbook/codec.js';
 import type { ChartContent, ChartDocument } from '../../../public/songbook/types.js';
-import { tryDecompressSections } from '../../../public/state/share-codec.js';
+import { decodeBase64Unicode, tryDecompressSections } from '../../../public/state/share-codec.js';
+import type { SharedBandPayload } from '../../../public/types.js';
 import { genreSwing } from './genre-swing';
 import { convertV1, NOTATIONS, type V1Source, v1ImportContext } from './import-v1';
 
@@ -84,7 +95,14 @@ const MAX_PROG_LENGTH = 1000;
 
 export type V1LinkOutcome =
     /** No v1 share payload in this URL — an ordinary v2 address, untouched. */
-    { kind: 'none' } | { kind: 'ok'; document: ChartDocument } | { kind: 'failed' };
+    | { kind: 'none' }
+    /**
+     * `autoplay` is true when the link asked to play (`?autoplay=1`). Browsers block audio
+     * before a gesture, so this is a request the caller must arm, not a promise it already
+     * happened — see the module doc's `autoplay` bullet.
+     */
+    | { kind: 'ok'; document: ChartDocument; autoplay: boolean }
+    | { kind: 'failed' };
 
 /**
  * Does this query string carry a v1 chart at all?
@@ -168,7 +186,14 @@ export function openV1ShareLink(
         if (conversion.kind === 'failed') {
             return { kind: 'failed' };
         }
-        return { kind: 'ok', document: withNotation(conversion.document, params.get('notation')) };
+        const document = withPartsMuted(
+            withEnergy(
+                withNotation(conversion.document, params.get('notation')),
+                params.get('int'),
+            ),
+            params.get('bnd'),
+        );
+        return { kind: 'ok', document, autoplay: params.get('autoplay') === '1' };
     } catch {
         // `convertV1` already catches its own conversion, but the whole path runs on
         // attacker-controlled input and the caller is a React effect: a throw from anywhere
@@ -274,6 +299,109 @@ function withNotation(document: ChartDocument, notation: string | null): ChartDo
         chart: {
             ...document.chart,
             arrangement: { ...document.chart.arrangement, notation },
+        },
+    });
+    return checked.kind === 'ok' ? checked.value : document;
+}
+
+/**
+ * Pin the chart's energy to a fixed level, or leave it alone.
+ *
+ * `intParam` is untrusted: anything that isn't a finite number is ignored rather than
+ * defaulted, so a malformed `?int=` cannot silently pin a level nobody asked for — the chart
+ * just keeps playing on `'auto'`, same as a link that never mentioned intensity at all. The
+ * canonical validator is still the gate, matching {@link withNotation}'s re-stamp pattern.
+ */
+function withEnergy(document: ChartDocument, intParam: string | null): ChartDocument {
+    if (!intParam) {
+        return document;
+    }
+    const value = Number.parseFloat(intParam);
+    if (!Number.isFinite(value)) {
+        return document;
+    }
+    const energy = Math.min(1, Math.max(0, value));
+    const checked = validateChartDocument({
+        ...document,
+        chart: {
+            ...document.chart,
+            performance: { ...document.chart.performance, energy },
+        },
+    });
+    return checked.kind === 'ok' ? checked.value : document;
+}
+
+/**
+ * `bnd`'s `e` (enabled) flags for the soloist/bass/chords lanes, or null when the payload is
+ * absent, malformed, or names none of them.
+ *
+ * `bnd` is the same base64+JSON envelope v1's own share writer used and `npm run
+ * audition-link` still writes (`SharedBandPayload`, `public/types.ts`); only property access
+ * by these three fixed keys (`.s`, `.b`, `.c`) ever happens here — never a dynamic
+ * `payload[untrusted]` lookup — so there is no lookup-table-poisoning surface to guard
+ * (CLAUDE.md's `TABLE[untrusted]` rule is about an indexed lookup, not a literal property
+ * read). `bnd.h` (harmony) is deliberately not read here — see the module doc's `bnd` bullet
+ * for why there is nothing in this app to apply it to.
+ */
+function linkPartSwitches(
+    bndParam: string | null,
+): Partial<Record<'soloist' | 'bass' | 'chords', boolean>> | null {
+    // Same 100KB bound `decompressBandSettings` applies to the identical envelope (utils.ts).
+    if (!bndParam || bndParam.length > 102400) {
+        return null;
+    }
+    let payload: SharedBandPayload;
+    try {
+        payload = JSON.parse(decodeBase64Unicode(bndParam));
+    } catch {
+        return null;
+    }
+    if (!payload || typeof payload !== 'object') {
+        return null;
+    }
+    const switches: Partial<Record<'soloist' | 'bass' | 'chords', boolean>> = {};
+    if (payload.s && payload.s.e !== undefined) {
+        switches.soloist = !!payload.s.e;
+    }
+    if (payload.b && payload.b.e !== undefined) {
+        switches.bass = !!payload.b.e;
+    }
+    if (payload.c && payload.c.e !== undefined) {
+        switches.chords = !!payload.c.e;
+    }
+    return Object.keys(switches).length ? switches : null;
+}
+
+/**
+ * Apply `bnd`'s part switches on top of the chart's own band, or leave it alone.
+ *
+ * Each switched lane keeps every other field of its existing `ChartLaneMix` — voice, volume,
+ * reverb, and whatever legacy fields survive on it — and changes only `enabled`, the same
+ * "wholesale block, one field changed" shape `npm run audition-link`'s own `buildBandParam`
+ * documents on the writer side.
+ */
+function withPartsMuted(document: ChartDocument, bndParam: string | null): ChartDocument {
+    const switches = linkPartSwitches(bndParam);
+    if (!switches) {
+        return document;
+    }
+    const band = document.chart.band;
+    const checked = validateChartDocument({
+        ...document,
+        chart: {
+            ...document.chart,
+            band: {
+                ...band,
+                ...(switches.soloist === undefined
+                    ? {}
+                    : { soloist: { ...band.soloist, enabled: switches.soloist } }),
+                ...(switches.bass === undefined
+                    ? {}
+                    : { bass: { ...band.bass, enabled: switches.bass } }),
+                ...(switches.chords === undefined
+                    ? {}
+                    : { chords: { ...band.chords, enabled: switches.chords } }),
+            },
         },
     });
     return checked.kind === 'ok' ? checked.value : document;

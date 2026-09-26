@@ -189,15 +189,20 @@ at its default `/v2` base; for the site use `--base-url=https://ensemble.brndn.z
 Available scenes are the same four shipped with `mix:report`:
 `rock-backbeat`, `blues-shuffle`, `jazz-ride`, `funk-pocket`.
 
-**What the app reads (#1358).** Since the cutover the link is opened by
+**What the app reads (#1358, extended #1382).** Since the cutover the link is opened by
 v2's old-link reader (`prototypes/v2/lib/v1-link.ts`, #1279), which takes
 `prog`, `key`, `ts`, `bpm` and `genre` and opens them as an unsaved
-shared chart. Everything else the script can emit is **ignored** and the
-script says so on stderr: `int`, the `bnd` part payload (so `--on`/`--off`
-and `--density`) and `autoplay` — the listener presses play, and the band
-plays with the genre's own parts and intensity. `?seed=` is inert too
-(v2 re-rolls it on play). Until v2 reads those fields, a line that depends
-on a part switch or intensity has to say so and be set up by hand.
+shared chart. It also reads `int` — the chart opens with its energy pinned to that
+level instead of `'auto'` — and `bnd`'s `--on`/`--off` part switches for `soloist`,
+`bass` and `chords`, applied as that lane's mute state. `autoplay=1` doesn't play
+immediately (browsers block audio before a gesture): the stand shows a "tap anywhere
+to play" hint and starts on the first pointer or key event anywhere on the page.
+`--density` and everything else `bnd` can carry (style, octave, volume, reverb) stay
+**ignored** — those are the genre's own settings, re-picked in the Feel/Sounds panels,
+not something a link should override. `--on=`/`--off=harmony` is accepted by the CLI
+but has no effect and the script says so on stderr: the band engine has no harmony
+lane and no v2 surface shows a control to mute one. `?seed=` is inert too (v2 re-rolls
+it on play) and always was — that one was never part of the dropped-fields warning.
 
 ### Ad-hoc scenarios — a link per listen-checklist line
 
@@ -213,12 +218,14 @@ npm run --silent audition-link -- --base-url=https://ensemble.brndn.zip/ \
 ```
 
 Flags the app reads: `--genre` (one of the 13, validated), `--key`,
-`--ts` (e.g. `6/8`), `--bpm` (omit to leave tempo to the app). Flags it
-currently ignores: `--int`, `--density=thin|standard|rich`, and
-`--on=`/`--off=` with any of `soloist,bass,chords,harmony`.
+`--ts` (e.g. `6/8`), `--bpm` (omit to leave tempo to the app), `--int`
+(clamped 0-1), and `--on=`/`--off=` with `soloist`, `bass` or `chords`
+(switched on or off on open). Flags it still ignores: `--density=thin|standard|rich`
+and `--on=`/`--off=harmony` (no harmony lane in the band engine).
 `tests/scripts/audition-link-roundtrip.test.ts` feeds generated links
-through v1's `loadFromUrl`, which is no longer the app's reader; nothing
-yet round-trips them through `lib/v1-link.ts`.
+through v1's `loadFromUrl`, which is no longer the app's reader; the v2
+Playwright suite (`prototypes/v2/checks/audition-link-fields.spec.ts`) is
+what round-trips them through `lib/v1-link.ts`.
 
 ## `npm run mix:analyze -- <file> [<file> ...]`
 
