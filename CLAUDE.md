@@ -110,7 +110,7 @@ Ensemble is a browser-based "virtual band" PWA. One app, two layers: the music s
 
 ### Runtime bootstrap (`prototypes/v2/lib/runtime.ts`)
 
-One runtime per page, independent of React mounts. `initialize()` starts the logic worker (`initWorker`), loads the default drum preset, subscribes to dispatches so `syncWorker(action.type, payload)` and `handleEffects()` run on every one, then `rebuild()`s: `validateProgression` → `analyzeFormUI` → a full `syncWorker()` → `flushBuffers()`. The React shell (`prototypes/v2/app/ensemble.tsx`) owns documents and hands the runtime authored content; it never writes engine state. v1's `hydrateState()` is not part of this path — v2 opens charts from its own songbook, and `public/state/persistence.ts` is swapped for a no-op at compile time (the `NormalModuleReplacementPlugin` in `prototypes/v2/next.config.mjs` → `lib/legacy-persistence.ts`).
+One runtime per page, independent of React mounts. `initialize()` loads the default drum preset, subscribes to dispatches so `handleEffects()` and `syncBand()` (the band host's settings) run on every one, then `rebuild()`s: `validateProgression` → `analyzeFormUI` → `flushBuffers()`. No logic worker runs (the old engine's, retiring in #1404). Play, stop and the exports go through the band host (`lib/band-host.ts`). The React shell (`prototypes/v2/app/ensemble.tsx`) owns documents and hands the runtime authored content; it never writes engine state. v1's `hydrateState()` is not part of this path — v2 opens charts from its own songbook, and `public/state/persistence.ts` is swapped for a no-op at compile time (the `NormalModuleReplacementPlugin` in `prototypes/v2/next.config.mjs` → `lib/legacy-persistence.ts`).
 
 ### State (`public/state.ts`, `public/state/`)
 

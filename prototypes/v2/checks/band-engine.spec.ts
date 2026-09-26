@@ -2,15 +2,15 @@ import { appUrl, editorRevealed, expect, test } from './fixtures';
 
 declare global {
     interface Window {
-        __band: { oldEngineNotes: number; audibleSamples: number; armed: boolean };
+        __band: { workers: number; audibleSamples: number; armed: boolean };
     }
 }
 
 /**
- * The band engine (docs/design/band-engine.md) plays by default, instead of the worker
- * generator. This proves the switch end to end on the real stand: sound reaches the
- * speakers, the chart pointer follows the form round the loop, the old worker generates
- * nothing, and Stop stops — with no page errors along the way. The lead (the soloist lane,
+ * The band engine (docs/design/band-engine.md) plays the stand. This proves it end to end:
+ * sound reaches the speakers, the chart pointer follows the form round the loop, no worker
+ * starts (the old engine's generator ran in one), and Stop stops — with no page errors along
+ * the way. The lead (the soloist lane,
  * off by default) is switched on, so its head plays too.
  */
 test('the band engine plays the chart round the loop and stops', async ({ page }) => {
@@ -18,16 +18,12 @@ test('the band engine plays the chart round the loop and stops', async ({ page }
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     await page.addInitScript(() => {
-        window.__band = { oldEngineNotes: 0, audibleSamples: 0, armed: false };
+        window.__band = { workers: 0, audibleSamples: 0, armed: false };
         const NativeWorker = window.Worker;
         window.Worker = class extends NativeWorker {
             constructor(url: string | URL, options?: WorkerOptions) {
                 super(url, options);
-                this.addEventListener('message', (event: MessageEvent<{ type: string }>) => {
-                    if (window.__band.armed && event.data?.type === 'notes') {
-                        window.__band.oldEngineNotes++;
-                    }
-                });
+                window.__band.workers++;
             }
         };
         // Branch an analyser off the final output, as the semantic-playback check does.
@@ -112,6 +108,6 @@ test('the band engine plays the chart round the loop and stops', async ({ page }
 
     const evidence = await page.evaluate(() => window.__band);
     expect(evidence.audibleSamples, 'the band should reach the speakers').toBeGreaterThan(0);
-    expect(evidence.oldEngineNotes, 'the old generator should stay idle').toBe(0);
+    expect(evidence.workers, 'no worker should start: the old generator is retired').toBe(0);
     expect(errors).toEqual([]);
 });

@@ -147,3 +147,80 @@ test('the band engine opens and plays holds, N.C., fermatas and off-grid lengths
     await expect(page.locator('.error-banner')).toHaveCount(0);
     expect(errors).toEqual([]);
 });
+
+/**
+ * First and second endings on the stand while the band plays: the chart keeps its four written
+ * bars (no unrolled copy, no sideways scroll), and the lit bar walks the performed route —
+ * 1, 2, 3, then 1, 2, 4 — lap after lap.
+ */
+test('repeats and endings: the stand keeps its written bars while the band walks the route', async ({
+    page,
+}) => {
+    test.setTimeout(60_000);
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    await page.goto(appUrl());
+    await page.getByRole('button', { name: '＋ New song', exact: true }).click();
+    await editorRevealed(page);
+    await page.getByLabel('Song title').fill('Two endings study');
+    await page.getByRole('button', { name: 'Repeats and endings', exact: true }).click();
+    const guide = page.getByRole('dialog', { name: 'Repeats and endings', exact: true });
+    await guide.getByLabel('Repeated body end bar').selectOption({ value: '1' });
+    await guide.getByRole('button', { name: 'Add first and second endings', exact: true }).click();
+    await expect(guide.getByTestId('guided-playback-route')).toHaveText('1–2–3 → 1–2–4');
+    await guide.getByRole('button', { name: 'Apply', exact: true }).click();
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
+    await page.getByRole('button', { name: 'Chart', exact: true }).click();
+    const tempo = page.getByLabel('Tempo', { exact: true });
+    await tempo.fill('240');
+    await tempo.press('Enter');
+    await expect(tempo).toHaveValue('240');
+    const bars = page.locator('.sheet .bar');
+    await expect(bars).toHaveCount(4);
+    await expect(page.locator('.sheet .chord')).toHaveText(['C', 'G', 'Am', 'F']);
+    await expect(page.getByLabel('Ending passes 1', { exact: true })).toBeVisible();
+    await expect(page.getByLabel('Ending passes 2', { exact: true })).toBeVisible();
+    const written = await bars.evaluateAll((all) =>
+        all.map((bar) => bar.getAttribute('data-measure-id') ?? ''),
+    );
+
+    await page.getByRole('button', { name: 'Start playback', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Stop playback', exact: true })).toBeEnabled();
+    const visits: string[] = [];
+    await expect
+        .poll(
+            async () => {
+                const id = await page
+                    .locator('.sheet .bar[data-active="true"]')
+                    .first()
+                    .getAttribute('data-measure-id', { timeout: 100 })
+                    .catch(() => null);
+                if (id !== null && visits.at(-1) !== id) {
+                    visits.push(id);
+                }
+                // Two whole laps of the six-bar route after the first bar-1 visit.
+                const first = visits.indexOf(written[0]);
+                return first < 0 ? 0 : visits.length - first;
+            },
+            { timeout: 40_000, intervals: [50], message: `bar visits: ${visits.join(' ')}` },
+        )
+        .toBeGreaterThanOrEqual(13);
+    // Still the four written bars, in place, with nothing scrolling sideways.
+    await expect(bars).toHaveCount(4);
+    expect(
+        await bars.evaluateAll((all) => all.map((bar) => bar.getAttribute('data-measure-id'))),
+    ).toEqual(written);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+        true,
+    );
+    await page.getByRole('button', { name: 'Stop playback', exact: true }).click();
+
+    // The route, from the first full lap on: 1 2 3, then 1 2 4.
+    const [one, two, three, four] = written;
+    const route = [one, two, three, one, two, four];
+    const start = visits.indexOf(one);
+    const lap = visits.slice(start, start + route.length * 2);
+    expect(lap).toEqual([...route, ...route]);
+    expect(errors).toEqual([]);
+});

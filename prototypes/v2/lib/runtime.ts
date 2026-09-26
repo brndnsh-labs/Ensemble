@@ -22,7 +22,7 @@ import {
 } from '@engine/controllers/practice-controller';
 import { autoVoiceForGenre } from '@engine/data/genre-sound-map';
 import { GENRE_NAMES, SMART_GENRES } from '@engine/data/smart-genres';
-import { registerScorePlaybackRenderer, validateProgression } from '@engine/engine/chords-engine';
+import { validateProgression } from '@engine/engine/chords-engine';
 import { analyzeFormUI } from '@engine/engine/conductor';
 import {
     initAudio,
@@ -43,7 +43,6 @@ import {
     type StemInstrument,
 } from '@engine/export/audio-export';
 import { proposeLegacyScoreConversion } from '@engine/songbook/legacy-score';
-import { renderScorePlayback } from '@engine/songbook/score-playback';
 import type { SemanticScore } from '@engine/songbook/score-types';
 import type {
     ChartContent,
@@ -459,38 +458,9 @@ export function captureDocument(document: ChartDocument): ChartDocument {
     return validateDocument({ ...document, chart: captureSessionContent() });
 }
 
-/** Display-only maps for bars bypassed by navigation; never installed in live state. */
-export function writtenChart() {
-    const state = getState();
-    const plan = state.arranger.scorePlan;
-    if (!plan) {
-        return state.arranger;
-    }
-    const detached = {
-        ...state,
-        arranger: {
-            ...state.arranger,
-            scorePlan: {
-                ...plan,
-                visits: plan.sections.flatMap((entry, sectionIndex) =>
-                    entry.measures.map((_, measureIndex) => ({
-                        sectionIndex,
-                        measureIndex,
-                        sectionPass: 0,
-                        repeatPasses: [],
-                    })),
-                ),
-            },
-        },
-    };
-    validateProgression(detached);
-    return detached.arranger;
-}
-
 /** One runtime per browser page, independent of React mount/unmount and route views. */
 export function initialize(): Promise<void> {
     if (!boot) {
-        registerScorePlaybackRenderer(renderScorePlayback);
         boot = (async () => {
             initializeSounds();
             await loadDrumPreset('Basic Rock');
@@ -935,9 +905,8 @@ export async function setGenre(
         // verified, and the band plays on through the check.
         await prepareFeelSounds(name, progress);
         // Read before the dispatch, not after: the reducer only stages a feel when
-        // the transport is already running, and the scheduler can make the swap
-        // during the await below — so the state afterwards cannot tell the two
-        // paths apart.
+        // the transport is already running, and `syncBand` commits it inside the
+        // dispatch itself — so the state afterwards cannot tell the two paths apart.
         const staged = getState().playback.isPlaying;
         dispatch(ACTIONS.SET_GENRE_FEEL, payload);
         // While playing, that reducer stages the feel and the band commits it at once
@@ -967,12 +936,13 @@ export async function setGenre(
         const resumeIntent = playIntent;
         loading = true;
         try {
-            // A failure after the dispatch on line ~482 can leave a staged feel
+            // A failure after the `SET_GENRE_FEEL` dispatch can leave a staged feel
             // behind: `apply()` restores the previous *document* content, but
             // `pendingGenreFeel` is runtime-derived and not part of that content,
-            // so nothing else clears it. Left set, the scheduler would apply the
-            // very feel we just failed to verify once playback resumes below — landing the band on the failed genre while
-            // `groove.genreFeel`/the UI still (correctly) read the previous one.
+            // so nothing else clears it. Left set, `syncBand` would commit the very
+            // feel we just failed to verify once playback resumes below — landing the
+            // band on the failed genre while `groove.genreFeel`/the UI still
+            // (correctly) read the previous one.
             param('groove', 'pendingGenreFeel', null);
             apply(previous);
             rebuild();

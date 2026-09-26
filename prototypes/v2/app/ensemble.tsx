@@ -2926,10 +2926,9 @@ export default function Ensemble() {
         }
         exportDocument(updateChart());
     }
-    // #1277 — reuse the shared `.mid` exporter (runs in its own detached worker
-    // realm, so it never touches the live scheduler/audio and is safe to call
-    // mid-playback). `exportToMidi` sanitizes the filename itself, matching how
-    // `exportSong` above applies pending text first.
+    // #1277 — the band's `.mid` (`runtime.exportMidi`): rendered on the side, so it
+    // never touches the live band or audio and is safe mid-playback. It sanitizes the
+    // filename itself; pending text is applied first, as `exportSong` does above.
     async function exportMidiFile() {
         if (!current) {
             return;
@@ -2937,9 +2936,8 @@ export default function Ensemble() {
         const candidate = updateChart();
         await runtime.exportMidi(candidate.title);
     }
-    // #1278 — reuse the same detached-clone WAV renderer v1's `ShareModal` uses
-    // (`renderCurrentSessionToWav`/`renderStemsToWav` in
-    // public/export/audio-export.ts). Deliberately NOT routed through `run()`:
+    // #1278 — the band's offline WAV render (`runtime.exportAudio`, on a detached
+    // state clone). Deliberately NOT routed through `run()`:
     // that helper's shared `busy` flag would also disable the Cancel button
     // this needs to stay clickable for the whole render, so this mirrors `run()`'s
     // shape (the same `working` mutex, so it still can't overlap another action)
