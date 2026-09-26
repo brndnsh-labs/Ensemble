@@ -8,7 +8,7 @@
  * name; energy rides the chart.
  */
 import { validateChartDocument, writtenSettings } from '@engine/songbook/codec';
-import type { ChartDocument } from '@engine/songbook/types';
+import type { ChartContent, ChartDocument } from '@engine/songbook/types';
 import { describe, expect, it } from 'vitest';
 import { captureContent, captureDocument, load, state } from './runtime';
 
@@ -171,7 +171,7 @@ describe('opening an old chart and capturing it again', () => {
     it('reads as the same chart once written today, so an old chart undone by hand is not an edit', () => {
         // The stand's dirty check compares charts as written today (`written` in ensemble.tsx):
         // the stored copy keeps its legacy fields until the next Save, a capture never has them.
-        const asWritten = (chart: ChartDocument['chart']) =>
+        const asWritten = (chart: Pick<ChartContent, 'performance' | 'band'>) =>
             JSON.stringify({ ...chart, ...writtenSettings(chart) });
         const stored = oldChart();
         load(stored);
