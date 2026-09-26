@@ -13,11 +13,6 @@ import { ACTIONS } from '../../../public/types.js';
 const { makeSoloistMock } = await vi.hoisted(
     async () => await import('../../utils/mock-soloist.js'),
 );
-const mockTrack = vi.hoisted(() => vi.fn());
-
-vi.mock('../../../public/telemetry.js', () => ({
-    track: mockTrack,
-}));
 
 vi.mock('../../../public/engine/engine.js', () => ({
     killAllPianoNotes: vi.fn(),
@@ -270,9 +265,6 @@ describe('Instrument Controller', () => {
             });
             expect(Engine.killAllPianoNotes).toHaveBeenCalled();
             expect(Engine.killChordBus).toHaveBeenCalled();
-            expect(mockTrack).toHaveBeenCalledWith('instrument_toggled', {
-                instrument: 'chords',
-            });
         });
 
         it('should handle soloist specific phrasing resets when turning on', () => {
@@ -337,7 +329,6 @@ describe('Instrument Controller', () => {
                 param: 'enabled',
                 value: false,
             });
-            expect(mockTrack).not.toHaveBeenCalled();
         });
 
         it('should handle chord/harmony alias names', () => {
@@ -348,9 +339,6 @@ describe('Instrument Controller', () => {
                     module: 'harmony',
                 }),
             );
-            expect(mockTrack).toHaveBeenCalledWith('instrument_toggled', {
-                instrument: 'harmony',
-            });
         });
     });
 });

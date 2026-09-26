@@ -93,6 +93,7 @@ import {
     seedInstalledSounds,
     validateVoice,
 } from './sounds';
+import { track } from './telemetry';
 
 export type { ChartContent, ChartDocument, StemInstrument };
 export { GENRE_NAMES };
@@ -272,6 +273,7 @@ function startBand(): void {
     startPlatformAudioAndWakeLock();
     host.start(bandSettings(), playback.bpm, (playback.startStep || 0) * STEP_TICKS, bandLoop());
     param('playback', 'isPlaying', true);
+    track('play_started');
     playhead ??= setInterval(followPlayhead, 50);
 }
 
@@ -965,6 +967,11 @@ export async function setGenre(
         // dispatch itself — so the state afterwards cannot tell the two paths apart.
         const staged = getState().playback.isPlaying;
         dispatch(ACTIONS.SET_GENRE_FEEL, payload);
+        // #1389 — NOT tracked here: `lib/starters.ts`'s one-time sample seeding calls this
+        // function directly (never through the transport bar) to build its 3 starter charts on
+        // a brand-new device, which would otherwise queue 3 synthetic `genre_changed` events for
+        // every first-time visitor. `app/ensemble.tsx`'s `onGenre` handler — the transport bar's
+        // actual call site — tracks the real, user-driven change instead.
         // While playing, that reducer stages the feel and the band commits it at once
         // (`syncBand`), playing it from its next barline. So this dispatch plus the
         // auto-voice effects are the entire engine change: no teardown, no rebuild, no
@@ -1026,9 +1033,16 @@ export async function setGenre(
 export function setTempo(bpm: number): void {
     dispatch(ACTIONS.SET_BPM, Math.max(40, Math.min(240, Math.round(bpm))));
 }
+/** `InstrumentModule`'s state-slice name for the drum lane; the telemetry event names it `drums`. */
+const TELEMETRY_PART: Record<
+    InstrumentModule,
+    'drums' | 'bass' | 'chords' | 'harmony' | 'soloist'
+> = { groove: 'drums', bass: 'bass', chords: 'chords', harmony: 'harmony', soloist: 'soloist' };
+
 export function setEnabled(module: InstrumentModule, enabled: boolean): void {
     if (getState()[module].enabled !== enabled) {
         togglePower(module);
+        track('part_toggled', { part: TELEMETRY_PART[module] });
     }
 }
 export function transpose(delta: number): void {
@@ -1176,6 +1190,7 @@ export function exportMidi(filename: string): Promise<void> {
         sampleRate: 0,
         filename: name,
     });
+    track('midi_exported');
     return Promise.resolve();
 }
 
@@ -1234,6 +1249,7 @@ export async function exportAudio(
             return;
         }
         downloadExportResult(result);
+        track('wav_exported', { stems: false });
         return;
     }
     // A stem always renders its lane even if it's muted live, so force every lane on for the
@@ -1256,6 +1272,7 @@ export async function exportAudio(
             for (const result of results) {
                 downloadExportResult(result);
             }
+            track('wav_exported', { stems: true });
         }
     } catch (error) {
         if (!(error instanceof ExportCancelled)) {
