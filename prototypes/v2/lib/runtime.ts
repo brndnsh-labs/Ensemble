@@ -43,6 +43,8 @@ import type {
     ChartLaneMix,
     ChartNotation,
     SoloistMode,
+    SoloistTradeBars,
+    SoloistTradeWith,
 } from '@engine/songbook/types';
 import { dispatch, getState, subscribe } from '@engine/state';
 import {
@@ -199,13 +201,17 @@ function scoreForBand(): SemanticScore {
     return bandScore.score;
 }
 
-function bandSettings(): BandSettings {
-    const { groove, bass, chords, soloist, playback } = getState();
+/** The band style the chart's genre plays. */
+function bandStyle(): StyleId {
+    const genre = getState().groove.lastSmartGenre;
     // A persisted genre string indexes this table: guard with hasOwn (the #1266 rule), so
     // 'constructor' or a retired key can't read an Object prototype member as a style.
-    const style = Object.hasOwn(STYLE_FOR_GENRE, groove.lastSmartGenre)
-        ? STYLE_FOR_GENRE[groove.lastSmartGenre]
-        : 'rock';
+    return Object.hasOwn(STYLE_FOR_GENRE, genre) ? STYLE_FOR_GENRE[genre] : 'rock';
+}
+
+function bandSettings(): BandSettings {
+    const { groove, bass, chords, soloist, playback } = getState();
+    const style = bandStyle();
     return {
         style,
         lanes: {
@@ -221,6 +227,14 @@ function bandSettings(): BandSettings {
         swingGrid: groove.swingSub === '16th' ? 16 : 8,
         humanize: groove.humanize,
         seed: bandSeed,
+        // The player trades with the soloist or the drummer; the band decides when it can.
+        trade:
+            soloist.tradeWith === 'off'
+                ? null
+                : {
+                      with: soloist.tradeWith === 'soloist' ? 'lead' : 'drums',
+                      bars: soloist.tradeBars,
+                  },
     };
 }
 
@@ -414,6 +428,10 @@ export function captureContent(): ChartContent {
                 autoMode: s.autoMode,
                 phrasingIntensity: s.phrasingIntensity,
                 tradeMode: s.tradeMode,
+                // Written only while trading, so a chart that never traded saves as before.
+                ...(s.tradeWith === 'off'
+                    ? {}
+                    : { tradeWith: s.tradeWith, tradeBars: s.tradeBars }),
             },
             harmony: { ...mix(h), style: h.style, octave: h.octave, complexity: h.complexity },
             groove: {
@@ -633,6 +651,42 @@ export function setReverb(module: InstrumentModule, value: number): void {
     dispatch(ACTIONS.SET_REVERB, { module, value });
 }
 
+/**
+ * Trading with the player (the band engine's `BandSettings.trade`): who the band trades with
+ * and how long a turn is. Trading with the soloist turns it on: it is the one you trade with.
+ */
+export function setTrade(tradeWith: SoloistTradeWith, bars: SoloistTradeBars): void {
+    param('soloist', 'tradeBars', bars);
+    param('soloist', 'tradeWith', tradeWith);
+    if (tradeWith === 'soloist' && !getState().soloist.enabled) {
+        togglePower('soloist');
+    }
+}
+
+/**
+ * Who the current genre's band can trade with: always the soloist; the drummer only where
+ * the style's drummer can take a solo.
+ */
+export function tradePartners(): { soloist: boolean; drums: boolean } {
+    return { soloist: true, drums: Boolean(STYLES[bandStyle()].drums.solos) };
+}
+
+/**
+ * Why the band can't trade the way the chart asks, or null when it can (or isn't asked to).
+ * Mirrors the gate in `planBars` (band/arrange/plan.ts), so the Trade control never claims a
+ * trade the band won't play.
+ */
+export function tradeBlocked(): 'soloist-off' | 'drums-off' | 'drummer-no-solo' | null {
+    const { soloist, groove } = getState();
+    if (soloist.tradeWith === 'soloist') {
+        return soloist.enabled ? null : 'soloist-off';
+    }
+    if (soloist.tradeWith === 'drums') {
+        return !groove.enabled ? 'drums-off' : tradePartners().drums ? null : 'drummer-no-solo';
+    }
+    return null;
+}
+
 // #1276 — Feel sheet. `groove.swing`/`swingSub`/`humanize` are `document`-owned
 // (`STATE_OWNERSHIP_MANIFEST`): they ride `captureContent()`'s `band.groove` projection, so
 // only the dispatch is needed here; the band re-reads them at its next barline (`syncBand`).
@@ -781,6 +835,9 @@ function apply(content: DocumentContent): void {
     }
     // Optional legacy source selector must not leak from the outgoing chart.
     param('chords', 'instrument', content.band.chords.instrument);
+    // Nor may trading: a chart saved without it doesn't trade.
+    param('soloist', 'tradeWith', content.band.soloist.tradeWith ?? 'off');
+    param('soloist', 'tradeBars', content.band.soloist.tradeBars ?? 4);
     param(
         'groove',
         'instruments',

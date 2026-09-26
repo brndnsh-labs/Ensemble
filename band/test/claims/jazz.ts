@@ -70,6 +70,25 @@ export const jazz = defineClaims({
             ],
         },
         {
+            take: { trade: { with: 'drums', bars: 4 } },
+            claims: [
+                ['tradeYourTurn', 1, 1, 'your four are yours: no sax, and the band keeps time'],
+                ['tradeBandLaysOut', 1, 1, "the drummer's four are the drums alone"],
+                ['tradeDrumsSolo', 0.95, 1, 'a solo, not the time, with the foot still going'],
+                ['tradeDrumMotif', 0.9, 1, "the drummer's idea comes back an eighth later"],
+                ['tradeDrumVerbatim', 0, 0.1, 'developed, not repeated'],
+                ['tradeBackOnCrash', 1, 1, 'the band comes back in on a crash'],
+            ],
+        },
+        {
+            take: { trade: { with: 'lead', bars: 4 } },
+            claims: [
+                ['tradeLeadPlays', 0.95, 1, 'the sax plays each of its fours through'],
+                ['tradeYourTurn', 1, 1, 'then it lays out, and the band keeps comping for you'],
+                ['leadShortShare', 0.6, 0.95, 'bebop lines in its fours'],
+            ],
+        },
+        {
             take: { lead: 'solo' },
             claims: [
                 // Ablations measured on the solo take (answer off / no lay-out / no fill / no
