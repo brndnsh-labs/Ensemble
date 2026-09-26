@@ -39,6 +39,7 @@ test('every Feel-sheet control has an accessible name', async ({ page }) => {
     await expect(page.getByLabel('Complexity', { exact: true })).toHaveCount(0);
     await expect(page.getByLabel('Master volume', { exact: true })).toBeVisible();
     await expect(page.getByLabel('Metronome', { exact: true })).toBeVisible();
+    await expect(page.getByLabel('Count-in', { exact: true })).toBeVisible();
     await expect(page.getByLabel('Chord notation', { exact: true })).toBeVisible();
 });
 
@@ -128,6 +129,30 @@ test('master volume is a device preference: it persists across reload without Sa
     await expect(page.getByLabel('Master volume', { exact: true })).toHaveValue('75');
 });
 
+test('count-in (#1417) is a device preference too: it persists across reload without Save, independent of the chart', async ({
+    page,
+}) => {
+    await page.goto(appUrl());
+    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
+    await openFeel(page);
+
+    const countIn = page.getByLabel('Count-in', { exact: true });
+    // This suite seeds it OFF (`fixtures.ts`) so a bar of clicks doesn't push back the first
+    // note/highlight in every OTHER spec that presses Play — the real product default is ON
+    // (`playback.countIn`'s own initial value), unread here until this test writes one.
+    await expect(countIn).not.toBeChecked();
+    await countIn.check();
+    await expect(countIn).toBeChecked();
+    await closeFeel(page);
+    // A preference change alone must not create a document-save prompt.
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
+
+    await page.reload();
+    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).first().click();
+    await openFeel(page);
+    await expect(page.getByLabel('Count-in', { exact: true })).toBeChecked();
+});
+
 test('band intensity, auto intensity and the metronome are session-only: they reset on reload', async ({
     page,
 }) => {
@@ -178,4 +203,26 @@ test('changing swing during playback does not stop the band', async ({ page }) =
     // Still playing — a feel change must not have tripped the transport.
     await expect(page.getByRole('button', { name: 'Stop playback', exact: true })).toBeEnabled();
     await page.getByRole('button', { name: 'Stop playback', exact: true }).click();
+});
+
+test('count-in (#1417) clicks one bar before the band, then the chart plays from the top', async ({
+    page,
+}) => {
+    await page.goto(appUrl());
+    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
+    await openFeel(page);
+    await page.getByLabel('Count-in', { exact: true }).check();
+    await closeFeel(page);
+
+    const playButton = page.getByRole('button', { name: 'Stop playback', exact: true });
+    await page.getByRole('button', { name: 'Start playback', exact: true }).click();
+    await expect(playButton).toBeVisible();
+    // The play button counts the bar down instead of showing the stop glyph, and the chart
+    // itself doesn't move yet — the count-in must not advance the playhead.
+    await expect(playButton).toHaveText('1');
+    await expect(page.locator('.chord[aria-current="true"]')).toHaveCount(0);
+    // Once the bar elapses, the band's own downbeat lands and the glyph returns to stop.
+    await expect(playButton).toHaveText('■', { timeout: 10_000 });
+    await expect(page.locator('.chord[aria-current="true"]')).toHaveCount(1);
+    await playButton.click();
 });

@@ -88,7 +88,12 @@ import {
 } from './documents';
 import { checkPlayable } from './engine-mode';
 import { genreSwing } from './genre-swing';
-import { masterVolumePreference, rememberMasterVolume } from './session';
+import {
+    countInPreference,
+    masterVolumePreference,
+    rememberCountIn,
+    rememberMasterVolume,
+} from './session';
 import {
     initializeSounds,
     prepareSound,
@@ -250,7 +255,15 @@ function bandLoop(): { from: number; to: number } | null {
         : null;
 }
 
-function startBand(): void {
+/**
+ * `freshPlay` marks a genuine Play-from-stopped gesture (`toggle`, `startSection` when
+ * stopped) — the only case a count-in is even considered, and only then if the
+ * `playback.countIn` preference is on. Every other caller (a genre-change resume, a transpose/
+ * mode/edit restart while playing, `startSection` while already playing) passes nothing and
+ * gets the default `false`, so the band resumes exactly where it was asked to, with no click
+ * bar in front of it.
+ */
+function startBand(freshPlay = false): void {
     const host = bandHost();
     const state = getState();
     const { arranger, playback } = state;
@@ -275,7 +288,13 @@ function startBand(): void {
     }
     restoreGains(state);
     startPlatformAudioAndWakeLock();
-    host.start(bandSettings(), playback.bpm, (playback.startStep || 0) * STEP_TICKS, bandLoop());
+    host.start(
+        bandSettings(),
+        playback.bpm,
+        (playback.startStep || 0) * STEP_TICKS,
+        bandLoop(),
+        freshPlay && playback.countIn,
+    );
     param('playback', 'isPlaying', true);
     track('play_started');
     playhead ??= setInterval(followPlayhead, 50);
@@ -291,6 +310,11 @@ function stopBand(): void {
     if (getState().playback.isPlaying) {
         param('playback', 'isPlaying', false);
     }
+    // A Stop pressed mid count-in must clear the indicator too — `band.stop()` above already
+    // dropped the host's own count-in bookkeeping, so nothing would otherwise turn this off.
+    if (getState().playback.isCountingIn) {
+        param('playback', 'isCountingIn', false);
+    }
     dispatch(ACTIONS.SET_START_STEP, 0);
     stopPlatformAudioAndWakeLock();
     void killAllNotes(getState());
@@ -298,6 +322,22 @@ function stopBand(): void {
 
 /** Publish the written event under the playhead for the chart sheet, as the old scheduler did. */
 function followPlayhead(): void {
+    // While the count-in clicks, the chart must not advance: report the beat instead of a
+    // tick, and leave `chords.lastActiveChordIndex` exactly where playback will resume it.
+    const countInBeat = band?.countingInBeat() ?? null;
+    const { playback } = getState();
+    if (countInBeat !== null) {
+        if (!playback.isCountingIn) {
+            param('playback', 'isCountingIn', true);
+        }
+        if (playback.countInBeat !== countInBeat) {
+            param('playback', 'countInBeat', countInBeat);
+        }
+        return;
+    }
+    if (playback.isCountingIn) {
+        param('playback', 'isCountingIn', false);
+    }
     const tick = band?.songTick();
     if (tick == null) {
         return;
@@ -517,6 +557,13 @@ export function initialize(): Promise<void> {
             if (storedMasterVolume !== null) {
                 param('playback', 'masterVolume', storedMasterVolume);
             }
+            // Count-in (#1417) is the same `preferences` pattern: hydrate from its own
+            // device-local key, falling back to the slice's own default (`true`) when this
+            // device has never recorded a choice.
+            const storedCountIn = countInPreference();
+            if (storedCountIn !== null) {
+                param('playback', 'countIn', storedCountIn);
+            }
             rebuild();
             document.addEventListener('visibilitychange', () => {
                 const { playback } = getState();
@@ -615,6 +662,46 @@ export function loopedSection(): string | null {
     return null;
 }
 
+/**
+ * Section tap menu's "Start here" (#1417). `bounds.start` off the same lookups `loopSection`/
+ * `loopedSection` use is already the section's FIRST PERFORMED visit, not a written position:
+ * both `sectionSteps` (band-timeline visits) and `getSectionStepBounds` (the old engine's
+ * `sectionMap`) collapse every occurrence of the id to `{ min(start), max(end) }`, and since
+ * ticks only increase across one pass, that min is the earliest one. So a repeated section (a
+ * second ending, a `repeat` count) still lands on the bar a musician would actually call "the
+ * top of the section," not wherever it happens to recur.
+ *
+ * Stopped: prepares sounds like a normal Play and starts from there, count-in included per the
+ * `countIn` preference (a fresh Play, same as `toggle`'s). Already playing: restarts the band
+ * immediately at that point (`BandHost.start`'s own restart, the same one `transpose`/`setMode`
+ * use) rather than waiting for the next barline — `update()`'s barline-swap machinery only
+ * carries a *settings* change forward, not a new start tick, so an immediate restart is the
+ * one this host supports cleanly.
+ */
+export async function startSection(
+    sectionId: string,
+    progress: (text: string) => void = () => {},
+): Promise<boolean> {
+    const bounds = bandView ? sectionSteps(bandView, sectionId) : getSectionStepBounds(sectionId);
+    if (!bounds) {
+        return false;
+    }
+    if (getState().playback.isPlaying) {
+        dispatch(ACTIONS.SET_START_STEP, bounds.start);
+        startBand();
+        return true;
+    }
+    initAudio(getState());
+    const intent = ++playIntent;
+    await prepareSounds(captureContent(), progress);
+    if (intent !== playIntent) {
+        return true;
+    }
+    dispatch(ACTIONS.SET_START_STEP, bounds.start);
+    startBand(true);
+    return true;
+}
+
 export async function toggle(progress: (text: string) => void): Promise<void> {
     if (getState().playback.isPlaying) {
         stop();
@@ -627,7 +714,7 @@ export async function toggle(progress: (text: string) => void): Promise<void> {
     if (intent !== playIntent) {
         return;
     }
-    startBand();
+    startBand(true);
 }
 
 export async function setVoice(
@@ -754,6 +841,17 @@ export function setMetronome(enabled: boolean): void {
 export function setMasterVolume(value: number): void {
     dispatch(ACTIONS.SET_PARAM, { module: 'playback', param: 'masterVolume', value });
     rememberMasterVolume(value);
+}
+
+/**
+ * One bar of clicks before a fresh Play, at the chart's own tempo and meter — a practice
+ * habit, so like `masterVolume` it's `preferences`-owned and persists to its own device-local
+ * key rather than riding the saved chart. Read by `startBand`'s `freshPlay` gate, never by a
+ * mid-song resume (genre change, transpose, "Start here" while already playing).
+ */
+export function setCountIn(enabled: boolean): void {
+    dispatch(ACTIONS.SET_PARAM, { module: 'playback', param: 'countIn', value: enabled });
+    rememberCountIn(enabled);
 }
 
 /**

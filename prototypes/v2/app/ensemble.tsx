@@ -224,6 +224,7 @@ function feelSnapshot(): FeelSnapshot {
         autoIntensity: playback.autoIntensity,
         metronome: playback.metronome,
         masterVolume: playback.masterVolume,
+        countIn: playback.countIn,
     };
 }
 
@@ -327,6 +328,9 @@ export default function Ensemble() {
     const [playing, setPlaying] = useState(false);
     const [playbackPending, setPlaybackPending] = useState(false);
     const [active, setActive] = useState<number | null>(null);
+    // The count-in beat sounding now (0-based), or null when not counting in (#1417) — cheap
+    // enough to ride the same 60ms poll `playing`/`active` already use, no new interval.
+    const [countInBeat, setCountInBeat] = useState<number | null>(null);
     // #1211 — id of the section a practice loop is armed/running on, or null.
     // Polled alongside playing/active below; the engine is the source of truth.
     const [loopedSectionId, setLoopedSectionId] = useState<string | null>(null);
@@ -697,6 +701,7 @@ export default function Ensemble() {
             setPlaying(state.playback.isPlaying);
             setActive(state.playback.isPlaying ? state.chords.lastActiveChordIndex : null);
             setLoopedSectionId(runtime.loopedSection());
+            setCountInBeat(state.playback.isCountingIn ? state.playback.countInBeat : null);
         }, 60);
         const preventLoss = (event: BeforeUnloadEvent) => {
             if (volatileDrafts.current.size || pendingText.current) {
@@ -1646,6 +1651,18 @@ export default function Ensemble() {
             runtime.loopSection(id);
         }
         setLoopedSectionId(runtime.loopedSection());
+    }
+    // Section tap menu's "Start here" (#1417): jump playback to a section's first performed
+    // bar, same `id`-may-be-undefined guard as `toggleSectionLoop` above.
+    function startHereSection(id: string | undefined) {
+        if (!id) {
+            return;
+        }
+        void run(async () => {
+            await runtime.startSection(id, setSoundProgress);
+            setLoopedSectionId(runtime.loopedSection());
+            setSoundProgress('');
+        });
     }
     function revealEditor(id = sectionId) {
         runtime.stop();
@@ -3392,6 +3409,7 @@ export default function Ensemble() {
                         current={current}
                         busy={busy}
                         playbackActive={playbackActive}
+                        countInBeat={countInBeat}
                         onPlayToggle={() => {
                             if (runtime.state().playback.isPlaying || playbackPending) {
                                 runtime.stop();
@@ -3522,6 +3540,12 @@ export default function Ensemble() {
                                 setFeel((f) => ({ ...f, masterVolume: value }));
                             })
                         }
+                        onCountIn={(enabled) =>
+                            change(() => {
+                                runtime.setCountIn(enabled);
+                                setFeel((f) => ({ ...f, countIn: enabled }));
+                            })
+                        }
                         onNotation={(notation) => change(() => runtime.setNotation(notation))}
                     />
                     <div className={`workspace-body ${editing ? 'editing' : ''}`}>
@@ -3568,6 +3592,7 @@ export default function Ensemble() {
                                 playbackActive={playbackActive}
                                 totalBars={totalBars}
                                 onToggleLoop={toggleSectionLoop}
+                                onStartHere={startHereSection}
                                 onEditSection={(block) => {
                                     if (current.schemaVersion === 2) {
                                         setMeasureId(block.measures[0]?.chords[0]?.measureId ?? '');
