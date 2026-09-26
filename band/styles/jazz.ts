@@ -559,11 +559,13 @@ const jazzLead = leadIdiom({
 export const jazz: Style = {
     id: 'jazz',
     name: 'Jazz',
-    // Medium swing (offbeat at ~62% of the beat, not a hard triplet). The walking bass
+    // Medium swing: 60, the offbeat at 60% of the beat, not a hard triplet (Brandon's ear,
+    // 2026-09-26: 60 sat right at 138 and still at 200, so it doesn't ease off with tempo;
+    // the style was first tuned at 72). The walking bass
     // sits on top of the ride (a hair ahead drives the time); the comping lays back.
     // The guitar's four-to-the-bar chunk is part of the time, locked with the bass.
     feel: {
-        swing: 72,
+        swing: 60,
         swingGrid: 8,
         // The soloist lays back against the ride, like the comping, not ahead with the bass.
         lean: { bass: -2, comp: 8, lead: 10 },

@@ -64,17 +64,6 @@ export async function loadDrumPreset(name: string): Promise<void> {
         param: 'instruments',
         value: [...newInstruments],
     });
-    dispatch(ACTIONS.SET_PARAM, {
-        module: 'groove',
-        param: 'swing',
-        value: p.swing !== undefined ? p.swing : groove.swing,
-    });
-    dispatch(ACTIONS.SET_PARAM, {
-        module: 'groove',
-        param: 'swingSub',
-        value: p.sub || groove.swingSub,
-    });
-
     dispatch(ACTIONS.DRUM_PRESET_LOADED);
 }
 

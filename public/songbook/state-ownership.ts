@@ -179,6 +179,7 @@ export const STATE_OWNERSHIP_MANIFEST = {
         tradeMode: 'document',
         tradeWith: 'document',
         tradeBars: 'document',
+        tradeChoruses: 'document',
         // #1062 — the trade block's runtime on/off decision. Must never be
         // 'document'/'preferences': it is derived at each section/loop
         // boundary while tradeMode is active, not a user setting, and must

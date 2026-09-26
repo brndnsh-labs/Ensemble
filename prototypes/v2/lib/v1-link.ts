@@ -41,12 +41,12 @@
  * own, never one derived from the sender's bytes.
  */
 
-import { DRUM_PRESETS } from '../../../public/data/drum-presets.js';
-import { resolveGenre, SMART_GENRES } from '../../../public/data/smart-genres.js';
+import { resolveGenre } from '../../../public/data/smart-genres.js';
 import { stripDangerousChars } from '../../../public/sanitize.js';
 import { validateChartDocument } from '../../../public/songbook/codec.js';
 import type { ChartContent, ChartDocument } from '../../../public/songbook/types.js';
 import { tryDecompressSections } from '../../../public/state/share-codec.js';
+import { genreSwing } from './genre-swing';
 import { convertV1, NOTATIONS, type V1Source, v1ImportContext } from './import-v1';
 
 /**
@@ -243,31 +243,13 @@ function linkSession(params: URLSearchParams): Record<string, unknown> {
         chords: { style: params.get('style') ?? undefined },
         // The share writer emits the FEEL; older and hand-written links carry the genre
         // NAME. `resolveGenre` (via `sessionBand`) accepts either keyspace, which is the
-        // same tolerance `loadFromUrl` grew in #1200.
+        // same tolerance `loadFromUrl` grew in #1200. A link carries no swing: the genre's
+        // own is the one a picked genre plays (`genreSwing`). Without it a `genre=Jazz` link
+        // fell to `sessionBand`'s fallback of 0 and played straight eighths (#1412).
         groove: {
             genreFeel: params.get('genre') ?? undefined,
-            ...(genre ? genreSwing(genre.name) : {}),
+            ...(genre ? genreSwing(genre.name) : null),
         },
-    };
-}
-
-/**
- * The swing a linked genre brings, as the session record's `swing`/`swingSub`.
- *
- * v1 applied a linked genre through the genre picker's own pipeline, and so does the v2
- * picker (`runtime.setGenre`): `SET_GENRE_FEEL` writes the genre's `SMART_GENRES` swing, then
- * the genre change loads its drum preset, whose own swing and grid overwrite it
- * (`loadDrumPreset`). The preset's is the swing a picked genre plays, so it is the one a link
- * carries. A session record has no swing of its own: without this a `genre=Jazz` link fell to
- * `sessionBand`'s fallback of 0 and played straight eighths.
- */
-function genreSwing(name: string): { swing: number; swingSub: string } {
-    const genre = SMART_GENRES[name];
-    const preset =
-        genre.drum && Object.hasOwn(DRUM_PRESETS, genre.drum) ? DRUM_PRESETS[genre.drum] : null;
-    return {
-        swing: preset?.swing ?? genre.swing,
-        swingSub: preset?.sub || genre.sub,
     };
 }
 

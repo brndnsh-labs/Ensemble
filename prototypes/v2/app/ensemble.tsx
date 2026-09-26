@@ -3445,8 +3445,8 @@ export default function Ensemble() {
                         partners={runtime.tradePartners()}
                         blocked={runtime.tradeBlocked()}
                         onClose={() => setTradeMenu(false)}
-                        onChange={(tradeWith, bars) =>
-                            change(() => runtime.setTrade(tradeWith, bars))
+                        onChange={(tradeWith, bars, choruses) =>
+                            change(() => runtime.setTrade(tradeWith, bars, choruses))
                         }
                     />
                     <SoundsPanel

@@ -535,7 +535,7 @@ function validateSoloist(ctx: ValidationContext, candidate: unknown, path: strin
             'phrasingIntensity',
             'tradeMode',
         ],
-        ['tradeWith', 'tradeBars'],
+        ['tradeWith', 'tradeBars', 'tradeChoruses'],
     );
     const tradeWith = optionalStringField(ctx, record, 'tradeWith', path, {
         min: 1,
@@ -547,6 +547,8 @@ function validateSoloist(ctx: ValidationContext, candidate: unknown, path: strin
     if (tradeBars !== undefined && !SOLOIST_TRADE_BARS.includes(tradeBars as 2 | 4 | 8)) {
         ctx.issue(pathFor(path, 'tradeBars'), 'invalid-value', 'A trade lasts 2, 4 or 8 bars');
     }
+    // 0-4: 0 keeps trading forever, 1-4 is how many traded choruses before the head returns.
+    const tradeChoruses = optionalNumberField(ctx, record, 'tradeChoruses', path, 0, 4, true);
     return {
         ...validateLaneMix(ctx, record, path),
         style: stringField(ctx, record, 'style', path, {
@@ -578,6 +580,9 @@ function validateSoloist(ctx: ValidationContext, candidate: unknown, path: strin
         }) as ChartSoloist['tradeMode'],
         ...(tradeWith === undefined ? {} : { tradeWith }),
         ...(tradeBars === undefined ? {} : { tradeBars: tradeBars as ChartSoloist['tradeBars'] }),
+        ...(tradeChoruses === undefined
+            ? {}
+            : { tradeChoruses: tradeChoruses as ChartSoloist['tradeChoruses'] }),
     };
 }
 

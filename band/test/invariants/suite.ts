@@ -247,12 +247,12 @@ function defineLeads(styles: StyleId[]): void {
                         problems.push(`${seed}: the head changed when it came back`);
                     }
                     const trades: TradeSettings[] = [
-                        { with: 'lead', bars: 4 },
-                        { with: 'lead', bars: 2 },
+                        { with: 'lead', bars: 4, choruses: null },
+                        { with: 'lead', bars: 2, choruses: null },
                         ...(style.drums.solos
                             ? ([
-                                  { with: 'drums', bars: 4 },
-                                  { with: 'drums', bars: 8 },
+                                  { with: 'drums', bars: 4, choruses: null },
+                                  { with: 'drums', bars: 8, choruses: null },
                               ] as const)
                             : []),
                     ];

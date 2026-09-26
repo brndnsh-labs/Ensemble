@@ -147,27 +147,37 @@ expression devices take turns rather than stack; one peak note per cycle.
     the head can return.
   - An intro is the band's: the lead enters after it. A section labelled Solo is a solo on any
     pass.
-  - **Trading with the player** (`BandSettings.trade`, DECISION 2026-09-25). The player
-    picks who to trade with and how long each turn is: 2, 4 or 8 bars. After the head, every
-    time through is traded: the band first (so the player has a phrase to answer), then you,
-    the turns counted from the top of each chorus (the intro is the band's) and running on
-    across choruses (a 12-bar blues in fours: B Y B, Y B Y). A turn never spans an intro (a
-    D.C. can bring one back mid-form); the bars before it end on a short turn. The head doesn't
-    come back while trading: every time through after the first is traded, which is what a
-    practice session wants (a deliberate choice; "trade N choruses, then the head" is open).
-    - **With the soloist:** it plays the band's turns, phrases of four played through to an
-      arrival (eights are two phrases, the arrival between them the breath; busy, or calmer
-      in a spacious style), and lays out for yours while the band keeps comping.
-    - **With the drummer** (a style whose drum idiom solos, `DrumBook.trade`; jazz): the bass
-      and comp lay out for his turn and comp for yours; the soloist is silent throughout (you
-      are the soloist). He solos over the time's own hi-hat foot, in any meter: a two-beat
-      motif stated on the one, displaced by an eighth onto the toms, played as accents in a
-      stream of eighths, then a run home down the three toms, louder as it goes, to a shot on
-      the "and" of 4 (eights say it twice; twos are a statement and the run home). His turn
-      opens on the kick under the statement, never a crash, even on a section downbeat; the
-      crash is the band coming back. Asking to trade with the drummer makes you the soloist
-      after the head even where the trade can't happen (a practice loop, the drums off, a
-      drummer who doesn't solo): the band's soloist never plays over you.
+  - **Trading with the player** (`BandSettings.trade`, DECISION 2026-09-25, updated
+    2026-09-26). The player picks who to trade with, how long each turn is (2, 4 or 8 bars),
+    and how many traded choruses before the head returns (1–4, or "keep trading" — the
+    original, head-never-returns behavior). After the head, the turns are counted from the top
+    of each chorus (the intro is the band's) and run on across choruses within a trading block
+    (a 12-bar blues in fours: B Y B, Y B Y) — the alternation restarts at the top of each new
+    block, the same way the very first one started.
+    - **With the soloist:** the band trades **band first** (so the player has a phrase to
+      answer) — it plays the band's turns, phrases of four played through to an arrival
+      (eights are two phrases, the arrival between them the breath; busy, or calmer in a
+      spacious style), and lays out for yours while the band keeps comping.
+    - **With the drummer** (a style whose drum idiom solos, `DrumBook.trade`; jazz): the band
+      trades **you first** — jazz convention, the player plays their turn and the drummer
+      answers. The bass and comp lay out for his turn and comp for yours; the soloist is
+      silent throughout except a returned head (you are the soloist otherwise). He solos over
+      the time's own hi-hat foot, in any meter: a two-beat motif stated on the one, displaced
+      by an eighth onto the toms, played as accents in a stream of eighths, then a run home
+      down the three toms, louder as it goes, to a shot on the "and" of 4 (eights say it
+      twice; twos are a statement and the run home). His turn opens on the kick under the
+      statement, never a crash, even on a section downbeat; the crash is the band coming back
+      in — whether that's your next turn or the returning head. Asking to trade with the
+      drummer makes you the soloist for every pass but a returned head, even where the trade
+      can't happen (a practice loop, the drums off, a drummer who doesn't solo): the band's
+      soloist never plays over you, but it does play the head when it comes back.
+    - **The head returns** (the Trade sheet's "Head returns" setting, `SoloistTradeChoruses`,
+      default 2 choruses): with `choruses` set to N, the cycle is the head, then N traded
+      passes, then the head again, repeating for as long as the performance loops (pass 0 =
+      head, passes 1..N traded, pass N+1 = head, …). "Never (keep trading)" is the original
+      behavior: every pass after the first stays a turn, forever.
+    - A turn never spans an intro (a D.C. can bring one back mid-form); the bars before it end
+      on a short turn.
     - Nothing rings into the drummer's turn: the organ's hold stops, the comp doesn't
       anticipate into it and the bass doesn't approach it, including across the barline
       into the next pass (`performPass` takes the wrap bar's lanes from the next pass's plan).

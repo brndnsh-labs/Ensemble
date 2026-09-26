@@ -1,4 +1,5 @@
 import { leadRole } from './arrange/cycle.js';
+import { fullWindow, planBars } from './arrange/plan.js';
 import { DEFAULT_SETTINGS, type PitchedNote, PPQ, type TradeSettings } from './core/types.js';
 import { chordAt, compileTimeline } from './form/timeline.js';
 import { performPass } from './perform.js';
@@ -163,7 +164,11 @@ describe('comp instruments', () => {
 describe('trading with the player', () => {
     const lanes = { drums: true, bass: true, comp: true, lead: true };
     const jazz = { ...DEFAULT_SETTINGS, style: 'jazz' as const, lanes, lead: 'sax' as const };
-    const fours = (w: TradeSettings['with']): TradeSettings => ({ with: w, bars: 4 });
+    const fours = (w: TradeSettings['with']): TradeSettings => ({
+        with: w,
+        bars: 4,
+        choruses: null,
+    });
     type Timeline = ReturnType<typeof compileTimeline>;
     type Events = ReturnType<typeof performPass>['events'];
     /** One letter per turn: B the band's, Y yours, - no trade. */
@@ -206,8 +211,8 @@ describe('trading with the player', () => {
         // A 12-bar blues is three fours: the next chorus starts where the last left off.
         expect(turns(blues, 1, fours('lead'))).toBe('BYB');
         expect(turns(blues, 2, fours('lead'))).toBe('YBY');
-        expect(turns(blues, 1, { with: 'lead', bars: 2 })).toBe('BYBYBY');
-        expect(turns(blues, 1, { with: 'lead', bars: 8 })).toBe('BY');
+        expect(turns(blues, 1, { with: 'lead', bars: 2, choruses: null })).toBe('BYBYBY');
+        expect(turns(blues, 1, { with: 'lead', bars: 8, choruses: null })).toBe('BY');
         // The intro is the band's; the turns start on the verse.
         const role = leadRole(popSong, 4, 1, fours('lead'));
         expect(leadRole(popSong, 0, 1, fours('lead')).kind).toBe('rest');
@@ -252,24 +257,40 @@ describe('trading with the player', () => {
         }
     });
 
-    it('lets nothing ring from the head into the drummer taking the first turn', () => {
-        for (const seed of 'abcdefghijklmnop') {
-            for (const comp of ['piano', 'organ'] as const) {
-                const { events } = performPass(
-                    blues,
-                    { ...jazz, seed, comp, intensity: 0.8, trade: fours('drums') },
-                    { pass: 0, looping: true },
-                );
-                const over = events.filter(
-                    (e) => e.lane !== 'drums' && e.tick + e.dur > blues.ticks,
-                );
-                expect(over, `seed ${seed} ${comp}`).toEqual([]);
+    // Was "...into the drummer taking the first turn", asserted at the pass-0-to-pass-1
+    // boundary: trading with the drummer used to be band-first, so that boundary was always
+    // the drummer's exposed alone bar. It's you-first now (jazz convention), so that specific
+    // boundary is never exposed for the drums partner any more — but a 12-bar blues in fours
+    // has an odd turn count, so the exposure flips each chorus and a *later* pass boundary
+    // (1 to 2) lands on the drummer again. Guard whichever boundary is actually exposed instead
+    // of assuming it's always the first one.
+    it("lets nothing ring across a pass boundary into the drummer's exposed turn", () => {
+        const trade = fours('drums');
+        const exposedBoundaries = [0, 1].filter((pass) => drummerBars(blues, pass + 1).includes(0));
+        expect(exposedBoundaries.length, 'no exposed boundary to guard').toBeGreaterThan(0);
+        for (const pass of exposedBoundaries) {
+            for (const seed of 'abcdefghijklmnop') {
+                for (const comp of ['piano', 'organ'] as const) {
+                    const { events } = performPass(
+                        blues,
+                        { ...jazz, seed, comp, intensity: 0.8, trade },
+                        { pass, looping: true },
+                    );
+                    const over = events.filter(
+                        (e) => e.lane !== 'drums' && e.tick + e.dur > blues.ticks,
+                    );
+                    expect(over, `seed ${seed} ${comp} pass ${pass}`).toEqual([]);
+                }
             }
         }
     });
 
     it('resumes at any barline of a traded pass exactly as the full pass', () => {
-        for (const trade of [fours('drums'), fours('lead'), { with: 'lead', bars: 2 } as const]) {
+        for (const trade of [
+            fours('drums'),
+            fours('lead'),
+            { with: 'lead', bars: 2, choruses: null } as const,
+        ]) {
             for (const pass of [1, 2]) {
                 const settings = { ...jazz, trade };
                 const full = performPass(rhythmChanges, settings, { pass, looping: true });
@@ -341,7 +362,11 @@ describe('trading with the player', () => {
         );
         for (const bars of [4, 8] as const) {
             for (const bar of timeline.bars) {
-                const role = leadRole(timeline, bar.index, 2, { with: 'lead', bars });
+                const role = leadRole(timeline, bar.index, 2, {
+                    with: 'lead',
+                    bars,
+                    choruses: null,
+                });
                 if (role.kind !== 'trade') {
                     continue;
                 }
@@ -359,7 +384,7 @@ describe('trading with the player', () => {
         // Fours, then eights from bar 2: the soloist's eight-bar turn (bars 0-7) plays on
         // after the change instead of stopping where the four-bar plan ended.
         const four = { ...jazz, trade: fours('lead') };
-        const eights = { ...jazz, trade: { with: 'lead', bars: 8 } as const };
+        const eights = { ...jazz, trade: { with: 'lead', bars: 8, choruses: null } as const };
         const played = performPass(rhythmChanges, four, { pass: 1, looping: true });
         const resumed = performPass(rhythmChanges, eights, {
             pass: 1,
@@ -448,5 +473,56 @@ describe('trading with the player', () => {
         }
         // And with the soloist on but no trade, pass 1 is a solo chorus as before.
         expect(plain.some((e) => e.lane === 'lead')).toBe(true);
+    });
+
+    describe('the head returns while trading (choruses)', () => {
+        it('trading with the drummer is you-first; trading with the soloist stays band-first', () => {
+            const you = leadRole(blues, 0, 1, { with: 'drums', bars: 4, choruses: null });
+            expect(you.kind === 'trade' && you.turn).toBe('you');
+            const band = leadRole(blues, 0, 1, { with: 'lead', bars: 4, choruses: null });
+            expect(band.kind === 'trade' && band.turn).toBe('band');
+        });
+
+        it('brings the head back after `choruses` traded passes, and again every block after', () => {
+            const trade: TradeSettings = { with: 'lead', bars: 4, choruses: 2 };
+            const kindAt = (pass: number) => leadRole(blues, 0, pass, trade).kind;
+            expect(kindAt(0)).toBe('head');
+            expect(kindAt(1)).toBe('trade');
+            expect(kindAt(2)).toBe('trade');
+            expect(kindAt(3)).toBe('head');
+            expect(kindAt(4)).toBe('trade');
+            expect(kindAt(5)).toBe('trade');
+            expect(kindAt(6)).toBe('head');
+        });
+
+        it('keeps trading forever with `choruses: null` (or 0), never bringing the head back', () => {
+            for (const choruses of [null, 0] as const) {
+                const trade: TradeSettings = { with: 'lead', bars: 4, choruses };
+                for (let pass = 1; pass <= 8; pass++) {
+                    expect(
+                        leadRole(blues, 0, pass, trade).kind,
+                        `choruses ${choruses} pass ${pass}`,
+                    ).toBe('trade');
+                }
+            }
+        });
+
+        it('restarts the alternation at the top of each block, the same as the very first one', () => {
+            const trade: TradeSettings = { with: 'lead', bars: 4, choruses: 2 };
+            expect(turns(blues, 1, trade)).toBe(turns(blues, 4, trade));
+            expect(turns(blues, 2, trade)).toBe(turns(blues, 5, trade));
+        });
+
+        it('plays the soloist on a returned head trading with the drummer, silences it on a traded pass', () => {
+            const trade: TradeSettings = { with: 'drums', bars: 4, choruses: 2 };
+            const settings = { ...jazz, trade };
+            const options = { looping: true, window: fullWindow(blues), drumSolos: true };
+            const head = planBars(blues, settings, { pass: 3, ...options });
+            const traded = planBars(blues, settings, { pass: 1, ...options });
+            expect(head[0].lead.kind).toBe('head');
+            expect(head[0].lanes.lead).toBe(true);
+            expect(traded[0].lead.kind).toBe('trade');
+            expect(traded[0].lanes.lead).toBe(false);
+        });
     });
 });
