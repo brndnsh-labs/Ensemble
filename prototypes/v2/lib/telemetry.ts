@@ -1,42 +1,44 @@
+/**
+ * Privacy-preserving Umami analytics for the v2 stand (#1389). Moved here from
+ * `public/telemetry.ts` (#1358 retired that caller): telemetry is UI-host code, not engine
+ * library, so it lives beside the app that actually calls it rather than in `public/`.
+ *
+ * Privacy contract (unchanged from v1):
+ * - An allow-listed, typed event vocabulary. No free-form payloads, and never a chart title,
+ *   chord content, account id or email.
+ * - Every payload's `url` is `location.pathname` and `referrer` is always `''` — v2 carries a
+ *   shared chart in the `#chart=` fragment, so the pathname-only rule keeps it (and the query
+ *   string, and any real referrer) out of every request.
+ * - `data-do-not-track="true"`, `autoTrack`/`autoPageview` off, `referrerPolicy: strict-origin`.
+ * - Installed only on the canonical host, in a build made for production. Never on ensembletest,
+ *   local dev, the Playwright export, or a render-bridge build.
+ * - The tracker is optional: a blocked or failed script never affects the app. Bounded queue
+ *   before it loads (or if it never does).
+ * - Never precached by the offline service worker (`scripts/offline.mjs`'s asset list is
+ *   same-origin only) — an offline visit simply sends nothing.
+ */
 const UMAMI_HOST = 'https://umami.brndn.zip';
 const ENSEMBLE_HOST = 'ensemble.brndn.zip';
 const WEBSITE_ID = '3b7ffbc5-a7bd-4dcd-9587-8eef4053c0ad';
 const MAX_QUEUED_EVENTS = 32;
-const STYLE_GALLERY_SLUGS: ReadonlySet<string> = new Set([
-    'jazz-blues-bb',
-    'autumn-jazz',
-    'bossa-nova-morning',
-    'neo-soul-sunset',
-    'funk-soul-vamp',
-    'lo-fi-study-loop',
-    'stadium-rock',
-    'ska-punk-skank',
-    'power-metal-core',
-    'country-two-step',
-    'campfire-folk',
-    'flamenco-fusion',
-]);
 
 type TelemetryData = Record<string, string | number | boolean>;
 
 interface TelemetryEventData {
+    session_class: { device: 'mobile' | 'tablet' | 'desktop' };
     play_started: undefined;
     genre_changed: { genre: string };
-    instrument_toggled: {
-        instrument: 'drums' | 'bass' | 'chords' | 'harmony' | 'soloist';
-    };
-    preset_loaded:
-        | { source: 'built-in'; name: string; mode: 'replace' | 'append' }
-        | { source: 'user'; mode: 'replace' | 'append' };
-    style_gallery_link: { slug: string };
-    share_copied: { audition: boolean };
-    share_sent: { audition: boolean };
-    share_opened: { audition: boolean };
-    export_midi: undefined;
-    export_wav: { stems: boolean };
-    manual_opened: undefined;
-    visualizer_opened: undefined;
-    session_class: { device: 'mobile' | 'tablet' | 'desktop' };
+    part_toggled: { part: 'drums' | 'bass' | 'chords' | 'harmony' | 'soloist' };
+    chart_opened: { source: 'songbook' | 'import' };
+    chart_created: undefined;
+    chart_imported: { format: 'ireal' | 'v1' | 'file' };
+    share_created: undefined;
+    share_opened: { legacy: boolean };
+    account_signed_in: undefined;
+    account_registered: undefined;
+    sync_conflict_shown: undefined;
+    midi_exported: undefined;
+    wav_exported: { stems: boolean };
 }
 
 type TelemetryEventName = keyof TelemetryEventData;
@@ -57,6 +59,17 @@ interface UmamiClient {
     track: (buildPayload: (defaults: UmamiPayload) => UmamiPayload) => undefined | Promise<unknown>;
 }
 
+/**
+ * The one test-only escape hatch (#1389 Acceptance), read by nothing but this module. It is set
+ * by Playwright's `page.addInitScript` — which runs before ANY page script, including this one —
+ * never by a URL, hash or query string, so no real visitor can set it from a link the way a
+ * `?debug=1`-style switch could be used to enable/disable or redirect tracking. Checked in
+ * `initializeTelemetry` only; nothing downstream trusts it.
+ */
+interface TelemetryTestWindow extends Window {
+    __ENSEMBLE_TELEMETRY_TEST_OVERRIDE__?: boolean;
+}
+
 let initialized = false;
 let enabled = false;
 const queue: QueuedEvent[] = [];
@@ -69,8 +82,8 @@ function sendPageview(client: UmamiClient): void {
     try {
         const request = client.track((defaults) => ({
             ...defaults,
-            // Populate Umami's overview without sending shared arrangement data
-            // from the query string, hash, or referrer.
+            // Populate Umami's overview without sending shared arrangement data from the
+            // hash (v2 carries a chart in `#chart=`) or an unrelated referrer.
             url: location.pathname,
             referrer: '',
         }));
@@ -87,8 +100,6 @@ function send(client: UmamiClient, event: QueuedEvent): void {
         const request = client.track((defaults) => ({
             ...defaults,
             name: event.name,
-            // Shared arrangements live in the query string. Never let those
-            // contents (or the hash/referrer) cross the telemetry boundary.
             url: location.pathname,
             referrer: '',
             ...(event.data ? { data: event.data } : {}),
@@ -111,29 +122,25 @@ function classifyDevice(): 'mobile' | 'tablet' | 'desktop' {
     return 'desktop';
 }
 
-function isStyleGallerySlug(slug: string | null): slug is string {
-    return slug !== null && STYLE_GALLERY_SLUGS.has(slug);
-}
-
-function isSharedSession(params: URLSearchParams): boolean {
-    // Curated manual links also carry arrangement data. Keep that known funnel
-    // distinct from person-to-person shares instead of double-counting both.
-    if (isStyleGallerySlug(params.get('gallery'))) {
-        return false;
-    }
-    return params.has('s') || params.has('prog') || params.has('bnd');
-}
-
-/** Install the external tracker only in a real production visit. */
+/** Install the external tracker only in a real production visit on the canonical host. */
 export function initializeTelemetry(): void {
     if (initialized || typeof window === 'undefined') {
         return;
     }
     initialized = true;
 
-    // A test or preview build can also report production mode, so the canonical
-    // hostname check is the second half of the no-dev/no-test contract.
-    if (import.meta.env.MODE !== 'production' || location.hostname !== ENSEMBLE_HOST) {
+    const testOverride =
+        (window as TelemetryTestWindow).__ENSEMBLE_TELEMETRY_TEST_OVERRIDE__ === true;
+    // The build-time flag is the always-DEFINED `NEXT_PUBLIC_TELEMETRY` (mirrors
+    // `NEXT_PUBLIC_RENDER_BRIDGE`, `next.config.mjs`) — an unset `NEXT_PUBLIC_*` would stay a
+    // runtime lookup instead of a value Next inlines. The same `ensemble-web` image is released
+    // to prod AND ensembletest (one build, two hosts), so the hostname check is what keeps the
+    // test host silent; the build flag alone only rules out dev, the Playwright export and a
+    // render-bridge build, which never set it.
+    if (
+        !testOverride &&
+        (process.env.NEXT_PUBLIC_TELEMETRY !== '1' || location.hostname !== ENSEMBLE_HOST)
+    ) {
         return;
     }
 
@@ -170,13 +177,9 @@ export function initializeTelemetry(): void {
     document.head.append(script);
 
     track('session_class', { device: classifyDevice() });
-    const params = new URLSearchParams(location.search);
-    if (isSharedSession(params)) {
-        track('share_opened', { audition: params.get('autoplay') === '1' });
-    }
 }
 
-/** Record one aggregate, allow-listed event. Calls are no-ops outside production. */
+/** Record one aggregate, allow-listed event. Calls are no-ops outside a production visit. */
 export function track<Name extends TelemetryEventName>(
     name: Name,
     ...args: TelemetryEventData[Name] extends undefined ? [] : [data: TelemetryEventData[Name]]
@@ -197,12 +200,5 @@ export function track<Name extends TelemetryEventName>(
 
     if (queue.length < MAX_QUEUED_EVENTS) {
         queue.push(event);
-    }
-}
-
-/** Count every playback entry point once, after its reducer confirms a start. */
-export function trackPlaybackTransition(action: string, isPlaying: boolean): void {
-    if (action === 'TOGGLE_PLAY' && isPlaying) {
-        track('play_started');
     }
 }

@@ -24,6 +24,11 @@ export default {
         // chunk) from every build that doesn't ask for it; an unset NEXT_PUBLIC_* would stay a
         // runtime lookup and ship the bridge unreachable. `scripts/mix-report.ts` sets it (#1358).
         NEXT_PUBLIC_RENDER_BRIDGE: process.env.NEXT_PUBLIC_RENDER_BRIDGE === '1' ? '1' : '',
+        // #1389 — same always-DEFINED shape as the render-bridge flag above. Only the CI
+        // `web-image` job (the ONE build released as `ensemble-web`, to prod and ensembletest
+        // alike) sets this to '1'; `lib/telemetry.ts` pairs it with a canonical-hostname check,
+        // since the same image serves both hosts and only the hostname tells them apart.
+        NEXT_PUBLIC_TELEMETRY: process.env.NEXT_PUBLIC_TELEMETRY === '1' ? '1' : '',
     },
     webpack(config, { webpack }) {
         config.resolve.alias['@engine'] = path.resolve(directory, '../../public');

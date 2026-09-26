@@ -10,6 +10,7 @@ import {
     passkeysSupported,
     signIn,
 } from '../../lib/account/passkeys';
+import { track } from '../../lib/telemetry';
 import { whenClosed } from '../dialog-close';
 import { AccountFailureNotice } from './account-failure';
 import { RecoverFlow } from './recover';
@@ -151,6 +152,7 @@ export function SignInDialog({
         // Tell the shell immediately: the account exists now, even if the recovery step below
         // fails or is abandoned, and the header must not claim otherwise.
         onAccountChanged();
+        track('account_registered');
         // Registration mints a freshly-authenticated session, so this needs no second prompt.
         const enrolled = await enrollRecoveryCode(accountApi);
         if (!openRef.current) {
@@ -181,6 +183,7 @@ export function SignInDialog({
             return;
         }
         onAccountChanged();
+        track('account_signed_in');
         onClose();
     }
 

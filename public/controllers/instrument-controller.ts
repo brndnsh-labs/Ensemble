@@ -13,7 +13,6 @@ import {
     restoreGains,
 } from '../engine/engine.js';
 import { dispatch, getState, stateMap } from '../state.js';
-import { track } from '../telemetry.js';
 import type { Mutable } from '../types.js';
 import { ACTIONS } from '../types.js';
 import { getStepsPerMeasure } from '../utils.js';
@@ -233,20 +232,6 @@ export function togglePower(type: string): void {
 
     if (newState) {
         restoreGains(getState());
-    }
-
-    const telemetryInstrument: 'drums' | 'bass' | 'chords' | 'harmony' | 'soloist' | undefined =
-        normalizedType === 'groove'
-            ? 'drums'
-            : normalizedType === 'chord'
-              ? 'chords'
-              : normalizedType === 'bass' ||
-                  normalizedType === 'harmony' ||
-                  normalizedType === 'soloist'
-                ? normalizedType
-                : undefined;
-    if (telemetryInstrument) {
-        track('instrument_toggled', { instrument: telemetryInstrument });
     }
 
     // #1144 — no immediate save: the SET_PARAM dispatch above (enabled, plus
