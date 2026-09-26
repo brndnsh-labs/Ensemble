@@ -149,7 +149,7 @@ existing document field from an engine/conductor path.
     it as the constant `{ MODE: 'test', DEV: false }` (`prototypes/v2/next.config.mjs`), and
     Vitest supplies its own. Gate code that must not ship on a `NEXT_PUBLIC_*` flag instead,
     read from the v2 host where Next inlines it — the precedent is `NEXT_PUBLIC_RENDER_BRIDGE`,
-    which `lib/runtime.ts` checks before dynamically importing `render-bridge.ts`, so a
+    which `lib/runtime.ts` checks before dynamically importing `lib/render-bridge.ts`, so a
     production build drops the branch and the module. Before gating out an existing branch,
     grep every consumer of what it installs (e.g. `window.ensemble`), or a prod path reaching
     through the same global goes silently dead.

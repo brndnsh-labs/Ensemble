@@ -35,6 +35,15 @@ function parseWav(buf: Buffer): ParsedWav {
     return { numChannels, bitsPerSample, durationSeconds: dataSize / bytesPerFrame / sampleRate };
 }
 
+/** Loudest sample of a 16-bit WAV's data chunk, 0–1. */
+function peakOf(buf: Buffer): number {
+    let peak = 0;
+    for (let offset = 44; offset + 1 < buf.length; offset += 2) {
+        peak = Math.max(peak, Math.abs(buf.readInt16LE(offset)) / 0x8000);
+    }
+    return peak;
+}
+
 /** Same New-song-via-bar-editor flow `band-engine.spec.ts` uses, shared by both tests below. */
 async function newBandChart(page: Page, title: string): Promise<void> {
     await page.goto(appUrl());
@@ -105,8 +114,13 @@ test('Export audio (stems) renders drums/bass/chords/soloist, never harmony', as
     for (const [i, event] of downloads.entries()) {
         const dest = testInfo.outputPath(`band-stem-${i}.wav`);
         await event.saveAs(dest);
-        const wav = parseWav(await readFile(dest));
+        const buf = await readFile(dest);
+        const wav = parseWav(buf);
         expect(wav.durationSeconds).toBeGreaterThan(1);
+        // Every stem is heard, the lead included though it is off live: a lane that is off
+        // renders its stem with its bus open (`renderBandPasses`), not at −80 dB (−40 dBFS
+        // is a floor far under any lane's real level and far over a closed bus's).
+        expect(peakOf(buf), event.suggestedFilename()).toBeGreaterThan(0.01);
     }
     await expect(page.locator('.error-banner')).toHaveCount(0);
 });

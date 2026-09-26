@@ -8,6 +8,10 @@
  * clone driving `initAudio` with an offline context, then `encodeWav` on the rendered buffer —
  * but skips its step-by-step generation entirely: the band engine already produced its events,
  * so this only needs to schedule them.
+ *
+ * `renderBandPasses` is the one offline render of band events: the app's WAV and stem exports
+ * below encode it, and the listening-gate tools (`render-bridge.ts`, `scripts/mix-report.ts`)
+ * measure its raw channel data.
  */
 import type { BandEvent, Lane, Timeline } from '@band/index';
 import { secondsAt } from '@band/index';
@@ -23,11 +27,12 @@ import {
 } from '@engine/export/audio-export';
 import { cloneStateForDetachedGeneration } from '@engine/export/detached-generation-state';
 import { getState } from '@engine/state';
+import type { EnsembleState } from '@engine/types';
 import { legatoLeads, playBandEvent } from './band-host';
 
 /** Matches `audio-export.ts`'s `leadIn` — a hair of silence before the first note. */
 const LEAD_IN_S = 0.25;
-/** Tail after the pass ends for release/reverb decay, matching `audio-export.ts`'s own `+2`. */
+/** Tail after the last pass ends for release/reverb decay, matching `audio-export.ts`'s own `+2`. */
 const RELEASE_TAIL_S = 2;
 
 /** The band's lanes a stem export can isolate; `StemInstrument`'s `harmony` has no band lane
@@ -39,24 +44,79 @@ const STEM_LANE: Partial<Record<StemInstrument, Lane>> = {
     soloist: 'lead',
 };
 
+/** The state module that holds each band lane's bus and sound. */
+const LANE_MODULE = {
+    drums: 'groove',
+    bass: 'bass',
+    comp: 'chords',
+    lead: 'soloist',
+} as const satisfies Record<Lane, keyof EnsembleState>;
+
+/** One event as it was handed to its voice: the render-absolute time and written length. */
+export interface ScheduledBandEvent {
+    event: BandEvent;
+    /** Which of the rendered passes it belongs to. */
+    pass: number;
+    time: number;
+    durationSeconds: number;
+}
+
+export interface BandRenderOptions {
+    sampleRate: number;
+    /**
+     * Edits the render's detached state clone before its audio graph is built — which sound
+     * each lane plays, reverb sends, the level the voices read. Never the live state tree.
+     */
+    prepare?: (state: EnsembleState) => void;
+    /** Called once per event, with the time and length its voice is played with. */
+    onSchedule?: (scheduled: ScheduledBandEvent) => void;
+}
+
+export interface BandRender {
+    /** One Float32Array per channel, copied out of the rendered buffer. */
+    channels: Float32Array[];
+    sampleRate: number;
+    durationSeconds: number;
+    leadInSeconds: number;
+    /** The length of one pass at this tempo, fermatas included. */
+    passSeconds: number;
+}
+
 /**
- * Renders one pass's events to a WAV. Shared core for the mix and per-stem renders below —
- * they differ only in which events they hand it (all of them, or one lane's).
+ * Renders passes of the band offline, back to back, each starting where the one before ended —
+ * the same arithmetic the live host uses to queue its segments. One pass is the app's export; the
+ * listening-gate tools render several (a chorus each, `render-bridge.ts`). Every event goes
+ * through `playBandEvent`, the voice mapping `BandHost` schedules live with, feel offsets
+ * included.
+ *
+ * Everything before `startRendering` is synchronous, so a caller that seeds `Math.random`
+ * around this call seeds exactly the draws the voices make while scheduling.
  */
-async function renderBandEventsToWav(
-    events: BandEvent[],
+export async function renderBandPasses(
+    passes: BandEvent[][],
     timeline: Timeline,
     bpm: number,
-    filename: string,
-    sampleRate: number,
-): Promise<AudioExportResult> {
+    options: BandRenderOptions,
+): Promise<BandRender> {
+    const { sampleRate } = options;
     // A throwaway clone, never the live state tree — same discipline as `audio-export.ts`'s
     // `cloneStateForRender`. Nothing here dispatches or touches the live scheduler/audio graph.
     const state = cloneStateForDetachedGeneration(getState());
+    // A lane with events in this render is heard. `initAudio` holds a lane's bus at silence
+    // (0.0001) while its state is disabled, which is right live and wrong here: a stem renders
+    // its lane even when that lane is off live (`renderBandStemsToWav`), and without this the
+    // lead's stem — off by default — rendered at −80 dB. A mix loses nothing: a lane that is off
+    // live has no events in its pass. Writes the detached clone only.
+    const heard = new Set(passes.flat().map((event) => LANE_MODULE[event.lane]));
+    for (const module of heard) {
+        (state[module] as { enabled: boolean }).enabled = true;
+    }
+    options.prepare?.(state);
 
-    // The pass end in seconds, honouring fermata stretches (`secondsAt`), plus a release tail —
-    // this is the WAV's whole length, computed once so every event schedules against it.
-    const renderSeconds = LEAD_IN_S + secondsAt(timeline, timeline.ticks, bpm) + RELEASE_TAIL_S;
+    // The pass length in seconds, honouring fermata stretches (`secondsAt`); the render is every
+    // pass plus a release tail, computed once so every event schedules against it.
+    const passSeconds = secondsAt(timeline, timeline.ticks, bpm);
+    const renderSeconds = LEAD_IN_S + passSeconds * passes.length + RELEASE_TAIL_S;
     const frameCount = Math.ceil(renderSeconds * sampleRate);
     const offlineCtx = new OfflineAudioContext(2, frameCount, sampleRate);
     // Same offline-context branch `initAudio` already takes for the old engine's export path.
@@ -65,36 +125,41 @@ async function renderBandEventsToWav(
         enableWatchdog: false,
     });
 
-    // Comp chord sizes by tick, for the voice's per-note gain — same map `BandHost` keeps per
-    // segment, rebuilt here from the (possibly lane-filtered) event list being rendered.
-    const chordSizes = new Map<number, number>();
-    for (const event of events) {
-        if (event.lane === 'comp') {
-            chordSizes.set(event.tick, (chordSizes.get(event.tick) ?? 0) + 1);
+    passes.forEach((events, pass) => {
+        const passStart = LEAD_IN_S + pass * passSeconds;
+        // Comp chord sizes by tick, for the voice's per-note gain — same map `BandHost` keeps
+        // per segment, rebuilt here from the (possibly lane-filtered) events being rendered.
+        const chordSizes = new Map<number, number>();
+        for (const event of events) {
+            if (event.lane === 'comp') {
+                chordSizes.set(event.tick, (chordSizes.get(event.tick) ?? 0) + 1);
+            }
         }
-    }
-    const legato = legatoLeads(events);
-    for (const event of events) {
-        // The feel layer's micro-timing (lean, character, the strum roll) rides on
-        // `offsetMs`, exactly as the live host schedules it — without it an export is quantized.
-        const time = Math.max(
-            0,
-            LEAD_IN_S + secondsAt(timeline, event.tick, bpm) + event.offsetMs / 1000,
-        );
-        const durationSeconds =
-            event.lane === 'drums'
-                ? 0
-                : secondsAt(timeline, event.tick + event.dur, bpm) -
-                  secondsAt(timeline, event.tick, bpm);
-        playBandEvent(
-            state,
-            event,
-            time,
-            durationSeconds,
-            chordSizes.get(event.tick) ?? 1,
-            legato.has(event),
-        );
-    }
+        const legato = legatoLeads(events);
+        for (const event of events) {
+            // The feel layer's micro-timing (lean, character, the strum roll) rides on
+            // `offsetMs`, exactly as the live host schedules it — without it a render is
+            // quantized.
+            const time = Math.max(
+                0,
+                passStart + secondsAt(timeline, event.tick, bpm) + event.offsetMs / 1000,
+            );
+            const durationSeconds =
+                event.lane === 'drums'
+                    ? 0
+                    : secondsAt(timeline, event.tick + event.dur, bpm) -
+                      secondsAt(timeline, event.tick, bpm);
+            options.onSchedule?.({ event, pass, time, durationSeconds });
+            playBandEvent(
+                state,
+                event,
+                time,
+                durationSeconds,
+                chordSizes.get(event.tick) ?? 1,
+                legato.has(event),
+            );
+        }
+    });
 
     const rendered = await offlineCtx.startRendering();
     const channels: Float32Array[] = [];
@@ -103,11 +168,30 @@ async function renderBandEventsToWav(
         // and may be reclaimed by the context's GC (same note as `audio-export.ts`).
         channels.push(rendered.getChannelData(ch).slice());
     }
-    const wav = encodeWav(channels, rendered.sampleRate);
+    return {
+        channels,
+        sampleRate: rendered.sampleRate,
+        durationSeconds: rendered.duration,
+        leadInSeconds: LEAD_IN_S,
+        passSeconds,
+    };
+}
+
+/** Renders one pass's events to a WAV: the shared core for the mix and per-stem exports below,
+ * which differ only in which events they hand it (all of them, or one lane's). */
+async function renderBandEventsToWav(
+    events: BandEvent[],
+    timeline: Timeline,
+    bpm: number,
+    filename: string,
+    sampleRate: number,
+): Promise<AudioExportResult> {
+    const render = await renderBandPasses([events], timeline, bpm, { sampleRate });
+    const wav = encodeWav(render.channels, render.sampleRate);
     return {
         blob: new Blob([wav], { type: 'audio/wav' }),
-        durationSeconds: rendered.duration,
-        sampleRate: rendered.sampleRate,
+        durationSeconds: render.durationSeconds,
+        sampleRate: render.sampleRate,
         filename: `${filename}.wav`,
     };
 }

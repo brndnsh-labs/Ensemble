@@ -32,7 +32,6 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/controllers/app-controller.ts` | BPM updates with in-flight scheduler rescheduling (called from `state-effects.ts`), plus v1's palette/mode setters (no app caller since #1358). | `setBpm`, `setPalette`, `setMode` |
 | `public/worker-client.ts` | Main-thread orchestrator for the live logic worker plus one-shot MIDI export workers. | `initWorker`, `startWorker`, `syncWorker`, `flushWorker`, `requestBuffer`, `startExport` |
 | `public/midi-export-worker.ts` | One-shot MIDI export worker entry; owns a fresh module realm and detached generation state for each export. | worker message handler |
-| `public/render-bridge.ts` | Puts engine internals on `window.ensemble` for the listening-gate tools (`mix:report` and the scripts built on it). Installed by the v2 runtime only in a `NEXT_PUBLIC_RENDER_BRIDGE=1` build. | `installRenderBridge` |
 | `public/telemetry.ts` | Production-only, privacy-safe Umami analytics boundary. | `initializeTelemetry`, `track` |
 
 ## Band Engine (`band/`, the default engine; `?engine=old` plays the old one)
@@ -56,7 +55,10 @@ The ground-up replacement for the generative engine, the default since 2026-09-2
 | `band/test/` | Fixture charts, the invariant suite, the critique (`critique/harness.ts` metric library; `claims/<id>.ts` one claims file per style). | `FIXTURES`, `defineClaims`, `METRICS` |
 | `scripts/band-render.ts` | `npm run band:render` — `.mid` + text grid from node. | CLI |
 | `prototypes/v2/lib/band-host.ts` | Live host for the band engine: segments on the audio clock, regenerate-at-barline, voice adapter (`playBandEvent`) onto today's synth/sample voices, metronome. Driven only by `runtime.ts`. | `BandHost`, `playBandEvent` |
-| `prototypes/v2/lib/band-export.ts` | Offline WAV/stem export for the band engine: `band-host.ts`'s `playBandEvent` against an `OfflineAudioContext`, so an export matches live playback. Stems are drums/bass/chords (the comp)/soloist (the lead). | `renderBandMixToWav`, `renderBandStemsToWav` |
+| `prototypes/v2/lib/band-export.ts` | The offline render of band events (`renderBandPasses`: passes back to back through `band-host.ts`'s `playBandEvent` against an `OfflineAudioContext`, raw channel data out) and the WAV/stem export built on it, so an export matches live playback. Stems are drums/bass/chords (the comp)/soloist (the lead). | `renderBandPasses`, `renderBandMixToWav`, `renderBandStemsToWav` |
+| `prototypes/v2/lib/band-voices.ts` | The app's names for the band's parts: genre → style, lane sound → comp/lead instrument. Type-only imports, so `scripts/band-scene.ts` reads the same tables in node. | `STYLE_FOR_GENRE`, `COMP_FOR_VOICE`, `LEAD_FOR_VOICE` |
+| `prototypes/v2/lib/render-bridge.ts` | The listening-gate tools' page side, on `window.ensemble`: renders band events it is handed through `renderBandPasses` on pinned lane sounds, returns channels plus a dispatch tap. Installed by `runtime.ts` only in a `NEXT_PUBLIC_RENDER_BRIDGE=1` build. | `installRenderBridge` |
+| `scripts/band-scene.ts` | The listening-gate tools' node side: a `mix:report` scene → score → `compileTimeline` → `performPass` passes; settings, schedule analysis and the `--write-events` dump. | `performSceneForReport`, `sceneSettings`, `buildEventDump` |
 | `prototypes/v2/lib/band-chart.ts` | The chart sheet's view of a score on the band engine, from the score + band timeline: every written event (holds, N.C., fermatas, off-grid lengths), its performed slots, section loop windows, chord names in all three notations. | `bandChart`, `slotAt`, `chordNames` |
 | `prototypes/v2/lib/engine-mode.ts` | The `BAND_ENGINE` flag (false only under `?engine=old`) and `checkPlayable`, the one capability check every open/edit/import path asks (band: valid + timeline compiles; old engine: `prepareScorePlayback`). | `BAND_ENGINE`, `checkPlayable` |
 
@@ -69,7 +71,7 @@ The ground-up replacement for the generative engine, the default since 2026-09-2
 | `public/state/groove.ts` | Genre, intensity, and drum kit selection. | `groove` |
 | `public/state/instruments.ts` | Per-instrument synthesis parameters. | `bass`, `soloist`, `harmony` |
 | `public/state/midi.ts` | WebMIDI routing and local muting state. | `midi` |
-| `public/state/visualizer.ts` | `vizState.enabled`: whether the scheduler queues visualizer note events (no visualizer ships; `mix:report`'s event capture turns it on). | `vizState` |
+| `public/state/visualizer.ts` | `vizState.enabled`: whether the scheduler queues visualizer note events (no visualizer ships; only the old engine's scheduler, `?engine=old`, reads it). | `vizState` |
 | `public/state/conductor.ts` | Macro-arc, intensity drift, and form iteration state. | `conductor` |
 | `public/state/share-codec.ts` | Share-URL / preset wire format: Unicode-safe Base64 + the minified section payload, plus the section-id generator deserialization mints. Main thread only. | `compressSections`, `decompressSections`, `encodeBase64Unicode`, `generateId` |
 | `public/state/state-effects.ts` | Cross-module state side effects (Inversion of Control). | `handleEffects` |
@@ -241,7 +243,7 @@ account sync. Per-surface ownership is the navigation table in `prototypes/v2/CL
 | `public/platform.ts` | Browser hacks (WakeLock, Audio Unlock). |
 | `public/utils.ts` | Worker-safe musical/math primitives: pitch conversion + the step/meter timing core. No DOM, no Web Audio, no persistence. | `getFrequency`, `getStepInfo` |
 | `public/sanitize.ts` | Main-thread string sanitization and display formatting (HTML escaping, dangerous-char stripping, ♯/♭ glyphs). | `escapeHTML`, `stripDangerousChars`, `formatUnicodeSymbols` |
-| `public/visualizer/visualizer-events.ts` | Note-event contract the scheduler queues when `vizState.enabled`; kept for `mix:report`'s event capture. | `queueVisualizerNoteEvent`, `VisualizerQueuedEvent` |
+| `public/visualizer/visualizer-events.ts` | Note-event contract the scheduler queues when `vizState.enabled`; kept because the old engine's scheduler (`?engine=old`) still queues through it. | `queueVisualizerNoteEvent`, `VisualizerQueuedEvent` |
 
 ## Infrastructure & Lifecycle (Internal)
 
