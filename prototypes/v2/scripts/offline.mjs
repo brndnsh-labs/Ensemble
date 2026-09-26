@@ -160,7 +160,7 @@ function injectCspMeta(html, csp) {
     // As early in <head> as this export can put it — the very first thing after the opening tag,
     // ahead of the charset meta, the stylesheet link and every script — so nothing in <head> ever
     // renders or runs unpolicied.
-    return html.replace(/<head([^>]*)>/i, (openTag) => `${openTag}${metaTag}`);
+    return html.replace(/<head(?=[\s>])[^>]*>/i, (openTag) => `${openTag}${metaTag}`);
 }
 for (const file of (await walk(root)).filter((p) => p.endsWith('.html'))) {
     const html = await readFile(file, 'utf8');
