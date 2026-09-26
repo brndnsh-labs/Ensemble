@@ -23,7 +23,6 @@ import {
 import { autoVoiceForGenre } from '@engine/data/genre-sound-map';
 import { GENRE_NAMES, SMART_GENRES } from '@engine/data/smart-genres';
 import { validateProgression } from '@engine/engine/chords-engine';
-import { analyzeFormUI } from '@engine/engine/conductor';
 import {
     initAudio,
     killAllNotes,
@@ -37,11 +36,6 @@ import {
     stopPlatformAudioAndWakeLock,
 } from '@engine/engine/platform-orchestrator';
 import { transposeChordText } from '@engine/engine/transpose';
-import {
-    downloadExportResult,
-    STEM_INSTRUMENTS,
-    type StemInstrument,
-} from '@engine/export/audio-export';
 import { proposeLegacyScoreConversion } from '@engine/songbook/legacy-score';
 import type { SemanticScore } from '@engine/songbook/score-types';
 import type {
@@ -66,7 +60,13 @@ import {
 } from '@engine/types';
 import { getFrequency, transposeKeyName } from '@engine/utils';
 import { auditionMidis, type BandChart, bandChart, sectionSteps, slotAt } from './band-chart';
-import { renderBandMixToWav, renderBandStemsToWav } from './band-export';
+import {
+    downloadExportResult,
+    renderBandMixToWav,
+    renderBandStemsToWav,
+    STEM_INSTRUMENTS,
+    type StemInstrument,
+} from './band-export';
 import { BandHost } from './band-host';
 import {
     AUTO_VOICE_FOR_STYLE,
@@ -438,7 +438,6 @@ function rebuild(): void {
     if (!bandView && !getState().arranger.progression.length) {
         throw new Error('The chart has no playable chords. Check your chord text.');
     }
-    analyzeFormUI(getState().arranger);
     // Silences whatever is still sounding. (Its worker flush does nothing: no worker runs.)
     flushBuffers();
     restoreGains(getState());
@@ -1135,8 +1134,7 @@ export function cancelExportAudio(): void {
  * event stream on a detached state clone in an `OfflineAudioContext`, through the same
  * `playBandEvent` voice mapping the live band host schedules with, so an exported mix matches
  * what was heard live and nothing here dispatches. Stems are drums/bass/chords (the comp)/
- * soloist (the lead): `harmony` has no band lane to render, and `renderBandStemsToWav` drops
- * it rather than erroring.
+ * soloist (the lead).
  *
  * Sampled voices must be installed before the render can use them —
  * `resolveInstrumentSource` (instrument-registry.ts) silently resolves an

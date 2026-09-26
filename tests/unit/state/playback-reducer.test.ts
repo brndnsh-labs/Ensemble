@@ -25,13 +25,6 @@ describe('Playback Reducer', () => {
         expect(playback.bpm).toBe(40);
     });
 
-    it('should toggle playing state', () => {
-        playbackReducer({ type: ACTIONS.TOGGLE_PLAY, payload: undefined });
-        expect(playback.isPlaying).toBe(true);
-        playbackReducer({ type: ACTIONS.TOGGLE_PLAY, payload: undefined });
-        expect(playback.isPlaying).toBe(false);
-    });
-
     it('should set various playback flags and params', () => {
         playbackReducer({ type: ACTIONS.SET_BAND_INTENSITY, payload: 0.9 });
         expect(playback.bandIntensity).toBe(0.9);
@@ -47,9 +40,6 @@ describe('Playback Reducer', () => {
 
         playbackReducer({ type: ACTIONS.SET_SESSION_TIMER, payload: 10 });
         expect(playback.sessionTimer).toBe(10);
-
-        playbackReducer({ type: ACTIONS.SET_ENDING_PENDING, payload: true });
-        expect(playback.isEndingPending).toBe(true);
     });
 
     describe('section practice (#1016)', () => {
@@ -81,22 +71,6 @@ describe('Playback Reducer', () => {
             playbackReducer({ type: ACTIONS.SET_PRACTICE_LOOP, payload: { start: 32, end: 64 } });
             // end <= start is not a loop — treat as clear.
             playbackReducer({ type: ACTIONS.SET_PRACTICE_LOOP, payload: { start: 64, end: 64 } });
-            expect(playback.loopStartStep).toBe(-1);
-            expect(playback.loopEndStep).toBe(-1);
-        });
-
-        it('stopping playback clears the drill (start step + loop)', () => {
-            playbackReducer({ type: ACTIONS.SET_START_STEP, payload: 32 });
-            playbackReducer({ type: ACTIONS.SET_PRACTICE_LOOP, payload: { start: 32, end: 64 } });
-            // Start (isPlaying → true) keeps the seed…
-            playbackReducer({ type: ACTIONS.TOGGLE_PLAY, payload: undefined });
-            expect(playback.isPlaying).toBe(true);
-            expect(playback.startStep).toBe(32);
-            expect(playback.loopStartStep).toBe(32);
-            // …stop (isPlaying → false) wipes it so the next plain Play starts at the top.
-            playbackReducer({ type: ACTIONS.TOGGLE_PLAY, payload: undefined });
-            expect(playback.isPlaying).toBe(false);
-            expect(playback.startStep).toBe(0);
             expect(playback.loopStartStep).toBe(-1);
             expect(playback.loopEndStep).toBe(-1);
         });

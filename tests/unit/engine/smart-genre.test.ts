@@ -44,11 +44,6 @@ vi.mock('../../../public/controllers/app-controller.js', () => ({
     applyTheme: vi.fn(),
 }));
 
-vi.mock('../../../public/engine/scheduler-core.js', () => ({
-    togglePlay: vi.fn(),
-    scheduler: vi.fn(),
-}));
-
 describe('Smart Genre System', () => {
     let playback, chords, bass, soloist, harmony, groove;
 

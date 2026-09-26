@@ -1,6 +1,5 @@
 import { KEY_ORDER } from '../config.js';
 import { transformRelativeProgression, validateProgression } from '../engine/chords-engine.js';
-import { analyzeFormUI } from '../engine/conductor.js';
 import { restoreGains } from '../engine/engine.js';
 import { transposeChordText } from '../engine/transpose.js';
 import { pushHistory } from '../state/history.js';
@@ -11,7 +10,6 @@ import type { Chord, Section, SectionInstrumentKey } from '../types.js';
 import { ACTIONS } from '../types.js';
 import { showToast } from '../ui.js';
 import { normalizeKey } from '../utils.js';
-import { syncWorker } from '../worker-client.js';
 import { flushBuffers } from './instrument-controller.js';
 
 export function saveProgression(): void {
@@ -47,9 +45,7 @@ export function saveProgression(): void {
 }
 
 export function validateAndAnalyze(): void {
-    validateProgression(stateMap, undefined, () => {
-        analyzeFormUI(getState().arranger);
-    });
+    validateProgression(stateMap);
 }
 
 function clearChordPresetHighlight(): void {
@@ -61,13 +57,6 @@ function clearChordPresetHighlight(): void {
  * The canonical "arrangement changed — resync everything" sequence. Any UI that
  * mutates the progression/meter/key should end in this single call rather than
  * hand-copying the steps (the divergence #1128 consolidated).
- *
- * #1120 — the order is load-bearing: `syncWorker()` must run BEFORE
- * `flushBuffers()`. flushBuffers() bundles a worker FLUSH that synchronously
- * refills buffers from `getSyncState()`; run before the SYNC_STATE patch lands,
- * that refill (and its ~4-measure lookahead) generates from the OLD
- * progression. dispatch()/validateAndAnalyze() are synchronous, so ordering
- * flush last costs nothing perceptible on the note-kill.
  *
  * #1144 — saveCurrentState() stays here (not folded into the #1127
  * chokepoint's caller-side dispatch). It used to be load-bearing for exactly
@@ -82,7 +71,6 @@ function clearChordPresetHighlight(): void {
  */
 export function refreshArrangerUI(): void {
     validateAndAnalyze();
-    syncWorker();
     flushBuffers();
     restoreGains(stateMap);
     saveCurrentState();

@@ -495,9 +495,6 @@ export function instrumentReducer(action: Action): boolean {
             }
             break;
         }
-        case ACTIONS.RESET_SESSION:
-            (s.session as Mutable<typeof s.session>).sessionSteps = 0;
-            return true;
         case ACTIONS.SET_GENRE_FEEL:
             if (action.payload.chord) {
                 c.style = action.payload.chord;

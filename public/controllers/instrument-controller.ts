@@ -12,12 +12,11 @@ import {
     killSoloistNote,
     restoreGains,
 } from '../engine/engine.js';
-import { dispatch, getState, getSyncState, stateMap } from '../state.js';
+import { dispatch, getState, stateMap } from '../state.js';
 import { track } from '../telemetry.js';
 import type { Mutable } from '../types.js';
 import { ACTIONS } from '../types.js';
 import { getStepsPerMeasure } from '../utils.js';
-import { flushWorker, syncWorker } from '../worker-client.js';
 
 export function switchMeasure(idx: number): void {
     const { groove } = getState();
@@ -108,7 +107,7 @@ export function handleTap(setBpmRef: (bpm: number) => void): void {
 }
 
 export function flushBuffers(): void {
-    const { playback, bass, soloist, chords, harmony } = getState();
+    const { bass, soloist, chords, harmony } = getState();
     // 1. Clear local buffers
     bass.buffer.clear();
     soloist.audio.buffer.clear();
@@ -128,16 +127,11 @@ export function flushBuffers(): void {
     killDrumBus(stateMap);
     killHarmonyBus(stateMap);
 
-    // 3. Prepare sync data for atomicity
-    const syncData = getSyncState();
-
-    // 4. Trigger a BUNDLED worker flush
-    flushWorker(playback.step, syncData);
     restoreGains(stateMap);
 }
 
 function flushBuffer(...types: string[]): void {
-    const { playback, chords, bass, soloist, harmony } = getState();
+    const { chords, bass, soloist, harmony } = getState();
     const has = (lane: string) => types.includes(lane) || types.includes('all');
     if (has('bass')) {
         if (bass.lastPlayedFreq !== null) {
@@ -169,11 +163,6 @@ function flushBuffer(...types: string[]): void {
     if (has('groove')) {
         killDrumNote(stateMap);
         killDrumBus(stateMap);
-    }
-
-    // Solo flush (usually from UI toggles)
-    if (!types.includes('none')) {
-        flushWorker(playback.step, null);
     }
     restoreGains(stateMap);
 }
@@ -235,8 +224,7 @@ export function togglePower(type: string): void {
     // line is sounding (rootless shells + a higher floor with it, rooted voicings
     // without). Muting the bass is "I'm playing that part", so the comp has to be
     // re-voiced NOW or it keeps the rootless shapes with nothing stating the root.
-    // Same load-bearing order as refreshArrangerUI(): mutate -> validate ->
-    // syncWorker -> flush. Flush every lane that reads the re-voiced progression
+    // Mutate -> validate -> flush. Flush every lane that reads the re-voiced progression
     // (chords + harmony, not just the bass buffer) — but NOT the drums or the
     // soloist: a player muting the bass mid-groove must not hear the time hiccup.
     const bassToggled = normalizedType === 'bass';
@@ -245,8 +233,6 @@ export function togglePower(type: string): void {
         // lookup above and shadows the imported state tree.
         validateProgression(getState(), dispatch);
     }
-
-    syncWorker();
 
     if (bassToggled) {
         flushBuffer('bass', 'chord', 'harmony');

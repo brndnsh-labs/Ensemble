@@ -1,17 +1,18 @@
-# public/ — state, worker bridge, controllers
+# public/ — state, controllers, voices
 
 Since #1358 `public/` is a library, not an app: the v2 music stand (`prototypes/v2`) compiles it
 through the `@engine/*` alias, and `prototypes/v2/lib/runtime.ts` is its one main-thread host.
 The main-thread plumbing layer: `state.ts` + the `state/*.ts` family — the `deepSignal`
 slices plus the non-slice plumbing that sits beside them (`state/state-effects.ts`,
 `state/state-hydration.ts`, `state/history.ts`, `state/persistence.ts`,
-`state/share-codec.ts`) — `worker-client.ts`, the `controllers/*.ts` family
+`state/share-codec.ts`) — the `controllers/*.ts` family
 (`controllers/app-controller.ts`, `controllers/arranger-controller.ts`,
 `controllers/instrument-controller.ts`, …), and
 `config.ts`. Only the slice files are exempt from `npm run check-mutations`; the
-plumbing dispatches like any other consumer. For the worker's
-message *schema*, see `docs/guides/WORKER_CONTRACT.md`; for the generative engines
-themselves, see `public/engine/CLAUDE.md`. This file is the traps that don't fit either.
+plumbing dispatches like any other consumer. For the voices and the audio graph, see
+`public/engine/CLAUDE.md`; the band engine that plays them is `band/`. This file is the traps
+that don't fit either. (The old engine's logic worker and its sync contract are gone, #1404;
+`docs/archive/WORKER_CONTRACT.md` keeps them for history.)
 
 **Write ownership:** `songbook/state-ownership.ts`'s `STATE_OWNERSHIP_MANIFEST` classifies every
 top-level field as `document`/`preferences`/`runtime-derived` for persistence — and, per
@@ -21,116 +22,35 @@ top-level field as `document`/`preferences`/`runtime-derived` for persistence �
 `tradeSilenced`, `isInstrumentActiveAtStep`) before adding a new dispatch site that touches an
 existing document field from an engine/conductor path.
 
-## Worker sync
-
-1. **A `syncWorker(ACTION, payload)` call is only real if `ACTION` has a `case` in the
-   delta `switch` in `worker-client.ts`.** Actions with no case (`SET_TIME_SIGNATURE`,
-   `SET_GROUPING`) fall through to an empty `data` object and the
-   `Object.keys(data).length > 0` guard means **nothing is posted** — a subscriber-forwarded
-   `syncWorker('SET_TIME_SIGNATURE', …)` in the v2 runtime's dispatch subscriber
-   (`initialize()` in `prototypes/v2/lib/runtime.ts`) is a silent no-op. That's why `refreshArrangerUI()` (`arranger-controller.ts`) ends with a **bare**
-   `syncWorker()` — no action arg — which ships a full `getSyncState()` snapshot (so does the
-   v2 runtime's `rebuild()`). That call
-   is load-bearing, not redundant belt-and-suspenders: delete it (or "dedupe" it against the
-   subscriber) and the worker keeps generating over the old progression/meter until stop→play.
-   Before touching any `syncWorker` call site, grep the action's `case` in the switch first —
-   an action that *does* have a delta case (e.g. `SET_GENRE_FEEL`) makes a manual duplicate
-   call genuinely safe to drop; one that doesn't, isn't.
-
-2. **A new field on any `build*SyncPayload` snapshot builder (`state.ts`) must be classified
-   in `WORKER_SYNC_MANIFEST`** (`tests/unit/engine/worker-sync-reachability.test.ts`) as either
-   `{ delta: '<ACTION>' }` (a live `syncWorker()` delta case actually carries it) or
-   `{ snapshotOnly: '<reason>' }`. The test fails loudly on anything unclassified — that's the
-   intended tripwire for the half-update class of bug (a field that reaches the worker at
-   playback-start via the full snapshot but never updates again on change).
-
-3. **An instrument's `voice` (`chords.voice`, `bass.voice`, …) is main-thread-audio-routing-only
-   by default and does NOT cross to the worker** — the audio source resolves at play time in
-   `synth-*.ts`. It only needs to cross if a voice starts affecting *note generation itself*
-   (e.g. the crunch pack's power-chord reduction inside `tick-logic.ts`) — see the
-   `chords.voice` precedent (`getSyncState()` snapshot field + `SET_INSTRUMENT_VOICE` delta
-   case) before wiring a new voice-dependent generation path for another lane; it will not be
-   synced by default. Gate worker-side logic on the voice **string**, never `isPackLoaded` —
-   the worker holds no decoded sample buffers, so any loaded-check is permanently false there.
-
-4. **`flushBuffers()` (`instrument-controller.ts`) reads `getSyncState()` synchronously at the
-   moment it's called** and ships it as the worker's `FLUSH` message, which the worker uses to
-   *immediately, synchronously* refill its lookahead buffer. Call-site ordering relative to the
-   state mutation it should reflect is load-bearing: call it before `dispatch()` /
-   `validateAndAnalyze()` and it primes the buffer from the *old* state — and a `syncWorker()`
-   called afterward does **not** fix this, because a bare `SYNC_STATE` patches the mirrored
-   slices in place without re-triggering `resetCursors()`/`fillBuffers()`. The correct order,
-   matching `refreshArrangerUI()`: mutate state → `validateAndAnalyze()` → `syncWorker()` →
-   `flushBuffers()`. Any call site that both mutates arranger/chords/bass/etc. state and calls
-   `flushBuffers()` must follow that order, not "mutate, flush, resync after."
-
-5. **`WORKER_MSG.FLUSH`'s "Centralized Reset Phase"** (`resetSoloistState` /
-   `resetBassState` / `clearHarmonyMemory` / `resetCompingState` in `logic-worker.ts`) runs on
-   **every** flush, not just a new song — and `flushBuffers()` fires mid-song on ordinary user
-   actions (genre change, instrument/style change, per-lane toggle). Any change to what a reset
-   ritual touches has live mid-song behavioral consequences, not just an offline/new-song one —
-   trace whether `FLUSH` reaches the thing you're resetting before assuming it's a fresh-start
-   concern only.
-
-6. **`recursiveSafeSync` (`engine/worker-utils.ts`, called from `logic-worker.ts`) DEEP-MERGES
-   object-valued synced fields into the worker's existing mirror in place** — it replaces arrays
-   and scalars wholesale but recurses
-   into plain objects, mutating the *same* worker-side object rather than swapping in the fresh
-   one from the main thread. So after a mid-play change regenerates an object field (e.g. the
-   soloist session seed on a key/tempo change), the worker's copy has **new contents but the same
-   object identity**. Any cache keyed on that identity — a `WeakMap<seed, …>`, an
-   `if (obj === lastObj)` guard — is therefore a silent staleness bug: the key is reference-equal,
-   so the cache serves the *old* digest against the *new* contents, and it only manifests after a
-   live change (never at playback-start, never in a fresh-object unit test). Fix: stamp a **content
-   token** into the object at generation time (a djb2/content hash — `seedId` on `SoloistSessionSeed`
-   is the precedent) and key/validate the cache on that token, not on object identity. This bit the
-   #1157 Q&A-hang digest cache; the regression guard is `tests/unit/engine/qa-hang-digest-cache.test.ts`,
-   which mutates a seed **in place** to reproduce what the deep-merge does. When adding any
-   identity-keyed cache over a synced object field, assume its identity is stable across content
-   changes and reach for a content token instead.
-
 ## Effects & reactivity (`state/state-effects.ts`)
 
 7. **Any side effect on the global dispatch subscriber (`handleEffects`) fires on every single
-   dispatch.** During playback the auto-conductor (`autoIntensity`, default ON) dispatches
-   `SET_BAND_INTENSITY` / `UPDATE_CONDUCTOR_DECISION` / `UPDATE_HB` roughly every step while an
-   intensity ramp is in flight (driven from `scheduler-core.ts`'s per-step
-   `scheduleGlobalEvent`). A **debounced** effect hung off `handleEffects` gets its timer reset
-   on every one of those and never settles until the ramp ends — starved, not just deferred.
+   dispatch.** During playback the runtime's playhead publishes `chords.lastActiveChordIndex`
+   at every chord change (`followPlayhead`), and the band's own settings sync (`syncBand`) runs
+   on every dispatch too. A **debounced** effect hung off `handleEffects` gets its timer reset
+   on every one of those — starved, not just deferred.
    The persistence save (`debounceSaveState`) already solves this with a denylist
    (`TRANSIENT_PERSIST_ACTIONS` at the top of `state-effects.ts`) — persist-by-default, with the
    high-frequency per-step actions explicitly excluded. Any *new* debounced/coalesced subscriber
    effect needs its own equivalent exclusion list; don't assume the persistence denylist covers
    it, since it's scoped to "does this change a persisted field," not "is this high-frequency."
-   `playback.step` itself is not a dispatch (`// @direct-mutation` in `scheduler-core.ts`), so
-   it's the conductor's ramp dispatches to watch for, not the tick.
 
 8. **Audio-up side effects belong on `initAudio()` (`engine.ts`), not on the
    `ACTIONS.INIT_AUDIO` dispatch.** Since #1358 nothing dispatches `ACTIONS.INIT_AUDIO` at all
    (v1's Sounds panel was its only dispatcher); only its `state-effects.ts` case remains. Every
-   way audio comes up — the scheduler (`scheduler-core.ts`), the v2 runtime's `toggle()` and
-   `audition()` — calls `initAudio(state)` directly. Anything that must run
+   way audio comes up — the v2 runtime's `toggle()` and `audition()`, and the offline export —
+   calls `initAudio(state)` directly. Anything that must run
    "whenever audio is live" (e.g. pack loading, #666) has to hook `initAudio()` itself, gated
    `if (!usingOfflineContext && playback.audio)` so offline render/export contexts are excluded
    — wiring it into the `INIT_AUDIO` case means it never runs.
 
-## Practice loop / step framing (`section-overrides.ts`, `practice-controller.ts`)
-
-9. **The worker consumes a monotonic absolute `step`** — it buckets notes by `n.step` and its
-   per-instrument buffer-head bookkeeping only ever advances forward. Section-practice looping
-   (`foldPracticeStep` in `engine/section-overrides.ts`) therefore does **not** wrap
-   `playback.step` itself; it folds only the *musical* position (`chord`/`section` lookups,
-   drum step) into `[loopStartStep, loopEndStep)` while every lane-buffer consumer keeps using
-   the raw monotonic `step` as its map key. If you touch this path, keep the two variables
-   (`step` the key, `musicalStep`/folded value the music) distinct — collapsing them back into
-   one desyncs the worker's buffer heads. `foldPracticeStep` is the identity function whenever
-   no loop is active (`loopStartStep < 0`), which is what keeps normal (non-looping) playback
-   byte-for-byte unchanged.
+## Offline-render clones
 
 10. **A new live-audio-handle field on any state slice (`GainNode`, a voice handle closing over
-    the live `AudioContext`) must be nulled in *both* offline-render clone hosts**, not just
-    declared: `audio-export.ts`'s `cloneStateForRender` and `scripts/mix-report.ts`'s inline
-    clone. Both spread the whole slice then explicitly null the known handle fields
+    the live `AudioContext`) must be nulled in the offline-render clone**, not just declared:
+    `export/detached-generation-state.ts`'s `cloneStateForDetachedGeneration`, which the band's
+    WAV export and the listening-gate tools render from (`prototypes/v2/lib/band-export.ts`). It
+    spreads the whole slice then explicitly nulls the known handle fields
     (`lastHatGain`/`lastRideGain`/`lastCrashGain` on `groove`; `activeChordVoices`/`lastChordKey`
     on `playback`). A new handle rides through the spread un-nulled and its first
     choke/ramp during an offline render pokes a **live-context** node — usually silent (the

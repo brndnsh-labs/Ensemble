@@ -126,12 +126,10 @@ of Done and the reviewer set:
 - `claude` — general UI, non-engine `public/**`, mechanical work.
 
 **Reviewers**, additive (union what fires):
-`music-theory-reviewer` (engine/`tests/standards/`, Track musical) ·
+`music-theory-reviewer` (`band/**` and its claims, Track musical) ·
 `synth-graph-reviewer` (`synth-*.ts`/audio-graph, Track synth) ·
-`state-discipline-reviewer` (state slices, new actions, `coordination-engine.ts`, any
-`signal.x = y` that might bypass `dispatch`) ·
-`worker-contract-reviewer` (state read by the logic worker — `getSyncState()`/
-`syncWorker()`, worker-mirrored slices, new `WORKER_MSG.*`) ·
+`state-discipline-reviewer` (state slices, new actions, any `signal.x = y` that might bypass
+`dispatch`) ·
 `bundle-hygiene-reviewer` (Track bundle) ·
 `/code-review` (correctness pass, any non-trivial diff) ·
 a **test-quality lens** for test-only diffs (coverage gaps, intent-vs-implementation,

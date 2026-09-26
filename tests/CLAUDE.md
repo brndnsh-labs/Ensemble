@@ -9,51 +9,13 @@ smells (tautology, sub-baseline threshold, mislabel, log-vs-assert mismatch, har
 and proven patterns (loop-awareness, final-stage multiplier, seeded mulberry32), see
 `docs/guides/musical-engine-patterns.md` — this file is sharper traps not covered there.
 
-## Critique tests (`tests/standards/`)
+## Critique tests
 
-- **A harness that runs a simplified shape (short synthetic seed, per-bar fallback) can be green
-  while production (full macro-form, sticky section) is broken.** Production soloist seeds are a
-  ~2048-step macro-form; a unit test with `loopLengthSteps = 64` makes an apex/hook recur every
-  loop and "confirms" behavior that doesn't hold at 128 bars. Pair fast synthetic unit tests with
-  at least one **production-faithful test** that drives the real `generateSessionSeed`/arrangement
-  over the real structure with a fixed seed string. Smell: a unit test needing `loopLen ==
-  scanWindow` to make an event recur.
-- **Groove/drum critique mocks must seed `groove.sectionSeedMap`, or the harness measures the
-  per-bar fallback distribution, not production's sticky-per-section one.** `getMotif` and the
-  groove-strategy layer derive `sectionSeed` from `sectionSeedMap[sectionId]` in production (one
-  seed held across a whole section); with an empty map, every bar gets a different seed and
-  motif/flavor decisions flip bar-to-bar. Calibrate thresholds **empirically** (run once, observe,
-  set floor with 2-3x headroom) — don't trust an audit-doc's production-math estimate against a
-  harness running the fallback path.
-- **A groove critique mock for a non-4/4 meter must include `arranger.timeSignature`.**
-  `applyGrooveOverrides` recomputes `stepsPerBar`/`loopStep`/`barIndex` internally from
-  `arranger.timeSignature`, defaulting to 4/4 (16 steps) when the slice is absent — the
-  `stepsPerBar` you pass in `params` is ignored. Without it, meter-derived flags (`isPulseStart`,
-  `beatIndex`, etc. from `getStepInfo`) are meter-correct but internal grid math silently runs 4/4,
-  producing a plausible-looking but wrong mixed result. Exception: `checkBassActiveStyle` takes
-  `ts` as an explicit param and never reads `getState()`. Mutation-test any new guard: revert the
-  engine fix, confirm the test goes red.
-- **Forcing a specific drum motif index deterministically needs three knobs, not one — the loop
-  ceiling is the silent gotcha.** (1) Pin `sectionSeed` via a real `arranger.stepMap` +
-  `groove.sectionSeedMap`, not an `{undefined: x}` key. (2) Land the right intensity tier —
-  `getMotif(seed, complexity, intensity)` maps the same seed to different motifs per tier. (3)
-  `activeMotif = min(getMotif(...), loopMotifCeiling(currentLoopCount))` — `loopMotifCeiling(0)=1`,
-  so on the default Head (`currentLoopCount` undefined→0) any motif ≥2 is silently clamped to 1
-  with no error. Set `playback.currentLoopCount: 2`+ to exercise full motif range.
-- **Motif/hook/"the lick returns" repetition claims are invisible to the single-pass per-genre
-  harness** (`getSoloistNote` in a bar loop) — it starts loop 1 with an empty `thematicSeed`, so
-  the motif-replay machinery never builds anything to repeat, and sparseness *dilutes* the
-  reuse-share metric (a sparse profile measures as less repetitive even when it subjectively loops
-  more). Repetition claims need the multi-loop `buildSeedSweep`/`buildSeedSweepSummary` harness
-  (`scripts/soloist-analysis-utils.ts`) with fixed head seeds. Placement/sparseness/chromaticism/
-  register/device claims are fine on the single-pass harness. Before tuning toward a claim, confirm
-  a harness can even *see* the property — some claims (verbatim hook repetition without dedicated
-  motif machinery) are genuinely untestable as-is and need new engine machinery, not profile tuning.
-- **Cross-genre density tests: assert absolute hits/bar bounds keyed to the voice's profile, not a
-  ratio against the 4/4 baseline.** Low-baseline genres (funk/hiphop/disco kick/hat) make a "% of
-  4/4" ratio fail on musically-correct output — a genre whose 4/4 density is already low can have a
-  *correct* 6/8 density that's numerically above its own 4/4 number. Log the 4/4 count as
-  informational only.
+The old engine's critique suite and its harness (`tests/standards/` per-genre critiques, the
+groove/soloist mocks, the seed sweeps) were deleted with it (#1404). The band engine's claims and
+critique harness live in `band/test/` — read `band/CLAUDE.md`. These lessons from the old suite
+still hold for any statistical claim:
+
 - **A density bound alone can't distinguish "right count, wrong position."** `hitsPerBar ∈
   [0.5, 2.5]` passed at 1.0/bar when 1.0/bar was the bug (downbeat only, second pulse lost). Add
   explicit per-position assertions (`hitsByStep[N] ≥ threshold`) for every position the fix is
@@ -61,11 +23,13 @@ and proven patterns (loop-awareness, final-stage multiplier, seeded mulberry32),
   bound. Watch the tautology trap too: asserting "hits cluster on positions {X}" when the
   engine-under-test is *defined* to only emit on {X} at that intensity passes for any
   implementation and guards nothing — test at an intensity where the helper allows more spread.
+
 - **A DoD-gating critique test that ships with `it.skip`'d acceptance criteria is not a gate — it's
   a snapshot of broken state.** `it.skip` doesn't enforce, and asserting current (buggy) engine
   behavior as the target calcifies the bug. If a story's critique test comes back with skipped
   acceptance items, don't ship it as Done: promote each skip to its own follow-up story, and
   rewrite the DoD test with correct musical targets only after the gaps land.
+
 - **Reading a critique test's actual metric value:** `npm test` runs vitest `--reporter=dot
   --silent=true`, so `console.log`'d "Critique Report" output is invisible by default — running the
   file directly is also effectively quiet. Force-fail an assertion (`expect(ratio).toBeLessThan(-1)`

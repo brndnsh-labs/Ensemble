@@ -1,7 +1,6 @@
 import { dispatch, getState } from '../state.js';
 import type { Mutable, Palette, ThemeMode } from '../types.js';
 import { ACTIONS } from '../types.js';
-import { syncWorker } from '../worker-client.js';
 
 /** Choose the color-palette identity. The App-level resolver picks up the
  *  state change and rewrites `<html data-palette>`. */
@@ -54,7 +53,6 @@ export function setBpm(
         dispatch(ACTIONS.SET_BPM, newBpm);
     }
 
-    syncWorker();
     // #1144 — no immediate save: setBpm's only live caller is the SET_BPM
     // case in state-effects.ts's handleEffects, so the dispatch that reached
     // this call already schedules the #1127 chokepoint's debounced save once

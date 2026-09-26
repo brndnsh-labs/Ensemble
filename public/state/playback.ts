@@ -99,24 +99,6 @@ export function playbackReducer(action: Action): boolean {
             p.songMode = true;
             p.masterVolume = 0.4;
             return true;
-        case ACTIONS.TOGGLE_PLAY:
-            p.isPlaying = !p.isPlaying;
-            if (p.isPlaying) {
-                p.sessionStartTime = performance.now();
-                p.currentLoopCount = 0;
-            } else {
-                // Stopping ends any section-practice drill (#1016): the loop and
-                // the start-from-here seed are transient, invoked from the
-                // stopped-state popover. Clearing here means the global Play
-                // button always resumes normal full-form playback from the top.
-                p.startStep = 0;
-                p.loopStartStep = -1;
-                p.loopEndStep = -1;
-            }
-            if (p.autoIntensity) {
-                p.bandIntensity = 0.35;
-            }
-            return true;
         case ACTIONS.SET_BPM:
             p.bpm = Math.max(40, Math.min(240, parseInt(String(action.payload), 10)));
             return true;
@@ -164,9 +146,6 @@ export function playbackReducer(action: Action): boolean {
             return true;
         case ACTIONS.SET_SESSION_TIMER:
             p.sessionTimer = action.payload;
-            return true;
-        case ACTIONS.SET_ENDING_PENDING:
-            p.isEndingPending = action.payload;
             return true;
         case ACTIONS.SET_START_STEP:
             // Section-practice (#1016): seed the step the next play starts from.

@@ -5,15 +5,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { setBpm, setMode, setPalette } from '../../../public/controllers/app-controller.js';
 import { dispatch, getState } from '../../../public/state.js';
-import { syncWorker } from '../../../public/worker-client.js';
 
 vi.mock('../../../public/state.js', () => ({
     getState: vi.fn(),
     dispatch: vi.fn(),
-}));
-
-vi.mock('../../../public/worker-client.js', () => ({
-    syncWorker: vi.fn(),
 }));
 
 describe('App Controller', () => {
@@ -93,10 +88,9 @@ describe('App Controller', () => {
     });
 
     describe('setBpm', () => {
-        it('should dispatch SET_BPM and sync the worker when not playing', () => {
+        it('should dispatch SET_BPM when not playing', () => {
             setBpm(140);
             expect(dispatch).toHaveBeenCalledWith('SET_BPM', 140);
-            expect(syncWorker).toHaveBeenCalled();
         });
 
         it('should dispatch constrained BPM between 40 and 240', () => {
@@ -128,7 +122,7 @@ describe('App Controller', () => {
         it('should return early if BPM is same and not fromDispatch', () => {
             state.playback.bpm = 120;
             setBpm(120);
-            expect(syncWorker).not.toHaveBeenCalled();
+            expect(dispatch).not.toHaveBeenCalled();
         });
     });
 });

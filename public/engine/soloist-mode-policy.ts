@@ -25,10 +25,6 @@ export function isSoloistGuitarMode(mode: string | null | undefined): boolean {
     return resolveSoloistMode(mode) === 'guitar';
 }
 
-export function allowsSoloistPolyphony(mode: string | null | undefined): boolean {
-    return !isSoloistMonophonicMode(mode);
-}
-
 export function getSoloistVoiceLimit(mode: string | null | undefined): number {
     const resolved = resolveSoloistMode(mode);
     if (resolved === 'guitar') {

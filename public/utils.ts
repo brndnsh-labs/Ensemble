@@ -37,23 +37,6 @@ export function clamp01(x: number): number {
 }
 
 /**
- * Generates a random 6-character hex string to act as a default seed.
- */
-export function generateRandomSeed(): string {
-    // 🛡️ Sentinel: Security Enhancement - Cryptographically Secure RNG
-    // Fallback to Math.random() is maintained for environments without crypto.
-    if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
-        const array = new Uint32Array(1);
-        crypto.getRandomValues(array);
-        return (array[0] % 0xffffff).toString(16).padStart(6, '0').toUpperCase();
-    }
-    return Math.floor(Math.random() * 0xffffff)
-        .toString(16)
-        .padStart(6, '0')
-        .toUpperCase();
-}
-
-/**
  * Normalizes a note name (e.g., C# to Db) based on the project's map.
  */
 export function normalizeKey(k: string): string {
@@ -136,54 +119,6 @@ export function getMidi(freq: number): number | null {
 }
 
 /**
- * Chord-quality families whose triad has NO perfect fifth, read by
- * `chordHasPerfectFifth` below.
- *
- * Spellings are the union of what `getChordDetails` (`engine/chords-engine.ts`) normalizes
- * to (`dim`, `halfdim`, `aug`) and the longer forms that reach us from imported/hand-built
- * chord objects (`diminished`, `m7b5`, `half-diminished`, `augmented`, `+`).
- *
- * #1329 — the second reader, `getChordMidiNotes`, is gone: it was a scale-degree table with
- * no production caller (`scheduler-core.ts` has its own local function of that name and the
- * only importer was this module's unit test), so every new chord quality had to be taught to
- * it for nothing.
- */
-const DIMINISHED_QUALITIES = ['dim', 'dim7', 'diminished', 'halfdim', 'm7b5', 'half-diminished'];
-const AUGMENTED_QUALITIES = ['augmented', 'aug', '+'];
-
-/**
- * Does this chord quality contain a natural (perfect) fifth?
- *
- * why: any generator that wants to voice a bare "root + 5th" — the disco pump's `fifth`
- * variation in `bass-pump.ts` is the first — must not emit a natural 5 over a chord whose
- * fifth is flatted or sharped. On a `dim7`/`m7b5`/`aug`/`7alt` the comper is stating ♭5 or
- * ♯5 and a natural 5 in the bass grinds a semitone against it on an accented upbeat.
- *
- * NOTE this is an interval above the chord ROOT. A caller building the interval up from
- * some other pitch — a slash bass, say — needs its own separate check that the two coincide;
- * this predicate cannot see the difference. `canFifth` in `bass-pump.ts` is the precedent.
- *
- * NOTE for the bass in particular: "just play the altered fifth instead" is the wrong repair.
- * The bass sits at MIDI 34-46 under a pump, and down there a ♭5/♯5 fights the root it is
- * sounding against — the bass is the harmonic floor, so its job on those chords is to state
- * the root, not to color the alteration. That color belongs to the comper's register. So the
- * right answer for a quality without a perfect fifth is "pick a different gesture", which is
- * why this is a boolean predicate rather than a fifth-interval lookup.
- *
- * `false` for the diminished family, the augmented family (including `augmaj7`, which is
- * `maj7#5` normalized and so would slip a literal `#5` substring test), and any quality
- * spelled with `alt` / `b5` / `#5`. `true` otherwise — including `7b9`/`7#9`/`7#11`/`7b13`
- * and the sus qualities, all of which keep a natural fifth.
- */
-export function chordHasPerfectFifth(quality: string | undefined | null): boolean {
-    const q = (quality || 'major').toLowerCase();
-    if (DIMINISHED_QUALITIES.includes(q) || AUGMENTED_QUALITIES.includes(q)) {
-        return false;
-    }
-    return !(q.includes('alt') || q.includes('b5') || q.includes('#5') || q.includes('aug'));
-}
-
-/**
  * Returns the duration, in seconds, of one internal step (always a 16th)
  * given the displayed BPM.
  *
@@ -247,7 +182,7 @@ export function getStepsPerMeasure(ts: string): number {
  * Optimized binary search for arrays containing objects with `start` and `end` properties.
  * Useful for fast O(log N) lookups in `arranger.stepMap`, `sectionMap`, and `measureMap`.
  */
-export function binarySearchMapIndex(
+function binarySearchMapIndex(
     mapArray: Array<{ start: number; end: number }>,
     step: number,
 ): number {
@@ -277,37 +212,6 @@ export function binarySearchMap<T extends { start: number; end: number }>(
 ): T | null {
     const index = binarySearchMapIndex(mapArray, step);
     return index !== -1 ? mapArray[index] : null;
-}
-
-/**
- * Checks if a specific step falls within the "turnaround" (final part) of its section.
- */
-export function isSectionTurnaround(
-    step: number,
-    sectionMap: Array<{ start: number; end: number }>,
-    stepsPerBar: number,
-    thresholdBars = 1,
-): boolean {
-    if (!sectionMap || sectionMap.length === 0) {
-        return false;
-    }
-    const entry = binarySearchMap(sectionMap, step);
-    if (!entry) {
-        return false;
-    }
-
-    const sectionLengthSteps = entry.end - entry.start;
-    const measuresInSection = Math.max(1, sectionLengthSteps / stepsPerBar);
-
-    // Suppress turnarounds for extremely short sections (e.g., 1 measure)
-    if (measuresInSection <= thresholdBars && thresholdBars === 1) {
-        return false;
-    }
-
-    const stepInSection = step - entry.start;
-    const barInSection = Math.floor(stepInSection / stepsPerBar);
-
-    return barInSection >= measuresInSection - thresholdBars;
 }
 
 /**
