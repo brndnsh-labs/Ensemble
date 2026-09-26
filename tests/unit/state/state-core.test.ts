@@ -1,36 +1,10 @@
-/**
- * @vitest-environment happy-dom
- */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { dispatch, getState, storage, subscribe } from '../../../public/state.js';
+import { dispatch, getState, subscribe } from '../../../public/state.js';
 import { ACTIONS } from '../../../public/types.js';
-
-// Manual localStorage mock
-const localStorageMock = (() => {
-    let store: Record<string, string> = {};
-    return {
-        getItem: vi.fn((key) => store[key] || null),
-        setItem: vi.fn((key, value) => {
-            store[key] = value.toString();
-        }),
-        clear: vi.fn(() => {
-            store = {} as Record<string, string>;
-        }),
-        removeItem: vi.fn((key) => {
-            delete store[key];
-        }),
-    };
-})();
-
-Object.defineProperty(window, 'localStorage', {
-    value: localStorageMock,
-    writable: true,
-});
 
 describe('State Core Manager', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        window.localStorage.clear();
     });
 
     describe('getState', () => {
@@ -71,53 +45,6 @@ describe('State Core Manager', () => {
             dispatch(ACTIONS.FLASH_EXPIRED);
 
             expect(listener).not.toHaveBeenCalled();
-        });
-    });
-
-    describe('storage helper', () => {
-        it('should save and retrieve data from localStorage', () => {
-            const key = 'testKey';
-            const data = { foo: 'bar' };
-
-            storage.save(key, data);
-            const retrieved = storage.get(key);
-
-            expect(retrieved).toEqual(data);
-        });
-
-        it('should return empty array if key does not exist', () => {
-            const retrieved = storage.get('nonExistent');
-            expect(retrieved).toEqual([]);
-        });
-
-        it('should return empty array and log error on invalid JSON', () => {
-            window.localStorage.setItem('ensemble_invalid', 'not-json');
-            const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-            const retrieved = storage.get('invalid');
-
-            expect(retrieved).toEqual([]);
-            expect(consoleSpy).toHaveBeenCalled();
-            consoleSpy.mockRestore();
-        });
-
-        it('should handle localStorage being unavailable', () => {
-            // Mock localStorage to be undefined
-            const originalLocalStorage = window.localStorage;
-            Object.defineProperty(window, 'localStorage', {
-                value: undefined,
-                configurable: true,
-            });
-
-            // Should not throw
-            storage.save('key', 'val');
-            const result = storage.get('key');
-            expect(result).toEqual([]);
-
-            Object.defineProperty(window, 'localStorage', {
-                value: originalLocalStorage,
-                configurable: true,
-            });
         });
     });
 });

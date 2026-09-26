@@ -8,7 +8,6 @@ import {
 } from '../../../public/state/instruments.js';
 import { ACTIONS, type Mutable } from '../../../public/types.js';
 
-const mutableChords = chords as Mutable<typeof chords>;
 const mutableHarmony = harmony as Mutable<typeof harmony>;
 const mutableSoloist = soloist as Mutable<typeof soloist>;
 
@@ -94,18 +93,6 @@ describe('Instrument Reducer', () => {
             expect(chords.autoSound).toBe(true);
             expect(soloist.autoSound).toBe(true);
         });
-    });
-
-    it('#1064 — UPDATE_CONDUCTOR_DECISION never writes chords.density', () => {
-        // The conductor's computed density now lands only on the runtime-derived
-        // playback.conductorDensity mirror (see playback-reducer.test.ts); the
-        // instrument reducer must leave the user's own document field alone.
-        mutableChords.density = 'standard';
-        instrumentReducer({
-            type: ACTIONS.UPDATE_CONDUCTOR_DECISION,
-            payload: { density: 'thin' },
-        });
-        expect(chords.density).toBe('standard');
     });
 
     it('should handle SET_GENRE_FEEL for all instruments', () => {

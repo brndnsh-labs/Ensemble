@@ -15,10 +15,6 @@ vi.mock('../../../public/ui.js', () => ({
     },
 }));
 
-vi.mock('../../../public/state/persistence.js', () => ({
-    debounceSaveState: vi.fn(),
-}));
-
 import { clampFreq, createSoftClipCurve } from '../../../public/engine/audio-graph-utils.js';
 import { initAudio } from '../../../public/engine/engine.js';
 import { getState } from '../../../public/state.js';

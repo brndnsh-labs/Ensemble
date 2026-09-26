@@ -1,0 +1,14 @@
+{
+    "presetMajor": {
+        "name": "My Tune",
+        "sections": "W3sibCI6IkhlYWQiLCJ2IjoiSSB8IHZpIHwgaWkgfCBWIiwiayI6IkcifSx7ImwiOiJUYWciLCJ2IjoiSVYgfCBJIiwiciI6M31d",
+        "isMinor": false,
+        "timestamp": 1790450376128
+    },
+    "presetMinor": {
+        "name": "Minor thing",
+        "sections": "W3sibCI6IkEiLCJ2IjoiaSB8IGJWSSB8IGJWSUkgfCBpIn1d",
+        "isMinor": true,
+        "timestamp": 1790450376129
+    }
+}

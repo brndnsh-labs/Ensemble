@@ -1,4 +1,4 @@
-<!-- cycle:rendered template=DOCTRINE.md.tmpl hash=98e00d6d78f1 — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=DOCTRINE.md.tmpl hash=4a8585ddfd1b — managed by the-cycle; edit the template, not this file -->
 # Pipeline doctrine (shared)
 
 Single source of truth for the rules the Ensemble work-loop skills share. A skill that says
@@ -181,8 +181,8 @@ exits 127 on every one — "never ran", which a piped `tail` reports as a pass.
 **Repo-specific gotchas the gates enforce:**
 - A new `public/engine/*.ts` file must be registered in `AI_MAP.md` or the pre-commit
   docs-lint hook blocks the commit — add the row during `/done` staging.
-- `// @direct-mutation` is only sanctioned in the four categories in `CLAUDE.md`
-  (real-time hot paths, init-only, pre-mount, detached render clone). Everywhere else
+- `// @direct-mutation` is only sanctioned in the three categories in `CLAUDE.md`
+  (real-time hot paths, init-only, detached render clone). Everywhere else
   routes through `dispatch` — `state-discipline-reviewer` enforces it.
 
 ## §5 Judgment calls & autonomy

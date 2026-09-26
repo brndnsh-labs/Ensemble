@@ -40,12 +40,29 @@ const fileContents = allFiles.map((f) => ({ path: f, content: fs.readFileSync(f,
 
 // "Is this a state slice?" is a CONTENT question, not a directory one: `public/state/`
 // also holds non-slice plumbing (`state-effects`, `state-hydration`, `history`,
-// `persistence`, `share-codec`) that dispatches like any other consumer. Keying on the
+// `share-codec`) that dispatches like any other consumer. Keying on the
 // `deepSignal<` declaration keeps the dispatch/handler split honest as files move in and
 // out of that directory. Same discriminator as `scripts/check-mutations.ts`.
 const isSlice = (f) => /deepSignal</.test(f.content);
-// The effect/hydration listeners handle actions with `case` arms outside any slice.
-const HANDLER_FILES = ['state-effects.ts', 'state-hydration.ts'];
+// The effect listener handles actions with `case` arms outside any slice.
+const HANDLER_FILES = ['state-effects.ts'];
+
+/**
+ * Actions left with no dispatcher when v1's load/save layer went (#1424): v1's readers
+ * dispatched these, and `state-effects.ts`'s save denylist named the `UPDATE_*` family. #1381
+ * deletes each (with its reducer arms) or records why it stays, and then empties this list —
+ * it is a hand-off, not an exemption, so don't add to it.
+ */
+const UNDISPATCHED_SINCE_1424 = [
+    'RESET_STATE',
+    'SET_MIDI_CONFIG',
+    'SET_SESSION_TIMER',
+    'SET_MODAL_OPEN',
+    'UPDATE_SB',
+    'UPDATE_HB',
+    'UPDATE_GB',
+    'UPDATE_CONDUCTOR_DECISION',
+];
 const isHandlerFile = (f) => isSlice(f) || HANDLER_FILES.some((h) => f.path.endsWith(h));
 
 // Extract ACTIONS keys from public/types.js
@@ -97,7 +114,11 @@ describe('State Integrity Audit', () => {
                 'PROG_VALIDATED',
             ];
 
-            if (!isDispatched && !exceptions.includes(key)) {
+            if (
+                !isDispatched &&
+                !exceptions.includes(key) &&
+                !UNDISPATCHED_SINCE_1424.includes(key)
+            ) {
                 unusedInDispatch.push(key);
             }
             if (!isHandled && !exceptions.includes(key)) {

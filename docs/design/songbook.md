@@ -3,6 +3,8 @@
 **Status:** Accepted architecture; foundation work begins in issue #1029. Later phases remain
 design targets and must ship as separately reviewed stories.
 **Date:** 2026-08-26
+**Amended 2026-09-26 (#1424):** v1's session writer and reader that §1 and §10 describe
+(`saveCurrentState()`, `hydrateState()`) are deleted; a chart document is the only save.
 **Goal:** Let a musician keep, reopen, share, and back up multiple songs without making the live
 arranger state, browser storage, or share URL into accidental document formats.
 

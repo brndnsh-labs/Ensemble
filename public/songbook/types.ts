@@ -67,7 +67,11 @@ export interface ChartArrangement {
     grouping: number[] | null;
     isMinor: boolean;
     notation: ChartNotation;
-    lastChordPreset: string;
+    /**
+     * Legacy (v1's preset library, #1424): the name of the preset the chords last came from.
+     * Read, never written, like the old engine's fields below.
+     */
+    lastChordPreset?: string;
 }
 
 /**

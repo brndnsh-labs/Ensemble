@@ -152,13 +152,10 @@ export function tryDecompressSections(str: string): Section[] | null {
                 key: typeof s.k === 'string' ? safeSectionKey(s.k) : '',
                 isMinor: typeof s.m === 'number' ? s.m === 1 : undefined,
                 repeat: Math.min(Math.max(1, parseInt(s.r, 10) || 1), 64), // Clamp repeats
-                // Membership, not just length (#1258). `decompressSections`'s output goes
-                // straight into state with no `validateSections` pass, so this is the ONLY
-                // guard on the `?s=` path — and '__proto__' (9), 'toString' (8) and
-                // 'valueOf' (7) all slipped under a `length < 10` check. TIME_SIGNATURES is
-                // null-prototype now so the consequence is already neutralized downstream,
-                // but two readers of one field disagreeing on its keyspace is the defect:
-                // `validateSections` requires table membership, so this should too.
+                // Membership, not just length (#1258): '__proto__' (9), 'toString' (8) and
+                // 'valueOf' (7) all slipped under a `length < 10` check. This is the only
+                // meter guard a `?s=` payload gets, and `validateSections` requires table
+                // membership, so this does too.
                 timeSignature: typeof s.t === 'string' && TIME_SIGNATURES[s.t] ? s.t : '',
                 seamless: !!s.s,
             };
@@ -192,12 +189,4 @@ export function tryDecompressSections(str: string): Section[] | null {
         console.error('Failed to decompress sections', e);
         return null;
     }
-}
-
-/**
- * Decompresses the Base64 string back into sections, handling Unicode. The
- * fallback is retained for user-facing share URLs that must remain recoverable.
- */
-export function decompressSections(str: string): Section[] {
-    return tryDecompressSections(str) ?? [{ id: generateId(), label: 'Intro', value: 'I | IV' }];
 }

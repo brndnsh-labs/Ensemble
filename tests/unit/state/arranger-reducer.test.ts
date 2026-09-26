@@ -67,7 +67,6 @@ describe('Arranger Reducer', () => {
                 sectionMap: [{ id: '1' }],
                 history: ['{}'],
                 lastInteractedSectionId: 's2',
-                lastChordPreset: 'Jazz',
                 mutatedSectionId: 's1',
                 isDirty: true,
             };

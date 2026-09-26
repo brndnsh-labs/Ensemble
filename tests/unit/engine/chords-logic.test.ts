@@ -12,7 +12,7 @@ vi.mock('../../../public/ui.js', () => ({ ui: { updateProgressionDisplay: vi.fn(
 vi.mock('../../../public/state.js', () => {
     const mockState = {
         playback: { bandIntensity: 0.5 },
-        chords: { density: 'standard', octave: 60 },
+        chords: {},
         arranger: {
             timeSignature: '4/4',
             key: 'C',
@@ -94,14 +94,13 @@ import {
 import { getState } from '../../../public/state.js';
 import { getMidi } from '../../../public/utils.js';
 
-const { arranger, playback, chords, bass, groove } = getState();
+const { arranger, playback, bass, groove } = getState();
 
 describe('Chords & Voicing Logic', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         groove.genreFeel = 'Rock';
         bass.enabled = true;
-        chords.density = 'standard';
         playback.bandIntensity = 0.5;
     });
 
@@ -236,28 +235,27 @@ describe('Chords & Voicing Logic', () => {
 
     describe('Inversion & Voice Leading (getBestInversion)', () => {
         it('should center the first chord and minimize movement thereafter', () => {
-            // C Major triad
-            const voicedC = getBestInversion(getState(), 60, [0, 4, 7], []);
-            expect(voicedC).toEqual([55, 60, 64]);
+            // C Major triad, centred on the comp's anchor (MIDI 65)
+            const voicedC = getBestInversion(60, [0, 4, 7], []);
+            expect(voicedC).toEqual([60, 64, 67]);
 
             // Transition to F Major [5, 9, 0]
-            const voicedF = getBestInversion(getState(), 65, [0, 4, 7], voicedC);
-            // Closest F triad to [55, 60, 64] is [53, 57, 60] or [57, 60, 65]
-            // Let's verify voice leading
-            const avgC = voicedC.reduce((a, b) => a + b, 0) / 3; // 59.66
+            const voicedF = getBestInversion(65, [0, 4, 7], voicedC);
+            // Verify voice leading: the F triad stays close to the C before it.
+            const avgC = voicedC.reduce((a, b) => a + b, 0) / 3; // 63.66
             const avgF = voicedF.reduce((a, b) => a + b, 0) / 3;
             expect(Math.abs(avgF - avgC)).toBeLessThan(7);
         });
 
         it('should respect range limits and prevent overlapping with bass', () => {
-            const voicedLow = getBestInversion(getState(), 36, [0, 4, 7], []);
+            const voicedLow = getBestInversion(36, [0, 4, 7], []);
             const avg = voicedLow.reduce((a, b) => a + b, 0) / 3;
             expect(avg).toBeGreaterThanOrEqual(43);
         });
 
         it('should maintain spread voicings as a unit', () => {
             const intervals = [0, 7, 16, 19];
-            const voiced = getBestInversion(getState(), 48, intervals, []);
+            const voiced = getBestInversion(48, intervals, []);
             const resultIntervals = voiced.map((n) => n - voiced[0]);
             expect(resultIntervals).toEqual(intervals);
         });
@@ -568,30 +566,14 @@ describe('Chords & Voicing Logic', () => {
             expect(arranger.progression[0].freqs.length).toBe(5);
         });
 
-        it('#1064 — voicing density resolves from playback.conductorDensity when set, else falls back to chords.density', () => {
+        it('voices a parsed chord at standard density (#1424)', () => {
             arranger.sections = [{ id: 's1', label: 'Main', value: 'I', repeat: 1 }];
             arranger.key = 'C';
             arranger.isMinor = false;
             groove.genreFeel = 'Rock';
             playback.bandIntensity = 0.5; // below every intensity-based extension tier
-            chords.density = 'thin';
-            playback.conductorDensity = null;
-
-            // No conductor value yet: falls back to the document field. Rock major
-            // standard is [0, 7, 16, 19] (getIntervals unit above); thin strips the 5th.
-            validateProgression(getState());
-            expect(arranger.progression[0].intervals).toEqual([0, 16, 19]);
-
-            // The conductor's runtime-derived mirror wins over the document field —
-            // never the other way around (#1064: the conductor must never write
-            // chords.density itself, only this separate runtime field).
-            playback.conductorDensity = 'rich';
-            validateProgression(getState());
-            expect(arranger.progression[0].intervals).toEqual([0, 7, 16, 19, 14]);
-
-            // Clearing the conductor mirror falls back to the document field again.
-            playback.conductorDensity = null;
-            chords.density = 'standard';
+            // Rock major standard is [0, 7, 16, 19] (getIntervals unit above). The density was a
+            // chords-slice setting until #1424; nothing changed it, so the parser uses standard.
             validateProgression(getState());
             expect(arranger.progression[0].intervals).toEqual([0, 7, 16, 19]);
         });

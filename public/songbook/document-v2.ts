@@ -117,7 +117,6 @@ export function validateChartDocumentV2(candidate: unknown): CodecDecodeResult<C
                 timeSignature: '4/4',
                 grouping: null,
                 notation: 'name',
-                lastChordPreset: 'Validation',
                 sections: [{ id: 'validation-only', label: 'Validation', value: 'C' }],
             },
         },

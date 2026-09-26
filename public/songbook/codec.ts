@@ -363,15 +363,12 @@ function validateArrangement(
     candidate: unknown,
     path: string,
 ): ChartArrangement {
-    const record = ctx.object(candidate, path, [
-        'sections',
-        'key',
-        'timeSignature',
-        'grouping',
-        'isMinor',
-        'notation',
-        'lastChordPreset',
-    ]);
+    const record = ctx.object(
+        candidate,
+        path,
+        ['sections', 'key', 'timeSignature', 'grouping', 'isMinor', 'notation'],
+        ['lastChordPreset'],
+    );
     const rawSections = record.sections;
     let sections: ChartSection[] = [];
     if (!Array.isArray(rawSections)) {
@@ -435,12 +432,14 @@ function validateArrangement(
             allowed: NOTATIONS,
             message: 'Unknown notation',
         }) as ChartArrangement['notation'],
-        lastChordPreset: stringField(ctx, record, 'lastChordPreset', path, {
-            min: 1,
-            max: 100,
-            predicate: validateSafeDisplayString,
-            message: 'Preset name contains unsafe characters',
-        }),
+        ...legacy(record, 'lastChordPreset', () =>
+            stringField(ctx, record, 'lastChordPreset', path, {
+                min: 1,
+                max: 100,
+                predicate: validateSafeDisplayString,
+                message: 'Preset name contains unsafe characters',
+            }),
+        ),
     };
 }
 
@@ -877,6 +876,16 @@ export function writtenSettings(content: Pick<ChartContent, 'performance' | 'ban
             },
         },
     };
+}
+
+/**
+ * A chart's arrangement as a chart is written today: v1's `lastChordPreset` left out (#1424).
+ * The arrangement's counterpart of {@link writtenSettings}, for comparing an old chart, whose
+ * stored copy keeps the field until its next save, with what the app captures now.
+ */
+export function writtenArrangement(arrangement: ChartArrangement): ChartArrangement {
+    const { lastChordPreset: _legacy, ...written } = arrangement;
+    return written;
 }
 
 function validateChartContent(

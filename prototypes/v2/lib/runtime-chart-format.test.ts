@@ -7,7 +7,7 @@
  * next capture writes none of them, so it sheds them on its next save. Genre is stored once, by
  * name; energy rides the chart.
  */
-import { validateChartDocument, writtenSettings } from '@engine/songbook/codec';
+import { validateChartDocument, writtenArrangement, writtenSettings } from '@engine/songbook/codec';
 import type { ChartContent, ChartDocument } from '@engine/songbook/types';
 import { describe, expect, it } from 'vitest';
 import { captureContent, captureDocument, load, state } from './runtime';
@@ -112,6 +112,8 @@ describe('opening an old chart and capturing it again', () => {
         load(stored);
         const content = captureContent();
         expect(content.performance).not.toHaveProperty('complexity');
+        // v1's preset name went the same lazy way (#1424).
+        expect(content.arrangement).not.toHaveProperty('lastChordPreset');
         expect(content.band).not.toHaveProperty('harmony');
         for (const lane of ['chords', 'bass', 'soloist', 'groove'] as const) {
             for (const field of LEGACY[lane]) {
@@ -126,7 +128,8 @@ describe('opening an old chart and capturing it again', () => {
     it('keeps every field the band honours, exactly', () => {
         load(oldChart());
         const { arrangement, performance, band } = captureContent();
-        expect(arrangement).toEqual(oldChart().chart.arrangement);
+        const { lastChordPreset: _dropped, ...music } = oldChart().chart.arrangement;
+        expect(arrangement).toEqual(music);
         expect(performance).toEqual({
             bpm: 132,
             seed: 'A1B2C3',
@@ -172,7 +175,17 @@ describe('opening an old chart and capturing it again', () => {
         // The stand's dirty check compares charts as written today (`written` in ensemble.tsx):
         // the stored copy keeps its legacy fields until the next Save, a capture never has them.
         const asWritten = (chart: Pick<ChartContent, 'performance' | 'band'>) =>
-            JSON.stringify({ ...chart, ...writtenSettings(chart) });
+            JSON.stringify({
+                ...chart,
+                ...writtenSettings(chart),
+                ...('arrangement' in chart
+                    ? {
+                          arrangement: writtenArrangement(
+                              chart.arrangement as ChartContent['arrangement'],
+                          ),
+                      }
+                    : {}),
+            });
         const stored = oldChart();
         load(stored);
         expect(asWritten(captureDocument(stored).chart)).toBe(asWritten(stored.chart));

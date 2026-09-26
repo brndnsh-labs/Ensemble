@@ -162,10 +162,11 @@ function printUsage(): void {
 /**
  * The `bnd` blob for the parts a link switches, or null when it switches none.
  *
- * Hydration applies each band block WHOLESALE — a block that carries only `e` would reset that
- * part's octave to hydration's fallback (48 for chords, where the app default is 65) — so every
+ * v1's reader applied each band block WHOLESALE — a block that carries only `e` would reset that
+ * part's octave to its fallback (48 for chords, where the app default was 65) — so every
  * emitted block is the part's full default config with just the requested field changed. Blocks
- * for untouched parts are omitted so they keep whatever the genre sets up.
+ * for untouched parts are omitted so they keep whatever the genre sets up. The octave, preset
+ * and density are v1's own defaults, written as literals since the state fields went (#1424).
  */
 function buildBandParam(args: CliArgs): string | null {
     const switched = new Map<Part, boolean>();
@@ -186,8 +187,8 @@ function buildBandParam(args: CliArgs): string | null {
         band.s = {
             e: flag('soloist', soloist.enabled),
             s: soloist.style,
-            p: soloist.preset,
-            o: soloist.octave,
+            p: 'trumpet',
+            o: 72,
             v: soloist.volume,
             r: soloist.reverb,
             m: soloist.mode,
@@ -199,7 +200,7 @@ function buildBandParam(args: CliArgs): string | null {
         band.b = {
             e: flag('bass', bass.enabled),
             s: bass.style,
-            o: bass.octave,
+            o: 38,
             v: bass.volume,
             r: bass.reverb,
         };
@@ -208,10 +209,10 @@ function buildBandParam(args: CliArgs): string | null {
         band.c = {
             e: flag('chords', chords.enabled),
             s: chords.style,
-            o: chords.octave,
+            o: 65,
             v: chords.volume,
             r: chords.reverb,
-            d: args.density || chords.density,
+            d: args.density || 'standard',
         };
     }
     if (switched.has('harmony')) {

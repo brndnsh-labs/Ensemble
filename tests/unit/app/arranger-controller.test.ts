@@ -10,7 +10,6 @@ import {
     onSectionUpdate,
     refreshArrangerUI,
     replaceChordInSection,
-    saveProgression,
     setKeyCenter,
     setSectionInstrumentEnabled,
     setSectionIntensity,
@@ -22,9 +21,7 @@ import { flushBuffers } from '../../../public/controllers/instrument-controller.
 import { validateProgression } from '../../../public/engine/chords-engine.js';
 import { restoreGains } from '../../../public/engine/engine.js';
 import { pushHistory } from '../../../public/state/history.js';
-import { saveCurrentState } from '../../../public/state/persistence.js';
 import { getState, stateMap } from '../../../public/state.js';
-import { showToast } from '../../../public/ui.js';
 
 vi.mock('../../../public/state.js', () => {
     const mockState = {};
@@ -70,16 +67,11 @@ vi.mock('../../../public/controllers/instrument-controller.js', () => ({
     flushBuffers: vi.fn(),
 }));
 
-vi.mock('../../../public/state/persistence.js', () => ({
-    saveCurrentState: vi.fn(),
-}));
-
 vi.mock('../../../public/ui.js', () => ({
     showToast: vi.fn(),
 }));
 
 vi.mock('../../../public/state/share-codec.js', () => ({
-    compressSections: vi.fn((sections) => sections), // Just pass through for tests
     generateId: vi.fn(() => 'new-id'),
 }));
 
@@ -94,38 +86,14 @@ vi.mock('../../../public/utils.js', () => ({
 const originalPrompt = window.prompt;
 const originalConfirm = window.confirm;
 
-// Manual localStorage mock
-const localStorageMock = (() => {
-    let store = {};
-    return {
-        getItem: vi.fn((key) => store[key] || null),
-        setItem: vi.fn((key, value) => {
-            store[key] = value.toString();
-        }),
-        clear: vi.fn(() => {
-            store = {};
-        }),
-        removeItem: vi.fn((key) => {
-            delete store[key];
-        }),
-    };
-})();
-
-Object.defineProperty(window, 'localStorage', {
-    value: localStorageMock,
-    writable: true,
-});
-
 describe('Arranger Controller', () => {
     let state;
 
     beforeEach(() => {
         vi.clearAllMocks();
-        window.localStorage.clear();
 
         state = {
             arranger: {
-                lastChordPreset: 'Test Preset',
                 sections: [
                     { id: 's1', label: 'Verse', value: 'C G', repeat: 2, key: 'C' },
                     { id: 's2', label: 'Chorus', value: 'Am F', repeat: 1, key: 'A' },
@@ -143,26 +111,6 @@ describe('Arranger Controller', () => {
         window.confirm = originalConfirm;
     });
 
-    describe('saveProgression', () => {
-        it('should save to localStorage and show toast', () => {
-            window.prompt = vi.fn().mockReturnValue('My New Hit');
-
-            saveProgression();
-
-            const saved = JSON.parse(window.localStorage.getItem('ensemble_userPresets'));
-            expect(saved).toHaveLength(1);
-            expect(saved[0].name).toBe('My New Hit');
-            expect(saved[0].sections.length).toBe(2);
-            expect(showToast).toHaveBeenCalledWith('Saved "My New Hit" to library');
-        });
-
-        it('should bail if prompt is cancelled', () => {
-            window.prompt = vi.fn().mockReturnValue(null);
-            saveProgression();
-            expect(window.localStorage.getItem('ensemble_userPresets')).toBeNull();
-        });
-    });
-
     describe('validateAndAnalyze', () => {
         it('should validate the progression', () => {
             validateAndAnalyze();
@@ -176,7 +124,6 @@ describe('Arranger Controller', () => {
             expect(validateProgression).toHaveBeenCalled();
             expect(flushBuffers).toHaveBeenCalled();
             expect(restoreGains).toHaveBeenCalledWith(stateMap);
-            expect(saveCurrentState).toHaveBeenCalled();
         });
     });
 

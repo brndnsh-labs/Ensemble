@@ -8,7 +8,6 @@ import type { Mutable } from '../../../public/types.js';
 
 const state = getState();
 const arranger = state.arranger as Mutable<typeof state.arranger>;
-const chords = state.chords as Mutable<typeof state.chords>;
 const bass = state.bass as Mutable<typeof state.bass>;
 const groove = state.groove as Mutable<typeof state.groove>;
 
@@ -22,8 +21,6 @@ describe('Harmonic Fuzz Testing', () => {
         vi.clearAllMocks();
         arranger.key = 'C';
         arranger.timeSignature = '4/4';
-        chords.octave = 60;
-        chords.density = 'standard';
         groove.genreFeel = 'Rock';
         bass.enabled = true;
     });

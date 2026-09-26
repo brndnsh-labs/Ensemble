@@ -1,0 +1,48 @@
+{
+    "arranger": {
+        "key": "C",
+        "isMinor": false,
+        "timeSignature": "4/4",
+        "notation": "roman",
+        "lastChordPreset": "Pop (Standard)",
+        "sectionValues": ["I7 | IV7"],
+        "randomizeSeed": true
+    },
+    "playback": {
+        "bpm": 100
+    },
+    "chords": {
+        "enabled": true,
+        "voice": "pack:rhodes",
+        "autoSound": false,
+        "volume": 0.62,
+        "reverb": 0.3
+    },
+    "bass": {
+        "enabled": true,
+        "voice": "synth",
+        "autoSound": true,
+        "volume": 0.48,
+        "reverb": 0.05
+    },
+    "soloist": {
+        "enabled": true,
+        "voice": "synth",
+        "autoSound": true,
+        "volume": 1,
+        "reverb": 0.6,
+        "mode": "monophonic",
+        "autoMode": true
+    },
+    "groove": {
+        "enabled": true,
+        "voice": "pack:acoustic-kit",
+        "autoSound": false,
+        "volume": 1,
+        "reverb": 0.2,
+        "swing": 62,
+        "swingSub": "16th",
+        "humanize": 35,
+        "lastSmartGenre": "Funk"
+    }
+}

@@ -214,7 +214,6 @@ export function playBandEvent(
     playNote(state, hz(event.midi), time, length, {
         muted: event.muted,
         vol: level,
-        instrument: (state.chords as { instrument?: string }).instrument || 'Piano',
         numVoices: chordSize,
     });
 }

@@ -42,19 +42,6 @@ export default {
             '.jsx': ['.tsx', '.jsx'],
             '.mjs': ['.mjs'],
         };
-        // The prototype imports the real browser engine, never the old page bootstrap.
-        // Isolate its legacy persistence calls at compile time. Preview saves must not
-        // reach ensemble_currentState, including calls inside the conductor/effects.
-        config.plugins.push(
-            new webpack.NormalModuleReplacementPlugin(/persistence\.js$/, (resource) => {
-                if (
-                    path.resolve(resource.context, resource.request) ===
-                    path.resolve(directory, '../../public/state/persistence.js')
-                ) {
-                    resource.request = path.join(directory, 'lib/legacy-persistence.ts');
-                }
-            }),
-        );
         config.plugins.push(
             new webpack.DefinePlugin({
                 'import.meta.env': JSON.stringify({ MODE: 'test', DEV: false }),

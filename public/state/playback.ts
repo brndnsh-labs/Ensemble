@@ -28,7 +28,6 @@ export const playback = deepSignal<GlobalContext>({
     mode: 'auto',
     wakeLock: null,
     bandIntensity: DEFAULT_BAND_INTENSITY,
-    complexity: 0.3,
     autoIntensity: true,
     metronome: false,
     applyPresetSettings: false,
@@ -53,7 +52,6 @@ export const playback = deepSignal<GlobalContext>({
     suspendTimeout: null,
     currentKey: null,
     conductorVelocity: 1.0,
-    conductorDensity: null,
     conductorHarmonyComplexity: null,
     masterVolume: 0.4,
     countIn: true,
@@ -84,7 +82,6 @@ export function playbackReducer(action: Action): boolean {
             p.palette = 'after-hours';
             p.mode = 'auto';
             p.bandIntensity = DEFAULT_BAND_INTENSITY;
-            p.complexity = 0.3;
             p.autoIntensity = true;
             p.metronome = false;
             p.countIn = true;
@@ -93,7 +90,6 @@ export function playbackReducer(action: Action): boolean {
             p.sessionTimer = 5;
             p.applyPresetSettings = false;
             p.conductorVelocity = 1.0;
-            p.conductorDensity = null;
             p.conductorHarmonyComplexity = null;
             // #1259 — hydrated fields that RESET_STATE used to skip. `masterVolume` is
             // the one with teeth: it is clamped to [0,1], so a persisted `0` survived
@@ -138,9 +134,6 @@ export function playbackReducer(action: Action): boolean {
             }
             p.bandIntensity = Math.max(0, Math.min(1, action.payload));
             return true;
-        case ACTIONS.SET_COMPLEXITY:
-            p.complexity = Math.max(0, Math.min(1, action.payload));
-            return true;
         case ACTIONS.SET_AUTO_INTENSITY:
             p.autoIntensity = !!action.payload;
             return true;
@@ -179,12 +172,8 @@ export function playbackReducer(action: Action): boolean {
             if (action.payload.velocity) {
                 p.conductorVelocity = action.payload.velocity;
             }
-            // #1064 — runtime-derived mirrors of chords.density/harmony.complexity.
-            // Never written onto the document fields themselves; readers compose
-            // them at READ time (`playback.conductorDensity ?? chords.density`).
-            if (action.payload.density !== undefined) {
-                p.conductorDensity = action.payload.density;
-            }
+            // #1064 — runtime-derived mirror of harmony.complexity. Never written onto
+            // the document field itself; readers compose the two at READ time.
             if (action.payload.harmonyComplexity !== undefined) {
                 p.conductorHarmonyComplexity = action.payload.harmonyComplexity;
             }

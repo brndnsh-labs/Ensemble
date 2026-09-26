@@ -14,74 +14,19 @@ import {
     velocityTimbre,
 } from './synth-utils.js';
 
-interface ChordInstrumentPreset {
-    attack: number;
-    decay: number;
-    filterBase: number;
-    filterDepth: number;
-    resonance: number;
-    gainMult: number;
-    tine?: boolean;
-    fundamental?: OscillatorType;
-    harmonic?: OscillatorType;
-    fifth?: OscillatorType;
-    weights?: number[];
-    reverbMult?: number;
-}
-
-const INSTRUMENT_PRESETS: Record<string, ChordInstrumentPreset> = {
-    Warm: {
-        attack: 0.03,
-        decay: 0.6,
-        filterBase: 600,
-        filterDepth: 1800,
-        resonance: 2.2,
-        tine: true,
-        fundamental: 'triangle',
-        harmonic: 'sine',
-        fifth: 'sine',
-        weights: [1.2, 0.3, 0.1],
-        reverbMult: 1.1,
-        gainMult: 1.0,
-    },
-    Piano: {
-        attack: 0.001,
-        decay: 5.0,
-        filterBase: 400,
-        filterDepth: 2400,
-        resonance: 1.2,
-        gainMult: 1.25,
-    },
-    // Mix-pass 2026-05-23 — power-metal accompaniment previously used `Warm`,
-    // an electric-piano voice (tine: true, resonance: 2.2) that droned when
-    // retriggered every 8th note: the high-Q lowpass peak never settled
-    // between chugs and tails stacked into a sustained metallic ring. The
-    // PowerMetal preset is a dry, palm-mute-leaning amp tone — single saw
-    // fundamental, no tine, low resonance so the filter sweep moves but
-    // doesn't ring, and a short decay so each chug clears before the next.
-    PowerMetal: {
-        attack: 0.005,
-        decay: 0.35,
-        filterBase: 350,
-        filterDepth: 1400,
-        resonance: 0.7,
-        tine: false,
-        fundamental: 'sawtooth',
-        gainMult: 0.9,
-    },
-};
-
-function createPianoWave(audioCtx: AudioContext): PeriodicWave {
-    const real = new Float32Array([0, 1, 0.6, 0.4, 0.25, 0.15, 0.1, 0.08, 0.05, 0.03]);
-    const imag = new Float32Array(real.length).fill(0);
-    return audioCtx.createPeriodicWave(real, imag);
-}
+/**
+ * The additive piano body's onset and level (`playAdditiveBody`). The chord voice had two other
+ * presets, `Warm` and `PowerMetal`, played through a legacy single-oscillator body; they were
+ * chosen by the chords slice's `instrument` field, which only ever held a value that resolved
+ * to this piano. Both went with that field (#1424).
+ */
+const PIANO_BODY = { attack: 0.001, gainMult: 1.25 } as const;
 
 // synth-audit Epic 2 S3 — the velocity "bright" wave. Energy is concentrated
 // in partials 3-7 with a deliberately light fundamental, so layering it adds
 // upper-harmonic shimmer (an EP-leaning tine bite) without doubling the body's
-// low end. The `new` voice crossfades this in by velocity: soft chords stay on
-// the mellow `pianoWave` body alone, hard hits bloom this layer in on top.
+// low end. The voice crossfades this in by velocity: soft chords stay on the
+// mellow additive body alone, hard hits bloom this layer in on top.
 function createBrightWave(audioCtx: AudioContext): PeriodicWave {
     const real = new Float32Array([
         0, 0.15, 0.25, 0.4, 0.5, 0.45, 0.35, 0.28, 0.2, 0.14, 0.09, 0.05,
@@ -90,10 +35,7 @@ function createBrightWave(audioCtx: AudioContext): PeriodicWave {
     return audioCtx.createPeriodicWave(real, imag);
 }
 
-let pianoWave: PeriodicWave | null = null;
 let brightWave: PeriodicWave | null = null;
-let cachedShaperCurve: Float32Array<ArrayBuffer> | null = null;
-let cachedShaperDrive = -1;
 
 export function updateSustain(
     state: EnsembleState,
@@ -143,7 +85,6 @@ export function killAllPianoNotes(state: EnsembleState): void {
 interface PlayNoteOptions {
     vol?: number;
     index?: number;
-    instrument?: string;
     muted?: boolean;
     numVoices?: number;
     /**
@@ -170,12 +111,13 @@ const SYNTH_CHORD_LEVEL = 0.85;
 // is structurally satisfied by the sampled `SampledNoteHandle`.
 type ChordVoiceHandle = { release(when: number, fade: number): void };
 
-// The synth chord voice. `playNoteNew` is the reworked synth-audit voice (the
-// only one since #649 retired the Current/New A/B); it internally layers a
-// strum-staggered fundamental rendered by `playNoteCurrent`.
-function dispatchChordSynth(...args: Parameters<typeof playNoteCurrent>): ChordVoiceHandle | null {
-    return playNoteNew(...args);
-}
+type PlayNoteArgs = [
+    state: EnsembleState,
+    freq: number,
+    time: number,
+    duration: number,
+    opts?: PlayNoteOptions,
+];
 
 // synth-audit Epic 6 S6 — play one chord note from a sample pack. Converts the
 // scheduled frequency to a MIDI target, picks the nearest loaded zone, and
@@ -231,7 +173,7 @@ function playSampledChord(
 // synth-audit Epic 6 S1/S6 — instrument-source seam. A `pack:<id>` voice plays
 // from the sample pack once its zones are loaded; until then (or if a note is
 // out of range) it falls back to the synth voice — bit-identical with no packs.
-export function playNote(...args: Parameters<typeof playNoteCurrent>): ChordVoiceHandle | null {
+export function playNote(...args: PlayNoteArgs): ChordVoiceHandle | null {
     const source = resolveInstrumentSource(args[0].chords.voice);
     if (source.kind === 'sample') {
         const [state, freq, time, duration, opts] = args;
@@ -243,7 +185,7 @@ export function playNote(...args: Parameters<typeof playNoteCurrent>): ChordVoic
     // #707 — the synth path now returns a release handle too, so the scheduler
     // can cut a ringing synth voicing on a chord change exactly as it cuts a
     // sampled one (was: returned null, so synth chords rang across the change).
-    return dispatchChordSynth(...args);
+    return playSynthNote(...args);
 }
 
 // synth-audit Epic 2 S1 — strum-stagger. The `current` voice always received
@@ -251,11 +193,7 @@ export function playNote(...args: Parameters<typeof playNoteCurrent>): ChordVoic
 // perfectly simultaneously. The `new` voice gets a real ascending pitch rank
 // and turns it into a low→high roll: a base ~4 ms-per-voice spread plus a
 // small deterministic timing jitter so the roll isn't mechanically linear.
-// The offset is applied to `time` here and the delegated call gets `index: 0`
-// so `playNoteCurrent`'s legacy `Math.random()` stagger stays off (no double
-// strum). The lowest note (index 0) is anchored exactly on the beat.
-// `freq` is assumed finite here — `playNoteCurrent` is the guarding layer,
-// and the scheduler's `.filter(n => n.freq)` keeps non-finite notes out.
+// The lowest note (index 0) is anchored exactly on the beat.
 const CHORD_STRUM_STEP = 0.004; // seconds of roll per chord-voice index
 // Fraction of the chords lane's timing spread the strum jitter may use. Kept
 // small so the roll stays a roll — the jitter shapes it, never reorders it.
@@ -264,8 +202,8 @@ const CHORD_STRUM_JITTER = 0.15;
 /**
  * #1068 — the per-voice wobble on a chord roll, seeded and knob-gated.
  *
- * Was `Math.random()` in `playNoteCurrent` and an un-gated fixed-scale
- * `humanizeNote` in `playNoteNew` (a constant 0.15 that ignored `groove.humanize`
+ * Was `Math.random()` in the legacy chord body and an un-gated fixed-scale
+ * `humanizeNote` in this voice (a constant 0.15 that ignored `groove.humanize`
  * entirely, so a chart with the knob at 0 still got ±2.4 ms of strum jitter).
  * Now: deterministic in `(index, freq)` — the same voice of the same voicing
  * rolls the same way every time — and exactly 0 when the knob is off.
@@ -285,22 +223,15 @@ function chordStrumJitter(index: number, freq: number, humanize: number | undefi
     );
 }
 
-function playNoteNew(...args: Parameters<typeof playNoteCurrent>): ChordVoiceHandle | null {
+/** The synth chord voice: the synth-audit additive piano (the only one since #649 and #1424). */
+function playSynthNote(...args: PlayNoteArgs): ChordVoiceHandle | null {
     const [state, freq, time, duration, opts = {}] = args;
-    const {
-        vol = 0.1,
-        index = 0,
-        instrument = 'Piano',
-        muted = false,
-        numVoices = 1,
-        ignoreSustain = false,
-    } = opts;
+    const { vol = 0.1, index = 0, muted = false, numVoices = 1, ignoreSustain = false } = opts;
     const { playback, groove } = state;
 
-    // Bail to the delegate's own guard if the context is unusable — never
-    // schedule a transient for a note `playNoteCurrent` will reject.
+    // Nothing to schedule on an unusable context or a non-finite pitch.
     if (!playback.audio || !Number.isFinite(freq)) {
-        return playNoteCurrent(state, freq, time, duration, { ...opts, index: 0 });
+        return null;
     }
 
     // Strum offset (Epic 2 S1) — 0 for the lowest note (index 0), ascending
@@ -312,22 +243,8 @@ function playNoteNew(...args: Parameters<typeof playNoteCurrent>): ChordVoiceHan
     }
     const startTime = Math.max(time + strum, playback.audio.currentTime);
 
-    // Epic 2 targets the electric-piano voice — for any other instrument
-    // (Warm, PowerMetal) the `new` voice keeps the legacy delegated body
-    // untouched so the preset's own oscillator/filter/decay parameters drive
-    // the sound.
-    const resolvedInstrument =
-        instrument === 'Piano' || instrument === 'Warm' || instrument === 'PowerMetal'
-            ? instrument
-            : 'Piano';
-    if (resolvedInstrument !== 'Piano') {
-        return playNoteCurrent(state, freq, time + strum, duration, { ...opts, index: 0 });
-    }
-
-    // --- The `new` Piano voice ---------------------------------------------
-    // It no longer delegates to `playNoteCurrent`: a per-partial additive
-    // body (S4) replaces the legacy single-oscillator body, and the attack
-    // transient (S2) + bright layer (S3) sit on top.
+    // A per-partial additive body (S4) with the attack transient (S2) and bright
+    // layer (S3) on top.
     // synth-audit Epic 2 S6 — soften polyphony compensation. The legacy
     // `1/√numVoices` curve drops a 4-note chord to 0.5× per voice, so a full
     // voicing ends up quieter than a single note — working against de-burial.
@@ -336,8 +253,8 @@ function playNoteNew(...args: Parameters<typeof playNoteCurrent>): ChordVoiceHan
     // dense chords, but a full chord no longer sits below a sparse one.
     const finalVol = (vol / Math.max(1, numVoices) ** 0.3) * SYNTH_CHORD_LEVEL;
 
-    // synth-audit Epic 2 S2 — real attack transient. `playNoteCurrent`'s only
-    // onset cue is a quiet (`finalVol*0.15`), diffuse noise blip — nothing for
+    // synth-audit Epic 2 S2 — real attack transient. The legacy body's only
+    // onset cue was a quiet (`finalVol*0.15`), diffuse noise blip — nothing for
     // the ear to latch onto, a primary cause of chord burial. The `new` voice
     // gives the onset a defined two-part transient:
     //   1. a boosted noise "chiff" — the hammer strike, ~3x the legacy level;
@@ -370,9 +287,9 @@ function playNoteNew(...args: Parameters<typeof playNoteCurrent>): ChordVoiceHan
             duration: 0.045,
         });
 
-        // synth-audit Epic 2 S3 — velocity → brightness. `playNoteCurrent`
-        // moves only cutoff + gain with velocity; its wave content never
-        // changes, so soft and hard hits are timbrally identical. This layer
+        // synth-audit Epic 2 S3 — velocity → brightness. The legacy body moved
+        // only cutoff + gain with velocity; its wave content never changed, so
+        // soft and hard hits were timbrally identical. This layer
         // crossfades a fundamental-light "bright" wave in by velocity — the
         // convex `velocityTimbre` curve keeps soft chords on the mellow body
         // alone and blooms upper-harmonic shimmer in only on harder hits.
@@ -409,7 +326,7 @@ function playNoteNew(...args: Parameters<typeof playNoteCurrent>): ChordVoiceHan
     // delegated single-oscillator-through-one-LPF body). Guarded: the
     // scheduler iterates a chord's notes with `forEach`, so an un-caught
     // throw here would abort every later note in the chord, not just this
-    // one. `playNoteCurrent` has the equivalent guard around its own body.
+    // one.
     try {
         return playAdditiveBody(state, freq, startTime, duration, finalVol, muted, ignoreSustain);
     } catch (err) {
@@ -440,7 +357,7 @@ function playAdditiveBody(
         return null;
     }
     const audio = playback.audio;
-    const preset = INSTRUMENT_PRESETS.Piano;
+    const preset = PIANO_BODY;
 
     if (!playback.heldNotes) {
         (playback as Mutable<typeof playback>).heldNotes = new Set(); // @direct-mutation
@@ -449,7 +366,7 @@ function playAdditiveBody(
     // Master body level — velocity gain + the note's release envelope.
     const bodyGain = audio.createGain();
     bodyGain.gain.setValueAtTime(0, startTime);
-    bodyGain.gain.setTargetAtTime(finalVol * (preset.gainMult || 1.0), startTime, preset.attack);
+    bodyGain.gain.setTargetAtTime(finalVol * preset.gainMult, startTime, preset.attack);
 
     // Mix chain: a highpass to keep dense voicings out of the mud, then a
     // gentle pan. The legacy per-note LPF sweep is deliberately gone — the
@@ -603,264 +520,6 @@ function playAdditiveBody(
         },
     };
     return releaseHandle;
-}
-
-function playNoteCurrent(
-    state: EnsembleState,
-    freq: number,
-    time: number,
-    duration: number,
-    {
-        vol = 0.1,
-        index = 0,
-        instrument = 'Piano',
-        muted = false,
-        numVoices = 1,
-        ignoreSustain = false,
-    }: PlayNoteOptions = {},
-): ChordVoiceHandle | null {
-    const { playback, groove } = state;
-    if (!playback.audio || !Number.isFinite(freq)) {
-        return null;
-    }
-
-    const polyphonyComp = 1 / Math.sqrt(Math.max(1, numVoices));
-    const finalVol = vol * polyphonyComp * SYNTH_CHORD_LEVEL;
-
-    if (!playback.heldNotes) {
-        (playback as Mutable<typeof playback>).heldNotes = new Set(); // @direct-mutation
-    }
-
-    try {
-        if (instrument !== 'Piano' && instrument !== 'Warm' && instrument !== 'PowerMetal') {
-            instrument = 'Piano';
-        }
-
-        const preset = INSTRUMENT_PRESETS[instrument] || INSTRUMENT_PRESETS.Piano;
-        const now = playback.audio.currentTime;
-        const baseTime = Math.max(time, now);
-
-        const isPiano = instrument === 'Piano';
-        if (isPiano && !pianoWave) {
-            pianoWave = createPianoWave(playback.audio);
-        }
-
-        const staggerMult = muted ? 0.4 : 1.0;
-        // #1068: was `index * (0.005 + Math.random() * 0.01)` — unseeded AND
-        // not gated by the humanize knob. Same split as `playNoteNew`: a
-        // deterministic 5 ms/voice roll (the strum articulation, and `index` is
-        // 0 for every keyboard voicing so this is inert unless a strummed voice
-        // is selected) plus a seeded, knob-gated wobble that is exactly 0 at
-        // `humanize: 0`.
-        const stagger =
-            (index * 0.005 + chordStrumJitter(index, freq, groove?.humanize)) * staggerMult;
-        const startTime = baseTime + stagger;
-
-        const intensity = playback.bandIntensity;
-        const intensityShift = (intensity - 0.5) * 2400;
-        const intensityDepthMult = 0.5 + intensity * 2.5;
-        const lowMidCut =
-            muted || numVoices < 2
-                ? 0
-                : Math.min(4, Math.max(0, numVoices - 1) * 0.8 + Math.max(0, intensity - 0.5) * 3);
-        const velocityCutoff = Math.max(
-            100,
-            preset.filterBase + intensityShift + finalVol * preset.filterDepth * intensityDepthMult,
-        );
-
-        // --- Component A: The Hammer Strike ---
-        if (isPiano && !muted && playback.audioGraph) {
-            playPercussiveStrike(
-                playback.audio,
-                groove.audioBuffers.noise,
-                playback.audioGraph.chords.gain,
-                startTime,
-                {
-                    volume: finalVol * 0.15,
-                    filterType: 'bandpass',
-                    freq: Math.max(800, Math.min(4000, 800 + (freq / 440) * 600 + finalVol * 500)),
-                    Q: 1.5,
-                    attack: 0.001,
-                    decay: 0.01,
-                    duration: 0.1,
-                },
-            );
-        }
-
-        // --- Component B: The Harmonic Body ---
-        const osc = playback.audio.createOscillator();
-        const mainGain = playback.audio.createGain();
-        const filter = playback.audio.createBiquadFilter();
-        let unisonOsc: OscillatorNode | null = null;
-        let unisonGain: GainNode | null = null;
-
-        if (isPiano && pianoWave) {
-            osc.setPeriodicWave(pianoWave);
-            unisonOsc = playback.audio.createOscillator();
-            unisonGain = playback.audio.createGain();
-            unisonOsc.setPeriodicWave(pianoWave);
-            unisonOsc.frequency.setValueAtTime(freq, startTime);
-            unisonOsc.detune.setValueAtTime(6 + Math.random() * 4, startTime);
-            unisonGain.gain.setValueAtTime(0.6, startTime);
-            unisonOsc.connect(unisonGain);
-            unisonGain.connect(filter);
-        } else {
-            osc.type = preset.fundamental || 'sine';
-        }
-
-        osc.frequency.setValueAtTime(freq, startTime);
-        osc.detune.setValueAtTime(Math.random() * 4 - 2, startTime);
-
-        filter.type = 'lowpass';
-        filter.frequency.setValueAtTime(velocityCutoff, startTime);
-        filter.frequency.setTargetAtTime(preset.filterBase, startTime, isPiano ? 0.35 : 0.1);
-        filter.Q.setValueAtTime(preset.resonance, startTime);
-
-        mainGain.gain.setValueAtTime(0, startTime);
-        mainGain.gain.setTargetAtTime(
-            finalVol * (preset.gainMult || 1.0),
-            startTime,
-            preset.attack,
-        );
-
-        const stopNote = (t: number, isPanic = false): void => {
-            const dampingConstant = isPanic ? 0.005 : duration < 0.2 ? 0.02 : 0.12;
-            rampGain(mainGain.gain, 0, t, dampingConstant);
-            try {
-                osc.stop(t + 0.5);
-            } catch {
-                /* ignore */
-            }
-            if (unisonOsc) {
-                try {
-                    unisonOsc.stop(t + 0.5);
-                } catch {
-                    /* ignore */
-                }
-            }
-        };
-
-        if (playback.sustainActive && !muted && !ignoreSustain) {
-            const noteRef = { stop: stopNote };
-            playback.heldNotes.add(noteRef);
-            if (playback.heldNotes.size > 64) {
-                const firstNote = playback.heldNotes.values().next().value;
-                firstNote.stop(now);
-                playback.heldNotes.delete(firstNote);
-            }
-        } else {
-            const actualDuration = muted ? 0.015 : duration;
-            rampGain(mainGain.gain, 0, startTime + actualDuration, 0.03);
-        }
-
-        osc.connect(filter);
-
-        let shaper: WaveShaperNode | null = null;
-        let lastNode: AudioNode = filter;
-        if (!muted) {
-            shaper = playback.audio.createWaveShaper();
-            const drive = Math.max(0.001, (intensity - 0.5) * 4.0);
-
-            if (!cachedShaperCurve || Math.abs(drive - cachedShaperDrive) > 0.01) {
-                const n_samples = 44100;
-                cachedShaperCurve = new Float32Array(n_samples);
-                for (let i = 0; i < n_samples; ++i) {
-                    const x = (i * 2) / n_samples - 1;
-                    cachedShaperCurve[i] =
-                        ((Math.PI + drive) * x) / (Math.PI + drive * Math.abs(x));
-                }
-                cachedShaperDrive = drive;
-            }
-
-            shaper.curve = cachedShaperCurve;
-            shaper.oversample = '2x';
-            filter.connect(shaper);
-            lastNode = shaper;
-        }
-
-        lastNode.connect(mainGain);
-
-        const bodyShape = playback.audio.createBiquadFilter();
-        bodyShape.type = 'peaking';
-        bodyShape.frequency.setValueAtTime(isPiano ? 330 : 300, startTime);
-        bodyShape.Q.setValueAtTime(0.85, startTime);
-        bodyShape.gain.setValueAtTime(-lowMidCut, startTime);
-
-        const hpf = playback.audio.createBiquadFilter();
-        hpf.type = 'highpass';
-        hpf.frequency.setValueAtTime(150, startTime);
-
-        const panner = createSimplePanner(playback.audio, -0.2, startTime);
-
-        mainGain.connect(bodyShape);
-        bodyShape.connect(hpf);
-        hpf.connect(panner);
-        if (playback.audioGraph) {
-            panner.connect(playback.audioGraph.chords.gain);
-        }
-
-        osc.start(startTime);
-        if (unisonOsc) {
-            unisonOsc.start(startTime);
-        }
-        // No-pedal natural end — hoisted so the release handle can clamp its
-        // early stop into the live window (never push the stop later).
-        const naturalStop = startTime + (muted ? 0.1 : duration + 1.0);
-        if (!playback.sustainActive || muted || ignoreSustain) {
-            osc.stop(naturalStop);
-            if (unisonOsc) {
-                unisonOsc.stop(naturalStop);
-            }
-        }
-
-        osc.onended = () =>
-            safeDisconnect([
-                osc,
-                filter,
-                mainGain,
-                hpf,
-                panner,
-                ...(unisonOsc && unisonGain ? [unisonOsc, unisonGain] : []),
-                ...(shaper ? [shaper] : []),
-            ]);
-
-        // #707/#691 — release handle for the legacy (Warm/PowerMetal) chord
-        // body, symmetric with the additive voice: ease `mainGain` to silence
-        // from its live value and pull the oscillators' stop in. Lets the
-        // scheduler cut this voicing on a chord change instead of letting it
-        // ring its full duration into the next chord.
-        const releaseHandle: ChordVoiceHandle = {
-            release(when: number, fade: number): void {
-                try {
-                    const tc = Math.max(0.005, Number.isFinite(fade) ? fade : 0.05);
-                    const at = Number.isFinite(when)
-                        ? Math.max(startTime, Math.min(when, naturalStop))
-                        : now;
-                    mainGain.gain.cancelScheduledValues(at);
-                    mainGain.gain.setTargetAtTime(0, at, tc);
-                    const stopAt = Math.min(naturalStop, at + tc * 8);
-                    try {
-                        osc.stop(stopAt);
-                    } catch {
-                        /* already stopped */
-                    }
-                    if (unisonOsc) {
-                        try {
-                            unisonOsc.stop(stopAt);
-                        } catch {
-                            /* already stopped */
-                        }
-                    }
-                } catch {
-                    /* closed context / already stopped */
-                }
-            },
-        };
-        return releaseHandle;
-    } catch (err) {
-        console.error('playNote error:', err);
-        return null;
-    }
 }
 
 export function playChordScratch(state: EnsembleState, time: number, vol = 0.1): void {

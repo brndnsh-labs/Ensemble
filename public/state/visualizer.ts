@@ -18,11 +18,7 @@ export function vizReducer(action: Action): boolean {
             }
             break;
         // #1259 — this slice had no RESET_STATE case at all, which made `enabled` the
-        // stickiest survivor of the corrupt-payload fallback: it is written very early
-        // in `hydrateSavedState()`, so it survives every plausible throw point, and the
-        // next `saveCurrentState()` writes it straight back out. A garbage-truthy value
-        // therefore outlived the very reload meant to clear it, while making the
-        // scheduler emit visualizer events on every step.
+        // stickiest survivor of v1's corrupt-payload fallback (a reader deleted in #1424).
         case ACTIONS.RESET_STATE:
             v.enabled = false;
             return true;

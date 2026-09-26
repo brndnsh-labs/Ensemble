@@ -118,7 +118,8 @@ const KNOWN_HARMONY_STYLES: ReadonlySet<string> = new Set(HARMONY_STYLES.map((s)
  * `swingSub` (#1257) and `chords.density` (#1258) each need a *second*,
  * retrofitted persist-side fix after their share-side one. One exported
  * predicate per lane means "what values may this field hold" is answered in one
- * place and both readers ask the same question.
+ * place and every reader asks the same question. (Those two readers went with v1's
+ * load/save layer, #1424; the songbook codec's legacy-field validation reads them now.)
  *
  * Unlike chords, none of these three unions in a genre-routed value. Within
  * `public/`, `SET_STYLE` is only ever dispatched for `module: 'chords'`, and the

@@ -223,9 +223,9 @@ Flags the app reads: `--genre` (one of the 13, validated), `--key`,
 (switched on or off on open). Flags it still ignores: `--density=thin|standard|rich`
 and `--on=`/`--off=harmony` (no harmony lane in the band engine).
 `tests/scripts/audition-link-roundtrip.test.ts` feeds generated links
-through v1's `loadFromUrl`, which is no longer the app's reader; the v2
-Playwright suite (`prototypes/v2/checks/audition-link-fields.spec.ts`) is
-what round-trips them through `lib/v1-link.ts`.
+through the app's reader, `lib/v1-link.ts` (v1's `loadFromUrl` is gone, #1424); the v2
+Playwright suite (`prototypes/v2/checks/audition-link-fields.spec.ts`) checks the
+fields it applies in the browser.
 
 ## `npm run mix:analyze -- <file> [<file> ...]`
 

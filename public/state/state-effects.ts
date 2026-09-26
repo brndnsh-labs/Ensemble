@@ -22,37 +22,6 @@ import type {
 } from '../types.js';
 import { ACTIONS } from '../types.js';
 import { clearToastActions } from '../ui.js';
-import { debounceSaveState } from './persistence.js';
-
-// #1127 — the persistence chokepoint's denylist. Every dispatch schedules a
-// debounced save EXCEPT these, none of which changes a persisted field:
-//   • pure UI ephemera (toasts, flashes)
-//   • worker runtime seed/buffer state (UPDATE_SB/UPDATE_GB)
-//   • the auto-conductor's per-STEP dispatches (SET_BAND_INTENSITY,
-//     UPDATE_CONDUCTOR_DECISION, UPDATE_HB) — conductorVelocity/conductorDensity/
-//     conductorHarmonyComplexity are runtime-derived and bandIntensity is not in the
-//     v1 payload (it is a chart's energy now, saved with the chart instead), so none
-//     is persisted here (#1064 fixed UPDATE_CONDUCTOR_DECISION/UPDATE_HB writing onto
-//     the persisted chords.density/harmony.complexity fields directly — this
-//     claim is accurate again now that they don't); autoIntensity defaults ON,
-//     so these fire ~every step during an intensity ramp.
-// Excluding the high-frequency ones is what lets the 1s debounce actually settle
-// during playback instead of being perpetually reset (a real save gets written
-// ~1s after the last genuine change; in v1 a loop-boundary save in the old conductor
-// and a visibilitychange flush in main.ts bounded the window, and neither exists now).
-// Persist-by-default (denylist, not allowlist) so a new persisted field can never
-// silently miss a save — the exact silent-drift failure this story closes.
-const TRANSIENT_PERSIST_ACTIONS = new Set<string>([
-    ACTIONS.SHOW_TOAST,
-    ACTIONS.TOAST_EXPIRED,
-    ACTIONS.TRIGGER_FLASH,
-    ACTIONS.FLASH_EXPIRED,
-    ACTIONS.UPDATE_SB,
-    ACTIONS.UPDATE_GB,
-    ACTIONS.SET_BAND_INTENSITY,
-    ACTIONS.UPDATE_CONDUCTOR_DECISION,
-    ACTIONS.UPDATE_HB,
-]);
 
 interface HandleEffectsContext {
     dispatch: Dispatch;
@@ -309,13 +278,5 @@ export function handleEffects(
             initAudio(stateMap);
             break;
         }
-    }
-
-    // #1127 — persistence chokepoint. Replaces the ~50 hand-copied
-    // dispatch-then-saveCurrentState() rituals: every non-transient dispatch
-    // schedules one debounced save. main.ts flushes immediately on tab-hide so
-    // the 1s debounce window can't lose a change on close.
-    if (!TRANSIENT_PERSIST_ACTIONS.has(action.type)) {
-        debounceSaveState();
     }
 }

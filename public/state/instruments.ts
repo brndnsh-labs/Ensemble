@@ -31,13 +31,10 @@ export const chords = deepSignal<ChordState>({
     style: 'smart',
     volume: 1.0,
     reverb: INSTRUMENT_REVERB_DEFAULTS.chords,
-    octave: 65,
-    density: 'standard',
     lastActiveChordIndex: null,
     scheduledChordIndex: null,
     buffer: new Map(),
     rhythmicMask: 0,
-    instrument: 'Clean',
 });
 
 export const bass = deepSignal<BassState>({
@@ -49,7 +46,6 @@ export const bass = deepSignal<BassState>({
     lastFreq: null,
     lastPlayedFreq: null,
     buffer: new Map(),
-    octave: 38,
     style: 'smart',
     busySteps: 0,
     lastMidiPlayed: null,
@@ -57,28 +53,21 @@ export const bass = deepSignal<BassState>({
 });
 
 export const soloist = deepSignal<SoloistState>({
-    // === Configuration (persisted) ===
+    // === Configuration ===
     enabled: false,
     voice: 'synth',
     autoSound: true,
-    preset: 'trumpet',
     mode: 'monophonic',
     // #856 — Auto: phrasing mode follows the lead voice (guitar pack → guitar).
     autoMode: true,
     style: 'smart',
-    octave: 72,
     volume: 1.0,
     reverb: INSTRUMENT_REVERB_DEFAULTS.soloist,
-    phrasingIntensity: 0.5,
-    tradeMode: 'manual',
     // Trading with the player on the band engine (`BandSettings.trade`): off, or the partner.
     tradeWith: 'off',
     tradeBars: 4,
     // How many traded choruses before the head returns; 0 keeps trading forever.
     tradeChoruses: 2,
-    // #1062 — runtime-derived trade-silencing layer; see the SoloistState
-    // field doc in types.ts. Never the user's `enabled` setting.
-    tradeSilenced: false,
 
     // === Engine runtime ===
     session: {
@@ -180,20 +169,15 @@ type SoloistFieldRoute =
     | { kind: 'audio'; key: string };
 
 const SOLOIST_FIELD_ROUTES: Record<string, SoloistFieldRoute> = {
-    // --- Config (flat at the top, persisted) ---
+    // --- Config (flat at the top) ---
     enabled: { kind: 'config', key: 'enabled' },
-    preset: { kind: 'config', key: 'preset' },
     mode: { kind: 'config', key: 'mode' },
     style: { kind: 'config', key: 'style' },
-    octave: { kind: 'config', key: 'octave' },
     volume: { kind: 'config', key: 'volume' },
     reverb: { kind: 'config', key: 'reverb' },
-    phrasingIntensity: { kind: 'config', key: 'phrasingIntensity' },
-    tradeMode: { kind: 'config', key: 'tradeMode' },
     tradeWith: { kind: 'config', key: 'tradeWith' },
     tradeBars: { kind: 'config', key: 'tradeBars' },
     tradeChoruses: { kind: 'config', key: 'tradeChoruses' },
-    tradeSilenced: { kind: 'config', key: 'tradeSilenced' },
 
     // --- Session (top-level) ---
     sessionSeed: { kind: 'session', key: 'seed' },
@@ -249,12 +233,21 @@ const SOLOIST_FIELD_ROUTES: Record<string, SoloistFieldRoute> = {
  * `motifTracking` / `pinnedProfile` in #866 (the legacy engine's retirement, epic
  * #10), and `complexity` in #1070 (dead since #1167 rewired the slider to
  * `phrasingIntensity` — zero writers, zero readers, absent from
- * `buildSoloistSyncPayload`). Old persisted sessions / share-URLs may still carry
- * them; we drop them on load rather than letting the unknown-key fall-through
- * resurrect them as stray top-level fields. Compat shim — keep entries here so
- * stale payloads load cleanly.
+ * `buildSoloistSyncPayload`), and the old engine's settings `preset`, `octave`,
+ * `phrasingIntensity`, `tradeMode` and `tradeSilenced` in #1424. A stray payload
+ * carrying one is dropped rather than letting the unknown-key fall-through
+ * resurrect it as a stray top-level field. Keep entries here.
  */
-const DEPRECATED_SOLOIST_KEYS = new Set(['motifTracking', 'pinnedProfile', 'complexity']);
+const DEPRECATED_SOLOIST_KEYS = new Set([
+    'motifTracking',
+    'pinnedProfile',
+    'complexity',
+    'preset',
+    'octave',
+    'phrasingIntensity',
+    'tradeMode',
+    'tradeSilenced',
+]);
 
 /**
  * Apply a flat-keyed soloist payload to the nested state shape. Unknown keys
@@ -325,14 +318,6 @@ export function instrumentReducer(action: Action): boolean {
             // Soloist params are flat at the wire but nested in state — route them.
             if (modKey === 'soloist' || modKey === 'sb') {
                 applySoloistPayload(soloist, { [action.payload.param]: action.payload.value });
-                // #1062 — leaving an active trade mode (either the user picking
-                // "Manual" in SoloistControls.tsx, or togglePower's turn-OFF
-                // reset in instrument-controller.ts) always clears the runtime
-                // silencing layer too, so a later manual re-enable isn't left
-                // muted by a stale trade decision.
-                if (action.payload.param === 'tradeMode' && action.payload.value === 'manual') {
-                    s.tradeSilenced = false;
-                }
                 return true;
             }
             // grooveReducer owns the groove lane for this action (#1182).
@@ -351,9 +336,6 @@ export function instrumentReducer(action: Action): boolean {
             c.enabled = true;
             c.volume = 1.0;
             c.reverb = INSTRUMENT_REVERB_DEFAULTS.chords;
-            c.instrument = 'Clean';
-            c.octave = 65;
-            c.density = 'standard';
             c.voice = 'synth';
             c.autoSound = true;
             // #1259 — the chords lane was the one instrument whose `style` this case
@@ -364,7 +346,6 @@ export function instrumentReducer(action: Action): boolean {
             b.enabled = true;
             b.volume = 1.0;
             b.reverb = INSTRUMENT_REVERB_DEFAULTS.bass;
-            b.octave = 38;
             b.style = 'smart';
             b.voice = 'synth';
             b.autoSound = true;
@@ -372,20 +353,14 @@ export function instrumentReducer(action: Action): boolean {
             s.enabled = false;
             s.voice = 'synth';
             s.autoSound = true;
-            s.preset = 'trumpet';
             s.volume = 1.0;
             s.reverb = INSTRUMENT_REVERB_DEFAULTS.soloist;
-            s.octave = 72;
             s.style = 'smart';
             s.mode = 'monophonic';
             // #1259 — hydrated (#856) but never reset. Left false, the `mode` this case
             // just set back to 'monophonic' would stay manually pinned instead of
             // re-deriving from the voice on the next fresh session.
             s.autoMode = true;
-            s.tradeMode = 'manual';
-            // #1062 — runtime-derived; a fresh session starts unsilenced.
-            s.tradeSilenced = false;
-            s.phrasingIntensity = 0.5;
             // Reset engine runtime to a fresh session.
             const session = s.session as Mutable<typeof s.session>;
             const phr = session.phrasing as Mutable<typeof session.phrasing>;

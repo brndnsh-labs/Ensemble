@@ -2,14 +2,19 @@
 /**
  * v1 → v2 songbook import (#1274).
  *
- * The fixtures are produced by v1's OWN writers — `saveCurrentState()` for the current
- * session and `saveProgression()` (the Save-progression gesture, prompt and all) for the
- * preset library — driven through real `dispatch()` calls, never hand-typed JSON. That is
- * the point of this suite: the import has to survive the bytes v1 actually writes, and a
- * hand-written fixture would drift the moment the persisted payload changes. The only
- * hand-built payloads here are the deliberately corrupt ones, which no writer produces.
+ * The fixtures in `tests/fixtures/v1/` are the frozen output of v1's OWN writers:
+ * `saveCurrentState()` for the current session and `saveProgression()` (the Save-progression
+ * gesture) for the preset library, driven through real `dispatch()` calls and captured at #1424,
+ * when that load/save layer was deleted. v1 is frozen for good, so those bytes are exactly what
+ * a real v1 profile holds, and the import has to survive them. `sessions.json` holds each
+ * session as the object v1 wrote; `JSON.stringify` gives back the exact string it stored.
+ * `tunedBand` also carries the drum preset and step-sequencer pattern every real v1 profile
+ * has, added by hand before capture because that state was already gone (2026-09-26).
+ * `tuned-band-hydrated.json` is what v1's own reader (`hydrateState()`) made of `tunedBand`,
+ * captured the same day. The only hand-built payloads here are the deliberately corrupt ones,
+ * which no writer produces.
  */
-import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import type { ChartDocument } from '../../../prototypes/v2/lib/documents.js';
 import {
     convertV1,
@@ -39,18 +44,15 @@ import {
     v1ImportLedger,
     v1SessionMark,
 } from '../../../prototypes/v2/lib/session.js';
-import { saveProgression } from '../../../public/controllers/arranger-controller.js';
-import { saveCurrentState } from '../../../public/state/persistence.js';
 import {
     clamp,
     hydrateAutoSound,
-    hydrateState,
-    normalizeSoloistPreset,
     sanitizeDisplayString,
     validateSections,
 } from '../../../public/state/state-hydration.js';
-import { dispatch, getState } from '../../../public/state.js';
-import { ACTIONS } from '../../../public/types.js';
+import presetsFixture from '../../fixtures/v1/presets.json';
+import sessionsFixture from '../../fixtures/v1/sessions.json';
+import tunedBandHydrated from '../../fixtures/v1/tuned-band-hydrated.json';
 import { installFakeIndexedDB } from '../../utils/fake-indexeddb.js';
 
 /**
@@ -61,8 +63,8 @@ import { installFakeIndexedDB } from '../../utils/fake-indexeddb.js';
 const V1_IMPORT_LEDGER_KEY = 'ensemble-v2-preview:v1-import';
 const V1_SESSION_MARK_KEY = 'ensemble-v2-preview:v1-session-import';
 
-// happy-dom in this repo ships no Storage implementation, so the v1 writers get the same
-// manual mock the existing arranger-controller suite installs.
+// happy-dom in this repo ships no Storage implementation, so the suites that read v1's keys
+// through `window.localStorage` get a manual one.
 const store = new Map<string, string>();
 Object.defineProperty(window, 'localStorage', {
     value: {
@@ -78,26 +80,10 @@ Object.defineProperty(window, 'localStorage', {
     writable: true,
 });
 
-const param = (module: string, name: string, value: unknown) =>
-    dispatch(ACTIONS.SET_PARAM, { module, param: name, value });
-
-/** Drives v1's own `saveCurrentState()` and returns the exact bytes it wrote. */
-function writeSession(setup: () => void): string {
-    dispatch(ACTIONS.RESET_STATE);
-    setup();
-    saveCurrentState();
-    return window.localStorage.getItem(V1_STATE_KEY)!;
-}
-
-/** Drives v1's own Save-progression gesture and returns the preset it appended. */
-function writePreset(name: string, setup: () => void): Record<string, unknown> {
-    dispatch(ACTIONS.RESET_STATE);
-    setup();
-    vi.stubGlobal('prompt', () => name);
-    window.localStorage.removeItem(V1_PRESETS_KEY);
-    saveProgression();
-    return JSON.parse(window.localStorage.getItem(V1_PRESETS_KEY)!)[0];
-}
+/** A session exactly as v1 stored it: the string `saveCurrentState()` wrote (see the header). */
+const session = (name: keyof typeof sessionsFixture): string =>
+    JSON.stringify(sessionsFixture[name]);
+const PRESETS: Record<string, Record<string, unknown>> = presetsFixture;
 
 function storageOf(entries: Record<string, string | undefined>) {
     return {
@@ -179,89 +165,13 @@ const CORRUPT_SESSION = '{"sections":[{"label":"Verse"';
 const CORRUPT_SHAPE_SESSION = '{"sections":"I | IV | V | I","bpm":120}';
 const CORRUPT_PRESET = { name: 'Broken tune', sections: '!!!not-base64!!!', isMinor: false };
 
-let multiSection: string;
-let oddMeter: string;
-let tunedBand: string;
-let minorKey: string;
-let untouched: string;
-let presetMajor: Record<string, unknown>;
-let presetMinor: Record<string, unknown>;
-
-beforeAll(() => {
-    multiSection = writeSession(() => {
-        param('arranger', 'sections', [
-            { id: 'intro', label: 'Intro', value: 'I | IV', key: '', repeat: 2 },
-            { id: 'verse', label: 'Verse', value: 'I | vi | IV | V', key: 'F' },
-            {
-                id: 'bridge',
-                label: 'Bridge',
-                value: 'ii | V | I',
-                key: 'Bb',
-                timeSignature: '3/4',
-                seamless: true,
-            },
-        ]);
-        param('arranger', 'key', 'C');
-        param('arranger', 'notation', 'name');
-        param('arranger', 'lastChordPreset', 'Long form');
-        dispatch(ACTIONS.SET_BPM, 132);
-    });
-    oddMeter = writeSession(() => {
-        param('arranger', 'sections', [{ id: 'a', label: 'A', value: 'i | iv | V | i' }]);
-        param('arranger', 'timeSignature', '7/8');
-        param('arranger', 'grouping', [2, 2, 3]);
-        dispatch(ACTIONS.SET_BPM, 96);
-    });
-    tunedBand = writeSession(() => {
-        param('arranger', 'sections', [{ id: 'a', label: 'A', value: 'I7 | IV7' }]);
-        param('chords', 'style', 'funk');
-        param('chords', 'voice', 'pack:rhodes');
-        param('chords', 'autoSound', false);
-        param('chords', 'volume', 0.62);
-        param('chords', 'density', 'rich');
-        param('bass', 'style', 'funk');
-        param('bass', 'volume', 0.48);
-        param('bass', 'octave', 34);
-        param('soloist', 'enabled', true);
-        param('soloist', 'style', 'funk');
-        param('soloist', 'phrasingIntensity', 0.8);
-        param('harmony', 'enabled', true);
-        param('harmony', 'complexity', 0.7);
-        param('groove', 'voice', 'pack:acoustic-kit');
-        param('groove', 'autoSound', false);
-        param('groove', 'swing', 62);
-        param('groove', 'swingSub', '16th');
-        param('groove', 'humanize', 35);
-        param('groove', 'genreFeel', 'Funk');
-        param('groove', 'lastSmartGenre', 'Funk');
-    });
-    // v1's writer saved its drum preset and step-sequencer pattern too. The state behind them
-    // is gone (2026-09-26), so this build's copy of the writer can't — but every real v1
-    // profile carries them, so they go into the bytes by hand, shaped as v1 wrote them.
-    const tuned = JSON.parse(tunedBand);
-    tuned.groove.lastDrumPreset = 'Funk Break';
-    tuned.groove.pattern = [
-        { name: 'Kick', steps: Array.from({ length: 128 }, (_, i) => (i % 8 === 0 ? 1 : 0)) },
-        { name: 'Snare', steps: new Array(128).fill(0) },
-    ];
-    tunedBand = JSON.stringify(tuned);
-    minorKey = writeSession(() => {
-        param('arranger', 'sections', [{ id: 'a', label: 'A', value: 'i | iv | v | i' }]);
-        param('arranger', 'key', 'A');
-        param('arranger', 'isMinor', true);
-    });
-    untouched = writeSession(() => {});
-    presetMajor = writePreset('My Tune', () => {
-        param('arranger', 'sections', [
-            { id: 'a', label: 'Head', value: 'I | vi | ii | V', key: 'G' },
-            { id: 'b', label: 'Tag', value: 'IV | I', repeat: 3 },
-        ]);
-    });
-    presetMinor = writePreset('Minor thing', () => {
-        param('arranger', 'sections', [{ id: 'a', label: 'A', value: 'i | bVI | bVII | i' }]);
-        param('arranger', 'isMinor', true);
-    });
-});
+const multiSection = session('multiSection');
+const oddMeter = session('oddMeter');
+const tunedBand = session('tunedBand');
+const minorKey = session('minorKey');
+const untouched = session('untouched');
+const presetMajor = PRESETS.presetMajor;
+const presetMinor = PRESETS.presetMinor;
 
 function onlySource(
     session?: string,
@@ -507,7 +417,8 @@ describe('round-tripping a real v1 session', () => {
         expect(document.chart.arrangement.key).toBe('C');
         expect(document.chart.arrangement.isMinor).toBe(false);
         expect(document.chart.arrangement.notation).toBe('name');
-        expect(document.chart.arrangement.lastChordPreset).toBe('Long form');
+        // v1's preset name is not brought over: a chart no longer writes it (#1424).
+        expect(document.chart.arrangement).not.toHaveProperty('lastChordPreset');
         expect(document.chart.performance.bpm).toBe(132);
     });
 
@@ -540,6 +451,21 @@ describe('round-tripping a real v1 session', () => {
             humanize: 35,
             genre: 'Funk',
         });
+    });
+
+    it('bounds a hostile seed, top-level or in the pre-#791 nested soloist slot', () => {
+        const withSeed = (fields: Record<string, unknown>) =>
+            convert(JSON.stringify({ ...JSON.parse(untouched), ...fields })).chart.performance.seed;
+        expect(withSeed({ seed: 'a'.repeat(500) })).toHaveLength(64);
+        expect(withSeed({ seed: '<script>' })).toBe('script');
+        expect(withSeed({ seed: { evil: 1 } })).toBe('');
+        expect(withSeed({ seed: 'blue-note-42' })).toBe('blue-note-42');
+        // The nested fallback is bounded the same way, and the top-level seed wins over it.
+        const soloist = JSON.parse(untouched).soloist;
+        expect(withSeed({ seed: '', soloist: { ...soloist, seed: 'b'.repeat(500) } })).toHaveLength(
+            64,
+        );
+        expect(withSeed({ seed: 'top', soloist: { ...soloist, seed: 'nested' } })).toBe('top');
     });
 
     it("brings over only what the band honours: none of the old engine's settings (2026-09-26)", () => {
@@ -711,7 +637,7 @@ describe('round-tripping a real v1 saved progression', () => {
             ['Head', 'I | vi | ii | V', 'G', 1],
             ['Tag', 'IV | I', '', 3],
         ]);
-        expect(document.chart.arrangement.lastChordPreset).toBe('My Tune');
+        expect(document.chart.arrangement).not.toHaveProperty('lastChordPreset');
         // v1's own Save-progression payload carries `timestamp`; keep it as the origin.
         expect(document.createdAt).toBe(new Date(presetMajor.timestamp as number).toISOString());
     });
@@ -769,7 +695,7 @@ describe('round-tripping a real v1 saved progression', () => {
         expect(document.chart.arrangement.timeSignature).toBe('4/4');
     });
 
-    it('caps a long preset name at the codec lastChordPreset limit, not the title limit (#1274 P2-6)', () => {
+    it('keeps a long preset name as the title, whole (#1274 P2-6)', () => {
         const longName = `${'A'.repeat(90)} — a very long saved progression name`;
         expect(longName.length).toBeGreaterThan(100);
         expect(longName.length).toBeLessThanOrEqual(200);
@@ -780,8 +706,7 @@ describe('round-tripping a real v1 saved progression', () => {
         };
         const document = convert(undefined, [preset]);
         expect(document.title).toBe(longName);
-        expect(document.chart.arrangement.lastChordPreset.length).toBeLessThanOrEqual(100);
-        expect(document.chart.arrangement.lastChordPreset).toBe(longName.slice(0, 100));
+        expect(document.chart.arrangement).not.toHaveProperty('lastChordPreset');
     });
 });
 
@@ -977,23 +902,20 @@ describe('importing', () => {
 describe('agreement with v1 itself', () => {
     /**
      * The claim the whole module rests on: an imported song is what v1 would have
-     * loaded from those same bytes. Checked against v1's own `hydrateState()` — the
-     * reader that runs on every v1 boot — rather than against this file's expectations.
+     * loaded from those same bytes. Checked against what v1's own `hydrateState()` — the
+     * reader that ran on every v1 boot — made of them, frozen at #1424 when it was deleted,
+     * rather than against this file's expectations.
      */
     it('lands every shared field where v1 hydration puts it', () => {
-        window.localStorage.setItem(V1_STATE_KEY, tunedBand);
-        dispatch(ACTIONS.RESET_STATE);
-        hydrateState();
-        const live = getState();
+        const live = tunedBandHydrated;
         const { arrangement, performance, band } = convert(tunedBand).chart;
 
         expect(arrangement.key).toBe(live.arranger.key);
         expect(arrangement.isMinor).toBe(live.arranger.isMinor);
         expect(arrangement.timeSignature).toBe(live.arranger.timeSignature);
         expect(arrangement.notation).toBe(live.arranger.notation);
-        expect(arrangement.lastChordPreset).toBe(live.arranger.lastChordPreset);
         expect(arrangement.sections.map((section) => section.value)).toEqual(
-            live.arranger.sections.map((section) => section.value),
+            live.arranger.sectionValues,
         );
         expect(performance.bpm).toBe(live.playback.bpm);
         expect(performance.randomizeSeed).toBe(live.arranger.randomizeSeed);
@@ -1027,9 +949,6 @@ describe('agreement with v1 itself', () => {
         expect(clamp(null, 0, 1, 1)).toBe(1);
         expect(clamp('0.42', 0, 1, 1)).toBeCloseTo(0.42);
         expect(clamp(Number.POSITIVE_INFINITY, 0, 100, 20)).toBe(20);
-        // Retired soloist presets coerce to the one surviving voice.
-        expect(normalizeSoloistPreset('saxophone')).toBe('trumpet');
-        expect(normalizeSoloistPreset('trumpet')).toBe('trumpet');
         // Sound-source mode: a save with no `autoSound` follows the voice it pinned.
         expect(hydrateAutoSound(undefined, 'synth')).toBe(true);
         expect(hydrateAutoSound(undefined, 'pack:rhodes')).toBe(false);

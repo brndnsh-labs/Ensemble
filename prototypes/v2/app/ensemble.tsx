@@ -2,7 +2,7 @@
 
 import { KEY_ORDER } from '@engine/config';
 import { decodeChartLink, encodeChartLink } from '@engine/songbook/chart-link';
-import { writtenSettings } from '@engine/songbook/codec';
+import { writtenArrangement, writtenSettings } from '@engine/songbook/codec';
 import type { SemanticScore } from '@engine/songbook/score-types';
 import type { InstrumentVoice } from '@engine/types';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -101,7 +101,11 @@ import { useStageTheme } from './use-stage-theme';
  * not the raw stored chart, keeps a change undone by hand on an old chart from reading as an
  * edit — which would otherwise hold an account draft against every later remote advance.
  */
-const written = (chart: ChartDocument['chart']) => ({ ...chart, ...writtenSettings(chart) });
+const written = (chart: ChartDocument['chart']) => ({
+    ...chart,
+    ...writtenSettings(chart),
+    ...('arrangement' in chart ? { arrangement: writtenArrangement(chart.arrangement) } : {}),
+});
 
 const same = (a: ChartDocument, b: ChartDocument) =>
     a.title === b.title && JSON.stringify(written(a.chart)) === JSON.stringify(written(b.chart));

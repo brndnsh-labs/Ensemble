@@ -26,6 +26,6 @@ exits 127 on every one — "never ran", which a piped `tail` reports as a pass.
 **Repo-specific gotchas the gates enforce:**
 - A new `public/engine/*.ts` file must be registered in `AI_MAP.md` or the pre-commit
   docs-lint hook blocks the commit — add the row during `/done` staging.
-- `// @direct-mutation` is only sanctioned in the four categories in `CLAUDE.md`
-  (real-time hot paths, init-only, pre-mount, detached render clone). Everywhere else
+- `// @direct-mutation` is only sanctioned in the three categories in `CLAUDE.md`
+  (real-time hot paths, init-only, detached render clone). Everywhere else
   routes through `dispatch` — `state-discipline-reviewer` enforces it.

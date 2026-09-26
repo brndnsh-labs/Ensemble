@@ -12,6 +12,13 @@ incident pair. `public/songbook/state-ownership.ts`'s `STATE_OWNERSHIP_MANIFEST`
 through a share URL). Until now nothing constrained who may **write** a field, and the manifest's
 classification was silently trusted to imply a write rule it never actually stated.
 
+**Amended 2026-09-26 (#1424):** v1's load/save layer (`saveCurrentState`, `debounceSaveState`,
+`hydrateState`, `loadFromUrl`) is deleted, and with it the old engine's settings it alone still
+carried — among them `chords.density`, `soloist.tradeMode` and `soloist.tradeSilenced`, and the
+conductor's `playback.conductorDensity`. So the persistence hazard in §2 now applies to a chart's
+Save (`prototypes/v2/lib/runtime.ts`'s `captureContent`), and two of the precedents below (the
+trade layer, the density mirror) survive only as history in §5. The law itself is unchanged.
+
 ## 1. The law
 
 > A `document`- or `preferences`-owned field is written **only** by user intent — a UI dispatch or
@@ -71,13 +78,12 @@ no race to lose.
   targeting (`conductor.ts`). The conductor reads a section's authored override to decide how
   hard to close the gap toward it; it never writes the override back. The only writer is the
   arranger controller's unlocked-mode slider (`arranger-controller.ts`), i.e. user intent.
-- **`isInstrumentActiveAtStep`** (`engine/section-overrides.ts`) — the single authority every
-  generation path (`scheduler-core.ts`, `worker-buffer-manager.ts`, `drums-tick.ts`,
-  `groove-engine.ts`, `harmonies.ts`, `accompaniment.ts`, `synth-drums.ts`) calls to decide
-  whether a lane sounds on a given step. It layers a per-section override, and (since #1062) the
-  soloist trade block's `tradeSilenced`, over the slice's own `enabled` — composed inside this one
-  function, at read time. No caller ever needs to know the field is layered; no writer ever
-  touches `enabled` to express the layering.
+- **`isInstrumentActiveAtStep`** (`engine/section-overrides.ts`) — the single authority the
+  generation paths called to decide whether a lane sounds on a given step. It layers a
+  per-section override (and, from #1062 until #1424, the soloist trade block's `tradeSilenced`)
+  over the slice's own `enabled` — composed inside this one function, at read time. No caller
+  ever needs to know the field is layered; no writer ever touches `enabled` to express the
+  layering.
 - **The Intensity slider's `disabled={autoIntensity}`** (`components/InstrumentRail.tsx`) — the
   UI-layer sibling of the same law. When the conductor owns intensity (`autoIntensity` is on), the
   manual `bandIntensity` slider is disabled rather than being silently driven out from under the
@@ -170,8 +176,8 @@ playback:
    `document`/`preferences` in `STATE_OWNERSHIP_MANIFEST`, that field's only legitimate writers are
    the UI dispatch and state hydration.
 2. **Add a sibling `runtime-derived` field** for the runtime system's own opinion
-   (`playback.conductorVelocity` / `conductorDensity` / `conductorHarmonyComplexity`,
-   `soloist.tradeSilenced` are the worked precedents). Classify it in
+   (`playback.conductorVelocity` / `conductorHarmonyComplexity` are the live precedents;
+   `conductorDensity` and `soloist.tradeSilenced` were, until #1424). Classify it in
    `STATE_OWNERSHIP_MANIFEST` immediately — the `satisfies` guard fails typecheck until you do.
 3. **Compose at the read site**, not upstream of it: the one place the value actually gets used
    (a generation engine, `isInstrumentActiveAtStep`, a scheduler velocity computation) is where

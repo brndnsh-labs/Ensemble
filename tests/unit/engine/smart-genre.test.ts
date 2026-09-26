@@ -12,7 +12,7 @@ import { ACTIONS } from '../../../public/types.js';
 // Mock dependencies that are dynamically imported to prevent floating promises
 vi.mock('../../../public/state.js', async (importOriginal) => {
     const actual = await importOriginal();
-    const { playbackReducer } = await import('../../../public/state/playback.js');
+    const { playback, playbackReducer } = await import('../../../public/state/playback.js');
     const { arrangerReducer } = await import('../../../public/state/arranger.js');
     const { instrumentReducer } = await import('../../../public/state/instruments.js');
     const { grooveReducer } = await import('../../../public/state/groove.js');
@@ -27,7 +27,7 @@ vi.mock('../../../public/state.js', async (importOriginal) => {
             playbackReducer(a);
             arrangerReducer(a);
             instrumentReducer(a);
-            grooveReducer(a, actual.playback);
+            grooveReducer(a, playback);
             midiReducer(a);
             vizReducer(a);
         }),

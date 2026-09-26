@@ -2,7 +2,7 @@
 name: review
 description: Review the current uncommitted Ensemble diff. Inspects git status + diff --stat to route reviewers — an inline correctness pass for any non-trivial change, plus `/security-review` whenever the diff touches an always-brake surface (Track `synth` and genuinely-subjective musical work (no critique-test oracle for the idiom, the Needs-ear stop), destructive data ops (drops/rewrites persisted sessions, share-URL schema, preset data, or a state-slice migration that breaks saved state), the state contract (a `@direct-mutation` outside the sanctioned categories)), and optionally a second-model angle on a meaty diff. Presents the reviewer plan before running. Does NOT change Status — review happens within status:in-progress. Use after /implement, before /done.
 ---
-<!-- cycle:rendered template=skills/review.md.tmpl hash=cd9b8edcf040 — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/review.md.tmpl hash=8f25b5625a8f — managed by the-cycle; edit the template, not this file -->
 
 # /review — review the uncommitted tree
 
@@ -59,7 +59,7 @@ story stays `status:in-progress` through review and patch.
    | :- | :- | :- |
    | The band engine — `band/**` (styles, players, arrange, feel, theory) — or its claims, `band/test/claims/**` | **`music-theory-reviewer`** | Whether the musical intent is actually *expressed* by the code. Catches "programmer's math": statistically clean, musically wrong. |
    | `public/engine/synth-*.ts`, `engine.ts` `initAudio()`, `reverb.ts`, `synth-utils.ts`, the band host's scheduling in `prototypes/v2/lib/band-host.ts` | **`synth-graph-reviewer`** | Web Audio graph hygiene only — NaN/0 into an `AudioParam`, nodes created but never disconnected, `exponentialRamp` from/to zero, feedback stability, per-note allocation in a hot path. **Not** "does it sound good" — that's the `status:needs-ear` gate. |
-   | `public/state/**`, `prototypes/v2/lib/runtime.ts`, a new `ACTIONS.*`, a new `// @direct-mutation` marker, or any `signal.x = y` outside a reducer | **`state-discipline-reviewer`** | Dispatch discipline; `@direct-mutation` used outside the four sanctioned categories in CLAUDE.md; non-atomic dispatch chains; v2 UI reaching engine state outside `lib/runtime.ts`. |
+   | `public/state/**`, `prototypes/v2/lib/runtime.ts`, a new `ACTIONS.*`, a new `// @direct-mutation` marker, or any `signal.x = y` outside a reducer | **`state-discipline-reviewer`** | Dispatch discipline; `@direct-mutation` used outside the three sanctioned categories in CLAUDE.md; non-atomic dispatch chains; v2 UI reaching engine state outside `lib/runtime.ts`. |
    | Any diff whose *claim* is fewer bytes or "dead code removal / no behavior change", whatever the path | **`bundle-hygiene-reviewer`** | Reachable code deleted under a "dead" claim; behavior change disguised as cleanup; tree-shaking defeated. It does **not** measure — the orchestrator measures the v2 export (`prototypes/v2/out/_next/static/`). |
    | `prototypes/v2/app/**` (UI and CSS) | the **inline pass**, against `prototypes/v2/CLAUDE.md` | The per-surface boundaries in its navigation table (the shell owns the `<dialog>` refs and all state; surfaces are presentational), dialog a11y, CSS. The `webkit-phone` Playwright project is emulated WebKit, not a phone — say when a finding needs `verify-on-device`. |
    | A `band/test/**` claim or critique that *is* the deliverable | the **test-quality lens**, sharpened to the **five critique smells** below | — |

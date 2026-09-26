@@ -12,9 +12,9 @@ import { describe, expect, it } from 'vitest';
  * mechanism — the soloist trade block in `conductor.ts` chief among them —
  * may flip it: that was exactly the P0 bug (trading silently overwrote and
  * persisted the user's setting across reload and share links). The fix
- * routes trading through the separate `runtime-derived` field
- * `soloist.tradeSilenced` instead (composed at READ time by
- * `isInstrumentActiveAtStep` in `section-overrides.ts`).
+ * routed trading through a separate `runtime-derived` field,
+ * `soloist.tradeSilenced` (gone with the old engine's trade block, #1424;
+ * the band engine's trading never touches `enabled` either).
  *
  * This test statically scans every dispatch of `ACTIONS.UPDATE_SB` and
  * `ACTIONS.SET_PARAM` under `public/` for a payload that would write
