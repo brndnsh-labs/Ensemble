@@ -85,10 +85,9 @@ npm run test:e2e --prefix prototypes/v2  # v2 Playwright suite against the BUILT
 Targeted tests:
 
 ```bash
-npm run test:vitest -- worker-client                # Vitest filename/name filter
-npm run test:vitest -- standards/                   # critique-only Vitest files
-npm run test:vitest -- tests/standards/funk-bass-critique.test.ts
-npx vitest run tests/unit/engine/worker-client.test.ts -t "specific test name"
+npm run test:vitest -- band-chart                   # Vitest filename/name filter
+npm run test:vitest -- band/test/critique.test.ts   # the band's critique claims
+npx vitest run band/perform.test.ts -t "specific test name"
 
 # v2 Playwright — from prototypes/v2, after a build; projects are `laptop` and `webkit-phone`
 (cd prototypes/v2 && npx playwright test checks/semantic-playback.spec.ts --project=laptop)
@@ -123,23 +122,24 @@ One runtime per page, independent of React mounts. `initialize()` loads the defa
 
 `// @direct-mutation` is a sanctioned escape hatch. Use it only in these categories:
 
-- **Sanctioned (real-time hot paths):** `public/engine/scheduler-core.ts` and the `synth-*.ts` family — direct audio param writes for scheduling and synthesis. Also `public/controllers/app-controller.ts`'s BPM reschedule (`nextNoteTime`/`unswungNextNoteTime`) and `public/controllers/instrument-controller.ts`'s `flushBuffer()` voice-continuity writes, which are the same real-time class outside the engine dir.
+- **Sanctioned (real-time hot paths):** the `synth-*.ts` family — direct audio param writes for synthesis. Also `public/controllers/app-controller.ts`'s BPM reschedule (`nextNoteTime`/`unswungNextNoteTime`) and `public/controllers/instrument-controller.ts`'s `flushBuffer()` voice-continuity writes, which are the same real-time class outside the engine dir.
 - **Sanctioned exception (init-only):** `public/engine/engine.ts` `initAudio()`, `public/engine/audio-recovery.ts` — one-shot audio-graph setup that runs before any dispatch subscriber exists.
 - **Sanctioned exception (pre-mount only):** `public/state/state-hydration.ts`'s `hydrateState`/`loadFromUrl` — written to run before any reactive listener is attached. Since #1358 no app code calls them (v2 opens charts from its own songbook and imports only this file's validators), so extend them only with a live caller in hand.
-- **Sanctioned exception (detached render clone):** `public/export/audio-export.ts`'s `cloneStateForRender` output, and the clone `prototypes/v2/lib/band-export.ts`'s `renderBandPasses` renders from (written by it and by the render bridge's `prepare` hook). These write a throwaway copy of the state tree for an offline render — dispatching would write the *live* slices and corrupt the running app mid-export. `public/engine/chords-engine.ts`'s `validateProgression` belongs here too: it writes `arranger.progression` on **its passed-in `state`**, which is the live tree on the main path and a detached clone on the export path, so a dispatch there would silently corrupt live state during an offline stem render.
+- **Sanctioned exception (detached render clone):** the clone `prototypes/v2/lib/band-export.ts`'s `renderBandPasses` renders from (written by it and by the render bridge's `prepare` hook). These write a throwaway copy of the state tree for an offline render — dispatching would write the *live* slices and corrupt the running app mid-export. `public/engine/chords-engine.ts`'s `validateProgression` belongs here too: it writes `arranger.progression` on **its passed-in `state`**, which is the live tree on the main path and a detached clone on the export path, so a dispatch there would silently corrupt live state during an offline stem render.
 - **Everything else routes through reducers.** Any site not in the four categories above must dispatch.
 
 Enforced by `npm run check-mutations` over `public/**/*.{ts,tsx}` — it catches the bare, cast (`(slice as Mutable<…>).f =`), and aliased-handle assignment idioms, treating a `@direct-mutation`/`@worker-mutation` marker anywhere in the statement as the exemption. The skip list is **content-based, not path-based**: a file is exempt only if it *declares* a slice (contains `deepSignal<`), plus `*reducer*` by name. That deliberately keeps the non-slice plumbing that lives alongside the slices (`state/state-effects.ts`, `state/state-hydration.ts`, `state/history.ts`, `state/persistence.ts`, `state/share-codec.ts`) inside the guard — a blanket `state/` path skip would exempt them the moment they moved into that directory. Two known limits: **`scripts/` is not in scope** (it has its own unmigrated sites), and **array-method mutation is invisible** to an assignment-based guard — `state/history.ts`'s `arranger.history.push/shift/pop` is unmarked and unenforced.
 
-`// @worker-mutation` is the sibling marker for writes to the **worker's own copy** of the tree — reconstructed from `getSyncState()`, never round-tripped back to the main thread. It is *not* interchangeable with `@direct-mutation`: using it on a main-thread file sends the next reader hunting for a worker boundary that doesn't exist.
+`// @worker-mutation` was the sibling marker for the old engine's worker copy of the tree. No worker runs any more (#1404), so no new site should use it.
 
-### The band engine (`band/`) — the default since 2026-09-25
+### The band engine (`band/`) — the only engine since 2026-09-26
 
 Every page plays the ground-up band engine: `band/` is a pure, deterministic `performPass` over the
 score's timeline, driven live by `prototypes/v2/lib/band-host.ts` and exported through the same
 event stream (`.mid`, WAV). Read `band/CLAUDE.md` and `docs/design/band-engine.md` before touching
-it. The app no longer runs the old worker pipeline below (`?engine=old` is gone); its code is
-deleted next (#1404). The Musical Logic sections that name `public/engine` files describe it.
+it. The old worker-based generator is gone (#1404): `public/engine` now holds the voices, sample
+packs and audio graph the band plays through, plus the chord parser the measure-less charts'
+display still uses (`chords-engine.ts`'s `validateProgression`).
 
 The listening-gate tools (`npm run mix:report` and `mix:ab`/`mix:verify`/`mix:spectro`/`mix:plant`
 built on it) render the band engine: `scripts/band-scene.ts` composes each scene in node
@@ -149,15 +149,7 @@ in the app through `renderBandPasses` (`lib/band-export.ts`, the export's own of
 `NEXT_PUBLIC_RENDER_BRIDGE=1`, which `mix:report` makes for itself; a production build compiles it
 out. See `docs/guides/listening-gate-tools.md`.
 
-### Generative Engine Pipeline (worker thread) — the old engine, no longer run
-
-- `public/worker-client.ts` — main-thread bridge; sends full snapshots (`getSyncState()`) or deltas (`syncWorker()`).
-- `public/logic-worker.ts` — orchestrates live note generation, buffer fills, and resolution handling.
-- `public/midi-export-worker.ts` — owns one detached MIDI export in a fresh module-worker realm.
-- `public/engine/scheduler-core.ts` — real-time scheduler consuming worker buffers; timing is based on `playback.audio.currentTime`, not UI clocks.
-- Musical engines: `soloist-phrase-first.ts`, `bass-engine.ts`, `accompaniment.ts`, `chords-engine.ts`, `harmonies.ts`, `grooves/` (13 genre strategies).
-
-There is no visualizer any more. `vizState` and `public/visualizer/visualizer-events.ts` survive only because the old engine's `scheduler-core.ts` queues note events through them; since the listening-gate tools moved to the band engine nothing turns `vizState` on, and both go with the old engine (#1404).
+There is no visualizer. `vizState` and `public/visualizer/visualizer-events.ts`'s types survive only as leftovers of the old engine's scheduler; nothing turns `vizState` on.
 
 ### UI (`prototypes/v2/app/`)
 
@@ -166,10 +158,10 @@ The music stand: songbook home, chart sheet, transport, edit panel and sounds pa
 ### Data / Config split
 
 - UI metadata (menus, categories): `public/data/instrument-styles.ts`
-- Generative behavior: `public/engine/bass-styles.ts`, `public/engine/chords-styles.ts`, `public/engine/grooves/`
+- Musical behavior: the band engine's styles, `band/styles/` (one file per genre)
 - Styles live beside the components in `prototypes/v2/app/` (`style.css` plus per-surface `.css` files). `public/` holds no CSS.
 
-**Layering (documented, deliberately not gated).** The UI should reach the engine through `prototypes/v2/lib/runtime.ts`, data/config modules and state, not by importing generative engine internals; engine modules should receive state via parameters or specific slices rather than importing the global state manager. Both were once `dependency-cruiser` rules, but at `severity: 'warn'` they never failed a build, and a 2026-07-24 measurement found only 8 sites — 7 of which are legitimate registry/policy lookups that merely live under `engine/` (`instrument-registry`, `soloist-mode-policy`, `pack-runtime`, `sample-voice`, `arc`, `note-spelling`) plus `scheduler-core.ts`'s sanctioned real-time state import. Enforcing the rule as written would flag mostly-correct code, so it stays prose (#1232). **If you ever want a real gate, narrow "engine" to generative modules first** — that redefinition is the actual work, not the checker.
+**Layering (documented, deliberately not gated).** The UI should reach the engine through `prototypes/v2/lib/runtime.ts`, data/config modules and state, not by importing generative engine internals; engine modules should receive state via parameters or specific slices rather than importing the global state manager. Both were once `dependency-cruiser` rules, but at `severity: 'warn'` they never failed a build, and a 2026-07-24 measurement found only 8 sites — 7 of which are legitimate registry/policy lookups that merely live under `engine/` (`instrument-registry`, `soloist-mode-policy`, `pack-runtime`, `sample-voice`, `arc`, `note-spelling`) plus the old scheduler's sanctioned real-time state import (both since deleted with the old engine). Enforcing the rule as written would flag mostly-correct code, so it stays prose (#1232). **If you ever want a real gate, narrow "engine" to generative modules first** — that redefinition is the actual work, not the checker.
 
 ## Musical Logic & Generative Standards
 
@@ -179,30 +171,19 @@ In generative logic, always document **why** a probability or offset exists (e.g
 
 ### Deterministic phrasing
 
-Prefer **deterministic, seeded motif generation** (`barIndex`, `sectionId`) over raw `Math.random()`. Keeps critique tests and looped playback coherent. Reference: `getDrumMotif` in `groove-engine.ts`.
+Prefer **deterministic, seeded motif generation** (`barIndex`, `sectionId`) over raw `Math.random()`. Keeps critique tests and looped playback coherent. The band draws every choice from `rng(seed, …keys)` (`band/core/random.ts`), so a pass is byte-identical for its inputs.
 
 ### Weight-based selectors: final-stage multipliers win
 
-For any weight-based picker (e.g. the pitch-weighting block in `getBassNote` in `bass-engine.ts`), if you want a new bias to actually shift the chosen distribution, apply it as a **final-stage `weight *= mult`** after all the additive bonuses, not as a multiplier on one factor's `+= bonus` line. Generative engines accumulate many simultaneous biases (chord-tone bonus, profile boost, common-tone reward, etc.); scaling just one of them gets washed out. Confirmed during the May 2026 SRDC bias work — additive multiplier gave 0pt phase gap; final-stage multiplier gave 30pt+ gap.
+For any weight-based picker, if you want a new bias to actually shift the chosen distribution, apply it as a **final-stage `weight *= mult`** after all the additive bonuses, not as a multiplier on one factor's `+= bonus` line. Generative engines accumulate many simultaneous biases (chord-tone bonus, profile boost, common-tone reward, etc.); scaling just one of them gets washed out. Confirmed during the May 2026 SRDC bias work — additive multiplier gave 0pt phase gap; final-stage multiplier gave 30pt+ gap.
 
-### Dynamic Head / Chorus Evolution (Soloist)
+### Registers
 
-The soloist generates a session-wide `sessionSeed` (SRDC structure: Statement, Restatement, Departure, Conclusion) at playback start. The live mechanism (`getSoloistNotePhraseFirst` in `soloist-phrase-first.ts`, see `docs/design/soloist-phrase-first.md` §6/§9 for the full design):
-
-- **Loop 0 (The Head):** the seed itself is pre-baked with Imperfect Symmetry — `generateSessionSeed` in `soloist-seeder.ts` drifts repeated 'A' measures at a 15–30% rate (`symmetryMutationProb`, tightest for HOOK contours, loosest outside jazz) so Loop 0 doesn't clone verbatim; the live engine then plays the frozen seed straight (head-bypass).
-- **Loop 1+:** `loopLift` (a concave entrance ramp reaching ~0.56 at loop 4 — front-loaded per #858, replacing the older linear 0.14/loop; `loopCount` clamped to 4) layers onto `intensityLift`/`tempoFill`; a per-step sine-swell `activityAt` shapes note density across the loop. `developmentDepth`/`DEPTH_DEGREES` drives cyclical diatonic transposition of the whole line, keyed to `loopCount` so pitch only shifts at a loop boundary (never mid-phrase) — with periodic theme-return (`depth 0` = verbatim head) and one apex/money-note peak per cycle.
-
-### Coordination & Register Slotting
-
-Source of truth: `public/engine/coordination-engine.ts`. Always pass `CoordinationContext` to instrument generators. `tick-logic.ts` enforces ranges via `enforceRegisterSlotting` (exported from `coordination-engine.ts`):
-
-- **Bass:** 23–57
-- **Chords/Harmony:** 52–84
-- **Soloist:** priority 60–90 (only clamp when a note would fall below MIDI 52)
+Each band lane keeps to its register slot — bass 23–57, keyboard comp 52–84 (`docs/design/band-engine.md`, "Register slots") — and the invariant suite (in `band/test/`) checks every style against its lane ranges.
 
 ### Naming / Canonicalization
 
-- **Supported-genre canon (the 13):** `Rock`, `Jazz`, `Funk`, `Disco`, `Hip Hop`, `Blues`, `Neo-Soul`, `Reggae`, `Acoustic`, `Bossa`, `Country`, `Metal`, `Ska-Punk`. This is the matrix's column axis and the **exact set the UI exposes** — the genre picker (`prototypes/v2/app/transport-bar.tsx`, via `lib/runtime.ts`'s re-export) renders straight over `GENRE_NAMES` (= `Object.keys(GENRE_OVERRIDES)` in `public/data/smart-genres.ts`), so there's no config-vs-UI drift. Pinned by `tests/standards/genre-canon-guard.test.ts`. **Don't add a 14th genre or resurrect a retired one without updating the canon + that guard.** The phantom routing keys (`Shred`, `Latin`, `Afrobeat`, `Soul`) that once lingered in engine routing maps have all been retired (verified 2026-07-23); `tests/standards/genre-feel-canon-guard.test.ts` keeps them out. Don't reintroduce them. Note `Minimal` is a live **drum-preset** name (`public/data/drum-presets.ts`), not a genre key — the two namespaces are different.
+- **Supported-genre canon (the 13):** `Rock`, `Jazz`, `Funk`, `Disco`, `Hip Hop`, `Blues`, `Neo-Soul`, `Reggae`, `Acoustic`, `Bossa`, `Country`, `Metal`, `Ska-Punk`. This is the matrix's column axis and the **exact set the UI exposes** — the genre picker (`prototypes/v2/app/transport-bar.tsx`, via `lib/runtime.ts`'s re-export) renders straight over `GENRE_NAMES` (= `Object.keys(GENRE_OVERRIDES)` in `public/data/smart-genres.ts`), so there's no config-vs-UI drift. Pinned by `tests/standards/genre-canon-guard.test.ts`. **Don't add a 14th genre or resurrect a retired one without updating the canon + that guard.** The phantom routing keys (`Shred`, `Latin`, `Afrobeat`, `Soul`) that once lingered in the old engine's routing maps are retired. Don't reintroduce them. Note `Minimal` is a live **drum-preset** name (`public/data/drum-presets.ts`), not a genre key — the two namespaces are different.
 - One canonical internal name per concept. UI labels can be friendlier, but state keys, config keys, persisted payloads, and code paths normalize to the canonical form.
 - Aliases live near the data/config that owns the concept — don't scatter alias checks across components, tests, docs, and controllers.
 - Before any rename: grep the entire repo (`public/`, `prototypes/`, `tests/`, `scripts/`, `docs/`, `.github/`) for every usage. Update code, tests, persistence, sharing, docs, and allowlists in the same pass.
@@ -216,9 +197,9 @@ All `public/` source is `.ts`/`.tsx` (migration complete May 2026). `tsconfig.js
 
 ## Testing Standards
 
-### Critique tests (`tests/standards/`)
+### Critique claims (`band/test/`)
 
-The **Definition of Done** for musicality. When you modify a musical engine (bass, drums, soloist, etc.), you **must** run the corresponding critique test (e.g. `npx vitest run tests/standards/funk-bass-critique.test.ts`). They use statistical ranges — never replace with rigid binary snapshots. Check the "Critique Report" output for balance.
+The **Definition of Done** for musicality. Each style's claims (`band/test/claims/<style>.ts`) are statistical ranges the critique harness measures (`band/test/critique.test.ts`); the invariant suite (in `band/test/`) holds every style to the band's laws. When you change a style or a player, run them — never replace a range with a rigid snapshot. `band/CLAUDE.md` has the details. The old engine's critique suite in `tests/standards/` went with it; what remains there are genre and routing guards, a disco piano critique and the security ledger.
 
 ### Vitest (logic / unit / integration)
 
@@ -275,14 +256,12 @@ Canonicalization* above, and decisions are dated entries in `docs/design/`. See
 
 ## Misc Conventions
 
-- When adding worker-relevant state, update both `getSyncState()` / `syncWorker()` on the main thread and the worker's sync handling.
-- For transport/audio behavior, reuse existing controller entrypoints (`togglePlay`, `setBpm`, `loadDrumPreset`) instead of creating parallel side-effect paths.
+- For transport/audio behavior, go through the runtime's band paths (`startBand`/`stopBand`, `syncBand`) instead of creating parallel side-effect paths.
 - Inline styles only for runtime-calculated values (widths, dynamic grid templates, transition names); static presentation belongs in semantic CSS classes.
 - Atomic state changes: batch related updates in a single `dispatch` where possible.
 - Semantic prop names: name props after their domain (`isTransportVisible`) rather than visual state (`isBlue`).
-- Fail fast in workers: validate payload shapes immediately when sending data to `logic-worker.ts`.
 - Cross-reference comments name a symbol (a function/`const`/interface like `isDepartureCategory`), never a `file.ts:NNNN` line number — line numbers rot on every edit above them, but a symbol name is easy to `grep` and survives.
-- **Prototype guard on `TABLE[untrusted]` (Forgejo-era #1266 — archive provenance, *not* GitHub #1266, which is an unrelated v2 story; code comments citing `#1266` mean this rule) — pick by consumer count, not taste.** A lookup table indexed by a persisted/share-URL value must not be a plain literal: `TABLE['constructor']` returns the `Object` constructor, a truthy hit that sails past `|| fallback` and is then read as config. **Null-prototype the declaration** (`Object.assign(Object.create(null), {…})`, or `Object.create(null)` as a `reduce` seed) when the table has many `|| fallback` consumers — `TIME_SIGNATURES`, `LEGACY_THEME_MAP`, `STYLE_CONFIG`, the `smart-genres.ts` feel tables. **`Object.hasOwn` at the guard** when the table is read in one place — `resolveMappedStyle`, `loadDrumPreset`, `harmonies.ts`'s `STYLE_CONFIGS`. (`Object.prototype.hasOwnProperty.call` in `theory-scales.ts` is the same thing pre-`Object.hasOwn`; don't add new ones.) **A null prototype on a STATE SLICE field is not available** — `toRaw` in `worker-client.ts` rebuilds every synced object as a plain `{}` before `postMessage`, and a reducer that re-creates the field (`groove.ts`'s `sectionSeedMap = {}`) drops it too; deepsignal also refuses to proxy a null-prototype object (`SUPPORTED.has(value.constructor)`), silently costing nested reactivity. For slice data, reject the bad KEY at the reader and type-check the VALUE at each read instead. Best of all, validate at the reader so nothing downstream is untrusted — `state-hydration.ts` is where that happens, and **both** readers there must use the *same* predicate.
+- **Prototype guard on `TABLE[untrusted]` (Forgejo-era #1266 — archive provenance, *not* GitHub #1266, which is an unrelated v2 story; code comments citing `#1266` mean this rule) — pick by consumer count, not taste.** A lookup table indexed by a persisted/share-URL value must not be a plain literal: `TABLE['constructor']` returns the `Object` constructor, a truthy hit that sails past `|| fallback` and is then read as config. **Null-prototype the declaration** (`Object.assign(Object.create(null), {…})`, or `Object.create(null)` as a `reduce` seed) when the table has many `|| fallback` consumers — `TIME_SIGNATURES`, `LEGACY_THEME_MAP`, `STYLE_CONFIG`, the `smart-genres.ts` feel tables. **`Object.hasOwn` at the guard** when the table is read in one place — `loadDrumPreset`, the runtime's `STYLE_FOR_GENRE` lookup. (Don't add new `Object.prototype.hasOwnProperty.call` guards.) **A null prototype on a STATE SLICE field is not available** — a reducer that re-creates the field (`groove.ts`'s `sectionSeedMap = {}`) drops it too; deepsignal also refuses to proxy a null-prototype object (`SUPPORTED.has(value.constructor)`), silently costing nested reactivity. For slice data, reject the bad KEY at the reader and type-check the VALUE at each read instead. Best of all, validate at the reader so nothing downstream is untrusted — `state-hydration.ts` is where that happens, and **both** readers there must use the *same* predicate.
 
 ## Active Product Direction
 

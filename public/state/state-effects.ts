@@ -4,11 +4,6 @@ import { autoVoiceForGenre } from '../data/genre-sound-map.js';
 import { SMART_GENRES } from '../data/smart-genres.js';
 import { validateProgression } from '../engine/chords-engine.js';
 import {
-    generateDrumFills,
-    generateDrumOrchestration,
-    generateSoloistAccents,
-} from '../engine/drum-seeder.js';
-import {
     initAudio,
     restoreGains,
     syncBusReverbSend,
@@ -17,10 +12,7 @@ import {
 } from '../engine/engine.js';
 import { isPackInstalled, packIdFromVoice } from '../engine/instrument-registry.js';
 import { ensurePackLoaded } from '../engine/pack-runtime.js';
-import { togglePlay } from '../engine/scheduler-core.js';
-import { isInstrumentEverActive } from '../engine/section-overrides.js';
 import { deriveSoloistMode } from '../engine/soloist-mode-policy.js';
-import { generateSessionSeed } from '../engine/soloist-seeder.js';
 import type {
     Action,
     Dispatch,
@@ -190,68 +182,6 @@ export async function reconcileUrlGenreOnBoot(
     }
 }
 
-/**
- * Re-seed the soloist (and, optionally, the drum orchestration / fills /
- * accents bag) from the current state. Shared by the play-start path and the
- * during-playback "arrangement changed" path so both routes use the same
- * recipe — bandIntensity, song seed, genre feel, and the dispatch shape.
- */
-function regenerateSessionSeeds(
-    stateMap: EnsembleState,
-    songSeed: string,
-    seedTimelineStartStep: number,
-    dispatch: HandleEffectsContext['dispatch'],
-): void {
-    const { arranger, soloist, groove, playback } = stateMap;
-    const soloGenerated = generateSessionSeed(
-        stateMap,
-        arranger,
-        soloist.style || 'smart',
-        playback.bandIntensity,
-        songSeed,
-    );
-
-    dispatch(ACTIONS.UPDATE_SB, { sessionSeed: soloGenerated });
-
-    if (isInstrumentEverActive(stateMap, 'groove')) {
-        const genreFeel = groove.genreFeel || 'Rock';
-        const drumOrchGenerated = generateDrumOrchestration(
-            stateMap,
-            arranger,
-            genreFeel,
-            playback.bandIntensity,
-            songSeed,
-        );
-        const drumFillsGenerated = generateDrumFills(
-            stateMap,
-            arranger,
-            genreFeel,
-            playback.bandIntensity,
-            songSeed,
-            // why (drum audit 2026-05-29): pass the soloist seed so the fill generator
-            // can lay out when the solo is busy through a turnaround bar (defer-to-
-            // soloist) — but ONLY when the soloist is enabled. With no audible solo there
-            // is no line to step on, so the drummer should fill at the full base rate.
-            // soloGenerated carries { notes, loopLengthSteps }.
-            isInstrumentEverActive(stateMap, 'soloist') ? soloGenerated : undefined,
-        );
-        const drumAccentsGenerated = generateSoloistAccents(
-            stateMap,
-            arranger,
-            soloGenerated,
-            genreFeel,
-            playback.bandIntensity,
-            songSeed,
-        );
-        dispatch(ACTIONS.UPDATE_GB, {
-            orchestrationMap: drumOrchGenerated,
-            fillMap: drumFillsGenerated,
-            accentMap: drumAccentsGenerated,
-            seedTimelineStartStep,
-        });
-    }
-}
-
 export function handleEffects(
     action: Action,
     stateMap: EnsembleState,
@@ -323,54 +253,6 @@ export function handleEffects(
             }
             break;
         }
-        case ACTIONS.TOGGLE_PLAY: {
-            const { playback, arranger } = stateMap;
-            if (playback.isPlaying) {
-                // Auto-lock the chart whenever playback starts. The chart is a
-                // music stand — you don't rewrite while the band is playing.
-                // Unlock pauses; lock-on-play is the symmetric rule.
-                if (!playback.chartLocked) {
-                    dispatch(ACTIONS.SET_CHART_LOCKED, true);
-                }
-                let currentSongSeed = arranger.seed;
-                // Randomize-each-playback: re-roll on every start so each take is
-                // fresh. Otherwise the seed is locked — only roll when none is set.
-                if (arranger.randomizeSeed || !currentSongSeed) {
-                    currentSongSeed = Math.floor(Math.random() * 0xffffff)
-                        .toString(16)
-                        .padStart(6, '0')
-                        .toUpperCase();
-                    dispatch(ACTIONS.SET_SONG_SEED, currentSongSeed);
-                }
-
-                regenerateSessionSeeds(stateMap, currentSongSeed, playback.step || 0, dispatch);
-            } else {
-                dispatch(ACTIONS.UPDATE_SB, { sessionSeed: null });
-                dispatch(ACTIONS.UPDATE_GB, {
-                    orchestrationMap: null,
-                    fillMap: null,
-                    accentMap: null,
-                    seedTimelineStartStep: 0,
-                });
-            }
-            togglePlay(stateMap, true, dispatch);
-            break;
-        }
-        case ACTIONS.SET_CHART_LOCKED: {
-            // #1128 — "unlocking pauses playback" is the symmetric partner of the
-            // auto-lock-on-play above (you don't rewrite while the band plays).
-            // Centralized here so ChartSurface.toggleLock, GlobalShortcuts ('e' +
-            // open-editor) no longer each hand-copy the pause. payload is the bare
-            // new locked flag. Locking (true) auto-locks silently; only unlocking
-            // while playing pauses — and TOGGLE_PLAY's lock branch can't re-fire
-            // because isPlaying is already false by the time its effect runs.
-            // `!payload` (not `=== false`) tracks the reducer's own `!!` coercion,
-            // so any falsy unlock pauses in lock-step with what it wrote.
-            if (!action.payload && stateMap.playback.isPlaying) {
-                dispatch(ACTIONS.TOGGLE_PLAY, undefined);
-            }
-            break;
-        }
         case ACTIONS.SET_SECTIONS:
         case ACTIONS.ADD_SECTION:
         case ACTIONS.REMOVE_SECTION:
@@ -380,15 +262,6 @@ export function handleEffects(
         case ACTIONS.SET_GROUPING:
         case ACTIONS.SET_IS_MINOR: {
             validateProgression(stateMap, dispatch);
-            // If arrangement changes during playback, we must regenerate seeds
-            if (stateMap.playback.isPlaying) {
-                regenerateSessionSeeds(
-                    stateMap,
-                    stateMap.arranger.seed,
-                    stateMap.playback.step || 0,
-                    dispatch,
-                );
-            }
             break;
         }
         case ACTIONS.SET_BPM: {

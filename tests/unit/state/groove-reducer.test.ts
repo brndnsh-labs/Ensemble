@@ -30,14 +30,11 @@ describe('Groove Reducer', () => {
         // sectionSeedMap is a memo of deriveSectionSeed(sectionId, songSeed);
         // it must be invalidated whenever the song seed changes so stale,
         // wrong-seed groove markers never linger.
-        grooveReducer({ type: ACTIONS.SET_GROOVE_SEED, payload: { sectionId: 's1', seed: 0.42 } });
-        expect(groove.sectionSeedMap.s1).toBe(0.42);
-
+        mutableGroove.sectionSeedMap = { s1: 0.42 };
         grooveReducer({ type: ACTIONS.SET_SONG_SEED, payload: 'A1B2C3' });
         expect(groove.sectionSeedMap).toEqual({});
 
-        grooveReducer({ type: ACTIONS.SET_GROOVE_SEED, payload: { sectionId: 's2', seed: 0.7 } });
-        expect(groove.sectionSeedMap.s2).toBe(0.7);
+        mutableGroove.sectionSeedMap = { s2: 0.7 };
         grooveReducer({ type: ACTIONS.RESET_STATE, payload: undefined });
         expect(groove.sectionSeedMap).toEqual({});
     });
@@ -65,23 +62,6 @@ describe('Groove Reducer', () => {
             payload: { module: 'other', value: 0.1 },
         });
         expect(result).toBe(false);
-    });
-
-    it('should set genre countdown', () => {
-        grooveReducer({ type: ACTIONS.SET_GENRE_COUNTDOWN, payload: 4 });
-        expect(groove.genreSwitchCountdown).toBe(4);
-
-        // Setting same value returns false
-        const result = grooveReducer({ type: ACTIONS.SET_GENRE_COUNTDOWN, payload: 4 });
-        expect(result).toBe(false);
-    });
-
-    it('should trigger drum fills', () => {
-        const payload = { steps: { 0: 1 }, startStep: 16, length: 16, crash: true };
-        grooveReducer({ type: ACTIONS.TRIGGER_FILL, payload });
-        expect(groove.fillActive).toBe(true);
-        expect((groove.fillSteps as any)[0]).toBe(1);
-        expect(groove.pendingCrash).toBe(true);
     });
 
     it('should handle SET_GENRE_FEEL - immediate update when NOT playing', () => {

@@ -1,14 +1,4 @@
-import {
-    activateWakeLock,
-    deactivateWakeLock,
-    initPlatform,
-    lockAudio,
-    unlockAudio,
-} from '../platform.js';
-
-export function initPlatformHacks(): void {
-    initPlatform();
-}
+import { activateWakeLock, deactivateWakeLock, lockAudio, unlockAudio } from '../platform.js';
 
 export function stopPlatformAudioAndWakeLock(): void {
     lockAudio();

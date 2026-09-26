@@ -96,9 +96,8 @@ test('Export audio (stems) renders drums/bass/chords/soloist, never harmony', as
     await newBandChart(page, 'Band stems study');
 
     await page.getByRole('button', { name: 'Song actions' }).click();
-    // `renderBandStemsToWav` drops `harmony` before rendering anything for it (band-export.ts)
-    // — the band engine has no such lane — so exactly 4 downloads land, not the old engine's
-    // 5; the soloist stem is the lead, forced on like every stem even though it is off live.
+    // One stem per band lane (`STEM_INSTRUMENTS` in band-export.ts), so exactly 4 downloads land;
+    // the soloist stem is the lead, forced on like every stem even though it is off live.
     // Matches `audio-export.chromium.spec.ts`'s accumulation pattern for
     // `downloadExportResult`'s tight synchronous loop.
     const downloads: import('@playwright/test').Download[] = [];

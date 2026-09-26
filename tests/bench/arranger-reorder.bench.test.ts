@@ -15,7 +15,6 @@ vi.mock('../../public/engine/chords-engine.js', () => ({
 
 vi.mock('../../public/controllers/instrument-controller.js', () => ({ flushBuffers: vi.fn() }));
 vi.mock('../../public/engine/engine.js', () => ({ restoreGains: vi.fn() }));
-vi.mock('../../public/worker-client.js', () => ({ syncWorker: vi.fn() }));
 vi.mock('../../public/state/persistence.js', () => ({ saveCurrentState: vi.fn() }));
 vi.mock('../../public/song/form-analysis.js', () => ({ analyzeForm: vi.fn() }));
 vi.mock('../../public/ui.js', () => ({ showToast: vi.fn() }));
