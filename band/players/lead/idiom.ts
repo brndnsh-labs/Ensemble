@@ -327,7 +327,7 @@ function soloPlan(
     const arc =
         role.kind === 'trade'
             ? tradeArc(tier)
-            : soloArc(role.chorus, ctx.timeline, slotStart, tier);
+            : soloArc(role.chorus, ctx.timeline, slotStart, tier, role.toFours);
     const [lo, hi] = ctx.lead.range;
     // The peak's top note: the instrument's top, or the book's reach above home.
     const home = homeOf(ctx, book);

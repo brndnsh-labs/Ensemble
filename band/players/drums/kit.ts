@@ -104,12 +104,18 @@ export function drumIdiom(book: DrumBook): DrumIdiom {
             }
             const tier = energyTier(plan.energy);
             const soloing = plan.lead.kind === 'trade' && plan.lead.turn === 'drums';
+            const time = isCommonTime(bar)
+                ? book.groove(ctx, tier)
+                : composeFromCells(ctx, tier, book);
+            // A drum solo in a chorus of fours keeps the time's own hi-hat foot, whatever the
+            // meter: the form is never lost.
             let lines =
                 soloing && book.trade
-                    ? book.trade(ctx, bar.phrase.bar, bar.phrase.length, tier)
-                    : isCommonTime(bar)
-                      ? book.groove(ctx, tier)
-                      : composeFromCells(ctx, tier, book);
+                    ? {
+                          ...book.trade(ctx, bar.phrase.bar, bar.phrase.length, tier),
+                          ...(time.hatPedal ? { hatPedal: time.hatPedal } : {}),
+                      }
+                    : time;
             const fillStep = fillStart(ctx, book);
             if (fillStep !== null) {
                 const fill = book.fill(ctx, total - fillStep, ctx.rng('fill'));

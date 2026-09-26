@@ -32,86 +32,99 @@ import type { BarContext, PitchedIdiom, Style } from './types.js';
 // positions once the feel pass swings them, and read as flams.
 const JAZZ_COMP_SPOTS = [2, 6, 8, 10, 14];
 
-/**
- * The drummer's four, bebop style (Max Roach, Philly Joe Jones): a two-beat motif stated,
- * moved around the kit, developed, then a run home that sets up whoever comes in next. The
- * hi-hat foot stays on 2 and 4 throughout, so the form is never lost. Swung eighths only,
- * for the same reason as the comping (a sixteenth would flam once swung).
- */
-// Two beats of swung eighths, each with an offbeat in it: a quarter-note motif marches.
-const TRADE_MOTIFS = ['xx.x', 'x.xx', 'x..x', '.xxx', 'xxx.', '.x.x', '.xx.'];
+// Two beats of swung eighths, each on the beat with an offbeat in it: the statement is
+// heard as the band drops out, so it starts on the one (a displacement moves it off later).
+const TRADE_MOTIFS = ['xx.x', 'x.xx', 'x..x', 'xxx.'];
+const TOMS = ['tomHigh', 'tomMid', 'tomLow'] as const;
 
+/**
+ * The drummer's four, bebop style (Max Roach, Philly Joe Jones). The first bar states a
+ * two-beat motif on the snare, answered on the toms, with the kick on the one as the band
+ * drops out. The middle bars develop it: displaced by an eighth and moved to the toms, then
+ * as accents in a stream of eighths. The last bar states it once more and runs home down the
+ * toms, louder as it goes, to a snare-and-kick shot on the "and" of 4; the crash on the next
+ * downbeat is the band coming back. Swung eighths only, for the same reason as the comping (a
+ * sixteenth would flam once swung). The hi-hat foot is the time's own: the kit keeps it.
+ */
 function jazzTrade(ctx: BarContext, bar: number, length: number, tier: EnergyTier): Lines {
     const total = barSteps(ctx.bar);
     const slotStart = ctx.bar.index - bar;
     // One motif for the whole four: it is the solo's idea.
     const motif = ctx.rng(`trade:${ctx.pass}:${slotStart}`, 'song').pick(TRADE_MOTIFS);
-    const rng = ctx.rng('trade');
-    const lines: Record<'snare' | 'tomHigh' | 'tomMid' | 'tomLow' | 'kick' | 'hatPedal', string[]> =
-        {
-            snare: [],
-            tomHigh: [],
-            tomMid: [],
-            tomLow: [],
-            kick: [],
-            hatPedal: [],
-        };
+    const lines = {
+        snare: [] as string[],
+        tomHigh: [] as string[],
+        tomMid: [] as string[],
+        tomLow: [] as string[],
+        kick: [] as string[],
+    };
     for (const line of Object.values(lines)) {
         line.push(...'.'.repeat(total));
     }
     const hit = tier === 'low' ? 'o' : 'x';
-    const last = bar === length - 1;
-    // The bar before the run home develops the idea; the ones between restate it on the toms.
-    const develops = !last && bar > 0 && bar === length - 2;
-    for (let e = 0; e * 2 < total; e++) {
-        const step = e * 2;
+    const role =
+        bar === length - 1
+            ? 'home'
+            : bar === 0
+              ? 'state'
+              : bar === length - 2
+                ? 'stream'
+                : 'displace';
+    // A displaced bar plays the motif an eighth late; its first stroke is still the accent.
+    const shift = role === 'displace' ? 1 : 0;
+    const runFrom = 8;
+    const run: number[] = [];
+    for (let step = runFrom; step < total - 2; step += 2) {
+        run.push(step);
+    }
+    for (let step = 0; step < total; step += 2) {
+        const e = step / 2;
         const half = Math.floor(e / 4);
-        const on = motif[e % 4] === 'x';
-        const accent = on && e % 4 === motif.indexOf('x');
-        if (last && half >= 1) {
-            // The run home: down the toms on the eighths, to a snare-and-kick shot on the "and"
-            // of the last beat; the crash on the next downbeat is the arrival.
-            const place = (step - 8) / Math.max(2, total - 10);
-            const tom = place < 0.34 ? 'tomHigh' : place < 0.67 ? 'tomMid' : 'tomLow';
-            if (step === total - 2) {
-                lines.snare[step] = 'X';
-                lines.kick[step] = 'X';
-            } else if (on || rng.chance(0.6)) {
-                lines[tom][step] = hit;
-            }
+        const on = motif[(e - shift + 4) % 4] === 'x';
+        const accent = e % 4 === shift;
+        if (role === 'home' && step === total - 2) {
+            lines.snare[step] = 'X';
+            lines.kick[step] = 'X';
             continue;
         }
-        if (develops) {
-            // The motif as accents in a stream of eighths, the accents doubled on the kick.
+        if (role === 'home' && step >= runFrom) {
+            // Every eighth, the three toms in turn from high to low, getting louder.
+            const k = run.indexOf(step);
+            lines[TOMS[Math.floor((k * TOMS.length) / run.length)]][step] =
+                tier === 'low' || k < run.length / 2 ? 'o' : 'x';
+            continue;
+        }
+        if (role === 'stream') {
+            // The motif as accents in a stream of eighths, each figure's first doubled by the
+            // kick (a "bomb").
             lines.snare[step] = on ? 'X' : 'g';
-            if (accent) {
+            if (on && accent) {
                 lines.kick[step] = 'x';
             }
             continue;
         }
         if (!on) {
-            // Between the motif's hits the left hand keeps talking, softly, as energy rises.
-            if (rng.chance(tier === 'low' ? 0 : tier === 'mid' ? 0.3 : 0.5)) {
+            // Driving hard, the left hand keeps the eighths going softly between the strokes.
+            if (tier === 'high') {
                 lines.snare[step] = 'g';
             }
             continue;
         }
-        if (bar === 0) {
-            // Stated on the snare, answered on the toms.
-            lines[half % 2 === 0 ? 'snare' : 'tomHigh'][step] = accent ? 'X' : hit;
-        } else {
-            // Moved around the kit: high tom, then the low toms answer.
-            lines[half % 2 === 0 ? 'tomHigh' : rng.chance(0.5) ? 'tomMid' : 'tomLow'][step] = accent
-                ? 'X'
-                : hit;
-        }
-        if (accent && rng.chance(0.4)) {
-            lines.kick[step] = 'o';
-        }
+        // Stated on the snare and answered on the high tom; displaced, it moves to the toms
+        // as a unit, high then the floor tom.
+        const piece =
+            role === 'displace'
+                ? half % 2 === 0
+                    ? 'tomHigh'
+                    : 'tomLow'
+                : half % 2 === 0
+                  ? 'snare'
+                  : 'tomHigh';
+        lines[piece][step] = accent ? 'X' : hit;
     }
-    // The foot on 2 and 4 (every other beat in any meter).
-    for (let beat = 1; beat * 4 < total; beat += 2) {
-        lines.hatPedal[beat * 4] = 'x';
+    if (role === 'state') {
+        // The one, under the statement: the band has just dropped out.
+        lines.kick[0] = 'x';
     }
     return Object.fromEntries(
         Object.entries(lines).map(([piece, line]) => [piece, line.join('')]),

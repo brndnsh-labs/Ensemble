@@ -38,6 +38,7 @@ export function soloArc(
     timeline: Timeline,
     slotStart: number,
     energy: EnergyTier,
+    toFours = false,
 ): Arc {
     const bars = timeline.bars;
     const slotLength = bars[slotStart].phrase.length;
@@ -62,7 +63,11 @@ export function soloArc(
             windDown: false,
         };
     } else if (lastSlot && bars.length > slotLength) {
-        arc = { density: 'mid', register: 0, peak: false, windDown: true };
+        // Before the head, the last phrase comes down; before the fours it keeps the heat
+        // for the exchange (the drummer's last four set up the head instead).
+        arc = toFours
+            ? { density: 'busy', register: 2, peak: false, windDown: false }
+            : { density: 'mid', register: 0, peak: false, windDown: true };
     } else {
         // The peak is the phrase before the wind-down (or the only phrase of a short chart).
         const peak = secondLast || bars.length <= slotLength;

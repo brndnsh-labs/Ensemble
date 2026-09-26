@@ -51,11 +51,18 @@ export function performPass(
     const lead = style.lead?.idiom;
     const leadProfile = LEAD_INSTRUMENTS[settings.lead];
     const window = options.window ?? fullWindow(timeline);
-    const plans = planBars(timeline, settings, {
-        ...options,
-        window,
-        trades: Boolean(style.trades && lead),
-    });
+    const trades = Boolean(style.trades && lead);
+    const plans = planBars(timeline, settings, { ...options, window, trades });
+    // Where the pass wraps, the next bar belongs to the next pass, whose lanes can differ (the
+    // fours may open with the drummer alone): what it plays is taken from that pass's plan.
+    const wrapPlan = options.looping
+        ? planBars(timeline, settings, {
+              pass: options.pass + 1,
+              looping: true,
+              window: { ...window, from: window.wrapTo },
+              trades,
+          })[window.wrapTo]
+        : undefined;
     const memory: PassMemory = options.memory
         ? { ...options.memory }
         : {
@@ -73,14 +80,18 @@ export function performPass(
         const plan = plans[i];
         snapshots[i] = { ...memory };
         const nextIndex = i + 1 < window.to ? i + 1 : options.looping ? window.wrapTo : -1;
-        // The bar after the window is planned by the pass that plays it; its plan is only
-        // needed for "is the next bar an arrival/ending", which a wrap resolves the same way.
-        const nextPlan = plans[nextIndex] ?? {
+        // The bar after the window is planned by the pass that plays it. "Is the next bar an
+        // arrival/ending" a wrap resolves the same way; who plays it comes from `wrapPlan`.
+        const wrapped = plans[nextIndex] ?? {
             ...plan,
             crash: nextIndex >= 0,
             ending: false,
             fill: 'none',
         };
+        const nextPlan =
+            i === window.to - 1 && wrapPlan
+                ? { ...wrapped, lanes: wrapPlan.lanes, lead: wrapPlan.lead }
+                : wrapped;
         const heard: BarContext['heard'] = { drums: [], bass: [], lead: [] };
         const context = (lane: Lane): BarContext => ({
             timeline,

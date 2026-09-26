@@ -189,7 +189,7 @@ describe.each(STYLE_IDS.filter((id) => STYLES[id].lead))('%s lead', (styleId) =>
                 };
                 const lean = feelFor(style, COMP_INSTRUMENTS[settings.comp].family).lean;
                 const heads: string[] = [];
-                const cycle = cycleLength(Boolean(style.trades));
+                const cycle = cycleLength(timeline, Boolean(style.trades));
                 let memory: PassMemory | undefined;
                 for (let pass = 0; pass <= cycle; pass++) {
                     const result = performPass(timeline, settings, { pass, looping: true, memory });

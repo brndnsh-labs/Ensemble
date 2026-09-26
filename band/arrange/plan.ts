@@ -89,8 +89,18 @@ export function planBars(
     }: { pass: number; looping: boolean; window: PassWindow; trades?: boolean },
 ): BarPlan[] {
     const { bars } = timeline;
-    // Fours are traded over the whole song: a practice loop keeps its band.
-    const trading = trades && window.from === 0 && window.to === bars.length;
+    // Fours are traded over the whole song (a pass resumed at a barline still is one); a
+    // practice loop keeps its band. Only a lead that is playing trades.
+    const trading =
+        trades && settings.lanes.lead && window.to === bars.length && window.wrapTo === 0;
+    // Whether the drummer has bar `index` of `pass` to himself: his turn, in a bar the lead
+    // would play (a section written without the lead is the band's).
+    const drummerAlone = (index: number, onPass: number) => {
+        const role = leadRole(timeline, index, onPass, trading);
+        return (
+            role.kind === 'trade' && role.turn === 'drums' && bars[index].visit.lanes.lead !== false
+        );
+    };
     // A song that loops earns a little more each time round — capped, so the fourth chorus
     // is fuller than the first but the band never runs away from the player.
     const passLift = Math.min(pass, 3) * 0.03;
@@ -116,9 +126,8 @@ export function planBars(
         for (const lane of ['drums', 'bass', 'comp', 'lead'] as const) {
             lanes[lane] = settings.lanes[lane] && bar.visit.lanes[lane] !== false;
         }
-        // Only a lead that is playing trades: without it, the band plays the chorus.
-        const lead = leadRole(timeline, i, pass, trading && lanes.lead);
-        const drumsTurn = lead.kind === 'trade' && lead.turn === 'drums';
+        const lead = leadRole(timeline, i, pass, trading);
+        const drumsTurn = lanes.lead && drummerAlone(i, pass);
         if (drumsTurn) {
             lanes.bass = false;
             lanes.comp = false;
@@ -143,8 +152,11 @@ export function planBars(
         // the band is past quiet energy.
         const afterFill = prevPlan?.fill === 'phrase' && energy >= 0.5;
         // The band comes back in on a crash after the drummer's four.
-        const afterDrums =
-            prevPlan?.lead.kind === 'trade' && prevPlan.lead.turn === 'drums' && !drumsTurn;
+        // Read from the form, not the previous plan, so a pass resumed here still crashes; the
+        // bar before the first is the last bar of the pass before.
+        const before =
+            i > 0 ? drummerAlone(i - 1, pass) : pass > 0 && drummerAlone(bars.length - 1, pass - 1);
+        const afterDrums = before && !drumsTurn;
         plans[i] = {
             energy,
             lanes,
