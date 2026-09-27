@@ -355,6 +355,11 @@ function keyOf(document: ChartDocument): string {
 /**
  * "Pick up where you left off" (#1441): the song's own first bars — never a sample — with Open
  * chart and ▶ Play. The phone shows the first four (CSS), the desktop all eight.
+ *
+ * One label (#1459): the state phrase ("Pick up where you left off" / "From your songbook") that
+ * used to sit above the title as its own eyebrow now leads the meta line instead — the page's own
+ * "Your songbook" heading right above this card already reads as an eyebrow, and stacking a
+ * second one said the same thing twice for no reason worth a whole line.
  */
 function ContinueCard({
     featured,
@@ -373,11 +378,9 @@ function ContinueCard({
             aria-labelledby="continue-title"
         >
             <div className="continue-copy">
-                <span className="eyebrow">
-                    {continued ? 'Pick up where you left off' : 'From your songbook'}
-                </span>
                 <h2 id="continue-title">{featured.title}</h2>
                 <p className="continue-meta">
+                    {continued ? 'Pick up where you left off' : 'From your songbook'} ·{' '}
                     {featured.genre} · {featured.bpm} BPM · {featured.key}
                     {featured.isMinor ? 'm' : ''}
                     {ago ? ` · opened ${ago}` : ''}
@@ -518,9 +521,10 @@ function RecentSongs({
                             <th>
                                 <span className="sr">Star</span>
                             </th>
-                            <th>Song</th>
-                            <th className="hide-mobile">Key</th>
-                            <th className="hide-mobile">Tempo</th>
+                            {/* Visible on the laptop; sr-only on the phone (#1459) — a lone
+                                "SONG" header over a one-visible-column list said nothing a
+                                musician needed. */}
+                            <th className="song-col-header">Song</th>
                             <th className="hide-mobile">Opened</th>
                             <th>
                                 <span className="sr">More actions</span>
@@ -560,24 +564,38 @@ function RecentSongs({
                                         </button>
                                     </td>
                                     <td>
+                                        {/* Two lines (#1459): the title, then one meta line —
+                                            composer (or genre) · key · tempo. `.song-detail` keeps
+                                            EXACTLY the composer/genre text (nothing appended
+                                            inside it): `songLink()`'s exact-match filter, used
+                                            across the whole v2 suite, matches this element's own
+                                            text. The key/tempo facts sit beside it in a sibling
+                                            span so the two read as one line without touching that
+                                            contract. */}
                                         <button
                                             className="song-link"
                                             disabled={busy}
                                             onClick={() => onOpenSong(song.id)}
                                         >
                                             <span className="song-name">{song.title}</span>
-                                            <span className="song-detail">
-                                                {composerOf(song) || genreOf(song)}
+                                            <span className="song-meta-line">
+                                                <span className="song-detail">
+                                                    {composerOf(song) || genreOf(song)}
+                                                </span>
+                                                <span className="song-meta">
+                                                    {' '}
+                                                    · {keyOf(song)} · {song.chart.performance.bpm}{' '}
+                                                    BPM
+                                                    {/* The phone has no Opened column, so the
+                                                        opened time rides the meta line there. */}
+                                                    {ago && (
+                                                        <span className="song-ago"> · {ago}</span>
+                                                    )}
+                                                </span>
                                             </span>
                                             <CandidateMarker kind={kinds.get(song.id) ?? null} />
-                                            <span className="song-meta">
-                                                {keyOf(song)} · {song.chart.performance.bpm} BPM
-                                                {ago ? ` · ${ago}` : ''}
-                                            </span>
                                         </button>
                                     </td>
-                                    <td className="song-key hide-mobile">{keyOf(song)}</td>
-                                    <td className="hide-mobile">{song.chart.performance.bpm}</td>
                                     <td className="hide-mobile song-opened">{ago ?? '—'}</td>
                                     <td className="more-cell">
                                         <button
