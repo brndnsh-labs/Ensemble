@@ -181,29 +181,6 @@ describe('bounded source-preserving iReal import', () => {
     });
 
     it.each([
-        // 3/4: 2 chords evenly split a 3-beat bar into two dotted quarters (1.5 quarter notes
-        // each). CELL_BEATS['3/4'] = 0.5 (infojunkie/ireal-musicxml converter.js's
-        // `Converter.mapTime['34']`), so 2 raw cells each (4 total, the usual 4-cells-per-bar
-        // grid) pad to 3 cells each before scaling: 3 * 0.5 = 1.5 quarter notes.
-        [
-            '3/4',
-            'T34[C F Z',
-            [
-                [3, 2],
-                [3, 2],
-            ],
-        ],
-        // 6/8: 2 chords split a 6-eighth-note (3-quarter-note) bar into two dotted quarters.
-        // CELL_BEATS['6/8'] defaults to 1 (only 3/4, 3/2 and 12/8 differ), so 2 raw cells each
-        // pad to 3 cells each: 3 beats * (4/8 quarter-notes-per-eighth-beat) = 1.5 quarter notes.
-        [
-            '6/8',
-            'T68[C F Z',
-            [
-                [3, 2],
-                [3, 2],
-            ],
-        ],
         // 5/4: 1 chord over 4 raw cells plus 1 chord over 1 raw cell already total exactly 5 —
         // the meter's own beat count — so CELL_BEATS's default weight of 1 needs no round-robin
         // adjustment at all, unlike the other three cases here.
@@ -228,6 +205,16 @@ describe('bounded source-preserving iReal import', () => {
                 [3, 2],
             ],
         ],
+        // 6/4: 2 chords, 2 raw cells each (4 total, the usual grid), already summing to the
+        // meter's own 6-beat count via the default weight of 1 — no adjustment needed.
+        [
+            '6/4',
+            'T64[C  D  Z',
+            [
+                [3, 1],
+                [3, 1],
+            ],
+        ],
     ])(
         'maps multi-chord cells in %s per the 4-cells-per-bar grid (#1453)',
         (_meter, body, durations) => {
@@ -239,10 +226,37 @@ describe('bounded source-preserving iReal import', () => {
         },
     );
 
+    it.each(['3/4', '3/2', '6/8'])(
+        'still refuses a multi-chord bar in %s — a scope decision, not a technical gap (#1453)',
+        (meter) => {
+            // `multiChordDurations` implements the cited algorithm generally, but
+            // `SHIPPED_MULTI_CHORD_METERS` deliberately excludes these three: 3/4 and 3/2's 0.5
+            // beat-per-cell weight makes a plain two-chord bar split 1.5+1.5, landing on the "and"
+            // of beat 2 in most waltzes (measured at 168 of 181 such bars, 43 songs, across the
+            // whole Jazz 1460 playlist) — the reference converter's own comment calls this
+            // specific algorithm "unknown", so it isn't an established rule under #1171 without an
+            // explicit by-ear check against iReal Pro's own playback. 6/8 has no real-playlist
+            // multi-chord evidence at all. A single-chord bar in any of these three is unaffected
+            // (see the "does not mistake..." and other single-event tests elsewhere in this file).
+            const token = { '3/4': '34', '3/2': '32', '6/8': '68' }[meter];
+            blocked(`T${token}[C F Z`);
+        },
+    );
+
     it('refuses more chords than a meter has beats for, rather than guessing a split', () => {
         // 5 chords cannot fit a 4/4 bar's 4 beats — established from converter.js's own guard,
         // `if (measure.chords.length > this.time.beats) { error(...); }`.
         blocked('T44[C,Dm,Em,F,G7Z');
+    });
+
+    it('refuses a multi-chord bar whose round-robin trim cannot converge', () => {
+        // 5 chords in 12/8 (cellCounts.length = 5, within the 12-beat "too many chords" limit)
+        // each start at the 1-cell floor, worth 3 beats apiece (CELL_BEATS['12/8'] = 3) — 15
+        // total against a 12-beat target. Trimming needs to remove exactly 1 cell's worth (3
+        // beats), but every cell is already at the floor — `multiChordDurations`'s trim loop only
+        // decrements above (`adjusted[i] > 1`), so it can never converge; the bounded guard
+        // refuses instead of looping forever.
+        blocked('T12[C,D,E,F,GZ');
     });
 
     it('maps repeat barlines and alternate ending markers without unfolding the authored chart', () => {

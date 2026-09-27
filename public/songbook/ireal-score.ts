@@ -59,6 +59,20 @@ const CELL_BEATS = new Map([
     ['12/8', 3],
 ]);
 
+// Meters this importer will actually SPLIT a multi-chord bar for (#1453 scope decision, not a
+// technical limitation — `multiChordDurations` below implements the cited algorithm generally).
+// A whole-playlist measurement found real evidence for 5/4 (Take Five's own Ebm(3)+Bbm7(2) vamp)
+// and 6/4 (West Coast Blues); 12/8's beatUnit of 3 (one written cell = one whole dotted-quarter
+// beat) has no split-the-beat ambiguity either. 3/4 and 3/2 are held back: their beatUnit of 0.5
+// means a plain two-chord bar splits 1.5+1.5 beats, landing on the "and" of beat 2 — measured
+// across the whole playlist at 168 of 181 such bars (43 songs), and the reference converter's own
+// comment calls this specific algorithm "unknown" — not an established rule under #1171 without
+// an explicit by-ear check against iReal Pro's own playback. 6/8 has zero real-playlist evidence
+// either way (its one 6/8 chart has no multi-chord bar). A bar in an excluded meter still refuses
+// with the existing message; a single-chord bar in one is unaffected, since that path (see
+// `timedEvents`) never consults this set at all.
+const SHIPPED_MULTI_CHORD_METERS = new Set(['4/4', '5/4', '6/4', '12/8']);
+
 // Equivalent spellings only, not approximated voicings or dropped extensions.
 // https://www.irealpro.com/learn/chord-symbols/ (official shorthand table)
 const CHORD_ALIASES = new Map([
@@ -376,6 +390,12 @@ function readBars(
             // Officially visual-only, both established in ironss/accompaniser's irealb_parser.lua:
             // 'Y' is vertical spacing, its own `vspace` production; 's'/'l' (chord glyph size) are
             // in the separate `unknown` production. Neither adds a cell.
+            // Known divergence from infojunkie/ireal-musicxml converter.js (review, #1453): there
+            // 's' also sets `chord.short = true`, forcing that chord's `beats()` to exactly 1
+            // regardless of trailing blanks/round-robin padding — a real duration effect this
+            // importer doesn't model. Left as a visual no-op: long-standing (predates #1453) and
+            // fails safe (produces a plausible, if occasionally non-reference-exact, duration
+            // rather than a wrong one silently).
             offset++;
         } else if (char === 'N') {
             const pass = Number(body[offset + 1]);
@@ -501,6 +521,11 @@ function readBars(
             addCell({ repeat: char === 'x' ? 'one' : 'two' });
             offset++;
         } else if (char === 'n' || char === 'p') {
+            // Known divergence from infojunkie/ireal-musicxml converter.js (review, #1453): 'p'
+            // there is a pause/space filler (a slash with no root), and doubles as a W-alias when
+            // it's the first token in a measure — not a sustained "hold" the way this importer
+            // treats it. Left as-is: long-standing (predates #1453) and fails safe (an audibly
+            // held chord, not a wrong pitch or a dropped beat).
             addCell({ event: { kind: char === 'n' ? 'no-chord' : 'hold', duration: [1, 1] } });
             offset++;
         } else if (char === 'W') {
@@ -592,6 +617,9 @@ function readBars(
  * musical fact, and scaling proportionally against it (as a single-event bar safely can, since
  * there's only one span to normalize) would silently invent a wrong split whenever a chart's raw
  * layout departs from 4 cells, e.g. via this importer's own compressed "Kcl"/"LZ" tokens.
+ *
+ * Gated by `SHIPPED_MULTI_CHORD_METERS`: a meter not in that set refuses here even though the
+ * algorithm above is general — see that set's own comment for which meters and why.
  */
 function multiChordDurations(
     cellCounts: readonly number[],
@@ -599,7 +627,7 @@ function multiChordDurations(
     index: number,
 ): ScoreDuration[] {
     const { counts, unit } = scoreMeter(meter);
-    if (cellCounts.length > counts) {
+    if (cellCounts.length > counts || !SHIPPED_MULTI_CHORD_METERS.has(meter)) {
         fail(index, 'Multi-chord cell timing in this meter needs a verified import mapping.');
     }
     const cellBeats = CELL_BEATS.get(meter) ?? 1;
