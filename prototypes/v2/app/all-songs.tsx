@@ -43,6 +43,16 @@ interface AllSongsProps {
     onOpenSong: (id: string) => void;
     onToggleStar: (id: string) => void;
     onOpenRowMenu: (id: string, title: string) => void;
+    /**
+     * The id THIS TAB's own row action just removed from the library (#1440 review P5), or null.
+     * `document.activeElement === document.body` — the old guard — is also the ordinary resting
+     * state for a mouse user who has clicked nothing since loading the page, so it fired on a
+     * row disappearing for ANY reason (a sync-driven removal, another device's delete) and stole
+     * focus from wherever the musician actually was. This is set only by the delete handlers in
+     * `app/ensemble.tsx` and cleared right after, so the effect below can require the removed row
+     * to match this specific id before it moves focus at all.
+     */
+    lastRemovedId: string | null;
 }
 
 /**
@@ -71,6 +81,7 @@ export function AllSongs({
     onOpenSong,
     onToggleStar,
     onOpenRowMenu,
+    lastRemovedId,
 }: AllSongsProps) {
     const [view, setView] = useState<LibraryView>('all');
     const [genre, setGenre] = useState('');
@@ -176,28 +187,39 @@ export function AllSongs({
 
     // After a row delete, focus goes to the next row, or the heading if the list is now empty
     // (#1440 review P3), rather than falling to `<body>` — a `<dialog>` closing over a row that
-    // no longer exists has nowhere else to return the browser's own default restore to. Guarded
-    // on `document.activeElement === document.body`: a row genuinely vanishing while focus was
-    // elsewhere (a different tab's delete, say) has nothing here to correct.
+    // no longer exists has nowhere else to return the browser's own default restore to.
+    //
+    // Scoped to THIS TAB'S OWN action via `lastRemovedId` (#1440 review P5) — the earlier
+    // `document.activeElement === document.body` guard is also the ordinary resting state for a
+    // mouse user who hasn't clicked anything, so it fired for a row vanishing for ANY reason
+    // (another device's delete arriving mid-sync, `songbookLoading` flipping the list) and stole
+    // focus from wherever the musician actually was. `handledRemovalId` makes the move fire once
+    // per removal even though `sorted` can re-run this effect again before `lastRemovedId` is
+    // cleared (e.g. a sync refresh right after the delete).
     const previousRowIds = useRef<string[]>([]);
+    const handledRemovalId = useRef<string | null>(null);
     useEffect(() => {
         const previousIds = previousRowIds.current;
         const currentIds = sorted.map((song) => song.id);
-        if (previousIds.length > 0 && document.activeElement === document.body) {
-            const removedIndex = previousIds.findIndex((id) => !currentIds.includes(id));
-            if (removedIndex !== -1) {
-                const nextId = currentIds[Math.min(removedIndex, currentIds.length - 1)];
-                const nextRow = nextId ? rows.current.get(nextId) : undefined;
-                const link = nextRow?.querySelector<HTMLButtonElement>('.song-link');
-                if (link) {
-                    link.focus();
-                } else {
-                    heading.current?.focus();
-                }
+        if (
+            lastRemovedId &&
+            handledRemovalId.current !== lastRemovedId &&
+            previousIds.includes(lastRemovedId) &&
+            !currentIds.includes(lastRemovedId)
+        ) {
+            handledRemovalId.current = lastRemovedId;
+            const removedIndex = previousIds.indexOf(lastRemovedId);
+            const nextId = currentIds[Math.min(removedIndex, currentIds.length - 1)];
+            const nextRow = nextId ? rows.current.get(nextId) : undefined;
+            const link = nextRow?.querySelector<HTMLButtonElement>('.song-link');
+            if (link) {
+                link.focus();
+            } else {
+                heading.current?.focus();
             }
         }
         previousRowIds.current = currentIds;
-    }, [sorted]);
+    }, [sorted, lastRemovedId]);
 
     const showAzIndex = sort === 'title' || sort === 'composer';
 

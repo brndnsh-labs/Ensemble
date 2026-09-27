@@ -2107,6 +2107,14 @@ dialog textarea {
     font-size: 13px;
     line-height: 1.6;
 }
+/* Always mounted now (#1440 review P2) so a screen reader reliably picks up the text change on a
+   row action, rather than a freshly-inserted region sometimes going unannounced — so the empty
+   state (nothing to say yet, or just cleared) has to collapse visually instead of unmounting. */
+.status-banner[data-empty="true"] {
+    padding: 0;
+    height: 0;
+    overflow: hidden;
+}
 .preview-note {
     font-size: 12px;
     line-height: 1.7;

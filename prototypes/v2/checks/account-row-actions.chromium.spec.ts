@@ -91,9 +91,12 @@ test('Rename on an account song with a live draft opens it instead of renaming i
 
     // The song opens (recovering the draft) instead of renaming in place — an in-place rename
     // would have gone through `AccountSongbook.save`, which retires every writer's older drafts
-    // on commit, silently destroying the edit. The row menu's own typed text was never sent.
-    await expect(page.getByRole('heading', { name: 'Set list edited', exact: true })).toBeVisible();
-    await expect(page.getByLabel('Song title')).toHaveValue('Set list edited');
+    // on commit, silently destroying the edit. The row menu's own typed title is carried forward
+    // as a fresh edit on top of the recovered draft (#1440 review P4), rather than discarded.
+    await expect(
+        page.getByRole('heading', { name: 'Renamed from the row menu', exact: true }),
+    ).toBeVisible();
+    await expect(page.getByLabel('Song title')).toHaveValue('Renamed from the row menu');
     await expect(page.getByLabel('Song title')).toBeFocused();
 });
 

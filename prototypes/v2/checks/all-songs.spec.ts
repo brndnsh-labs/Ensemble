@@ -366,13 +366,14 @@ test('Rename opens the song (recovering its draft) instead of renaming in place 
     await page.getByTestId('row-menu-rename-input').fill('Renamed from the row menu');
     await page.getByTestId('row-menu-rename-save').click();
 
-    // The song opens instead of renaming in place: the recovered draft's own edited title comes
-    // back — never the row menu's typed text, which was never committed anywhere — in both the
-    // heading and the focused title field.
+    // The song opens instead of renaming in place, recovering the draft — and the title the
+    // musician just typed into the row menu is carried forward as a fresh edit on top of that
+    // recovered draft (#1440 review P4), rather than being discarded, in both the heading and the
+    // focused title field.
     await expect(
-        page.getByRole('heading', { name: 'Blue pocket edited', exact: true }),
+        page.getByRole('heading', { name: 'Renamed from the row menu', exact: true }),
     ).toBeVisible();
-    await expect(page.getByLabel('Song title')).toHaveValue('Blue pocket edited');
+    await expect(page.getByLabel('Song title')).toHaveValue('Renamed from the row menu');
     await expect(page.getByLabel('Song title')).toBeFocused();
     await expect(page.locator('.playback-footer [role="status"]')).toContainText(
         'opened it here so renaming won’t lose them',

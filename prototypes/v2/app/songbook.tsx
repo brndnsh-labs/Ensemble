@@ -133,6 +133,11 @@ interface SongbookProps {
     /** Where focus returns after leaving the All songs page (#1440 review P3) — same reason as
      * `standardsEntryRef` above. */
     allSongsEntryRef: RefObject<HTMLButtonElement | null>;
+    /**
+     * The id THIS TAB's own row action just removed (#1440 review P5) — same contract as
+     * `AllSongs`' own `lastRemovedId`; see its doc comment.
+     */
+    lastRemovedId: string | null;
 }
 
 export function Songbook({
@@ -163,6 +168,7 @@ export function Songbook({
     onOpenRowMenu,
     onOpenAllSongs,
     allSongsEntryRef,
+    lastRemovedId,
 }: SongbookProps) {
     // A map, not `.find`: both this list and the account library are capped at 2,000, and the
     // pair of them scanned against each other is the one place that product would be paid for.
@@ -175,25 +181,32 @@ export function Songbook({
     const heading = useRef<HTMLHeadingElement>(null);
     // After a row delete, focus goes to the next row, or the heading if the list is now empty
     // (#1440 review P3) — the same fix and the same reasoning as `AllSongs`' own copy of this.
+    // Scoped to THIS TAB'S OWN action via `lastRemovedId` (#1440 review P5) — see `AllSongs`' own
+    // copy of this effect for why `document.activeElement === document.body` was the wrong guard.
     const previousRowIds = useRef<string[]>([]);
+    const handledRemovalId = useRef<string | null>(null);
     useEffect(() => {
         const previousIds = previousRowIds.current;
         const currentIds = filteredSongs.map((s) => s.id);
-        if (previousIds.length > 0 && document.activeElement === document.body) {
-            const removedIndex = previousIds.findIndex((id) => !currentIds.includes(id));
-            if (removedIndex !== -1) {
-                const nextId = currentIds[Math.min(removedIndex, currentIds.length - 1)];
-                const nextRow = nextId ? rows.current.get(nextId) : undefined;
-                const link = nextRow?.querySelector<HTMLButtonElement>('.song-link');
-                if (link) {
-                    link.focus();
-                } else {
-                    heading.current?.focus();
-                }
+        if (
+            lastRemovedId &&
+            handledRemovalId.current !== lastRemovedId &&
+            previousIds.includes(lastRemovedId) &&
+            !currentIds.includes(lastRemovedId)
+        ) {
+            handledRemovalId.current = lastRemovedId;
+            const removedIndex = previousIds.indexOf(lastRemovedId);
+            const nextId = currentIds[Math.min(removedIndex, currentIds.length - 1)];
+            const nextRow = nextId ? rows.current.get(nextId) : undefined;
+            const link = nextRow?.querySelector<HTMLButtonElement>('.song-link');
+            if (link) {
+                link.focus();
+            } else {
+                heading.current?.focus();
             }
         }
         previousRowIds.current = currentIds;
-    }, [filteredSongs]);
+    }, [filteredSongs, lastRemovedId]);
     return (
         <main className="home">
             <div className="home-intro">
