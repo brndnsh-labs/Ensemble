@@ -291,26 +291,44 @@ function clampScrollTop(scrollEl: HTMLElement, top: number): number {
 }
 
 /**
+ * The doc-space bottom edge of the first ROW strictly below `rowEl`'s own row — not the next
+ * `.bar` in document order, which on a 4-per-row desktop layout is usually still a SIBLING in the
+ * same row (patch review P3-3: adding its height to `rowEl`'s own double-counted one row as if it
+ * were a second one, rather than measuring the next row at all). Naturally includes any
+ * `.section-head` between the two rows, since it just reads whatever bar comes next at a lower
+ * top, at its ACTUAL rendered position — a taller gap there simply pushes that bar further down.
+ * Null past the last row.
+ */
+function nextRowBottom(scrollEl: HTMLElement, rowEl: HTMLElement): number | null {
+    const bars = Array.from(scrollEl.querySelectorAll<HTMLElement>('.bar'));
+    const rowTop = rowEl.getBoundingClientRect().top;
+    const next = bars
+        .slice(bars.indexOf(rowEl))
+        .find((bar) => bar.getBoundingClientRect().top > rowTop + 1);
+    return next ? docTop(scrollEl, next) + next.getBoundingClientRect().height : null;
+}
+
+/**
  * The playing row at the top third of the scroller (Touches #1) — the next two rows then sit
  * fully in the remaining two-thirds on both measured viewports (laptop 4-per-row, phone 2).
  *
  * On a short scroller (a landscape phone, ~250px) a flat 28% can push the playing row down far
- * enough that `nextEl` — the bar right after it, usually the next row's first — no longer fits
- * below it even though the two would fit together at a smaller offset. Clamp the anchor so that,
- * whenever they DO fit together, the anchor never asks for more room than that: the offset only
- * ever shrinks from 28%, so the playing row is never pushed lower than the default position.
+ * enough that the next ROW (`nextBottom`, `nextRowBottom` above) no longer fits below it even
+ * though the two would fit together at a smaller offset. Clamp the anchor so that, whenever they
+ * DO fit together, the anchor never asks for more room than that: the offset only ever shrinks
+ * from 28%, so the playing row is never pushed lower than the default position.
  */
-function scrollRowIntoView(scrollEl: HTMLElement, rowEl: HTMLElement, nextEl: HTMLElement | null) {
+function scrollRowIntoView(scrollEl: HTMLElement, rowEl: HTMLElement, nextBottom: number | null) {
     const viewHeight = scrollEl.clientHeight;
+    const rowTop = docTop(scrollEl, rowEl);
     let anchor = viewHeight * 0.28;
-    if (nextEl) {
-        const rowHeight = rowEl.getBoundingClientRect().height;
-        const nextHeight = nextEl.getBoundingClientRect().height;
-        if (rowHeight + nextHeight <= viewHeight) {
-            anchor = Math.max(0, Math.min(anchor, viewHeight - rowHeight - nextHeight));
+    if (nextBottom !== null) {
+        const combinedHeight = nextBottom - rowTop;
+        if (combinedHeight <= viewHeight) {
+            anchor = Math.max(0, Math.min(anchor, viewHeight - combinedHeight));
         }
     }
-    const top = docTop(scrollEl, rowEl) - anchor;
+    const top = rowTop - anchor;
     scrollEl.scrollTo({ top: clampScrollTop(scrollEl, top), behavior: scrollBehavior() });
 }
 
@@ -953,10 +971,26 @@ export default function Ensemble() {
     // it scrolled there, so a chord change WITHIN the same row (no vertical move) is a no-op —
     // null right after Following turns back on, forcing an immediate re-apply ("Resume follow").
     const followRowTop = useRef<number | null>(null);
-    // The `active` slot the jump-ahead scroll last fired for, so the last-beat window (several
-    // 60ms ticks) triggers it exactly once rather than on every tick it stays true.
+    // The performed BAR the jump-ahead scroll last fired for (patch review P3-2 — not the
+    // `active` slot: a chord landing exactly on the last felt pulse changes slot without
+    // changing bar), so the last-beat window (several 60ms ticks) triggers it exactly once
+    // rather than on every tick it stays true.
     const followJumpedFor = useRef<number | null>(null);
     const editPanel = useRef<HTMLElement>(null);
+    // Moved up from beside its JSX consumers so the Following effects below — which need
+    // `activeBar` (patch review P3-2) — can read it without a forward reference; `useChartView`
+    // has no render boundary of its own, so calling it here instead of later changes nothing
+    // about what it computes, only where its already-fresh-every-render result becomes available.
+    const {
+        blocks,
+        displayActive,
+        displayNext,
+        activeEvent,
+        activeBar,
+        totalBars,
+        writtenBars,
+        writtenSections,
+    } = useChartView(current, active);
     const hasPendingText = buffers.size > 0 || pendingMeasures;
     const text =
         buffers.get(sectionId) ??
@@ -1903,10 +1937,10 @@ export default function Ensemble() {
         followRowTop.current = null;
         followJumpedFor.current = null;
     }, [current?.id]);
-    // `followJumpedFor`'s de-dupe (below) is keyed on the `active` SLOT INDEX, which is a fixed
-    // array position the band re-walks every lap — so it recurs identically on lap 2, lap 3, and
-    // so on. Retiring it the moment `nextSoon` goes false (the playing bar's last-beat window
-    // closing) means the NEXT time any bar's last beat arrives — the very same slot index
+    // `followJumpedFor`'s de-dupe (below) is keyed on the PERFORMED BAR (`activeBar`), which is a
+    // fixed array position the band re-walks every lap — so it recurs identically on lap 2, lap 3,
+    // and so on. Retiring it the moment `nextSoon` goes false (the playing bar's last-beat window
+    // closing) means the NEXT time any bar's last beat arrives — the very same bar index
     // included — the jump-ahead is live again, rather than permanently spent after its first fire.
     useEffect(() => {
         if (!nextSoon) {
@@ -1934,20 +1968,24 @@ export default function Ensemble() {
             return; // Same row as last time: a chord changed, not a row.
         }
         followRowTop.current = top;
-        // The bar right after the active one in document order — usually the start of the NEXT
-        // row too, and short-viewport clamping (below) wants its height to fit both together.
-        const bars = scrollEl.querySelectorAll<HTMLElement>('.bar');
-        const nextEl = bars[Array.prototype.indexOf.call(bars, activeEl) + 1] ?? null;
-        scrollRowIntoView(scrollEl, activeEl, nextEl);
+        scrollRowIntoView(scrollEl, activeEl, nextRowBottom(scrollEl, activeEl));
     }, [active, following]);
     // The jump-ahead (#1458, Touches #3): fires once per bar, on `nextSoon`'s rising edge (the
     // playing bar's last beat), only when the next performed bar isn't document-adjacent to the
     // active one and isn't already on screen — a repeat back, an ending skip, the form's loop to
-    // bar 1, or a practice loop's wrap. `followJumpedFor` is the de-dupe: `nextSoon` stays true for
+    // bar 1, or a practice loop's wrap. `followJumpedFor` is the de-dupe, keyed on the PERFORMED
+    // BAR rather than `active`'s slot (patch review P3-2): a chord landing exactly on the last
+    // felt pulse changes `active` without changing the bar, and a slot-keyed de-dupe would let
+    // that re-fire the jump a second time inside the very same bar. `nextSoon` stays true for
     // several 60ms ticks, this must act on only the first one (and is retired above the moment
     // `nextSoon` next goes false, so lap 2's last beat can fire it again).
     useEffect(() => {
-        if (!nextSoon || !following || active === null || followJumpedFor.current === active) {
+        if (
+            !nextSoon ||
+            !following ||
+            activeBar === null ||
+            followJumpedFor.current === activeBar
+        ) {
             return;
         }
         const scrollEl = scroll.current;
@@ -1968,9 +2006,9 @@ export default function Ensemble() {
         if (inView) {
             return;
         }
-        followJumpedFor.current = active;
+        followJumpedFor.current = activeBar;
         scrollForJump(scrollEl, activeEl, targetEl);
-    }, [nextSoon, following, active]);
+    }, [nextSoon, following, activeBar]);
 
     async function run(task: () => void | Promise<void>) {
         if (working.current) {
@@ -4193,15 +4231,6 @@ export default function Ensemble() {
             setExportAudioProgress('');
         }
     }
-    const {
-        blocks,
-        displayActive,
-        displayNext,
-        activeEvent,
-        totalBars,
-        writtenBars,
-        writtenSections,
-    } = useChartView(current, active);
     // The Continue card (#1441): the live songbook's own "last opened" song, read by id with the
     // home slice, else its most recently opened row. A device with no songs has no card at all —
     // it gets the first-visit layout, where the standards are the page.
