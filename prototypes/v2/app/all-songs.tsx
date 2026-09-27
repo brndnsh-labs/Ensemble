@@ -78,15 +78,12 @@ export function AllSongs({
     const [sort, setSort] = useState<AllSongsSort>(initialSort ?? 'title');
     const rows = useRef(new Map<string, HTMLTableRowElement>());
     const heading = useRef<HTMLHeadingElement>(null);
-    // Same courtesy `StandardsBrowser` gives the standards browse view: this is a view swap, not
-    // a dialog, but opening it moves focus to its own heading and leaving it restores focus to
-    // whatever opened it, rather than dropping either on `<body>`.
+    // Same courtesy `StandardsBrowser` gives the standards browse view: opening this moves focus
+    // to its own heading. Restoring focus on the way OUT is the shell's job instead (#1440 review
+    // P3, `app/ensemble.tsx`'s `allSongsEntryRef`) — see `StandardsBrowser`'s own note on why a
+    // captured `document.activeElement` cannot survive this view swap's remount.
     useEffect(() => {
-        const opener = document.activeElement as HTMLElement | null;
         heading.current?.focus();
-        return () => {
-            opener?.focus?.();
-        };
     }, []);
 
     const remoteCandidateKinds = useMemo(
@@ -177,11 +174,46 @@ export function AllSongs({
         return next;
     }, [filtered, sort, openedAt]);
 
+    // After a row delete, focus goes to the next row, or the heading if the list is now empty
+    // (#1440 review P3), rather than falling to `<body>` — a `<dialog>` closing over a row that
+    // no longer exists has nowhere else to return the browser's own default restore to. Guarded
+    // on `document.activeElement === document.body`: a row genuinely vanishing while focus was
+    // elsewhere (a different tab's delete, say) has nothing here to correct.
+    const previousRowIds = useRef<string[]>([]);
+    useEffect(() => {
+        const previousIds = previousRowIds.current;
+        const currentIds = sorted.map((song) => song.id);
+        if (previousIds.length > 0 && document.activeElement === document.body) {
+            const removedIndex = previousIds.findIndex((id) => !currentIds.includes(id));
+            if (removedIndex !== -1) {
+                const nextId = currentIds[Math.min(removedIndex, currentIds.length - 1)];
+                const nextRow = nextId ? rows.current.get(nextId) : undefined;
+                const link = nextRow?.querySelector<HTMLButtonElement>('.song-link');
+                if (link) {
+                    link.focus();
+                } else {
+                    heading.current?.focus();
+                }
+            }
+        }
+        previousRowIds.current = currentIds;
+    }, [sorted]);
+
     const showAzIndex = sort === 'title' || sort === 'composer';
 
     function jumpTo(letter: string) {
         const target = sorted.find((song) => leadingLetter(sortKeyFor(song, sort)) >= letter);
-        rows.current.get(target?.id ?? '')?.scrollIntoView({ block: 'start' });
+        const row = rows.current.get(target?.id ?? '');
+        // Focus the row's own song link, not just scroll to it (#1440 review P3): a jump that
+        // only scrolls hands nothing to keyboard/screen-reader use, and leaves focus wherever the
+        // letter button itself sits.
+        const link = row?.querySelector<HTMLButtonElement>('.song-link');
+        if (link) {
+            link.focus({ preventScroll: true });
+            link.scrollIntoView({ block: 'start' });
+        } else {
+            row?.scrollIntoView({ block: 'start' });
+        }
     }
 
     return (

@@ -2098,6 +2098,15 @@ dialog textarea {
     text-decoration: underline;
     flex-shrink: 0;
 }
+/* A row action's own status while browsing the songbook (#1440) — neutral, unlike `.error-banner`:
+   "Renamed to…"/"Duplicated"/"Deleted" are not faults. */
+.status-banner {
+    background: var(--chip);
+    color: var(--ink);
+    padding: 12px 20px;
+    font-size: 13px;
+    line-height: 1.6;
+}
 .preview-note {
     font-size: 12px;
     line-height: 1.7;

@@ -144,3 +144,18 @@ test('editing an open standard writes nothing to recovery storage', async ({ pag
     await page.getByRole('button', { name: 'Song actions' }).click();
     await expect(page.getByText(/Preserved drafts \(/)).toHaveCount(0);
 });
+
+/**
+ * Leaving returns focus to the entry point on home (#1440 review P3), not `<body>`. This view
+ * swap remounts `Songbook` (and its "Browse standards" button) on every return, so the fix has
+ * to be a ref the SHELL holds across that remount (`app/ensemble.tsx`'s `standardsEntryRef`) —
+ * a ref captured inside `StandardsBrowser` itself would already be pointing at a removed node by
+ * the time its own unmount cleanup could use it.
+ */
+test('leaving the standards browser returns focus to its entry point on home', async ({ page }) => {
+    await page.goto(appUrl());
+    await page.getByRole('button', { name: 'Browse standards' }).click();
+    await expect(page.getByRole('heading', { name: 'Standards.' })).toBeVisible();
+    await page.getByRole('button', { name: 'Back to songbook' }).click();
+    await expect(page.getByRole('button', { name: 'Browse standards' })).toBeFocused();
+});

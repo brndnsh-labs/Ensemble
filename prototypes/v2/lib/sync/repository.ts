@@ -209,6 +209,12 @@ function commitDeleted(
     tx.table('songs').delete([scope.ownerId, documentId]);
     tx.table('meta').delete(key);
     tx.table('meta').delete(deletionKey(scope.ownerId, documentId));
+    // The opened-at/star preferences go with it too (#1440 review P3), in this SAME transaction:
+    // the song has just left the library by both of `commitDeleted`'s callers (this device's own
+    // acknowledged delete, or a download adopting another device's tombstone), and a preference
+    // row that outlived it would be a leftover with no song left to describe.
+    tx.table('meta').delete(openedKey(scope.ownerId, documentId));
+    tx.table('meta').delete(starKey(scope.ownerId, documentId));
     return 'removed';
 }
 
@@ -818,8 +824,14 @@ export class AccountSongbook {
             tx.read(tx.table('meta').getAll(range), (rows: OpenedAt[]) => {
                 const map = new Map<string, string>();
                 for (const row of rows) {
-                    const valid = savedOpenedAt(row, scope, row.documentId);
-                    map.set(valid.documentId, valid.openedAt);
+                    try {
+                        const valid = savedOpenedAt(row, scope, row.documentId);
+                        map.set(valid.documentId, valid.openedAt);
+                    } catch {
+                        // One corrupt row must not cost every OTHER song its opened-at time
+                        // (#1440 review P3) — skip it and keep going, the posture guest
+                        // `recoveriesFor` already takes for an unreadable recovery slot.
+                    }
                 }
                 tx.finish(map);
             });
@@ -850,7 +862,12 @@ export class AccountSongbook {
             tx.read(tx.table('meta').getAll(range), (rows: Star[]) => {
                 const ids = new Set<string>();
                 for (const row of rows) {
-                    ids.add(savedStar(row, scope, row.documentId).documentId);
+                    try {
+                        ids.add(savedStar(row, scope, row.documentId).documentId);
+                    } catch {
+                        // One corrupt row must not cost every OTHER song its star (#1440
+                        // review P3) — same posture as `openedAtMap` above.
+                    }
                 }
                 tx.finish(ids);
             });

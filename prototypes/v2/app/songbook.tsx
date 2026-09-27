@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { type RefObject, useEffect, useMemo, useRef } from 'react';
 import {
     ACCOUNT_SWITCH_MESSAGES,
     REMOTE_UPDATE_MESSAGES,
@@ -106,6 +106,12 @@ interface SongbookProps {
     onOpenFeatured: () => void;
     /** Opens the standards browse surface (#1439). */
     onBrowseStandards: () => void;
+    /**
+     * Where focus returns after leaving the standards browser (#1440 review P3) — the shell holds
+     * this ref across the view swap that remounts this button on every return, which is why the
+     * restore lives there instead of inside `StandardsBrowser`'s own unmount.
+     */
+    standardsEntryRef: RefObject<HTMLButtonElement | null>;
     busy: boolean;
     offline: string;
     search: string;
@@ -124,6 +130,9 @@ interface SongbookProps {
     onOpenRowMenu: (id: string, title: string) => void;
     /** #1440's full-library page — the "All N songs →" link a large songbook needs. */
     onOpenAllSongs: () => void;
+    /** Where focus returns after leaving the All songs page (#1440 review P3) — same reason as
+     * `standardsEntryRef` above. */
+    allSongsEntryRef: RefObject<HTMLButtonElement | null>;
 }
 
 export function Songbook({
@@ -138,6 +147,7 @@ export function Songbook({
     continued,
     onOpenFeatured,
     onBrowseStandards,
+    standardsEntryRef,
     busy,
     offline,
     search,
@@ -152,10 +162,38 @@ export function Songbook({
     onToggleStar,
     onOpenRowMenu,
     onOpenAllSongs,
+    allSongsEntryRef,
 }: SongbookProps) {
     // A map, not `.find`: both this list and the account library are capped at 2,000, and the
     // pair of them scanned against each other is the one place that product would be paid for.
     const remoteCandidateKinds = new Map(remoteCandidates.map((row) => [row.id, row.kind]));
+    const filteredSongs = useMemo(
+        () => songs.filter((s) => s.title.toLowerCase().includes(search.toLowerCase())),
+        [songs, search],
+    );
+    const rows = useRef(new Map<string, HTMLTableRowElement>());
+    const heading = useRef<HTMLHeadingElement>(null);
+    // After a row delete, focus goes to the next row, or the heading if the list is now empty
+    // (#1440 review P3) — the same fix and the same reasoning as `AllSongs`' own copy of this.
+    const previousRowIds = useRef<string[]>([]);
+    useEffect(() => {
+        const previousIds = previousRowIds.current;
+        const currentIds = filteredSongs.map((s) => s.id);
+        if (previousIds.length > 0 && document.activeElement === document.body) {
+            const removedIndex = previousIds.findIndex((id) => !currentIds.includes(id));
+            if (removedIndex !== -1) {
+                const nextId = currentIds[Math.min(removedIndex, currentIds.length - 1)];
+                const nextRow = nextId ? rows.current.get(nextId) : undefined;
+                const link = nextRow?.querySelector<HTMLButtonElement>('.song-link');
+                if (link) {
+                    link.focus();
+                } else {
+                    heading.current?.focus();
+                }
+            }
+        }
+        previousRowIds.current = currentIds;
+    }, [filteredSongs]);
     return (
         <main className="home">
             <div className="home-intro">
@@ -214,7 +252,7 @@ export function Songbook({
                         />
                     )}
                     <div className="section-heading library-heading">
-                        <h2 data-testid="library-heading">
+                        <h2 ref={heading} tabIndex={-1} data-testid="library-heading">
                             {accountLibrary ? 'Your account songbook' : 'Your songbook'}
                         </h2>
                         <label className="search">
@@ -232,6 +270,7 @@ export function Songbook({
                         // whole-playlist imports land.
                         <p className="all-songs-link">
                             <button
+                                ref={allSongsEntryRef}
                                 className="btn"
                                 data-testid="all-songs-link"
                                 onClick={onOpenAllSongs}
@@ -283,108 +322,112 @@ export function Songbook({
                             </tr>
                         </thead>
                         <tbody>
-                            {songs
-                                .filter((s) => s.title.toLowerCase().includes(search.toLowerCase()))
-                                .map((s) => {
-                                    const candidateKind = remoteCandidateKinds.get(s.id) ?? null;
-                                    const isStarred = starred.has(s.id);
-                                    return (
-                                        <tr className="song-row" key={s.id}>
-                                            <td>
-                                                <button
-                                                    className="icon-button star-toggle"
-                                                    aria-pressed={isStarred}
-                                                    aria-label={
-                                                        isStarred
-                                                            ? `Unstar ${s.title}`
-                                                            : `Star ${s.title}`
-                                                    }
-                                                    disabled={busy}
-                                                    onClick={() => onToggleStar(s.id)}
-                                                >
-                                                    {isStarred ? '★' : '☆'}
-                                                </button>
-                                            </td>
-                                            <td>
-                                                <button
-                                                    className="song-link"
-                                                    disabled={busy}
-                                                    onClick={() => onOpenSong(s.id)}
-                                                >
-                                                    <span className="song-glyph">♪</span>
-                                                    <span>
-                                                        <span className="song-name">{s.title}</span>
-                                                        {/* Per-row storage-location repetition
+                            {filteredSongs.map((s) => {
+                                const candidateKind = remoteCandidateKinds.get(s.id) ?? null;
+                                const isStarred = starred.has(s.id);
+                                return (
+                                    <tr
+                                        className="song-row"
+                                        key={s.id}
+                                        ref={(element) => {
+                                            if (element) {
+                                                rows.current.set(s.id, element);
+                                            } else {
+                                                rows.current.delete(s.id);
+                                            }
+                                        }}
+                                    >
+                                        <td>
+                                            <button
+                                                className="icon-button star-toggle"
+                                                aria-pressed={isStarred}
+                                                aria-label={
+                                                    isStarred
+                                                        ? `Unstar ${s.title}`
+                                                        : `Star ${s.title}`
+                                                }
+                                                disabled={busy}
+                                                onClick={() => onToggleStar(s.id)}
+                                            >
+                                                {isStarred ? '★' : '☆'}
+                                            </button>
+                                        </td>
+                                        <td>
+                                            <button
+                                                className="song-link"
+                                                disabled={busy}
+                                                onClick={() => onOpenSong(s.id)}
+                                            >
+                                                <span className="song-glyph">♪</span>
+                                                <span>
+                                                    <span className="song-name">{s.title}</span>
+                                                    {/* Per-row storage-location repetition
                                                             is fixed on the All songs page (#1440);
                                                             left as-is here since dozens of OTHER
                                                             specs across this suite select rows by
                                                             this exact accessible name ("<title>
                                                             <genre> · Saved locally"), and this
                                                             table's own redesign is #1441's. */}
-                                                        <span className="song-detail">
-                                                            {genreOf(s)} ·{' '}
-                                                            {accountLibrary
-                                                                ? 'In your account'
-                                                                : 'Saved locally'}
-                                                        </span>
-                                                        {/* #1310, widened #1362 — said here as well
+                                                    <span className="song-detail">
+                                                        {genreOf(s)} ·{' '}
+                                                        {accountLibrary
+                                                            ? 'In your account'
+                                                            : 'Saved locally'}
+                                                    </span>
+                                                    {/* #1310, widened #1362 — said here as well
                                                             as on the stand because this is the only
                                                             surface that shows the whole library at
                                                             once, and the song it is about may not be
                                                             the one open. One row, one kind: a row is
                                                             never marked for more than one candidate
                                                             at a time. */}
-                                                        {candidateKind === 'version' && (
-                                                            <span
-                                                                className="song-marker"
-                                                                data-testid="song-newer-in-account"
-                                                            >
-                                                                {REMOTE_UPDATE_MESSAGES.marker}
-                                                            </span>
-                                                        )}
-                                                        {candidateKind === 'deleted' && (
-                                                            <span
-                                                                className="song-marker"
-                                                                data-testid="song-deleted-in-account"
-                                                            >
-                                                                {
-                                                                    REMOTE_UPDATE_MESSAGES.deletedMarker
-                                                                }
-                                                            </span>
-                                                        )}
-                                                        {candidateKind === 'unsupported' && (
-                                                            <span
-                                                                className="song-marker"
-                                                                data-testid="song-unsupported-in-account"
-                                                            >
-                                                                {
-                                                                    REMOTE_UPDATE_MESSAGES.unsupportedMarker
-                                                                }
-                                                            </span>
-                                                        )}
-                                                    </span>
-                                                </button>
-                                            </td>
-                                            <td className="song-key">
-                                                {arrangementOf(s).key}
-                                                {arrangementOf(s).isMinor ? 'm' : ''}
-                                            </td>
-                                            <td className="hide-mobile">
-                                                {s.chart.performance.bpm}
-                                            </td>
-                                            <td>
-                                                <button
-                                                    className="icon-button row-more"
-                                                    aria-label={`More actions for ${s.title}`}
-                                                    disabled={busy}
-                                                    onClick={() => onOpenRowMenu(s.id, s.title)}
-                                                >
-                                                    ⋯
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
+                                                    {candidateKind === 'version' && (
+                                                        <span
+                                                            className="song-marker"
+                                                            data-testid="song-newer-in-account"
+                                                        >
+                                                            {REMOTE_UPDATE_MESSAGES.marker}
+                                                        </span>
+                                                    )}
+                                                    {candidateKind === 'deleted' && (
+                                                        <span
+                                                            className="song-marker"
+                                                            data-testid="song-deleted-in-account"
+                                                        >
+                                                            {REMOTE_UPDATE_MESSAGES.deletedMarker}
+                                                        </span>
+                                                    )}
+                                                    {candidateKind === 'unsupported' && (
+                                                        <span
+                                                            className="song-marker"
+                                                            data-testid="song-unsupported-in-account"
+                                                        >
+                                                            {
+                                                                REMOTE_UPDATE_MESSAGES.unsupportedMarker
+                                                            }
+                                                        </span>
+                                                    )}
+                                                </span>
+                                            </button>
+                                        </td>
+                                        <td className="song-key">
+                                            {arrangementOf(s).key}
+                                            {arrangementOf(s).isMinor ? 'm' : ''}
+                                        </td>
+                                        <td className="hide-mobile">{s.chart.performance.bpm}</td>
+                                        <td>
+                                            <button
+                                                className="icon-button row-more"
+                                                aria-label={`More actions for ${s.title}`}
+                                                disabled={busy}
+                                                onClick={() => onOpenRowMenu(s.id, s.title)}
+                                            >
+                                                ⋯
+                                            </button>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
                         </tbody>
                     </table>
                     <p className="offline-note">
@@ -404,7 +447,12 @@ export function Songbook({
                             Blues forms, jazz standards and genre grooves — pick one, change the key
                             or the feel, and make it your own.
                         </p>
-                        <button className="btn" disabled={busy} onClick={onBrowseStandards}>
+                        <button
+                            ref={standardsEntryRef}
+                            className="btn"
+                            disabled={busy}
+                            onClick={onBrowseStandards}
+                        >
                             Browse standards →
                         </button>
                     </section>

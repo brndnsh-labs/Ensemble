@@ -93,12 +93,16 @@ test('search, genre filter, every sort order and the A–Z index', async ({ page
     await page.locator('.all-songs-select select').nth(1).selectOption('composer');
     await expect(page.locator('.az-index button')).toHaveCount(26);
 
-    // Jumping to a letter scrolls the first song at or after it into view.
+    // Jumping to a letter scrolls the first song at or after it into view AND focuses its own
+    // song link (#1440 review P3) — not just a scroll, which hands nothing to keyboard use.
     await page.locator('.all-songs-select select').nth(1).selectOption('title');
     await page.locator('.az-index button', { hasText: 'M' }).click();
     await expect(
         page.locator('.all-songs-table .song-row', { hasText: 'Minor swing sketch' }),
     ).toBeInViewport();
+    await expect(
+        page.locator('.all-songs-table .song-link', { hasText: 'Minor swing sketch' }),
+    ).toBeFocused();
 });
 
 test('the sort choice is remembered per device across a reload', async ({ page }) => {
@@ -216,6 +220,21 @@ test('a fresh device (no songs) shows no All songs link', async ({ page }) => {
     await expect(page.getByTestId('all-songs-link')).toHaveCount(0);
 });
 
+/**
+ * Leaving returns focus to the entry point on home (#1440 review P3), not `<body>`. This view
+ * swap remounts `Songbook` (and its "All N songs →" button) on every return, so the fix has to
+ * be a ref the SHELL holds across that remount (`app/ensemble.tsx`'s `allSongsEntryRef`) — a ref
+ * captured inside `AllSongs` itself would already be pointing at a removed node by the time its
+ * own unmount cleanup could use it.
+ */
+test('leaving the All songs page returns focus to its entry link on home', async ({ page }) => {
+    await seedStarters(page);
+    await page.getByTestId('all-songs-link').click();
+    await expect(page.getByRole('heading', { name: /All songs/ })).toBeVisible();
+    await page.getByRole('button', { name: '← Home' }).click();
+    await expect(page.getByTestId('all-songs-link')).toBeFocused();
+});
+
 test('the row ⋯ menu: Star/Unstar, Rename, Duplicate, Export file, Delete…', async ({ page }) => {
     await seedStarters(page);
     await page.getByTestId('all-songs-link').click();
@@ -277,18 +296,27 @@ test('the row ⋯ menu: Star/Unstar, Rename, Duplicate, Export file, Delete…',
     await expect(page.locator('.all-songs-table .song-row')).toHaveCount(3);
 });
 
-test('deleting the open song and the Continue song both leave the songbook consistent', async ({
+/**
+ * Deleting the Continue song leaves the songbook consistent (#1440 review P5).
+ *
+ * A row's ⋯ menu only ever renders while `current` is null (`Songbook`/`AllSongs` are only
+ * mounted in that state), so a row-menu delete can never target the chart actually open on the
+ * stand — there is no UI path to reach it, and an earlier version of both `renameRow` and
+ * `deleteGuestSong` carried a branch that handled exactly that unreachable case. That dead code
+ * is gone; what is left to prove is the real, reachable case this test covers: the Continue
+ * card's own song, and a second delete right after it, both leaving no dangling state.
+ */
+test('deleting the Continue song leaves the songbook consistent, and so does a second delete', async ({
     page,
 }) => {
     await seedStarters(page);
-    // Open "Blue pocket" so it becomes the Continue song, then leave it — it is now BOTH the
-    // Continue card and an ordinary row.
+    // Open "Blue pocket" so it becomes the Continue song, then leave it.
     await page.locator('.song-link', { hasText: 'Blue pocket' }).click();
     await expect(page.getByRole('heading', { name: 'Blue pocket', exact: true })).toBeVisible();
     await backToSongbook(page);
     await expect(page.locator('.continue-card')).toContainText('Blue pocket');
 
-    // Delete the Continue song from the home row list, while it is NOT the open chart.
+    // Delete the Continue song from the home row list.
     const homeRow = page.locator('.song-table .song-row', { hasText: 'Blue pocket' });
     await homeRow.getByRole('button', { name: 'More actions for Blue pocket' }).click();
     await page.getByTestId('row-menu-delete').click();
@@ -297,17 +325,58 @@ test('deleting the open song and the Continue song both leave the songbook consi
     // The Continue card falls back cleanly rather than pointing at a dead id.
     await expect(page.locator('.continue-card')).not.toContainText('Blue pocket');
 
-    // Now delete the OPEN chart: open "After hours", then delete it from the same row list.
-    await page.locator('.song-link', { hasText: 'After hours' }).click();
-    await expect(page.getByRole('heading', { name: 'After hours', exact: true })).toBeVisible();
-    await backToSongbook(page);
-    const openRow = page.locator('.song-table .song-row', { hasText: 'After hours' });
-    await openRow.getByRole('button', { name: 'More actions for After hours' }).click();
+    // A second, unrelated delete right after leaves the songbook just as consistent.
+    const secondRow = page.locator('.song-table .song-row', { hasText: 'After hours' });
+    await secondRow.getByRole('button', { name: 'More actions for After hours' }).click();
     await page.getByTestId('row-menu-delete').click();
     await page.getByTestId('delete-guest-song-confirm').click();
     await expect(page.locator('.song-table .song-row', { hasText: 'After hours' })).toHaveCount(0);
-    // The stand is left consistent: back at the songbook, nothing crashed, no dangling banner.
+    // The songbook is left consistent: nothing crashed, no dangling banner.
     await expect(page.getByRole('heading', { name: 'Let’s play something.' })).toBeVisible();
+});
+
+/**
+ * Rename must never destroy a live draft (#1440 review P1): an in-place rename would either
+ * retire an account's newer drafts or (here, guest) bump `updatedAt` and silently orphan the
+ * recovery slot `recoveryFor` would otherwise still offer. So Rename opens the song instead,
+ * through the normal path that recovers the draft, and focuses the title field there.
+ */
+test('Rename opens the song (recovering its draft) instead of renaming in place when one exists', async ({
+    page,
+}) => {
+    await seedStarters(page);
+    await page.locator('.song-link', { hasText: 'Blue pocket' }).click();
+    await page.getByRole('button', { name: 'Edit chart' }).click();
+    await page.getByLabel('Song title').fill('Blue pocket edited');
+    await expect
+        .poll(() =>
+            page.evaluate(
+                () =>
+                    Object.keys(localStorage).filter((key) =>
+                        key.startsWith('ensemble-v2-preview:recovery:'),
+                    ).length,
+            ),
+        )
+        .toBeGreaterThan(0);
+    await backToSongbook(page);
+
+    const row = page.locator('.song-table .song-row', { hasText: 'Blue pocket' });
+    await row.getByRole('button', { name: 'More actions for Blue pocket' }).click();
+    await page.getByTestId('row-menu-rename').click();
+    await page.getByTestId('row-menu-rename-input').fill('Renamed from the row menu');
+    await page.getByTestId('row-menu-rename-save').click();
+
+    // The song opens instead of renaming in place: the recovered draft's own edited title comes
+    // back — never the row menu's typed text, which was never committed anywhere — in both the
+    // heading and the focused title field.
+    await expect(
+        page.getByRole('heading', { name: 'Blue pocket edited', exact: true }),
+    ).toBeVisible();
+    await expect(page.getByLabel('Song title')).toHaveValue('Blue pocket edited');
+    await expect(page.getByLabel('Song title')).toBeFocused();
+    await expect(page.locator('.playback-footer [role="status"]')).toContainText(
+        'opened it here so renaming won’t lose them',
+    );
 });
 
 test('a live draft is discarded, not orphaned, when its song is deleted', async ({ page }) => {
@@ -364,4 +433,45 @@ test('new song / save-a-copy naming stays distinct from the row menu’s "<title
     await expect(
         page.locator('.all-songs-table .song-name', { hasText: 'Original tune copy' }),
     ).toBeVisible();
+});
+
+/**
+ * After a row delete, focus goes to the next row, or the heading once the list is empty
+ * (#1440 review P3) — never to `<body>`, which is where the browser's own default restore lands
+ * once the row that held focus before the confirm dialog opened no longer exists to restore it to.
+ */
+test('after a row delete, focus goes to the next row, or the heading once the list is empty', async ({
+    page,
+}) => {
+    await seedStarters(page);
+    await page.getByTestId('all-songs-link').click();
+
+    // Title order: After hours, Blue pocket, Minor swing sketch. Deleting the MIDDLE row leaves
+    // focus on what is now the row at that same position.
+    await page
+        .locator('.all-songs-table .song-row', { hasText: 'Blue pocket' })
+        .getByRole('button', { name: 'More actions for Blue pocket' })
+        .click();
+    await page.getByTestId('row-menu-delete').click();
+    await page.getByTestId('delete-guest-song-confirm').click();
+    await expect(page.locator('.all-songs-table .song-row')).toHaveCount(2);
+    await expect(
+        page.locator('.all-songs-table .song-link', { hasText: 'Minor swing sketch' }),
+    ).toBeFocused();
+
+    // Deleting the rest empties the list — focus falls back to the page's own heading.
+    await page
+        .locator('.all-songs-table .song-row', { hasText: 'After hours' })
+        .getByRole('button', { name: 'More actions for After hours' })
+        .click();
+    await page.getByTestId('row-menu-delete').click();
+    await page.getByTestId('delete-guest-song-confirm').click();
+    await page
+        .locator('.all-songs-table .song-row', { hasText: 'Minor swing sketch' })
+        .getByRole('button', { name: 'More actions for Minor swing sketch' })
+        .click();
+    await page.getByTestId('row-menu-delete').click();
+    await page.getByTestId('delete-guest-song-confirm').click();
+    await expect(page.locator('.all-songs-empty')).toBeVisible();
+    await expect(page.getByRole('heading', { name: /All songs/ })).toBeFocused();
 });
