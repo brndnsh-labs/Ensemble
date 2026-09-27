@@ -983,16 +983,17 @@ export function readVersion(
     return { kind: 'current', record: candidate };
 }
 
-export function validateChartDocument(candidate: unknown): CodecDecodeResult<ChartDocument> {
-    const prepared = prepareCandidate(candidate);
-    if (prepared.kind === 'invalid') {
-        return prepared;
-    }
-    const version = readVersion(
-        prepared.candidate,
-        CHART_DOCUMENT_SCHEMA_VERSION,
-        prepared.candidate,
-    );
+/**
+ * Validates an already-prepared candidate — one that has already been through
+ * {@link prepareCandidate}'s structural walk and JSON round trip, either directly or as a
+ * subtree of a larger document that has (the v1-then-v2 dispatch reuses the same detached
+ * top-level candidate; a nested subtree inherits its parent's bounds because a subtree of an
+ * already depth/size-bounded, acyclic, accessor-free tree cannot itself violate those bounds).
+ * Does NOT re-run the structural walk — callers that hold raw, untrusted input must call
+ * {@link validateChartDocument} (or `prepareCandidate` directly) instead.
+ */
+export function validatePreparedChartDocument(prepared: unknown): CodecDecodeResult<ChartDocument> {
+    const version = readVersion(prepared, CHART_DOCUMENT_SCHEMA_VERSION, prepared);
     if (version.kind !== 'current') {
         return version;
     }
@@ -1037,6 +1038,14 @@ export function validateChartDocument(candidate: unknown): CodecDecodeResult<Cha
         chart: validateChartContent(ctx, record.chart, '$.chart'),
     };
     return ctx.issues.length > 0 ? { kind: 'invalid', issues: ctx.issues } : { kind: 'ok', value };
+}
+
+export function validateChartDocument(candidate: unknown): CodecDecodeResult<ChartDocument> {
+    const prepared = prepareCandidate(candidate);
+    if (prepared.kind === 'invalid') {
+        return prepared;
+    }
+    return validatePreparedChartDocument(prepared.candidate);
 }
 
 export function decodeJson<T>(

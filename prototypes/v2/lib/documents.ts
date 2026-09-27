@@ -1,5 +1,5 @@
-import { chartGenre, validateChartDocument, writtenSettings } from '@engine/songbook/codec';
-import { validateChartDocumentV2 } from '@engine/songbook/document-v2';
+import { chartGenre, writtenSettings } from '@engine/songbook/codec';
+import { validateAnyChartDocument } from '@engine/songbook/document-v2';
 import { proposeLegacyScoreConversion } from '@engine/songbook/legacy-score';
 import { resolveScoreContext } from '@engine/songbook/score-context';
 import { scoreMeter } from '@engine/songbook/score-duration';
@@ -16,11 +16,7 @@ export function genreOf(document: ChartDocument): string {
 }
 
 export function validateDocument(candidate: unknown): ChartDocument {
-    const legacy = validateChartDocument(candidate);
-    const result =
-        legacy.kind === 'future-version' && legacy.schemaVersion === 2
-            ? validateChartDocumentV2(candidate)
-            : legacy;
+    const result = validateAnyChartDocument(candidate);
     if (result.kind !== 'ok') {
         const reason =
             result.kind === 'future-version'
