@@ -2,7 +2,7 @@
  * The Following look-ahead's next-bar cue (#1458). Pinned here: `nextBarIndex`'s bar-skip and
  * wrap rules, and `measureOfGlobalIndex`'s written-measure bucketing, in isolation from the band
  * engine and React — `use-chart-view.test.ts`'s own sibling coverage for what
- * `band-chart.test.ts` pins at the `BandChart` level (`bars`, `barAt`, `BandSlot.bar`).
+ * `band-chart.test.ts` pins at the `BandChart` level (`BandSlot.bar`).
  */
 import { describe, expect, it } from 'vitest';
 import type { ChartBlock } from '../lib/lead-sheet';
