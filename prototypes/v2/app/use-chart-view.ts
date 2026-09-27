@@ -7,12 +7,14 @@ import * as runtime from '../lib/runtime';
 
 /**
  * Every written event's `globalIndex`, bucketed by which WRITTEN MEASURE it belongs to (an
- * ordinal position among every measure in `blocks`, in written order) — the identity
- * `nextBarIndex` below walks past when a bar holds more than one chord. Shared by a
- * schemaVersion-2 slot's `.display` and a measure-less chart's own flat index (`display ===
- * index` there), since both name a written event the same way.
+ * ordinal position among every measure in `blocks`, in written order). This is a measure-less
+ * (v1) chart's only notion of "performed bar" — v1 has no repeat/ending marks (`ScoreDirection`
+ * is a schemaVersion-2 concept only), so its performance is one straight pass and "written
+ * measure" and "performed bar" name the exact same thing there. For a schemaVersion-2 chart,
+ * `BandSlot.bar` (`lib/band-chart.ts`) is the real performed-bar identity instead — see
+ * `nextBarIndex`'s doc for why the two must NOT be conflated.
  */
-function measureOfGlobalIndex(blocks: ChartBlock[]): Map<number, number> {
+export function measureOfGlobalIndex(blocks: ChartBlock[]): Map<number, number> {
     const map = new Map<number, number>();
     let m = 0;
     for (const block of blocks) {
@@ -27,30 +29,38 @@ function measureOfGlobalIndex(blocks: ChartBlock[]): Map<number, number> {
 }
 
 /**
- * The next performed item whose WRITTEN BAR differs from `active`'s (#1458's next-bar cue) —
+ * The next performed item whose PERFORMED BAR differs from `active`'s (#1458's next-bar cue) —
  * walking forward past every further chord still inside that same bar, not just `active + 1`,
- * which a bar holding more than one chord would otherwise point the cue at itself with. Wraps to
- * the loop's first item once none remain inside it, or to item 0 when `loop` is null (the band
- * loops the whole form at the end, so after the last bar comes the top). Shared by the band's
- * slots (schemaVersion 2) and the old engine's `stepMap` (a measure-less chart) — both are
- * performed order already, so the bar-skip and the wrap are the only two rules either needs.
+ * which a bar holding more than one chord would otherwise point the cue at itself with (P1-1).
+ * Wraps to the loop's first item once none remain inside it, or to item 0 when `loop` is null
+ * (the band loops the whole form at the end, so after the last bar comes the top).
+ *
+ * `barOf` identifies "performed bar", which is deliberately NOT "written measure": a `||: F7 :||
+ * x4` repeat performs the SAME written bar four times, and each of those four is its own
+ * performed bar — comparing by WRITTEN identity (a patch review P2-1 regression) would skip all
+ * four as "the same bar" and point the cue at whatever follows the repeat for the entire time,
+ * not just its last pass. `barOf` is `(slot) => slot.bar` for the band's slots (schemaVersion 2)
+ * and `(_, index) => measureOfGlobalIndex(...).get(index)` for the old engine's `stepMap` (a
+ * measure-less chart, where the two notions coincide — see that function's doc); it takes the
+ * item's INDEX too so a caller with no per-item field to read (v1) can pass the raw array
+ * straight through instead of copying it into one that has one.
  */
-function nextBarIndex(
-    items: readonly { start: number; display: number }[],
+export function nextBarIndex<T extends { start: number }>(
+    items: readonly T[],
     active: number,
     loop: { start: number; end: number } | null,
-    measureOf: Map<number, number>,
+    barOf: (item: T, index: number) => number,
 ): number | null {
     if (active < 0 || active >= items.length) {
         return null;
     }
-    const activeMeasure = measureOf.get(items[active].display);
+    const activeBar = barOf(items[active], active);
     const inLoop = (i: number) =>
         i >= 0 &&
         i < items.length &&
         (!loop || (items[i].start >= loop.start && items[i].start < loop.end));
     let i = active + 1;
-    while (inLoop(i) && measureOf.get(items[i].display) === activeMeasure) {
+    while (inLoop(i) && barOf(items[i], i) === activeBar) {
         i += 1;
     }
     if (inLoop(i)) {
@@ -107,11 +117,13 @@ export function useChartView(current: ChartDocument | null, active: number | nul
         const { loopStartStep, loopEndStep } = runtime.state().playback;
         const loop = loopStartStep >= 0 ? { start: loopStartStep, end: loopEndStep } : null;
         if (band) {
-            const next = nextBarIndex(band.slots, active, loop, measureOf);
+            const next = nextBarIndex(band.slots, active, loop, (slot) => slot.bar);
             return next === null ? null : band.slots[next].display;
         }
-        const steps = runtime.state().arranger.stepMap.map((step, i) => ({ ...step, display: i }));
-        return nextBarIndex(steps, active, loop, measureOf);
+        // No per-item field to read `barOf` off (a measure-less chart's `display` IS its index),
+        // so the raw `stepMap` goes straight in — no per-render copy (patch review P3-6).
+        const stepMap = runtime.state().arranger.stepMap;
+        return nextBarIndex(stepMap, active, loop, (_step, i) => measureOf.get(i) ?? -1);
     })();
     const activeEvent =
         active === null
@@ -119,6 +131,18 @@ export function useChartView(current: ChartDocument | null, active: number | nul
             : band
               ? (band.slots[active] ?? null)
               : runtime.state().arranger.stepMap[active];
+    /** The performed bar `active` sits in — `BandSlot.bar` for schemaVersion 2, its own written
+     * measure's ordinal for a measure-less chart (the two coincide there — see
+     * `measureOfGlobalIndex`'s doc). Null while stopped. Used to de-dupe the jump-ahead by
+     * performed bar (patch review P3-2), not by slot index — a chord landing exactly on the last
+     * felt pulse changes `active`'s slot without changing its bar, and keying on the slot would
+     * let that trigger the jump a second time inside the very same bar. */
+    const activeBar =
+        active === null
+            ? null
+            : band
+              ? (band.slots[active]?.bar ?? null)
+              : (measureOf.get(displayActive ?? -1) ?? null);
     const totalBars = blocks.reduce((n, b) => n + b.measures.length, 0);
     const writtenBars = useMemo(
         () =>
@@ -145,6 +169,7 @@ export function useChartView(current: ChartDocument | null, active: number | nul
         displayActive,
         displayNext,
         activeEvent,
+        activeBar,
         totalBars,
         writtenBars,
         writtenSections,
