@@ -1,5 +1,4 @@
-import { validateChartDocument } from '../../../../public/songbook/codec.js';
-import { validateChartDocumentV2 } from '../../../../public/songbook/document-v2.js';
+import { validateAnyChartDocument } from '../../../../public/songbook/document-v2.js';
 import type { ChartDocumentV2 } from '../../../../public/songbook/score-types.js';
 import type { ChartDocument as LegacyDocument } from '../../../../public/songbook/types.js';
 
@@ -294,11 +293,7 @@ export function remoteRevision(value: unknown): asserts value is string {
 }
 
 export function snapshot(candidate: unknown): ChartDocument {
-    const legacy = validateChartDocument(candidate);
-    const decoded =
-        legacy.kind === 'future-version' && legacy.schemaVersion === 2
-            ? validateChartDocumentV2(candidate)
-            : legacy;
+    const decoded = validateAnyChartDocument(candidate);
     if (decoded.kind !== 'ok') {
         throw new Error('Cannot sync this chart version or content. The source is unchanged.');
     }

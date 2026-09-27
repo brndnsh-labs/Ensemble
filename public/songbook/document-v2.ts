@@ -1,24 +1,38 @@
 import {
     decodeJson,
     encodeValidated,
+    type PreparedCandidate,
     prepareCandidate,
+    preparedSubtree,
     readVersion,
-    validateChartDocument,
+    validatePreparedChartDocument,
 } from './codec.js';
-import { validateSemanticScore } from './score-codec.js';
+import { validatePreparedSemanticScore } from './score-codec.js';
 import type { ChartDocumentV2 } from './score-types.js';
-import type { CodecDecodeResult, CodecEncodeResult, CodecIssue } from './types.js';
+import type {
+    CodecDecodeResult,
+    CodecEncodeResult,
+    CodecIssue,
+    ChartDocument as LegacyChartDocument,
+} from './types.js';
+
+/** Whichever version the stand can open today, however `readVersion` classified it. */
+export type AnyChartDocument = LegacyChartDocument | ChartDocumentV2;
 
 // biome-ignore lint/suspicious/noControlCharactersInRegex: imported metadata must not contain controls or markup.
 const UNSAFE_METADATA = /[<>\u0000-\u001f\u007f]/;
 
-/** Additive reader: this does not change the version used by existing storage or shares. */
-export function validateChartDocumentV2(candidate: unknown): CodecDecodeResult<ChartDocumentV2> {
-    const prepared = prepareCandidate(candidate);
-    if (prepared.kind !== 'ok') {
-        return prepared;
-    }
-    const version = readVersion(prepared.candidate, 2, prepared.candidate);
+/**
+ * Validates an already-prepared candidate — one that has already been through
+ * {@link prepareCandidate}'s structural walk and JSON round trip (the v1-then-v2 dispatch
+ * reuses the same detached top-level candidate for both attempts). Does NOT re-run the
+ * structural walk — callers that hold raw, untrusted input must call
+ * {@link validateChartDocumentV2} instead.
+ */
+function validatePreparedChartDocumentV2(
+    prepared: PreparedCandidate,
+): CodecDecodeResult<ChartDocumentV2> {
+    const version = readVersion(prepared, 2, prepared);
     if (version.kind !== 'current') {
         return version;
     }
@@ -99,32 +113,40 @@ export function validateChartDocumentV2(candidate: unknown): CodecDecodeResult<C
         return { kind: 'invalid', issues };
     }
 
-    // Validation-only projection reuses the unchanged envelope/band/performance contracts.
-    // This neutral arrangement is NEVER returned, persisted, or passed to playback.
-    const envelope = validateChartDocument({
-        schemaVersion: 1,
-        id: root.id,
-        title: root.title,
-        createdAt: root.createdAt,
-        updatedAt: root.updatedAt,
-        revision: root.revision,
-        chart: {
-            performance: chart.performance,
-            band: chart.band,
-            arrangement: {
-                key: 'C',
-                isMinor: false,
-                timeSignature: '4/4',
-                grouping: null,
-                notation: 'name',
-                sections: [{ id: 'validation-only', label: 'Validation', value: 'C' }],
+    // Validation-only projection reuses the unchanged envelope/band/performance contracts. This
+    // synthetic wrapper is NEVER returned, persisted, or passed to playback, and needs no
+    // structural walk of its own: `chart.performance`/`chart.band` are subtrees of `prepared`,
+    // which already went through the full walk and JSON round trip as a whole — so they're
+    // already guaranteed acyclic, accessor- and toJSON-free, and within the document's
+    // depth/size bounds — and the rest is a small fixed literal this function authors itself.
+    const envelope = validatePreparedChartDocument(
+        preparedSubtree({
+            schemaVersion: 1,
+            id: root.id,
+            title: root.title,
+            createdAt: root.createdAt,
+            updatedAt: root.updatedAt,
+            revision: root.revision,
+            chart: {
+                performance: chart.performance,
+                band: chart.band,
+                arrangement: {
+                    key: 'C',
+                    isMinor: false,
+                    timeSignature: '4/4',
+                    grouping: null,
+                    notation: 'name',
+                    sections: [{ id: 'validation-only', label: 'Validation', value: 'C' }],
+                },
             },
-        },
-    });
+        }),
+    );
     if (envelope.kind !== 'ok') {
         return envelope;
     }
-    const score = validateSemanticScore(chart.score);
+    // `chart.score` is a subtree of `prepared` (the whole document already went through
+    // `prepareCandidate`), so it is revalidated without a second structural walk/round trip.
+    const score = validatePreparedSemanticScore(preparedSubtree(chart.score));
     if (score.kind === 'invalid') {
         return {
             kind: 'invalid',
@@ -137,7 +159,33 @@ export function validateChartDocumentV2(candidate: unknown): CodecDecodeResult<C
     if (score.kind !== 'ok') {
         return score;
     }
-    return { kind: 'ok', value: prepared.candidate as ChartDocumentV2 };
+    return { kind: 'ok', value: prepared as unknown as ChartDocumentV2 };
+}
+
+/** Additive reader: this does not change the version used by existing storage or shares. */
+export function validateChartDocumentV2(candidate: unknown): CodecDecodeResult<ChartDocumentV2> {
+    const prepared = prepareCandidate(candidate);
+    if (prepared.kind !== 'ok') {
+        return prepared;
+    }
+    return validatePreparedChartDocumentV2(prepared.candidate);
+}
+
+/**
+ * Prepares `candidate` exactly once and dispatches to the matching codec. Every caller that
+ * used to try `validateChartDocument` first and fall through to `validateChartDocumentV2` on a
+ * schemaVersion-2 `future-version` result — reading and JSON-round-tripping the candidate a
+ * second time to do it — reads the one detached copy instead.
+ */
+export function validateAnyChartDocument(candidate: unknown): CodecDecodeResult<AnyChartDocument> {
+    const prepared = prepareCandidate(candidate);
+    if (prepared.kind === 'invalid') {
+        return prepared;
+    }
+    const legacy = validatePreparedChartDocument(prepared.candidate);
+    return legacy.kind === 'future-version' && legacy.schemaVersion === 2
+        ? validatePreparedChartDocumentV2(prepared.candidate)
+        : legacy;
 }
 
 export function decodeChartDocumentV2(json: string): CodecDecodeResult<ChartDocumentV2> {

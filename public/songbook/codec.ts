@@ -871,8 +871,28 @@ function validateChartContent(
     };
 }
 
+declare const preparedCandidateBrand: unique symbol;
+
+/**
+ * A candidate that has been through {@link prepareCandidate}'s bounded structural walk and JSON
+ * detachment. Opaque on purpose: the `validatePrepared*` entry points skip that walk, so the type
+ * system — not a doc comment — is what stops raw, untrusted input reaching them. Only
+ * `prepareCandidate` and {@link preparedSubtree} produce one.
+ */
+export type PreparedCandidate = { readonly [preparedCandidateBrand]: true };
+
+/**
+ * Marks a value derived from an already-prepared candidate — one of its subtrees, or a small
+ * literal this codec assembles from its subtrees plus fixed values — as prepared. A subtree of a
+ * bounded, acyclic, accessor-free detached tree is itself all of those, so re-walking it is pure
+ * cost (#1445). NEVER pass anything that did not come out of a `PreparedCandidate`.
+ */
+export function preparedSubtree(value: unknown): PreparedCandidate {
+    return value as PreparedCandidate;
+}
+
 type CandidatePreparationResult =
-    | { kind: 'ok'; candidate: unknown }
+    | { kind: 'ok'; candidate: PreparedCandidate }
     | { kind: 'invalid'; issues: CodecIssue[] };
 
 /** Shared bounded, accessor-safe detachment for versioned songbook codecs. */
@@ -926,7 +946,7 @@ export function prepareCandidate(candidate: unknown): CandidatePreparationResult
         if (detachedStructure.kind === 'invalid') {
             return { kind: 'invalid', issues: [detachedStructure.issue] };
         }
-        return { kind: 'ok', candidate: detachedCandidate };
+        return { kind: 'ok', candidate: detachedCandidate as PreparedCandidate };
     } catch {
         return {
             kind: 'invalid',
@@ -983,16 +1003,19 @@ export function readVersion(
     return { kind: 'current', record: candidate };
 }
 
-export function validateChartDocument(candidate: unknown): CodecDecodeResult<ChartDocument> {
-    const prepared = prepareCandidate(candidate);
-    if (prepared.kind === 'invalid') {
-        return prepared;
-    }
-    const version = readVersion(
-        prepared.candidate,
-        CHART_DOCUMENT_SCHEMA_VERSION,
-        prepared.candidate,
-    );
+/**
+ * Validates an already-prepared candidate — one that has already been through
+ * {@link prepareCandidate}'s structural walk and JSON round trip, either directly or as a
+ * subtree of a larger document that has (the v1-then-v2 dispatch reuses the same detached
+ * top-level candidate; a nested subtree inherits its parent's bounds because a subtree of an
+ * already depth/size-bounded, acyclic, accessor-free tree cannot itself violate those bounds).
+ * Does NOT re-run the structural walk — callers that hold raw, untrusted input must call
+ * {@link validateChartDocument} (or `prepareCandidate` directly) instead.
+ */
+export function validatePreparedChartDocument(
+    prepared: PreparedCandidate,
+): CodecDecodeResult<ChartDocument> {
+    const version = readVersion(prepared, CHART_DOCUMENT_SCHEMA_VERSION, prepared);
     if (version.kind !== 'current') {
         return version;
     }
@@ -1037,6 +1060,14 @@ export function validateChartDocument(candidate: unknown): CodecDecodeResult<Cha
         chart: validateChartContent(ctx, record.chart, '$.chart'),
     };
     return ctx.issues.length > 0 ? { kind: 'invalid', issues: ctx.issues } : { kind: 'ok', value };
+}
+
+export function validateChartDocument(candidate: unknown): CodecDecodeResult<ChartDocument> {
+    const prepared = prepareCandidate(candidate);
+    if (prepared.kind === 'invalid') {
+        return prepared;
+    }
+    return validatePreparedChartDocument(prepared.candidate);
 }
 
 export function decodeJson<T>(
