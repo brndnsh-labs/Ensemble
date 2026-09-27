@@ -41,6 +41,14 @@ export interface BandSlot {
     end: number;
     /** Index into `chords`: the written event this performs. */
     display: number;
+    /**
+     * Ordinal of the PERFORMED bar this slot belongs to — `form`/`timeline.bars`' own index.
+     * Two chords sharing one written bar (#1458's next-bar cue, P1-1) share this too, so a
+     * next-bar walk can skip both; two performed VISITS of the same written bar through a
+     * repeat (P2-1) do NOT — each visit gets its own `bar`, so a one-bar `||: :||` correctly
+     * points a pass's cue at the FOLLOWING performed bar, never back at itself.
+     */
+    bar: number;
 }
 
 /**
@@ -142,6 +150,7 @@ export function bandChart(score: SemanticScore, timeline: Timeline): BandChart {
                 start: from / STEP_TICKS,
                 end: to / STEP_TICKS,
                 display: first + j,
+                bar: i,
             };
             slots.push(slot);
             // A chord shows where it is first played, as the old sheet's steps did.

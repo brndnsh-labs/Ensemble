@@ -62,14 +62,7 @@ import {
     type SwingSub,
 } from '@engine/types';
 import { getFrequency, transposeKeyName } from '@engine/utils';
-import {
-    auditionMidis,
-    type BandChart,
-    bandChart,
-    barAt,
-    sectionSteps,
-    slotAt,
-} from './band-chart';
+import { auditionMidis, type BandChart, bandChart, sectionSteps, slotAt } from './band-chart';
 import {
     downloadExportResult,
     renderBandMixToWav,
@@ -1433,9 +1426,12 @@ export function bandChartView(): BandChart | null {
 }
 
 /**
- * Is playback in the last FELT pulse of its performed bar right now (#1458's Following
- * look-ahead)? A dotted quarter in 6/8, not a raw eighth — the band's own `Meter.pulses`
- * skeleton (`BandChart.bars`), never `TIME_SIGNATURES.stepsPerBeat`.
+ * Is playback in the last FELT pulse of its performed bar right now, or already within the
+ * jump-ahead's fixed real-time lead of the barline at a fast tempo (#1458's Following
+ * look-ahead)? `BandHost.inLastPulse` does the actual work, off `this.timeline` directly rather
+ * than `bandChartView()` — that reads the SAME timeline `runtime.ts`'s `scoreForBand` compiles
+ * for a measure-less (v1) chart too, so this works for v1 exactly like a schemaVersion-2 chart
+ * (P2-2: the old `!bandView` gate wrongly denied v1 charts this cue and the jump-ahead both).
  *
  * Pure engine read off `songTick()` directly, not the chart's `active`/`lastActiveChordIndex`
  * state: `active` is published by `followPlayhead`'s own 50ms poll and React only commits it on
@@ -1447,9 +1443,5 @@ export function bandChartView(): BandChart | null {
  */
 export function inLastBeat(): boolean {
     const tick = band?.songTick();
-    if (tick == null || !bandView) {
-        return false;
-    }
-    const bar = barAt(bandView, tick);
-    return bar !== null && tick >= bar.lastPulseStart;
+    return tick != null && (band?.inLastPulse(tick) ?? false);
 }
