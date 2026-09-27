@@ -568,8 +568,32 @@ test('a feel staged for the next bar settles when the musician stops inside it',
     // all while it's showing, unlike a plain `message`).
     await expect(page.getByTestId('stand-toast')).toHaveAttribute('data-tone', 'busy');
     await expect(page.getByTestId('stand-toast')).toContainText('Switching feel at the next bar');
+    // Re-review P3 — `showBusy = busy && busyToastVisible`, not `busyToastVisible` alone: the
+    // debounce flag flips false via an EFFECT, one render after `busy` itself already reads
+    // false, so without the extra check that one render would flash "Updating…" the instant the
+    // feel genuinely settles. Recorded via a `MutationObserver` from here on, since a polled
+    // assertion can't tell "never happened" from "happened and is gone by the time I checked".
+    await page.evaluate(() => {
+        const node = document.querySelector('[data-testid="stand-toast"] span');
+        const seen: string[] = [];
+        Object.assign(window, { __settleHistory: seen });
+        if (!node) {
+            return;
+        }
+        const record = () => seen.push(node.textContent ?? '');
+        new MutationObserver(record).observe(node, {
+            childList: true,
+            characterData: true,
+            subtree: true,
+        });
+    });
     await page.getByRole('button', { name: 'Stop playback' }).click();
     await expect(page.getByLabel('Feel', { exact: true })).toBeEnabled();
+    await page.waitForTimeout(300);
+    const settleHistory = await page.evaluate(
+        () => (window as unknown as { __settleHistory: string[] }).__settleHistory,
+    );
+    expect(settleHistory.some((text) => text.includes('Updating'))).toBe(false);
     await expect(page.getByLabel('Feel', { exact: true })).toHaveValue('Rock');
     await expect(page.getByRole('button', { name: 'Start playback', exact: true })).toBeEnabled();
     await page.getByRole('button', { name: 'Song actions' }).click();
@@ -917,6 +941,28 @@ test('all existing feels and key/mutes survive a save; long charts scroll legibl
     await page.locator('.chart-scroll').press('PageDown');
     await page.locator('.chart-scroll').press('PageDown');
     await expect.poll(activeInView).toBe(false);
+
+    // #1460 re-review P3 — `.chart-scroll`'s bottom padding must still let the LAST row clear
+    // the stack once it shows something (the pill, here) — the whole reason the padding formula
+    // reads the stack's own measured height rather than staying a fixed guess. Waited for the
+    // message toast to go empty first, so the stack holds exactly the pill and nothing else —
+    // otherwise a still-showing "Saved on this device" from this test's earlier reload/re-open
+    // would inflate `--stand-stack-height` and make this a race against that message's own ~4s
+    // auto-dismiss rather than a check of the padding formula itself.
+    await expect(page.getByTestId('stand-toast')).toHaveAttribute('data-empty', 'true');
+    // `.chart-scroll` has `scroll-behavior: smooth`, which — per the CSSOM View spec — also
+    // governs a direct `scrollTop` assignment, not just `scrollTo()`/`scrollIntoView()`. An
+    // explicit `behavior: 'instant'` is what actually jumps immediately instead of leaving this
+    // read mid-animation.
+    await scrollEl.evaluate((el) => {
+        el.scrollTo({ top: el.scrollHeight, behavior: 'instant' });
+    });
+    const lastBarBox = await page.locator('.bar').last().boundingBox();
+    const pillBox = await page.getByTestId('resume-follow').boundingBox();
+    expect(lastBarBox).not.toBeNull();
+    expect(pillBox).not.toBeNull();
+    expect(lastBarBox!.y + lastBarBox!.height).toBeLessThanOrEqual(pillBox!.y);
+
     await page.getByTestId('resume-follow').click();
     await expect(page.getByTestId('resume-follow')).toHaveCount(0);
     await expect.poll(activeInView).toBe(true);

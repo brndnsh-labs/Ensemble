@@ -747,6 +747,20 @@ html [hidden] {
     padding: 25px 48px 40px;
     scroll-behavior: smooth;
 }
+/* Re-review P3 — `.chart-scroll` is a `<div tabIndex={0}>` (arrow-key scrolling), not one of the
+   `button`/`a`/`input`/`select` the global `:focus-visible` rule already covers, so it fell back
+   to the browser's own default `:focus` ring on ANY focus — including the Resume-follow pill's
+   `.focus({ preventScroll: true })` after a plain pointer tap, which is not a keyboard action and
+   must not draw a ring around the whole chart. `:focus-visible` alone (never plain `:focus`) is
+   what tells the two apart: it matches a real Tab-to-focus, not a programmatic call from a click
+   handler. */
+.chart-scroll:focus {
+    outline: none;
+}
+.chart-scroll:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+}
 .sheet {
     max-width: 1040px;
     margin: 0 auto;
@@ -982,6 +996,12 @@ html [hidden] {
     align-items: center;
     gap: 10px;
     max-width: calc(100vw - 28px);
+    /* Re-review P3 — the empty `.stand-toast` collapses to zero size (below), but the STACK
+       CONTAINER itself is a full-width-capped, fixed-position box sitting over the bottom of the
+       chart at every moment, whether or not anything inside it is currently showing — on phone
+       widths that silently ate taps meant for the chord grid underneath. `none` here, `auto` on
+       each visible child, so only the toast/notice/pill themselves ever intercept a tap. */
+    pointer-events: none;
 }
 /* Always mounted (`data-empty` collapses it) for the same reason `.status-banner` is: a live
    region's TEXT CHANGE is announced reliably, a freshly-inserted one is not (#1440). */
@@ -997,6 +1017,7 @@ html [hidden] {
     box-shadow: var(--shadow);
     border-radius: 12px;
     max-width: 100%;
+    pointer-events: auto;
 }
 .stand-toast[data-empty="true"] {
     padding: 0;
@@ -1028,6 +1049,7 @@ html [hidden] {
     box-shadow: var(--shadow);
     border-radius: 12px;
     max-width: 100%;
+    pointer-events: auto;
 }
 .toast-close {
     flex-shrink: 0;
@@ -1056,6 +1078,7 @@ html [hidden] {
     font-weight: 600;
     border-radius: 22px;
     box-shadow: var(--shadow);
+    pointer-events: auto;
 }
 .edit-panel {
     width: 286px;
@@ -2517,13 +2540,17 @@ dialog textarea {
     padding: 8px 24px;
     gap: 16px;
 }
-/* #1460 — the bottom padding clears the fixed toast AND the resume-follow pill (both
-   `position: fixed`, so they no longer claim any of `.chart-scroll`'s own flow height the way
-   the removed footer did): the last row can still scroll fully clear of all three, even with the
-   message toast, the sync-failure notice AND the Resume-follow pill stacked at once (review
-   P2 #1 made that a real, reachable state instead of three things sharing one slot). */
+/* #1460 — the bottom padding clears the fixed `.stand-stack` (it no longer claims any of
+   `.chart-scroll`'s own flow height the way the removed footer did): the last row can still
+   scroll fully clear of it. Re-review P3 — 108px is the ORIGINAL floor, sized for the common
+   case (the message toast, or the toast plus the pill); it does not grow just because the stack
+   COULD hold a third thing. `--stand-stack-height` (set by the `ResizeObserver` in
+   `app/ensemble.tsx`) is the stack's OWN actual current height, 0 when nothing shows, so `max()`
+   only asks for more room while the stack genuinely needs it — a chart that fit before this
+   story still fits, and the last row still clears the stack on the rare render where all three
+   are up. */
 .song-open .chart-scroll {
-    padding: 12px 24px 200px;
+    padding: 12px 24px max(108px, calc(var(--stand-stack-height, 0px) + 28px));
 }
 .song-open .sheet {
     max-width: 1200px;
@@ -2637,9 +2664,8 @@ dialog textarea {
         margin-left: 0;
     }
     .song-open .chart-scroll {
-        /* #1460 — clears the phone-width stack (toast + sync-failure notice + pill); see the
-           base rule's note. */
-        padding: 10px 14px 180px;
+        /* #1460 — 100px is the original phone-width floor; see the base rule's note. */
+        padding: 10px 14px max(100px, calc(var(--stand-stack-height, 0px) + 24px));
     }
     .song-open .tempo-control .step {
         width: 28px;

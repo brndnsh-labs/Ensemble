@@ -278,13 +278,14 @@ test('a 413 names the refusal on the chip, and a fresh Save clears it (#1298)', 
 });
 
 /**
- * #1460 review P2 #2 — a local Save failure already has the top `.error-banner` (`run()`'s
- * catch, since `storeSave` re-throws past `setSaveFailed(true)`). The stand's own
- * `stand-sync-failure` notice must not ALSO say "Saved on this device …" — every `SYNC_MESSAGES`
- * sentence starts with exactly that phrase, which would be a flat lie the instant the local
- * write itself is what failed.
+ * #1460 re-review P2 #1 — a local Save failure DOES get a persistent stand notice, reversing the
+ * previous round's call: the top `.error-banner` alone isn't enough, because `run()` opens with
+ * `setError('')` and the very next `run()` ANYWHERE — opening Song actions to go check, pressing
+ * Play, a feel change — wipes that banner while the local failure is still true.
+ * `syncFailureNotice` checks `view.local.status === 'save-failed'` FIRST, ahead of the pass-level
+ * failure, so the stand's own notice survives regardless of what else runs in between.
  */
-test('a forced local Save failure never tells the stand "Saved on this device" — the error banner owns that fact', async ({
+test('a forced local Save failure gets a persistent stand notice that survives other run()s', async ({
     page,
 }) => {
     await addVirtualAuthenticator(page);
@@ -294,8 +295,8 @@ test('a forced local Save failure never tells the stand "Saved on this device" �
     await saveAndUpload(page, 'Local fail take');
 
     // Offline (so a pass-level `sync.failure` would ALSO be live) and the account's own local
-    // IndexedDB write is what fails — the exact ambiguity `syncFailureNotice` has to resolve in
-    // the local write's favour.
+    // IndexedDB write is what fails — `syncFailureNotice` must resolve the ambiguity in the local
+    // write's favour, not the pass-level one.
     await page.context().setOffline(true);
     await page.evaluate(() => {
         const put = IDBObjectStore.prototype.put;
@@ -316,12 +317,22 @@ test('a forced local Save failure never tells the stand "Saved on this device" �
     await page.getByLabel('Song title').fill('Local fail take two');
     await page.getByRole('button', { name: 'Save', exact: true }).click();
 
-    // The top banner owns this fact …
     await expect(page.locator('.error-banner')).toBeVisible();
-    // … and the stand's own notice says NOTHING at all, rather than the misleading "Saved on
-    // this device" every pass-level `SYNC_MESSAGES` sentence starts with.
-    await expect(page.getByTestId('stand-sync-failure')).toHaveCount(0);
+    const standNotice = page.getByTestId('stand-sync-failure');
+    await expect(standNotice).toContainText('Save failed on this device');
+
+    // Opening Song actions is itself a `run()` (`onMenu`) — its own `setError('')` wipes the top
+    // banner the instant it fires, but the stand's own notice reads a different fact and must not
+    // move.
     await openSongActions(page);
     await expect(page.getByTestId('sync-local')).toHaveText('Save failed on this device');
     await closeSongActions(page);
+    await expect(page.locator('.error-banner')).toHaveCount(0);
+    await expect(standNotice).toContainText('Save failed on this device');
+
+    // And pressing Play — another `run()` — still doesn't clear it.
+    await page.getByRole('button', { name: 'Start playback', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Stop playback' })).toBeEnabled();
+    await expect(standNotice).toContainText('Save failed on this device');
+    await page.getByRole('button', { name: 'Stop playback' }).click();
 });

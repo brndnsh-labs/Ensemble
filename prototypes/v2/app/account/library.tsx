@@ -240,11 +240,21 @@ export interface StandSyncFailure {
  * failure NOTHING ELSE already says. Everything else `SyncStatus` shows (three routine facts)
  * moved into the menu; a `foreign` reading already has its own permanent banner
  * (`OWNER_MESSAGES.mismatch`, driven by the same `standMismatch` this component's `foreign` prop
- * carries), so it is deliberately not repeated here. Review P2 #2 widens the exclusion to the
- * other two facts that already have their own top-of-stand say: a local Save failure is the
- * `.error-banner` `run()`'s catch already raised (`storeSave` re-throws past `setSaveFailed`),
- * and an expired/reauth session is `account-expired-banner` (`heldWithoutSession`) — saying
- * either again here would be the same fact twice in two places.
+ * carries), so it is deliberately not repeated here.
+ *
+ * Re-review P2 #1 — a local Save failure is checked FIRST and DOES surface here, reversing the
+ * previous round's assumption that the top `.error-banner` alone covers it: `run()` opens with
+ * `setError('')`, so the very next `run()` anywhere — opening Song actions to go check, pressing
+ * Play, a feel change — wipes that banner while the local failure is still true. The stand's own
+ * notice is keyed independently (`local:save-failed`) and stays up until the NEXT Save actually
+ * succeeds, regardless of what else runs in between. `expired`/reauth is still excluded: that
+ * banner (`account-expired-banner`, driven by `heldWithoutSession`) is a storage-derived fact,
+ * not a `run()`-cleared one, so it genuinely does persist on its own.
+ *
+ * Re-review P3 — a pass-level `too-large`/`refused` failure (`sync.failure.reason`) is keyed as
+ * `refused:<kind>`, the SAME namespace `view.cloud.status === 'refused'`'s per-document reading
+ * uses below: a 413 that gets re-worded between the two forms across passes is still one fact,
+ * and must not reappear after being dismissed just because the words changed.
  *
  * Null means nothing is left to say here: no local Save failure, no expired-session pass
  * failure, no other pass-level retry/reauth failure, and the cloud has not permanently refused
@@ -253,13 +263,16 @@ export interface StandSyncFailure {
 export function syncFailureNotice(props: SyncStatusProps): StandSyncFailure | null {
     const { view } = deriveSyncView(props);
     if (view.local.status === 'save-failed') {
-        return null;
+        return { text: LOCAL_LABELS['save-failed'], key: 'local:save-failed' };
     }
     if (props.sync.failure !== null) {
-        if (props.sync.failure.reason === 'expired') {
+        const { reason } = props.sync.failure;
+        if (reason === 'expired') {
             return null;
         }
-        return { text: props.sync.failure.message, key: `pass:${props.sync.failure.reason}` };
+        const key =
+            reason === 'too-large' || reason === 'refused' ? `refused:${reason}` : `pass:${reason}`;
+        return { text: props.sync.failure.message, key };
     }
     if (view.cloud.status === 'refused') {
         const refused = view.cloud.refused ?? 'refused';

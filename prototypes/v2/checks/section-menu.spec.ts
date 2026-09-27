@@ -124,3 +124,27 @@ test('Start here jumps a playing song into that section immediately, without sto
     });
     await page.getByRole('button', { name: 'Stop playback', exact: true }).click();
 });
+
+/**
+ * #1460 re-review P3 — `startHereSection` re-engages Following, the same reasoning as
+ * `startPlayback`: this is another way of starting playback, and a scroll while stopped (which
+ * already turns Following off today) must not leave it starting unfollowed with the
+ * Resume-follow pill already showing before anything has moved.
+ */
+test('Start here re-engages Following, even after a scroll while stopped turned it off', async ({
+    page,
+}) => {
+    await newTwoSectionSong(page);
+    await page.locator('.chart-scroll').press('PageDown');
+
+    const sectionB = page.getByRole('button', {
+        name: 'Section B · hold to practice-loop',
+        exact: true,
+    });
+    await sectionB.click();
+    await page.getByRole('menuitem', { name: 'Start here', exact: true }).click();
+
+    await expect(page.getByRole('button', { name: 'Stop playback', exact: true })).toBeVisible();
+    await expect(page.getByTestId('resume-follow')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Stop playback', exact: true }).click();
+});
