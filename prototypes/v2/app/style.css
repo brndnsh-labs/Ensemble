@@ -3111,6 +3111,10 @@ html[data-theme="stage"] {
     font-size: 11px;
     color: var(--muted);
 }
+/* The laptop shows the opened time in its own column; the phone shows it on the meta line. */
+.song-ago {
+    display: none;
+}
 /* The phone-only "SONG" column header (#1459): present for assistive tech, not shown when it is
    the one visible header over a single content column. */
 .song-col-header {
@@ -3345,6 +3349,14 @@ html[data-theme="stage"] {
     }
     /* The lone "SONG" header over a single visible column (#1459) — kept for assistive tech,
        not shown, rather than removed from the DOM. */
+    .home-table .song-ago {
+        display: inline;
+    }
+    /* Every header cell's text is visually hidden on the phone, so the header row collapses to
+       nothing instead of leaving its bottom padding as a gap above the first row. */
+    .home-table thead th {
+        padding: 0;
+    }
     .home-table th.song-col-header {
         position: absolute;
         width: 1px;

@@ -586,6 +586,11 @@ function RecentSongs({
                                                     {' '}
                                                     · {keyOf(song)} · {song.chart.performance.bpm}{' '}
                                                     BPM
+                                                    {/* The phone has no Opened column, so the
+                                                        opened time rides the meta line there. */}
+                                                    {ago && (
+                                                        <span className="song-ago"> · {ago}</span>
+                                                    )}
                                                 </span>
                                             </span>
                                             <CandidateMarker kind={kinds.get(song.id) ?? null} />
