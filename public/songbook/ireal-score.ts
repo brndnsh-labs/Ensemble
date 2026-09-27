@@ -155,15 +155,29 @@ function readBars(
     //   `case 'f': obj.annots.push(cell); cell = null;` does not advance, so the chord token right
     //   after it lands in the still-open cell too — and since converter.js pushes a cell's own
     //   chord before applying that cell's annotations, the fermata lands on that following chord.
-    // - Anything else between 'f' and the next real chord (even a single blank/rest cell, which
-    //   IS its own advancing token) closes that shared cell first, so the fermata cell ends up
-    //   chordless; converter.js's `cell.annots.forEach` then reads `this.measure.chords[length-1]`
-    //   — the most recently pushed chord already in the CURRENT measure — landing the fermata on
-    //   the PRECEDING chord instead. `this.measure.chords` is a fresh array per measure
-    //   (`this.measure = new Converter.Measure(...)` at each new bar), so this backward fallback
-    //   cannot reach into an earlier bar; a fermata with nothing before it in the same bar either
-    //   would index `[-1]` and crash the reference converter, so this importer refuses it too
-    //   rather than inventing a cross-bar target the reference itself does not support.
+    // - A BLANK/rest cell (a space, its own advancing token — parser.js's `chordRegex2` matches a
+    //   space as a chord token, so it ALSO joins the still-open 'f' cell and immediately closes
+    //   it) is decided the instant it arrives, not deferred: converter.js's "Chords." section
+    //   handles a blank chord's `case ' ':` as a no-op (nothing pushed), so when "Other
+    //   attributes." then reads `this.measure.chords[length-1]` for that same cell's 'f'
+    //   annotation, it finds whatever was already there — the PRECEDING chord — and resolves
+    //   there and then. A repeat marker ('x'/'r') is treated the same way here for the same
+    //   reason (a rest with no symbol of its own); the reference's own repeat handling for this
+    //   exact combination is a measure-clone edge case this importer's own repeat model (a
+    //   `{kind:'repeat', measureId}` reference, not a literal clone at parse time) has no
+    //   faithful analogue for, so it is scoped out rather than guessed.
+    // - A bar-boundary character (`|`, `[`, `{`, `]`, `}`, `Z`) is TRANSPARENT to a pending
+    //   fermata: parser.js's cases for all six either leave the currently-open cell untouched
+    //   (`|`/`[`/`{` set `cell = null`, no advance) or only touch the PREVIOUS (already-closed)
+    //   cell's `.bars` (`]`/`}`/`Z`) — none of them force or interrupt resolution. A fermata can
+    //   therefore carry across a bar line and land on the FIRST chord of the next bar (matching
+    //   #1452's own implicit-reopen citation: real content with no open bar starts one anyway).
+    // - `this.measure.chords` is a fresh array per measure, so the backward-fallback case above
+    //   cannot reach into an earlier bar — a fermata with nothing before it in the same bar, and
+    //   nothing chord-shaped immediately after it either, would index `[-1]` and crash the
+    //   reference converter (also true at the very end of the chart, with nothing following at
+    //   all), so this importer refuses both rather than inventing a target the reference itself
+    //   does not support.
     let pendingFermata = false;
     function addCell(cell: Cell | null) {
         if (!inside) {
@@ -172,21 +186,17 @@ function readBars(
         if (current.cells.length >= 64) {
             fail(bars.length, 'The bar has too many rhythm cells.');
         }
-        if (pendingFermata && cell?.event) {
-            cell.event.fermata = true;
-            pendingFermata = false;
-        }
-        current.cells.push(cell);
-    }
-    function closeBar(edge: string) {
         if (pendingFermata) {
-            const target = [...current.cells].reverse().find((cell) => cell?.event);
+            const target = cell?.event ? cell : [...current.cells].reverse().find((c) => c?.event);
             if (!target?.event) {
                 fail(bars.length, 'A fermata must immediately precede its event.');
             }
             target.event.fermata = true;
             pendingFermata = false;
         }
+        current.cells.push(cell);
+    }
+    function closeBar(edge: string) {
         if (!current.cells.length) {
             const bare = !(
                 current.start.length ||
@@ -475,6 +485,13 @@ function readBars(
             offset += chord.length;
         }
     }
+    // A fermata still pending at the very end of the chart has nothing left to attach to —
+    // the reference converter would crash the same way it would on one with nothing preceding it
+    // in an otherwise-empty bar (see `pendingFermata`'s declaration). Checked ahead of the
+    // generic incomplete-bar failure below for a clearer reason.
+    if (pendingFermata) {
+        fail(bars.length, 'A fermata must immediately precede its event.');
+    }
     if (
         current.cells.length ||
         current.start.length ||
@@ -482,8 +499,7 @@ function readBars(
         current.notes.length ||
         current.jump ||
         current.repeatTimes ||
-        pendingMeter ||
-        pendingFermata
+        pendingMeter
     ) {
         fail(bars.length, 'The chart ends without a complete closing barline.');
     }

@@ -191,9 +191,13 @@ describe('bounded source-preserving iReal import', () => {
     });
 
     it('preserves slash bass, alternate chords, fermata, N.C. and held events as distinct notation', () => {
-        // The fermata is a PREFIX ("fC/E…"), not a suffix — see ireal-score.ts's 'f' branch for
-        // the infojunkie/ireal-musicxml + pianosnake/ireal-reader citation (#1451). This fixture
-        // used to write it as a suffix ("C/E(Dm7)f"), which encoded the wrong rule.
+        // Written as a PREFIX ("fC/E…"), per the Jazz 1460 playlist's own usage — see
+        // ireal-score.ts's 'f' branch for the infojunkie/ireal-musicxml + pianosnake/ireal-reader
+        // citation (#1451). A suffix immediately touching the same chord ("C/E(Dm7)f", this
+        // fixture's original form) resolves to the SAME chord too — there's only one chord in the
+        // bar for the backward fallback to land on — so it wasn't actually testing the prefix
+        // rule; a real playlist chart never writes it that way, which is what this fixture now
+        // pins.
         const bars = score('T44[fC/E(Dm7)   |n   |p   Z').sections[0].measures;
         expect(bars.map((bar) => bar.content)).toEqual([
             {
@@ -238,6 +242,48 @@ describe('bounded source-preserving iReal import', () => {
         // reference itself would index a nonexistent element. Refuse rather than reach into an
         // earlier bar the reference can't reach either (#1451).
         blocked('T44[f   Z');
+    });
+
+    it('resolves a blank cell between a fermata and the next chord backward, never skipping forward to it', () => {
+        // Independent review finding: an earlier version of this fix let a pending fermata skip
+        // over a blank cell and land on the chord AFTER it. Per the same citation, a blank cell
+        // (a space — parser.js's `chordRegex2` matches it as its own chord-array token) is decided
+        // the instant it arrives, exactly like the comma-then-blanks case above: it becomes the
+        // "Chords." step for whatever cell the pending 'f' is sharing, and a blank chord pushes
+        // nothing, so "Other attributes." resolves the fermata against what was ALREADY there —
+        // the preceding chord — not whatever comes next.
+        expect(score('T44[Cf D |G Z').sections[0].measures[0].content).toEqual({
+            kind: 'events',
+            events: [
+                { kind: 'chord', symbol: 'C', duration: [2, 1], fermata: true },
+                { kind: 'chord', symbol: 'D', duration: [2, 1] },
+            ],
+        });
+    });
+
+    it("carries a fermata across a bar line to the next bar's first chord, never resolving early", () => {
+        // Established: a bar-boundary character is TRANSPARENT to a pending fermata (see
+        // `pendingFermata`'s declaration) — parser.js's '|'/'['/'{' cases leave the currently-open
+        // cell untouched, and ']'/'}' /'Z' only touch the PREVIOUS cell, so none of them force
+        // resolution. A lone chord before the bar line (no trailing blank) keeps this bar's own
+        // duration split untouched by the fermata, isolating the cross-bar-carry behavior from
+        // this importer's cell-count-to-duration mapping.
+        const bars = score('T44[Cf|G Z').sections[0].measures;
+        expect(bars[0].content).toEqual({
+            kind: 'events',
+            events: [{ kind: 'chord', symbol: 'C', duration: [4, 1] }],
+        });
+        expect(bars[1].content).toEqual({
+            kind: 'events',
+            events: [{ kind: 'chord', symbol: 'G', duration: [4, 1], fermata: true }],
+        });
+    });
+
+    it('refuses a fermata with nothing left to attach to at the very end of the chart', () => {
+        // The reference converter would index `this.measure.chords[-1]` on nothing (an "OPEN"
+        // measure that never closes) — a crash, not a silently-dropped fermata. Refuse with a
+        // dedicated reason instead of falling through to the generic incomplete-chart message.
+        blocked('T44[C D fZ');
     });
 
     it('does not mistake official parenthesized chord qualities for alternate chords', () => {
