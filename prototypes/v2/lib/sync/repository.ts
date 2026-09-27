@@ -1,4 +1,12 @@
-import { type HomeRead, type HomeRequest, type HomeSlice, settleHome } from '../home';
+import {
+    HOME_FILL_SPARE,
+    type HomeRead,
+    type HomeRequest,
+    type HomeSlice,
+    readable,
+    rememberingValidator,
+    settleHome,
+} from '../home';
 import { AccountDatabase, type Transaction } from './database';
 import {
     type AccountScope,
@@ -511,6 +519,10 @@ export class AccountSongbook {
     async home(scope: AccountScope, request: HomeRequest): Promise<HomeSlice> {
         scope = copyScope(scope);
         const owned = IDBKeyRange.bound([scope.ownerId], [scope.ownerId, []], false, true);
+        const validate = rememberingValidator((row: SavedSong) => {
+            identifier(row?.documentId);
+            return savedSong(row, scope, row.documentId).document;
+        });
         const read = await this.database.run<HomeRead<SavedSong>>('readonly', scope, (tx) => {
             const songs = tx.table('songs');
             const result: HomeRead<SavedSong> = {
@@ -532,19 +544,27 @@ export class AccountSongbook {
             let pending = request.recentIds.length;
             const fill = () => {
                 result.recent = found.filter((row) => row !== undefined);
-                const wanted = request.rows - result.recent.length;
+                // Only READABLE opened songs fill a row, as in the guest `home`.
+                const wanted =
+                    request.rows - result.recent.filter((row) => readable(validate, row)).length;
                 if (wanted <= 0) {
                     return;
                 }
                 const listed = new Set(request.recentIds);
+                let good = 0;
+                let steps = 0;
                 const cursor = songs.openCursor(owned);
                 tx.read(cursor, (at: IDBCursorWithValue | null) => {
-                    if (!at || result.fill.length >= wanted) {
+                    if (!at || good >= wanted || steps >= wanted + HOME_FILL_SPARE) {
                         return;
                     }
                     const row = at.value as SavedSong;
                     if (!listed.has(row?.documentId)) {
+                        steps += 1;
                         result.fill.push(row);
+                        if (readable(validate, row)) {
+                            good += 1;
+                        }
                     }
                     at.continue();
                 });
@@ -562,14 +582,7 @@ export class AccountSongbook {
                 });
             });
         });
-        return settleHome(
-            read,
-            (row) => {
-                identifier(row?.documentId);
-                return savedSong(row, scope, row.documentId).document;
-            },
-            request.rows,
-        );
+        return settleHome(read, validate, request.rows);
     }
 
     async pending(scope: AccountScope, documentId: string): Promise<SaveOperation[]> {

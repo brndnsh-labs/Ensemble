@@ -831,6 +831,20 @@ export default function Ensemble() {
      * than rendering "nothing to bring over" from a songbook nobody has looked at.
      */
     const [v1Plan, setV1Plan] = useState<V1ImportPlan | null>(null);
+    /**
+     * Why no plan can be made, when none can (#1441 review P2) — the whole guest songbook would
+     * not read (one corrupt song is enough: `repository.list` refuses a songbook it cannot wholly
+     * read), or the plan itself threw. Said on the card, never a card that silently never
+     * appears: an offer the musician ASKED for must always answer.
+     */
+    const [v1PlanFailure, setV1PlanFailure] = useState<string | null>(null);
+    /**
+     * Has this page load looked for the old Ensemble's data yet (#1441 review P2)? With the plan
+     * now waiting on a lazy read, "no card" is only a fact once this is true and any offer's plan
+     * has settled — the songbook publishes that as `data-v1-plan`, so a check that no offer
+     * appears has something positive to wait for.
+     */
+    const [v1Looked, setV1Looked] = useState(false);
     const dialog = useRef<HTMLDialogElement>(null);
     const accountDialogRef = useRef<HTMLDialogElement>(null);
     const accountPageDialogRef = useRef<HTMLDialogElement>(null);
@@ -1080,6 +1094,7 @@ export default function Ensemble() {
         if (!ready) {
             return;
         }
+        setV1Looked(true);
         try {
             // Two `getItem`s (patch R3). Whether this origin has an old-Ensemble profile AT
             // ALL is what decides the song menu's permanent way back (DECISION 2026-09-19) —
@@ -1116,11 +1131,21 @@ export default function Ensemble() {
         // whenever the offer or the songbook moves, which includes right after a run.
         if (!v1Data) {
             setV1Plan(null);
+            setV1PlanFailure(null);
             return;
         }
         if (guestSongs === null) {
-            // A whole-library pass (#1441): ask for the guest songbook and wait for it.
             setV1Plan(null);
+            if (guestLibraryFailure !== null) {
+                // The read that the plan is a diff against failed. Said, with its reason —
+                // a guess in either direction ("nothing new" or "import all") would be wrong.
+                setV1PlanFailure(
+                    `Some songs on this device couldn’t be read, so the old Ensemble’s songs can’t be compared with them yet. ${guestLibraryFailure}`,
+                );
+                return;
+            }
+            // A whole-library pass (#1441): ask for the guest songbook and wait for it.
+            setV1PlanFailure(null);
             wantLibrary('guest');
             return;
         }
@@ -1142,11 +1167,16 @@ export default function Ensemble() {
                     v1SessionMark(),
                 ),
             );
-        } catch {
-            // A plan is a nicety; never let it take the songbook down. The run itself
-            // reaches its own verdicts and reports whatever it finds.
+            setV1PlanFailure(null);
+        } catch (failure) {
+            // A plan must never take the songbook down — and it must not make the card vanish
+            // either, taking the unreadable-v1 problems it lists with it. Said instead.
+            setV1Plan(null);
+            setV1PlanFailure(
+                `The old Ensemble’s songs couldn’t be compared with this songbook. ${failure instanceof Error ? failure.message : String(failure)}`,
+            );
         }
-    }, [v1Data, guestSongs, current]);
+    }, [v1Data, guestSongs, guestLibraryFailure, current]);
     useEffect(() => {
         if (editing && !busy && editorRequest !== revealedEditorRequest.current) {
             // Reveal the actual input, including an already-open editor's selected section.
@@ -1572,12 +1602,30 @@ export default function Ensemble() {
      * so it waits for the songbook: `onStand` is a dependency, and going back re-asks it.
      */
     const onStand = current !== null;
+    /**
+     * The inputs the last COMPLETED zero-candidate check ran against (#1441 review P5), or null.
+     *
+     * `computeAdoptCandidates` reads the whole guest songbook and the whole account library, and
+     * this effect re-runs on every download progress publish, every dialog and every return from
+     * the stand. When nothing it diffs has changed since a check that found nothing to offer, the
+     * answer is the same "nothing", so it is not asked again. The key is the owner, the account
+     * library's downloaded counts and the guest songbook's own `count()` — candidates are decided
+     * by document ID, so only a song arriving or leaving on either side can change the answer.
+     * Only a check that finished with zero candidates is remembered: one that found some opens the
+     * offer (and `adoptOffered` takes over), and one that failed or was superseded proves nothing.
+     */
+    const adoptCheckedKey = useRef<string | null>(null);
+    // Read by the effect below without re-running it: a guest write changes the key, and the
+    // next ordinary trigger then checks again, exactly when it always would have.
+    const guestSongCount = useRef<number | null>(null);
+    guestSongCount.current = guestHome?.count ?? null;
     useEffect(() => {
         const owner = sync.owner;
         if (owner === null) {
             // Signed out: this attach is over, and the next one — same account or not — is a
             // fresh offer rather than one this device has already made.
             adoptOffered.current = null;
+            adoptCheckedKey.current = null;
             return;
         }
         if (
@@ -1595,9 +1643,16 @@ export default function Ensemble() {
         ) {
             return;
         }
+        const key = `${owner}|${sync.documents.required}|${sync.documents.verified}|${guestSongCount.current}`;
+        if (adoptCheckedKey.current === key) {
+            return;
+        }
         let alive = true;
         void computeAdoptCandidates(owner)
             .then((offer) => {
+                if (alive && offer.candidates.length === 0) {
+                    adoptCheckedKey.current = key;
+                }
                 if (alive && offer.candidates.length > 0) {
                     adoptOffered.current = owner;
                     // The sign-in offer is about the whole guest songbook; only an import scopes
@@ -2412,6 +2467,38 @@ export default function Ensemble() {
     }
     function wantLiveLibrary() {
         wantLibrary(signedIn ? 'account' : 'guest');
+    }
+    /**
+     * Open the All songs page with a list that is current (#1441 review P3). A full list read
+     * earlier in the page is kept, but another tab may have written since, so opening the page
+     * re-reads it. When the home's own `count()` already disagrees with the kept list, the kept
+     * one is dropped first and the page shows loading — never "All 21 songs" on the home and then
+     * a page of 20. When they agree, the page shows the kept list at once and the re-read
+     * replaces it (a rename in another tab changes no count).
+     */
+    function openAllSongs() {
+        const which = signedIn ? 'account' : 'guest';
+        if (liveSongs === null || !libraryWanted.current[which]) {
+            wantLibrary(which);
+        } else if (liveHome !== null && liveHome.count !== liveSongs.length) {
+            if (signedIn) {
+                accountSongsOwner.current = null;
+                setAccountSongs(null);
+                if (sessionOwner !== null) {
+                    void reloadAccountLibrary(sessionOwner);
+                }
+            } else {
+                // The guest load effect re-reads a wanted songbook whose list is null.
+                setGuestSongs(null);
+            }
+        } else if (signedIn) {
+            if (sessionOwner !== null) {
+                void reloadAccountLibrary(sessionOwner);
+            }
+        } else {
+            void reloadGuestLibrary();
+        }
+        setAllSongsOpen(true);
     }
     /**
      * The guest songbook, all of it, validated — `repository.list()`, which refuses a songbook it
@@ -3470,6 +3557,12 @@ export default function Ensemble() {
      * and `startPlayback` reads `current` from a render that has not seen this song yet.
      */
     function playSong(id: string) {
+        // FIRST, synchronously, while this is still the tap's own call stack: everything below
+        // awaits storage before `runtime.toggle` runs, and mobile Safari only lets an
+        // AudioContext start (and the silent unlock element play) inside the gesture. The
+        // transport's own Play reaches `initAudio` before its first await; this is how a Play that
+        // must open its song first does the same.
+        runtime.warmAudio();
         void run(async () => {
             const document = await readLiveSong(id);
             if (!document) {
@@ -4321,7 +4414,10 @@ export default function Ensemble() {
                     // What the home shows and nothing more (#1441): the home slice, never the whole
                     // library — `library` is only for search, and only once it has been asked for.
                     home={songbookLoading ? null : liveHome}
-                    library={liveSongs}
+                    // Gated like `home`: until the session settles this may be the WRONG songbook's
+                    // list (a guest list standing in for an account one), so search says it is
+                    // still looking rather than listing guest songs as "Your songs".
+                    library={songbookLoading ? null : liveSongs}
                     libraryFailure={liveLibraryFailure}
                     featured={songbookLoading ? null : featured}
                     openedAt={openedAt}
@@ -4337,8 +4433,7 @@ export default function Ensemble() {
                     onToggleStar={toggleStar}
                     onOpenRowMenu={openRowMenu}
                     onOpenAllSongs={() => {
-                        wantLiveLibrary();
-                        setAllSongsOpen(true);
+                        openAllSongs();
                     }}
                     allSongsEntryRef={allSongsEntryRef}
                     continued={continuedSave !== null}
@@ -4374,7 +4469,9 @@ export default function Ensemble() {
                         // The plan is a diff against the whole guest songbook, read lazily
                         // (#1441): the offer waits for it rather than guessing, while a finished
                         // run's result needs no plan to be said.
-                        v1Data && (v1Data.asked || !signedIn) && (v1Plan || v1Result !== null)
+                        v1Data &&
+                        (v1Data.asked || !signedIn) &&
+                        (v1Plan || v1PlanFailure !== null || v1Result !== null)
                             ? {
                                   // What Import would actually do, not what v1 holds (patch
                                   // R12/N2): the menu path offers everything, ledger
@@ -4391,6 +4488,7 @@ export default function Ensemble() {
                                       ...(v1Plan?.blocked ?? []),
                                   ],
                                   result: v1Result,
+                                  unavailable: v1Plan ? null : v1PlanFailure,
                                   // An offer the musician asked for never records a decline,
                                   // whatever shape it is in (patch N1b).
                                   asked: v1Data.asked,
@@ -4404,6 +4502,10 @@ export default function Ensemble() {
                     onImportV1={importV1Songs}
                     onDismissV1={dismissV1}
                     v1Present={v1Present}
+                    v1PlanSettled={
+                        v1Looked &&
+                        (!v1Data || v1Plan !== null || v1PlanFailure !== null || v1Result !== null)
+                    }
                     onOpenV1Import={openV1Import}
                 />
             ) : (
@@ -4814,7 +4916,7 @@ export default function Ensemble() {
                             // yet — never an empty export standing in for an unread library.
                             const library =
                                 accountSongs ??
-                                libraryDocuments(await accountSync.listLibrary(sync.owner));
+                                libraryDocuments(await accountSync.listLibrary(sessionOwner));
                             // Read once, before the first file: the retained drafts are what makes
                             // these the newest versions, and awaiting between two downloads is
                             // what loses the later ones (#1299). Folded in rather than assigned

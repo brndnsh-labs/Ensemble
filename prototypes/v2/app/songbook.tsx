@@ -61,6 +61,12 @@ export interface V1ImportOffer {
      * account page's standing button for every run that opens none.
      */
     accountPointer: boolean;
+    /**
+     * Why the offer cannot say what Import would do, when it cannot (#1441 review P2): the guest
+     * songbook it is compared against would not read, or the comparison itself failed. The card
+     * says so, with the reason, instead of disappearing or claiming there is nothing to bring.
+     */
+    unavailable: string | null;
 }
 
 /** Which standards entry point opened the browse view: "Browse all →", or one shelf's link. */
@@ -153,6 +159,11 @@ interface SongbookProps {
     onImportV1: () => void;
     /** `declined` is the card's own answer — see `V1ImportCard` (#1274 patch N1). */
     onDismissV1: (declined: boolean) => void;
+    /**
+     * True once no further v1 offer can appear on its own: the old app's data has been looked for
+     * and any offer's plan has settled (#1441 review P2). Published as `data-v1-plan`.
+     */
+    v1PlanSettled: boolean;
     /** Whether this origin holds an old-Ensemble profile at all — the first-visit card's gate. */
     v1Present: boolean;
     /** The song menu's permanent way back into the v1 import, from the first-visit card. */
@@ -200,10 +211,31 @@ export function Songbook(props: SongbookProps) {
     const shown = new Set(rows.map((row) => row.id));
     const markedElsewhere = remoteCandidates.filter((row) => !shown.has(row.id)).length;
     const heading = useRef<HTMLHeadingElement>(null);
+    const firstVisitHeading = useRef<HTMLHeadingElement>(null);
     const libraryName = accountLibrary ? 'Your account songbook' : 'Your songbook';
+    // The first visit's own h1 is the page's heading only while it is on screen; a search
+    // replaces it, and then the songbook's name is the h1 again (#1441 review P3).
+    const firstVisitIntro = firstVisit && !query;
+    // Deleting the last song on the home turns it into the first visit, which unmounts the row
+    // list — and `RecentSongs`' focus rescue with it. So the rescue for that one case lives here:
+    // THIS tab's own delete emptied the songbook, and focus goes to the new page's heading
+    // instead of falling to `<body>` (#1440 review P5's `lastRemovedId` scoping, kept).
+    const wasFirstVisit = useRef(firstVisit);
+    useEffect(() => {
+        if (!wasFirstVisit.current && firstVisit && props.lastRemovedId !== null) {
+            firstVisitHeading.current?.focus();
+        }
+        wasFirstVisit.current = firstVisit;
+    }, [firstVisit, props.lastRemovedId]);
     return (
-        <main className="home" data-layout={firstVisit ? 'first-visit' : 'everyday'}>
-            {firstVisit ? (
+        <main
+            className="home"
+            data-layout={firstVisit ? 'first-visit' : 'everyday'}
+            // A positive "no more v1 offer is coming" signal (#1441 review P2): the offer's plan
+            // waits on a lazy whole-songbook read, so "no card yet" alone proves nothing.
+            data-v1-plan={props.v1PlanSettled ? 'settled' : 'pending'}
+        >
+            {firstVisitIntro ? (
                 <p className="home-library" data-testid="library-heading">
                     {libraryName}
                 </p>
@@ -261,6 +293,18 @@ export function Songbook(props: SongbookProps) {
                     </button>
                 </p>
             )}
+            {firstVisitIntro && (
+                <section className="first-visit" aria-labelledby="first-visit-title">
+                    <h1 id="first-visit-title" ref={firstVisitHeading} tabIndex={-1}>
+                        Pick a tune. The band comes in.
+                    </h1>
+                    <p>
+                        Drums, bass and keys follow the chart. Change the key, the tempo or the
+                        feel, and play along.
+                    </p>
+                </section>
+            )}
+            {/* Below the page's h1 in both layouts, so its own h2 never outranks it. */}
             {v1Import && (
                 <V1ImportCard
                     offer={v1Import}
@@ -655,20 +699,14 @@ function StandardItem({
 
 /**
  * A fresh device (#1441): nothing of its own and nothing to continue, so the standards are the
- * page — a bigger shelf — and "Or bring your own" offers the three ways in. The old-Ensemble card
+ * page — a bigger shelf — and "Or bring your own" offers the three ways in. (Its h1 and subline
+ * are rendered by `Songbook` itself, above the v1 card.) The old-Ensemble card
  * appears only when this origin holds v1 data.
  */
 function FirstVisit(props: SongbookProps) {
     const { busy, onImport, onNewSong, v1Present, onOpenV1Import } = props;
     return (
         <>
-            <section className="first-visit" aria-labelledby="first-visit-title">
-                <h1 id="first-visit-title">Pick a tune. The band comes in.</h1>
-                <p>
-                    Drums, bass and keys follow the chart. Change the key, the tempo or the feel,
-                    and play along.
-                </p>
-            </section>
             <StandardsShelf {...props} perShelf={6} firstVisit />
             <section className="home-section bring-your-own" aria-labelledby="byo-heading">
                 <div className="section-heading">
@@ -821,22 +859,26 @@ function V1ImportCard({
     const declines = v1OfferDeclines(offer);
     const headingText = offer.result
         ? 'Brought over from the old Ensemble'
-        : offer.songs > 0
-          ? `Bring over ${plural(offer.songs, 'song')} from the old Ensemble?`
-          : offer.alreadyHere > 0
-            ? 'Everything from the old Ensemble is already here'
-            : offer.problems.length > 0
-              ? 'Some music in the old Ensemble could not be read'
-              : 'There is nothing in the old Ensemble to bring over';
+        : offer.unavailable
+          ? 'The old Ensemble’s songs can’t be compared yet'
+          : offer.songs > 0
+            ? `Bring over ${plural(offer.songs, 'song')} from the old Ensemble?`
+            : offer.alreadyHere > 0
+              ? 'Everything from the old Ensemble is already here'
+              : offer.problems.length > 0
+                ? 'Some music in the old Ensemble could not be read'
+                : 'There is nothing in the old Ensemble to bring over';
     const body = offer.result
         ? null
-        : offer.songs > 0
-          ? 'They are copied into this songbook. Nothing in the old app is changed or removed.'
-          : offer.alreadyHere > 0
-            ? `Nothing new to bring over — ${plural(offer.alreadyHere, 'song')} from the old app ${offer.alreadyHere === 1 ? 'is' : 'are'} already in this songbook.`
-            : offer.problems.length > 0
-              ? 'Nothing was changed there. Open the old Ensemble to check those songs.'
-              : 'The old app is still on this device, but it has no saved songs to copy.';
+        : offer.unavailable
+          ? offer.unavailable
+          : offer.songs > 0
+            ? 'They are copied into this songbook. Nothing in the old app is changed or removed.'
+            : offer.alreadyHere > 0
+              ? `Nothing new to bring over — ${plural(offer.alreadyHere, 'song')} from the old app ${offer.alreadyHere === 1 ? 'is' : 'are'} already in this songbook.`
+              : offer.problems.length > 0
+                ? 'Nothing was changed there. Open the old Ensemble to check those songs.'
+                : 'The old app is still on this device, but it has no saved songs to copy.';
     return (
         <section
             className="home-card import-card"
@@ -844,9 +886,9 @@ function V1ImportCard({
             aria-labelledby="v1-import-heading"
         >
             <span className="eyebrow">From the old Ensemble</span>
-            <h3 id="v1-import-heading" ref={heading} tabIndex={-1}>
+            <h2 id="v1-import-heading" ref={heading} tabIndex={-1}>
                 {headingText}
-            </h3>
+            </h2>
             {body && <p>{body}</p>}
             {!offer.result && offer.problems.length > 0 && (
                 <ul className="import-problems" data-testid="v1-import-problems">

@@ -75,6 +75,49 @@ export function homeRequest(
 }
 
 /**
+ * A validator that remembers its verdict per raw value, so a store can ask "is this one readable?"
+ * while sizing its fill (inside the transaction) and `settleHome` can then reuse the same answer
+ * rather than validate each document twice. One per home read.
+ */
+export function rememberingValidator<R>(
+    validate: (raw: R) => ChartDocument,
+): (raw: R) => ChartDocument {
+    const verdicts = new Map<R, { document: ChartDocument } | { failure: unknown }>();
+    return (raw) => {
+        let verdict = verdicts.get(raw);
+        if (!verdict) {
+            try {
+                verdict = { document: validate(raw) };
+            } catch (failure) {
+                verdict = { failure };
+            }
+            verdicts.set(raw, verdict);
+        }
+        if ('failure' in verdict) {
+            throw verdict.failure;
+        }
+        return verdict.document;
+    };
+}
+
+/** Does `validate` accept this raw value? For sizing a fill; never throws. */
+export function readable<R>(validate: (raw: R) => ChartDocument, raw: R): boolean {
+    try {
+        validate(raw);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * How many cursor steps a fill may take beyond the rows it still needs: an unreadable document it
+ * meets is read and counted, and the fill keeps going to top the list up — but never into a scan
+ * of a songbook whose every document is corrupt.
+ */
+export const HOME_FILL_SPARE = 8;
+
+/**
  * Validate a raw home read into the page it shows.
  *
  * **A document that does not validate is left out, counted, and never fatal** (#1441). The home

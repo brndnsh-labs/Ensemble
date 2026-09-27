@@ -116,4 +116,23 @@ describe('AccountSongbook.home (#1441)', () => {
         expect(slice.rows.map((row) => row.id)).toEqual(['good']);
         expect(slice.unreadable).toBe(2);
     });
+
+    it('tops the list up past an opened song that will not read', async () => {
+        for (let i = 0; i < 10; i++) {
+            await book.save(scopeA, accountChart(`Song ${i}`, `song-${i}`), null);
+        }
+        await putRaw({
+            ownerId: A,
+            documentId: 'song-3',
+            document: { id: 'song-3', title: 42 },
+            remoteRevision: null,
+        });
+        const opened = new Map(
+            Array.from({ length: 8 }, (_, i) => [`song-${i}`, `2026-01-01T00:0${i}:00.000Z`]),
+        );
+        const slice = await book.home(scopeA, homeRequest(opened, null));
+        expect(slice.rows).toHaveLength(8);
+        expect(slice.rows.some((row) => row.id === 'song-3')).toBe(false);
+        expect(slice.unreadable).toBe(1);
+    });
 });

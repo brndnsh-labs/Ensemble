@@ -464,7 +464,7 @@ html [hidden] {
 .import-card {
     margin-bottom: 22px;
 }
-.import-card h3 {
+.import-card h2 {
     font-size: 15px;
     font-weight: 650;
     margin: 7px 0 8px;
@@ -474,7 +474,7 @@ html [hidden] {
     line-height: 1.6;
     color: var(--muted);
 }
-.import-card h3:focus-visible {
+.import-card h2:focus-visible {
     /* Focused by script when a run finishes (#1274 patch N9), so it needs a visible ring
        of its own — it is not a control and has no default one. */
     outline: 2px solid var(--accent);

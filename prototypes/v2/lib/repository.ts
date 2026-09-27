@@ -1,6 +1,14 @@
 import type { InstrumentModule } from '@engine/types';
 import { type ChartDocument, validateDocument } from './documents';
-import { type HomeRead, type HomeRequest, type HomeSlice, settleHome } from './home';
+import {
+    HOME_FILL_SPARE,
+    type HomeRead,
+    type HomeRequest,
+    type HomeSlice,
+    readable,
+    rememberingValidator,
+    settleHome,
+} from './home';
 import { validateVoice } from './sounds';
 // Each page load is a separate writer; the account `drafts` store keys on the same id (#1299).
 import { writerId as writer } from './writer';
@@ -86,6 +94,7 @@ export async function list(): Promise<ChartDocument[]> {
  */
 export async function home(request: HomeRequest): Promise<HomeSlice> {
     const db = await open();
+    const validate = rememberingValidator(validated);
     const read = await new Promise<HomeRead<unknown>>((resolve, reject) => {
         const tx = db.transaction(STORE, 'readonly');
         const store = tx.objectStore(STORE);
@@ -104,19 +113,28 @@ export async function home(request: HomeRequest): Promise<HomeSlice> {
         let pending = request.recentIds.length;
         const fill = () => {
             result.recent = found.filter((value) => value !== undefined);
-            const wanted = request.rows - result.recent.length;
+            // Only READABLE opened songs fill a row: an unreadable one is counted and left out
+            // (`settleHome`), so the fill tops the list up past it rather than leaving it short.
+            const wanted =
+                request.rows - result.recent.filter((raw) => readable(validate, raw)).length;
             if (wanted <= 0) {
                 return;
             }
             const listed = new Set(request.recentIds);
+            let good = 0;
+            let steps = 0;
             const cursor = store.openCursor();
             cursor.onsuccess = () => {
                 const at = cursor.result;
-                if (!at || result.fill.length >= wanted) {
+                if (!at || good >= wanted || steps >= wanted + HOME_FILL_SPARE) {
                     return;
                 }
                 if (!listed.has(String(at.primaryKey))) {
+                    steps += 1;
                     result.fill.push(at.value);
+                    if (readable(validate, at.value)) {
+                        good += 1;
+                    }
                 }
                 at.continue();
             };
@@ -138,7 +156,7 @@ export async function home(request: HomeRequest): Promise<HomeSlice> {
         tx.onerror = () => reject(new Error('Unable to read your local songbook.'));
         tx.onabort = () => reject(new Error('Unable to read your local songbook.'));
     });
-    return settleHome(read, validated, request.rows);
+    return settleHome(read, validate, request.rows);
 }
 
 /**

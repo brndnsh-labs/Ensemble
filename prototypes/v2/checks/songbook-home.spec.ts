@@ -25,6 +25,32 @@ function manySongs(count: number) {
     });
 }
 
+/**
+ * Counts full reads of the guest songbook from outside the app (#1441 review P3): `repository.list`
+ * is the one caller of `getAll()` on the guest `documents` store, and the home's own reads are
+ * `get`, `count` and a cursor. Installed before the app's scripts run.
+ */
+async function countFullReads(page: Page): Promise<void> {
+    await page.addInitScript(() => {
+        const w = window as unknown as { __fullReads: number };
+        w.__fullReads = 0;
+        const getAll = IDBObjectStore.prototype.getAll;
+        IDBObjectStore.prototype.getAll = function (
+            this: IDBObjectStore,
+            ...args: Parameters<IDBObjectStore['getAll']>
+        ) {
+            if (this.name === 'documents') {
+                w.__fullReads += 1;
+            }
+            return getAll.apply(this, args);
+        };
+    });
+}
+
+function fullReads(page: Page): Promise<number> {
+    return page.evaluate(() => (window as unknown as { __fullReads: number }).__fullReads);
+}
+
 /** What the phone and desktop must never do at the page level. */
 async function horizontalOverflow(page: Page): Promise<number> {
     return page.evaluate(
@@ -37,9 +63,12 @@ test('the home renders its rows without a full-library read', async ({ page }) =
     // wholly read) — keyed to sort after every other id, so the home's bounded reads (by id, then
     // a cursor fill that stops at eight rows) never reach it.
     const corrupt = { schemaVersion: 1, id: 'zz-corrupt', title: 42, chart: null };
+    await countFullReads(page);
     await seedGuestDocuments(page, [...manySongs(12), corrupt]);
     await expect(page.getByTestId('library-heading')).toHaveText('Your songbook');
     await expect(page.locator('.home-table .song-row')).toHaveCount(8);
+    // The seam, counted: the home rendered its rows and nothing read the whole songbook.
+    expect(await fullReads(page)).toBe(0);
     // The count is IndexedDB's own — the corrupt song is still one of the thirteen.
     await expect(page.getByTestId('all-songs-link')).toHaveText('All 13 songs →');
     await expect(page.getByTestId('home-unreadable')).toHaveCount(0);
@@ -48,6 +77,30 @@ test('the home renders its rows without a full-library read', async ({ page }) =
     await page.getByTestId('all-songs-link').click();
     await expect(page.getByTestId('library-failure')).toContainText('Cannot open this chart');
     await expect(page.locator('.all-songs-table .song-row')).toHaveCount(0);
+    // …and the counter is not vacuous: that page's full read went through it.
+    expect(await fullReads(page)).toBeGreaterThan(0);
+});
+
+test('an opened song that will not read leaves no gap: the list is topped up', async ({ page }) => {
+    // Eight opened songs, one of them corrupt: seven readable opened rows, and the fill adds one
+    // more from the rest of the songbook rather than leaving the list short.
+    const songs = manySongs(12);
+    const corrupt = { schemaVersion: 1, id: 'home-song-03', title: 42, chart: null };
+    const opened = Object.fromEntries(
+        songs
+            .slice(0, 8)
+            .map((song, i) => [song.id, new Date(Date.UTC(2026, 1, 1, 0, i)).toISOString()]),
+    );
+    await page.addInitScript((map) => {
+        localStorage.setItem('ensemble-v2-preview:opened-at', JSON.stringify(map));
+    }, opened);
+    await seedGuestDocuments(page, [
+        ...songs.filter((song) => song.id !== 'home-song-03'),
+        corrupt,
+    ]);
+    await expect(page.locator('.home-table .song-row')).toHaveCount(8);
+    await expect(page.getByTestId('home-unreadable')).toContainText('couldn’t be read');
+    await expect(page.getByTestId('all-songs-link')).toHaveText('All 12 songs →');
 });
 
 test('a corrupt song the home does read is left out and said, never blanking the page', async ({
@@ -166,6 +219,28 @@ test('one search returns your songs and the standards, grouped', async ({ page }
     await expect(page.locator('.home-table')).toHaveCount(0);
     await standards.getByRole('button', { name: 'Open Minor Blues' }).click();
     await expect(page.getByRole('heading', { name: 'Minor Blues', exact: true })).toBeVisible();
+});
+
+test('the first visit keeps an h1 while searching', async ({ page }) => {
+    await page.goto(appUrl());
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(
+        'Pick a tune. The band comes in.',
+    );
+    await page.getByRole('searchbox', { name: 'Search your songs and the standards' }).fill('blu');
+    await expect(page.getByTestId('search-standards')).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Your songbook');
+});
+
+test('deleting the last song on the home lands focus on the first visit’s heading', async ({
+    page,
+}) => {
+    await seedGuestDocuments(page, manySongs(1));
+    await page.getByRole('button', { name: 'More actions for Home song 0' }).click();
+    await page.getByTestId('row-menu-delete').click();
+    await page.getByTestId('delete-guest-song-confirm').click();
+    const heading = page.getByRole('heading', { name: 'Pick a tune. The band comes in.' });
+    await expect(heading).toBeVisible();
+    await expect(heading).toBeFocused();
 });
 
 test('focus returns to Browse all when leaving the standards browser', async ({ page }) => {

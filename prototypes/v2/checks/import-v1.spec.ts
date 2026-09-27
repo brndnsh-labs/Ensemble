@@ -1,4 +1,11 @@
-import { appUrl, expect, seedStarters, test } from './fixtures';
+import {
+    appUrl,
+    expect,
+    seedGuestDocuments,
+    seedStarters,
+    starterDocuments,
+    test,
+} from './fixtures';
 
 /**
  * The v1 import offer, end to end (#1274).
@@ -138,7 +145,7 @@ test('brings v1 songs into the songbook, plays one, and leaves v1 untouched', as
     // The offer is remembered per v1 item, so a reload does not ask again — and the
     // imported songs are still there.
     await page.reload();
-    await expect(page.getByTestId('library-heading')).toBeVisible();
+    await expect(page.locator('main.home')).toHaveAttribute('data-v1-plan', 'settled');
     await expect(page.getByTestId('v1-import')).toHaveCount(0);
     expect(await v1SessionRows(page)).toBe(1);
     expect(await v1KeysUnchanged(page)).toEqual({ state: true, presets: true });
@@ -162,7 +169,7 @@ test('declining is permanent, and the song menu brings the import back', async (
 
     // Never again by itself, whatever this device has or hasn't imported.
     await page.reload();
-    await expect(page.getByTestId('library-heading')).toBeVisible();
+    await expect(page.locator('main.home')).toHaveAttribute('data-v1-plan', 'settled');
     await expect(page.getByTestId('v1-import')).toHaveCount(0);
 
     async function openImportFromTheMenu() {
@@ -197,7 +204,7 @@ test('declining is permanent, and the song menu brings the import back', async (
 
 test('offers nothing on a profile that never ran v1', async ({ page }) => {
     await page.goto(appUrl());
-    await expect(page.getByTestId('library-heading')).toBeVisible();
+    await expect(page.locator('main.home')).toHaveAttribute('data-v1-plan', 'settled');
     await expect(page.getByTestId('v1-import')).toHaveCount(0);
 });
 
@@ -242,7 +249,7 @@ test('lists v1 data it cannot read instead of quietly importing nothing', async 
     // card does not re-open by itself for it (patch R1) …
     await page.getByTestId('v1-import').getByRole('button', { name: 'Done' }).click();
     await page.reload();
-    await expect(page.getByTestId('library-heading')).toBeVisible();
+    await expect(page.locator('main.home')).toHaveAttribute('data-v1-plan', 'settled');
     await expect(page.getByTestId('v1-import')).toHaveCount(0);
 
     // … and the way back still lists it, with its reason, for anyone who goes looking.
@@ -327,7 +334,7 @@ test('dismissing an unreadable-only card settles it without declining', async ({
     await card.getByRole('button', { name: 'Done' }).click();
 
     await page.reload();
-    await expect(page.getByTestId('library-heading')).toBeVisible();
+    await expect(page.locator('main.home')).toHaveAttribute('data-v1-plan', 'settled');
     await expect(page.getByTestId('v1-import')).toHaveCount(0);
     expect(await declined(page)).toBe(false);
 
@@ -340,4 +347,28 @@ test('dismissing an unreadable-only card settles it without declining', async ({
     );
     // Reading it again is not agreeing to anything, so it still has not declined.
     expect(await declined(page)).toBe(false);
+});
+
+/**
+ * A guest songbook that will not read whole (one corrupt song the home never needed) cannot be
+ * compared with v1's songs (#1441 review P2). The card says so, with the reason, instead of never
+ * appearing — and the unreadable song does not blank the home either.
+ */
+test('a guest songbook that will not read whole says the offer cannot be compared yet', async ({
+    page,
+}) => {
+    await seedV1Profile(page);
+    await seedGuestDocuments(page, [
+        ...starterDocuments(),
+        { schemaVersion: 1, id: 'zz-corrupt', title: 42, chart: null },
+    ]);
+    const card = page.getByTestId('v1-import');
+    await expect(
+        card.getByRole('heading', { name: 'The old Ensemble’s songs can’t be compared yet' }),
+    ).toBeVisible();
+    await expect(card).toContainText('couldn’t be read');
+    await expect(card.getByRole('button', { name: 'Import' })).toHaveCount(0);
+    await expect(page.locator('main.home')).toHaveAttribute('data-v1-plan', 'settled');
+    await expect(page.locator('.home-table .song-row')).toHaveCount(3);
+    expect(await v1KeysUnchanged(page)).toEqual({ state: true, presets: true });
 });
