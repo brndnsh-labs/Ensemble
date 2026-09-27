@@ -183,70 +183,60 @@ html [hidden] {
     background: var(--green-light);
     color: var(--green);
 }
+/* The top bar (#1441): the wordmark, the one search box, Import chart, New song and the account
+   button. The search and the two actions are the songbook home's alone; on the All songs and
+   standards views the bar carries the wordmark and the account button only. */
 .site-header {
-    height: 76px;
-    padding: 0 42px;
-    display: flex;
+    min-height: 72px;
+    padding: 12px 42px;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    grid-template-areas: "brand search tools account";
     align-items: center;
-    justify-content: space-between;
+    gap: 12px 20px;
     border-bottom: 1px solid var(--line);
-    gap: 24px;
     background: var(--paper);
 }
 .brand {
-    display: flex;
-    align-items: center;
-    gap: 9px;
-    font-size: 24px;
-    font-weight: 750;
-    letter-spacing: -1.2px;
+    grid-area: brand;
+    justify-self: start;
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 26px;
+    font-weight: 400;
+    letter-spacing: -0.6px;
     padding: 0;
+    min-height: 44px;
 }
-.brand svg {
-    height: 26px;
-    width: 26px;
+.home-search {
+    grid-area: search;
+    justify-self: center;
+    width: 100%;
+    max-width: 560px;
+    min-height: 44px;
 }
-.header-left {
-    display: flex;
-    align-items: center;
-    gap: 44px;
+.site-header .home-search input {
+    width: 100%;
+    font-size: 14px;
 }
-.site-nav {
-    display: flex;
-    gap: 26px;
-    height: 76px;
-}
-.site-nav button {
-    font-size: 13px;
+.home-search input::placeholder {
     color: var(--muted);
-    padding: 0 2px;
-    border-bottom: 2px solid transparent;
 }
-.site-nav button.active {
-    color: var(--ink);
-    border-color: var(--ink);
-    font-weight: 650;
+.header-tools {
+    grid-area: tools;
+    display: flex;
+    gap: 9px;
 }
 .header-right {
+    grid-area: account;
     display: flex;
-    gap: 18px;
+    gap: 12px;
     align-items: center;
+    justify-content: flex-end;
 }
-.local-status {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 12px;
-    color: var(--muted);
-}
-.concept-tag {
-    font-size: 10px;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--muted);
-    border: 1px solid var(--line);
-    padding: 4px 6px;
-    border-radius: 4px;
+.btn.accent {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--on-ink);
 }
 .account-btn {
     font-size: 12px;
@@ -283,11 +273,6 @@ html [hidden] {
     gap: 9px;
     padding-bottom: 4px;
 }
-.home-grid {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 294px;
-    gap: 36px;
-}
 .section-heading {
     display: flex;
     align-items: center;
@@ -298,90 +283,6 @@ html [hidden] {
     font-size: 16px;
     font-weight: 650;
     letter-spacing: -0.2px;
-}
-.continue-card {
-    /* Fixed deep green in both themes: its copy is always light. */
-    background: light-dark(#315d49, #27503d);
-    color: #fffefa;
-    display: grid;
-    grid-template-columns: 1fr 210px;
-    min-height: 200px;
-    border-radius: var(--radius);
-    overflow: hidden;
-    position: relative;
-    padding: 27px 28px;
-    gap: 12px;
-}
-.continue-copy {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    position: relative;
-    z-index: 1;
-}
-.continue-copy .eyebrow {
-    color: #d1deca;
-}
-.continue-copy h3 {
-    font-family: Georgia, serif;
-    font-weight: 400;
-    font-size: 32px;
-    margin: 11px 0 8px;
-    letter-spacing: -0.5px;
-}
-.continue-copy p {
-    color: #e0e6dc;
-    font-size: 12px;
-}
-.continue-copy .btn {
-    margin-top: 23px;
-    border: 0;
-    background: #f6f2df;
-    color: #293c30;
-    padding: 9px 13px;
-}
-.continue-art {
-    display: grid;
-    place-content: center;
-    transform: rotate(-8deg);
-    align-self: center;
-    background: #f0eddc;
-    color: #344638;
-    height: 154px;
-    width: 220px;
-    padding: 18px;
-    box-shadow: 0 10px 30px #102d3745;
-    border-radius: 3px;
-    margin-left: 6px;
-}
-.mini-heading {
-    font-size: 10px;
-    font-weight: 650;
-    margin-bottom: 14px;
-    border-bottom: 1px solid #293c3020;
-    padding-bottom: 8px;
-}
-.mini-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 14px 0;
-    font-family: Georgia, serif;
-    font-size: 14px;
-}
-.mini-grid span {
-    border-left: 1px solid #34463860;
-    padding: 0 7px;
-}
-.mini-grid sup {
-    font-size: 9px;
-}
-.library-heading {
-    margin-top: 30px;
-}
-.library-tools {
-    display: flex;
-    align-items: center;
-    gap: 12px;
 }
 .search {
     display: flex;
@@ -528,25 +429,6 @@ html [hidden] {
     height: 14px;
     width: 14px;
 }
-.quick-jam {
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-    background: var(--paper-raised);
-    padding: 23px;
-}
-.quick-jam h2 {
-    font-family: Georgia, serif;
-    font-size: 26px;
-    font-weight: 400;
-    letter-spacing: -0.5px;
-    margin: 8px 0 9px;
-}
-.quick-jam > p {
-    font-size: 12px;
-    color: var(--muted);
-    line-height: 1.6;
-    margin-bottom: 21px;
-}
 .jam-tile {
     display: flex;
     align-items: center;
@@ -572,12 +454,13 @@ html [hidden] {
     margin-left: auto;
     width: 16px;
 }
-.quick-jam .text-button {
-    margin-top: 14px;
-    font-size: 12px;
+/* The v1 import offer (#1274): a raised card over the home's content. */
+.home-card {
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--paper-raised);
+    padding: 23px;
 }
-/* The v1 import offer (#1274) borrows the raised-card box above; it only needs to sit
-   over the library and size its own heading and button row. */
 .import-card {
     margin-bottom: 22px;
 }
@@ -618,32 +501,6 @@ html [hidden] {
     display: flex;
     gap: 9px;
     margin-top: 15px;
-}
-.sync-card {
-    padding: 22px 7px 0;
-}
-.sync-card h3 {
-    font-size: 13px;
-    font-weight: 650;
-    margin: 10px 0 7px;
-}
-.sync-card p {
-    font-size: 12px;
-    line-height: 1.65;
-    color: var(--muted);
-}
-.sync-card .text-button {
-    color: var(--accent);
-    margin-top: 7px;
-}
-.home-footer {
-    display: flex;
-    justify-content: space-between;
-    color: var(--muted);
-    font-size: 11px;
-    margin-top: 33px;
-    padding-top: 17px;
-    border-top: 1px solid var(--line);
 }
 .workspace {
     height: calc(100dvh - 76px);
@@ -1431,25 +1288,8 @@ dialog textarea {
     }
 }
 @media (max-width: 1100px) {
-    .site-header {
-        padding: 0 25px;
-    }
     .home {
         padding: 34px 28px;
-    }
-    .home-grid {
-        grid-template-columns: minmax(0, 1fr) 255px;
-        gap: 24px;
-    }
-    .continue-card {
-        grid-template-columns: 1fr 155px;
-        padding: 24px;
-    }
-    .continue-art {
-        width: 190px;
-    }
-    .continue-copy h3 {
-        font-size: 28px;
     }
     .home h1 {
         font-size: 39px;
@@ -1474,9 +1314,6 @@ dialog textarea {
         width: 260px;
         padding: 21px 18px;
     }
-    .header-left {
-        gap: 26px;
-    }
     .song-actions .btn {
         padding: 9px 11px;
     }
@@ -1496,28 +1333,8 @@ dialog textarea {
     }
 }
 @media (max-width: 760px) {
-    .site-header {
-        height: 62px;
-        padding: 0 19px;
-        gap: 9px;
-    }
-    .brand {
-        font-size: 22px;
-    }
-    .brand svg {
-        width: 23px;
-    }
-    .site-nav {
-        display: none;
-    }
     .header-right {
         gap: 10px;
-    }
-    .local-status {
-        display: none;
-    }
-    .concept-tag {
-        font-size: 8px;
     }
     .account-btn {
         font-size: 11px;
@@ -1544,45 +1361,8 @@ dialog textarea {
     .home-actions .btn {
         font-size: 12px;
     }
-    .home-grid {
-        display: flex;
-        flex-direction: column;
-        gap: 28px;
-    }
-    .continue-card {
-        grid-template-columns: 1fr 115px;
-        min-height: 184px;
-        padding: 23px 21px;
-    }
-    .continue-copy h3 {
-        font-size: 29px;
-    }
-    .continue-art {
-        width: 180px;
-        height: 143px;
-        transform: rotate(-9deg);
-        margin-left: 0;
-    }
-    .continue-copy p {
-        font-size: 11px;
-        max-width: 175px;
-        line-height: 1.6;
-    }
-    .continue-copy .btn {
-        margin-top: 16px;
-    }
     .section-heading h2 {
         font-size: 15px;
-    }
-    .library-heading {
-        margin-top: 26px;
-    }
-    .search {
-        padding: 7px;
-        width: 113px;
-    }
-    .search input {
-        width: 75px;
     }
     .song-table th,
     .song-table td {
@@ -1609,31 +1389,8 @@ dialog textarea {
     .song-link {
         gap: 10px;
     }
-    .quick-jam {
-        padding: 20px;
-    }
-    .quick-jam h2 {
-        font-size: 25px;
-    }
-    .quick-jam > p {
-        margin-bottom: 12px;
-    }
-    .quick-jam .eyebrow {
-        font-size: 10px;
-    }
     .jam-tile {
         margin-top: 7px;
-    }
-    .home-footer {
-        font-size: 10px;
-        gap: 12px;
-        line-height: 1.6;
-    }
-    .home-footer > span:first-child {
-        max-width: 190px;
-    }
-    .sync-card {
-        padding: 22px 3px 0;
     }
     .workspace {
         height: calc(100dvh - 62px);
@@ -1894,12 +1651,6 @@ dialog textarea {
     }
 }
 @media (min-width: 761px) and (max-height: 650px) {
-    .site-header {
-        height: 54px;
-    }
-    .site-nav {
-        height: 54px;
-    }
     .workspace {
         height: calc(100dvh - 54px);
     }
@@ -1916,9 +1667,6 @@ dialog textarea {
     }
 }
 @media (max-height: 520px) and (max-width: 1000px) and (orientation: landscape) {
-    .site-header {
-        height: 44px;
-    }
     .workspace {
         height: calc(100dvh - 44px);
     }
@@ -1981,9 +1729,6 @@ dialog textarea {
     .playback-footer {
         min-height: 28px;
         padding: 5px 20px;
-    }
-    .site-nav {
-        display: none;
     }
     .workspace-body.editing {
         display: flex;
@@ -2399,12 +2144,6 @@ dialog textarea {
     }
     .header-right {
         gap: 7px;
-    }
-    .concept-tag {
-        font-size: 8px;
-    }
-    .site-header .local-status {
-        display: none;
     }
     .setting-select {
         font-size: 12px;
@@ -3074,9 +2813,6 @@ html[data-theme="stage"] {
 }
 
 /* The songbook home's link into #1440's All songs page. */
-.all-songs-link {
-    margin: -6px 0 14px;
-}
 
 /* The All songs page (#1440). `.home` supplies the page's max-width/padding/heading styles;
    everything below is additional to that shared shell. */
@@ -3221,5 +2957,397 @@ html[data-theme="stage"] {
         flex-wrap: wrap;
         position: static;
         justify-content: center;
+    }
+}
+/* ── The songbook home (#1441, direction A "one page, library first") ── */
+/* Which songbook this is, said once at the top — small, because the page's content is the
+   songs; `.home .home-library` outranks `.home h1`'s display type. */
+.home .home-library {
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 16px;
+}
+.home-library:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+}
+.home-section {
+    margin-top: 36px;
+}
+.home-section .section-heading h2 {
+    margin: 0;
+}
+.section-sub {
+    font-size: 12px;
+    color: var(--muted);
+    margin: -6px 0 16px;
+}
+.text-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 36px;
+    padding: 0 2px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--accent);
+    white-space: nowrap;
+}
+/* "Pick up where you left off": the song's own first bars, never a sample. */
+.continue-card {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 380px);
+    gap: 28px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 26px 28px;
+}
+.continue-copy {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    min-width: 0;
+}
+.continue-copy .eyebrow {
+    color: var(--accent);
+}
+.home .continue-copy h2 {
+    font-family: Georgia, "Times New Roman", serif;
+    font-weight: 400;
+    font-size: 30px;
+    letter-spacing: -0.5px;
+    line-height: 1.2;
+    margin: 10px 0 6px;
+    overflow-wrap: anywhere;
+}
+.continue-meta {
+    font-size: 12px;
+    color: var(--muted);
+    margin: 0;
+}
+.continue-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 9px;
+    margin-top: auto;
+    padding-top: 22px;
+}
+.continue-bars {
+    min-width: 0;
+}
+.continue-bars-label {
+    font-size: 10px;
+    font-weight: 650;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 12px;
+}
+.continue-grid {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    row-gap: 14px;
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 17px;
+    color: var(--ink);
+}
+.continue-grid li {
+    border-left: 1px solid var(--bar-line-strong);
+    padding: 4px 9px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.continue-grid li:nth-child(4n),
+.continue-grid li:last-child {
+    border-right: 1px solid var(--bar-line-strong);
+}
+/* Recently opened: title plus one muted fact, the facts in columns on a wide screen and in one
+   meta line on a phone. */
+.home-table .song-link {
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 2px;
+    min-height: 44px;
+}
+.home-table .song-name {
+    margin-bottom: 0;
+}
+.home-table .star-cell,
+.home-table .more-cell {
+    width: 44px;
+}
+.song-meta {
+    display: none;
+    font-size: 11px;
+    color: var(--muted);
+}
+.home-table .song-marker,
+.search-list .song-marker {
+    display: inline-flex;
+    margin-top: 4px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--accent-light);
+    font-size: 10.5px;
+    font-weight: 600;
+}
+/* The standards shelf: three columns on a wide screen, one horizontal row of cards per shelf
+   on a phone. */
+.shelf-columns {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 24px;
+}
+.shelf-column {
+    min-width: 0;
+}
+.home .shelf-column h3 {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 6px;
+}
+.shelf-items {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.standard-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    min-height: 48px;
+    padding: 7px 8px;
+    border-radius: 10px;
+    text-align: left;
+}
+.standard-item:hover {
+    background: var(--hover);
+}
+.play-circle {
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+    display: grid;
+    place-content: center;
+    border: 1px solid var(--line);
+    border-radius: 50%;
+    background: var(--surface);
+    color: var(--accent);
+    font-size: 10px;
+}
+.standard-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+.standard-title {
+    font-size: 13px;
+    font-weight: 620;
+    color: var(--ink);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.standard-meta {
+    font-size: 11px;
+    color: var(--muted);
+}
+/* A first visit: the standards are the page. */
+.first-visit p {
+    font-size: 15px;
+    line-height: 1.6;
+    color: var(--muted);
+    max-width: 560px;
+    margin: 0;
+}
+.byo-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 14px;
+}
+.byo-card {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-height: 88px;
+    padding: 18px 20px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+    text-align: left;
+}
+.byo-card strong {
+    font-size: 14px;
+    color: var(--ink);
+}
+.byo-card span {
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--muted);
+}
+/* One search, two groups. */
+.search-results {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 32px;
+}
+.home .search-group h2 {
+    font-size: 16px;
+    font-weight: 650;
+    margin: 0 0 10px;
+}
+.search-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+.search-list li {
+    border-top: 1px solid var(--line);
+}
+.search-list .song-link {
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 2px;
+    min-height: 52px;
+    padding: 6px 0;
+}
+.search-empty {
+    font-size: 13px;
+    color: var(--muted);
+}
+.home-footer {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 8px 16px;
+    margin-top: 44px;
+    padding-top: 17px;
+    border-top: 1px solid var(--line);
+    font-size: 11px;
+    line-height: 1.6;
+    color: var(--muted);
+}
+.home-offline {
+    white-space: nowrap;
+}
+@media (max-width: 760px) {
+    .site-header {
+        padding: 10px 16px;
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-areas: "brand account";
+        gap: 10px;
+    }
+    .site-header[data-home="true"] {
+        grid-template-areas:
+            "brand account"
+            "search search"
+            "tools tools";
+    }
+    .brand {
+        font-size: 23px;
+    }
+    .home-search {
+        max-width: none;
+    }
+    .header-tools {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+    }
+    .site-header .btn,
+    .site-header .account-btn,
+    .home .btn,
+    .home .account-btn {
+        min-height: 44px;
+    }
+    .home {
+        padding: 20px 16px 24px;
+    }
+    .home .home-library {
+        margin-bottom: 12px;
+    }
+    .home-section {
+        margin-top: 28px;
+    }
+    .text-link {
+        min-height: 44px;
+    }
+    .continue-card {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 18px;
+        padding: 20px;
+    }
+    .home .continue-copy h2 {
+        font-size: 26px;
+    }
+    .continue-actions {
+        padding-top: 16px;
+    }
+    /* The phone's compact card shows the first four bars. */
+    .continue-grid li:nth-child(n + 5) {
+        display: none;
+    }
+    .continue-grid li:nth-child(4) {
+        border-right: 1px solid var(--bar-line-strong);
+    }
+    .home-table .icon-button {
+        width: 44px;
+        height: 44px;
+    }
+    .home-table .song-link {
+        min-height: 52px;
+    }
+    .song-meta {
+        display: block;
+    }
+    .shelf-columns {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 20px;
+    }
+    .shelf-items {
+        flex-direction: row;
+        gap: 10px;
+        overflow-x: auto;
+        scroll-snap-type: x mandatory;
+        padding-bottom: 6px;
+    }
+    .shelf-items li {
+        flex: 0 0 152px;
+        scroll-snap-align: start;
+    }
+    .shelf-items .standard-item {
+        flex-direction: column;
+        align-items: flex-start;
+        height: 100%;
+        padding: 12px;
+        border: 1px solid var(--line);
+        background: var(--surface);
+    }
+    .shelf-items .standard-title {
+        white-space: normal;
+    }
+    .home h1 {
+        font-size: 34px;
+    }
+    .search-results {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 24px;
     }
 }

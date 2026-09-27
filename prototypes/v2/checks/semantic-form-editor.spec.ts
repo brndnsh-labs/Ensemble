@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import type { Page } from '@playwright/test';
 import type { ChartDocument } from '../lib/documents';
-import { appUrl, test as base, editorRevealed, expect } from './fixtures';
+import { appUrl, test as base, editorRevealed, expect, songLink } from './fixtures';
 
 const test = base.extend<{ disconnect: () => Promise<void> }>({
     disconnect: async ({ browserName, context, request }, use) => {
@@ -185,9 +185,7 @@ test('pending forms save atomically from the hidden editor, transpose and reopen
         .toContain(appUrl('sw.js'));
     await disconnect();
     await page.reload();
-    await page
-        .getByRole('button', { name: /^♪ Two ending study .*Saved locally$/, exact: true })
-        .click();
+    await songLink(page, 'Two ending study').click();
     await expect(page.getByLabel('Key', { exact: true })).toHaveValue('D');
     await expectWrittenStand(page, ['D', 'A', 'Bm', 'G']);
     await page.getByRole('button', { name: 'Edit chart', exact: true }).click();

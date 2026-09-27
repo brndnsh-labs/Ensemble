@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { appUrl, expect, seedStarters, test } from './fixtures';
+import { appUrl, expect, seedStarters, songLink, test } from './fixtures';
 
 // #1275 — per-instrument volume/reverb controls (and, on the old engine, style) in
 // the Sounds panel. Mirrors `foundation.spec.ts`'s Sounds helpers and
@@ -43,7 +43,7 @@ async function withoutClipboard(page: import('@playwright/test').Page) {
 
 test('every per-instrument sound control has a lane-scoped accessible name', async ({ page }) => {
     await seedStarters(page);
-    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
+    await songLink(page, 'Blue pocket', 'Blues').click();
     await openSounds(page);
 
     // The band engine's lanes: harmony is not a band role, and each genre plays its own
@@ -68,7 +68,7 @@ test('bass volume persists through save, reload, revert and a share link', async
     // `addInitScript` only takes effect on a page's NEXT document load.
     await withoutClipboard(page);
     await seedStarters(page);
-    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
+    await songLink(page, 'Blue pocket', 'Blues').click();
     await openSounds(page);
 
     const bassVolume = page.getByLabel('Bass volume', { exact: true });
@@ -96,7 +96,7 @@ test('bass volume persists through save, reload, revert and a share link', async
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
 
     await page.reload();
-    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).first().click();
+    await songLink(page, 'Blue pocket', 'Blues').first().click();
     await openSounds(page);
     await expect(bassVolume).toHaveValue('40');
     await closeSounds(page);

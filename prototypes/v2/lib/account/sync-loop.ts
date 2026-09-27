@@ -1,3 +1,4 @@
+import { type HomeSlice, homeRequest } from '../home';
 import {
     BACKOFF_FALLBACK_MS,
     type LibraryDownloadResult,
@@ -657,6 +658,19 @@ export interface SyncLoop {
      * this device holds is refused rather than answered with somebody else's library.
      */
     listLibrary(owner?: string | null): Promise<SavedSong[]>;
+    /**
+     * What the songbook home shows (#1441): the Continue song, the most recently opened ones by
+     * id and the library's count — never the whole library. The account's own opened-at map and
+     * last-opened pointer decide which ids; see `AccountSongbook.home`. Scoped exactly like
+     * `listLibrary`.
+     */
+    homeLibrary(owner?: string | null): Promise<HomeSlice>;
+    /**
+     * One saved song by id, or null when this account's library does not hold it (#1441) — what
+     * opening, renaming or exporting a row reads instead of the whole library. Scoped exactly like
+     * `listLibrary`.
+     */
+    readSong(documentId: string, owner?: string | null): Promise<ChartDocument | null>;
     /**
      * Commit locally and queue that exact version. Does NOT send; the caller triggers a pass.
      *
@@ -1475,6 +1489,18 @@ export function createSyncLoop(
                 cursor = listing.nextAfterDocumentId;
             }
             throw new Error('Account library paging did not terminate.');
+        },
+        async homeLibrary(owner = null) {
+            const current = await heldScope(owner);
+            const [openedAt, continueId] = await Promise.all([
+                songbook.openedAtMap(current),
+                songbook.lastOpened(current),
+            ]);
+            return songbook.home(current, homeRequest(openedAt, continueId));
+        },
+        async readSong(documentId, owner = null) {
+            const current = await heldScope(owner);
+            return (await songbook.read(current, documentId))?.document ?? null;
         },
         async save(document, expected, owner) {
             // #1311: before `songbook.save`, deliberately. A Save refused here has written

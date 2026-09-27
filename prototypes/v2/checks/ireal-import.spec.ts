@@ -3,7 +3,7 @@ import { dirname, resolve } from 'node:path';
 import type { Page } from '@playwright/test';
 import type { ChartDocument } from '../lib/documents';
 import { expectVisitsFollowForm } from './chart-visits';
-import { appUrl, test as base, expect } from './fixtures';
+import { appUrl, test as base, expect, songLink } from './fixtures';
 
 const test = base.extend<{ disconnect: () => Promise<void> }>({
     disconnect: async ({ browserName, context, request }, use) => {
@@ -142,7 +142,7 @@ test('an iReal HTML preview is inert, explicitly added, transposed, exported and
         .toContain(appUrl('sw.js'));
     await disconnect();
     await page.reload();
-    await page.getByRole('button', { name: /^♪ Blues fixture .*Saved locally$/ }).click();
+    await songLink(page, 'Blues fixture').click();
     await expect(page.getByLabel('Key', { exact: true })).toHaveValue('D');
     await expect(page.locator('.bar')).toHaveCount(12);
     expect((await savedDocuments(page)).find((document) => document.id === imported.id)).toEqual(

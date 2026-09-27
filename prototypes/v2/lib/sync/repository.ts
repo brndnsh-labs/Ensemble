@@ -1,3 +1,4 @@
+import { type HomeRead, type HomeRequest, type HomeSlice, settleHome } from '../home';
 import { AccountDatabase, type Transaction } from './database';
 import {
     type AccountScope,
@@ -493,6 +494,82 @@ export class AccountSongbook {
                 },
             );
         });
+    }
+
+    /**
+     * What the songbook home shows, without reading the whole library (#1441) — the account half
+     * of `lib/repository.ts`'s guest `home`, over the same owner-bounded key range `list` pages
+     * with: this owner's `count()`, the Continue document and the recently opened ones by id, and
+     * a bounded cursor fill only when fewer than `request.rows` of those exist. One owner-fenced
+     * read-only transaction.
+     *
+     * A record that does not validate is left out and counted rather than failing the read
+     * (`settleHome`) — the posture `openedAtMap` already takes for one corrupt row, and the
+     * opposite of `list`, which refuses a page it cannot wholly read. That refusal is still what
+     * a full-library read reports; the home page just does not depend on it.
+     */
+    async home(scope: AccountScope, request: HomeRequest): Promise<HomeSlice> {
+        scope = copyScope(scope);
+        const owned = IDBKeyRange.bound([scope.ownerId], [scope.ownerId, []], false, true);
+        const read = await this.database.run<HomeRead<SavedSong>>('readonly', scope, (tx) => {
+            const songs = tx.table('songs');
+            const result: HomeRead<SavedSong> = {
+                count: 0,
+                continued: undefined,
+                recent: [],
+                fill: [],
+            };
+            tx.finish(result);
+            tx.read(songs.count(owned), (count: number) => {
+                result.count = count;
+            });
+            if (request.continueId !== null) {
+                tx.read(songs.get([scope.ownerId, request.continueId]), (row: SavedSong) => {
+                    result.continued = row;
+                });
+            }
+            const found: Array<SavedSong | undefined> = new Array(request.recentIds.length);
+            let pending = request.recentIds.length;
+            const fill = () => {
+                result.recent = found.filter((row) => row !== undefined);
+                const wanted = request.rows - result.recent.length;
+                if (wanted <= 0) {
+                    return;
+                }
+                const listed = new Set(request.recentIds);
+                const cursor = songs.openCursor(owned);
+                tx.read(cursor, (at: IDBCursorWithValue | null) => {
+                    if (!at || result.fill.length >= wanted) {
+                        return;
+                    }
+                    const row = at.value as SavedSong;
+                    if (!listed.has(row?.documentId)) {
+                        result.fill.push(row);
+                    }
+                    at.continue();
+                });
+            };
+            if (pending === 0) {
+                fill();
+            }
+            request.recentIds.forEach((documentId, index) => {
+                tx.read(songs.get([scope.ownerId, documentId]), (row: SavedSong | undefined) => {
+                    found[index] = row;
+                    pending -= 1;
+                    if (pending === 0) {
+                        fill();
+                    }
+                });
+            });
+        });
+        return settleHome(
+            read,
+            (row) => {
+                identifier(row?.documentId);
+                return savedSong(row, scope, row.documentId).document;
+            },
+            request.rows,
+        );
     }
 
     async pending(scope: AccountScope, documentId: string): Promise<SaveOperation[]> {

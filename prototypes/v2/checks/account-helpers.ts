@@ -137,7 +137,7 @@ export const CODE_SHAPE = RECOVERY_CODE_SHAPE;
  */
 export async function openWithAccounts(page: Page): Promise<void> {
     await seedStarters(page);
-    await expect(page.getByRole('heading', { name: 'Let’s play something.' })).toBeVisible();
+    await expect(page.getByTestId('library-heading')).toBeVisible();
 }
 
 /** Create an account and stop on the recovery-code step, returning the code it showed. */

@@ -12,8 +12,6 @@ import { appUrl, expect, seedStarters, test } from './fixtures';
  * having: a device that asked for it makes no request at all.
  */
 
-const SONGBOOK = 'Let’s play something.';
-
 /** Every `/api/*` request the page makes, as `METHOD /path`. */
 function apiCalls(page: import('@playwright/test').Page): string[] {
     const seen: string[] = [];
@@ -32,7 +30,7 @@ test('a default profile gets the account entry point and asks the server nothing
     const calls = apiCalls(page);
 
     await page.goto(appUrl());
-    await expect(page.getByRole('heading', { name: SONGBOOK })).toBeVisible();
+    await expect(page.getByTestId('library-heading')).toBeVisible();
     await expect(page.getByTestId('account-sign-in')).toBeVisible();
     await expect(page.getByTestId('library-loading')).toHaveCount(0);
     // Past the moment an ungated bootstrap read would have fired: the read is gated on the
@@ -53,7 +51,7 @@ test('a device that holds an account does ask for its session, once', async ({ p
     const calls = apiCalls(page);
 
     await page.goto(appUrl());
-    await expect(page.getByRole('heading', { name: SONGBOOK })).toBeVisible();
+    await expect(page.getByTestId('library-heading')).toBeVisible();
     await expect(page.getByTestId('library-loading')).toHaveCount(0);
 
     // Exactly one, and only that one: nothing downloads a library or queues a Save for a device
@@ -67,7 +65,7 @@ test('?accounts=off turns every account surface off, and makes no request at all
     const calls = apiCalls(page);
 
     await page.goto(appUrl('?accounts=off'));
-    await expect(page.getByRole('heading', { name: SONGBOOK })).toBeVisible();
+    await expect(page.getByTestId('library-heading')).toBeVisible();
     // The parameter is consumed, exactly as the opt-in was: the choice belongs to this device,
     // not to a URL somebody might share.
     expect(page.url()).not.toContain('accounts=');
@@ -127,7 +125,7 @@ test('the opt-out survives a reload with no parameter in the URL', async ({ page
     // not quietly reassert itself the moment the parameter is gone.
     const calls = apiCalls(page);
     await page.reload();
-    await expect(page.getByRole('heading', { name: SONGBOOK })).toBeVisible();
+    await expect(page.getByTestId('library-heading')).toBeVisible();
     await expect(page.getByTestId('library-loading')).toHaveCount(0);
     await expect(page.getByTestId('account-sign-in')).toHaveCount(0);
     expect(calls).toEqual([]);
@@ -148,7 +146,7 @@ test('a default profile still plays as a guest when the server is unreachable', 
     await shapeApi(page, 'unreachable');
 
     await seedStarters(page);
-    await expect(page.getByRole('heading', { name: SONGBOOK })).toBeVisible();
+    await expect(page.getByTestId('library-heading')).toBeVisible();
     // The entry point renders even though the session could not be read: the alternative is a
     // feature that silently never appears when the network is having a bad day.
     await expect(page.getByTestId('account-sign-in')).toBeVisible();
@@ -157,7 +155,7 @@ test('a default profile still plays as a guest when the server is unreachable', 
     await expect(page.locator('.song-row').first()).toBeVisible();
 
     // Guest playback is untouched by any of it.
-    await page.getByRole('button', { name: 'Open chart →' }).click();
+    await page.getByRole('button', { name: 'Open chart' }).click();
     await page.getByRole('button', { name: 'Start playback', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Stop playback' })).toBeVisible();
     await page.getByRole('button', { name: 'Stop playback' }).click();
@@ -176,12 +174,12 @@ test('a server that answers with an error leaves the guest songbook exactly as i
     await shapeApi(page, 'error');
 
     await seedStarters(page);
-    await expect(page.getByRole('heading', { name: SONGBOOK })).toBeVisible();
+    await expect(page.getByTestId('library-heading')).toBeVisible();
     await expect(page.getByTestId('library-loading')).toHaveCount(0);
     await expect(page.locator('.song-row').first()).toBeVisible();
     await expect(page.getByTestId('account-sign-in')).toBeVisible();
 
-    await page.getByRole('button', { name: 'Open chart →' }).click();
+    await page.getByRole('button', { name: 'Open chart' }).click();
     await page.getByRole('button', { name: 'Start playback', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Stop playback' })).toBeVisible();
     await page.getByRole('button', { name: 'Stop playback' }).click();
@@ -200,7 +198,7 @@ test('an origin that accepts the session request and never answers it does not h
 
     try {
         await seedStarters(page);
-        await expect(page.getByRole('heading', { name: SONGBOOK })).toBeVisible();
+        await expect(page.getByTestId('library-heading')).toBeVisible();
         // The whole claim: the library stops waiting, and the songs are there to open.
         await expect(page.getByTestId('library-loading')).toHaveCount(0);
         await expect(page.locator('.song-row').first()).toBeVisible();
@@ -210,7 +208,7 @@ test('an origin that accepts the session request and never answers it does not h
             'Couldn’t reach your account',
         );
 
-        await page.getByRole('button', { name: 'Open chart →' }).click();
+        await page.getByRole('button', { name: 'Open chart' }).click();
         await page.getByRole('button', { name: 'Start playback', exact: true }).click();
         await expect(page.getByRole('button', { name: 'Stop playback' })).toBeVisible();
         await page.getByRole('button', { name: 'Stop playback' }).click();
@@ -235,7 +233,7 @@ test('a browser without passkeys explains itself instead of offering a dead butt
     // No `asHeldDevice`: the dialog is user-initiated, so this is a plain first-time visitor —
     // which is exactly who meets the "passkeys aren't available here" copy.
     await page.goto(appUrl());
-    await expect(page.getByRole('heading', { name: SONGBOOK })).toBeVisible();
+    await expect(page.getByTestId('library-heading')).toBeVisible();
 
     await page.getByTestId('account-sign-in').click();
     await expect(
@@ -254,7 +252,7 @@ test('an unreachable server says so, and says guest playback still works', async
     test.skip(browserName !== 'chromium', 'needs WebAuthn to reach the ceremony path at all.');
     await shapeApi(page, 'unreachable');
     await page.goto(appUrl());
-    await expect(page.getByRole('heading', { name: SONGBOOK })).toBeVisible();
+    await expect(page.getByTestId('library-heading')).toBeVisible();
 
     await page.getByTestId('account-sign-in').click();
     await page.getByTestId('account-create').click();

@@ -72,6 +72,53 @@ export function installFakeIndexedDB(): FakeIndexedDB {
                     });
                     return request;
                 },
+                count() {
+                    const request = makeRequest<number>();
+                    tx.pending++;
+                    queueMicrotask(() => {
+                        request.result = store.size;
+                        request.onsuccess?.();
+                        settle();
+                    });
+                    return request;
+                },
+                // Ascending key order, one `onsuccess` per `continue()`, then `result: null` —
+                // what the songbook home's bounded fill reads (#1441).
+                openCursor() {
+                    const request = makeRequest<{
+                        primaryKey: string;
+                        value: unknown;
+                        continue: () => void;
+                    } | null>();
+                    const keys = [...store.keys()].sort();
+                    let index = 0;
+                    tx.pending++;
+                    const step = () =>
+                        queueMicrotask(() => {
+                            if (index >= keys.length) {
+                                request.result = null;
+                                request.onsuccess?.();
+                                settle();
+                                return;
+                            }
+                            const key = keys[index++];
+                            let advanced = false;
+                            request.result = {
+                                primaryKey: key,
+                                value: store.get(key),
+                                continue: () => {
+                                    advanced = true;
+                                    step();
+                                },
+                            };
+                            request.onsuccess?.();
+                            if (!advanced) {
+                                settle();
+                            }
+                        });
+                    step();
+                    return request;
+                },
                 delete(key: string) {
                     const request = makeRequest<void>();
                     tx.pending++;

@@ -138,7 +138,7 @@ test('brings v1 songs into the songbook, plays one, and leaves v1 untouched', as
     // The offer is remembered per v1 item, so a reload does not ask again — and the
     // imported songs are still there.
     await page.reload();
-    await expect(page.getByRole('heading', { name: 'Let’s play something.' })).toBeVisible();
+    await expect(page.getByTestId('library-heading')).toBeVisible();
     await expect(page.getByTestId('v1-import')).toHaveCount(0);
     expect(await v1SessionRows(page)).toBe(1);
     expect(await v1KeysUnchanged(page)).toEqual({ state: true, presets: true });
@@ -162,7 +162,7 @@ test('declining is permanent, and the song menu brings the import back', async (
 
     // Never again by itself, whatever this device has or hasn't imported.
     await page.reload();
-    await expect(page.getByRole('heading', { name: 'Let’s play something.' })).toBeVisible();
+    await expect(page.getByTestId('library-heading')).toBeVisible();
     await expect(page.getByTestId('v1-import')).toHaveCount(0);
 
     async function openImportFromTheMenu() {
@@ -197,7 +197,7 @@ test('declining is permanent, and the song menu brings the import back', async (
 
 test('offers nothing on a profile that never ran v1', async ({ page }) => {
     await page.goto(appUrl());
-    await expect(page.getByRole('heading', { name: 'Let’s play something.' })).toBeVisible();
+    await expect(page.getByTestId('library-heading')).toBeVisible();
     await expect(page.getByTestId('v1-import')).toHaveCount(0);
 });
 
@@ -242,7 +242,7 @@ test('lists v1 data it cannot read instead of quietly importing nothing', async 
     // card does not re-open by itself for it (patch R1) …
     await page.getByTestId('v1-import').getByRole('button', { name: 'Done' }).click();
     await page.reload();
-    await expect(page.getByRole('heading', { name: 'Let’s play something.' })).toBeVisible();
+    await expect(page.getByTestId('library-heading')).toBeVisible();
     await expect(page.getByTestId('v1-import')).toHaveCount(0);
 
     // … and the way back still lists it, with its reason, for anyone who goes looking.
@@ -327,7 +327,7 @@ test('dismissing an unreadable-only card settles it without declining', async ({
     await card.getByRole('button', { name: 'Done' }).click();
 
     await page.reload();
-    await expect(page.getByRole('heading', { name: 'Let’s play something.' })).toBeVisible();
+    await expect(page.getByTestId('library-heading')).toBeVisible();
     await expect(page.getByTestId('v1-import')).toHaveCount(0);
     expect(await declined(page)).toBe(false);
 

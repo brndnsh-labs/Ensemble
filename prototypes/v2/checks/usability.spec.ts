@@ -1,11 +1,10 @@
 import { readFile } from 'node:fs/promises';
 import type { Page } from '@playwright/test';
-import { expect, seedStarters, test } from './fixtures';
+import { expect, seedStarters, songLink, test } from './fixtures';
 
-const blue = 'Blue pocket Blues · Saved locally';
 async function openEditor(page: Page) {
     await seedStarters(page);
-    await page.getByRole('button', { name: blue }).click();
+    await songLink(page, 'Blue pocket', 'Blues').click();
     await page.getByRole('button', { name: 'Edit chart', exact: true }).click();
 }
 async function savedBlue(page: Page) {
@@ -103,7 +102,7 @@ test('a queued close event cannot shut a dialog that has already been reopened (
     page,
 }) => {
     await seedStarters(page);
-    await page.getByRole('button', { name: blue }).click();
+    await songLink(page, 'Blue pocket', 'Blues').click();
     await page.getByRole('button', { name: 'Song actions' }).click();
     await expect(page.getByRole('button', { name: 'Export file', exact: true })).toBeVisible();
     // `close()` queues its `close` event. When an action closes the menu and "Song actions"
@@ -249,7 +248,7 @@ test('transposition follows pending text and cannot be undone by stale editor te
     await expect(page.getByLabel('Chord text')).toHaveValue('Em7 | A7');
     await page.getByLabel('Chord text').fill('F#m7 | B7');
     await page.getByRole('button', { name: 'Back to songbook' }).click();
-    await page.getByRole('button', { name: 'Open chart →', exact: true }).click();
+    await page.getByRole('button', { name: 'Open chart', exact: true }).click();
     await page.getByRole('button', { name: 'Edit chart', exact: true }).click();
     await expect(page.getByLabel('Chord text')).toHaveValue('F#m7 | B7');
     await page.getByRole('button', { name: 'Start playback', exact: true }).click();
@@ -296,8 +295,8 @@ test('Continue remembers opened songs and recovered setup without changing saved
     page,
 }) => {
     await seedStarters(page);
-    await expect(page.locator('.continue-card')).toContainText('A good place to start');
-    await page.getByRole('button', { name: blue }).click();
+    await expect(page.locator('.continue-card')).toContainText('From your songbook');
+    await songLink(page, 'Blue pocket', 'Blues').click();
     const before = await savedBlue(page);
     await page.getByRole('button', { name: 'Faster', exact: true }).click();
     await page.getByRole('button', { name: 'Back to songbook' }).click();
@@ -308,7 +307,7 @@ test('Continue remembers opened songs and recovered setup without changing saved
     await expect(page.locator('.continue-card')).toContainText('Pick up where you left off');
     await expect(page.locator('.continue-card')).toContainText('Blue pocket');
     await expect(page.locator('.continue-card')).toContainText('115 BPM');
-    await page.getByRole('button', { name: 'Open chart →', exact: true }).click();
+    await page.getByRole('button', { name: 'Open chart', exact: true }).click();
     await expect(page.getByLabel('Tempo', { exact: true })).toHaveValue('115');
     expect(await savedBlue(page)).toEqual(before);
 });
@@ -359,7 +358,7 @@ test('a failed Save retains typed chords through recovery, navigation and retry'
     expect(await savedBlue(page)).toEqual(original);
     await page.getByRole('button', { name: 'Back to songbook' }).click();
     await page.reload();
-    await page.getByRole('button', { name: 'Open chart →', exact: true }).click();
+    await page.getByRole('button', { name: 'Open chart', exact: true }).click();
     await page.getByRole('button', { name: 'Edit chart', exact: true }).click();
     await expect(page.getByLabel('Chord text')).toHaveValue('Fmaj7 | E7 | Am7');
     await page.getByRole('button', { name: 'Save', exact: true }).click();
@@ -432,7 +431,7 @@ test('the stand scales to its screen, holds still across play/pause and keeps mu
     page,
 }, info) => {
     await seedStarters(page);
-    await page.getByRole('button', { name: blue }).click();
+    await songLink(page, 'Blue pocket', 'Blues').click();
     await page.waitForSelector('.bar');
     // #1186 pinned a playing-only scale larger than idle; that made every play/pause
     // toggle reflow bar height, chord size and section letters at once, which read
@@ -530,7 +529,7 @@ test('stage mode darkens the stand, persists per device and follows the system w
     await page.emulateMedia({ colorScheme: 'light' });
     const openStand = async () => {
         await seedStarters(page);
-        await page.getByRole('button', { name: blue }).click();
+        await songLink(page, 'Blue pocket', 'Blues').click();
         await page.waitForSelector('.bar');
     };
     const paint = () =>
@@ -579,7 +578,7 @@ test('stage mode darkens the stand, persists per device and follows the system w
     // before hydration, and it is not written into the saved document.
     await page.reload();
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'stage');
-    await page.getByRole('button', { name: blue }).click();
+    await songLink(page, 'Blue pocket', 'Blues').click();
     await expect(stageButton).toHaveAttribute('aria-pressed', 'true');
     expect(JSON.stringify(await savedBlue(page))).not.toContain('stage');
 
@@ -600,7 +599,7 @@ test('a muted lane reads as muted at a distance and toggling never reflows the r
     page,
 }) => {
     await seedStarters(page);
-    await page.getByRole('button', { name: blue }).click();
+    await songLink(page, 'Blue pocket', 'Blues').click();
     await page.waitForSelector('.bar');
     const drums = page.getByRole('button', { name: 'Drums', exact: true });
     const chrome = () =>

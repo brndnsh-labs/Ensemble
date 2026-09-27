@@ -1,4 +1,4 @@
-import { appUrl, editorRevealed, expect, seedStarters, test } from './fixtures';
+import { appUrl, editorRevealed, expect, seedStarters, songLink, test } from './fixtures';
 
 declare global {
     interface Window {
@@ -122,7 +122,7 @@ test('changing the key of a measure-less chart while it plays restarts the band 
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     await seedStarters(page);
-    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
+    await songLink(page, 'Blue pocket', 'Blues').click();
     const tempo = page.getByLabel('Tempo', { exact: true });
     await tempo.fill('240');
     await tempo.press('Enter');
@@ -160,7 +160,7 @@ test('Play starts the silent audio track that unlocks iOS audio', async ({ page 
         };
     });
     await seedStarters(page);
-    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
+    await songLink(page, 'Blue pocket', 'Blues').click();
     await page.getByRole('button', { name: 'Start playback', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Stop playback', exact: true })).toBeEnabled();
     await expect

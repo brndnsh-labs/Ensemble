@@ -5,7 +5,7 @@ import { appUrl, expect, test } from './fixtures';
 /**
  * The read-only standards catalog (#1439): a fresh device's guest songbook is genuinely empty
  * now that `lib/starters.ts` no longer auto-seeds it, and the catalog (`lib/standards.ts`) is
- * what fills the "good place to start" role instead — never written to storage until Save.
+ * what that device's first-visit home is made of (#1441) — never written to storage until Save.
  */
 
 async function documents(page: Page): Promise<ChartDocument[]> {
@@ -31,15 +31,17 @@ test('a fresh device has zero saved songs and all 28 standards in the catalog', 
     page,
 }) => {
     await page.goto(appUrl());
-    await expect(page.getByRole('heading', { name: 'Let’s play something.' })).toBeVisible();
-    // Nothing seeded: the library table has no rows, and the catalog fills the featured card
-    // instead ("A good place to start" — never "Pick up where you left off", which only a real
-    // last-opened song earns).
-    await expect(page.locator('.song-table .song-row')).toHaveCount(0);
-    await expect(page.locator('.continue-card')).toContainText('A good place to start');
+    await expect(page.getByTestId('library-heading')).toBeVisible();
+    // Nothing seeded: no song rows and no Continue card (only a real song earns one) — the
+    // first-visit layout, where the standards are the page (#1441).
+    await expect(page.locator('.home-table .song-row')).toHaveCount(0);
+    await expect(page.getByTestId('continue-card')).toHaveCount(0);
+    await expect(
+        page.getByRole('heading', { name: 'Pick a tune. The band comes in.' }),
+    ).toBeVisible();
     expect(await documents(page)).toEqual([]);
 
-    await page.getByRole('button', { name: 'Browse standards' }).click();
+    await page.getByRole('button', { name: 'Browse all →' }).click();
     await expect(page.getByRole('heading', { name: 'Standards.' })).toBeVisible();
     await expect(page.locator('.standards-table .song-row')).toHaveCount(28);
 
@@ -66,7 +68,7 @@ test('opening a standard lands an unsaved draft that plays and changes key/feel;
     page,
 }) => {
     await page.goto(appUrl());
-    await page.getByRole('button', { name: 'Browse standards' }).click();
+    await page.getByRole('button', { name: 'Browse all →' }).click();
     const row = page.locator('.standards-table .song-row', { hasText: '12-Bar Blues' });
     await expect(row).toContainText('Blues');
     await expect(row).toContainText('100');
@@ -104,8 +106,8 @@ test('opening a standard lands an unsaved draft that plays and changes key/feel;
 
     // The catalog itself is unaffected: opening it again still lands a fresh, unsaved draft.
     await page.getByRole('button', { name: 'Back to songbook' }).click();
-    await expect(page.locator('.song-table .song-row')).toHaveCount(1);
-    await page.getByRole('button', { name: 'Browse standards' }).click();
+    await expect(page.locator('.home-table .song-row')).toHaveCount(1);
+    await page.getByRole('button', { name: 'Browse all →' }).click();
     await expect(page.locator('.standards-table .song-row')).toHaveCount(28);
 });
 
@@ -119,7 +121,7 @@ test('opening a standard lands an unsaved draft that plays and changes key/feel;
  */
 test('editing an open standard writes nothing to recovery storage', async ({ page }) => {
     await page.goto(appUrl());
-    await page.getByRole('button', { name: 'Browse standards' }).click();
+    await page.getByRole('button', { name: 'Browse all →' }).click();
     const row = page.locator('.standards-table .song-row', { hasText: '12-Bar Blues' });
     await row.getByRole('button', { name: 'Open' }).click();
     await expect(page.getByRole('heading', { name: '12-Bar Blues', exact: true })).toBeVisible();
@@ -147,15 +149,15 @@ test('editing an open standard writes nothing to recovery storage', async ({ pag
 
 /**
  * Leaving returns focus to the entry point on home (#1440 review P3), not `<body>`. This view
- * swap remounts `Songbook` (and its "Browse standards" button) on every return, so the fix has
+ * swap remounts `Songbook` (and its "Browse all →" button) on every return, so the fix has
  * to be a ref the SHELL holds across that remount (`app/ensemble.tsx`'s `standardsEntryRef`) —
  * a ref captured inside `StandardsBrowser` itself would already be pointing at a removed node by
  * the time its own unmount cleanup could use it.
  */
 test('leaving the standards browser returns focus to its entry point on home', async ({ page }) => {
     await page.goto(appUrl());
-    await page.getByRole('button', { name: 'Browse standards' }).click();
+    await page.getByRole('button', { name: 'Browse all →' }).click();
     await expect(page.getByRole('heading', { name: 'Standards.' })).toBeVisible();
     await page.getByRole('button', { name: 'Back to songbook' }).click();
-    await expect(page.getByRole('button', { name: 'Browse standards' })).toBeFocused();
+    await expect(page.getByRole('button', { name: 'Browse all →' })).toBeFocused();
 });

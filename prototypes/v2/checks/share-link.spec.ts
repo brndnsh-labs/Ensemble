@@ -1,4 +1,4 @@
-import { appUrl, expect, seedStarters, test } from './fixtures';
+import { appUrl, expect, seedStarters, songLink, test } from './fixtures';
 
 // Deterministic across both projects (Desktop Chrome and the WebKit-based
 // `webkit-phone` project, which grants no clipboard permission by default,
@@ -17,7 +17,7 @@ test('shares a link that reopens as an unsaved draft; Keep a copy persists it an
 }) => {
     await withoutClipboard(page);
     await seedStarters(page);
-    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
+    await songLink(page, 'Blue pocket', 'Blues').click();
     await expect(page.getByRole('heading', { name: 'Blue pocket' })).toBeVisible();
 
     await page.getByRole('button', { name: 'Song actions' }).click();
@@ -63,7 +63,7 @@ test('editing an opened share link before Keep a copy writes nothing to recovery
 }) => {
     await withoutClipboard(page);
     await seedStarters(page);
-    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
+    await songLink(page, 'Blue pocket', 'Blues').click();
     await page.getByRole('button', { name: 'Song actions' }).click();
     await page.getByRole('button', { name: 'Copy link', exact: true }).click();
     const link = await page.getByTestId('share-link-fallback').inputValue();

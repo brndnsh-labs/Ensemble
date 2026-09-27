@@ -1,7 +1,6 @@
 import { readFile } from 'node:fs/promises';
-import { appUrl, expect, seedStarters, test } from './fixtures';
+import { appUrl, expect, seedStarters, songLink, test } from './fixtures';
 
-const blue = 'Blue pocket Blues · Saved locally';
 // Same starter facts `checks/midi-export.spec.ts` hardcodes, for the same reason: an
 // independent check on the exporter, not a mirror of the app's own arranger math.
 const STARTER_BPM = 110;
@@ -60,7 +59,7 @@ test('Export audio (mix) downloads a valid WAV of plausible duration, and the li
     // rather than the default 45s.
     test.setTimeout(120_000);
     await seedStarters(page);
-    await page.getByRole('button', { name: blue }).click();
+    await songLink(page, 'Blue pocket', 'Blues').click();
     await expect(page.getByRole('heading', { name: 'Blue pocket' })).toBeVisible();
     const before = await page.locator('.sheet').innerText();
 
@@ -96,7 +95,7 @@ test('Export audio during playback does not stop or glitch the band', async ({ p
     // scheduler's real-time ticks — same generous budget, not a tighter one.
     test.setTimeout(120_000);
     await seedStarters(page);
-    await page.getByRole('button', { name: blue }).click();
+    await songLink(page, 'Blue pocket', 'Blues').click();
     await page.getByRole('button', { name: 'Start playback', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Stop playback', exact: true })).toBeEnabled();
 
@@ -138,7 +137,7 @@ test('Cancel stops an in-flight export before any download', async ({ page }) =>
         };
     }, appUrl('packs/grand/manifest.json'));
     await seedStarters(page);
-    await page.getByRole('button', { name: blue }).click();
+    await songLink(page, 'Blue pocket', 'Blues').click();
     await page.getByRole('button', { name: 'Sounds', exact: true }).click();
     await page.getByLabel('Chords sound', { exact: true }).selectOption('pack:grand');
     // Wait for the picker's OWN install to fully finish (`toBeEnabled`, not just
@@ -198,7 +197,7 @@ test('A pack that fails to install surfaces an error, never a silent synth fallb
         };
     }, appUrl('packs/grand/'));
     await seedStarters(page);
-    await page.getByRole('button', { name: blue }).click();
+    await songLink(page, 'Blue pocket', 'Blues').click();
     await page.getByRole('button', { name: 'Sounds', exact: true }).click();
     await page.getByLabel('Chords sound', { exact: true }).selectOption('pack:grand');
     await expect(page.getByLabel('Chords sound', { exact: true })).toBeEnabled();
