@@ -1,3 +1,4 @@
+import { TIME_SIGNATURES } from '@engine/config';
 import type { SemanticScore } from '@engine/songbook/score-types';
 import type { ChartNotation } from '@engine/songbook/types';
 import { type MouseEvent as ReactMouseEvent, useEffect, useRef, useState } from 'react';
@@ -52,6 +53,13 @@ interface ChartSheetProps {
     blocks: ChartBlock[];
     /** Display index of the sounding chord, or null while stopped. */
     displayActive: number | null;
+    /** Display index of the next performed bar (#1458), wrapping across a repeat, the form's
+     * own loop and an active practice loop — see `useChartView`'s `displayNext`. Null while
+     * stopped, or when the chart has nothing after `displayActive` to point at. */
+    displayNext: number | null;
+    /** Following's look-ahead scroll (`app/ensemble.tsx`) is in the playing bar's last beat —
+     * strengthens the next-bar cue from a quiet outline to a stronger one. */
+    nextSoon: boolean;
     /** The performed event under the playhead, in steps. */
     activeEvent: { start: number; end: number } | null;
     writtenBars: Map<string, WrittenBar>;
@@ -75,6 +83,8 @@ export function ChartSheet({
     current,
     blocks,
     displayActive,
+    displayNext,
+    nextSoon,
     activeEvent,
     writtenBars,
     writtenSections,
@@ -284,6 +294,21 @@ export function ChartSheet({
                             const endingEndBefore = writtenBar?.start?.some(
                                 (mark) => mark.kind === 'ending-end',
                             );
+                            const isNext = measure.chords.some(
+                                (c) => c.globalIndex === displayNext,
+                            );
+                            // The bar's own step span (first chord's start to last chord's end)
+                            // and where its last beat begins, per its own time signature — read
+                            // by the Following look-ahead's own poll (`app/ensemble.tsx`) off the
+                            // ACTIVE bar's DOM node, so the jump-ahead trigger and the next-bar
+                            // cue's "soon" strengthening need no extra state or per-tick re-render.
+                            const barEnd = measure.chords.at(-1)?.end;
+                            const barSteps =
+                                TIME_SIGNATURES[measure.chords[0]?.timeSignature ?? ''];
+                            const lastBeatStep =
+                                barEnd !== undefined
+                                    ? barEnd - (barSteps ?? TIME_SIGNATURES['4/4']).stepsPerBeat
+                                    : undefined;
                             return (
                                 <div
                                     className={`bar ${measure.chords.some((c) => c.globalIndex === displayActive) ? 'active' : ''} ${i === block.measures.length - 1 ? 'end' : ''} ${repeatStart ? 'repeat-start' : ''} ${repeatEnd ? 'repeat-end' : ''} ${endingStart ? 'ending-start' : ''} ${endingEnd ? 'ending-end' : ''}`}
@@ -291,6 +316,9 @@ export function ChartSheet({
                                     data-active={measure.chords.some(
                                         (c) => c.globalIndex === displayActive,
                                     )}
+                                    data-next={isNext ? (nextSoon ? 'soon' : 'true') : undefined}
+                                    data-bar-end-step={barEnd}
+                                    data-bar-last-beat-step={lastBeatStep}
                                     key={measure.chords[0]?.globalIndex}
                                 >
                                     <span className="bar-number">{barNumber}</span>

@@ -1424,3 +1424,15 @@ export function state(): EnsembleState {
 export function bandChartView(): BandChart | null {
     return bandView;
 }
+
+/**
+ * The song position sounding right now, in the same sixteenth-note steps the chart sheet's
+ * `start`/`end` fields use — or null while stopped or counting in. A pure read of the band
+ * host's audio-clock tick (`songTick()`), for a caller (the Following look-ahead scroll, #1458)
+ * that needs finer-than-chord-change resolution without a new polled state field: it samples
+ * this on its own cadence rather than the chart re-rendering every tick.
+ */
+export function currentStep(): number | null {
+    const tick = band?.songTick();
+    return tick == null ? null : tick / STEP_TICKS;
+}
