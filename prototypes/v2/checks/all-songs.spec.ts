@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 import { backToSongbook, newSongOnTheStand, saveAs } from './account-helpers';
 import { appUrl, expect, seedStarters, test } from './fixtures';
+import { seedGuestSongs } from './large-library';
 
 /**
  * The All songs page (#1440): search, Starred/Recently-opened filters, a genre dropdown scoped
@@ -162,6 +163,52 @@ test('opening a song from the All songs page queues no Save', async ({ page }) =
 
     const after = await documentRecord(page, 'starter-blues');
     expect(after).toEqual(before);
+});
+
+/**
+ * At scale (#1442's fixture, ≥500 songs) — the acceptance criterion's own ask. Every seeded song
+ * shares the imported template's genre and composer ("Ensemble" — see `large-library.ts`'s own
+ * note on the fixture's embedded title/composer), which is what makes a composer-only search
+ * assertion possible here: none of the titles ("Guest song N") contain "ensemble".
+ */
+test('functions correctly at scale: 500 seeded songs', async ({ page }) => {
+    test.setTimeout(60_000);
+    await seedGuestSongs(page, 500);
+    await page.goto(appUrl());
+    await expect(page.getByTestId('library-heading')).toBeVisible();
+    await page.getByTestId('all-songs-link').click();
+    await expect(page.getByRole('heading', { name: /All songs/ })).toContainText('· 500');
+    await expect(page.locator('.all-songs-table .song-row')).toHaveCount(500, { timeout: 30_000 });
+
+    // Search matches COMPOSER, not just title: no title contains "ensemble", so every row
+    // matching proves the composer field is actually being read.
+    await page.getByPlaceholder('Title or composer…').fill('ensemble');
+    await expect(page.locator('.all-songs-table .song-row')).toHaveCount(500);
+    await page.getByPlaceholder('Title or composer…').fill('Guest song 500');
+    await expect(page.locator('.all-songs-table .song-row')).toHaveCount(1);
+    await expect(page.locator('.all-songs-table .song-name')).toHaveText(['Guest song 500']);
+    await page.getByPlaceholder('Title or composer…').fill('');
+    await expect(page.locator('.all-songs-table .song-row')).toHaveCount(500);
+
+    // Every seeded song shares one genre, so the dropdown lists exactly one option besides "All
+    // genres", and filtering by it keeps every row.
+    const genreOptions = page.locator('.all-songs-toolbar select').first().locator('option');
+    await expect(genreOptions).toHaveCount(2);
+    const onlyGenre = await genreOptions.nth(1).textContent();
+    await page
+        .locator('.all-songs-select select')
+        .nth(0)
+        .selectOption(onlyGenre ?? '');
+    await expect(page.locator('.all-songs-table .song-row')).toHaveCount(500);
+    await page.locator('.all-songs-select select').nth(0).selectOption('');
+
+    // Sort by Title shows the A–Z index; sorting by Recently added genuinely reorders (seeding
+    // writes ascending timestamps, so "Guest song 500" — the newest — leads that order).
+    await page.locator('.all-songs-select select').nth(1).selectOption('title');
+    await expect(page.locator('.az-index button')).toHaveCount(26);
+    await expect(page.locator('.all-songs-table .song-name').first()).toHaveText('Guest song 1');
+    await page.locator('.all-songs-select select').nth(1).selectOption('recentAdded');
+    await expect(page.locator('.all-songs-table .song-name').first()).toHaveText('Guest song 500');
 });
 
 test('a fresh device (no songs) shows no All songs link', async ({ page }) => {
