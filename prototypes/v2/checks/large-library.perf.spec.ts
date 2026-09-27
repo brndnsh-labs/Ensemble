@@ -22,6 +22,22 @@ import {
  *
  * Each size seeds once, then measures 3 navigations and reports the median — see
  * `docs/design/` / the #1442 issue for the recorded numbers and verdict.
+ *
+ * Follow-up CDP CPU profile (2026-09-26, laptop/Chromium only, N=2,000, 3 runs, measured —
+ * not inferred): of JS self-time during a load, validation is ~59% and React render/commit is
+ * ~1% — the opposite of the render-per-row guess this story's first commit made from the "no
+ * windowing" observation alone. Nearly all of that 59% is
+ * `inspectSongbookStructure`/`ownEnumerableKeys` (`public/songbook/structural-limits.ts`), a
+ * structural/security walk that `prepareCandidate` (`public/songbook/codec.ts`) runs TWICE per
+ * call (once on the raw candidate, once on its JSON-round-tripped copy) — and
+ * `lib/documents.ts`'s `validateDocument` calls `prepareCandidate` twice more per document: once
+ * via the doomed v1 attempt (every stored chart here is `schemaVersion: 2`, so
+ * `validateChartDocument` always redirects to `validateChartDocumentV2`) and once via the v2
+ * attempt that actually lands. That's 4 full-document structural walks plus 2
+ * `JSON.stringify`/`JSON.parse` round trips per chart, for content that is `schemaVersion: 2`
+ * every single time. Sort self-time didn't surface above the noise floor. This profiling pass
+ * needed a `productionBrowserSourceMaps: true` build this harness's normal build doesn't make,
+ * so it was not checked in as a spec — the run and its numbers are recorded on the #1442 issue.
  */
 test.skip(
     () => process.env.ENSEMBLE_PERF !== '1',
