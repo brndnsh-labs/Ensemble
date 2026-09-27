@@ -147,6 +147,24 @@ function readBars(
     let segnos = 0;
     let codas = 0;
     let fines = 0;
+    // A fermata's target, established from infojunkie/ireal-musicxml's own tokenizer+converter
+    // (cited fully at the 'f' branch below), is resolved per-cell, in raw token order, against
+    // whichever chord is "last pushed" at the moment the 'f'-holding cell is processed:
+    // - A prefix 'f' immediately touching a following chord token (no space, bar or other
+    //   cell-advancing character between them) shares that chord's SAME cell — parser.js's
+    //   `case 'f': obj.annots.push(cell); cell = null;` does not advance, so the chord token right
+    //   after it lands in the still-open cell too — and since converter.js pushes a cell's own
+    //   chord before applying that cell's annotations, the fermata lands on that following chord.
+    // - Anything else between 'f' and the next real chord (even a single blank/rest cell, which
+    //   IS its own advancing token) closes that shared cell first, so the fermata cell ends up
+    //   chordless; converter.js's `cell.annots.forEach` then reads `this.measure.chords[length-1]`
+    //   — the most recently pushed chord already in the CURRENT measure — landing the fermata on
+    //   the PRECEDING chord instead. `this.measure.chords` is a fresh array per measure
+    //   (`this.measure = new Converter.Measure(...)` at each new bar), so this backward fallback
+    //   cannot reach into an earlier bar; a fermata with nothing before it in the same bar either
+    //   would index `[-1]` and crash the reference converter, so this importer refuses it too
+    //   rather than inventing a cross-bar target the reference itself does not support.
+    let pendingFermata = false;
     function addCell(cell: Cell | null) {
         if (!inside) {
             fail(bars.length, 'Music needs an opening barline.');
@@ -154,9 +172,21 @@ function readBars(
         if (current.cells.length >= 64) {
             fail(bars.length, 'The bar has too many rhythm cells.');
         }
+        if (pendingFermata && cell?.event) {
+            cell.event.fermata = true;
+            pendingFermata = false;
+        }
         current.cells.push(cell);
     }
     function closeBar(edge: string) {
+        if (pendingFermata) {
+            const target = [...current.cells].reverse().find((cell) => cell?.event);
+            if (!target?.event) {
+                fail(bars.length, 'A fermata must immediately precede its event.');
+            }
+            target.event.fermata = true;
+            pendingFermata = false;
+        }
         if (!current.cells.length) {
             const bare = !(
                 current.start.length ||
@@ -418,11 +448,14 @@ function readBars(
             }
             offset += alternate.length + 2;
         } else if (char === 'f') {
-            const event = current.cells.at(-1)?.event;
-            if (!event || event.fermata) {
-                fail(bars.length, 'A fermata must immediately follow its event.');
+            // Fermata (#1451): see `pendingFermata`'s declaration above for the full citation
+            // (infojunkie/ireal-musicxml src/lib/parser.js + converter.js; pianosnake/ireal-reader's
+            // Parser.js has the identical cell-grouping switch, since infojunkie's is explicitly
+            // derived from it — both agree, so #1451's "stop if the sources disagree" doesn't apply).
+            if (pendingFermata) {
+                fail(bars.length, 'A fermata must immediately precede its event.');
             }
-            event.fermata = true;
+            pendingFermata = true;
             offset++;
         } else if (char === 'x' || char === 'r') {
             addCell({ repeat: char === 'x' ? 'one' : 'two' });
@@ -449,7 +482,8 @@ function readBars(
         current.notes.length ||
         current.jump ||
         current.repeatTimes ||
-        pendingMeter
+        pendingMeter ||
+        pendingFermata
     ) {
         fail(bars.length, 'The chart ends without a complete closing barline.');
     }

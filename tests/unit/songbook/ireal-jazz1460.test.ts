@@ -243,4 +243,19 @@ describe('the Jazz 1460 playlist fixtures (#1447)', () => {
             }),
         );
     });
+
+    it('imports One For My Baby at 61 performed bars, landing its closing fermata on the chord it precedes (#1451)', () => {
+        // The chart writes its one fermata as a prefix on the final measure ("fG6"), the pattern
+        // #1451 fixes: ireal-score.ts's 'f' branch cites infojunkie/ireal-musicxml's tokenizer +
+        // converter for why a prefix fermata lands on the chord it precedes, not the one before it.
+        const { document } = importFixture('one-for-my-baby');
+        expect(performedBarCount(document)).toBe(61);
+        expectCanonicalRoundTrip(document);
+        const measures = document.chart.score.sections[0].measures;
+        const last = measures[measures.length - 1];
+        expect(last.content).toEqual({
+            kind: 'events',
+            events: [{ kind: 'chord', symbol: 'G6', duration: [4, 1], fermata: true }],
+        });
+    });
 });

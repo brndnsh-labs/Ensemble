@@ -191,7 +191,10 @@ describe('bounded source-preserving iReal import', () => {
     });
 
     it('preserves slash bass, alternate chords, fermata, N.C. and held events as distinct notation', () => {
-        const bars = score('T44[C/E(Dm7)f   |n   |p   Z').sections[0].measures;
+        // The fermata is a PREFIX ("fC/E…"), not a suffix — see ireal-score.ts's 'f' branch for
+        // the infojunkie/ireal-musicxml + pianosnake/ireal-reader citation (#1451). This fixture
+        // used to write it as a suffix ("C/E(Dm7)f"), which encoded the wrong rule.
+        const bars = score('T44[fC/E(Dm7)   |n   |p   Z').sections[0].measures;
         expect(bars.map((bar) => bar.content)).toEqual([
             {
                 kind: 'events',
@@ -208,6 +211,33 @@ describe('bounded source-preserving iReal import', () => {
             { kind: 'events', events: [{ kind: 'no-chord', duration: [4, 1] }] },
             { kind: 'events', events: [{ kind: 'hold', duration: [4, 1] }] },
         ]);
+    });
+
+    it('falls back to the preceding chord when a fermata is not immediately followed by one', () => {
+        // A comma then only blank cells before the bar closes never gives the 'f' a chord to
+        // group forward with. Per the same converter.js citation, `cell.annots.forEach` then
+        // resolves it against `this.measure.chords[length-1]` — the chord already pushed earlier
+        // in THIS bar — so it falls back onto the preceding chord instead (#1451; this exact
+        // shape occurs in the Jazz 1460 playlist, e.g. "Chan's Song (Never Said)" and
+        // "Locomotion", each as "<chord>,fXyQ").
+        expect(score('T44[C   ,f   Z').sections[0].measures[0].content).toEqual({
+            kind: 'events',
+            events: [{ kind: 'chord', symbol: 'C', duration: [4, 1], fermata: true }],
+        });
+        // The immediately-adjacent suffix form (the pre-#1451 assumption) still resolves the same
+        // way, for the same reason: nothing follows 'f' to group forward with.
+        expect(score('T44[Cf Z').sections[0].measures[0].content).toEqual({
+            kind: 'events',
+            events: [{ kind: 'chord', symbol: 'C', duration: [4, 1], fermata: true }],
+        });
+    });
+
+    it('refuses a fermata with no chord before or after it in the same bar', () => {
+        // converter.js's fallback reads `this.measure.chords[this.measure.chords.length-1]` —
+        // an array that is fresh per measure — so with nothing pushed yet in this bar, the
+        // reference itself would index a nonexistent element. Refuse rather than reach into an
+        // earlier bar the reference can't reach either (#1451).
+        blocked('T44[f   Z');
     });
 
     it('does not mistake official parenthesized chord qualities for alternate chords', () => {
