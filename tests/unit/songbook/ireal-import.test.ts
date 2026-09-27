@@ -201,6 +201,30 @@ describe('bounded source-preserving iReal import', () => {
         });
     });
 
+    it('treats the documented "U" player marker as visual-only, like Y/s/l', () => {
+        const content = score('T44[C UZ').sections[0].measures[0].content;
+        expect(content).toEqual({
+            kind: 'events',
+            events: [{ kind: 'chord', symbol: 'C', duration: [4, 1] }],
+        });
+    });
+
+    it('drops an alternate chord with nowhere to attach and notes it, instead of blocking the song', () => {
+        const source = open('T44[C (Dm) Z');
+        const parsed = parseIRealImport(source);
+        const song = parsed.songs[0];
+        expect(song.score?.sections[0].measures[0].content).toEqual({
+            kind: 'events',
+            events: [{ kind: 'chord', symbol: 'C', duration: [4, 1] }],
+        });
+        expect(song.diagnostics).toContainEqual(
+            expect.objectContaining({
+                severity: 'warning',
+                message: expect.stringContaining('dropped'),
+            }),
+        );
+    });
+
     it('retains sticky written meter changes at the next measure boundary', () => {
         const result = score('T44[C   T34|F   |G7  Z');
         expect(result.meter).toBe('4/4');
@@ -223,6 +247,41 @@ describe('bounded source-preserving iReal import', () => {
         });
     });
 
+    it('imports a chart with a "D.C. al Nth ending" instruction as text, with a warning, rather than blocking it', () => {
+        // The official iReal chord-symbol guide documents "al [N]th ending" alongside al
+        // Fine/al Coda, but jumping to a specific earlier repeat pass is not modeled by
+        // ScoreDestination's 'ending' kind yet (score-form.ts rejects it as unimplemented).
+        const source = open('T44[C   |F   <D.C. al 2nd ending>Z');
+        const parsed = parseIRealImport(source);
+        const song = parsed.songs[0];
+        expect(song.score?.sections[0].measures).toHaveLength(2);
+        expect(song.score?.sections[0].measures[1].end).toBeUndefined();
+        expect(song.score?.sections[0].measures[1].annotations).toEqual([
+            { text: 'D.C. al 2nd ending', at: [4, 1], placement: 'below' },
+        ]);
+        expect(song.diagnostics).toContainEqual(
+            expect.objectContaining({
+                severity: 'warning',
+                message: expect.stringContaining('D.C. al 2nd ending'),
+            }),
+        );
+    });
+
+    it('imports a chart with a free-text playback-flavored comment as a note, rather than blocking it', () => {
+        const source = open('T44[C <Bass break>Z');
+        const parsed = parseIRealImport(source);
+        const song = parsed.songs[0];
+        expect(song.score?.sections[0].measures[0].annotations).toEqual([
+            { text: 'Bass break', at: [4, 1], placement: 'below' },
+        ]);
+        expect(song.diagnostics).toContainEqual(
+            expect.objectContaining({
+                severity: 'warning',
+                message: expect.stringContaining('Bass break'),
+            }),
+        );
+    });
+
     it('maps coda departure after music separately from coda arrival before music', () => {
         const bars = score('T44[C   Q|F   <D.C. al Coda>Z[QG7  Z').sections[0].measures;
         expect(bars[0].end).toEqual([{ kind: 'coda', label: 'coda-1' }]);
@@ -241,7 +300,6 @@ describe('bounded source-preserving iReal import', () => {
         'T34[C F Z',
         'T44[C | |G7 Z',
         'T44[CunknownZ',
-        'T44[C UZ',
         'T44[C Kcl Z',
         'T44[C LZ',
         'T44[C7',
@@ -250,20 +308,25 @@ describe('bounded source-preserving iReal import', () => {
         'T44[C |F |r Z',
         'T44[C |F |r |G7 Z',
         'T44[W/C Z',
-        'T44[C <Bass break>Z',
-        'T44[C <D.C. al 2nd End.>Z',
+        'T44[C (Dm Z',
         'T44{C <Fine>|F <D.C. al Fine>}Z',
         'T44[C <D.C. al Fine>Z',
         'T44[C <Fine>|F <D.C. al Fine>|G7Z',
         'T44[QC|F <D.C. al Coda>Z[QG7Z',
         '[C Z',
         'T44[N0C Z',
-        'T44[C (Dm) Z',
         'T44[C<unclosed Z',
     ])('blocks unsupported, ambiguous or incomplete music without a partial score: %s', blocked);
 
+    it('treats a double barline as the manuscript line-break convention, not a lost measure', () => {
+        // Established: pianosnake/ireal-reader's Parser.js `createNewMeasure()` only inserts a
+        // new blank measure "unless the last measure is a blank" — a second consecutive barline
+        // (bare, or one expanded from a compressed "LZ") is always a no-op (#1447). This is what
+        // let All Blues import at all: its written body compresses to "...LZ x LZ x LZ|G7...".
+        expect(score('T44[C   ||G7  Z').sections[0].measures).toHaveLength(2);
+    });
+
     it.each([
-        'T44[C   ||G7  Z',
         'T44[C   |Z',
         'T44[C   |]',
         'T44[C   ][Z',

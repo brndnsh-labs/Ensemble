@@ -95,9 +95,18 @@ function chordAt(body: string, offset: number): string | undefined {
     return best;
 }
 
-function readBars(body: string, modern: boolean): WrittenBar[] {
+function readBars(
+    body: string,
+    modern: boolean,
+    notes: string[],
+    flags: { unmappedJump: boolean },
+): WrittenBar[] {
     const bars: WrittenBar[] = [];
-    let activeMeter = '';
+    // iReal defaults an unmarked chart to common time until a T-token overrides it (established:
+    // infojunkie/ireal-musicxml src/lib/converter.js initializes `this.time = { beats: 4,
+    // beatType: 4, beatUnit: 1 }` before any explicit time-signature token is read). Scoped to
+    // the modern export this importer decodes from a Jazz 1460-style playlist.
+    let activeMeter = modern ? '4/4' : '';
     let nextMeter: string | undefined;
     let pendingMeter = false;
     let current = newBar(activeMeter);
@@ -117,6 +126,24 @@ function readBars(body: string, modern: boolean): WrittenBar[] {
     }
     function closeBar(edge: string) {
         if (!current.cells.length) {
+            const bare = !(
+                current.start.length ||
+                current.end.length ||
+                current.notes.length ||
+                current.jump ||
+                current.repeatTimes
+            );
+            // Two plain barlines back to back with nothing written between them (including one
+            // expanded from a compressed "LZ" immediately followed by a bare "|") are the
+            // documented manuscript line-break convention: pianosnake/ireal-reader's Parser.js
+            // `createNewMeasure()` only inserts a new blank measure "unless the last measure is
+            // a blank" — i.e. a second consecutive barline is always a no-op, never a lost bar.
+            // Scoped to a plain continuing '|' specifically: a terminal, double-bar or
+            // repeat-end edge keeps its own stricter check below, since silently dropping an
+            // empty measure at one of those boundaries could hide a truncated or corrupted chart.
+            if (inside && edge === '|' && bars.length && bare) {
+                return;
+            }
             if (inside && '|}]Z'.includes(edge) && bars.length) {
                 fail(bars.length, 'An empty interior measure must not disappear during import.');
             }
@@ -163,15 +190,43 @@ function readBars(body: string, modern: boolean): WrittenBar[] {
                 }
             }
             offset += 3;
+        } else if (modern && body.startsWith('Kcl', offset)) {
+            // Compressed barline + same-bar repeat-previous-measure cell. Established mapping:
+            // infojunkie/ireal-musicxml src/lib/parser.js `unscramble()`:
+            // `r.replace(/Kcl/g, '| x').replace(/LZ/g, ' |').replace(/XyQ/g, '   ')`.
+            // Equivalent to the two literal characters "| x": close this measure, then start the
+            // next one with the standalone repeat-previous-measure cell.
+            closeBar('|');
+            inside = true;
+            addCell({ repeat: 'one' });
+            offset += 3;
+        } else if (modern && body.startsWith('LZ', offset)) {
+            // Compressed blank cell + barline: the " |" half of the same established mapping
+            // above.
+            if (inside) {
+                addCell(null);
+            }
+            closeBar('|');
+            inside = true;
+            offset += 2;
         } else if (char === ' ') {
             if (inside) {
                 addCell(null);
             }
             offset++;
         } else if (char === ',') {
-            if (!inside || !current.cells.length) {
-                fail(bars.length, 'A divider needs a preceding cell.');
-            }
+            // A comma is the grammar's own spacing token, interchangeable with a literal space
+            // (established: ironss/accompaniser irealb_parser.lua's `space <- ' ' / ',' / %nl`).
+            // Ensemble additionally uses one following a chord to mark a sub-cell boundary
+            // narrower than a blank cell (see the exact-spacing tests); with nothing before it
+            // in this bar it carries no such meaning and is pure alignment padding, so it is
+            // always safe to skip rather than reject.
+            offset++;
+        } else if (char === 'U') {
+            // Documented visual-only marker ("ending measure for player"): established by both
+            // pianosnake/ireal-reader's Parser.js (`{ token: 'U', description: 'Ending measure
+            // for player' }`) and ironss/accompaniser's irealb_parser.lua `unknown` production,
+            // which lists it alongside 's'/'l'/'Y' as inert layout tokens. Adds no cell.
             offset++;
         } else if ('|[]{}Z'.includes(char)) {
             closeBar(char);
@@ -195,7 +250,11 @@ function readBars(body: string, modern: boolean): WrittenBar[] {
             offset += 3;
         } else if (char === '*') {
             const mark = body[offset + 1];
-            if (!mark || !'ABCDVi'.includes(mark) || current.cells.some(Boolean)) {
+            // Rehearsal-mark charset per the established grammar (ironss/accompaniser
+            // irealb_parser.lua: `labelchar <- [ABCDvi]`) — section letters A-D plus lowercase
+            // 'i' (intro) and 'v'. 'V' is kept too for backward compatibility with any prior
+            // acceptance of it here.
+            if (!mark || !'ABCDVvi'.includes(mark) || current.cells.some(Boolean)) {
                 fail(bars.length, 'This rehearsal-mark placement is not supported.');
             }
             current.notes.push({ text: mark, cell: 0, above: true });
@@ -250,15 +309,24 @@ function readBars(body: string, modern: boolean): WrittenBar[] {
                 }
                 current.repeatTimes = times;
             } else {
+                // Any other bounded staff text — a navigation phrase this importer doesn't map
+                // ("D.C. al Nth ending": documented iReal vocabulary, but jumping to a specific
+                // earlier repeat pass is not modeled by ScoreDestination's 'ending' kind yet —
+                // score-form.ts's navigation() explicitly rejects it as unimplemented), or a
+                // free-text performance note ("Original takes Coda every time") — is kept as
+                // inert annotation. #1171's honest boundary is satisfied by never guessing a
+                // jump for it (so the performed order is never silently wrong) plus a warning
+                // through the import diagnostics when the text reads as playback-relevant,
+                // rather than refusing the whole chart over text safe to leave unapplied (#1447).
                 if (
                     /D\.[CS]\.|\b(?:break|stop|hold|fine|coda|segno|repeat|ending|rit|tempo)\b/i.test(
                         text,
                     )
                 ) {
-                    fail(
-                        bars.length,
-                        'This playback text command needs a supported musical mapping.',
+                    notes.push(
+                        `A staff-text instruction ("${text}") is preserved as text only; it is not applied to the performed order.`,
                     );
+                    flags.unmappedJump = true;
                 }
                 current.notes.push({
                     text,
@@ -269,17 +337,23 @@ function readBars(body: string, modern: boolean): WrittenBar[] {
             offset = end + 1;
         } else if (char === '(') {
             const alternate = chordAt(body, offset + 1);
-            const previous = current.cells.at(-1)?.event;
-            if (
-                !alternate ||
-                body[offset + alternate.length + 1] !== ')' ||
-                previous?.kind !== 'chord'
-            ) {
+            if (!alternate || body[offset + alternate.length + 1] !== ')') {
                 fail(bars.length, 'An alternate must immediately follow its owning chord.');
             }
-            previous.alternates = [...(previous.alternates ?? []), canonicalChord(alternate)];
-            if (previous.alternates.length > 8) {
-                fail(bars.length, 'Too many alternate chords.');
+            const previous = current.cells.at(-1)?.event;
+            if (previous?.kind !== 'chord') {
+                // ScoreEvent only carries `alternates` on a chord event; there is nowhere to put
+                // one following a blank cell, a repeat cell or N.C./hold. Keep the chart
+                // importable per #1447: drop the alternate and note it rather than failing the
+                // whole song over data the semantic score has no slot for.
+                notes.push(
+                    `An alternate chord ("${canonicalChord(alternate)}") with no owning chord was dropped from the import.`,
+                );
+            } else {
+                previous.alternates = [...(previous.alternates ?? []), canonicalChord(alternate)];
+                if (previous.alternates.length > 8) {
+                    fail(bars.length, 'Too many alternate chords.');
+                }
             }
             offset += alternate.length + 2;
         } else if (char === 'f') {
@@ -353,7 +427,7 @@ function timedEvents(bar: WrittenBar, index: number): ScoreEvent[] {
     });
 }
 
-function mapNavigation(bars: WrittenBar[]): void {
+function mapNavigation(bars: WrittenBar[], tolerateUnpairedMarkers: boolean): void {
     const markers = bars.flatMap((bar, index) => [
         ...bar.start.map((direction) => ({ direction, index, edge: 'start' })),
         ...bar.end.map((direction) => ({ direction, index, edge: 'end' })),
@@ -418,6 +492,7 @@ function mapNavigation(bars: WrittenBar[]): void {
         });
     }
     if (
+        !tolerateUnpairedMarkers &&
         !jumps.length &&
         markers.some(({ direction }) => ['coda', 'fine', 'segno'].includes(direction.kind))
     ) {
@@ -431,12 +506,17 @@ export function scoreFromIRealBody(
     key: string,
     index: number,
     modern: boolean,
-): SemanticScore {
+): { score: SemanticScore; notes: string[] } {
     if (!/^[A-G][#b]?-?$/.test(key)) {
         throw new Error('The stored key signature is unsupported.');
     }
-    const bars = readBars(body, modern);
-    mapNavigation(bars);
+    const notes: string[] = [];
+    const flags = { unmappedJump: false };
+    const bars = readBars(body, modern, notes, flags);
+    // An unmapped D.C./D.S. text (e.g. "al Nth ending") is imported as inert annotation only, so
+    // a Fine/Coda/Segno marker it would otherwise have paired with is expected to be unpaired
+    // here; the warning already pushed to `notes` is the honest signal, not a hard failure.
+    mapNavigation(bars, flags.unmappedJump);
     const id = (bar: number) => `ireal-${index + 1}-bar-${bar + 1}`;
     const measures: ScoreMeasure[] = [];
     let pendingTwo = false;
@@ -503,5 +583,5 @@ export function scoreFromIRealBody(
     // Authored validity alone permits unresolved form. Import also proves a bounded route;
     // lane/quality/meter playback capability remains the host adapter's separate decision.
     compileScoreForm(checked.value);
-    return checked.value;
+    return { score: checked.value, notes };
 }

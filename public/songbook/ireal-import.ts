@@ -68,7 +68,11 @@ function importSong(fields: string[], modern: boolean, index: number): IRealImpo
             throw new Error('This open-protocol header variant is not supported.');
         }
         const body = modern ? decodeIRealMusic(fields[6]) : fields[5];
-        song.score = scoreFromIRealBody(body, key, index, modern);
+        const built = scoreFromIRealBody(body, key, index, modern);
+        song.score = built.score;
+        for (const note of built.notes) {
+            song.diagnostics.push({ severity: 'warning', message: note });
+        }
         song.diagnostics.push({
             severity: 'warning',
             message: modern
