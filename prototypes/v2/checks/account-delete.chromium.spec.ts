@@ -1,9 +1,11 @@
 import type { Page } from '@playwright/test';
 import {
     backToSongbook,
+    closeSongActions,
     dismissAdoptGuestPrompt,
     newSongOnTheStand,
     openSong,
+    openSongActions,
     openWithAccounts,
     revealEditor,
     saveAndUpload,
@@ -79,7 +81,9 @@ test('a cloud delete reaches the other device: clean mirror dropped, divergent w
         await revealEditor(second);
         await second.context().setOffline(true);
         await saveAs(second, 'Scratch take two');
+        await openSongActions(second);
         await expect(second.getByTestId('sync-cloud')).toContainText('Waiting to upload');
+        await closeSongActions(second);
 
         // Device one deletes both songs. The confirm step offers the export preflight the contract
         // calls for, and deleting takes the chart off the stand.
@@ -101,10 +105,12 @@ test('a cloud delete reaches the other device: clean mirror dropped, divergent w
 
         // The stale queued Save is refused and SAID OUT LOUD — and never as "choose which to
         // keep", because the account has no version to choose. The local copy is still here.
+        await openSongActions(second);
         await expect(second.getByTestId('sync-cloud')).toHaveText(
             'No longer in your account — this version is still on this device',
         );
         await expect(second.getByTestId('sync-local')).toHaveText('Saved on this device');
+        await closeSongActions(second);
         await expect(
             second.getByRole('heading', { name: 'Scratch take two', exact: true }),
         ).toBeVisible();
@@ -191,7 +197,9 @@ test('offline the delete is disabled with a reason; a lost response retries the 
     // stand is exactly what the next download pass is allowed to drop the local copy of.
     await newSongOnTheStand(page);
     await saveAndUpload(page, 'Second take');
+    await openSongActions(page);
     await expect(page.getByTestId('sync-offline')).toContainText('Songs 1/1');
+    await closeSongActions(page);
 
     await page.route('**/api/documents/delete', async (route) => {
         await route.fetch();
@@ -213,8 +221,9 @@ test('offline the delete is disabled with a reason; a lost response retries the 
     // drop the record from under the musician and the chip would fall to "not in your account".
     await page.context().setOffline(true);
     await page.context().setOffline(false);
-    await expect(page.getByTestId('sync-offline')).toContainText('Songs 0/0');
     await expect(page.getByRole('heading', { name: 'Second take', exact: true })).toBeVisible();
+    await openSongActions(page);
+    await expect(page.getByTestId('sync-offline')).toContainText('Songs 0/0');
 
     // A `'deleted'` candidate this download preserved (#1362) — the account tombstoned this id
     // while the chart on the stand held it. The chip must not go on claiming "Saved to your
@@ -222,6 +231,7 @@ test('offline the delete is disabled with a reason; a lost response retries the 
     await expect(page.getByTestId('sync-cloud')).toHaveText(
         'No longer in your account — this version is still on this device',
     );
+    await closeSongActions(page);
     const banner = page.getByTestId('conflict-banner');
     await expect(banner).toHaveAttribute('data-conflict', 'candidate-deleted');
     await expect(page.getByTestId('conflict-title')).toHaveText('No longer in your account');
@@ -243,7 +253,9 @@ test('offline the delete is disabled with a reason; a lost response retries the 
         page.getByRole('heading', { name: 'Second take — kept', exact: true }),
     ).toBeVisible();
     await expect(page.getByTestId('conflict-banner')).toHaveCount(0);
+    await openSongActions(page);
     await expect(page.getByTestId('sync-cloud')).toHaveText('Saved to your account');
+    await closeSongActions(page);
     await backToSongbook(page);
     await expect(page.getByTestId('song-deleted-in-account')).toHaveCount(0);
     await expect(songTitles(page)).toHaveText(['Second take — kept']);

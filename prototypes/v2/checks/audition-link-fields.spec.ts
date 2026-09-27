@@ -96,23 +96,24 @@ test('autoplay=1 hints and starts the band on the first gesture, not before', as
     page.on('pageerror', (error) => errors.push(error.message));
     await page.goto(auditionLink({ autoplay: '1' }));
     await expect(page.getByRole('heading', { name: 'Shared song' })).toBeVisible();
-    const status = page.locator('.playback-footer [role="status"]');
+    const status = page.getByTestId('stand-toast');
     await expect(status).toContainText('tap anywhere to play');
     // Not playing yet: no gesture has happened, so autoplay must not have started itself.
-    await expect(status).not.toContainText('Band is playing');
+    await expect(page.getByRole('button', { name: 'Start playback', exact: true })).toBeVisible();
 
     // Any key press is the "first gesture" the hint asks for — the same one Play needs.
     await page.keyboard.press('Shift');
-    await expect(status).toContainText('Band is playing');
+    await expect(page.getByRole('button', { name: 'Stop playback' })).toBeVisible();
+    // #1460 — "Band is playing" is gone from the stand entirely; `startPlayback` clears the
+    // stale hint the instant the band actually starts, so the toast no longer echoes it either.
+    await expect(status).not.toContainText('tap anywhere to play');
     expect(errors).toEqual([]);
 });
 
 test('a link without autoplay never shows the tap-to-play hint', async ({ page }) => {
     await page.goto(auditionLink({}));
     await expect(page.getByRole('heading', { name: 'Shared song' })).toBeVisible();
-    await expect(page.locator('.playback-footer [role="status"]')).not.toContainText(
-        'tap anywhere to play',
-    );
+    await expect(page.getByTestId('stand-toast')).not.toContainText('tap anywhere to play');
 });
 
 /**
@@ -121,9 +122,9 @@ test('a link without autoplay never shows the tap-to-play hint', async ({ page }
  * reached `onPlayToggle`, which read `isPlaying` (already true, since `runtime.toggle()` can
  * resolve inside the tap's own pointerdown-to-click gap) and called `runtime.stop()` —
  * starting and immediately stopping the band on the very gesture meant to start it. Both
- * specs below hold `expect(status).toContainText('Band is playing')` for a beat afterward
- * (Playwright's own polling, not a fixed sleep) so a start-then-stop blip would show up as a
- * later failure even if the very first check happened to catch the band mid-blip.
+ * specs below hold `expect(stopButton).toBeVisible()` for a beat afterward (Playwright's own
+ * polling, not a fixed sleep) so a start-then-stop blip would show up as a later failure even if
+ * the very first check happened to catch the band mid-blip.
  */
 test('clicking Play on an armed autoplay link plays — it does not start and immediately stop', async ({
     page,
@@ -132,15 +133,16 @@ test('clicking Play on an armed autoplay link plays — it does not start and im
     page.on('pageerror', (error) => errors.push(error.message));
     await page.goto(auditionLink({ autoplay: '1' }));
     await expect(page.getByRole('heading', { name: 'Shared song' })).toBeVisible();
-    const status = page.locator('.playback-footer [role="status"]');
+    const status = page.getByTestId('stand-toast');
     await expect(status).toContainText('tap anywhere to play');
 
     await page.getByRole('button', { name: 'Start playback', exact: true }).click();
-    await expect(status).toContainText('Band is playing');
+    const stopButton = page.getByRole('button', { name: 'Stop playback' });
+    await expect(stopButton).toBeVisible();
     await expect(status).not.toContainText('tap anywhere to play');
     // Holds past the point a start-then-stop race would have undone it.
     await page.waitForTimeout(500);
-    await expect(status).toContainText('Band is playing');
+    await expect(stopButton).toBeVisible();
     expect(errors).toEqual([]);
 });
 
@@ -152,13 +154,14 @@ test('pressing Enter on the focused Play button plays an armed autoplay link the
     test.skip(testInfo.project.name !== 'laptop', 'keyboard-focus interaction, laptop only');
     await page.goto(auditionLink({ autoplay: '1' }));
     await expect(page.getByRole('heading', { name: 'Shared song' })).toBeVisible();
-    const status = page.locator('.playback-footer [role="status"]');
+    const status = page.getByTestId('stand-toast');
     await expect(status).toContainText('tap anywhere to play');
 
     await page.getByRole('button', { name: 'Start playback', exact: true }).focus();
     await page.keyboard.press('Enter');
-    await expect(status).toContainText('Band is playing');
+    const stopButton = page.getByRole('button', { name: 'Stop playback' });
+    await expect(stopButton).toBeVisible();
     await expect(status).not.toContainText('tap anywhere to play');
     await page.waitForTimeout(500);
-    await expect(status).toContainText('Band is playing');
+    await expect(stopButton).toBeVisible();
 });

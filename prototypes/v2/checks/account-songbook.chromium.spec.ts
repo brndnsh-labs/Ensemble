@@ -1,5 +1,7 @@
 import {
+    closeSongActions,
     newSongOnTheStand,
+    openSongActions,
     openWithAccounts,
     saveAndUpload,
     saveAs,
@@ -123,6 +125,25 @@ test('an offline Save is safe here and confirms on reconnect; a refusal arrives 
     // and it does not pretend the cloud has it.
     await page.context().setOffline(true);
     await saveAs(page, 'Road take two');
+
+    // #1460 acceptance — the SAME retry failure is a persistent notice on the stand, readable
+    // without opening Song actions at all.
+    const standNotice = page.getByTestId('stand-toast');
+    await expect(standNotice).toHaveAttribute('data-tone', 'error');
+    await expect(standNotice).toContainText('Saved on this device');
+    await expect(standNotice).toContainText('back online');
+
+    // #1460 acceptance — the close button dismisses it (a persistent notice, unlike an
+    // auto-dismissed message) and is a real ≥44px tap target, not a decorative ×.
+    const dismiss = standNotice.getByRole('button', { name: 'Dismiss' });
+    const dismissBox = await dismiss.boundingBox();
+    expect(dismissBox?.width).toBeGreaterThanOrEqual(44);
+    expect(dismissBox?.height).toBeGreaterThanOrEqual(44);
+    await dismiss.click();
+    await expect(standNotice).toHaveAttribute('data-empty', 'true');
+    // The failure itself has not changed — this is a dismissal of the notice, not a fix — so
+    // Song actions still shows it in full.
+    await openSongActions(page);
     await expect(page.getByTestId('sync-local')).toHaveText('Saved on this device');
     await expect(page.getByTestId('sync-cloud')).toContainText('Waiting to upload');
     const failure = page.getByTestId('sync-failure');
@@ -133,6 +154,9 @@ test('an offline Save is safe here and confirms on reconnect; a refusal arrives 
     await page.context().setOffline(false);
     await expect(page.getByTestId('sync-cloud')).toHaveText('Saved to your account');
     await expect(failure).toHaveCount(0);
+    await closeSongActions(page);
+    // The stand's own notice clears the moment the underlying fact does.
+    await expect(standNotice).toHaveAttribute('data-empty', 'true');
 
     // A refusal the musician has to act on reads as a sentence, never as a server code.
     await page.route('**/api/documents/save', (route) =>
@@ -143,10 +167,13 @@ test('an offline Save is safe here and confirms on reconnect; a refusal arrives 
         }),
     );
     await saveAs(page, 'Road take three');
-    await expect(failure).toContainText('library is full');
-    expect(await failure.textContent()).not.toContain('quota');
+    await openSongActions(page);
+    const failureAgain = page.getByTestId('sync-failure');
+    await expect(failureAgain).toContainText('library is full');
+    expect(await failureAgain.textContent()).not.toContain('quota');
     // Refused by the cloud and still safe here — the exact case three separate facts exist for.
     await expect(page.getByTestId('sync-local')).toHaveText('Saved on this device');
+    await closeSongActions(page);
     await page.unroute('**/api/documents/save');
 });
 
@@ -175,7 +202,9 @@ test('a 413 names the refusal on the chip, and a fresh Save clears it (#1298)', 
     );
     await saveAs(page, 'Big chart');
     await firstPassSettled;
+    await openSongActions(page);
     await expect(page.getByTestId('sync-cloud')).toHaveText('Saved to your account');
+    await closeSongActions(page);
 
     await page.route('**/api/documents/save', (route) =>
         route.fulfill({
@@ -192,8 +221,18 @@ test('a 413 names the refusal on the chip, and a fresh Save clears it (#1298)', 
     // safe case elsewhere in this suite and would make a call-count assertion flaky for reasons
     // unrelated to #1298. The unit-level proof that the SECOND, later pass sends nothing further
     // lives in `tests/unit/songbook/account-sync-loop.test.ts`.)
+    // #1460 — a permanent per-document refusal is ALSO one of the stand's own persistent-notice
+    // cases (`syncFailureNotice`'s `view.cloud.status === 'refused'` branch).
+    await openSongActions(page);
     await expect(page.getByTestId('sync-cloud')).toHaveText('This chart is too large to upload');
     await expect(page.getByTestId('sync-local')).toHaveText('Saved on this device');
+    await closeSongActions(page);
+    // The pass-level failure (`sync.failure`, reason `'too-large'`) outranks the per-document
+    // cloud label here — the same priority `syncFailureNotice` and `SyncStatus`'s own
+    // `sync-failure` element both give it — so the stand's own words are the fuller sentence.
+    const standNotice = page.getByTestId('stand-toast');
+    await expect(standNotice).toHaveAttribute('data-tone', 'error');
+    await expect(standNotice).toContainText('this chart is too large to upload');
 
     await page.unroute('**/api/documents/save');
     // A fresh Save of the SAME document is a request the account has never seen, and it clears
@@ -203,5 +242,7 @@ test('a 413 names the refusal on the chip, and a fresh Save clears it (#1298)', 
     );
     await saveAs(page, 'Big chart three');
     await uploaded;
+    await openSongActions(page);
     await expect(page.getByTestId('sync-cloud')).toHaveText('Saved to your account');
+    await closeSongActions(page);
 });

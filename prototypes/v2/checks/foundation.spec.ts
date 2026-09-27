@@ -564,7 +564,10 @@ test('a feel staged for the next bar settles when the musician stops inside it',
     await page.getByRole('button', { name: 'Start playback', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Stop playback' })).toBeEnabled();
     await page.getByLabel('Feel', { exact: true }).selectOption('Rock');
-    await expect(page.locator('.playback-footer')).toContainText('Switching feel at the next bar');
+    // #1460 — busy/progress is its own toast tone, pinned open (no auto-dismiss timer runs at
+    // all while it's showing, unlike a plain `message`).
+    await expect(page.getByTestId('stand-toast')).toHaveAttribute('data-tone', 'busy');
+    await expect(page.getByTestId('stand-toast')).toContainText('Switching feel at the next bar');
     await page.getByRole('button', { name: 'Stop playback' }).click();
     await expect(page.getByLabel('Feel', { exact: true })).toBeEnabled();
     await expect(page.getByLabel('Feel', { exact: true })).toHaveValue('Rock');
@@ -890,6 +893,10 @@ test('all existing feels and key/mutes survive a save; long charts scroll legibl
             .first()
             .evaluate((el) => Number.parseFloat(getComputedStyle(el).fontSize)),
     ).toBeGreaterThanOrEqual(28);
+    // #1460 — the Resume-follow pill only exists while playing (hidden when stopped, per
+    // acceptance), so proving a manual scroll turns Following off now needs the band running.
+    await page.getByRole('button', { name: 'Start playback', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Stop playback' })).toBeEnabled();
     await page.locator('.chart-scroll').press('PageDown');
-    await expect(page.getByRole('button', { name: 'Resume follow' }).first()).toBeVisible();
+    await expect(page.getByTestId('resume-follow')).toBeVisible();
 });

@@ -1,4 +1,4 @@
-import type { RefObject } from 'react';
+import type { ReactNode, RefObject } from 'react';
 import type * as repository from '../lib/repository';
 import type { ChartDocument } from '../lib/runtime';
 import { whenClosed } from './dialog-close';
@@ -47,6 +47,14 @@ interface SongMenuProps {
     onExportAudioStems: () => void;
     onCancelExportAudio: () => void;
     onDeleteFromAccount: () => void;
+    /**
+     * #1460 — the three sync facts (`SyncStatus`, `app/account/library.tsx`), moved here from the
+     * stand's now-removed footer. Null for a signed-out device or a guest song; a failure among
+     * these facts ALSO surfaces on the stand itself without opening this menu — see
+     * `syncFailureNotice` and `app/ensemble.tsx`'s `standSyncFailure` — so nothing here is the
+     * only place a musician can learn their Save didn't reach the cloud.
+     */
+    syncStatus: ReactNode;
 }
 
 export function SongMenu({
@@ -74,11 +82,13 @@ export function SongMenu({
     onExportAudioStems,
     onCancelExportAudio,
     onDeleteFromAccount,
+    syncStatus,
 }: SongMenuProps) {
     return (
         <dialog
             ref={dialogRef}
             className="modal-box"
+            data-testid="song-menu"
             onCancel={onClose}
             onClose={whenClosed(onClose)}
         >
@@ -87,6 +97,13 @@ export function SongMenu({
                 Saved setups and recovered drafts stay on this device. Export a file to move a song
                 to another computer.
             </p>
+            {/* #1460 — the three sync facts, moved here from the stand's now-removed footer. */}
+            {syncStatus && (
+                <div className="song-menu-status" data-testid="song-menu-status">
+                    <p className="song-menu-status-label">Status</p>
+                    {syncStatus}
+                </div>
+            )}
             <div className="dialog-actions">
                 <button className="btn primary" disabled={busy} onClick={onShare}>
                     Copy link

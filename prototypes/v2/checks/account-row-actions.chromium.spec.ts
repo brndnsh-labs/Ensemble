@@ -1,7 +1,9 @@
 import {
     backToSongbook,
+    closeSongActions,
     newSongOnTheStand,
     openSong,
+    openSongActions,
     openWithAccounts,
     revealEditor,
     saveAndUpload,
@@ -174,7 +176,9 @@ test('Delete… on a song the cloud has never acknowledged does not offer a dead
     await page.context().setOffline(true);
     await newSongOnTheStand(page);
     await saveAs(page, 'Still queued');
+    await openSongActions(page);
     await expect(page.getByTestId('sync-cloud')).toContainText('Waiting to upload');
+    await closeSongActions(page);
     await backToSongbook(page);
 
     const row = page.locator('.song-table .song-row', { hasText: 'Still queued' });

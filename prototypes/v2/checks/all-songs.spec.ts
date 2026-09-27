@@ -375,7 +375,7 @@ test('Rename opens the song (recovering its draft) instead of renaming in place 
     ).toBeVisible();
     await expect(page.getByLabel('Song title')).toHaveValue('Renamed from the row menu');
     await expect(page.getByLabel('Song title')).toBeFocused();
-    await expect(page.locator('.playback-footer [role="status"]')).toContainText(
+    await expect(page.getByTestId('stand-toast')).toContainText(
         'opened it here so renaming won’t lose them',
     );
 });

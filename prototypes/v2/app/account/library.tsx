@@ -23,7 +23,12 @@ import {
     type RemoteCandidateKind,
     type SyncSnapshot,
 } from '../../lib/account/sync-loop';
-import { type Progress, projectSyncStatus, type StatusFacts } from '../../lib/sync/status';
+import {
+    type Progress,
+    projectSyncStatus,
+    type StatusFacts,
+    type StatusView,
+} from '../../lib/sync/status';
 
 // Module scope keeps both references stable across renders, which is what `useSyncExternalStore`
 // requires to avoid resubscribing (and re-rendering) on every pass.
@@ -168,7 +173,12 @@ export interface SyncStatusProps {
     sync: SyncSnapshot;
 }
 
-export function SyncStatus({
+/**
+ * The projection `SyncStatus` renders, factored out so #1460's stand-level failure notice
+ * (`syncFailureNotice` below) can read the exact same facts without duplicating the activity
+ * derivation or the `'deleted'`-candidate correction.
+ */
+function deriveSyncView({
     savedRevision,
     editing,
     lastSave,
@@ -178,7 +188,7 @@ export function SyncStatus({
     foreign,
     candidateKind,
     sync,
-}: SyncStatusProps) {
+}: SyncStatusProps): { view: StatusView; cloudLabel: string } {
     const observation = sync.observation;
     // `status.ts` refuses "sending" without an observed, non-empty queue, and it is right to:
     // claiming an upload is in flight with nothing to send would invent progress the outbox
@@ -196,8 +206,6 @@ export function SyncStatus({
         cloud: { observation, activity, foreign },
         offline: { shell, documents: sync.documents, sounds },
     });
-    const songs = counted('Songs', view.offline.documents);
-    const soundFiles = counted('Sounds', view.offline.sounds);
     // #1362 — `status.ts` reads the record's stale `remoteRevision`, never a candidate: a download
     // that preserves a `'deleted'` candidate beside a HELD record (`commitDeleted`) never clears
     // the record's own `remoteRevision`, on purpose — that field is what the record used to mirror,
@@ -211,6 +219,39 @@ export function SyncStatus({
             : view.cloud.status === 'refused'
               ? CLOUD_REFUSAL_LABELS[view.cloud.refused ?? 'refused']
               : CLOUD_LABELS[view.cloud.status];
+    return { view, cloudLabel };
+}
+
+/**
+ * #1460 — the one fact worth surfacing on the STAND itself, without opening Song actions: a
+ * failure. Everything else `SyncStatus` shows (three routine facts) moved into the menu; a
+ * `foreign` reading already has its own permanent banner (`OWNER_MESSAGES.mismatch`, driven by
+ * the same `standMismatch` this component's `foreign` prop carries), so it is deliberately not
+ * repeated here — the two would otherwise say the same thing in two places the instant a chart
+ * mismatch outranked every other cloud reading.
+ *
+ * Null means nothing is wrong: no pass-level retry/reauth failure, the last local Save landed,
+ * and the cloud has not permanently refused this document.
+ */
+export function syncFailureNotice(props: SyncStatusProps): string | null {
+    if (props.sync.failure !== null) {
+        return props.sync.failure.message;
+    }
+    const { view } = deriveSyncView(props);
+    if (view.local.status === 'save-failed') {
+        return LOCAL_LABELS['save-failed'];
+    }
+    if (view.cloud.status === 'refused') {
+        return CLOUD_REFUSAL_LABELS[view.cloud.refused ?? 'refused'];
+    }
+    return null;
+}
+
+export function SyncStatus(props: SyncStatusProps) {
+    const { view, cloudLabel } = deriveSyncView(props);
+    const { sync } = props;
+    const songs = counted('Songs', view.offline.documents);
+    const soundFiles = counted('Sounds', view.offline.sounds);
     return (
         <div className="sync-status" data-testid="sync-status">
             <span className="sync-fact" data-testid="sync-local">

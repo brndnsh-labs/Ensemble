@@ -1,8 +1,10 @@
 import type { Page } from '@playwright/test';
 import {
     backToSongbook,
+    closeSongActions,
     newSongOnTheStand,
     openSong,
+    openSongActions,
     openWithAccounts,
     revealEditor,
     saveAndUpload,
@@ -93,7 +95,9 @@ test('sign-out names the work it would destroy, then leaves nothing of that acco
     await revealEditor(page);
     await page.route('**/api/documents/save', (route) => route.abort('failed'));
     await saveAs(page, 'Set list two');
+    await openSongActions(page);
     await expect(page.getByTestId('sync-cloud')).toContainText('Waiting to upload');
+    await closeSongActions(page);
 
     // Offline the header refuses sign-out outright, with the reason visible (decision 9 S2).
     // There is no persisted logout barrier, so a device that cannot reach the server cannot
@@ -193,18 +197,29 @@ test('an expired session pauses the outbox, says so everywhere, and loses no que
     // must not touch.
     await page.context().setOffline(true);
     await saveAs(page, 'Road take two');
+    await openSongActions(page);
     await expect(page.getByTestId('sync-cloud')).toContainText('Waiting to upload');
+    await closeSongActions(page);
 
     // The session goes away underneath the musician: the cookie is dropped, so the next request
     // meets a 401 with the account, the passkey and the queued Save all still perfectly valid.
     await page.context().clearCookies();
     await page.context().setOffline(false);
 
+    // #1460 acceptance — the SAME expired-session failure is a persistent notice on the stand,
+    // readable without opening Song actions at all.
+    const standNotice = page.getByTestId('stand-toast');
+    await expect(standNotice).toHaveAttribute('data-tone', 'error');
+    await expect(standNotice).toContainText('Saved on this device');
+    await expect(standNotice).toContainText('sign in again to upload it');
+
     // The outbox pauses and says why, leading with the local truth — never a server code.
+    await openSongActions(page);
     const failure = page.getByTestId('sync-failure');
     await expect(failure).toContainText('Saved on this device');
     await expect(failure).toContainText('sign in again to upload it');
     await expect(page.getByTestId('sync-local')).toHaveText('Saved on this device');
+    await closeSongActions(page);
     await expect(page.getByTestId('account-expired-banner')).toBeVisible();
 
     // And the banner follows to the songbook page. The stand's chip only exists with a chart
@@ -229,5 +244,7 @@ test('an expired session pauses the outbox, says so everywhere, and loses no que
     await expect(page.getByTestId('account-expired-banner')).toHaveCount(0);
     await expect(songTitles(page)).toHaveText(['Road take two']);
     await openSong(page, 'Road take two');
+    await openSongActions(page);
     await expect(page.getByTestId('sync-cloud')).toHaveText('Saved to your account');
+    await closeSongActions(page);
 });

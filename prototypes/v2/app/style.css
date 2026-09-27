@@ -962,37 +962,75 @@ html [hidden] {
     font-size: 12px;
     padding: 10px 0;
 }
-.playback-footer {
-    border-top: 1px solid var(--line);
-    min-height: 39px;
+/* #1460 — the stand's toast, replacing the footer's single status line. Fixed and centred so it
+   never claims flow height (the chart gets that back), and it must not cover the playing row —
+   with #1458's look-ahead the playing row sits in the top third of `.chart-scroll`, so a
+   bottom-anchored overlay only ever reaches bars further ahead. Always mounted (`data-empty`
+   collapses it) for the same reason `.status-banner` is: a live region's TEXT CHANGE is
+   announced reliably, a freshly-inserted one is not (#1440). */
+.stand-toast {
+    position: fixed;
+    left: 50%;
+    bottom: 20px;
+    transform: translateX(-50%);
+    z-index: 60;
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    padding: 8px 34px;
-    background: var(--paper);
-    font-size: 10px;
-    color: var(--muted);
-    gap: 8px;
+    gap: 10px;
+    padding: 12px 18px;
+    background: var(--ink);
+    color: var(--surface);
+    font-size: 12px;
+    line-height: 1.5;
+    box-shadow: var(--shadow);
+    border-radius: 12px;
+    max-width: calc(100vw - 28px);
+}
+.stand-toast[data-empty="true"] {
+    padding: 0;
+    max-width: 0;
+    max-height: 0;
+    overflow: hidden;
+}
+/* An undismissed sync failure (#1460 Touches #3): persists until closed, unlike the auto-dismiss
+   `message` tone above it — the danger palette, not `--ink`, is the only visual cue telling the
+   two apart, since both otherwise share the same shape. */
+.stand-toast[data-tone="error"] {
+    background: var(--danger-bg);
+    color: var(--danger);
+}
+.toast-close {
     flex-shrink: 0;
-}
-.footer-state {
+    min-width: 44px;
+    min-height: 44px;
     display: flex;
-    gap: 8px;
     align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    line-height: 1;
+    color: inherit;
 }
-.footer-state .dot {
-    color: var(--green);
-}
-.follow-btn {
-    font-size: 11px;
-    color: var(--green);
+/* #1460 — Resume follow, floating at the bottom of the chart. Shown only while playing with
+   Following off (a musician scrolled away); tapping it turns Following back on and hides it,
+   the only direction this control still offers — turning Following OFF stays a scroll/wheel/
+   touch gesture, same as before. */
+.resume-follow-pill {
+    position: fixed;
+    left: 50%;
+    bottom: 76px;
+    transform: translateX(-50%);
+    z-index: 59;
     display: flex;
     align-items: center;
     gap: 6px;
-}
-.follow-btn svg {
-    width: 13px;
-    height: 13px;
+    min-height: 44px;
+    padding: 0 18px;
+    background: var(--green);
+    color: var(--on-ink);
+    font-size: 13px;
+    font-weight: 600;
+    border-radius: 22px;
+    box-shadow: var(--shadow);
 }
 .edit-panel {
     width: 286px;
@@ -1583,16 +1621,18 @@ dialog textarea {
         line-height: 1.5;
         align-items: flex-start;
     }
-    .playback-footer {
-        padding: 9px 16px;
-        font-size: 9px;
-        min-height: 40px;
+    .stand-toast {
+        left: 16px;
+        right: 16px;
+        bottom: 14px;
+        transform: none;
+        max-width: none;
+        font-size: 11px;
     }
-    .playback-footer .footer-tip {
-        display: none;
-    }
-    .follow-btn {
-        font-size: 10px;
+    .resume-follow-pill {
+        bottom: 66px;
+        font-size: 12px;
+        padding: 0 14px;
     }
     .workspace-body.editing {
         display: flex;
@@ -1731,9 +1771,15 @@ dialog textarea {
     .song-actions .btn {
         padding: 7px 8px;
     }
-    .playback-footer {
-        min-height: 28px;
-        padding: 5px 20px;
+    .stand-toast {
+        bottom: 10px;
+        padding: 8px 14px;
+        font-size: 10px;
+    }
+    .resume-follow-pill {
+        /* min-height stays 44px (acceptance: tap targets never shrink below it, even here). */
+        bottom: 50px;
+        font-size: 11px;
     }
     .workspace-body.editing {
         display: flex;
@@ -1845,6 +1891,20 @@ dialog textarea {
     margin-top: 20px;
     max-height: 35dvh;
     overflow: auto;
+}
+/* #1460 — the three sync facts, moved into Song actions from the stand's now-removed footer. */
+.song-menu-status {
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
+}
+.song-menu-status-label {
+    margin: 0 0 8px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--muted);
 }
 .recovery-list summary {
     cursor: pointer;
@@ -2442,8 +2502,11 @@ dialog textarea {
     padding: 8px 24px;
     gap: 16px;
 }
+/* #1460 — the bottom padding clears the fixed toast AND the resume-follow pill (both
+   `position: fixed`, so they no longer claim any of `.chart-scroll`'s own flow height the way
+   the removed footer did): the last row can still scroll fully clear of both. */
 .song-open .chart-scroll {
-    padding: 12px 24px 24px;
+    padding: 12px 24px 108px;
 }
 .song-open .sheet {
     max-width: 1200px;
@@ -2486,10 +2549,6 @@ dialog textarea {
 .song-open .section-name {
     font-size: var(--section-name-size, 11px);
 }
-.song-open .playback-footer {
-    min-height: 28px;
-    padding: 6px 24px;
-}
 .performance-focus .song-subtitle,
 .performance-focus .mode-switch,
 .performance-focus .save-btn,
@@ -2521,12 +2580,6 @@ dialog textarea {
         --chord-size: 27px;
         --section-letter-size: 12px;
     }
-}
-.playback-footer [role="status"] {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
 }
 @media (max-width: 760px) {
     .sound-panel {
@@ -2567,7 +2620,8 @@ dialog textarea {
         margin-left: 0;
     }
     .song-open .chart-scroll {
-        padding: 10px 14px 24px;
+        /* #1460 — clears the phone-width toast + resume pill; see the base rule's note. */
+        padding: 10px 14px 100px;
     }
     .song-open .tempo-control .step {
         width: 28px;
@@ -2575,9 +2629,6 @@ dialog textarea {
     }
     .song-open .band-toggle {
         min-height: 36px;
-    }
-    .song-open .playback-footer {
-        padding: 6px 12px;
     }
     .performance-focus .song-heading {
         flex-basis: 0;

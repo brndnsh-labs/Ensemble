@@ -3,8 +3,10 @@ import { ACCOUNT_DATABASE } from '../lib/sync/protocol';
 import {
     backToSongbook,
     CODE_SHAPE,
+    closeSongActions,
     dismissAdoptGuestPrompt,
     newSongOnTheStand,
+    openSongActions,
     openWithAccounts,
     saveAndUpload,
     saveAs,
@@ -170,7 +172,9 @@ test('an expired session clears its account from this device, offline, without a
     // queued Save here can never be rescued by sending it.
     await page.context().setOffline(true);
     await saveAs(page, 'Set list two');
+    await openSongActions(page);
     await expect(page.getByTestId('sync-cloud')).toContainText('Waiting to upload');
+    await closeSongActions(page);
     await page.getByLabel('Song title').fill('Set list three');
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeEnabled();
     // The experiment is in the ACCOUNT's own database (#1299), which is what this zero measures:
@@ -389,7 +393,9 @@ test('a device that still holds an account after a RELOAD can still clear it', a
     // Work the account has not got, so the preflight has something to name after the reload.
     await page.context().setOffline(true);
     await saveAs(page, 'Set list two');
+    await openSongActions(page);
     await expect(page.getByTestId('sync-cloud')).toContainText('Waiting to upload');
+    await closeSongActions(page);
 
     // Cookies FIRST, then the network, for the reason the journey above states: the `online` event
     // runs a pass, and a pass with a live session uploads the queued Save.
