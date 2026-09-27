@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { appUrl, test as base, editorRevealed, expect } from './fixtures';
+import { appUrl, test as base, editorRevealed, expect, seedStarters } from './fixtures';
 
 async function observeSamples(page: import('@playwright/test').Page) {
     await page.addInitScript(() => {
@@ -74,7 +74,7 @@ test('manual sounds save, revert, export/import and play sampled audio after off
     disconnect,
 }) => {
     await observeSamples(page);
-    await page.goto(appUrl());
+    await seedStarters(page);
     await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
     await openSounds(page);
     await page.getByLabel('Chords sound', { exact: true }).selectOption('pack:grand');
@@ -152,7 +152,7 @@ test('manual sounds save, revert, export/import and play sampled audio after off
 test('every lane routes real samples and every catalog choice downloads', async ({ page }) => {
     test.setTimeout(120_000);
     await observeSamples(page);
-    await page.goto(appUrl());
+    await seedStarters(page);
     await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
     for (const label of LANES) {
         for (const other of LANES) {
@@ -213,7 +213,7 @@ test('corrupt downloads and storage failures preserve the previous sound', async
             return put.call(this, request, response);
         };
     }, appUrl('packs/'));
-    await page.goto(appUrl());
+    await seedStarters(page);
     await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
     await openSounds(page);
     await page.getByLabel('Chords sound', { exact: true }).selectOption('pack:grand');
@@ -245,7 +245,7 @@ test('one install applies genre sounds, preserves manual overrides and follows f
             downloads.push(request.url());
         }
     });
-    await page.goto(appUrl());
+    await seedStarters(page);
     await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
     expect(downloads).toEqual([]);
     await openSounds(page);
@@ -358,7 +358,7 @@ test('installed sounds follow the feel after a reload without touching the Sound
     // what is installed from the sound cache, and a song never opened since plays on it.
     test.setTimeout(120_000);
     await observeSamples(page);
-    await page.goto(appUrl());
+    await seedStarters(page);
     await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
     await openSounds(page);
     await page.getByRole('button', { name: 'Install all & use genre sounds' }).click();
@@ -407,7 +407,7 @@ test('failed bulk installation keeps every previous voice and retries completed 
             return put.call(this, request, response);
         };
     }, appUrl('packs/acoustic-kit/'));
-    await page.goto(appUrl());
+    await seedStarters(page);
     await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
     await openSounds(page);
     await page.getByRole('button', { name: 'Install all & use genre sounds' }).click();
@@ -484,7 +484,7 @@ test('feel preparation keeps the stand stable, rolls back playback safely, and r
                 typeof (window as unknown as { __preparation: { release: unknown } }).__preparation
                     .release === 'function',
         );
-    await page.goto(appUrl());
+    await seedStarters(page);
     await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
     await openSounds(page);
     await page.getByRole('button', { name: 'Install all & use genre sounds' }).click();
@@ -559,7 +559,7 @@ test('a feel staged for the next bar settles when the musician stops inside it',
     // swapped in at the next measure start, so the window between the choice and
     // the swap is real, and a Stop landing inside it must not leave the engine on
     // the old feel while the captured document already reads the new one (#1185).
-    await page.goto(appUrl());
+    await seedStarters(page);
     await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
     await page.getByRole('button', { name: 'Start playback', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Stop playback' })).toBeEnabled();
@@ -612,7 +612,7 @@ test('real runtime, local saves, reload recovery and offline playback', async ({
             }
         };
     });
-    await page.goto(appUrl());
+    await seedStarters(page);
     await expect(page.getByRole('heading', { name: 'Let’s play something.' })).toBeVisible();
     await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
     await expect(page.getByRole('heading', { name: 'Blue pocket', exact: true })).toBeVisible();
@@ -666,7 +666,7 @@ test('real runtime, local saves, reload recovery and offline playback', async ({
 });
 
 test('responsive chart and editor fit laptop, phone and tablet', async ({ page }) => {
-    await page.goto(appUrl());
+    await seedStarters(page);
     await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
     for (const [width, height] of [
         [1300, 940],
@@ -724,7 +724,7 @@ test('two tabs cannot overwrite a newer save; a conflicting take can become a co
     page,
     context,
 }) => {
-    await page.goto(appUrl());
+    await seedStarters(page);
     await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
     const second = await context.newPage();
     await second.goto(appUrl());
@@ -760,7 +760,7 @@ test('file export/import is detached; invalid input never changes the active son
             return read.call(this);
         };
     });
-    await page.goto(appUrl());
+    await seedStarters(page);
     await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
     await page.getByRole('button', { name: 'Edit chart', exact: true }).click();
     await editorRevealed(page);
@@ -797,7 +797,7 @@ test('file export/import is detached; invalid input never changes the active son
 test('failed recovery stays in memory through navigation and is never labelled recovered', async ({
     page,
 }) => {
-    await page.goto(appUrl());
+    await seedStarters(page);
     await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
     await page.evaluate(() => {
         Storage.prototype.setItem = () => {
@@ -818,7 +818,7 @@ test('an older competing draft remains explicitly recoverable after another tab 
     page,
     context,
 }) => {
-    await page.goto(appUrl());
+    await seedStarters(page);
     await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
     const second = await context.newPage();
     await second.goto(appUrl());
@@ -844,7 +844,7 @@ test('all existing feels and key/mutes survive a save; long charts scroll legibl
     page,
     disconnect,
 }) => {
-    await page.goto(appUrl());
+    await seedStarters(page);
     await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
     await expect
         .poll(() => page.evaluate(() => navigator.serviceWorker.controller?.scriptURL || ''))

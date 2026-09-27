@@ -162,8 +162,9 @@ test('a signed-in import opens the adopt offer by itself, scoped to the songs it
     await addVirtualAuthenticator(page);
     await openWithAccounts(page);
     await expect(page.getByTestId('library-loading')).toHaveCount(0);
-    // The guest starters this device already holds (`lib/starters.ts` seeds three). The scoped
-    // offer must leave every one of them out: they are not what the musician just asked for.
+    // The guest songs this device already holds (`openWithAccounts` seeds three, #1439 — the
+    // fixture's job now that `lib/starters.ts` no longer auto-seeds). The scoped offer must leave
+    // every one of them out: they are not what the musician just asked for.
     const starters = await page.locator('.song-name').allInnerTexts();
     expect(starters.length).toBeGreaterThan(0);
     expect(starters).not.toContain('Old tune');

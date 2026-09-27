@@ -29,6 +29,7 @@ import {
     blankSong,
     convertedCopy,
     extendedScore,
+    genreOf,
     type SectionChange,
     withFollowFeel,
     withoutMeasure,
@@ -64,6 +65,7 @@ import {
 } from '../lib/session';
 import { withSongMeter } from '../lib/song-meter';
 import { allSoundsAvailableOffline, installAllSounds, soundsAvailableOffline } from '../lib/sounds';
+import { buildStandardDocument, standardFor } from '../lib/standards';
 import { start } from '../lib/starters';
 import type { SavedSong } from '../lib/sync/protocol';
 import type { KeepBothResolution } from '../lib/sync/repository';
@@ -87,8 +89,9 @@ import { ImportDialog } from './import-dialog';
 import type { MeasureEditorHandle } from './measure-editor';
 import { SongHeader } from './song-header';
 import { SongMenu } from './song-menu';
-import { Songbook } from './songbook';
+import { type FeaturedSummary, Songbook } from './songbook';
 import { SoundsPanel } from './sounds-panel';
+import { StandardsBrowser } from './standards-browser';
 import { TradeSheet } from './trade-sheet';
 import { TransportBar } from './transport-bar';
 import { useChartView } from './use-chart-view';
@@ -380,6 +383,10 @@ export default function Ensemble() {
     // A chart opened from a `#chart=` share link: unsaved by definition (no `saved`
     // baseline), until "Keep a copy" commits it as a normal library document.
     const [sharedDraft, setSharedDraft] = useState(false);
+    // The standards browse surface (#1439): a second songbook-home view, shown instead of the
+    // library list while no chart is on the stand. Opening a standard clears it the same way
+    // opening a saved song does.
+    const [standardsOpen, setStandardsOpen] = useState(false);
     // Set only when the Clipboard API is unavailable or the write is rejected
     // (notably the Playwright WebKit project, which grants no clipboard
     // permission) — the visible fallback the acceptance criteria calls for.
@@ -655,16 +662,25 @@ export default function Ensemble() {
     // `?? []` is the LIST, not the claim: "we haven't read the account library yet" is carried
     // separately to the songbook as `loading`, so an unread library never renders as an empty one.
     const songs = signedIn ? (accountSongs ?? []) : guestSongs;
+    // The last-resort `template` fallback (below): a genre-accurate, never-stored standard,
+    // built once and kept referentially stable so it never re-arms the shared-link effect that
+    // lists `template` as a dependency.
+    const defaultTemplate = useMemo(
+        () => buildStandardDocument(standardFor('standard-12-bar-blues')!),
+        [],
+    );
     // Two things the songbook cannot yet claim: WHICH library this is (the first session read is
     // still out — rendering the guest list and then swapping it for the account library is a
     // wrong answer, not a loading state), and, once signed in, what the account library holds.
     // `settled` flips on any answer, so an offline cold start still shows the guest songbook.
     const songbookLoading =
         (accountsOn && ready && !account.settled) || (signedIn && accountSongs === null);
-    // The band/sound defaults a brand-new or imported song is built from. It falls back to the
-    // guest starters because a fresh account's library is legitimately empty, and "New song" and
-    // "Import" must still work on the very first visit after signing in.
-    const template = songs[0] ?? guestSongs[0];
+    // The band/sound defaults a brand-new or imported song is built from. Falls back through:
+    // the live songbook's own first song, else the guest songbook's (a fresh account's library is
+    // legitimately empty), else the standards catalog's own defaults (#1439) — a fresh DEVICE's
+    // guest songbook is legitimately empty too, now that starter seeding is retired, and "New
+    // song" and "Import" must still work on the very first visit, before anything is saved.
+    const template = songs[0] ?? guestSongs[0] ?? defaultTemplate;
     // #1274 — the v1 import offer: what this browser's old-Ensemble profile holds
     // (`finding`), what is still on offer after the ledger (`offer`), and the result
     // line of a run that just happened. Read once, after the songbook is ready.
@@ -756,6 +772,42 @@ export default function Ensemble() {
             window.removeEventListener('beforeunload', preventLoss);
         };
     }, []);
+    /**
+     * Lands `document` on the stand as an unsaved draft — belonging to no songbook until "Keep a
+     * copy"/Save decides one. Shared by every entry that opens a chart this way: a `#chart=` or
+     * v1 share link (below), and opening a standard from the catalog (`openStandard`, #1439).
+     * Deliberately not `open()`: no `saved` baseline (so it can't masquerade as already
+     * committed), no recovery-storage write (the id may be untrusted, or a catalog id that is
+     * never meant to collide with a recovery key), and `lastOpened`/`rememberSong` are left alone
+     * since this isn't a library entry yet.
+     */
+    function landDraftOnStand(document: ChartDocument, note: string) {
+        const withFeel = withFollowFeel(document);
+        runtime.load(withFeel);
+        setSaved(null);
+        setCurrent(runtime.withLoadedSounds(withFeel));
+        currentStore.current = null;
+        setStandStore(null);
+        setSharedDraft(true);
+        pendingText.current = false;
+        setBuffers(new Map());
+        setPendingMeasures(false);
+        measureEditor.current?.reset();
+        setRecoveryHealthy(true);
+        setEditing(false);
+        setFollowing(true);
+        setMessage(note);
+        const section = arrangementOf(withFeel).sections[0];
+        setSectionId(section.id);
+        if (withFeel.schemaVersion === 2) {
+            setMeasureId(
+                withFeel.chart.score.sections.find((s) => s.id === section.id)!.measures[0].id,
+            );
+        }
+    }
+    // `landDraftOnStand` is a component-scope function declaration, a new reference every
+    // render, which useExhaustiveDependencies rightly rejects as a hook dependency.
+    // biome-ignore lint/correctness/useExhaustiveDependencies: see above.
     useEffect(() => {
         // Runtime must be initialized (awaited inside `start()`, gated on `ready`)
         // before `runtime.load` is safe to call.
@@ -788,45 +840,13 @@ export default function Ensemble() {
             return;
         }
         let alive = true;
-        // Effect-local, so both entries open the SAME draft rather than two drifting copies
-        // of it, and so `useExhaustiveDependencies` has nothing to object to: a
-        // component-scope function declaration is a new reference every render, which biome
-        // rightly rejects as a hook dependency. Deliberately not `open()`: no `saved`
-        // baseline (so it can't masquerade as already committed), no recovery-storage write
-        // (the sender's document id is untrusted and shouldn't collide with this device's
-        // own recovery keys), and `lastOpened`/`rememberSong` are left alone since this
-        // isn't a library entry yet. "Keep a copy" (`keepSharedCopy`) is what turns it into
-        // one.
+        // `landDraftOnStand` handles both entries so they open the SAME draft rather than two
+        // drifting copies of it. `track` stays here rather than inside that shared helper: this
+        // is the one call site that knows `legacy`, and `openStandard` (#1439) tracks its own
+        // `chart_opened` event instead of `share_opened`.
         const openSharedDraft = (link: ChartDocument, note: string, legacy: boolean) => {
             track('share_opened', { legacy });
-            const document = withFollowFeel(link);
-            runtime.load(document);
-            setSaved(null);
-            setCurrent(runtime.withLoadedSounds(document));
-            // A shared draft belongs to no songbook yet; "Keep a copy" decides that.
-            // `bindStand` inlined: a component-scope function is a new reference every
-            // render, which useExhaustiveDependencies rightly rejects as a dependency.
-            currentStore.current = null;
-            setStandStore(null);
-            setSharedDraft(true);
-            // Inlined clearBuffers()/selectSection(): both are plain function
-            // declarations (a new reference every render), which
-            // useExhaustiveDependencies rightly rejects as hook dependencies.
-            pendingText.current = false;
-            setBuffers(new Map());
-            setPendingMeasures(false);
-            measureEditor.current?.reset();
-            setRecoveryHealthy(true);
-            setEditing(false);
-            setFollowing(true);
-            setMessage(note);
-            const section = arrangementOf(document).sections[0];
-            setSectionId(section.id);
-            if (document.schemaVersion === 2) {
-                setMeasureId(
-                    document.chart.score.sections.find((s) => s.id === section.id)!.measures[0].id,
-                );
-            }
+            landDraftOnStand(link, note);
         };
         // Consumed on load either way: a corrupt/foreign payload must not resurrect on
         // reload, and a successfully opened draft must not resurrect after "Keep a copy"
@@ -976,10 +996,7 @@ export default function Ensemble() {
             setV1Plan({ fresh: 0, alreadyHere: 0, blocked: [] });
             return;
         }
-        const base = current ?? guestSongs[0];
-        if (!base) {
-            return;
-        }
+        const base = current ?? guestSongs[0] ?? defaultTemplate;
         try {
             setV1Plan(
                 planV1Import(
@@ -1688,6 +1705,15 @@ export default function Ensemble() {
      */
     function draft(next: ChartDocument, baseline = saved) {
         setCurrent(next);
+        // A shared draft — a standard or a #chart=/v1 link (`landDraftOnStand`) — belongs to no
+        // songbook yet and has no `saved` baseline to recover FROM if the tab closes; "Keep a
+        // copy"/Save is what turns it into a library entry, and `open()` clears `sharedDraft`
+        // the moment that happens. Writing recovery storage for it here would key a slot under
+        // the shared id (a catalog id for a standard) that nothing but a Save — which this isn't
+        // — ever clears, so "Preserved drafts" would grow by one per edited-but-unsaved visit.
+        if (sharedDraft) {
+            return;
+        }
         if (baseline && same(next, baseline)) {
             retainNothingFor(next.id);
             setRecoveryHealthy(true);
@@ -2688,6 +2714,37 @@ export default function Ensemble() {
             track('chart_opened', { source: 'songbook' });
         });
     }
+    /**
+     * Opens a standards-catalog entry (#1439) the same way a shared `#chart=` link lands: an
+     * unsaved draft (`landDraftOnStand`), never written to storage. The catalog is built fresh
+     * on every open (`buildStandardDocument`), never cached — so re-opening the same standard
+     * twice never shares mutable state with an earlier draft. Save (or "Keep a copy") mints the
+     * musician's own copy under a fresh id; the catalog entry itself never changes.
+     */
+    function openStandard(id: string) {
+        void run(async () => {
+            const entry = standardFor(id);
+            if (!entry) {
+                throw new Error('Standard no longer exists.');
+            }
+            landDraftOnStand(buildStandardDocument(entry), 'Opened a standard · not saved yet');
+            setStandardsOpen(false);
+            track('chart_opened', { source: 'standard' });
+        });
+    }
+    /**
+     * The featured card's own "open" callback (#1439 review) — a separate, explicit path from
+     * `onOpenSong` rather than sniffing the id with `standardFor`: a library row is always a real
+     * song, and only the featured card can show either kind, since `featuredStandard`/
+     * `featuredSave` (below) already know which one built it.
+     */
+    function openFeatured() {
+        if (featuredStandard) {
+            openStandard(featuredStandard.id);
+        } else if (featuredSave) {
+            openSong(featuredSave.id);
+        }
+    }
     async function save(copy = false) {
         if (!current || !saved) {
             return;
@@ -2749,10 +2806,8 @@ export default function Ensemble() {
     }
     function newSong() {
         void run(async () => {
-            if (!template) {
-                throw new Error('Starter library is not ready.');
-            }
-            // A brand-new song belongs to whichever songbook is live right now, not to whatever
+            // `template` always has a value (`defaultTemplate` is the last-resort fallback), so
+            // a brand-new song belongs to whichever songbook is live right now, not to whatever
             // was last on the stand — set before `storeSave` so its expiry guard reads the truth.
             // Its owner claim is null for the same reason (#1311): these bars are nobody's yet.
             // From the SESSION (`liveStand`), never `sync.owner`: New song is reachable from the
@@ -2789,10 +2844,7 @@ export default function Ensemble() {
         }
         void run(async () => {
             const library = await repository.list();
-            const base = current ?? library[0];
-            if (!base) {
-                throw new Error('Songbook is not ready yet. Reload and try again.');
-            }
+            const base = current ?? library[0] ?? defaultTemplate;
             // One ledger write per batch, not per song (patch R6): `rememberV1Import` reads,
             // merges and re-serialises the whole ledger, so calling it 500 times is O(n²) and
             // 500 synchronous `setItem`s. A run interrupted between flushes loses at most the
@@ -3125,14 +3177,28 @@ export default function Ensemble() {
     const { blocks, displayActive, activeEvent, totalBars, writtenBars, writtenSections } =
         useChartView(current, active);
     const continuedSave = songs.find((song) => song.id === lastOpened);
-    const featuredSave =
-        continuedSave || songs.find((song) => song.id === 'starter-blues') || songs[0];
-    const featured = useMemo(() => {
+    const featuredSave = continuedSave || songs[0];
+    // A device with no saved songs (#1439 retired the seeded starters) features a standard
+    // instead of nothing — the mockup's "A good place to start". `songs`/`continuedSave` always
+    // win when there IS something of the musician's own: a standard is never "yours". Gated on
+    // `!songbookLoading` too: `songs` reads as `[]` while the account library is still being
+    // read, and without this a signed-in device with real songs would flash a standard first —
+    // the same "we haven't checked yet" distinction the library table itself already makes.
+    const featuredStandard =
+        featuredSave || songbookLoading ? null : standardFor('standard-12-bar-blues');
+    const featured: FeaturedSummary | null = useMemo(() => {
+        if (featuredStandard) {
+            return {
+                id: featuredStandard.id,
+                title: featuredStandard.title,
+                genre: featuredStandard.genre,
+                bpm: featuredStandard.bpm,
+                key: featuredStandard.key,
+                isMinor: featuredStandard.isMinor,
+            };
+        }
         if (!featuredSave) {
             return null;
-        }
-        if (current?.id === featuredSave.id) {
-            return current;
         }
         // `accountDrafts` is what makes the card preview an ACCOUNT chart's unsaved edit (#1299):
         // the guest slot below no longer holds one, and a store read cannot happen in a memo. It
@@ -3142,12 +3208,24 @@ export default function Ensemble() {
         const held =
             volatileDrafts.current.get(featuredSave.id) ??
             accountDrafts.current.get(featuredSave.id);
+        let resolved: ChartDocument;
         try {
-            return held || repository.recoveryFor(featuredSave)?.document || featuredSave;
+            resolved =
+                current?.id === featuredSave.id
+                    ? current
+                    : held || repository.recoveryFor(featuredSave)?.document || featuredSave;
         } catch {
-            return held || featuredSave;
+            resolved = current?.id === featuredSave.id ? current : held || featuredSave;
         }
-    }, [featuredSave, current]);
+        return {
+            id: resolved.id,
+            title: resolved.title,
+            genre: genreOf(resolved),
+            bpm: resolved.chart.performance.bpm,
+            key: arrangementOf(resolved).key,
+            isMinor: arrangementOf(resolved).isMinor,
+        };
+    }, [featuredSave, featuredStandard, current]);
     /**
      * `offline.sounds` for the status chip. `soundsAvailableOffline` answers one yes/no about the
      * whole set the open chart needs, so the honest count is that single requirement — verified
@@ -3436,10 +3514,14 @@ export default function Ensemble() {
                     <h1>Getting the band together.</h1>
                     <p>Loading your local songbook and musical engine.</p>
                 </main>
+            ) : !current && standardsOpen ? (
+                <StandardsBrowser onBack={() => setStandardsOpen(false)} onOpen={openStandard} />
             ) : !current ? (
                 <Songbook
                     songs={songbookLoading ? [] : songs}
                     featured={featured}
+                    onOpenFeatured={openFeatured}
+                    onBrowseStandards={() => setStandardsOpen(true)}
                     continued={!!continuedSave}
                     busy={busy}
                     offline={offline.label}
@@ -3558,8 +3640,11 @@ export default function Ensemble() {
                             change(async () => {
                                 // Tracked HERE, not inside `runtime.setGenre` (#1389): this is
                                 // the transport bar's real call site, so it only fires on an
-                                // actual musician gesture — never during `lib/starters.ts`'s
-                                // one-time sample seeding, which calls `setGenre` directly.
+                                // actual musician gesture. `lib/starters.ts`'s one-time sample
+                                // seeding used to call `setGenre` directly too (retired by
+                                // #1439's standards catalog, which never calls it at all), which
+                                // is why this stayed a separate call site rather than moving
+                                // inside `setGenre` itself.
                                 await runtime.setGenre(genre, setSoundProgress);
                                 track('genre_changed', { genre });
                             }, true)

@@ -1089,11 +1089,12 @@ export async function setGenre(
         // dispatch itself — so the state afterwards cannot tell the two paths apart.
         const staged = getState().playback.isPlaying;
         dispatch(ACTIONS.SET_GENRE_FEEL, payload);
-        // #1389 — NOT tracked here: `lib/starters.ts`'s one-time sample seeding calls this
-        // function directly (never through the transport bar) to build its 3 starter charts on
-        // a brand-new device, which would otherwise queue 3 synthetic `genre_changed` events for
-        // every first-time visitor. `app/ensemble.tsx`'s `onGenre` handler — the transport bar's
-        // actual call site — tracks the real, user-driven change instead.
+        // #1389 — NOT tracked here: this used to run for `lib/starters.ts`'s one-time sample
+        // seeding too, which called this function directly (never through the transport bar) to
+        // build its 3 starter charts on a brand-new device — #1439 retired that seeding (the
+        // standards catalog, `lib/standards.ts`, never calls `setGenre` at all), but the shape
+        // stands: `app/ensemble.tsx`'s `onGenre` handler, the transport bar's actual call site,
+        // is still the one place that tracks the real, user-driven change.
         // While playing, that reducer stages the feel and the band commits it at once
         // (`syncBand`), playing it from its next barline. So this dispatch plus the
         // auto-voice effects are the entire engine change: no teardown, no rebuild, no

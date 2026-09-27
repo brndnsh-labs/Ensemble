@@ -90,7 +90,7 @@ gate evidence. Do not copy old test totals or preview SHAs into a new claim of v
 | Surface | Start here | Boundary |
 | --- | --- | --- |
 | Session shell: open/save/recover, editing buffers, playback wiring | `app/ensemble.tsx`, `app/style.css` | Owns all state and hands each surface props; the one shared integration file, one owner at a time |
-| Songbook home | `app/songbook.tsx` | Presentational; library list, featured card, starters |
+| Songbook home | `app/songbook.tsx`, `app/standards-browser.tsx`, `lib/standards.ts` | Presentational; library list, featured card. The read-only standards catalog (#1439) replaced the seeded `starter-*` songs — never stored, identical for guest and account, built fresh on each open (`buildStandardDocument`) and landed on the stand as an unsaved draft the same way a `#chart=` link does. Its browse surface is a second songbook-home view (`standardsOpen` in `app/ensemble.tsx`); the home page's own layout is `#1441`'s to redesign |
 | Music stand surfaces | `app/song-header.tsx`, `app/transport-bar.tsx`, `app/chart-sheet.tsx` (+ `app/use-chart-view.ts`), `app/edit-panel.tsx` | Presentational; the section-letter long-press lives in `chart-sheet.tsx` |
 | Sounds and song actions | `app/sounds-panel.tsx`, `app/song-menu.tsx` | The shell owns both `<dialog>` refs and their `showModal()` effects |
 | Per-device conveniences | `app/use-stage-theme.ts`, `app/use-offline-install.ts` | Never document fields |

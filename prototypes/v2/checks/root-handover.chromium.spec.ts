@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { BASE, expect, test } from './fixtures';
+import { BASE, expect, seedStarters, test } from './fixtures';
 
 /**
  * What happens to a browser that has been here before, when the stand takes the site root
@@ -331,7 +331,7 @@ test('a pack still under the old base plays offline on the first load after the 
     // run again without a reload, so if the pack still resolves, `asset()`'s read-through is the
     // only thing that can have found it.
     test.setTimeout(90_000);
-    await page.goto('/');
+    await seedStarters(page);
     await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
     await page.getByRole('button', { name: 'Sounds', exact: true }).click();
     await page.getByLabel('Chords sound', { exact: true }).selectOption('pack:grand');

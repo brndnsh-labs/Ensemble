@@ -29,7 +29,7 @@ interface TelemetryEventData {
     play_started: undefined;
     genre_changed: { genre: string };
     part_toggled: { part: 'drums' | 'bass' | 'chords' | 'harmony' | 'soloist' };
-    chart_opened: { source: 'songbook' | 'import' };
+    chart_opened: { source: 'songbook' | 'import' | 'standard' };
     chart_created: undefined;
     chart_imported: { format: 'ireal' | 'v1' | 'file' };
     share_created: undefined;

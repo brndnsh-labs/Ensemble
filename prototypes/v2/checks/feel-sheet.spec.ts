@@ -1,4 +1,4 @@
-import { appUrl, expect, test } from './fixtures';
+import { expect, seedStarters, test } from './fixtures';
 
 // #1276 — the Feel & mix sheet: swing/swing grid/humanize/chord notation and the
 // chart's energy — auto intensity/band intensity, saved with the chart since the
@@ -27,7 +27,7 @@ async function setRange(page: import('@playwright/test').Page, label: string, va
 }
 
 test('every Feel-sheet control has an accessible name', async ({ page }) => {
-    await page.goto(appUrl());
+    await seedStarters(page);
     await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
     await openFeel(page);
 
@@ -47,7 +47,7 @@ test('every Feel-sheet control has an accessible name', async ({ page }) => {
 test('document-owned feel fields (swing, swing grid, humanize, notation) persist through save, reload and revert', async ({
     page,
 }) => {
-    await page.goto(appUrl());
+    await seedStarters(page);
     await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
     await openFeel(page);
 
@@ -112,7 +112,7 @@ test('document-owned feel fields (swing, swing grid, humanize, notation) persist
 test('master volume is a device preference: it persists across reload without Save, independent of the chart', async ({
     page,
 }) => {
-    await page.goto(appUrl());
+    await seedStarters(page);
     await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
     await openFeel(page);
 
@@ -133,7 +133,7 @@ test('master volume is a device preference: it persists across reload without Sa
 test('count-in (#1422) is a device preference too: it persists across reload without Save, independent of the chart', async ({
     page,
 }) => {
-    await page.goto(appUrl());
+    await seedStarters(page);
     await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
     await openFeel(page);
 
@@ -157,7 +157,7 @@ test('count-in (#1422) is a device preference too: it persists across reload wit
 test("energy (auto intensity, band intensity) is the chart's own: it dirties the chart, reverts, and persists through save and reload", async ({
     page,
 }) => {
-    await page.goto(appUrl());
+    await seedStarters(page);
     await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
     await openFeel(page);
 
@@ -208,7 +208,7 @@ test("energy (auto intensity, band intensity) is the chart's own: it dirties the
 test('the metronome is session-only: it never dirties the chart and resets on reload', async ({
     page,
 }) => {
-    await page.goto(appUrl());
+    await seedStarters(page);
     await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
     await openFeel(page);
 
@@ -226,7 +226,7 @@ test('the metronome is session-only: it never dirties the chart and resets on re
 });
 
 test('changing swing during playback does not stop the band', async ({ page }) => {
-    await page.goto(appUrl());
+    await seedStarters(page);
     await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
     await page.getByRole('button', { name: 'Start playback', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Stop playback', exact: true })).toBeEnabled();
@@ -247,7 +247,7 @@ test('changing swing during playback does not stop the band', async ({ page }) =
 test('count-in (#1422) clicks one bar before the band, then the chart plays from the top', async ({
     page,
 }) => {
-    await page.goto(appUrl());
+    await seedStarters(page);
     await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
     await openFeel(page);
     await page.getByLabel('Count-in', { exact: true }).check();

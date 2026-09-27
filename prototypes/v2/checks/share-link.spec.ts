@@ -1,4 +1,4 @@
-import { appUrl, expect, test } from './fixtures';
+import { appUrl, expect, seedStarters, test } from './fixtures';
 
 // Deterministic across both projects (Desktop Chrome and the WebKit-based
 // `webkit-phone` project, which grants no clipboard permission by default,
@@ -16,7 +16,7 @@ test('shares a link that reopens as an unsaved draft; Keep a copy persists it an
     context,
 }) => {
     await withoutClipboard(page);
-    await page.goto(appUrl());
+    await seedStarters(page);
     await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
     await expect(page.getByRole('heading', { name: 'Blue pocket' })).toBeVisible();
 
@@ -49,6 +49,48 @@ test('shares a link that reopens as an unsaved draft; Keep a copy persists it an
     await fresh.reload();
     await expect(fresh.locator('main.home')).toBeVisible();
     await expect(fresh.locator('main.workspace')).toHaveCount(0);
+});
+
+/**
+ * The same recovery-storage leak `standards-catalog.spec.ts` guards for a standard: a shared
+ * `#chart=` draft belongs to no songbook yet (`landDraftOnStand`'s own doc comment says "no
+ * recovery-storage write"), so editing it before "Keep a copy" must not write a slot under the
+ * link's random id that nothing but a Save ever clears.
+ */
+test('editing an opened share link before Keep a copy writes nothing to recovery storage', async ({
+    page,
+    context,
+}) => {
+    await withoutClipboard(page);
+    await seedStarters(page);
+    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
+    await page.getByRole('button', { name: 'Song actions' }).click();
+    await page.getByRole('button', { name: 'Copy link', exact: true }).click();
+    const link = await page.getByTestId('share-link-fallback').inputValue();
+    await page.getByRole('button', { name: 'Close', exact: true }).click();
+
+    const fresh = await context.newPage();
+    await withoutClipboard(fresh);
+    await fresh.goto(link);
+    await expect(fresh.getByRole('heading', { name: 'Blue pocket' })).toBeVisible();
+
+    await fresh.getByLabel('Key', { exact: true }).selectOption('D');
+    await fresh.getByLabel('Tempo', { exact: true }).fill('140');
+    await fresh.getByLabel('Tempo', { exact: true }).press('Enter');
+
+    await expect
+        .poll(() =>
+            fresh.evaluate(
+                () =>
+                    Object.keys(localStorage).filter((key) =>
+                        key.startsWith('ensemble-v2-preview:recovery:'),
+                    ).length,
+            ),
+        )
+        .toBe(0);
+
+    await fresh.getByRole('button', { name: 'Song actions' }).click();
+    await expect(fresh.getByText(/Preserved drafts \(/)).toHaveCount(0);
 });
 
 test('a malformed share link fails closed with a visible error, not a crash', async ({ page }) => {

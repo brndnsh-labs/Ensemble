@@ -33,7 +33,7 @@ Ensemble is not AI-generated audio. The codebase is AI-assisted and agents are f
 
 **The chart is the center.** Every UI decision departs from and returns to the chart. During playback the chart is a music stand; controls, settings and tools exist to serve it.
 
-**Zero friction by default.** A first visit lands on the songbook with starter charts ready; one tap puts a chart on the stand with the band ready to play. Configuration is available but never required, and no account is ever asked for in order to play.
+**Zero friction by default.** A first visit lands on the songbook with the standards catalog ready (#1439); one tap puts a chart on the stand with the band ready to play. Configuration is available but never required, and no account is ever asked for in order to play.
 
 **Time is sacred; defaults are metronomic.** Ensemble is a fancy metronome at its core — the practicing musician has to be able to lock to a reference that does not move, so tempo and groove stay steady by default. Expressive and live-performance features (tempo breathing, band-leader gestures) ship **opt-in and off by default**; nothing may make the default tempo or groove drift. Instrument-identity features (gestures, pads, MIDI-triggered form control) advance only via the probe-first plan banked on #937 — never as a speculative build.
 
@@ -51,7 +51,7 @@ Ensemble is not AI-generated audio. The codebase is AI-assisted and agents are f
 
 ## UI direction
 
-One app, the music stand (`prototypes/v2/app/`): a songbook home (recent songs, starters, new/import), the chart sheet, the transport, an edit panel and a sounds panel. Tempo, genre, instrument mutes and the transport are primary; key is one obvious action away; loop and start-from belong at the section they act on. Editing keeps the chart's spatial structure, and editing controls step aside during playback.
+One app, the music stand (`prototypes/v2/app/`): a songbook home (recent songs, the standards catalog, new/import), the chart sheet, the transport, an edit panel and a sounds panel. Tempo, genre, instrument mutes and the transport are primary; key is one obvious action away; loop and start-from belong at the section they act on. Editing keeps the chart's spatial structure, and editing controls step aside during playback.
 
 Designed for laptop, tablet and phone alike. Tablet is the sweet spot: readable at arm's length on a music stand, touch-friendly, portable to a rehearsal room. Whole measures and readable chord symbols survive every width.
 
