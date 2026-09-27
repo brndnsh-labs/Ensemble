@@ -2,7 +2,13 @@ import { validateSemanticScore } from './score-codec.js';
 import { scoreDuration, scoreMeter } from './score-duration.js';
 import { compileScoreForm } from './score-form.js';
 import { isScoreChord } from './score-text.js';
-import type { ScoreDirection, ScoreEvent, ScoreMeasure, SemanticScore } from './score-types.js';
+import type {
+    ScoreDirection,
+    ScoreDuration,
+    ScoreEvent,
+    ScoreMeasure,
+    SemanticScore,
+} from './score-types.js';
 
 interface Cell {
     event?: ScoreEvent;
@@ -38,6 +44,19 @@ const METERS = new Map([
     ['78', '7/8'],
     ['98', '9/8'],
     ['12', '12/8'],
+]);
+
+// Per-meter "weight" of one written iReal grid cell, in beats of that meter (#1453). Established
+// from infojunkie/ireal-musicxml converter.js's `Converter.mapTime` (`beatUnit`): iReal's editor
+// always draws a bar 4 cells wide regardless of the time signature, so a written cell is worth
+// exactly 1 beat only when 4 cells naturally fill the bar's own beat count. It's worth HALF a beat
+// in 3/4 and 3/2 (4 cells span what is actually a 3-beat bar) and THREE beats — one dotted-quarter
+// each — in 12/8 (4 cells span a 12-eighth-note bar). Every other supported meter maps 1:1 and is
+// omitted here (the lookup below defaults to 1).
+const CELL_BEATS = new Map([
+    ['3/4', 0.5],
+    ['3/2', 0.5],
+    ['12/8', 3],
 ]);
 
 // Equivalent spellings only, not approximated voicings or dropped extensions.
@@ -541,33 +560,77 @@ function readBars(
     return bars;
 }
 
-function timedEvents(bar: WrittenBar, index: number): ScoreEvent[] {
-    const positions = bar.cells.flatMap((cell, at) => (cell ? [at] : []));
-    const length = scoreMeter(bar.meter).length;
-    if (!positions.length) {
-        fail(index, 'Empty bars are not imported as silence or silently removed.');
-    }
-    if (positions.length > 1 && bar.meter !== '4/4') {
+/**
+ * Multi-chord cell → duration mapping (#1453), established from infojunkie/ireal-musicxml
+ * converter.js's `adjustChordsDuration()`. Each occupied cell's raw span (1 for itself, plus any
+ * trailing blank cells — exactly `Converter.Chord.beats()`'s `1 + spaces`) is trimmed or padded,
+ * round-robin from the first chord, until the total times the meter's own `CELL_BEATS` weight
+ * exactly equals the meter's own beat count (`this.time.beats`/`measure.chords.length >
+ * this.time.beats` is refused up front — too many chords for the meter to hold). This is
+ * INDEPENDENT of the bar's raw total cell count, unlike a single-event bar (below), because iReal's
+ * editor always draws 4 cells per bar regardless of meter — the raw count is a layout habit, not a
+ * musical fact, and scaling proportionally against it (as a single-event bar safely can, since
+ * there's only one span to normalize) would silently invent a wrong split whenever a chart's raw
+ * layout departs from 4 cells, e.g. via this importer's own compressed "Kcl"/"LZ" tokens.
+ */
+function multiChordDurations(
+    cellCounts: readonly number[],
+    meter: string,
+    index: number,
+): ScoreDuration[] {
+    const { counts, unit } = scoreMeter(meter);
+    if (cellCounts.length > counts) {
         fail(index, 'Multi-chord cell timing in this meter needs a verified import mapping.');
     }
-    // Leading blanks do not delay the first chord in iReal; normalize only the occupied span.
-    const start = positions[0];
-    const width = bar.cells.length - start;
-    return positions.map((at, i) => {
-        const event = bar.cells[at]?.event;
-        if (!event) {
-            fail(index, 'A measure-repeat sign cannot share a bar with chords.');
-        }
-        const cells = (positions[i + 1] ?? bar.cells.length) - at;
-        const duration = scoreDuration(length[0] * cells, length[1] * width);
-        if (positions.length > 1 && (duration[1] !== 1 || duration[0] < 1 || duration[0] > 4)) {
+    const cellBeats = CELL_BEATS.get(meter) ?? 1;
+    const adjusted = [...cellCounts];
+    const total = () => adjusted.reduce((sum, cells) => sum + cells, 0) * cellBeats;
+    // Bounded defensively: real iReal data always converges in well under this many steps (each
+    // step moves the total by exactly one meter-beat), since `cellCounts.length <= counts` is
+    // already enforced above. A chart that somehow can't converge (e.g. every cell already at the
+    // 1-cell floor with more total beats still to trim) is refused rather than looped forever.
+    for (let guard = 0; total() > counts; guard++) {
+        if (guard > 4096) {
             fail(
                 index,
                 'These rhythm cells need iReal rounding; choose explicit chord lengths instead.',
             );
         }
-        return { ...event, duration };
-    });
+        const i = guard % adjusted.length;
+        if (adjusted[i] > 1) {
+            adjusted[i]--;
+        }
+    }
+    for (let guard = 0; total() < counts; guard++) {
+        if (guard > 4096) {
+            fail(
+                index,
+                'These rhythm cells need iReal rounding; choose explicit chord lengths instead.',
+            );
+        }
+        adjusted[guard % adjusted.length]++;
+    }
+    return adjusted.map((cells) => scoreDuration(cells * cellBeats * 4, unit));
+}
+
+function timedEvents(bar: WrittenBar, index: number): ScoreEvent[] {
+    const positions = bar.cells.flatMap((cell, at) => (cell ? [at] : []));
+    if (!positions.length) {
+        fail(index, 'Empty bars are not imported as silence or silently removed.');
+    }
+    const events = positions.map((at) => bar.cells[at]?.event);
+    if (events.some((event) => !event)) {
+        fail(index, 'A measure-repeat sign cannot share a bar with chords.');
+    }
+    if (positions.length === 1) {
+        // Leading blanks do not delay the sole chord in iReal — its duration is the bar's own
+        // full length, regardless of exactly how many raw cells the chart happened to write
+        // (a proportional single-span scale-up always cancels back to the meter's own length).
+        return [{ ...events[0]!, duration: scoreMeter(bar.meter).length }];
+    }
+    const cellCounts = positions.map((at, i) => (positions[i + 1] ?? bar.cells.length) - at);
+    const durations = multiChordDurations(cellCounts, bar.meter, index);
+    return events.map((event, i) => ({ ...event!, duration: durations[i] }));
 }
 
 function mapNavigation(

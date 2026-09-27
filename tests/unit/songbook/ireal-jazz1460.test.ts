@@ -284,4 +284,51 @@ describe('the Jazz 1460 playlist fixtures (#1447)', () => {
             }),
         );
     });
+
+    // #1453: multi-chord cells in meters other than 4/4, per infojunkie/ireal-musicxml
+    // converter.js's `adjustChordsDuration()` — see `CELL_BEATS` and `multiChordDurations` in
+    // ireal-score.ts for the full citation. One real Jazz 1460 chart per affected meter; 6/8 has
+    // none in this playlist (its one 6/8 chart, Litha, has no multi-chord bar) and is covered only
+    // by the synthetic unit tests in ireal-import.test.ts.
+    it('imports 502 Blues at 32 performed bars, splitting a 3/4 bar into two dotted quarters', () => {
+        const { document } = importFixture('502-blues');
+        expect(document.chart.score.meter).toBe('3/4');
+        expect(performedBarCount(document)).toBe(32);
+        expectCanonicalRoundTrip(document);
+        expect(document.chart.score.sections[0].measures[11].content).toEqual({
+            kind: 'events',
+            events: [
+                { kind: 'chord', symbol: 'Abm7', duration: [3, 2] },
+                { kind: 'chord', symbol: 'Db7', duration: [3, 2] },
+            ],
+        });
+    });
+
+    it('imports Take Five at 24 performed bars, splitting its 5/4 vamp bar 3 beats + 2', () => {
+        const { document } = importFixture('take-five');
+        expect(document.chart.score.meter).toBe('5/4');
+        expect(performedBarCount(document)).toBe(24);
+        expectCanonicalRoundTrip(document);
+        expect(document.chart.score.sections[0].measures[0].content).toEqual({
+            kind: 'events',
+            events: [
+                { kind: 'chord', symbol: 'Ebm', duration: [3, 1] },
+                { kind: 'chord', symbol: 'Bbm7', duration: [2, 1] },
+            ],
+        });
+    });
+
+    it('imports West Coast Blues at 36 performed bars, splitting a 6/4 bar into two equal halves', () => {
+        const { document } = importFixture('west-coast-blues');
+        expect(document.chart.score.meter).toBe('6/4');
+        expect(performedBarCount(document)).toBe(36);
+        expectCanonicalRoundTrip(document);
+        expect(document.chart.score.sections[0].measures[3].content).toEqual({
+            kind: 'events',
+            events: [
+                { kind: 'chord', symbol: 'Bm7', duration: [3, 1] },
+                { kind: 'chord', symbol: 'E7', duration: [3, 1] },
+            ],
+        });
+    });
 });

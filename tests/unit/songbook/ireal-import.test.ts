@@ -161,6 +161,90 @@ describe('bounded source-preserving iReal import', () => {
         }
     });
 
+    it("rounds a 4/4 bar's under-filled cells to the meter's own beat count (#1453)", () => {
+        // "C,Dm,G7" writes 3 chords with no spacing at all (3 raw cells in a 4-cell bar).
+        // Established: infojunkie/ireal-musicxml converter.js's `adjustChordsDuration()` pads
+        // (round-robin from the first chord) until the total hits `this.time.beats` (4 for 4/4),
+        // NOT the bar's raw cell count — unlike the old proportional-width formula this replaces,
+        // which refused this exact shape ("iReal rounding") because 4*1/3 isn't a whole number of
+        // quarter notes. This is the SAME algorithm the multi-meter cases below use; 4/4 (beatUnit
+        // 1) is not special-cased.
+        const content = score('T44[C,Dm,G7Z').sections[0].measures[0].content;
+        expect(content.kind).toBe('events');
+        if (content.kind === 'events') {
+            expect(content.events.map((event) => event.duration)).toEqual([
+                [2, 1],
+                [1, 1],
+                [1, 1],
+            ]);
+        }
+    });
+
+    it.each([
+        // 3/4: 2 chords evenly split a 3-beat bar into two dotted quarters (1.5 quarter notes
+        // each). CELL_BEATS['3/4'] = 0.5 (infojunkie/ireal-musicxml converter.js's
+        // `Converter.mapTime['34']`), so 2 raw cells each (4 total, the usual 4-cells-per-bar
+        // grid) pad to 3 cells each before scaling: 3 * 0.5 = 1.5 quarter notes.
+        [
+            '3/4',
+            'T34[C F Z',
+            [
+                [3, 2],
+                [3, 2],
+            ],
+        ],
+        // 6/8: 2 chords split a 6-eighth-note (3-quarter-note) bar into two dotted quarters.
+        // CELL_BEATS['6/8'] defaults to 1 (only 3/4, 3/2 and 12/8 differ), so 2 raw cells each
+        // pad to 3 cells each: 3 beats * (4/8 quarter-notes-per-eighth-beat) = 1.5 quarter notes.
+        [
+            '6/8',
+            'T68[C F Z',
+            [
+                [3, 2],
+                [3, 2],
+            ],
+        ],
+        // 5/4: 1 chord over 4 raw cells plus 1 chord over 1 raw cell already total exactly 5 —
+        // the meter's own beat count — so CELL_BEATS's default weight of 1 needs no round-robin
+        // adjustment at all, unlike the other three cases here.
+        [
+            '5/4',
+            'T54[C   DZ',
+            [
+                [4, 1],
+                [1, 1],
+            ],
+        ],
+        // 12/8: 4 chords, one raw cell each (already summing to the meter's 12-beat count via
+        // CELL_BEATS['12/8'] = 3 — Converter.mapTime['12'] — with no round-robin adjustment
+        // needed either), the classic "4 iReal cells = 4 dotted-quarter beats" reading.
+        [
+            '12/8',
+            'T12[C,D,E,FZ',
+            [
+                [3, 2],
+                [3, 2],
+                [3, 2],
+                [3, 2],
+            ],
+        ],
+    ])(
+        'maps multi-chord cells in %s per the 4-cells-per-bar grid (#1453)',
+        (_meter, body, durations) => {
+            const content = score(body).sections[0].measures[0].content;
+            expect(content.kind).toBe('events');
+            if (content.kind === 'events') {
+                expect(content.events.map((event) => event.duration)).toEqual(durations);
+            }
+        },
+    );
+
+    it('refuses more chords than a meter has beats for, rather than guessing a split', () => {
+        // 5 chords cannot fit a 4/4 bar's 4 beats — established from converter.js's own guard,
+        // `if (measure.chords.length > this.time.beats) { error(...); }`.
+        blocked('T44[C,Dm,Em,F,G7Z');
+    });
+
     it('maps repeat barlines and alternate ending markers without unfolding the authored chart', () => {
         const result = score('T44*A{C   |N1F   }|N2G7  Z');
         const bars = result.sections[0].measures;
@@ -510,9 +594,7 @@ describe('bounded source-preserving iReal import', () => {
     });
 
     it.each([
-        'T44[C,Dm,G7Z',
         'T44[C,Dm,Em,F,G7Z',
-        'T34[C F Z',
         'T44[C | |G7 Z',
         'T44[CunknownZ',
         'T44[C Kcl Z',
