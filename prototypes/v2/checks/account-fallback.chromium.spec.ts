@@ -15,8 +15,6 @@ import { addVirtualAuthenticator } from './virtual-authenticator';
  * `*.chromium.spec.ts`: the CDP virtual authenticator is Chromium-only.
  */
 
-const SONGBOOK = 'Let’s play something.';
-
 test('a signed-in device whose session read hangs gets a labelled fallback, then its own library', async ({
     page,
 }) => {
@@ -34,7 +32,7 @@ test('a signed-in device whose session read hangs gets a labelled fallback, then
 
     try {
         await page.goto(appUrl());
-        await expect(page.getByRole('heading', { name: SONGBOOK })).toBeVisible();
+        await expect(page.getByTestId('library-heading')).toBeVisible();
         // The deadline releases the list rather than leaving it behind a loading line — and what
         // it releases is the GUEST library, because this device's session is still an open
         // question. Both halves are asserted: the sentence, and the heading it is explaining.

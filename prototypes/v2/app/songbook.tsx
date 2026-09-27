@@ -5,11 +5,18 @@ import {
     V1_IMPORT_ACCOUNT_MESSAGES,
 } from '../lib/account/messages';
 import type { RemoteCandidateKind } from '../lib/account/sync-loop';
-import { arrangementOf, genreOf } from '../lib/documents';
+import { arrangementOf, composerOf, genreOf } from '../lib/documents';
+import { type HomeSlice, openedAgo } from '../lib/home';
 import { v1OfferDeclines } from '../lib/import-v1';
 import type { ChartDocument } from '../lib/runtime';
+import {
+    STANDARD_SHELF_LABELS,
+    STANDARDS,
+    type StandardEntry,
+    type StandardShelf,
+} from '../lib/standards';
 
-/** The featured card's display facts (#1439) — a saved song's, or a standard's. See `featured`. */
+/** The Continue card's display facts (#1441) — always one of the musician's own songs. */
 export interface FeaturedSummary {
     id: string;
     title: string;
@@ -17,6 +24,8 @@ export interface FeaturedSummary {
     bpm: number;
     key: string;
     isMinor: boolean;
+    /** The song's own first bars as chord text (`firstBars`), up to 8. */
+    bars: string[];
 }
 
 /** The v1 import offer (#1274). Counts and copy only; the shell owns the work. */
@@ -52,27 +61,46 @@ export interface V1ImportOffer {
      * account page's standing button for every run that opens none.
      */
     accountPointer: boolean;
+    /**
+     * Why the offer cannot say what Import would do, when it cannot (#1441 review P2): the guest
+     * songbook it is compared against would not read, or the comparison itself failed. The card
+     * says so, with the reason, instead of disappearing or claiming there is nothing to bring.
+     */
+    unavailable: string | null;
 }
 
+/** Which standards entry point opened the browse view: "Browse all →", or one shelf's link. */
+export type StandardsEntry = StandardShelf | 'all';
+
+const SHELF_ORDER: readonly StandardShelf[] = ['blues', 'jazz', 'grooves'];
+
+/** How many of the musician's own songs a search lists before asking for a narrower query. */
+const SEARCH_LIMIT = 50;
+
 interface SongbookProps {
-    songs: ChartDocument[];
     /**
-     * True when `songs` is the signed-in account library rather than the guest one (#1266).
+     * The live songbook's home slice (#1441): the Continue song, at most `HOME_ROWS` recently
+     * opened songs read by id, and IndexedDB's own `count()`. Never the whole library — see
+     * `library` for the one surface here that needs that. Null while it has not been read.
+     */
+    home: HomeSlice | null;
+    /**
+     * True when this is the signed-in account library rather than the guest one (#1266).
      * There is no switcher — guest signed out, account signed in (rollout decision 9 S3) — so
-     * this only changes what the page SAYS about the list it was handed.
+     * this only changes what the page SAYS about the songs it was handed.
      */
     accountLibrary: boolean;
     /**
-     * True while the account library has not been read yet (#1266). An empty `songs` is a claim —
-     * "your account has no songs" — and it must not be made from a read that hasn't finished, or
-     * from one that failed. This is the difference between the two.
+     * True while this page cannot yet say what the songbook holds (#1266): which library it is,
+     * or the home slice itself. Nothing here claims "no songs" — not the first-visit layout, not
+     * an empty list — while this is true.
      */
     loading: boolean;
     /**
      * True when the first session read was released by its deadline instead of answered (#1357),
-     * so `songs` is the guest library standing in for one this device could not check. Distinct
-     * from `loading`: the list below is real and openable, it just may not be the whole story,
-     * and saying nothing would make a fallback indistinguishable from an answer.
+     * so this is the guest library standing in for one this device could not check. Distinct
+     * from `loading`: the songs below are real and openable, they just may not be the whole
+     * story, and saying nothing would make a fallback indistinguishable from an answer.
      */
     accountFallback: boolean;
     /** True when this device opted out with `?accounts=off` (#1357) — and only once known. */
@@ -81,57 +109,73 @@ interface SongbookProps {
     onEnableAccounts: () => void;
     /**
      * The account songs `reconcile` preserved a remote observation for rather than applying it over
-     * this device's unsaved work (#1310, widened #1362 to the `'deleted'`/`'unsupported'` kinds
-     * that used to have no surface at all). Document id plus kind — the id decides WHICH row, the
-     * kind decides which of the three sentences it gets — marked in the list so the state is
-     * visible from the one place a musician can see the whole library; the choice itself (for the
-     * one adoptable kind) lives on the stand, where the song's own text is.
+     * this device's unsaved work (#1310, widened #1362). Document id plus kind — the id decides
+     * WHICH row, the kind decides which of the three sentences it gets. The home page marks the
+     * rows it shows and says how many others are marked on the All songs page, which is now the
+     * one place the whole library is listed (#1441).
      *
      * Always empty for a guest songbook, which no account can advance underneath.
      */
     remoteCandidates: readonly { id: string; kind: RemoteCandidateKind }[];
     /**
-     * The card at the top: the last-opened song (with any recovered draft), else a standard
-     * (#1439) when there's nothing of the musician's own yet. A plain summary rather than a
-     * `ChartDocument` since one of those two sources never has a live document to read.
+     * The Continue card: the live songbook's own last-opened song (with any recovered draft),
+     * else its most recently opened one. Null when there is nothing of the musician's own.
      */
     featured: FeaturedSummary | null;
-    /** True when `featured` is the song the musician last had open (never true for a standard). */
+    /** True when `featured` is the song the musician last had open. */
     continued: boolean;
+    /** Per-device opened-at map (#1440), for the "opened … ago" wording. */
+    openedAt: ReadonlyMap<string, string>;
+    /** Opens a song and starts the band, without the editor (#1441's ▶ Play). */
+    onPlaySong: (id: string) => void;
+    onOpenSong: (id: string) => void;
+    /** Opens a standards-catalog entry as an unsaved draft (#1439). */
+    onOpenStandard: (id: string) => void;
+    /** Opens #1439's browse view, filtered to one shelf or showing all of them. */
+    onBrowseStandards: (entry: StandardsEntry) => void;
     /**
-     * Opens the featured card's chart (#1439 review) — a separate callback from `onOpenSong`
-     * rather than routing by id, since only this card can name either a real song or a standard;
-     * every `onOpenSong` row below is always a real song.
+     * Which entry point last opened the browse view, so `standardsEntryRef` lands on that same
+     * button when the musician comes back (#1440 review P3, #1441). The shell holds the ref across
+     * the view swap that remounts every button here.
      */
-    onOpenFeatured: () => void;
-    /** Opens the standards browse surface (#1439). */
-    onBrowseStandards: () => void;
-    /**
-     * Where focus returns after leaving the standards browser (#1440 review P3) — the shell holds
-     * this ref across the view swap that remounts this button on every return, which is why the
-     * restore lives there instead of inside `StandardsBrowser`'s own unmount.
-     */
+    standardsEntry: StandardsEntry;
     standardsEntryRef: RefObject<HTMLButtonElement | null>;
     busy: boolean;
+    /** The offline-install label (`useOfflineInstall`). */
     offline: string;
+    /** The one search box's query (the box itself is in the shell's top bar). */
     search: string;
-    onSearch: (value: string) => void;
+    /**
+     * The live songbook's FULL library, for search — null until the lazy read lands (#1441). The
+     * top bar starts that read when the box is focused, and the standards half of the results
+     * shows meanwhile.
+     */
+    library: ChartDocument[] | null;
+    /** Why the full-library read failed, when it did — said, never shown as "no matches". */
+    libraryFailure: string | null;
     onImport: () => void;
     onNewSong: () => void;
-    onOpenSong: (id: string) => void;
     v1Import: V1ImportOffer | null;
     onImportV1: () => void;
     /** `declined` is the card's own answer — see `V1ImportCard` (#1274 patch N1). */
     onDismissV1: (declined: boolean) => void;
+    /**
+     * True once no further v1 offer can appear on its own: the old app's data has been looked for
+     * and any offer's plan has settled (#1441 review P2). Published as `data-v1-plan`.
+     */
+    v1PlanSettled: boolean;
+    /** Whether this origin holds an old-Ensemble profile at all — the first-visit card's gate. */
+    v1Present: boolean;
+    /** The song menu's permanent way back into the v1 import, from the first-visit card. */
+    onOpenV1Import: () => void;
     /** Per-device star set (#1440) — same source the row ⋯ menu's Star/Unstar writes through. */
     starred: ReadonlySet<string>;
     onToggleStar: (id: string) => void;
     /** Opens the row ⋯ menu (Star/Unstar, Rename, Duplicate, Export file, Delete…) for one song. */
     onOpenRowMenu: (id: string, title: string) => void;
-    /** #1440's full-library page — the "All N songs →" link a large songbook needs. */
+    /** #1440's full-library page — the "All N songs →" link. */
     onOpenAllSongs: () => void;
-    /** Where focus returns after leaving the All songs page (#1440 review P3) — same reason as
-     * `standardsEntryRef` above. */
+    /** Where focus returns after leaving the All songs page (#1440 review P3). */
     allSongsEntryRef: RefObject<HTMLButtonElement | null>;
     /**
      * The id THIS TAB's own row action just removed (#1440 review P5) — same contract as
@@ -140,63 +184,305 @@ interface SongbookProps {
     lastRemovedId: string | null;
 }
 
-export function Songbook({
-    songs,
-    accountLibrary,
-    loading,
-    accountFallback,
-    accountsOff,
-    onEnableAccounts,
-    remoteCandidates,
+/**
+ * The songbook home (#1441, direction A "one page, library first"): pick up where you left off,
+ * the eight songs opened most recently, and the standards shelf — or, on a device with nothing of
+ * its own yet, the standards as the page. Presentational: every read and write is the shell's,
+ * and what it hands this is sized to what the page shows, never the whole library.
+ */
+export function Songbook(props: SongbookProps) {
+    const {
+        home,
+        accountLibrary,
+        loading,
+        accountFallback,
+        accountsOff,
+        onEnableAccounts,
+        remoteCandidates,
+        featured,
+        search,
+        v1Import,
+        busy,
+        offline,
+    } = props;
+    const rows = home?.rows ?? [];
+    const query = search.trim().toLowerCase();
+    const firstVisit = !loading && home !== null && home.count === 0 && featured === null;
+    const shown = new Set(rows.map((row) => row.id));
+    const markedElsewhere = remoteCandidates.filter((row) => !shown.has(row.id)).length;
+    const heading = useRef<HTMLHeadingElement>(null);
+    const firstVisitHeading = useRef<HTMLHeadingElement>(null);
+    const libraryName = accountLibrary ? 'Your account songbook' : 'Your songbook';
+    // The first visit's own h1 is the page's heading only while it is on screen; a search
+    // replaces it, and then the songbook's name is the h1 again (#1441 review P3).
+    const firstVisitIntro = firstVisit && !query;
+    // Deleting the last song on the home turns it into the first visit, which unmounts the row
+    // list — and `RecentSongs`' focus rescue with it. So the rescue for that one case lives here:
+    // THIS tab's own delete emptied the songbook, and focus goes to the new page's heading
+    // instead of falling to `<body>` (#1440 review P5's `lastRemovedId` scoping, kept).
+    const wasFirstVisit = useRef(firstVisit);
+    useEffect(() => {
+        if (!wasFirstVisit.current && firstVisit && props.lastRemovedId !== null) {
+            firstVisitHeading.current?.focus();
+        }
+        wasFirstVisit.current = firstVisit;
+    }, [firstVisit, props.lastRemovedId]);
+    return (
+        <main
+            className="home"
+            data-layout={firstVisit ? 'first-visit' : 'everyday'}
+            // A positive "no more v1 offer is coming" signal (#1441 review P2): the offer's plan
+            // waits on a lazy whole-songbook read, so "no card yet" alone proves nothing.
+            data-v1-plan={props.v1PlanSettled ? 'settled' : 'pending'}
+        >
+            {firstVisitIntro ? (
+                <p className="home-library" data-testid="library-heading">
+                    {libraryName}
+                </p>
+            ) : (
+                <h1
+                    className="home-library"
+                    ref={heading}
+                    tabIndex={-1}
+                    data-testid="library-heading"
+                >
+                    {libraryName}
+                </h1>
+            )}
+            {loading && (
+                <p className="library-loading" role="status" data-testid="library-loading">
+                    {accountLibrary ? 'Loading your account songbook…' : 'Loading your songbook…'}
+                </p>
+            )}
+            {/* The notices sit with the library they are about, above everything it shows.
+                `role="status"` rather than an alert: none is a failure to act on, and the
+                fallback one appears without the musician having done anything. */}
+            {accountFallback && !loading && (
+                <p className="library-notice" role="status" data-testid="account-fallback">
+                    {ACCOUNT_SWITCH_MESSAGES.fallback}
+                </p>
+            )}
+            {accountsOff && (
+                <p className="library-notice" role="status" data-testid="accounts-off">
+                    <span>{ACCOUNT_SWITCH_MESSAGES.off}</span>
+                    <button
+                        className="account-btn"
+                        data-testid="accounts-turn-on"
+                        onClick={onEnableAccounts}
+                    >
+                        {ACCOUNT_SWITCH_MESSAGES.turnOn}
+                    </button>
+                </p>
+            )}
+            {home !== null && home.unreadable > 0 && (
+                <p className="library-notice" role="status" data-testid="home-unreadable">
+                    {home.unreadable === 1
+                        ? 'One song on this device couldn’t be read, so it isn’t listed here.'
+                        : `${home.unreadable} songs on this device couldn’t be read, so they aren’t listed here.`}
+                </p>
+            )}
+            {markedElsewhere > 0 && !loading && (
+                <p className="library-notice" role="status" data-testid="home-candidates-elsewhere">
+                    <span>
+                        {markedElsewhere === 1
+                            ? 'Another song has an update in your account waiting for a look.'
+                            : `${markedElsewhere} more songs have updates in your account waiting for a look.`}
+                    </span>
+                    <button className="account-btn" onClick={props.onOpenAllSongs}>
+                        See All songs
+                    </button>
+                </p>
+            )}
+            {firstVisitIntro && (
+                <section className="first-visit" aria-labelledby="first-visit-title">
+                    <h1 id="first-visit-title" ref={firstVisitHeading} tabIndex={-1}>
+                        Pick a tune. The band comes in.
+                    </h1>
+                    <p>
+                        Drums, bass and keys follow the chart. Change the key, the tempo or the
+                        feel, and play along.
+                    </p>
+                </section>
+            )}
+            {/* Below the page's h1 in both layouts, so its own h2 never outranks it. */}
+            {v1Import && (
+                <V1ImportCard
+                    offer={v1Import}
+                    busy={busy}
+                    onImport={props.onImportV1}
+                    onDismiss={props.onDismissV1}
+                />
+            )}
+            {query ? (
+                <SearchResults
+                    query={query}
+                    library={props.library}
+                    libraryFailure={props.libraryFailure}
+                    busy={busy}
+                    onOpenSong={props.onOpenSong}
+                    onOpenStandard={props.onOpenStandard}
+                />
+            ) : firstVisit ? (
+                <FirstVisit {...props} />
+            ) : (
+                <>
+                    {featured && <ContinueCard {...props} featured={featured} />}
+                    {!loading && home !== null && (
+                        <RecentSongs {...props} home={home} heading={heading} />
+                    )}
+                    <StandardsShelf {...props} perShelf={4} firstVisit={false} />
+                </>
+            )}
+            <footer className="home-footer">
+                <span data-testid="home-storage">
+                    {accountLibrary
+                        ? 'In your account. Saved songs sync to your other devices.'
+                        : 'Saved on this device. Browser storage can be cleared; export songs you want to keep.'}{' '}
+                    <span className="home-offline">{offline}</span>
+                </span>
+                <span>Music stand beta · {process.env.NEXT_PUBLIC_SOURCE_REV}</span>
+            </footer>
+        </main>
+    );
+}
+
+/** A key the way the chart header writes it: `C`, `Am`. */
+function keyOf(document: ChartDocument): string {
+    const { key, isMinor } = arrangementOf(document);
+    return `${key}${isMinor ? 'm' : ''}`;
+}
+
+/**
+ * "Pick up where you left off" (#1441): the song's own first bars — never a sample — with Open
+ * chart and ▶ Play. The phone shows the first four (CSS), the desktop all eight.
+ */
+function ContinueCard({
     featured,
     continued,
-    onOpenFeatured,
-    onBrowseStandards,
-    standardsEntryRef,
+    openedAt,
     busy,
-    offline,
-    search,
-    onSearch,
-    onImport,
-    onNewSong,
     onOpenSong,
-    v1Import,
-    onImportV1,
-    onDismissV1,
+    onPlaySong,
+}: SongbookProps & { featured: FeaturedSummary }) {
+    const opened = openedAt.get(featured.id);
+    const ago = opened ? openedAgo(opened, Date.now()) : null;
+    return (
+        <section
+            className="continue-card"
+            data-testid="continue-card"
+            aria-labelledby="continue-title"
+        >
+            <div className="continue-copy">
+                <span className="eyebrow">
+                    {continued ? 'Pick up where you left off' : 'From your songbook'}
+                </span>
+                <h2 id="continue-title">{featured.title}</h2>
+                <p className="continue-meta">
+                    {featured.genre} · {featured.bpm} BPM · {featured.key}
+                    {featured.isMinor ? 'm' : ''}
+                    {ago ? ` · opened ${ago}` : ''}
+                </p>
+                <div className="continue-actions">
+                    <button
+                        className="btn primary"
+                        disabled={busy}
+                        onClick={() => onOpenSong(featured.id)}
+                    >
+                        Open chart
+                    </button>
+                    <button
+                        className="btn"
+                        disabled={busy}
+                        aria-label={`Play ${featured.title}`}
+                        onClick={() => onPlaySong(featured.id)}
+                    >
+                        ▶ Play
+                    </button>
+                </div>
+            </div>
+            {featured.bars.length > 0 && (
+                <div className="continue-bars">
+                    <div className="continue-bars-label">
+                        First {featured.bars.length === 1 ? 'bar' : `${featured.bars.length} bars`}
+                    </div>
+                    <ol className="continue-grid" data-testid="continue-bars">
+                        {featured.bars.map((bar, index) => (
+                            // biome-ignore lint/suspicious/noArrayIndexKey: bars are positional; two can read the same.
+                            <li key={index}>{bar}</li>
+                        ))}
+                    </ol>
+                </div>
+            )}
+        </section>
+    );
+}
+
+/** The candidate marker a row carries (#1310, widened #1362) — one row, one kind. */
+function CandidateMarker({ kind }: { kind: RemoteCandidateKind | null }) {
+    if (kind === 'version') {
+        return (
+            <span className="song-marker" data-testid="song-newer-in-account">
+                {REMOTE_UPDATE_MESSAGES.marker}
+            </span>
+        );
+    }
+    if (kind === 'deleted') {
+        return (
+            <span className="song-marker" data-testid="song-deleted-in-account">
+                {REMOTE_UPDATE_MESSAGES.deletedMarker}
+            </span>
+        );
+    }
+    if (kind === 'unsupported') {
+        return (
+            <span className="song-marker" data-testid="song-unsupported-in-account">
+                {REMOTE_UPDATE_MESSAGES.unsupportedMarker}
+            </span>
+        );
+    }
+    return null;
+}
+
+/**
+ * "Recently opened" (#1441): at most `HOME_ROWS` songs, by #1440's device-local opened-at, and
+ * "All N songs →" with the store's own count. Where the songs live is said once, in the footer,
+ * never per row.
+ */
+function RecentSongs({
+    home,
+    heading,
+    remoteCandidates,
+    openedAt,
     starred,
+    busy,
+    onOpenSong,
     onToggleStar,
     onOpenRowMenu,
     onOpenAllSongs,
     allSongsEntryRef,
     lastRemovedId,
-}: SongbookProps) {
-    // A map, not `.find`: both this list and the account library are capped at 2,000, and the
-    // pair of them scanned against each other is the one place that product would be paid for.
-    const remoteCandidateKinds = new Map(remoteCandidates.map((row) => [row.id, row.kind]));
-    const filteredSongs = useMemo(
-        () => songs.filter((s) => s.title.toLowerCase().includes(search.toLowerCase())),
-        [songs, search],
-    );
+}: SongbookProps & { home: HomeSlice; heading: RefObject<HTMLHeadingElement | null> }) {
+    // A map, not `.find`, for the same reason the All songs page keeps one.
+    const kinds = new Map(remoteCandidates.map((row) => [row.id, row.kind]));
     const rows = useRef(new Map<string, HTMLTableRowElement>());
-    const heading = useRef<HTMLHeadingElement>(null);
+    const now = Date.now();
     // After a row delete, focus goes to the next row, or the heading if the list is now empty
     // (#1440 review P3) — the same fix and the same reasoning as `AllSongs`' own copy of this.
-    // Scoped to THIS TAB'S OWN action via `lastRemovedId` (#1440 review P5) — see `AllSongs`' own
-    // copy of this effect for why `document.activeElement === document.body` was the wrong guard.
+    // Scoped to THIS TAB'S OWN action via `lastRemovedId` (#1440 review P5).
     const previousRowIds = useRef<string[]>([]);
     const handledRemovalId = useRef<string | null>(null);
+    const ids = useMemo(() => home.rows.map((song) => song.id), [home.rows]);
     useEffect(() => {
         const previousIds = previousRowIds.current;
-        const currentIds = filteredSongs.map((s) => s.id);
         if (
             lastRemovedId &&
             handledRemovalId.current !== lastRemovedId &&
             previousIds.includes(lastRemovedId) &&
-            !currentIds.includes(lastRemovedId)
+            !ids.includes(lastRemovedId)
         ) {
             handledRemovalId.current = lastRemovedId;
             const removedIndex = previousIds.indexOf(lastRemovedId);
-            const nextId = currentIds[Math.min(removedIndex, currentIds.length - 1)];
+            const nextId = ids[Math.min(removedIndex, ids.length - 1)];
             const nextRow = nextId ? rows.current.get(nextId) : undefined;
             const link = nextRow?.querySelector<HTMLButtonElement>('.song-link');
             if (link) {
@@ -205,298 +491,330 @@ export function Songbook({
                 heading.current?.focus();
             }
         }
-        previousRowIds.current = currentIds;
-    }, [filteredSongs, lastRemovedId]);
+        previousRowIds.current = ids;
+    }, [ids, lastRemovedId, heading]);
+    // "Recently opened" only when it is true of every row: a songbook with songs it never opened
+    // here (a v1 import, a downloaded library) fills the list from elsewhere (`HomeRead.fill`).
+    const allOpened = home.rows.every((song) => openedAt.has(song.id));
     return (
-        <main className="home">
-            <div className="home-intro">
-                <div>
-                    <span className="eyebrow">Your next good session</span>
-                    <h1>Let’s play something.</h1>
-                    <p>A chart, a backing band, and a little room to explore.</p>
-                </div>
-                <div className="home-actions">
-                    <button className="btn" disabled={busy} onClick={onImport}>
-                        Import chart
+        <section className="home-section recent-songs" aria-labelledby="recent-heading">
+            <div className="section-heading">
+                <h2 id="recent-heading">{allOpened ? 'Recently opened' : 'Your songs'}</h2>
+                {home.count > 0 && (
+                    <button
+                        ref={allSongsEntryRef}
+                        className="text-link"
+                        data-testid="all-songs-link"
+                        onClick={onOpenAllSongs}
+                    >
+                        All {home.count} {home.count === 1 ? 'song' : 'songs'} →
                     </button>
-                    <button className="btn primary" disabled={busy} onClick={onNewSong}>
-                        ＋ New song
-                    </button>
-                </div>
+                )}
             </div>
-            <div className="home-grid">
-                <div>
-                    {featured && (
-                        <section className="continue-card">
-                            <div className="continue-copy">
-                                <span className="eyebrow">
-                                    {continued
-                                        ? 'Pick up where you left off'
-                                        : 'A good place to start'}
-                                </span>
-                                <h3>{featured.title}</h3>
-                                <p>
-                                    {featured.genre} · {featured.bpm} BPM · {featured.key}
-                                    {featured.isMinor ? 'm' : ''}
-                                </p>
-                                <button className="btn" disabled={busy} onClick={onOpenFeatured}>
-                                    Open chart →
-                                </button>
-                            </div>
-                            <div className="continue-art" aria-hidden="true">
-                                <div className="mini-heading">A little room to improvise</div>
-                                <div className="mini-grid">
-                                    {['C7', 'F7', 'C7', 'G7', 'F7', 'F7', 'C7', 'G7'].map(
-                                        (c, i) => (
-                                            // biome-ignore lint/suspicious/noArrayIndexKey: Fixed decorative sample, never reordered.
-                                            <span key={i}>{c}</span>
-                                        ),
-                                    )}
-                                </div>
-                            </div>
-                        </section>
-                    )}
-                    {v1Import && (
-                        <V1ImportCard
-                            offer={v1Import}
-                            busy={busy}
-                            onImport={onImportV1}
-                            onDismiss={onDismissV1}
-                        />
-                    )}
-                    <div className="section-heading library-heading">
-                        <h2 ref={heading} tabIndex={-1} data-testid="library-heading">
-                            {accountLibrary ? 'Your account songbook' : 'Your songbook'}
-                        </h2>
-                        <label className="search">
-                            <span className="sr">Search songs</span>
-                            <input
-                                placeholder="Find a song…"
-                                value={search}
-                                onChange={(e) => onSearch(e.target.value)}
-                            />
-                        </label>
-                    </div>
-                    {!loading && songs.length > 0 && (
-                        // #1440 — the large-library escape hatch: this list stays capped by
-                        // whatever `songs` the shell hands it, and grows unbounded once #1443's
-                        // whole-playlist imports land.
-                        <p className="all-songs-link">
-                            <button
-                                ref={allSongsEntryRef}
-                                className="btn"
-                                data-testid="all-songs-link"
-                                onClick={onOpenAllSongs}
-                            >
-                                All {songs.length} songs →
-                            </button>
-                        </p>
-                    )}
-                    {loading && (
-                        <p className="library-loading" role="status" data-testid="library-loading">
-                            {accountLibrary
-                                ? 'Loading your account songbook…'
-                                : 'Loading your songbook…'}
-                        </p>
-                    )}
-                    {/* Both notices sit with the library they are about, under its heading and
-                        above the list itself. `role="status"` rather than an alert: neither is a
-                        failure to act on, and the fallback one appears without the musician
-                        having done anything. */}
-                    {accountFallback && !loading && (
-                        <p className="library-notice" role="status" data-testid="account-fallback">
-                            {ACCOUNT_SWITCH_MESSAGES.fallback}
-                        </p>
-                    )}
-                    {accountsOff && (
-                        <p className="library-notice" role="status" data-testid="accounts-off">
-                            <span>{ACCOUNT_SWITCH_MESSAGES.off}</span>
-                            <button
-                                className="account-btn"
-                                data-testid="accounts-turn-on"
-                                onClick={onEnableAccounts}
-                            >
-                                {ACCOUNT_SWITCH_MESSAGES.turnOn}
-                            </button>
-                        </p>
-                    )}
-                    <table className="song-table" hidden={loading}>
-                        <thead>
-                            <tr>
-                                <th>
-                                    <span className="sr">Star</span>
-                                </th>
-                                <th>Song</th>
-                                <th>Key</th>
-                                <th className="hide-mobile">Tempo</th>
-                                <th>
-                                    <span className="sr">More actions</span>
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {filteredSongs.map((s) => {
-                                const candidateKind = remoteCandidateKinds.get(s.id) ?? null;
-                                const isStarred = starred.has(s.id);
-                                return (
-                                    <tr
-                                        className="song-row"
-                                        key={s.id}
-                                        ref={(element) => {
-                                            if (element) {
-                                                rows.current.set(s.id, element);
-                                            } else {
-                                                rows.current.delete(s.id);
+            {home.rows.length > 0 && (
+                <table className="song-table home-table">
+                    <thead>
+                        <tr>
+                            <th>
+                                <span className="sr">Star</span>
+                            </th>
+                            <th>Song</th>
+                            <th className="hide-mobile">Key</th>
+                            <th className="hide-mobile">Tempo</th>
+                            <th className="hide-mobile">Opened</th>
+                            <th>
+                                <span className="sr">More actions</span>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {home.rows.map((song) => {
+                            const isStarred = starred.has(song.id);
+                            const opened = openedAt.get(song.id);
+                            const ago = opened ? openedAgo(opened, now) : null;
+                            return (
+                                <tr
+                                    className="song-row"
+                                    key={song.id}
+                                    ref={(element) => {
+                                        if (element) {
+                                            rows.current.set(song.id, element);
+                                        } else {
+                                            rows.current.delete(song.id);
+                                        }
+                                    }}
+                                >
+                                    <td className="star-cell">
+                                        <button
+                                            className="icon-button star-toggle"
+                                            aria-pressed={isStarred}
+                                            aria-label={
+                                                isStarred
+                                                    ? `Unstar ${song.title}`
+                                                    : `Star ${song.title}`
                                             }
-                                        }}
-                                    >
-                                        <td>
-                                            <button
-                                                className="icon-button star-toggle"
-                                                aria-pressed={isStarred}
-                                                aria-label={
-                                                    isStarred
-                                                        ? `Unstar ${s.title}`
-                                                        : `Star ${s.title}`
-                                                }
-                                                disabled={busy}
-                                                onClick={() => onToggleStar(s.id)}
-                                            >
-                                                {isStarred ? '★' : '☆'}
-                                            </button>
-                                        </td>
-                                        <td>
-                                            <button
-                                                className="song-link"
-                                                disabled={busy}
-                                                onClick={() => onOpenSong(s.id)}
-                                            >
-                                                <span className="song-glyph">♪</span>
-                                                <span>
-                                                    <span className="song-name">{s.title}</span>
-                                                    {/* Per-row storage-location repetition
-                                                            is fixed on the All songs page (#1440);
-                                                            left as-is here since dozens of OTHER
-                                                            specs across this suite select rows by
-                                                            this exact accessible name ("<title>
-                                                            <genre> · Saved locally"), and this
-                                                            table's own redesign is #1441's. */}
-                                                    <span className="song-detail">
-                                                        {genreOf(s)} ·{' '}
-                                                        {accountLibrary
-                                                            ? 'In your account'
-                                                            : 'Saved locally'}
-                                                    </span>
-                                                    {/* #1310, widened #1362 — said here as well
-                                                            as on the stand because this is the only
-                                                            surface that shows the whole library at
-                                                            once, and the song it is about may not be
-                                                            the one open. One row, one kind: a row is
-                                                            never marked for more than one candidate
-                                                            at a time. */}
-                                                    {candidateKind === 'version' && (
-                                                        <span
-                                                            className="song-marker"
-                                                            data-testid="song-newer-in-account"
-                                                        >
-                                                            {REMOTE_UPDATE_MESSAGES.marker}
-                                                        </span>
-                                                    )}
-                                                    {candidateKind === 'deleted' && (
-                                                        <span
-                                                            className="song-marker"
-                                                            data-testid="song-deleted-in-account"
-                                                        >
-                                                            {REMOTE_UPDATE_MESSAGES.deletedMarker}
-                                                        </span>
-                                                    )}
-                                                    {candidateKind === 'unsupported' && (
-                                                        <span
-                                                            className="song-marker"
-                                                            data-testid="song-unsupported-in-account"
-                                                        >
-                                                            {
-                                                                REMOTE_UPDATE_MESSAGES.unsupportedMarker
-                                                            }
-                                                        </span>
-                                                    )}
-                                                </span>
-                                            </button>
-                                        </td>
-                                        <td className="song-key">
-                                            {arrangementOf(s).key}
-                                            {arrangementOf(s).isMinor ? 'm' : ''}
-                                        </td>
-                                        <td className="hide-mobile">{s.chart.performance.bpm}</td>
-                                        <td>
-                                            <button
-                                                className="icon-button row-more"
-                                                aria-label={`More actions for ${s.title}`}
-                                                disabled={busy}
-                                                onClick={() => onOpenRowMenu(s.id, s.title)}
-                                            >
-                                                ⋯
-                                            </button>
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
-                    <p className="offline-note">
-                        {offline}. Browser storage can be cleared; export songs you want to keep.
-                    </p>
-                </div>
-                <aside>
-                    {/* #1439 — replaces the old Quick Jam tiles (a filter on the now-retired
-                        seeded `starter-*` songs) with an entry point to the full standards
-                        catalog: blues forms, jazz standards and genre grooves, none of them
-                        written to storage until Save. The browse surface itself is `#1441`'s to
-                        redesign; this story keeps the home minimal but truthful. */}
-                    <section className="quick-jam">
-                        <span className="eyebrow">No blank page required</span>
-                        <h2>Play a standard.</h2>
-                        <p>
-                            Blues forms, jazz standards and genre grooves — pick one, change the key
-                            or the feel, and make it your own.
-                        </p>
-                        <button
-                            ref={standardsEntryRef}
-                            className="btn"
-                            disabled={busy}
-                            onClick={onBrowseStandards}
-                        >
-                            Browse standards →
-                        </button>
-                    </section>
-                    <section className="sync-card">
-                        <h3>Your band, wherever you play.</h3>
-                        {accountLibrary ? (
-                            // The three sync facts are a music-stand surface: they describe the
-                            // chart on the stand, and there isn't one here (#1266).
-                            <p>
-                                Save on one device and open it on another. Your guest songbook stays
-                                on this device and is separate from your account.
-                            </p>
-                        ) : (
-                            <p>
-                                Sign in to save your songbook to an account and open it on another
-                                device. Until then, your songs stay on this device.
-                            </p>
-                        )}
-                        <p className="preview-note">
-                            Import an iReal Pro or Ensemble chart file with the button above, or
-                            open a song and use its menu's "Copy link" to share it — the link opens
-                            as an unsaved draft, with no account needed.
-                        </p>
-                    </section>
-                </aside>
+                                            disabled={busy}
+                                            onClick={() => onToggleStar(song.id)}
+                                        >
+                                            {isStarred ? '★' : '☆'}
+                                        </button>
+                                    </td>
+                                    <td>
+                                        <button
+                                            className="song-link"
+                                            disabled={busy}
+                                            onClick={() => onOpenSong(song.id)}
+                                        >
+                                            <span className="song-name">{song.title}</span>
+                                            <span className="song-detail">
+                                                {composerOf(song) || genreOf(song)}
+                                            </span>
+                                            <CandidateMarker kind={kinds.get(song.id) ?? null} />
+                                            <span className="song-meta">
+                                                {keyOf(song)} · {song.chart.performance.bpm} BPM
+                                                {ago ? ` · ${ago}` : ''}
+                                            </span>
+                                        </button>
+                                    </td>
+                                    <td className="song-key hide-mobile">{keyOf(song)}</td>
+                                    <td className="hide-mobile">{song.chart.performance.bpm}</td>
+                                    <td className="hide-mobile song-opened">{ago ?? '—'}</td>
+                                    <td className="more-cell">
+                                        <button
+                                            className="icon-button row-more"
+                                            aria-label={`More actions for ${song.title}`}
+                                            disabled={busy}
+                                            onClick={() => onOpenRowMenu(song.id, song.title)}
+                                        >
+                                            ⋯
+                                        </button>
+                                    </td>
+                                </tr>
+                            );
+                        })}
+                    </tbody>
+                </table>
+            )}
+        </section>
+    );
+}
+
+/**
+ * The standards shelf (#1441) — Blues, Jazz standards and Grooves, `perShelf` of each, every item
+ * opening the standard as an unsaved draft. "Browse all →" (and, on a first visit, each shelf's
+ * own "All N …" link) opens #1439's browse view.
+ */
+function StandardsShelf({
+    perShelf,
+    firstVisit,
+    busy,
+    onOpenStandard,
+    onBrowseStandards,
+    standardsEntry,
+    standardsEntryRef,
+}: SongbookProps & { perShelf: number; firstVisit: boolean }) {
+    const entryRef = (entry: StandardsEntry) =>
+        standardsEntry === entry ? standardsEntryRef : undefined;
+    return (
+        <section className="home-section standards-shelf" aria-labelledby="standards-heading">
+            <div className="section-heading">
+                <h2 id="standards-heading">Standards</h2>
+                <button
+                    ref={entryRef('all')}
+                    className="text-link"
+                    disabled={busy}
+                    onClick={() => onBrowseStandards('all')}
+                >
+                    Browse all →
+                </button>
             </div>
-            <footer className="home-footer">
-                <span>Made for practice, writing, and getting lost in a good groove.</span>
-                <span>Music stand beta · {process.env.NEXT_PUBLIC_SOURCE_REV}</span>
-            </footer>
-        </main>
+            <p className="section-sub">
+                {STANDARDS.length} charts that come with Ensemble. Open one to play; Save keeps your
+                own copy.
+            </p>
+            <div className="shelf-columns">
+                {SHELF_ORDER.map((shelf) => {
+                    const entries = STANDARDS.filter((entry) => entry.shelf === shelf);
+                    return (
+                        <div className="shelf-column" key={shelf}>
+                            <h3>{STANDARD_SHELF_LABELS[shelf]}</h3>
+                            <ul className="shelf-items">
+                                {entries.slice(0, perShelf).map((entry) => (
+                                    <li key={entry.id}>
+                                        <StandardItem
+                                            entry={entry}
+                                            busy={busy}
+                                            onOpen={onOpenStandard}
+                                        />
+                                    </li>
+                                ))}
+                            </ul>
+                            {firstVisit && (
+                                <button
+                                    ref={entryRef(shelf)}
+                                    className="text-link"
+                                    disabled={busy}
+                                    onClick={() => onBrowseStandards(shelf)}
+                                >
+                                    All {entries.length}{' '}
+                                    {STANDARD_SHELF_LABELS[shelf].toLowerCase()} →
+                                </button>
+                            )}
+                        </div>
+                    );
+                })}
+            </div>
+        </section>
+    );
+}
+
+function StandardItem({
+    entry,
+    busy,
+    onOpen,
+}: {
+    entry: StandardEntry;
+    busy: boolean;
+    onOpen: (id: string) => void;
+}) {
+    return (
+        <button
+            className="standard-item"
+            aria-label={`Open ${entry.title}`}
+            disabled={busy}
+            onClick={() => onOpen(entry.id)}
+        >
+            <span className="play-circle" aria-hidden="true">
+                ▶
+            </span>
+            <span className="standard-copy">
+                <span className="standard-title">{entry.title}</span>
+                <span className="standard-meta">
+                    {entry.genre} · {entry.bpm} BPM
+                </span>
+            </span>
+        </button>
+    );
+}
+
+/**
+ * A fresh device (#1441): nothing of its own and nothing to continue, so the standards are the
+ * page — a bigger shelf — and "Or bring your own" offers the three ways in. (Its h1 and subline
+ * are rendered by `Songbook` itself, above the v1 card.) The old-Ensemble card
+ * appears only when this origin holds v1 data.
+ */
+function FirstVisit(props: SongbookProps) {
+    const { busy, onImport, onNewSong, v1Present, onOpenV1Import } = props;
+    return (
+        <>
+            <StandardsShelf {...props} perShelf={6} firstVisit />
+            <section className="home-section bring-your-own" aria-labelledby="byo-heading">
+                <div className="section-heading">
+                    <h2 id="byo-heading">Or bring your own</h2>
+                </div>
+                <div className="byo-cards">
+                    <button className="byo-card" disabled={busy} onClick={onImport}>
+                        <strong>Import from iReal Pro</strong>
+                        <span>A song or a whole playlist, from a link or a file.</span>
+                    </button>
+                    <button className="byo-card" disabled={busy} onClick={onNewSong}>
+                        <strong>Write a new song</strong>
+                        <span>Type the chords, pick a feel.</span>
+                    </button>
+                    {v1Present && (
+                        <button className="byo-card" disabled={busy} onClick={onOpenV1Import}>
+                            <strong>Bring songs from the old Ensemble</strong>
+                            <span>Copy the songs this browser kept in the old app.</span>
+                        </button>
+                    )}
+                </div>
+            </section>
+        </>
+    );
+}
+
+/**
+ * One search across the musician's songs (title and composer) and the standards, grouped
+ * (#1441). The standards half answers at once; the songs half waits for the lazy full-library
+ * read the search box started, and says so rather than reporting no matches.
+ */
+function SearchResults({
+    query,
+    library,
+    libraryFailure,
+    busy,
+    onOpenSong,
+    onOpenStandard,
+}: {
+    query: string;
+    library: ChartDocument[] | null;
+    libraryFailure: string | null;
+    busy: boolean;
+    onOpenSong: (id: string) => void;
+    onOpenStandard: (id: string) => void;
+}) {
+    const songs = useMemo(
+        () =>
+            library?.filter(
+                (song) =>
+                    song.title.toLowerCase().includes(query) ||
+                    composerOf(song).toLowerCase().includes(query),
+            ) ?? null,
+        [library, query],
+    );
+    const standards = STANDARDS.filter(
+        (entry) =>
+            entry.title.toLowerCase().includes(query) || entry.genre.toLowerCase().includes(query),
+    );
+    return (
+        <section className="home-section search-results" aria-label="Search results">
+            <div className="search-group" data-testid="search-songs">
+                <h2>Your songs</h2>
+                {songs === null ? (
+                    <p className="library-loading" role="status">
+                        {libraryFailure ?? 'Searching your songs…'}
+                    </p>
+                ) : songs.length === 0 ? (
+                    <p className="search-empty">No songs match.</p>
+                ) : (
+                    <ul className="search-list">
+                        {songs.slice(0, SEARCH_LIMIT).map((song) => (
+                            <li key={song.id}>
+                                <button
+                                    className="song-link"
+                                    disabled={busy}
+                                    onClick={() => onOpenSong(song.id)}
+                                >
+                                    <span className="song-name">{song.title}</span>
+                                    <span className="song-detail">
+                                        {composerOf(song) || genreOf(song)}
+                                    </span>
+                                </button>
+                            </li>
+                        ))}
+                    </ul>
+                )}
+                {songs !== null && songs.length > SEARCH_LIMIT && (
+                    <p className="search-empty">
+                        Showing {SEARCH_LIMIT} of {songs.length}. Keep typing to narrow it down.
+                    </p>
+                )}
+            </div>
+            <div className="search-group" data-testid="search-standards">
+                <h2>Standards</h2>
+                {standards.length === 0 ? (
+                    <p className="search-empty">No standards match.</p>
+                ) : (
+                    <ul className="search-list">
+                        {standards.map((entry) => (
+                            <li key={entry.id}>
+                                <StandardItem entry={entry} busy={busy} onOpen={onOpenStandard} />
+                            </li>
+                        ))}
+                    </ul>
+                )}
+            </div>
+        </section>
     );
 }
 
@@ -541,32 +859,36 @@ function V1ImportCard({
     const declines = v1OfferDeclines(offer);
     const headingText = offer.result
         ? 'Brought over from the old Ensemble'
-        : offer.songs > 0
-          ? `Bring over ${plural(offer.songs, 'song')} from the old Ensemble?`
-          : offer.alreadyHere > 0
-            ? 'Everything from the old Ensemble is already here'
-            : offer.problems.length > 0
-              ? 'Some music in the old Ensemble could not be read'
-              : 'There is nothing in the old Ensemble to bring over';
+        : offer.unavailable
+          ? 'The old Ensemble’s songs can’t be compared yet'
+          : offer.songs > 0
+            ? `Bring over ${plural(offer.songs, 'song')} from the old Ensemble?`
+            : offer.alreadyHere > 0
+              ? 'Everything from the old Ensemble is already here'
+              : offer.problems.length > 0
+                ? 'Some music in the old Ensemble could not be read'
+                : 'There is nothing in the old Ensemble to bring over';
     const body = offer.result
         ? null
-        : offer.songs > 0
-          ? 'They are copied into this songbook. Nothing in the old app is changed or removed.'
-          : offer.alreadyHere > 0
-            ? `Nothing new to bring over — ${plural(offer.alreadyHere, 'song')} from the old app ${offer.alreadyHere === 1 ? 'is' : 'are'} already in this songbook.`
-            : offer.problems.length > 0
-              ? 'Nothing was changed there. Open the old Ensemble to check those songs.'
-              : 'The old app is still on this device, but it has no saved songs to copy.';
+        : offer.unavailable
+          ? offer.unavailable
+          : offer.songs > 0
+            ? 'They are copied into this songbook. Nothing in the old app is changed or removed.'
+            : offer.alreadyHere > 0
+              ? `Nothing new to bring over — ${plural(offer.alreadyHere, 'song')} from the old app ${offer.alreadyHere === 1 ? 'is' : 'are'} already in this songbook.`
+              : offer.problems.length > 0
+                ? 'Nothing was changed there. Open the old Ensemble to check those songs.'
+                : 'The old app is still on this device, but it has no saved songs to copy.';
     return (
         <section
-            className="quick-jam import-card"
+            className="home-card import-card"
             data-testid="v1-import"
             aria-labelledby="v1-import-heading"
         >
             <span className="eyebrow">From the old Ensemble</span>
-            <h3 id="v1-import-heading" ref={heading} tabIndex={-1}>
+            <h2 id="v1-import-heading" ref={heading} tabIndex={-1}>
                 {headingText}
-            </h3>
+            </h2>
             {body && <p>{body}</p>}
             {!offer.result && offer.problems.length > 0 && (
                 <ul className="import-problems" data-testid="v1-import-problems">

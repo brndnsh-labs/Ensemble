@@ -319,7 +319,7 @@ test('an import run with nothing new to bring over opens no offer', async ({ pag
     // fail or are refused at write time.)
     await newSongOnTheStand(page);
     await importFromTheSongMenu(page);
-    await expect(page.getByRole('heading', { level: 3, name: /already here/ })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 2, name: /already here/ })).toBeVisible();
     await expect(page.getByTestId('v1-import').getByRole('button', { name: 'Import' })).toHaveCount(
         0,
     );

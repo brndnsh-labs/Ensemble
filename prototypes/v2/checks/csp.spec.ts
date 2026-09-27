@@ -1,4 +1,4 @@
-import { appUrl, expect, seedStarters, test } from './fixtures';
+import { appUrl, expect, seedStarters, songLink, test } from './fixtures';
 
 /**
  * The build-time `<meta>` Content-Security-Policy (#1395, docs/SECURITY.md F8).
@@ -48,7 +48,7 @@ test.describe('Content-Security-Policy (#1395)', () => {
         // session actually takes (service worker registration, sample decode/playback, the
         // account entry point) rather than to re-implement that assertion.
         await seedStarters(page);
-        await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
+        await songLink(page, 'Blue pocket', 'Blues').click();
 
         await page.getByRole('button', { name: 'Start playback', exact: true }).click();
         await expect(page.getByRole('button', { name: 'Stop playback' })).toBeEnabled();

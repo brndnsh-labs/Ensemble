@@ -208,10 +208,12 @@ test('two devices save the same version: the loser keeps both, and nothing is lo
         await openExactSong(second, 'Our take');
         await backToSongbook(second);
 
-        // ...and on the device that won, which learns about the new song the ordinary way.
+        // ...and on the device that won, which learns about the new song the ordinary way. The
+        // home lists what THIS device opened first (#1441): it opened "Our take", and the kept
+        // song it has never opened follows it.
         await page.reload();
         await expect(page.getByTestId('library-loading')).toHaveCount(0);
-        await expect(songTitles(page)).toHaveText(['Our take — kept', 'Our take']);
+        await expect(songTitles(page)).toHaveText(['Our take', 'Our take — kept']);
     } finally {
         await fresh.close();
     }

@@ -32,6 +32,7 @@ import {
     stopPlatformAudioAndWakeLock,
 } from '@engine/engine/platform-orchestrator';
 import { transposeChordText } from '@engine/engine/transpose';
+import { unlockAudio } from '@engine/platform';
 import { chartGenre } from '@engine/songbook/codec';
 import { proposeLegacyScoreConversion } from '@engine/songbook/legacy-score';
 import type { SemanticScore } from '@engine/songbook/score-types';
@@ -689,6 +690,24 @@ export async function toggle(progress: (text: string) => void): Promise<void> {
         return;
     }
     startBand(true);
+}
+
+/**
+ * Warm the audio path on the gesture stack (#1441), for a Play that has to read storage BEFORE it
+ * can call `toggle`: the songbook's Continue ▶ Play opens its song first, and by then mobile
+ * Safari no longer counts the tap as a user gesture. So the click handler calls this
+ * synchronously, before any await — the same three things `toggle` and `startBand` do at the
+ * front of a gesture: create the AudioContext (`initAudio`), resume it, and play the platform's
+ * silent unlock element (`unlockAudio`, the iOS mute-switch workaround). Idempotent; `toggle`
+ * repeats the first two harmlessly.
+ */
+export function warmAudio(): void {
+    initAudio(getState());
+    const audio = getState().playback.audio;
+    if (audio?.state === 'suspended') {
+        void audio.resume().catch(() => {});
+    }
+    unlockAudio();
 }
 
 export async function setVoice(

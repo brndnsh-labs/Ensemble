@@ -1,5 +1,14 @@
 import type { InstrumentModule } from '@engine/types';
 import { type ChartDocument, validateDocument } from './documents';
+import {
+    HOME_FILL_SPARE,
+    type HomeRead,
+    type HomeRequest,
+    type HomeSlice,
+    readable,
+    rememberingValidator,
+    settleHome,
+} from './home';
 import { validateVoice } from './sounds';
 // Each page load is a separate writer; the account `drafts` store keys on the same id (#1299).
 import { writerId as writer } from './writer';
@@ -71,6 +80,99 @@ export async function list(): Promise<ChartDocument[]> {
             }
         };
     });
+}
+
+/**
+ * What the songbook home shows, without reading the whole songbook (#1441): the store's `count()`,
+ * the Continue document and the recently opened ones by id, and — only when fewer than
+ * `request.rows` of those exist — a bounded cursor fill (`HomeRead.fill`). One read-only
+ * transaction, so the count and the rows describe the same moment.
+ *
+ * Unlike `list()`, a document that does not validate does not fail the read: it is left out and
+ * counted (`settleHome`), so one corrupt chart cannot blank the home page. `list()` keeps refusing
+ * a songbook it cannot wholly read, which is what the All songs page reports.
+ */
+export async function home(request: HomeRequest): Promise<HomeSlice> {
+    const db = await open();
+    const validate = rememberingValidator(validated);
+    const read = await new Promise<HomeRead<unknown>>((resolve, reject) => {
+        const tx = db.transaction(STORE, 'readonly');
+        const store = tx.objectStore(STORE);
+        const result: HomeRead<unknown> = { count: 0, continued: undefined, recent: [], fill: [] };
+        const counted = store.count();
+        counted.onsuccess = () => {
+            result.count = counted.result;
+        };
+        if (request.continueId !== null) {
+            const continued = store.get(request.continueId);
+            continued.onsuccess = () => {
+                result.continued = continued.result;
+            };
+        }
+        const found: unknown[] = new Array(request.recentIds.length);
+        let pending = request.recentIds.length;
+        const fill = () => {
+            result.recent = found.filter((value) => value !== undefined);
+            // Only READABLE opened songs fill a row: an unreadable one is counted and left out
+            // (`settleHome`), so the fill tops the list up past it rather than leaving it short.
+            const wanted =
+                request.rows - result.recent.filter((raw) => readable(validate, raw)).length;
+            if (wanted <= 0) {
+                return;
+            }
+            const listed = new Set(request.recentIds);
+            let good = 0;
+            let steps = 0;
+            const cursor = store.openCursor();
+            cursor.onsuccess = () => {
+                const at = cursor.result;
+                if (!at || good >= wanted || steps >= wanted + HOME_FILL_SPARE) {
+                    return;
+                }
+                if (!listed.has(String(at.primaryKey))) {
+                    steps += 1;
+                    result.fill.push(at.value);
+                    if (readable(validate, at.value)) {
+                        good += 1;
+                    }
+                }
+                at.continue();
+            };
+        };
+        if (pending === 0) {
+            fill();
+        }
+        request.recentIds.forEach((id, index) => {
+            const row = store.get(id);
+            row.onsuccess = () => {
+                found[index] = row.result;
+                pending -= 1;
+                if (pending === 0) {
+                    fill();
+                }
+            };
+        });
+        tx.oncomplete = () => resolve(result);
+        tx.onerror = () => reject(new Error('Unable to read your local songbook.'));
+        tx.onabort = () => reject(new Error('Unable to read your local songbook.'));
+    });
+    return settleHome(read, validate, request.rows);
+}
+
+/**
+ * One song by id (#1441), or null when this songbook no longer holds it. Opening a row, renaming
+ * or duplicating it and exporting it all read the one document they act on rather than the whole
+ * songbook. A stored document that does not validate throws `validated`'s own reason, which is the
+ * honest answer for a song the musician just asked to open.
+ */
+export async function get(id: string): Promise<ChartDocument | null> {
+    const db = await open();
+    const raw = await new Promise<unknown>((resolve, reject) => {
+        const request = db.transaction(STORE, 'readonly').objectStore(STORE).get(id);
+        request.onerror = () => reject(new Error('Unable to read your local songbook.'));
+        request.onsuccess = () => resolve(request.result);
+    });
+    return raw === undefined ? null : validated(raw);
 }
 
 export async function save(

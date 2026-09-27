@@ -7,6 +7,8 @@ import {
 } from '../lib/standards';
 
 interface StandardsBrowserProps {
+    /** The shelf the home's entry point named (#1441's per-shelf links), or null for all. */
+    initialShelf: StandardShelf | null;
     onBack: () => void;
     onOpen: (id: string) => void;
 }
@@ -18,11 +20,11 @@ const SHELVES: Array<StandardShelf | 'all'> = ['all', 'blues', 'jazz', 'grooves'
  * The standards catalog browse surface (#1439) — the "A · Standards" mockup artboard: shelf
  * filter chips, then every entry's title, first bars, genre and tempo, with an Open button that
  * lands it on the stand as an unsaved draft (`app/ensemble.tsx`'s `openStandard`). Read-only:
- * nothing here ever writes storage. Its home-page entry point is the songbook's own aside
- * (`app/songbook.tsx`); the full home-page layout is `#1441`'s to redesign.
+ * nothing here ever writes storage. Its home-page entry points are the songbook's standards shelf
+ * (`app/songbook.tsx`, #1441): "Browse all →", and on a first visit each shelf's own link.
  */
-export function StandardsBrowser({ onBack, onOpen }: StandardsBrowserProps) {
-    const [shelf, setShelf] = useState<StandardShelf | 'all'>('all');
+export function StandardsBrowser({ initialShelf, onBack, onOpen }: StandardsBrowserProps) {
+    const [shelf, setShelf] = useState<StandardShelf | 'all'>(initialShelf ?? 'all');
     const entries = STANDARDS.filter((entry) => shelf === 'all' || entry.shelf === shelf);
     const heading = useRef<HTMLHeadingElement>(null);
     // A view switch, not a dialog, but it earns the same courtesy: opening it moves focus onto

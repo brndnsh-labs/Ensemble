@@ -1,4 +1,4 @@
-import { appUrl, expect, seedStarters, test } from './fixtures';
+import { appUrl, expect, seedStarters, songLink, test } from './fixtures';
 
 /**
  * Old v1 `?s=` share links landing on the v2 stand (#1279).
@@ -40,7 +40,7 @@ async function withoutClipboard(page: import('@playwright/test').Page) {
 async function chartFragment(page: import('@playwright/test').Page): Promise<string> {
     await withoutClipboard(page);
     await seedStarters(page);
-    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
+    await songLink(page, 'Blue pocket', 'Blues').click();
     await page.getByRole('button', { name: 'Song actions' }).click();
     await page.getByRole('button', { name: 'Copy link', exact: true }).click();
     const link = await page.getByTestId('share-link-fallback').inputValue();
@@ -120,7 +120,7 @@ test("a linked genre swings like the picked genre: a Blues link's swing is the B
         return { swing, grid };
     };
     await seedStarters(page);
-    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
+    await songLink(page, 'Blue pocket', 'Blues').click();
     const picked = await swingOf();
     expect(picked).toEqual({ swing: '100', grid: '8th' });
 
@@ -143,7 +143,7 @@ test('a garbage v1 link says so and leaves the songbook working', async ({ page 
     expect(new URL(page.url()).search).toBe('');
 
     // The songbook is untouched by the failed link.
-    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
+    await songLink(page, 'Blue pocket', 'Blues').click();
     await expect(page.getByRole('heading', { name: 'Blue pocket' })).toBeVisible();
 
     // Consumed here too: reloading must not re-show the failure indefinitely.
@@ -164,9 +164,7 @@ test('a share link is decided once per page load, not again when the songbook ch
     page.on('pageerror', (error) => errors.push(error.message));
 
     await page.getByRole('button', { name: 'Back to songbook' }).click();
-    // The list row's accessible name carries a leading ♪ glyph, so this is a substring
-    // match like the rest of the suite's songbook clicks, not an anchored one.
-    await page.getByRole('button', { name: 'Minor swing sketch Jazz · Saved locally' }).click();
+    await songLink(page, 'Minor swing sketch', 'Jazz').click();
     await expect(page.getByRole('heading', { name: 'Minor swing sketch' })).toBeVisible();
 
     // Make it dirty so Save is live, then plant the fragment without reloading.

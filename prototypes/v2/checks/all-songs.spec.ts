@@ -332,7 +332,7 @@ test('deleting the Continue song leaves the songbook consistent, and so does a s
     await page.getByTestId('delete-guest-song-confirm').click();
     await expect(page.locator('.song-table .song-row', { hasText: 'After hours' })).toHaveCount(0);
     // The songbook is left consistent: nothing crashed, no dangling banner.
-    await expect(page.getByRole('heading', { name: 'Let’s play something.' })).toBeVisible();
+    await expect(page.getByTestId('library-heading')).toBeVisible();
 });
 
 /**

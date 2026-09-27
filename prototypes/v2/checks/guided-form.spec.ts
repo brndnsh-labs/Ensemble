@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import type { Page } from '@playwright/test';
 import type { ChartDocument } from '../lib/documents';
-import { appUrl, editorRevealed, expect, test } from './fixtures';
+import { appUrl, editorRevealed, expect, songLink, test } from './fixtures';
 
 async function start(page: Page, title = 'Guided study') {
     await page.goto(appUrl());
@@ -175,11 +175,7 @@ test('guided endings survive save, copy, export, transpose, Revert and offline r
             await context.setOffline(true);
         }
         await page.reload();
-        await page
-            .getByRole('button', {
-                name: new RegExp(`^♪ ${copy.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} `),
-            })
-            .click();
+        await songLink(page, copy.title).click();
         await expect(page.locator('.bar .chord')).toHaveText(['D', 'A', 'Bm', 'G']);
         await page.getByRole('button', { name: 'Edit chart', exact: true }).click();
         const dialog = await openGuide(page);

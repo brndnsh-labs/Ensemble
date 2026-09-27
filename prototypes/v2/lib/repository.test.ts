@@ -14,8 +14,9 @@
 
 import type { ChartContent } from '@engine/songbook/types';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { installFakeIndexedDB } from '../../../tests/utils/fake-indexeddb';
-import { list, recoverySlotCount, remove, rename, save } from './repository';
+import { type FakeIndexedDB, installFakeIndexedDB } from '../../../tests/utils/fake-indexeddb';
+import { homeRequest } from './home';
+import { get, home, list, recoverySlotCount, remove, rename, save } from './repository';
 
 const localStore = new Map<string, string>();
 Object.defineProperty(window, 'localStorage', {
@@ -111,8 +112,9 @@ function chart(): ChartContent {
     };
 }
 
+let fake: FakeIndexedDB;
 beforeAll(() => {
-    installFakeIndexedDB();
+    fake = installFakeIndexedDB();
 });
 
 describe('repository.save createdAt provenance (#1274 P2-2)', () => {
@@ -248,5 +250,81 @@ describe('repository.rename (#1440)', () => {
 
     it('rejects renaming a song that no longer exists', async () => {
         await expect(rename('repo-rename-missing', 'New title')).rejects.toThrow();
+    });
+});
+
+describe('repository.home — the songbook home reads only what it shows (#1441)', () => {
+    const at = (minutes: number) => new Date(Date.UTC(2026, 0, 1, 0, minutes)).toISOString();
+    const id = (i: number) => `s${String(i).padStart(2, '0')}`;
+    function song(key: string, minutes: number) {
+        return {
+            schemaVersion: 1,
+            id: key,
+            title: `Song ${key}`,
+            createdAt: at(minutes),
+            updatedAt: at(minutes),
+            revision: 0,
+            chart: chart(),
+        };
+    }
+    beforeEach(() => {
+        fake.reset();
+    });
+
+    it('returns the Continue song and the opened ones by id, newest opened first, with the true count', async () => {
+        for (let i = 0; i < 30; i++) {
+            fake.rows.set(id(i), song(id(i), i));
+        }
+        const opened = new Map([
+            ['s05', at(100)],
+            ['s20', at(300)],
+            ['s11', at(200)],
+        ]);
+        const slice = await home(homeRequest(opened, 's11'));
+        expect(slice.count).toBe(30);
+        expect(slice.continued?.id).toBe('s11');
+        expect(slice.rows.slice(0, 3).map((row) => row.id)).toEqual(['s20', 's11', 's05']);
+        // Filled to eight from the rest, never the whole songbook.
+        expect(slice.rows).toHaveLength(8);
+        expect(slice.unreadable).toBe(0);
+    });
+
+    it('never validates more than it shows: a corrupt song elsewhere cannot fail it, while a full read refuses', async () => {
+        for (let i = 0; i < 12; i++) {
+            fake.rows.set(id(i), song(id(i), i));
+        }
+        // Sorts last by key, so the bounded fill never reaches it either.
+        fake.rows.set('zz-corrupt', { schemaVersion: 1, id: 'zz-corrupt', title: 42 });
+        const opened = new Map(Array.from({ length: 8 }, (_, i) => [id(i), at(100 + i)]));
+        const slice = await home(homeRequest(opened, null));
+        expect(slice.count).toBe(13);
+        expect(slice.rows).toHaveLength(8);
+        expect(slice.unreadable).toBe(0);
+        await expect(list()).rejects.toThrow();
+    });
+
+    it('leaves out and counts an unreadable document it did read, rather than blanking the page', async () => {
+        fake.rows.set('good', song('good', 1));
+        fake.rows.set('bad', { schemaVersion: 1, id: 'bad', title: 42 });
+        const opened = new Map([
+            ['bad', at(20)],
+            ['good', at(10)],
+        ]);
+        const slice = await home(homeRequest(opened, 'bad'));
+        expect(slice.continued).toBeNull();
+        expect(slice.rows.map((row) => row.id)).toEqual(['good']);
+        expect(slice.unreadable).toBe(2);
+        expect(slice.count).toBe(2);
+    });
+
+    it('skips opened ids whose song is gone, and says an empty songbook is empty', async () => {
+        const slice = await home(homeRequest(new Map([['gone', at(1)]]), 'gone'));
+        expect(slice).toEqual({ count: 0, continued: null, rows: [], unreadable: 0 });
+    });
+
+    it('get reads one song by id, null when it is gone', async () => {
+        fake.rows.set('one', song('one', 1));
+        expect((await get('one'))?.title).toBe('Song one');
+        expect(await get('missing')).toBeNull();
     });
 });

@@ -26,7 +26,7 @@ test('the guest app cold-starts with /api/* unreachable', async ({ page }) => {
     // the rest of this suite (which does exercise playback, extensively); this assertion pins
     // the unreachable-API precondition itself, directly, rather than relying on inference.
     await page.goto(appUrl());
-    await expect(page.getByRole('heading', { name: 'Let’s play something.' })).toBeVisible();
+    await expect(page.getByTestId('library-heading')).toBeVisible();
     const status = await page.evaluate(() =>
         fetch('/api/auth/session', { cache: 'no-store' }).then((response) => response.status),
     );

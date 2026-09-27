@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { appUrl, test as base, editorRevealed, expect, seedStarters } from './fixtures';
+import { appUrl, test as base, editorRevealed, expect, seedStarters, songLink } from './fixtures';
 
 async function observeSamples(page: import('@playwright/test').Page) {
     await page.addInitScript(() => {
@@ -75,7 +75,7 @@ test('manual sounds save, revert, export/import and play sampled audio after off
 }) => {
     await observeSamples(page);
     await seedStarters(page);
-    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
+    await songLink(page, 'Blue pocket', 'Blues').click();
     await openSounds(page);
     await page.getByLabel('Chords sound', { exact: true }).selectOption('pack:grand');
     await expect(page.getByLabel('Chords sound', { exact: true })).toBeEnabled();
@@ -121,7 +121,7 @@ test('manual sounds save, revert, export/import and play sampled audio after off
         .toContain(appUrl('sw.js'));
     await disconnect();
     await page.reload();
-    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).first().click();
+    await songLink(page, 'Blue pocket', 'Blues').first().click();
     await openSounds(page);
     await expect(page.getByLabel('Chords sound', { exact: true })).toHaveValue('pack:grand');
     await closeSounds(page);
@@ -135,7 +135,7 @@ test('manual sounds save, revert, export/import and play sampled audio after off
         await cache.delete(sample);
     });
     await page.reload();
-    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).first().click();
+    await songLink(page, 'Blue pocket', 'Blues').first().click();
     await openSounds(page);
     await expect(page.getByText('Some sounds need downloading', { exact: true })).toBeVisible();
     await closeSounds(page);
@@ -153,7 +153,7 @@ test('every lane routes real samples and every catalog choice downloads', async 
     test.setTimeout(120_000);
     await observeSamples(page);
     await seedStarters(page);
-    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
+    await songLink(page, 'Blue pocket', 'Blues').click();
     for (const label of LANES) {
         for (const other of LANES) {
             const mute = page.getByRole('button', { name: other, exact: true });
@@ -214,7 +214,7 @@ test('corrupt downloads and storage failures preserve the previous sound', async
         };
     }, appUrl('packs/'));
     await seedStarters(page);
-    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
+    await songLink(page, 'Blue pocket', 'Blues').click();
     await openSounds(page);
     await page.getByLabel('Chords sound', { exact: true }).selectOption('pack:grand');
     await expect(page.locator('.error-banner')).toContainText('could not be verified');
@@ -246,7 +246,7 @@ test('one install applies genre sounds, preserves manual overrides and follows f
         }
     });
     await seedStarters(page);
-    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
+    await songLink(page, 'Blue pocket', 'Blues').click();
     expect(downloads).toEqual([]);
     await openSounds(page);
     await page.getByRole('button', { name: 'Install all & use genre sounds' }).click();
@@ -304,7 +304,7 @@ test('one install applies genre sounds, preserves manual overrides and follows f
         .toContain(appUrl('sw.js'));
     await disconnect();
     await page.reload();
-    await page.getByRole('button', { name: 'Blue pocket Funk · Saved locally' }).first().click();
+    await songLink(page, 'Blue pocket', 'Funk').first().click();
     await page.getByLabel('Feel', { exact: true }).selectOption('Jazz');
     await expect(page.getByLabel('Feel', { exact: true })).toBeEnabled();
     await openSounds(page);
@@ -359,7 +359,7 @@ test('installed sounds follow the feel after a reload without touching the Sound
     test.setTimeout(120_000);
     await observeSamples(page);
     await seedStarters(page);
-    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
+    await songLink(page, 'Blue pocket', 'Blues').click();
     await openSounds(page);
     await page.getByRole('button', { name: 'Install all & use genre sounds' }).click();
     await expect(page.getByRole('button', { name: 'Install all & use genre sounds' })).toBeEnabled({
@@ -373,7 +373,7 @@ test('installed sounds follow the feel after a reload without touching the Sound
             downloads.push(request.url());
         }
     });
-    await page.getByRole('button', { name: 'Minor swing sketch Jazz · Saved locally' }).click();
+    await songLink(page, 'Minor swing sketch', 'Jazz').click();
     await openSounds(page);
     for (const label of LANES) {
         await expect(page.getByLabel(`${label} sound`, { exact: true })).toHaveValue('auto');
@@ -408,7 +408,7 @@ test('failed bulk installation keeps every previous voice and retries completed 
         };
     }, appUrl('packs/acoustic-kit/'));
     await seedStarters(page);
-    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
+    await songLink(page, 'Blue pocket', 'Blues').click();
     await openSounds(page);
     await page.getByRole('button', { name: 'Install all & use genre sounds' }).click();
     await expect(page.locator('.error-banner')).toContainText('Storage full', { timeout: 60_000 });
@@ -485,7 +485,7 @@ test('feel preparation keeps the stand stable, rolls back playback safely, and r
                     .release === 'function',
         );
     await seedStarters(page);
-    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
+    await songLink(page, 'Blue pocket', 'Blues').click();
     await openSounds(page);
     await page.getByRole('button', { name: 'Install all & use genre sounds' }).click();
     await expect(page.getByRole('button', { name: 'Install all & use genre sounds' })).toBeEnabled({
@@ -560,7 +560,7 @@ test('a feel staged for the next bar settles when the musician stops inside it',
     // the swap is real, and a Stop landing inside it must not leave the engine on
     // the old feel while the captured document already reads the new one (#1185).
     await seedStarters(page);
-    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
+    await songLink(page, 'Blue pocket', 'Blues').click();
     await page.getByRole('button', { name: 'Start playback', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Stop playback' })).toBeEnabled();
     await page.getByLabel('Feel', { exact: true }).selectOption('Rock');
@@ -613,8 +613,8 @@ test('real runtime, local saves, reload recovery and offline playback', async ({
         };
     });
     await seedStarters(page);
-    await expect(page.getByRole('heading', { name: 'Let’s play something.' })).toBeVisible();
-    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
+    await expect(page.getByTestId('library-heading')).toBeVisible();
+    await songLink(page, 'Blue pocket', 'Blues').click();
     await expect(page.getByRole('heading', { name: 'Blue pocket', exact: true })).toBeVisible();
     expect(
         await page
@@ -645,7 +645,7 @@ test('real runtime, local saves, reload recovery and offline playback', async ({
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
     await page.getByRole('button', { name: 'Faster', exact: true }).click();
     await page.reload();
-    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
+    await songLink(page, 'Blue pocket', 'Blues').click();
     await expect(page.getByLabel('Tempo', { exact: true })).toHaveValue('120');
     await page.getByRole('button', { name: 'Song actions' }).click();
     await page.getByRole('button', { name: 'Revert to saved' }).click();
@@ -655,7 +655,7 @@ test('real runtime, local saves, reload recovery and offline playback', async ({
         .toContain(appUrl('sw.js'));
     await disconnect();
     await page.reload();
-    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
+    await songLink(page, 'Blue pocket', 'Blues').click();
     await expect(page.getByLabel('Tempo', { exact: true })).toHaveValue('115');
     await page.getByRole('button', { name: 'Start playback', exact: true }).click();
     await expect.poll(() => page.locator('[data-active="true"]').count()).toBeGreaterThan(0);
@@ -667,7 +667,7 @@ test('real runtime, local saves, reload recovery and offline playback', async ({
 
 test('responsive chart and editor fit laptop, phone and tablet', async ({ page }) => {
     await seedStarters(page);
-    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
+    await songLink(page, 'Blue pocket', 'Blues').click();
     for (const [width, height] of [
         [1300, 940],
         [402, 874],
@@ -725,10 +725,10 @@ test('two tabs cannot overwrite a newer save; a conflicting take can become a co
     context,
 }) => {
     await seedStarters(page);
-    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
+    await songLink(page, 'Blue pocket', 'Blues').click();
     const second = await context.newPage();
     await second.goto(appUrl());
-    await second.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
+    await songLink(second, 'Blue pocket', 'Blues').click();
     await page.getByRole('button', { name: 'Faster', exact: true }).click();
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
@@ -744,7 +744,7 @@ test('two tabs cannot overwrite a newer save; a conflicting take can become a co
         second.getByRole('heading', { name: 'Blue pocket — copy', exact: true }),
     ).toBeVisible();
     await page.reload();
-    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
+    await songLink(page, 'Blue pocket', 'Blues').click();
     await expect(page.getByLabel('Tempo', { exact: true })).toHaveValue('115');
 });
 
@@ -761,7 +761,7 @@ test('file export/import is detached; invalid input never changes the active son
         };
     });
     await seedStarters(page);
-    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
+    await songLink(page, 'Blue pocket', 'Blues').click();
     await page.getByRole('button', { name: 'Edit chart', exact: true }).click();
     await editorRevealed(page);
     await page.getByLabel('Song title').fill('My writing sketch');
@@ -798,7 +798,7 @@ test('failed recovery stays in memory through navigation and is never labelled r
     page,
 }) => {
     await seedStarters(page);
-    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
+    await songLink(page, 'Blue pocket', 'Blues').click();
     await page.evaluate(() => {
         Storage.prototype.setItem = () => {
             throw new DOMException('Full', 'QuotaExceededError');
@@ -807,9 +807,9 @@ test('failed recovery stays in memory through navigation and is never labelled r
     await page.getByRole('button', { name: 'Faster', exact: true }).click();
     await expect(page.getByText('Unsaved setup · this tab only', { exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Back to songbook' }).click();
-    await page.getByRole('button', { name: 'After hours Bossa · Saved locally' }).click();
+    await songLink(page, 'After hours', 'Bossa').click();
     await page.getByRole('button', { name: 'Back to songbook' }).click();
-    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
+    await songLink(page, 'Blue pocket', 'Blues').click();
     await expect(page.getByLabel('Tempo', { exact: true })).toHaveValue('115');
     await expect(page.getByText('Unsaved setup · this tab only', { exact: true })).toBeVisible();
 });
@@ -819,16 +819,16 @@ test('an older competing draft remains explicitly recoverable after another tab 
     context,
 }) => {
     await seedStarters(page);
-    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
+    await songLink(page, 'Blue pocket', 'Blues').click();
     const second = await context.newPage();
     await second.goto(appUrl());
-    await second.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
+    await songLink(second, 'Blue pocket', 'Blues').click();
     await page.getByRole('button', { name: 'Slower', exact: true }).click();
     await second.getByRole('button', { name: 'Faster', exact: true }).click();
     await second.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(second.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
     await page.reload();
-    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
+    await songLink(page, 'Blue pocket', 'Blues').click();
     await expect(page.getByLabel('Tempo', { exact: true })).toHaveValue('115');
     await page.getByRole('button', { name: 'Song actions' }).click();
     await page.getByText(/Preserved drafts \(/).click();
@@ -845,7 +845,7 @@ test('all existing feels and key/mutes survive a save; long charts scroll legibl
     disconnect,
 }) => {
     await seedStarters(page);
-    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
+    await songLink(page, 'Blue pocket', 'Blues').click();
     await expect
         .poll(() => page.evaluate(() => navigator.serviceWorker.controller?.scriptURL || ''))
         .toContain(appUrl('sw.js'));
@@ -865,7 +865,7 @@ test('all existing feels and key/mutes survive a save; long charts scroll legibl
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
     await page.reload();
-    await page.getByRole('button', { name: /Blue pocket .* · Saved locally/ }).click();
+    await songLink(page, 'Blue pocket').click();
     await expect(page.getByLabel('Key', { exact: true })).toHaveValue('Eb');
     await expect(page.getByRole('button', { name: 'Bass', exact: true })).toHaveAttribute(
         'aria-pressed',

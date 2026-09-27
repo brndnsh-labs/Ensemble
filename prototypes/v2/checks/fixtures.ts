@@ -4,7 +4,7 @@ import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { test as base, expect, type Page } from '@playwright/test';
+import { test as base, expect, type Locator, type Page } from '@playwright/test';
 import type { ChartDocument } from '../lib/documents';
 import { validateDocument } from '../lib/documents';
 import { bandForGenre } from '../lib/standards';
@@ -259,6 +259,25 @@ export const accountTest = test.extend<{ accountApi: AccountApi }>({
  * "Guided offlineC" while `Song title` stayed "Untitled song". Asserting the steal has already
  * happened is both the barrier and a real assertion about the reveal contract.
  */
+/**
+ * A song's row link — on the songbook home, the All songs page or in search results — by its
+ * EXACT title and, when given, the one muted fact under it (#1441). The rows used to be selected
+ * by their accessible name, "<title> <genre> · Saved locally"; #1441 says where songs live once,
+ * under the list, so the name no longer carries it. This keeps both halves of what that name
+ * asserted: the title matches exactly (a "— copy" or "copy" row never does), and `detail` is the
+ * row's genre (or composer, for a song that has one) matched exactly too.
+ */
+export function songLink(scope: Page, title: string, detail?: string): Locator {
+    const exact = (text: string) => new RegExp(`^${text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`);
+    let link = scope
+        .locator('.song-link')
+        .filter({ has: scope.locator('.song-name', { hasText: exact(title) }) });
+    if (detail !== undefined) {
+        link = link.filter({ has: scope.locator('.song-detail', { hasText: exact(detail) }) });
+    }
+    return link;
+}
+
 export async function editorRevealed(page: Page): Promise<void> {
     await expect(page.locator('.edit-panel textarea').first()).toBeFocused();
 }
@@ -299,7 +318,7 @@ const STARTER_SAMPLES = [
     ],
 ] as const;
 
-function starterDocuments(): ChartDocument[] {
+export function starterDocuments(): ChartDocument[] {
     const base = Date.now();
     // Distinct, DESCENDING timestamps in listed order (blues newest) — `repository.list()` sorts
     // by `updatedAt` descending, and a spec that opens "the" featured/continue-card song expects
@@ -352,8 +371,17 @@ function starterDocuments(): ChartDocument[] {
  * `Context is stopped`) as `pageerror`s in any spec that collects them.
  */
 export async function seedStarters(page: Page, path = ''): Promise<void> {
+    await seedGuestDocuments(page, starterDocuments(), path);
+}
+
+/**
+ * `seedStarters`' write, for any raw rows (#1441): the rows go into the guest store exactly as
+ * given — no validation, so a spec can plant a corrupt document — on `build.json`, and only then
+ * does the app load, once. See `seedStarters` for why it is done in that order.
+ */
+export async function seedGuestDocuments(page: Page, docs: unknown[], path = ''): Promise<void> {
     await page.goto(appUrl('build.json'));
-    await page.evaluate(async (docs: ChartDocument[]) => {
+    await page.evaluate(async (rows: unknown[]) => {
         const db = await new Promise<IDBDatabase>((resolve, reject) => {
             const request = indexedDB.open('ensemble-v2-preview', 1);
             request.onupgradeneeded = () =>
@@ -363,13 +391,13 @@ export async function seedStarters(page: Page, path = ''): Promise<void> {
         });
         await new Promise<void>((resolve, reject) => {
             const tx = db.transaction('documents', 'readwrite');
-            for (const doc of docs) {
-                tx.objectStore('documents').put(doc);
+            for (const row of rows) {
+                tx.objectStore('documents').put(row);
             }
             tx.oncomplete = () => resolve();
             tx.onerror = () => reject(tx.error);
         });
         db.close();
-    }, starterDocuments());
+    }, docs);
     await page.goto(appUrl(path));
 }

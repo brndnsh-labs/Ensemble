@@ -11,6 +11,11 @@ import {
  * The songbook-at-scale measurement for #1442: what a large guest library costs on both
  * projects, against the budget of home rendered in <=1s at 2,000 songs on webkit-phone.
  *
+ * Since #1441 the home page reads only what it shows — at most eight songs by id and a `count()`
+ * — so "rendered" is the home's eight rows plus the true "All N songs" count, and the whole
+ * library is a separate number: `allSongsMsMedian`, the All songs page's lazy full read, measured
+ * from the click on "All N songs →" to its last row.
+ *
  * Opt-in and SKIPPED by default (`ENSEMBLE_PERF` unset) — this is a measurement story, not a
  * regression gate: there is no product change to protect, sizes up to 2,000 songs are slow by
  * design, and the numbers are meant to be read by a person deciding #1440/#1441, not asserted
@@ -61,6 +66,7 @@ for (const size of SIZES) {
         await seedGuestSongs(page, size);
 
         const totalMs: number[] = [];
+        const allSongsMs: number[] = [];
         const readMs: number[] = [];
         let heap: number | null = null;
         let longTasks: LongTaskSample | null = null;
@@ -69,8 +75,17 @@ for (const size of SIZES) {
             const start = Date.now();
             await page.goto(appUrl());
             await expect(page.getByTestId('library-heading')).toBeVisible();
-            await expect(page.locator('.song-row')).toHaveCount(size, { timeout: 60_000 });
+            await expect(page.locator('.home-table .song-row')).toHaveCount(Math.min(size, 8), {
+                timeout: 60_000,
+            });
+            await expect(page.getByTestId('all-songs-link')).toHaveText(`All ${size} songs →`);
             totalMs.push(Date.now() - start);
+            const opened = Date.now();
+            await page.getByTestId('all-songs-link').click();
+            await expect(page.locator('.all-songs-table .song-row')).toHaveCount(size, {
+                timeout: 60_000,
+            });
+            allSongsMs.push(Date.now() - opened);
             readMs.push(await rawReadMs(page));
             if (i === ITERATIONS - 1) {
                 // Steady state after repeated loads, not the very first (possibly still-warming) one.
@@ -83,6 +98,7 @@ for (const size of SIZES) {
             size,
             project: testInfo.project.name,
             navigationToRenderedMsMedian: median(totalMs),
+            allSongsMsMedian: median(allSongsMs),
             rawIndexedDbReadMsMedian: median(readMs),
             heapBytes: heap,
             longTasks,

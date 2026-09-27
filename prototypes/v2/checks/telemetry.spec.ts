@@ -1,4 +1,4 @@
-import { expect, seedStarters, test } from './fixtures';
+import { expect, seedStarters, songLink, test } from './fixtures';
 
 /**
  * The v2 Umami gate (#1389), end to end against a real page load.
@@ -48,7 +48,7 @@ test.describe('telemetry (#1389)', () => {
         await expect(page.locator('#umami-telemetry')).toHaveCount(1);
 
         // A real interaction on the songbook home: opening a saved song.
-        await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
+        await songLink(page, 'Blue pocket', 'Blues').click();
         await expect(
             page.getByRole('button', { name: 'Start playback', exact: true }),
         ).toBeVisible();
@@ -108,7 +108,7 @@ test.describe('telemetry (#1389)', () => {
         });
 
         await seedStarters(page);
-        await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
+        await songLink(page, 'Blue pocket', 'Blues').click();
         await expect(
             page.getByRole('button', { name: 'Start playback', exact: true }),
         ).toBeVisible();

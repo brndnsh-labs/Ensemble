@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { expect, seedStarters, test } from './fixtures';
+import { expect, seedStarters, songLink, test } from './fixtures';
 
 // Trading with the band (docs/design/band-engine.md, "Trading with the player"): the Trade
 // button by the Soloist chip opens a sheet; the choice is saved with the chart.
@@ -17,7 +17,7 @@ test('trading with the soloist is chosen by the soloist, saved with the chart an
     page,
 }) => {
     await seedStarters(page);
-    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
+    await songLink(page, 'Blue pocket', 'Blues').click();
     await expect(page.getByRole('button', { name: 'Soloist', exact: true })).toHaveAttribute(
         'aria-pressed',
         'false',
@@ -50,7 +50,7 @@ test('trading with the soloist is chosen by the soloist, saved with the chart an
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
     await page.reload();
-    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).first().click();
+    await songLink(page, 'Blue pocket', 'Blues').first().click();
     await expect(trade).toBeVisible();
     const soloist = await exportedSoloist(page);
     expect(soloist.tradeWith).toBe('soloist');
@@ -88,7 +88,7 @@ test('a jazz band offers trading with the drummer, and starts cleanly with it se
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     await seedStarters(page);
-    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
+    await songLink(page, 'Blue pocket', 'Blues').click();
     await page.getByLabel('Feel', { exact: true }).selectOption('Jazz');
     await expect(page.getByLabel('Feel', { exact: true })).toBeEnabled();
 

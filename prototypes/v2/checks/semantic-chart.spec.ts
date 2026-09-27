@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import type { Page } from '@playwright/test';
 import type { ChartDocument } from '../lib/documents';
-import { appUrl, test as base, editorRevealed, expect, seedStarters } from './fixtures';
+import { appUrl, test as base, editorRevealed, expect, seedStarters, songLink } from './fixtures';
 
 const test = base.extend<{ disconnect: () => Promise<void> }>({
     disconnect: async ({ browserName, context, request }, use) => {
@@ -44,9 +44,7 @@ async function documents(page: Page): Promise<ChartDocument[]> {
 
 async function convertBlue(page: Page) {
     await seedStarters(page);
-    await page
-        .getByRole('button', { name: '♪ Blue pocket Blues · Saved locally', exact: true })
-        .click();
+    await songLink(page, 'Blue pocket', 'Blues').click();
     await page.getByRole('button', { name: 'Edit chart', exact: true }).click();
     await page
         .getByRole('button', { name: 'Try the bar editor · keep original', exact: true })
@@ -123,9 +121,7 @@ test('2+1+1 editor saves a source-preserving copy, transposes and reopens offlin
         .toContain(appUrl('sw.js'));
     await disconnect();
     await page.reload();
-    await page
-        .getByRole('button', { name: '♪ Uneven blues Blues · Saved locally', exact: true })
-        .click();
+    await songLink(page, 'Uneven blues', 'Blues').click();
     await expect(page.getByLabel('Key', { exact: true })).toHaveValue('D');
     await page.getByRole('button', { name: 'Start playback', exact: true }).click();
     await expect.poll(() => page.locator('.chord[aria-current="true"]').count()).toBe(1);
@@ -212,7 +208,7 @@ test('new charts support bar key/meter changes, growing the chart, recovery and 
     expect(exported.chart.score.sections[0].measures[1]).toMatchObject({ key: 'G', meter: '3/4' });
     expect(exported.chart.score.sections[0].measures[2]).toMatchObject({ meter: '4/4' });
     await page.reload();
-    await page.getByRole('button', { name: /Untitled song .*Saved locally/, exact: true }).click();
+    await songLink(page, 'Untitled song').click();
     await expect(page.locator('.song-title')).toHaveText('Mixed meter sketch');
     await expect(page.locator('.bar')).toHaveCount(6);
     await page.getByLabel('Import Ensemble document').setInputFiles({
@@ -252,9 +248,7 @@ test('semantic revision conflicts keep both takes, and unsupported imports never
     const original = (await documents(page)).find((document) => document.schemaVersion === 2)!;
     const second = await context.newPage();
     await second.goto(appUrl());
-    await second
-        .getByRole('button', { name: `♪ ${original.title} Blues · Saved locally`, exact: true })
-        .click();
+    await songLink(second, original.title, 'Blues').click();
     await second.getByRole('button', { name: 'Edit chart', exact: true }).click();
     await page.getByLabel('Chords in this bar').fill('C:2 Dm:1 G7:1');
     await page.getByRole('button', { name: 'Save', exact: true }).click();

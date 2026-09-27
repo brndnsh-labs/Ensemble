@@ -1,4 +1,4 @@
-import { expect, seedStarters, test } from './fixtures';
+import { expect, seedStarters, songLink, test } from './fixtures';
 
 // #1276 — the Feel & mix sheet: swing/swing grid/humanize/chord notation and the
 // chart's energy — auto intensity/band intensity, saved with the chart since the
@@ -28,7 +28,7 @@ async function setRange(page: import('@playwright/test').Page, label: string, va
 
 test('every Feel-sheet control has an accessible name', async ({ page }) => {
     await seedStarters(page);
-    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
+    await songLink(page, 'Blue pocket', 'Blues').click();
     await openFeel(page);
 
     await expect(page.getByLabel('Swing', { exact: true })).toBeVisible();
@@ -48,7 +48,7 @@ test('document-owned feel fields (swing, swing grid, humanize, notation) persist
     page,
 }) => {
     await seedStarters(page);
-    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
+    await songLink(page, 'Blue pocket', 'Blues').click();
     await openFeel(page);
 
     const swing = page.getByLabel('Swing', { exact: true });
@@ -100,7 +100,7 @@ test('document-owned feel fields (swing, swing grid, humanize, notation) persist
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
 
     await page.reload();
-    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).first().click();
+    await songLink(page, 'Blue pocket', 'Blues').first().click();
     await expect(page.locator('.chord-button').first()).not.toHaveText('C7');
     await openFeel(page);
     await expect(swing).toHaveValue('60');
@@ -113,7 +113,7 @@ test('master volume is a device preference: it persists across reload without Sa
     page,
 }) => {
     await seedStarters(page);
-    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
+    await songLink(page, 'Blue pocket', 'Blues').click();
     await openFeel(page);
 
     const masterVolume = page.getByLabel('Master volume', { exact: true });
@@ -125,7 +125,7 @@ test('master volume is a device preference: it persists across reload without Sa
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
 
     await page.reload();
-    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).first().click();
+    await songLink(page, 'Blue pocket', 'Blues').first().click();
     await openFeel(page);
     await expect(page.getByLabel('Master volume', { exact: true })).toHaveValue('75');
 });
@@ -134,7 +134,7 @@ test('count-in (#1422) is a device preference too: it persists across reload wit
     page,
 }) => {
     await seedStarters(page);
-    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
+    await songLink(page, 'Blue pocket', 'Blues').click();
     await openFeel(page);
 
     const countIn = page.getByLabel('Count-in', { exact: true });
@@ -149,7 +149,7 @@ test('count-in (#1422) is a device preference too: it persists across reload wit
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
 
     await page.reload();
-    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).first().click();
+    await songLink(page, 'Blue pocket', 'Blues').first().click();
     await openFeel(page);
     await expect(page.getByLabel('Count-in', { exact: true })).toBeChecked();
 });
@@ -158,7 +158,7 @@ test("energy (auto intensity, band intensity) is the chart's own: it dirties the
     page,
 }) => {
     await seedStarters(page);
-    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
+    await songLink(page, 'Blue pocket', 'Blues').click();
     await openFeel(page);
 
     const autoIntensity = page.getByLabel('Auto intensity', { exact: true });
@@ -190,7 +190,7 @@ test("energy (auto intensity, band intensity) is the chart's own: it dirties the
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
 
     await page.reload();
-    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).first().click();
+    await songLink(page, 'Blue pocket', 'Blues').first().click();
     await openFeel(page);
     await expect(page.getByLabel('Auto intensity', { exact: true })).not.toBeChecked();
     await expect(page.getByLabel('Band intensity', { exact: true })).toBeEnabled();
@@ -199,7 +199,7 @@ test("energy (auto intensity, band intensity) is the chart's own: it dirties the
 
     // Another chart opens on its own energy, not this one's.
     await page.getByRole('button', { name: 'Back to songbook' }).click();
-    await page.getByRole('button', { name: 'Minor swing sketch Jazz · Saved locally' }).click();
+    await songLink(page, 'Minor swing sketch', 'Jazz').click();
     await openFeel(page);
     await expect(page.getByLabel('Auto intensity', { exact: true })).toBeChecked();
     await expect(page.getByLabel('Band intensity', { exact: true })).toHaveValue('35');
@@ -209,7 +209,7 @@ test('the metronome is session-only: it never dirties the chart and resets on re
     page,
 }) => {
     await seedStarters(page);
-    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
+    await songLink(page, 'Blue pocket', 'Blues').click();
     await openFeel(page);
 
     const metronome = page.getByLabel('Metronome', { exact: true });
@@ -220,14 +220,14 @@ test('the metronome is session-only: it never dirties the chart and resets on re
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
 
     await page.reload();
-    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).first().click();
+    await songLink(page, 'Blue pocket', 'Blues').first().click();
     await openFeel(page);
     await expect(page.getByLabel('Metronome', { exact: true })).not.toBeChecked();
 });
 
 test('changing swing during playback does not stop the band', async ({ page }) => {
     await seedStarters(page);
-    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
+    await songLink(page, 'Blue pocket', 'Blues').click();
     await page.getByRole('button', { name: 'Start playback', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Stop playback', exact: true })).toBeEnabled();
     // Playback auto-focuses the chart and hides the header chrome, Feel included
@@ -248,7 +248,7 @@ test('count-in (#1422) clicks one bar before the band, then the chart plays from
     page,
 }) => {
     await seedStarters(page);
-    await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
+    await songLink(page, 'Blue pocket', 'Blues').click();
     await openFeel(page);
     await page.getByLabel('Count-in', { exact: true }).check();
     await closeFeel(page);

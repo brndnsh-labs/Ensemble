@@ -1,7 +1,6 @@
 import { readFile } from 'node:fs/promises';
-import { expect, seedStarters, test } from './fixtures';
+import { expect, seedStarters, songLink, test } from './fixtures';
 
-const blue = 'Blue pocket Blues · Saved locally';
 // Authored in `lib/starters.ts`: 12 one-bar-per-chord measures (`C7 | F7 | ...`)
 // in 4/4 at 110 BPM. Hardcoded here rather than read back through the UI so this
 // spec is an independent check on the exporter, not a mirror of the same code.
@@ -173,7 +172,7 @@ test('Export MIDI downloads a valid multi-track file matching the chart', async 
     page,
 }, testInfo) => {
     await seedStarters(page);
-    await page.getByRole('button', { name: blue }).click();
+    await songLink(page, 'Blue pocket', 'Blues').click();
     await expect(page.getByRole('heading', { name: 'Blue pocket' })).toBeVisible();
 
     await page.getByRole('button', { name: 'Song actions' }).click();
@@ -214,7 +213,7 @@ test('Export MIDI downloads a valid multi-track file matching the chart', async 
 
 test('Export MIDI during playback does not stop or glitch the band', async ({ page }) => {
     await seedStarters(page);
-    await page.getByRole('button', { name: blue }).click();
+    await songLink(page, 'Blue pocket', 'Blues').click();
     await page.getByRole('button', { name: 'Start playback', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Stop playback', exact: true })).toBeEnabled();
 

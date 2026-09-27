@@ -28,7 +28,18 @@ function formatOpened(iso: string): string {
 }
 
 interface AllSongsProps {
-    songs: ChartDocument[];
+    /**
+     * The whole songbook — read lazily since #1441, the first time this page (or a search) asks
+     * for it. Null while that read is out: the page says it is loading rather than showing a
+     * songbook with no songs.
+     */
+    songs: ChartDocument[] | null;
+    /**
+     * Why that read failed, when it did. A full read refuses a songbook it cannot wholly read
+     * (`lib/repository.ts`'s `list`), and that refusal is said here — the one surface that lists
+     * every song — instead of being turned into a short or empty list.
+     */
+    failure: string | null;
     accountLibrary: boolean;
     /** Per-device star set (#1440) — same source `onToggleStar` writes through. */
     starred: ReadonlySet<string>;
@@ -69,7 +80,8 @@ interface AllSongsProps {
  * a comment marks where it lands, so as not to fake a feature that isn't built yet.
  */
 export function AllSongs({
-    songs,
+    songs: library,
+    failure,
     accountLibrary,
     starred,
     openedAt,
@@ -87,6 +99,8 @@ export function AllSongs({
     const [genre, setGenre] = useState('');
     const [search, setSearch] = useState('');
     const [sort, setSort] = useState<AllSongsSort>(initialSort ?? 'title');
+    const loaded = library !== null;
+    const songs = useMemo(() => library ?? [], [library]);
     const rows = useRef(new Map<string, HTMLTableRowElement>());
     const heading = useRef<HTMLHeadingElement>(null);
     // Same courtesy `StandardsBrowser` gives the standards browse view: opening this moves focus
@@ -248,7 +262,8 @@ export function AllSongs({
                         </button>
                     </span>
                     <h1 ref={heading} tabIndex={-1}>
-                        All songs <span className="all-songs-count">· {songs.length}</span>
+                        All songs{' '}
+                        {loaded && <span className="all-songs-count">· {songs.length}</span>}
                     </h1>
                 </div>
             </div>
@@ -293,27 +308,47 @@ export function AllSongs({
                         aria-pressed={view === 'all'}
                         onClick={() => setView('all')}
                     >
-                        All songs <span className="filter-count">{songs.length}</span>
+                        All songs{' '}
+                        <span className="filter-count">{loaded ? songs.length : '…'}</span>
                     </button>
                     <button
                         className="filter-item"
                         aria-pressed={view === 'starred'}
                         onClick={() => setView('starred')}
                     >
-                        Starred <span className="filter-count">{starredCount}</span>
+                        Starred <span className="filter-count">{loaded ? starredCount : '…'}</span>
                     </button>
                     <button
                         className="filter-item"
                         aria-pressed={view === 'recent'}
                         onClick={() => setView('recent')}
                     >
-                        Recently opened <span className="filter-count">{recentCount}</span>
+                        Recently opened{' '}
+                        <span className="filter-count">{loaded ? recentCount : '…'}</span>
                     </button>
                     {/* Collections group arrives with #1443's synced "Starred" collection and
                         whole-playlist imports. Nothing renders here until that story lands. */}
                 </nav>
                 <div className="all-songs-content">
-                    {sorted.length === 0 ? (
+                    {!loaded ? (
+                        failure ? (
+                            <p
+                                className="all-songs-empty"
+                                role="alert"
+                                data-testid="library-failure"
+                            >
+                                {failure}
+                            </p>
+                        ) : (
+                            <p
+                                className="all-songs-empty"
+                                role="status"
+                                data-testid="all-songs-loading"
+                            >
+                                Loading all your songs…
+                            </p>
+                        )
+                    ) : sorted.length === 0 ? (
                         <p className="all-songs-empty">No songs match.</p>
                     ) : (
                         <table className="song-table all-songs-table">

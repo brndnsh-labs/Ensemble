@@ -18,6 +18,7 @@ export default defineConfig({
             'tests/browser/account-adopt-candidate.browser.test.ts',
             'tests/browser/account-sign-out.browser.test.ts',
             'tests/browser/account-library-prefs.browser.test.ts',
+            'tests/browser/account-home.browser.test.ts',
         ],
         browser: {
             enabled: true,
