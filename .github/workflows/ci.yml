@@ -161,15 +161,14 @@ jobs:
   # laps. Adding workers to one runner barely helps and is what starves the tab
   # enough to drop a chord from the chart (#1240) — so more runners, not more workers.
   #
-  # Sharding only pays off WITH `fullyParallel` in playwright.config.ts. Playwright
-  # shards by group, and without it a file+project is one indivisible group: the
-  # first attempt here split 50/50 by test count and ran 1.5m against 4.0m, because
-  # `foundation.spec.ts` is 42% of the suite's seconds and landed whole on one shard.
-  #
-  # `heavy`/`rest` alone drifted: every new spec lands on `rest`, which went from ~265s
-  # to 430–550s in a week while `heavy` held at ~290s (#1400). Splitting each by project
-  # halves both, and a leg installs only its own browser's system packages (WebKit's are
-  # the slow apt step). The floor is `checks` at ~3.5m; more legs buy little below it.
+  # The legs split each project's spec FILES by their measured seconds
+  # (`prototypes/v2/shard-weights.json`), dealt out in playwright.config.ts — not by
+  # Playwright's count-based `--shard`, which ran 1.5m against 4.0m here. A hand-kept
+  # `heavy`/`rest` list drifted twice: every new spec landed on `rest`, until it held 80%
+  # of the seconds (#1400, #1463). The computed deal puts a new spec on the lighter leg by
+  # itself; re-measure with `npm run shard:weights` when a leg runs visibly longer than its
+  # sibling. Splitting by project also means a leg installs only its own browser's system
+  # packages (WebKit's are the slow apt step).
   #
   # The REQUIRED context is the `v2-checks` aggregate below, not these legs, so
   # the matrix can change without touching branch protection.
@@ -185,8 +184,9 @@ jobs:
       fail-fast: false
       matrix:
         # Duration-balanced, not Playwright's count-based `--shard` — see
-        # playwright.config.ts for the measurement that forced this.
-        shard: [heavy, rest]
+        # playwright.config.ts. `V2_SHARD` below is `<shard>/2`: keep its `2` in step
+        # with this list's length.
+        shard: [1, 2]
         project: [laptop, webkit-phone]
         include:
           - project: laptop
@@ -271,13 +271,13 @@ jobs:
       # ~25% over its baseline, so it fails only on an accident such as an eager import.
       # One leg is enough; every leg builds the same export.
       - name: Check the export's JavaScript against its ceiling
-        if: matrix.shard == 'heavy' && matrix.project == 'laptop'
+        if: matrix.shard == 1 && matrix.project == 'laptop'
         run: npm run check:bundle --prefix prototypes/v2
 
       - name: Run the v2 Playwright suite
         run: npm run test:e2e --prefix prototypes/v2 -- --project=${{ matrix.project }}
         env:
-          V2_SHARD: ${{ matrix.shard }}
+          V2_SHARD: ${{ matrix.shard }}/2
 
       - uses: actions/upload-artifact@v7
         if: failure()

@@ -91,6 +91,9 @@ async function buildLookaheadChart(
         sectionCBars?: number;
         sectionDBars?: number;
         bpm?: number;
+        /** False drops section A's repeat, for a test that only needs the form's own wrap and
+         * would otherwise sit through A's second pass every lap. */
+        repeatA?: boolean;
     } = {},
 ): Promise<void> {
     const sectionBBars = opts.sectionBBars ?? 40;
@@ -114,11 +117,12 @@ async function buildLookaheadChart(
 
     const document = await exportCurrent(page);
     const score = document.chart.score;
+    const repeatA = opts.repeatA ?? true;
     score.sections[0].measures = [
-        chordBar('A1', { start: [{ kind: 'repeat-start' }] }),
+        chordBar('A1', repeatA ? { start: [{ kind: 'repeat-start' }] } : {}),
         chordBar('A2'),
         chordBar('A3', { symbols: ['Dm7', 'G7'] }),
-        chordBar('A4', { end: [{ kind: 'repeat-end', times: 2 }] }),
+        chordBar('A4', repeatA ? { end: [{ kind: 'repeat-end', times: 2 }] } : {}),
     ];
     score.sections[1].measures = Array.from({ length: sectionBBars }, (_, i) =>
         chordBar(`B${i + 1}`),
@@ -372,7 +376,7 @@ function waitForActiveNext(
 test('the row after the playing row stays fully visible on every bar change, and the cue never marks the playing bar', async ({
     page,
 }) => {
-    test.setTimeout(75_000);
+    test.setTimeout(50_000);
     await buildLookaheadChart(page);
     const scrollEl = page.locator('.chart-scroll');
     expect(
@@ -381,9 +385,12 @@ test('the row after the playing row stays fully visible on every bar change, and
     ).toBe(true);
     await startHere(page, 'B');
     const violations: string[] = [];
-    // Section B is 40 plain bars — enough to sample many row changes without a full 47-bar lap.
-    await pollSamples(page, (s) => s.activeId === 'B38', {
-        timeoutMs: 45_000,
+    // Section B is 40 plain bars, so the chart overflows well past B18 and the scroll is never
+    // clamped at the document's end while this samples. B1→B18 is 17 bar changes: four row
+    // changes on the laptop's 4-per-row layout, eight on the phone's 2-per-row one. Every sample
+    // costs a real second at 240bpm (the tempo ceiling), so this stops there (#1463).
+    await pollSamples(page, (s) => s.activeId === 'B18', {
+        timeoutMs: 30_000,
         check: (s) => {
             expect(s.nextCount, 'exactly one bar should carry data-next').toBe(1);
             expect(s.nextId, 'the cue must never mark the bar that is currently playing').not.toBe(
@@ -571,7 +578,9 @@ test('the jump-ahead fires in the last felt beat (not the downbeat), and fires a
     await trackScrollCalls(page);
     // A short viewport forces this small chart to overflow anyway, so a full lap stays fast.
     await page.setViewportSize({ width: 1300, height: 350 });
-    await buildLookaheadChart(page, { sectionBBars: 1 });
+    // No repeat on A: a lap is then 8 bars, not 12, and A's second pass is nowhere near the
+    // C3 → A1 jump this measures (#1463).
+    await buildLookaheadChart(page, { sectionBBars: 1, repeatA: false });
     const scrollEl = page.locator('.chart-scroll');
     expect(await scrollEl.evaluate((el) => el.scrollHeight > el.clientHeight + 1)).toBe(true);
     await startHere(page, 'C');
