@@ -323,6 +323,11 @@ function starterDocuments(): ChartDocument[] {
                     notation: 'name',
                     sections: [{ id: 'a', label: 'A', value, repeat: 1 }],
                 },
+                // `randomizeSeed: false` here is a deliberate TEST-fixture divergence from what
+                // `lib/starters.ts` used to write (`randomizeSeed: true`, the engine's own
+                // default) — this fixture's job is reproducible clickable data across runs, not
+                // modelling real seed-randomization behavior, and several specs assert exact
+                // durations/output against these songs.
                 performance: { bpm, seed: '', randomizeSeed: false },
                 band: bandForGenre(genre),
             },

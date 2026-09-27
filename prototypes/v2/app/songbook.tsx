@@ -98,6 +98,12 @@ interface SongbookProps {
     featured: FeaturedSummary | null;
     /** True when `featured` is the song the musician last had open (never true for a standard). */
     continued: boolean;
+    /**
+     * Opens the featured card's chart (#1439 review) — a separate callback from `onOpenSong`
+     * rather than routing by id, since only this card can name either a real song or a standard;
+     * every `onOpenSong` row below is always a real song.
+     */
+    onOpenFeatured: () => void;
     /** Opens the standards browse surface (#1439). */
     onBrowseStandards: () => void;
     busy: boolean;
@@ -123,6 +129,7 @@ export function Songbook({
     remoteCandidates,
     featured,
     continued,
+    onOpenFeatured,
     onBrowseStandards,
     busy,
     offline,
@@ -170,11 +177,7 @@ export function Songbook({
                                     {featured.genre} · {featured.bpm} BPM · {featured.key}
                                     {featured.isMinor ? 'm' : ''}
                                 </p>
-                                <button
-                                    className="btn"
-                                    disabled={busy}
-                                    onClick={() => onOpenSong(featured.id)}
-                                >
+                                <button className="btn" disabled={busy} onClick={onOpenFeatured}>
                                     Open chart →
                                 </button>
                             </div>

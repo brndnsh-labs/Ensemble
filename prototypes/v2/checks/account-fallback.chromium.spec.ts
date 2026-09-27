@@ -1,4 +1,11 @@
-import { openWithAccounts, releaseApi, shapeApi, signUp } from './account-helpers';
+import {
+    newSongOnTheStand,
+    openWithAccounts,
+    releaseApi,
+    saveAndUpload,
+    shapeApi,
+    signUp,
+} from './account-helpers';
 import { appUrl, expect, accountTest as test } from './fixtures';
 import { addVirtualAuthenticator } from './virtual-authenticator';
 
@@ -56,4 +63,47 @@ test('a signed-in device whose session read hangs gets a labelled fallback, then
     await expect(page.getByTestId('account-fallback')).toHaveCount(0);
     await expect(page.getByTestId('library-heading')).toHaveText('Your account songbook');
     await expect(page.getByTestId('library-loading')).toHaveCount(0);
+});
+
+/**
+ * The featured/continue card's own version of the fallback problem above (#1439 review): `songs`
+ * reads as `[]` while a signed-in device's library download is still in flight, and without a
+ * loading gate the card would fill that gap with a standard — the catalog's "good place to
+ * start" fallback — even though this account actually has a song, which then flashes and is
+ * replaced the moment the real library lands. `route`, not `shapeApi`, because this holds
+ * `GET /api/documents` specifically and lets the session read (and everything else) go through.
+ */
+test('the featured card does not flash a standard while a signed-in device’s library is still downloading', async ({
+    page,
+}) => {
+    await addVirtualAuthenticator(page);
+    await openWithAccounts(page);
+    await signUp(page);
+    await newSongOnTheStand(page);
+    await saveAndUpload(page, 'My real song');
+    await page.getByRole('button', { name: 'Back to songbook' }).click();
+    await expect(page.locator('.continue-card')).toContainText('My real song');
+
+    let release: (() => void) | undefined;
+    const held = new Promise<void>((resolve) => {
+        release = resolve;
+    });
+    await page.route('**/api/documents?*', async (route) => {
+        await held;
+        await route.continue();
+    });
+
+    try {
+        await page.reload();
+        await expect(page.getByRole('heading', { name: SONGBOOK })).toBeVisible();
+        await expect(page.getByTestId('library-loading')).toBeVisible();
+        // The whole claim: nothing fabricated fills the gap while the real answer is in flight.
+        await expect(page.locator('.continue-card')).toHaveCount(0);
+    } finally {
+        release?.();
+        await page.unroute('**/api/documents?*');
+    }
+
+    await expect(page.getByTestId('library-loading')).toHaveCount(0);
+    await expect(page.locator('.continue-card')).toContainText('My real song');
 });

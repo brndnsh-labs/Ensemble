@@ -43,17 +43,19 @@ test('a fresh device has zero saved songs and all 28 standards in the catalog', 
     await expect(page.getByRole('heading', { name: 'Standards.' })).toBeVisible();
     await expect(page.locator('.standards-table .song-row')).toHaveCount(28);
 
-    // Shelf chips filter the list; "All" always accounts for the other three.
-    const blues = page.getByRole('tab', { name: 'Blues', exact: true });
-    const jazz = page.getByRole('tab', { name: 'Jazz standards', exact: true });
-    const grooves = page.getByRole('tab', { name: 'Grooves', exact: true });
+    // Shelf chips filter the list; "All" always accounts for the other three. Toggle buttons
+    // (`aria-pressed`), not tabs — there is no tabpanel here, just a filtered table.
+    const blues = page.getByRole('button', { name: 'Blues', exact: true });
+    const jazz = page.getByRole('button', { name: 'Jazz standards', exact: true });
+    const grooves = page.getByRole('button', { name: 'Grooves', exact: true });
     await blues.click();
+    await expect(blues).toHaveAttribute('aria-pressed', 'true');
     await expect(page.locator('.standards-table .song-row')).toHaveCount(4);
     await jazz.click();
     await expect(page.locator('.standards-table .song-row')).toHaveCount(11);
     await grooves.click();
     await expect(page.locator('.standards-table .song-row')).toHaveCount(13);
-    await page.getByRole('tab', { name: 'All', exact: true }).click();
+    await page.getByRole('button', { name: 'All', exact: true }).click();
     await expect(page.locator('.standards-table .song-row')).toHaveCount(28);
 
     // Nothing about browsing ever touches storage.
@@ -105,4 +107,40 @@ test('opening a standard lands an unsaved draft that plays and changes key/feel;
     await expect(page.locator('.song-table .song-row')).toHaveCount(1);
     await page.getByRole('button', { name: 'Browse standards' }).click();
     await expect(page.locator('.standards-table .song-row')).toHaveCount(28);
+});
+
+/**
+ * A shared draft — a standard here, a `#chart=`/v1 link in `share-link.spec.ts` /
+ * `v1-share-link.spec.ts` — belongs to no songbook yet (`landDraftOnStand`'s own doc comment:
+ * "no recovery-storage write"). `draft()` used to write one anyway on every edit, keyed under
+ * the standard's own catalog id (`ensemble-v2-preview:recovery:<writer>:standard-…`) — a slot
+ * nothing but a Save, which this never is, ever clears, so "Preserved drafts (N)" grew by one per
+ * edited-but-unsaved visit.
+ */
+test('editing an open standard writes nothing to recovery storage', async ({ page }) => {
+    await page.goto(appUrl());
+    await page.getByRole('button', { name: 'Browse standards' }).click();
+    const row = page.locator('.standards-table .song-row', { hasText: '12-Bar Blues' });
+    await row.getByRole('button', { name: 'Open' }).click();
+    await expect(page.getByRole('heading', { name: '12-Bar Blues', exact: true })).toBeVisible();
+
+    // Every one of these routes through `draft()`.
+    await page.getByLabel('Key', { exact: true }).selectOption('D');
+    await page.getByLabel('Tempo', { exact: true }).fill('140');
+    await page.getByLabel('Tempo', { exact: true }).press('Enter');
+    await page.getByLabel('Feel', { exact: true }).selectOption('Jazz');
+
+    await expect
+        .poll(() =>
+            page.evaluate(
+                () =>
+                    Object.keys(localStorage).filter((key) =>
+                        key.startsWith('ensemble-v2-preview:recovery:'),
+                    ).length,
+            ),
+        )
+        .toBe(0);
+
+    await page.getByRole('button', { name: 'Song actions' }).click();
+    await expect(page.getByText(/Preserved drafts \(/)).toHaveCount(0);
 });

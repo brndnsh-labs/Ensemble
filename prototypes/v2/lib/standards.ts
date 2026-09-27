@@ -795,7 +795,10 @@ export function buildStandardDocument(entry: StandardEntry): ChartDocumentV2 {
         revision: 0,
         chart: {
             score,
-            performance: { bpm: entry.bpm, seed: '', randomizeSeed: false },
+            // `randomizeSeed: true` (an empty `seed`) is the engine's own default
+            // (`public/state/arranger.ts`) — what a fresh `captureContent()` gives, and what the
+            // old starters wrote too. `false` would make every take after the first identical.
+            performance: { bpm: entry.bpm, seed: '', randomizeSeed: true },
             band: bandForGenre(entry.genre),
         },
     };

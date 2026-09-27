@@ -1705,6 +1705,15 @@ export default function Ensemble() {
      */
     function draft(next: ChartDocument, baseline = saved) {
         setCurrent(next);
+        // A shared draft — a standard or a #chart=/v1 link (`landDraftOnStand`) — belongs to no
+        // songbook yet and has no `saved` baseline to recover FROM if the tab closes; "Keep a
+        // copy"/Save is what turns it into a library entry, and `open()` clears `sharedDraft`
+        // the moment that happens. Writing recovery storage for it here would key a slot under
+        // the shared id (a catalog id for a standard) that nothing but a Save — which this isn't
+        // — ever clears, so "Preserved drafts" would grow by one per edited-but-unsaved visit.
+        if (sharedDraft) {
+            return;
+        }
         if (baseline && same(next, baseline)) {
             retainNothingFor(next.id);
             setRecoveryHealthy(true);
@@ -2723,12 +2732,17 @@ export default function Ensemble() {
             track('chart_opened', { source: 'standard' });
         });
     }
-    /** The songbook home's one "open" callback: a library row, or the featured card's fallback standard. */
-    function openSongOrStandard(id: string) {
-        if (standardFor(id)) {
-            openStandard(id);
-        } else {
-            openSong(id);
+    /**
+     * The featured card's own "open" callback (#1439 review) — a separate, explicit path from
+     * `onOpenSong` rather than sniffing the id with `standardFor`: a library row is always a real
+     * song, and only the featured card can show either kind, since `featuredStandard`/
+     * `featuredSave` (below) already know which one built it.
+     */
+    function openFeatured() {
+        if (featuredStandard) {
+            openStandard(featuredStandard.id);
+        } else if (featuredSave) {
+            openSong(featuredSave.id);
         }
     }
     async function save(copy = false) {
@@ -3166,8 +3180,12 @@ export default function Ensemble() {
     const featuredSave = continuedSave || songs[0];
     // A device with no saved songs (#1439 retired the seeded starters) features a standard
     // instead of nothing — the mockup's "A good place to start". `songs`/`continuedSave` always
-    // win when there IS something of the musician's own: a standard is never "yours".
-    const featuredStandard = featuredSave ? null : standardFor('standard-12-bar-blues');
+    // win when there IS something of the musician's own: a standard is never "yours". Gated on
+    // `!songbookLoading` too: `songs` reads as `[]` while the account library is still being
+    // read, and without this a signed-in device with real songs would flash a standard first —
+    // the same "we haven't checked yet" distinction the library table itself already makes.
+    const featuredStandard =
+        featuredSave || songbookLoading ? null : standardFor('standard-12-bar-blues');
     const featured: FeaturedSummary | null = useMemo(() => {
         if (featuredStandard) {
             return {
@@ -3502,6 +3520,7 @@ export default function Ensemble() {
                 <Songbook
                     songs={songbookLoading ? [] : songs}
                     featured={featured}
+                    onOpenFeatured={openFeatured}
                     onBrowseStandards={() => setStandardsOpen(true)}
                     continued={!!continuedSave}
                     busy={busy}
@@ -3527,7 +3546,7 @@ export default function Ensemble() {
                     onSearch={setSearch}
                     onImport={() => setImporting(true)}
                     onNewSong={newSong}
-                    onOpenSong={openSongOrStandard}
+                    onOpenSong={openSong}
                     v1Import={
                         // An offer the app opened by itself is for the GUEST songbook and is
                         // not shown over an account library (patch R2); one the musician
@@ -3621,8 +3640,11 @@ export default function Ensemble() {
                             change(async () => {
                                 // Tracked HERE, not inside `runtime.setGenre` (#1389): this is
                                 // the transport bar's real call site, so it only fires on an
-                                // actual musician gesture — never during `lib/starters.ts`'s
-                                // one-time sample seeding, which calls `setGenre` directly.
+                                // actual musician gesture. `lib/starters.ts`'s one-time sample
+                                // seeding used to call `setGenre` directly too (retired by
+                                // #1439's standards catalog, which never calls it at all), which
+                                // is why this stayed a separate call site rather than moving
+                                // inside `setGenre` itself.
                                 await runtime.setGenre(genre, setSoundProgress);
                                 track('genre_changed', { genre });
                             }, true)

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
     firstBarsPreview,
     STANDARD_SHELF_LABELS,
@@ -24,12 +24,26 @@ const SHELVES: Array<StandardShelf | 'all'> = ['all', 'blues', 'jazz', 'grooves'
 export function StandardsBrowser({ onBack, onOpen }: StandardsBrowserProps) {
     const [shelf, setShelf] = useState<StandardShelf | 'all'>('all');
     const entries = STANDARDS.filter((entry) => shelf === 'all' || entry.shelf === shelf);
+    const heading = useRef<HTMLHeadingElement>(null);
+    // A view switch, not a dialog, but it earns the same courtesy: opening it moves focus onto
+    // its own heading (never left behind on whatever button was clicked), and leaving it gives
+    // focus back to that button rather than dropping it on `<body>`. `document.activeElement` at
+    // mount time is the button that opened this — captured once, restored on unmount.
+    useEffect(() => {
+        const opener = document.activeElement as HTMLElement | null;
+        heading.current?.focus();
+        return () => {
+            opener?.focus?.();
+        };
+    }, []);
     return (
         <main className="home standards-browser">
             <div className="home-intro">
                 <div>
                     <span className="eyebrow">Read-only, never saved</span>
-                    <h1>Standards.</h1>
+                    <h1 ref={heading} tabIndex={-1}>
+                        Standards.
+                    </h1>
                     <p>
                         Blues forms, jazz standards and genre grooves. Opening one puts it on the
                         stand as an unsaved draft — Save keeps your own copy.
@@ -41,13 +55,12 @@ export function StandardsBrowser({ onBack, onOpen }: StandardsBrowserProps) {
                     </button>
                 </div>
             </div>
-            <div className="shelf-chips" role="tablist" aria-label="Filter standards by shelf">
+            <div className="shelf-chips" role="group" aria-label="Filter standards by shelf">
                 {SHELVES.map((option) => (
                     <button
                         key={option}
                         className="shelf-chip"
-                        role="tab"
-                        aria-selected={shelf === option}
+                        aria-pressed={shelf === option}
                         onClick={() => setShelf(option)}
                     >
                         {option === 'all' ? 'All' : STANDARD_SHELF_LABELS[option]}
@@ -61,7 +74,9 @@ export function StandardsBrowser({ onBack, onOpen }: StandardsBrowserProps) {
                         <th className="hide-mobile">First bars</th>
                         <th>Genre</th>
                         <th className="hide-mobile">Tempo</th>
-                        <th />
+                        <th>
+                            <span className="sr">Open</span>
+                        </th>
                     </tr>
                 </thead>
                 <tbody>
@@ -81,7 +96,11 @@ export function StandardsBrowser({ onBack, onOpen }: StandardsBrowserProps) {
                             <td>{entry.genre}</td>
                             <td className="hide-mobile">{entry.bpm}</td>
                             <td>
-                                <button className="btn" onClick={() => onOpen(entry.id)}>
+                                <button
+                                    className="btn"
+                                    aria-label={`Open ${entry.title}`}
+                                    onClick={() => onOpen(entry.id)}
+                                >
                                     Open
                                 </button>
                             </td>

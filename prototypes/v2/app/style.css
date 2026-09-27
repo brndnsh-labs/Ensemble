@@ -406,6 +406,7 @@ html [hidden] {
 }
 .shelf-chips {
     display: flex;
+    flex-wrap: wrap;
     gap: 8px;
     margin-bottom: 20px;
 }
@@ -419,7 +420,7 @@ html [hidden] {
     font-weight: 550;
     cursor: pointer;
 }
-.shelf-chip[aria-selected="true"] {
+.shelf-chip[aria-pressed="true"] {
     background: var(--ink);
     color: var(--on-ink);
     border-color: var(--ink);
@@ -557,14 +558,6 @@ html [hidden] {
     width: 100%;
     text-align: left;
     margin-top: 9px;
-}
-.jam-symbol {
-    font-size: 24px;
-    font-family: Georgia, serif;
-    font-style: italic;
-    color: var(--accent);
-    width: 29px;
-    text-align: center;
 }
 .jam-tile strong {
     font-size: 12px;
