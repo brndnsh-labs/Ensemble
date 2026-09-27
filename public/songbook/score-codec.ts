@@ -1,4 +1,4 @@
-import { prepareCandidate } from './codec.js';
+import { type PreparedCandidate, prepareCandidate } from './codec.js';
 import { resolveScoreContext } from './score-context.js';
 import { addScoreDurations, scoreDuration, scoreMeter } from './score-duration.js';
 import { isScoreChord } from './score-text.js';
@@ -306,14 +306,19 @@ function events(value: unknown, path: string, length: ScoreDuration): void {
     );
 }
 
-/** Structural/authored validity only; a performance adapter must separately prove playable form. */
-export function validateSemanticScore(candidate: unknown): CodecDecodeResult<SemanticScore> {
-    const prepared = prepareCandidate(candidate);
-    if (prepared.kind !== 'ok') {
-        return prepared;
-    }
+/**
+ * Validates an already-prepared score candidate — one that has already been through
+ * {@link prepareCandidate}'s structural walk and JSON round trip, either directly or as a
+ * subtree of a larger document that has (a score nested under an already-prepared chart
+ * document inherits its parent's depth/size/acyclic/accessor-free bounds, since a subtree of a
+ * bounded tree cannot itself exceed those bounds). Does NOT re-run the structural walk —
+ * callers that hold raw, untrusted input must call {@link validateSemanticScore} instead.
+ */
+export function validatePreparedSemanticScore(
+    prepared: PreparedCandidate,
+): CodecDecodeResult<SemanticScore> {
     try {
-        const root = object(prepared.candidate, '$', [
+        const root = object(prepared, '$', [
             'notation',
             'key',
             'isMinor',
@@ -499,7 +504,7 @@ export function validateSemanticScore(candidate: unknown): CodecDecodeResult<Sem
                 `Missing ${ref.kind} destination.`,
             );
         }
-        return { kind: 'ok', value: prepared.candidate as SemanticScore };
+        return { kind: 'ok', value: prepared as unknown as SemanticScore };
     } catch (error) {
         return {
             kind: 'invalid',
@@ -514,4 +519,13 @@ export function validateSemanticScore(candidate: unknown): CodecDecodeResult<Sem
             ],
         };
     }
+}
+
+/** Structural/authored validity only; a performance adapter must separately prove playable form. */
+export function validateSemanticScore(candidate: unknown): CodecDecodeResult<SemanticScore> {
+    const prepared = prepareCandidate(candidate);
+    if (prepared.kind !== 'ok') {
+        return prepared;
+    }
+    return validatePreparedSemanticScore(prepared.candidate);
 }

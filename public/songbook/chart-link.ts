@@ -11,10 +11,10 @@
  *
  * Trust boundary: a link carries portable musical intent only — no account,
  * session or retry metadata. That isn't a promise kept by this file's code; it's
- * enforced structurally by `validateChartDocument`/`validateChartDocumentV2`,
- * which reject any envelope key outside their fixed schema
- * (`schemaVersion`/`id`/`title`/`createdAt`/`updatedAt`/`revision`/`chart`, plus
- * `metadata`/`importSource` on v2) before a decoded payload is trusted. Decoding
+ * enforced structurally by `validateAnyChartDocument` (dispatching to
+ * `validateChartDocument`/`validateChartDocumentV2`), which reject any envelope key outside
+ * their fixed schema (`schemaVersion`/`id`/`title`/`createdAt`/`updatedAt`/`revision`/`chart`,
+ * plus `metadata`/`importSource` on v2) before a decoded payload is trusted. Decoding
  * never throws into the UI: any malformed, oversized or schema-invalid payload
  * resolves to `undefined` — the same fail-closed contract as
  * `tryDecompressSections` in `state/share-codec.ts`.
@@ -25,8 +25,7 @@
  * async.
  */
 
-import { validateChartDocument } from './codec.js';
-import { validateChartDocumentV2 } from './document-v2.js';
+import { validateAnyChartDocument } from './document-v2.js';
 import type { ChartDocumentV2 } from './score-types.js';
 import { SONGBOOK_MAX_INPUT_BYTES } from './structural-limits.js';
 import type { ChartDocument } from './types.js';
@@ -122,15 +121,8 @@ async function inflate(bytes: Uint8Array): Promise<Uint8Array | undefined> {
 
 /** Routes to the matching validator; fails closed rather than trusting the fragment. */
 function validateChartLinkDocument(candidate: unknown): ChartLinkDocument | undefined {
-    const legacy = validateChartDocument(candidate);
-    if (legacy.kind === 'ok') {
-        return legacy.value;
-    }
-    if (legacy.kind === 'future-version' && legacy.schemaVersion === 2) {
-        const v2 = validateChartDocumentV2(candidate);
-        return v2.kind === 'ok' ? v2.value : undefined;
-    }
-    return undefined;
+    const result = validateAnyChartDocument(candidate);
+    return result.kind === 'ok' ? result.value : undefined;
 }
 
 /** Encodes a chart as a shareable `#chart=` URL hash fragment. */
