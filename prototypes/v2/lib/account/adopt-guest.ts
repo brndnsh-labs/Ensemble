@@ -21,18 +21,21 @@
  * `crypto.randomUUID()`), which is the #1268 patch-review P0 fix. A deterministic operation id
  * beside a deterministic document id poisoned the outbox: the server's receipts never expire and
  * only replay an EXACT byte match, while `save()` restamps `updatedAt` with `Date.now()` on every
- * call, so a second device adopting the same guest starter (`starter-blues` is a literal id on
- * every device) sent the same operation id with different bytes and earned a permanent
+ * call, so a second device adopting the same guest starter (back when `lib/starters.ts` seeded
+ * `starter-blues` as a literal id on every device — #1439 retired that seeding, but an old device
+ * that already saved one keeps it as an ordinary song) sent the same operation id with different
+ * bytes and earned a permanent
  * `operation_mismatch` — a `'retry'` to the outbox, which ended every pass at that document
  * forever. With a fresh id, a create for a document the account already holds answers `conflict`
  * (the handled path: the operation is marked `conflict`, the chip says so, and Keep-both #1267
  * owns resolving it) and a tombstoned one answers `'gone'`. Neither wedges the queue.
  *
- * A guest starter (`id.startsWith('starter-')`, the same test `songbook.tsx`'s Quick Jam section
- * uses) is not filtered out. A starter a musician has actually been playing from is a real song to
- * them, and there is no reliable way to tell "played but never edited" apart from "brand new,
- * revision 0" without extra state this store does not keep. Simplicity wins here: every guest song
- * is offered, starter or not.
+ * A guest song is never filtered by id here — starter or not, standard-derived or not (a Saved
+ * standard mints a fresh id, #1439, so a `standard-*` id never even reaches this store). An old
+ * `starter-*` document a device saved before #1439 retired the seeding is a real song to whoever
+ * has been playing from it, and there is no reliable way to tell "played but never edited" apart
+ * from "brand new, revision 0" without extra state this store does not keep. Simplicity wins here:
+ * every guest song is offered.
  */
 
 import { withFollowFeel } from '../documents';

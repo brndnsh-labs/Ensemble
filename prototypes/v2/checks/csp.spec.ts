@@ -1,4 +1,4 @@
-import { appUrl, expect, test } from './fixtures';
+import { appUrl, expect, seedStarters, test } from './fixtures';
 
 /**
  * The build-time `<meta>` Content-Security-Policy (#1395, docs/SECURITY.md F8).
@@ -47,7 +47,7 @@ test.describe('Content-Security-Policy (#1395)', () => {
         // `securitypolicyviolation` event; this spec's own job is to exercise the paths a guest
         // session actually takes (service worker registration, sample decode/playback, the
         // account entry point) rather than to re-implement that assertion.
-        await page.goto(appUrl());
+        await seedStarters(page);
         await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
 
         await page.getByRole('button', { name: 'Start playback', exact: true }).click();

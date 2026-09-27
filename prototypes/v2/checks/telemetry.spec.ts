@@ -1,4 +1,4 @@
-import { appUrl, expect, test } from './fixtures';
+import { expect, seedStarters, test } from './fixtures';
 
 /**
  * The v2 Umami gate (#1389), end to end against a real page load.
@@ -44,10 +44,10 @@ test.describe('telemetry (#1389)', () => {
             ).__ENSEMBLE_TELEMETRY_TEST_OVERRIDE__ = true;
         });
 
-        await page.goto(appUrl());
+        await seedStarters(page);
         await expect(page.locator('#umami-telemetry')).toHaveCount(1);
 
-        // A real interaction on the songbook home: opening a starter chart.
+        // A real interaction on the songbook home: opening a saved song.
         await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
         await expect(
             page.getByRole('button', { name: 'Start playback', exact: true }),
@@ -107,7 +107,7 @@ test.describe('telemetry (#1389)', () => {
             return route.abort();
         });
 
-        await page.goto(appUrl());
+        await seedStarters(page);
         await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
         await expect(
             page.getByRole('button', { name: 'Start playback', exact: true }),

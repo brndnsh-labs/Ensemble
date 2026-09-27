@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { appUrl, expect, test } from './fixtures';
+import { expect, seedStarters, test } from './fixtures';
 
 // Trading with the band (docs/design/band-engine.md, "Trading with the player"): the Trade
 // button by the Soloist chip opens a sheet; the choice is saved with the chart.
@@ -16,7 +16,7 @@ async function exportedSoloist(page: import('@playwright/test').Page) {
 test('trading with the soloist is chosen by the soloist, saved with the chart and reloaded', async ({
     page,
 }) => {
-    await page.goto(appUrl());
+    await seedStarters(page);
     await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
     await expect(page.getByRole('button', { name: 'Soloist', exact: true })).toHaveAttribute(
         'aria-pressed',
@@ -87,7 +87,7 @@ test('a jazz band offers trading with the drummer, and starts cleanly with it se
 }) => {
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
-    await page.goto(appUrl());
+    await seedStarters(page);
     await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
     await page.getByLabel('Feel', { exact: true }).selectOption('Jazz');
     await expect(page.getByLabel('Feel', { exact: true })).toBeEnabled();

@@ -56,9 +56,9 @@ never a chart title, chord content, account id or email:
 | :- | :- | :- |
 | `session_class` | `{ device }` | Once per boot, alongside the pageview |
 | `play_started` | — | The band actually starts (`lib/runtime.ts`'s `startBand`) |
-| `genre_changed` | `{ genre }` | The transport bar's `onGenre` handler (`app/ensemble.tsx`) — deliberately not inside `runtime.setGenre` itself, which `lib/starters.ts` also calls directly to build its one-time sample charts on a fresh device |
+| `genre_changed` | `{ genre }` | The transport bar's `onGenre` handler (`app/ensemble.tsx`) — deliberately not inside `runtime.setGenre` itself, whose only other caller was `lib/starters.ts`'s one-time sample seeding (retired by #1439's standards catalog, which never calls `setGenre` at all) |
 | `part_toggled` | `{ part }` | `runtime.setEnabled` |
-| `chart_opened` | `{ source: songbook \| import }` | `openSong`, and after an import lands |
+| `chart_opened` | `{ source: songbook \| import \| standard }` | `openSong`, `openStandard` (#1439), and after an import lands |
 | `chart_created` | — | `newSong` |
 | `chart_imported` | `{ format: ireal \| v1 \| file }` | The iReal import dialog, the v1 importer, a dropped `.ensemble`/`.json` file |
 | `share_created` | — | Copying a `#chart=` link |
@@ -295,7 +295,8 @@ coexistence/production migration has not shipped. Prefer a corrective release an
   cancels, and steppers commit once. Its 40–240 bounds match the existing engine and codec.
 - Continue uses a best-effort device-local last-opened preference, including recovered setup
   metadata. Opening a song does not alter saved revisions/timestamps. First visits offer a
-  starter honestly rather than implying previous practice; preference failure never gates play.
+  standard from the catalog (#1439) honestly ("A good place to start") rather than implying
+  previous practice; preference failure never gates play.
 
 ## Deployment
 

@@ -1,5 +1,5 @@
 import { asHeldDevice, releaseApi, shapeApi } from './account-helpers';
-import { appUrl, expect, test } from './fixtures';
+import { appUrl, expect, seedStarters, test } from './fixtures';
 
 /**
  * The per-device account switch (#1262, default flipped on by the cutover #1357), on both
@@ -147,7 +147,7 @@ test('a default profile still plays as a guest when the server is unreachable', 
     await asHeldDevice(page);
     await shapeApi(page, 'unreachable');
 
-    await page.goto(appUrl());
+    await seedStarters(page);
     await expect(page.getByRole('heading', { name: SONGBOOK })).toBeVisible();
     // The entry point renders even though the session could not be read: the alternative is a
     // feature that silently never appears when the network is having a bad day.
@@ -175,7 +175,7 @@ test('a server that answers with an error leaves the guest songbook exactly as i
     await asHeldDevice(page);
     await shapeApi(page, 'error');
 
-    await page.goto(appUrl());
+    await seedStarters(page);
     await expect(page.getByRole('heading', { name: SONGBOOK })).toBeVisible();
     await expect(page.getByTestId('library-loading')).toHaveCount(0);
     await expect(page.locator('.song-row').first()).toBeVisible();
@@ -199,7 +199,7 @@ test('an origin that accepts the session request and never answers it does not h
     await shapeApi(page, 'hold');
 
     try {
-        await page.goto(appUrl());
+        await seedStarters(page);
         await expect(page.getByRole('heading', { name: SONGBOOK })).toBeVisible();
         // The whole claim: the library stops waiting, and the songs are there to open.
         await expect(page.getByTestId('library-loading')).toHaveCount(0);

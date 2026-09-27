@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import type { Page } from '@playwright/test';
 import type { ChartDocument } from '../lib/documents';
-import { appUrl, test as base, editorRevealed, expect } from './fixtures';
+import { appUrl, test as base, editorRevealed, expect, seedStarters } from './fixtures';
 
 const test = base.extend<{ disconnect: () => Promise<void> }>({
     disconnect: async ({ browserName, context, request }, use) => {
@@ -43,7 +43,7 @@ async function documents(page: Page): Promise<ChartDocument[]> {
 }
 
 async function convertBlue(page: Page) {
-    await page.goto(appUrl());
+    await seedStarters(page);
     await page
         .getByRole('button', { name: '♪ Blue pocket Blues · Saved locally', exact: true })
         .click();

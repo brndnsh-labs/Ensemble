@@ -1,10 +1,10 @@
 import { readFile } from 'node:fs/promises';
 import type { Page } from '@playwright/test';
-import { appUrl, expect, test } from './fixtures';
+import { expect, seedStarters, test } from './fixtures';
 
 const blue = 'Blue pocket Blues · Saved locally';
 async function openEditor(page: Page) {
-    await page.goto(appUrl());
+    await seedStarters(page);
     await page.getByRole('button', { name: blue }).click();
     await page.getByRole('button', { name: 'Edit chart', exact: true }).click();
 }
@@ -102,7 +102,7 @@ test('export and Save a copy include typed text but do not overwrite the origina
 test('a queued close event cannot shut a dialog that has already been reopened (#1402)', async ({
     page,
 }) => {
-    await page.goto(appUrl());
+    await seedStarters(page);
     await page.getByRole('button', { name: blue }).click();
     await page.getByRole('button', { name: 'Song actions' }).click();
     await expect(page.getByRole('button', { name: 'Export file', exact: true })).toBeVisible();
@@ -295,7 +295,7 @@ test('tempo allows sequential typing, Enter, blur, Escape and single step commit
 test('Continue remembers opened songs and recovered setup without changing saved timestamps', async ({
     page,
 }) => {
-    await page.goto(appUrl());
+    await seedStarters(page);
     await expect(page.locator('.continue-card')).toContainText('A good place to start');
     await page.getByRole('button', { name: blue }).click();
     const before = await savedBlue(page);
@@ -431,7 +431,7 @@ test('Edit chart and Edit section reveal the input across laptop, phone and tabl
 test('the stand scales to its screen, holds still across play/pause and keeps mute state readable', async ({
     page,
 }, info) => {
-    await page.goto(appUrl());
+    await seedStarters(page);
     await page.getByRole('button', { name: blue }).click();
     await page.waitForSelector('.bar');
     // #1186 pinned a playing-only scale larger than idle; that made every play/pause
@@ -529,7 +529,7 @@ test('stage mode darkens the stand, persists per device and follows the system w
 }, info) => {
     await page.emulateMedia({ colorScheme: 'light' });
     const openStand = async () => {
-        await page.goto(appUrl());
+        await seedStarters(page);
         await page.getByRole('button', { name: blue }).click();
         await page.waitForSelector('.bar');
     };
@@ -599,7 +599,7 @@ test('stage mode darkens the stand, persists per device and follows the system w
 test('a muted lane reads as muted at a distance and toggling never reflows the row', async ({
     page,
 }) => {
-    await page.goto(appUrl());
+    await seedStarters(page);
     await page.getByRole('button', { name: blue }).click();
     await page.waitForSelector('.bar');
     const drums = page.getByRole('button', { name: 'Drums', exact: true });

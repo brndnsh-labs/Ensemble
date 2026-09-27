@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { appUrl, expect, test } from './fixtures';
+import { appUrl, expect, seedStarters, test } from './fixtures';
 
 const blue = 'Blue pocket Blues · Saved locally';
 // Same starter facts `checks/midi-export.spec.ts` hardcodes, for the same reason: an
@@ -59,7 +59,7 @@ test('Export audio (mix) downloads a valid WAV of plausible duration, and the li
     // this suite's own machine has shown enough variance to need real headroom
     // rather than the default 45s.
     test.setTimeout(120_000);
-    await page.goto(appUrl());
+    await seedStarters(page);
     await page.getByRole('button', { name: blue }).click();
     await expect(page.getByRole('heading', { name: 'Blue pocket' })).toBeVisible();
     const before = await page.locator('.sheet').innerText();
@@ -95,7 +95,7 @@ test('Export audio during playback does not stop or glitch the band', async ({ p
     // render's step-generation loop now shares the main thread with the live
     // scheduler's real-time ticks — same generous budget, not a tighter one.
     test.setTimeout(120_000);
-    await page.goto(appUrl());
+    await seedStarters(page);
     await page.getByRole('button', { name: blue }).click();
     await page.getByRole('button', { name: 'Start playback', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Stop playback', exact: true })).toBeEnabled();
@@ -137,7 +137,7 @@ test('Cancel stops an in-flight export before any download', async ({ page }) =>
             return original(input, init);
         };
     }, appUrl('packs/grand/manifest.json'));
-    await page.goto(appUrl());
+    await seedStarters(page);
     await page.getByRole('button', { name: blue }).click();
     await page.getByRole('button', { name: 'Sounds', exact: true }).click();
     await page.getByLabel('Chords sound', { exact: true }).selectOption('pack:grand');
@@ -197,7 +197,7 @@ test('A pack that fails to install surfaces an error, never a silent synth fallb
             return original(input, init);
         };
     }, appUrl('packs/grand/'));
-    await page.goto(appUrl());
+    await seedStarters(page);
     await page.getByRole('button', { name: blue }).click();
     await page.getByRole('button', { name: 'Sounds', exact: true }).click();
     await page.getByLabel('Chords sound', { exact: true }).selectOption('pack:grand');
