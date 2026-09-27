@@ -25,12 +25,10 @@ import { genreSwing } from './genre-swing';
  * key — NOT transposed from v1's data, which the #1439 issue calls out as approximate in places
  * (e.g. Night and Day's first section was a plain ii-V-I).
  *
- * A `music-theory-reviewer` pass (#1439) checked all 11 against published changes and corrected
- * three real errors this file's own doubts didn't fully catch (All The Things You Are's ii
- * chords, Night and Day's missing bridge modulation, All Blues's turnback) plus one smaller one
- * (Stella's bar 4). One doubt remains genuinely open — Donna Lee's bridge, flagged inline — where
- * the reviewer's own reference wasn't itself fully confident either; every other inline "flagged
- * for review" comment is resolved and left as a record of what was checked.
+ * The 11 jazz standards are verified bar by bar against the iReal Pro Jazz 1460 playlist
+ * (decoded with this repo's own iReal reader) plus an independent source per tune (2026-09-26
+ * re-check). An earlier from-memory theory-review pass was unreliable (it invented Night and
+ * Day), so treat any future chart edit the same way: cite a source, don't recall.
  */
 
 export type StandardShelf = 'blues' | 'jazz' | 'grooves';
@@ -129,7 +127,7 @@ export const STANDARDS: readonly StandardEntry[] = [
         bpm: 140,
         key: 'Bb',
         isMinor: false,
-        // The Bb jazz-blues changes shared by "Now's the Time" and "Billie's Bounce" — the
+        // The standard bebop jazz-blues changes (as on "Now's the Time"/"Billie's Bounce", transposed from F) — the
         // canonical jam-session form, not v1's numerals (which this happens to match anyway).
         sections: [
             {
@@ -161,11 +159,12 @@ export const STANDARDS: readonly StandardEntry[] = [
         bpm: 140,
         key: 'G',
         isMinor: true,
+        // AABC, 32 bars, per iReal Jazz 1460 and the Real Book (C keeps the chromatic walk-down).
         sections: [
             { label: 'A', bars: ['Cm7', 'F7', 'Bbmaj7', 'Ebmaj7', 'Am7b5', 'D7', 'Gm7', 'Gm7'] },
             { label: 'A', bars: ['Cm7', 'F7', 'Bbmaj7', 'Ebmaj7', 'Am7b5', 'D7', 'Gm7', 'Gm7'] },
             { label: 'B', bars: ['Am7b5', 'D7', 'Gm7', 'Gm7', 'Cm7', 'F7', 'Bbmaj7', 'Ebmaj7'] },
-            { label: 'C', bars: ['Am7b5', 'D7', 'Gm7', 'Gm7', 'Am7b5', 'D7', 'Gm7', 'Gm7'] },
+            { label: 'C', bars: ['Am7b5', 'D7', 'Gm7 Gb7', 'Fm7 E7', 'Am7b5', 'D7', 'Gm7', 'Gm7'] },
         ],
     },
     {
@@ -176,11 +175,13 @@ export const STANDARDS: readonly StandardEntry[] = [
         bpm: 140,
         key: 'C',
         isMinor: true,
-        // One chord per bar, the commonly published 16-bar Kenny Dorham form — NOT v1's data,
-        // which stretched the opening i/iv to two bars each.
+        // The 16-bar Kenny Dorham form per iReal Jazz 1460 and published charts (i and iv two bars each).
         sections: [
-            { label: 'A', bars: ['Cm7', 'Fm7', 'Dm7b5', 'G7', 'Cm7', 'Fm7', 'Ebm7', 'Ab7'] },
-            { label: 'B', bars: ['Dbmaj7', 'Dbmaj7', 'Dm7b5', 'G7', 'Cm7', 'Cm7', 'Dm7b5', 'G7'] },
+            { label: 'A', bars: ['Cm7', 'Cm7', 'Fm7', 'Fm7', 'Dm7b5', 'G7b9', 'Cm7', 'Cm7'] },
+            {
+                label: 'B',
+                bars: ['Ebm7', 'Ab7', 'Dbmaj7', 'Dbmaj7', 'Dm7b5', 'G7b9', 'Cm7', 'Dm7b5 G7b9'],
+            },
         ],
     },
     {
@@ -191,25 +192,17 @@ export const STANDARDS: readonly StandardEntry[] = [
         bpm: 135,
         key: 'Ab',
         isMinor: false,
+        // 36-bar AABA′; the ii chords before Cmaj7/Gmaj7 are plain m7 (iReal Jazz 1460; Wikipedia "simple ii–V–I").
         sections: [
             {
                 label: 'A',
-                bars: ['Fm7', 'Bbm7', 'Eb7', 'Abmaj7', 'Dbmaj7', 'Dm7b5 G7', 'Cmaj7', 'Cmaj7'],
+                bars: ['Fm7', 'Bbm7', 'Eb7', 'Abmaj7', 'Dbmaj7', 'Dm7 G7', 'Cmaj7', 'Cmaj7'],
             },
             {
                 label: 'A2',
-                bars: ['Cm7', 'Fm7', 'Bb7', 'Ebmaj7', 'Abmaj7', 'Am7b5 D7', 'Gmaj7', 'Gmaj7'],
+                bars: ['Cm7', 'Fm7', 'Bb7', 'Ebmaj7', 'Abmaj7', 'Am7 D7', 'Gmaj7', 'Gmaj7'],
             },
-            // Theory review (music-theory-reviewer, #1439): a minor ii-V resolving to a MAJOR I
-            // is this tune's defining harmonic fingerprint (cited in Levine's Jazz Theory Book as
-            // the textbook example) — the ii chord is half-diminished throughout, in the A and A2
-            // cadences above too. An earlier draft used plain minor 7 here reasoning "the parallel
-            // A/A2 cadences use it" — backwards, since those were the same error; all three are
-            // m7b5 now.
-            {
-                label: 'B',
-                bars: ['Am7b5', 'D7', 'Gmaj7', 'Gmaj7', 'F#m7b5', 'B7', 'Emaj7', 'C7alt'],
-            },
+            { label: 'B', bars: ['Am7', 'D7', 'Gmaj7', 'Gmaj7', 'F#m7b5', 'B7', 'Emaj7', 'C7alt'] },
             {
                 label: 'A3',
                 bars: [
@@ -224,7 +217,7 @@ export const STANDARDS: readonly StandardEntry[] = [
                     'Bbm7',
                     'Eb7',
                     'Abmaj7',
-                    'C7alt',
+                    'Gm7b5 C7b9',
                 ],
             },
         ],
@@ -237,6 +230,7 @@ export const STANDARDS: readonly StandardEntry[] = [
         bpm: 180,
         key: 'Bb',
         isMinor: false,
+        // 32-bar AABA in Bb (iReal "I Got Rhythm"/"Anthropology"): the first and last A turn back; the A before the bridge resolves.
         sections: [
             {
                 label: 'A',
@@ -248,7 +242,7 @@ export const STANDARDS: readonly StandardEntry[] = [
                     'Bbmaj7 Bb7',
                     'Ebmaj7 Ebm7',
                     'Bbmaj7 F7',
-                    'Bbmaj7',
+                    'Bbmaj7 F7',
                 ],
             },
             {
@@ -275,7 +269,7 @@ export const STANDARDS: readonly StandardEntry[] = [
                     'Bbmaj7 Bb7',
                     'Ebmaj7 Ebm7',
                     'Bbmaj7 F7',
-                    'Bbmaj7',
+                    'Bbmaj7 F7',
                 ],
             },
         ],
@@ -288,13 +282,9 @@ export const STANDARDS: readonly StandardEntry[] = [
         bpm: 120,
         key: 'Bb',
         isMinor: false,
-        // Stella genuinely varies by fake-book edition (v1's own provenance note cites a named
-        // analysis). Authored here as the commonly played "modern Real Book" reading. Theory
-        // review (#1439) confirmed this against that reading, with one fix: bar 4's F7 broke the
-        // tune's own alteration pattern (every other minor ii-V here resolves V7 with a b9)
-        // — now F7b9.
+        // Modern Real Book / iReal Jazz 1460 reading; bar 4 is a major ii–V (Cm7 F7).
         sections: [
-            { label: 'A', bars: ['Em7b5', 'A7b9', 'Cm7', 'F7b9', 'Fm7', 'Bb7', 'Ebmaj7', 'Ab7'] },
+            { label: 'A', bars: ['Em7b5', 'A7b9', 'Cm7', 'F7', 'Fm7', 'Bb7', 'Ebmaj7', 'Ab7'] },
             {
                 label: 'B',
                 bars: [
@@ -450,16 +440,17 @@ export const STANDARDS: readonly StandardEntry[] = [
         bpm: 160,
         key: 'G',
         isMinor: false,
+        // ABAC, 32 bars, on "How High the Moon" (iReal Jazz 1460; standardrepertoire.com).
         sections: [
-            { label: 'A', bars: ['Gmaj7', 'Gmaj7', 'Gm7', 'C7', 'Fmaj7', 'Fmaj7', 'Fm7', 'Bb7'] },
             { label: 'A', bars: ['Gmaj7', 'Gmaj7', 'Gm7', 'C7', 'Fmaj7', 'Fmaj7', 'Fm7', 'Bb7'] },
             {
                 label: 'B',
-                bars: ['Ebmaj7', 'Ebmaj7', 'Am7b5', 'D7b9', 'Gm7', 'Gm7', 'Am7', 'D7'],
+                bars: ['Eb7', 'Am7b5 D7b9', 'Gm7', 'Am7b5 D7b9', 'Bm7', 'E7', 'Am7', 'D7'],
             },
+            { label: 'A', bars: ['Gmaj7', 'Gmaj7', 'Gm7', 'C7', 'Fmaj7', 'Fmaj7', 'Fm7', 'Bb7'] },
             {
-                label: 'A',
-                bars: ['Gmaj7', 'Gmaj7', 'Gm7', 'C7', 'Fm7', 'Bb7', 'Ebmaj7 D7', 'Gmaj7'],
+                label: 'C',
+                bars: ['Eb7', 'Am7b5 D7b9', 'Gmaj7', 'Am7 D7', 'Bm7 E7', 'Am7 D7', 'G6', 'Am7 D7'],
             },
         ],
     },
@@ -471,29 +462,17 @@ export const STANDARDS: readonly StandardEntry[] = [
         bpm: 220,
         key: 'Ab',
         isMinor: false,
+        // "Indiana" changes in Ab, per iReal Jazz 1460 and jazzleadsheet.com (bars 21–28: ii–V–i in F minor).
         sections: [
             {
                 label: 'A',
-                bars: ['Abmaj7', 'F7', 'Bb7', 'Bb7', 'Bbm7', 'Eb7', 'Abmaj7', 'Bbm7 Eb7'],
+                bars: ['Abmaj7', 'F7', 'Bb7', 'Bb7', 'Bbm7', 'Eb7', 'Abmaj7', 'Ebm7 Ab7'],
             },
-            // STILL UNRESOLVED after theory review (#1439): this section's brief excursion
-            // through G was flagged as the least confidently recalled going in, and the
-            // independent review agrees it's likely wrong — its own reference (a different
-            // "Donna Lee" lead sheet) instead tonicizes Db here (a shape closer to the catalog's
-            // own A2/A3, not a Gmaj7/E-major/F#maj7 excursion) and reserves the G-ish move for a
-            // separate relative-minor bridge (Gm7b5-C7b9 -> Fm7) this catalog doesn't have at
-            // all. "Indiana"-descended tunes are documented to genuinely vary by fake book, and
-            // the reviewer's own alternative wasn't fully specified either, so this section is
-            // left as originally authored pending a second independent source — not shipped as
-            // theory-review-confirmed the way the other ten standards are.
-            { label: 'B', bars: ['Gmaj7', 'E7', 'A7', 'A7', 'Abm7 Db7', 'F#maj7', 'Am7', 'D7'] },
-            {
-                label: 'A',
-                bars: ['Abmaj7', 'F7', 'Bb7', 'Bb7', 'Bbm7', 'Eb7', 'C7', 'Fm7'],
-            },
+            { label: 'B', bars: ['Dbmaj7', 'Gb7', 'Abmaj7', 'F7', 'Bb7', 'Bb7', 'Bbm7', 'Eb7'] },
+            { label: 'A2', bars: ['Abmaj7', 'F7', 'Bb7', 'Bb7', 'Gm7b5', 'C7b9', 'Fm', 'C7b9'] },
             {
                 label: 'C',
-                bars: ['Dbmaj7', 'Ddim7', 'Abmaj7/Eb', 'F7', 'Bb7', 'Eb7', 'Abmaj7', 'Bbm7 Eb7'],
+                bars: ['Fm', 'C7b9', 'Fm', 'Bdim7', 'Cm7 F7', 'Bbm7 Eb7', 'Abmaj7', 'Bbm7 Eb7'],
             },
         ],
     },
@@ -505,30 +484,24 @@ export const STANDARDS: readonly StandardEntry[] = [
         bpm: 130,
         key: 'C',
         isMinor: false,
-        // The famous device this tune is taught for — a tonic pedal under chromatically
-        // climbing diminished passing chords — replaces v1's plain ii-V-I first section (the
-        // #1439 issue's own example of an approximate v1 entry); the theory review (#1439)
-        // confirmed the A/A2/A3 sections as authored. The bridge's "immediate, fleeting and
-        // often unprepared key change up a minor third, before an equally transient and
-        // unexpected return" (its own well-documented signature device — the lyric's two-line
-        // repetition sits over exactly this Ebmaj7-Cmaj7 alternation) was missing from an
-        // earlier draft's fully-diatonic bridge; the review caught it. The bridge's own
-        // resolution back toward the final A (bars 5-8 below) is lower-confidence than that
-        // alternation and could use a second source.
+        // 48-bar ABABCB (Wikipedia; iReal Jazz 1460): bVImaj7–V7–I, a half-step descent from
+        // F#m7b5 to Dm7, and a bridge that flips between Eb and C.
         sections: [
-            { label: 'A', bars: ['Cmaj7', 'C#dim7', 'Dm7', 'D#dim7', 'Em7', 'A7', 'Dm7', 'G7'] },
             {
-                label: 'A2',
-                bars: ['Cmaj7', 'C#dim7', 'Dm7', 'D#dim7', 'Em7', 'Ebm7 Ab7', 'Dbmaj7', 'Dbmaj7'],
+                label: 'A',
+                bars: ['Abmaj7', 'G7', 'Cmaj7', 'Cmaj7', 'Abmaj7', 'G7', 'Cmaj7', 'Cmaj7'],
             },
+            { label: 'B', bars: ['F#m7b5', 'Fm7', 'Em7', 'Ebdim7', 'Dm7', 'G7', 'Cmaj7', 'Cmaj7'] },
+            {
+                label: 'A',
+                bars: ['Abmaj7', 'G7', 'Cmaj7', 'Cmaj7', 'Abmaj7', 'G7', 'Cmaj7', 'Cmaj7'],
+            },
+            { label: 'B', bars: ['F#m7b5', 'Fm7', 'Em7', 'Ebdim7', 'Dm7', 'G7', 'Cmaj7', 'Bb7'] },
             {
                 label: 'Bridge',
-                bars: ['Ebmaj7', 'Cmaj7', 'Ebmaj7', 'Cmaj7', 'Dm7', 'G7', 'Cmaj7 A7', 'Dm7 G7'],
+                bars: ['Ebmaj7', 'Ebmaj7', 'Cmaj7', 'Cmaj7', 'Ebmaj7', 'Ebmaj7', 'Cmaj7', 'Cmaj7'],
             },
-            {
-                label: 'A3',
-                bars: ['Cmaj7', 'C#dim7', 'Dm7', 'D#dim7', 'Em7', 'A7', 'Dm7 G7', 'Cmaj7'],
-            },
+            { label: 'B', bars: ['F#m7b5', 'Fm7', 'Em7', 'Ebdim7', 'Dm7', 'G7', 'C6', 'C6'] },
         ],
     },
     {
@@ -540,9 +513,7 @@ export const STANDARDS: readonly StandardEntry[] = [
         key: 'G',
         isMinor: false,
         meter: '6/8',
-        // Theory review (#1439): the turnback is one chord per bar for the full two bars —
-        // D7#9, then the deliberate bVI substitution Eb7#9, then back to D7#9 before resolving —
-        // not compressed into one bar with an early resolution to G7.
+        // 6/8 12-bar: V in bar 9, bVI then V in bar 10, tonic for bars 11–12 (iReal; Wikipedia).
         sections: [
             {
                 label: 'Head',
@@ -556,8 +527,8 @@ export const STANDARDS: readonly StandardEntry[] = [
                     'G7',
                     'G7',
                     'D7#9',
-                    'Eb7#9',
-                    'D7#9',
+                    'Eb7#9 D7#9',
+                    'G7',
                     'G7',
                 ],
             },
