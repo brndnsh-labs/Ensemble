@@ -161,6 +161,104 @@ describe('bounded source-preserving iReal import', () => {
         }
     });
 
+    it("rounds a 4/4 bar's under-filled cells to the meter's own beat count (#1453)", () => {
+        // "C,Dm,G7" writes 3 chords with no spacing at all (3 raw cells in a 4-cell bar).
+        // Established: infojunkie/ireal-musicxml converter.js's `adjustChordsDuration()` pads
+        // (round-robin from the first chord) until the total hits `this.time.beats` (4 for 4/4),
+        // NOT the bar's raw cell count — unlike the old proportional-width formula this replaces,
+        // which refused this exact shape ("iReal rounding") because 4*1/3 isn't a whole number of
+        // quarter notes. This is the SAME algorithm the multi-meter cases below use; 4/4 (beatUnit
+        // 1) is not special-cased.
+        const content = score('T44[C,Dm,G7Z').sections[0].measures[0].content;
+        expect(content.kind).toBe('events');
+        if (content.kind === 'events') {
+            expect(content.events.map((event) => event.duration)).toEqual([
+                [2, 1],
+                [1, 1],
+                [1, 1],
+            ]);
+        }
+    });
+
+    it.each([
+        // 5/4: 1 chord over 4 raw cells plus 1 chord over 1 raw cell already total exactly 5 —
+        // the meter's own beat count — so CELL_BEATS's default weight of 1 needs no round-robin
+        // adjustment at all, unlike the other three cases here.
+        [
+            '5/4',
+            'T54[C   DZ',
+            [
+                [4, 1],
+                [1, 1],
+            ],
+        ],
+        // 12/8: 4 chords, one raw cell each (already summing to the meter's 12-beat count via
+        // CELL_BEATS['12/8'] = 3 — Converter.mapTime['12'] — with no round-robin adjustment
+        // needed either), the classic "4 iReal cells = 4 dotted-quarter beats" reading.
+        [
+            '12/8',
+            'T12[C,D,E,FZ',
+            [
+                [3, 2],
+                [3, 2],
+                [3, 2],
+                [3, 2],
+            ],
+        ],
+        // 6/4: 2 chords, 2 raw cells each (4 total, the usual grid), already summing to the
+        // meter's own 6-beat count via the default weight of 1 — no adjustment needed.
+        [
+            '6/4',
+            'T64[C  D  Z',
+            [
+                [3, 1],
+                [3, 1],
+            ],
+        ],
+    ])(
+        'maps multi-chord cells in %s per the 4-cells-per-bar grid (#1453)',
+        (_meter, body, durations) => {
+            const content = score(body).sections[0].measures[0].content;
+            expect(content.kind).toBe('events');
+            if (content.kind === 'events') {
+                expect(content.events.map((event) => event.duration)).toEqual(durations);
+            }
+        },
+    );
+
+    it.each(['3/4', '3/2', '6/8'])(
+        'still refuses a multi-chord bar in %s — a scope decision, not a technical gap (#1453)',
+        (meter) => {
+            // `multiChordDurations` implements the cited algorithm generally, but
+            // `SHIPPED_MULTI_CHORD_METERS` deliberately excludes these three: 3/4 and 3/2's 0.5
+            // beat-per-cell weight makes a plain two-chord bar split 1.5+1.5, landing on the "and"
+            // of beat 2 in most waltzes (measured at 168 of 181 such bars, 43 songs, across the
+            // whole Jazz 1460 playlist) — the reference converter's own comment calls this
+            // specific algorithm "unknown", so it isn't an established rule under #1171 without an
+            // explicit by-ear check against iReal Pro's own playback. 6/8 has no real-playlist
+            // multi-chord evidence at all. A single-chord bar in any of these three is unaffected
+            // (see the "does not mistake..." and other single-event tests elsewhere in this file).
+            const token = { '3/4': '34', '3/2': '32', '6/8': '68' }[meter];
+            blocked(`T${token}[C F Z`);
+        },
+    );
+
+    it('refuses more chords than a meter has beats for, rather than guessing a split', () => {
+        // 5 chords cannot fit a 4/4 bar's 4 beats — established from converter.js's own guard,
+        // `if (measure.chords.length > this.time.beats) { error(...); }`.
+        blocked('T44[C,Dm,Em,F,G7Z');
+    });
+
+    it('refuses a multi-chord bar whose round-robin trim cannot converge', () => {
+        // 5 chords in 12/8 (cellCounts.length = 5, within the 12-beat "too many chords" limit)
+        // each start at the 1-cell floor, worth 3 beats apiece (CELL_BEATS['12/8'] = 3) — 15
+        // total against a 12-beat target. Trimming needs to remove exactly 1 cell's worth (3
+        // beats), but every cell is already at the floor — `multiChordDurations`'s trim loop only
+        // decrements above (`adjusted[i] > 1`), so it can never converge; the bounded guard
+        // refuses instead of looping forever.
+        blocked('T12[C,D,E,F,GZ');
+    });
+
     it('maps repeat barlines and alternate ending markers without unfolding the authored chart', () => {
         const result = score('T44*A{C   |N1F   }|N2G7  Z');
         const bars = result.sections[0].measures;
@@ -174,6 +272,36 @@ describe('bounded source-preserving iReal import', () => {
 
     it('retains a legitimate closing/opening double-bar boundary without fabricating a measure', () => {
         expect(score('T44[C   ][G7  Z').sections[0].measures).toHaveLength(2);
+    });
+
+    it('implicitly reopens a bar after a close with no reopening bracket (#1452)', () => {
+        // Established: infojunkie/ireal-musicxml converter.js's `convertMeasures()` starts a new
+        // measure whenever `!this.measure && (cell.chord || cell.annots.length ||
+        // cell.comments.length)` — real content with no open measure opens one regardless of
+        // `cell.bars` — and parser.js's tokenizer never assigns an opening mark to the cell right
+        // after `]`/`}`/`Z` (only the PRECEDING cell's `.bars` gets the closing character).
+        expect(score('T44[C   ]D   Z').sections[0].measures.map((bar) => bar.content)).toEqual([
+            { kind: 'events', events: [{ kind: 'chord', symbol: 'C', duration: [4, 1] }] },
+            { kind: 'events', events: [{ kind: 'chord', symbol: 'D', duration: [4, 1] }] },
+        ]);
+        expect(score('T44{C   }D   Z').sections[0].measures.map((bar) => bar.content)).toEqual([
+            { kind: 'events', events: [{ kind: 'chord', symbol: 'C', duration: [4, 1] }] },
+            { kind: 'events', events: [{ kind: 'chord', symbol: 'D', duration: [4, 1] }] },
+        ]);
+        // An implicit reopen gets a plain barline, same as the reference's empty `cell.bars`: no
+        // repeat-start, unlike an explicit '{'.
+        expect(score('T44{C   }D   Z').sections[0].measures[1].start).toBeUndefined();
+    });
+
+    it('does not disturb an explicitly reopened bar with a numbered ending (#1452 regression guard)', () => {
+        // #1447 found that a naive implicit-reopen implementation broke this exact shape: an
+        // ending-start marker on a bar that IS explicitly reopened by '|' right after the
+        // preceding repeat-end '}'. The fix is scoped to real content arriving with no open bar
+        // (checked lazily in `addCell`), so an explicit '|' here must leave this untouched.
+        const bars = score('T44*A{C   |N1F   }|N2G7  Z').sections[0].measures;
+        expect(bars).toHaveLength(3);
+        expect(bars[1].end).toEqual([{ kind: 'repeat-end', times: 2 }]);
+        expect(bars[2].start).toEqual([{ kind: 'ending-start', passes: [2] }]);
     });
 
     it('maps one- and two-bar repeats to their earlier authored sources', () => {
@@ -191,7 +319,14 @@ describe('bounded source-preserving iReal import', () => {
     });
 
     it('preserves slash bass, alternate chords, fermata, N.C. and held events as distinct notation', () => {
-        const bars = score('T44[C/E(Dm7)f   |n   |p   Z').sections[0].measures;
+        // Written as a PREFIX ("fC/E…"), per the Jazz 1460 playlist's own usage — see
+        // ireal-score.ts's 'f' branch for the infojunkie/ireal-musicxml + pianosnake/ireal-reader
+        // citation (#1451). A suffix immediately touching the same chord ("C/E(Dm7)f", this
+        // fixture's original form) resolves to the SAME chord too — there's only one chord in the
+        // bar for the backward fallback to land on — so it wasn't actually testing the prefix
+        // rule; a real playlist chart never writes it that way, which is what this fixture now
+        // pins.
+        const bars = score('T44[fC/E(Dm7)   |n   |p   Z').sections[0].measures;
         expect(bars.map((bar) => bar.content)).toEqual([
             {
                 kind: 'events',
@@ -208,6 +343,111 @@ describe('bounded source-preserving iReal import', () => {
             { kind: 'events', events: [{ kind: 'no-chord', duration: [4, 1] }] },
             { kind: 'events', events: [{ kind: 'hold', duration: [4, 1] }] },
         ]);
+    });
+
+    it('resolves the "W" invisible-root placeholder against the nearest preceding chord (#1452)', () => {
+        // Established: infojunkie/ireal-musicxml converter.js's `case 'W':` copies the previous
+        // chord's root+quality, then overwrites the copy's slash bass with W's own (dropping any
+        // slash the copied chord had, when W specifies none) and its own alternate. parser.js's
+        // `chordRegex2` gives W's grammar: an optional `/[A-G][#b]?` slash, then an optional
+        // `(...)` alternate — the alternate needs no special handling, since a following "(...)"
+        // is already picked up by this importer's own '(' branch.
+        expect(score('T44[C  W  Z').sections[0].measures[0].content).toEqual({
+            kind: 'events',
+            events: [
+                { kind: 'chord', symbol: 'C', duration: [2, 1] },
+                { kind: 'chord', symbol: 'C', duration: [2, 1] },
+            ],
+        });
+        expect(score('T44[C   ]W/EZ').sections[0].measures[1].content).toEqual({
+            kind: 'events',
+            events: [{ kind: 'chord', symbol: 'C/E', duration: [4, 1] }],
+        });
+        expect(score('T44[C   ]W(D7)Z').sections[0].measures[1].content).toEqual({
+            kind: 'events',
+            events: [{ kind: 'chord', symbol: 'C', duration: [4, 1], alternates: ['D7'] }],
+        });
+    });
+
+    it('refuses "W" with no preceding chord to copy', () => {
+        blocked('T44[W   Z');
+    });
+
+    it('refuses "W" right after N.C., rather than reaching past it to an older chord', () => {
+        // Independent review finding: converter.js's `case 'n':` pushes N.C. into
+        // `this.measure.chords` like any other chord (its `.note` is 'n', which isn't one of the
+        // switch's special x/r/p/W/' ' cases), so W's own reverse search for "the nearest measure
+        // with a chord" would try to copy the N.C. entry, not skip past it to the C before it.
+        blocked('T44[C |n |W Z');
+    });
+
+    it('falls back to the preceding chord when a fermata is not immediately followed by one', () => {
+        // A comma then only blank cells before the bar closes never gives the 'f' a chord to
+        // group forward with. Per the same converter.js citation, `cell.annots.forEach` then
+        // resolves it against `this.measure.chords[length-1]` — the chord already pushed earlier
+        // in THIS bar — so it falls back onto the preceding chord instead (#1451; this exact
+        // shape occurs in the Jazz 1460 playlist, e.g. "Chan's Song (Never Said)" and
+        // "Locomotion", each as "<chord>,fXyQ").
+        expect(score('T44[C   ,f   Z').sections[0].measures[0].content).toEqual({
+            kind: 'events',
+            events: [{ kind: 'chord', symbol: 'C', duration: [4, 1], fermata: true }],
+        });
+        // The immediately-adjacent suffix form (the pre-#1451 assumption) still resolves the same
+        // way, for the same reason: nothing follows 'f' to group forward with.
+        expect(score('T44[Cf Z').sections[0].measures[0].content).toEqual({
+            kind: 'events',
+            events: [{ kind: 'chord', symbol: 'C', duration: [4, 1], fermata: true }],
+        });
+    });
+
+    it('refuses a fermata with no chord before or after it in the same bar', () => {
+        // converter.js's fallback reads `this.measure.chords[this.measure.chords.length-1]` —
+        // an array that is fresh per measure — so with nothing pushed yet in this bar, the
+        // reference itself would index a nonexistent element. Refuse rather than reach into an
+        // earlier bar the reference can't reach either (#1451).
+        blocked('T44[f   Z');
+    });
+
+    it('resolves a blank cell between a fermata and the next chord backward, never skipping forward to it', () => {
+        // Independent review finding: an earlier version of this fix let a pending fermata skip
+        // over a blank cell and land on the chord AFTER it. Per the same citation, a blank cell
+        // (a space — parser.js's `chordRegex2` matches it as its own chord-array token) is decided
+        // the instant it arrives, exactly like the comma-then-blanks case above: it becomes the
+        // "Chords." step for whatever cell the pending 'f' is sharing, and a blank chord pushes
+        // nothing, so "Other attributes." resolves the fermata against what was ALREADY there —
+        // the preceding chord — not whatever comes next.
+        expect(score('T44[Cf D |G Z').sections[0].measures[0].content).toEqual({
+            kind: 'events',
+            events: [
+                { kind: 'chord', symbol: 'C', duration: [2, 1], fermata: true },
+                { kind: 'chord', symbol: 'D', duration: [2, 1] },
+            ],
+        });
+    });
+
+    it("carries a fermata across a bar line to the next bar's first chord, never resolving early", () => {
+        // Established: a bar-boundary character is TRANSPARENT to a pending fermata (see
+        // `pendingFermata`'s declaration) — parser.js's '|'/'['/'{' cases leave the currently-open
+        // cell untouched, and ']'/'}' /'Z' only touch the PREVIOUS cell, so none of them force
+        // resolution. A lone chord before the bar line (no trailing blank) keeps this bar's own
+        // duration split untouched by the fermata, isolating the cross-bar-carry behavior from
+        // this importer's cell-count-to-duration mapping.
+        const bars = score('T44[Cf|G Z').sections[0].measures;
+        expect(bars[0].content).toEqual({
+            kind: 'events',
+            events: [{ kind: 'chord', symbol: 'C', duration: [4, 1] }],
+        });
+        expect(bars[1].content).toEqual({
+            kind: 'events',
+            events: [{ kind: 'chord', symbol: 'G', duration: [4, 1], fermata: true }],
+        });
+    });
+
+    it('refuses a fermata with nothing left to attach to at the very end of the chart', () => {
+        // The reference converter would index `this.measure.chords[-1]` on nothing (an "OPEN"
+        // measure that never closes) — a crash, not a silently-dropped fermata. Refuse with a
+        // dedicated reason instead of falling through to the generic incomplete-chart message.
+        blocked('T44[C D fZ');
     });
 
     it('does not mistake official parenthesized chord qualities for alternate chords', () => {
@@ -422,9 +662,7 @@ describe('bounded source-preserving iReal import', () => {
     });
 
     it.each([
-        'T44[C,Dm,G7Z',
         'T44[C,Dm,Em,F,G7Z',
-        'T34[C F Z',
         'T44[C | |G7 Z',
         'T44[CunknownZ',
         'T44[C Kcl Z',

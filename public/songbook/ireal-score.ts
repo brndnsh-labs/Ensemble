@@ -2,7 +2,13 @@ import { validateSemanticScore } from './score-codec.js';
 import { scoreDuration, scoreMeter } from './score-duration.js';
 import { compileScoreForm } from './score-form.js';
 import { isScoreChord } from './score-text.js';
-import type { ScoreDirection, ScoreEvent, ScoreMeasure, SemanticScore } from './score-types.js';
+import type {
+    ScoreDirection,
+    ScoreDuration,
+    ScoreEvent,
+    ScoreMeasure,
+    SemanticScore,
+} from './score-types.js';
 
 interface Cell {
     event?: ScoreEvent;
@@ -39,6 +45,33 @@ const METERS = new Map([
     ['98', '9/8'],
     ['12', '12/8'],
 ]);
+
+// Per-meter "weight" of one written iReal grid cell, in beats of that meter (#1453). Established
+// from infojunkie/ireal-musicxml converter.js's `Converter.mapTime` (`beatUnit`): iReal's editor
+// always draws a bar 4 cells wide regardless of the time signature, so a written cell is worth
+// exactly 1 beat only when 4 cells naturally fill the bar's own beat count. It's worth HALF a beat
+// in 3/4 and 3/2 (4 cells span what is actually a 3-beat bar) and THREE beats — one dotted-quarter
+// each — in 12/8 (4 cells span a 12-eighth-note bar). Every other supported meter maps 1:1 and is
+// omitted here (the lookup below defaults to 1).
+const CELL_BEATS = new Map([
+    ['3/4', 0.5],
+    ['3/2', 0.5],
+    ['12/8', 3],
+]);
+
+// Meters this importer will actually SPLIT a multi-chord bar for (#1453 scope decision, not a
+// technical limitation — `multiChordDurations` below implements the cited algorithm generally).
+// A whole-playlist measurement found real evidence for 5/4 (Take Five's own Ebm(3)+Bbm7(2) vamp)
+// and 6/4 (West Coast Blues); 12/8's beatUnit of 3 (one written cell = one whole dotted-quarter
+// beat) has no split-the-beat ambiguity either. 3/4 and 3/2 are held back: their beatUnit of 0.5
+// means a plain two-chord bar splits 1.5+1.5 beats, landing on the "and" of beat 2 — measured
+// across the whole playlist at 168 of 181 such bars (43 songs), and the reference converter's own
+// comment calls this specific algorithm "unknown" — not an established rule under #1171 without
+// an explicit by-ear check against iReal Pro's own playback. 6/8 has zero real-playlist evidence
+// either way (its one 6/8 chart has no multi-chord bar). A bar in an excluded meter still refuses
+// with the existing message; a single-chord bar in one is unaffected, since that path (see
+// `timedEvents`) never consults this set at all.
+const SHIPPED_MULTI_CHORD_METERS = new Set(['4/4', '5/4', '6/4', '12/8']);
 
 // Equivalent spellings only, not approximated voicings or dropped extensions.
 // https://www.irealpro.com/learn/chord-symbols/ (official shorthand table)
@@ -147,12 +180,63 @@ function readBars(
     let segnos = 0;
     let codas = 0;
     let fines = 0;
+    // A fermata's target, established from infojunkie/ireal-musicxml's own tokenizer+converter
+    // (cited fully at the 'f' branch below), is resolved per-cell, in raw token order, against
+    // whichever chord is "last pushed" at the moment the 'f'-holding cell is processed:
+    // - A prefix 'f' immediately touching a following chord token (no space, bar or other
+    //   cell-advancing character between them) shares that chord's SAME cell — parser.js's
+    //   `case 'f': obj.annots.push(cell); cell = null;` does not advance, so the chord token right
+    //   after it lands in the still-open cell too — and since converter.js pushes a cell's own
+    //   chord before applying that cell's annotations, the fermata lands on that following chord.
+    // - A BLANK/rest cell (a space, its own advancing token — parser.js's `chordRegex2` matches a
+    //   space as a chord token, so it ALSO joins the still-open 'f' cell and immediately closes
+    //   it) is decided the instant it arrives, not deferred: converter.js's "Chords." section
+    //   handles a blank chord's `case ' ':` as a no-op (nothing pushed), so when "Other
+    //   attributes." then reads `this.measure.chords[length-1]` for that same cell's 'f'
+    //   annotation, it finds whatever was already there — the PRECEDING chord — and resolves
+    //   there and then. A repeat marker ('x'/'r') is treated the same way here for the same
+    //   reason (a rest with no symbol of its own); the reference's own repeat handling for this
+    //   exact combination is a measure-clone edge case this importer's own repeat model (a
+    //   `{kind:'repeat', measureId}` reference, not a literal clone at parse time) has no
+    //   faithful analogue for, so it is scoped out rather than guessed.
+    // - A bar-boundary character (`|`, `[`, `{`, `]`, `}`, `Z`) is TRANSPARENT to a pending
+    //   fermata: parser.js's cases for all six either leave the currently-open cell untouched
+    //   (`|`/`[`/`{` set `cell = null`, no advance) or only touch the PREVIOUS (already-closed)
+    //   cell's `.bars` (`]`/`}`/`Z`) — none of them force or interrupt resolution. A fermata can
+    //   therefore carry across a bar line and land on the FIRST chord of the next bar (matching
+    //   #1452's own implicit-reopen citation: real content with no open bar starts one anyway).
+    // - `this.measure.chords` is a fresh array per measure, so the backward-fallback case above
+    //   cannot reach into an earlier bar — a fermata with nothing before it in the same bar, and
+    //   nothing chord-shaped immediately after it either, would index `[-1]` and crash the
+    //   reference converter (also true at the very end of the chart, with nothing following at
+    //   all), so this importer refuses both rather than inventing a target the reference itself
+    //   does not support.
+    let pendingFermata = false;
+    // Implicit reopen after `]`/`}`/`Z` (#1452), established from infojunkie/ireal-musicxml
+    // converter.js's `convertMeasures()`: a new measure starts when `cell.bars` carries an
+    // explicit opening mark OR — regardless of `.bars` — `!this.measure && (cell.chord ||
+    // cell.annots.length || cell.comments.length)`, i.e. real content with no open measure starts
+    // one anyway. parser.js's tokenizer never assigns an opening mark to the cell right after a
+    // close (`]`/`}`/`Z` only appends the closing character to the PREVIOUS cell's `.bars`; see
+    // the '|[]{}Z' branch below — the cell that follows gets none), so this is the common way the
+    // rule fires. `addCell` is where every event-bearing/blank/repeat cell is created, so setting
+    // `inside` unconditionally here is exactly that rule: real content always has somewhere to
+    // land. It is deliberately lazy — nothing forces a reopen at the moment `]`/`}`/`Z` is read —
+    // so a bar explicitly reopened by a following `|`/`[`/`{` (e.g. this importer's own
+    // `{C |N1F }|N2G7 Z` repeat/ending test) is untouched: `inside` is already true by the time
+    // any cell is added.
     function addCell(cell: Cell | null) {
-        if (!inside) {
-            fail(bars.length, 'Music needs an opening barline.');
-        }
+        inside = true;
         if (current.cells.length >= 64) {
             fail(bars.length, 'The bar has too many rhythm cells.');
+        }
+        if (pendingFermata) {
+            const target = cell?.event ? cell : [...current.cells].reverse().find((c) => c?.event);
+            if (!target?.event) {
+                fail(bars.length, 'A fermata must immediately precede its event.');
+            }
+            target.event.fermata = true;
+            pendingFermata = false;
         }
         current.cells.push(cell);
     }
@@ -306,6 +390,12 @@ function readBars(
             // Officially visual-only, both established in ironss/accompaniser's irealb_parser.lua:
             // 'Y' is vertical spacing, its own `vspace` production; 's'/'l' (chord glyph size) are
             // in the separate `unknown` production. Neither adds a cell.
+            // Known divergence from infojunkie/ireal-musicxml converter.js (review, #1453): there
+            // 's' also sets `chord.short = true`, forcing that chord's `beats()` to exactly 1
+            // regardless of trailing blanks/round-robin padding — a real duration effect this
+            // importer doesn't model. Left as a visual no-op: long-standing (predates #1453) and
+            // fails safe (produces a plausible, if occasionally non-reference-exact, duration
+            // rather than a wrong one silently).
             offset++;
         } else if (char === 'N') {
             const pass = Number(body[offset + 1]);
@@ -418,18 +508,67 @@ function readBars(
             }
             offset += alternate.length + 2;
         } else if (char === 'f') {
-            const event = current.cells.at(-1)?.event;
-            if (!event || event.fermata) {
-                fail(bars.length, 'A fermata must immediately follow its event.');
+            // Fermata (#1451): see `pendingFermata`'s declaration above for the full citation
+            // (infojunkie/ireal-musicxml src/lib/parser.js + converter.js; pianosnake/ireal-reader's
+            // Parser.js has the identical cell-grouping switch, since infojunkie's is explicitly
+            // derived from it — both agree, so #1451's "stop if the sources disagree" doesn't apply).
+            if (pendingFermata) {
+                fail(bars.length, 'A fermata must immediately precede its event.');
             }
-            event.fermata = true;
+            pendingFermata = true;
             offset++;
         } else if (char === 'x' || char === 'r') {
             addCell({ repeat: char === 'x' ? 'one' : 'two' });
             offset++;
         } else if (char === 'n' || char === 'p') {
+            // Known divergence from infojunkie/ireal-musicxml converter.js (review, #1453): 'p'
+            // there is a pause/space filler (a slash with no root), and doubles as a W-alias when
+            // it's the first token in a measure — not a sustained "hold" the way this importer
+            // treats it. Left as-is: long-standing (predates #1453) and fails safe (an audibly
+            // held chord, not a wrong pitch or a dropped beat).
             addCell({ event: { kind: char === 'n' ? 'no-chord' : 'hold', duration: [1, 1] } });
             offset++;
+        } else if (char === 'W') {
+            // Invisible-root placeholder (#1452), established from infojunkie/ireal-musicxml
+            // converter.js's `case 'W':`: it copies the previous chord's root+quality — searching
+            // the current measure first, then reverse-searching earlier measures for the nearest
+            // one with a chord (`measures.slice().reverse().find(m => m.chords.length)`) — then
+            // OVERWRITES the copy's slash bass with W's own (`chord.over = cell.chord.over`, which
+            // is absent/undefined when W has none, dropping any slash the copied chord had) and
+            // its own alternate (`chord.alternate = cell.chord.alternate`). parser.js's
+            // `chordRegex2` gives W's own grammar: `/^([ Wp])()()(\/[A-G][#b]?)?(\(.*?\))?/` — an
+            // optional slash bass, then an optional alternate in parens; the alternate needs no
+            // special handling here, since a following "(...)" is already picked up by this
+            // importer's own '(' branch once the synthesized chord below is on the cell stack.
+            // Scoped to a preceding CHORD specifically (not N.C./hold, which the reference's own
+            // `this.measure.chords` conflates with real chords in a way this importer's typed
+            // events don't model): find the NEAREST preceding event — skipping only cell-less
+            // blanks/repeats, which never carry an event in either model — and refuse unless that
+            // nearest one is itself a chord. Reaching PAST a non-chord event (e.g. "C |n |W")
+            // to copy an older chord instead would invent a target the reference doesn't support
+            // either: converter.js's `case 'n':` pushes N.C. into `this.measure.chords` like any
+            // other chord, so W's own `measures.slice().reverse().find(m => m.chords.length)`
+            // search stops right there too — it would try to copy the N.C. entry, not skip it.
+            const nearest = [...bars.flatMap((bar) => bar.cells), ...current.cells]
+                .reverse()
+                .map((cell) => cell?.event)
+                .find((event) => event !== undefined);
+            const rootQuality =
+                nearest?.kind === 'chord'
+                    ? /^([A-G][#b]?)(.*?)(?:\/[A-G][#b]?)?$/.exec(nearest.symbol)
+                    : null;
+            if (!rootQuality) {
+                fail(bars.length, 'A slash-root placeholder needs an earlier chord to copy.');
+            }
+            const slash = /^\/([A-G][#b]?)/.exec(body.slice(offset + 1));
+            addCell({
+                event: {
+                    kind: 'chord',
+                    symbol: rootQuality[1] + rootQuality[2] + (slash ? `/${slash[1]}` : ''),
+                    duration: [1, 1],
+                },
+            });
+            offset += 1 + (slash ? slash[0].length : 0);
         } else {
             const chord = chordAt(body, offset);
             if (!chord) {
@@ -441,6 +580,13 @@ function readBars(
             addCell({ event: { kind: 'chord', symbol: canonicalChord(chord), duration: [1, 1] } });
             offset += chord.length;
         }
+    }
+    // A fermata still pending at the very end of the chart has nothing left to attach to —
+    // the reference converter would crash the same way it would on one with nothing preceding it
+    // in an otherwise-empty bar (see `pendingFermata`'s declaration). Checked ahead of the
+    // generic incomplete-bar failure below for a clearer reason.
+    if (pendingFermata) {
+        fail(bars.length, 'A fermata must immediately precede its event.');
     }
     if (
         current.cells.length ||
@@ -459,33 +605,80 @@ function readBars(
     return bars;
 }
 
-function timedEvents(bar: WrittenBar, index: number): ScoreEvent[] {
-    const positions = bar.cells.flatMap((cell, at) => (cell ? [at] : []));
-    const length = scoreMeter(bar.meter).length;
-    if (!positions.length) {
-        fail(index, 'Empty bars are not imported as silence or silently removed.');
-    }
-    if (positions.length > 1 && bar.meter !== '4/4') {
+/**
+ * Multi-chord cell → duration mapping (#1453), established from infojunkie/ireal-musicxml
+ * converter.js's `adjustChordsDuration()`. Each occupied cell's raw span (1 for itself, plus any
+ * trailing blank cells — exactly `Converter.Chord.beats()`'s `1 + spaces`) is trimmed or padded,
+ * round-robin from the first chord, until the total times the meter's own `CELL_BEATS` weight
+ * exactly equals the meter's own beat count (`this.time.beats`/`measure.chords.length >
+ * this.time.beats` is refused up front — too many chords for the meter to hold). This is
+ * INDEPENDENT of the bar's raw total cell count, unlike a single-event bar (below), because iReal's
+ * editor always draws 4 cells per bar regardless of meter — the raw count is a layout habit, not a
+ * musical fact, and scaling proportionally against it (as a single-event bar safely can, since
+ * there's only one span to normalize) would silently invent a wrong split whenever a chart's raw
+ * layout departs from 4 cells, e.g. via this importer's own compressed "Kcl"/"LZ" tokens.
+ *
+ * Gated by `SHIPPED_MULTI_CHORD_METERS`: a meter not in that set refuses here even though the
+ * algorithm above is general — see that set's own comment for which meters and why.
+ */
+function multiChordDurations(
+    cellCounts: readonly number[],
+    meter: string,
+    index: number,
+): ScoreDuration[] {
+    const { counts, unit } = scoreMeter(meter);
+    if (cellCounts.length > counts || !SHIPPED_MULTI_CHORD_METERS.has(meter)) {
         fail(index, 'Multi-chord cell timing in this meter needs a verified import mapping.');
     }
-    // Leading blanks do not delay the first chord in iReal; normalize only the occupied span.
-    const start = positions[0];
-    const width = bar.cells.length - start;
-    return positions.map((at, i) => {
-        const event = bar.cells[at]?.event;
-        if (!event) {
-            fail(index, 'A measure-repeat sign cannot share a bar with chords.');
-        }
-        const cells = (positions[i + 1] ?? bar.cells.length) - at;
-        const duration = scoreDuration(length[0] * cells, length[1] * width);
-        if (positions.length > 1 && (duration[1] !== 1 || duration[0] < 1 || duration[0] > 4)) {
+    const cellBeats = CELL_BEATS.get(meter) ?? 1;
+    const adjusted = [...cellCounts];
+    const total = () => adjusted.reduce((sum, cells) => sum + cells, 0) * cellBeats;
+    // Bounded defensively: real iReal data always converges in well under this many steps (each
+    // step moves the total by exactly one meter-beat), since `cellCounts.length <= counts` is
+    // already enforced above. A chart that somehow can't converge (e.g. every cell already at the
+    // 1-cell floor with more total beats still to trim) is refused rather than looped forever.
+    for (let guard = 0; total() > counts; guard++) {
+        if (guard > 4096) {
             fail(
                 index,
                 'These rhythm cells need iReal rounding; choose explicit chord lengths instead.',
             );
         }
-        return { ...event, duration };
-    });
+        const i = guard % adjusted.length;
+        if (adjusted[i] > 1) {
+            adjusted[i]--;
+        }
+    }
+    for (let guard = 0; total() < counts; guard++) {
+        if (guard > 4096) {
+            fail(
+                index,
+                'These rhythm cells need iReal rounding; choose explicit chord lengths instead.',
+            );
+        }
+        adjusted[guard % adjusted.length]++;
+    }
+    return adjusted.map((cells) => scoreDuration(cells * cellBeats * 4, unit));
+}
+
+function timedEvents(bar: WrittenBar, index: number): ScoreEvent[] {
+    const positions = bar.cells.flatMap((cell, at) => (cell ? [at] : []));
+    if (!positions.length) {
+        fail(index, 'Empty bars are not imported as silence or silently removed.');
+    }
+    const events = positions.map((at) => bar.cells[at]?.event);
+    if (events.some((event) => !event)) {
+        fail(index, 'A measure-repeat sign cannot share a bar with chords.');
+    }
+    if (positions.length === 1) {
+        // Leading blanks do not delay the sole chord in iReal — its duration is the bar's own
+        // full length, regardless of exactly how many raw cells the chart happened to write
+        // (a proportional single-span scale-up always cancels back to the meter's own length).
+        return [{ ...events[0]!, duration: scoreMeter(bar.meter).length }];
+    }
+    const cellCounts = positions.map((at, i) => (positions[i + 1] ?? bar.cells.length) - at);
+    const durations = multiChordDurations(cellCounts, bar.meter, index);
+    return events.map((event, i) => ({ ...event!, duration: durations[i] }));
 }
 
 function mapNavigation(
