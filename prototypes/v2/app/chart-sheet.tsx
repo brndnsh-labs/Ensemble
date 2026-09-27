@@ -1,4 +1,3 @@
-import { TIME_SIGNATURES } from '@engine/config';
 import type { SemanticScore } from '@engine/songbook/score-types';
 import type { ChartNotation } from '@engine/songbook/types';
 import { type MouseEvent as ReactMouseEvent, useEffect, useRef, useState } from 'react';
@@ -297,18 +296,6 @@ export function ChartSheet({
                             const isNext = measure.chords.some(
                                 (c) => c.globalIndex === displayNext,
                             );
-                            // The bar's own step span (first chord's start to last chord's end)
-                            // and where its last beat begins, per its own time signature — read
-                            // by the Following look-ahead's own poll (`app/ensemble.tsx`) off the
-                            // ACTIVE bar's DOM node, so the jump-ahead trigger and the next-bar
-                            // cue's "soon" strengthening need no extra state or per-tick re-render.
-                            const barEnd = measure.chords.at(-1)?.end;
-                            const barSteps =
-                                TIME_SIGNATURES[measure.chords[0]?.timeSignature ?? ''];
-                            const lastBeatStep =
-                                barEnd !== undefined
-                                    ? barEnd - (barSteps ?? TIME_SIGNATURES['4/4']).stepsPerBeat
-                                    : undefined;
                             return (
                                 <div
                                     className={`bar ${measure.chords.some((c) => c.globalIndex === displayActive) ? 'active' : ''} ${i === block.measures.length - 1 ? 'end' : ''} ${repeatStart ? 'repeat-start' : ''} ${repeatEnd ? 'repeat-end' : ''} ${endingStart ? 'ending-start' : ''} ${endingEnd ? 'ending-end' : ''}`}
@@ -317,8 +304,6 @@ export function ChartSheet({
                                         (c) => c.globalIndex === displayActive,
                                     )}
                                     data-next={isNext ? (nextSoon ? 'soon' : 'true') : undefined}
-                                    data-bar-end-step={barEnd}
-                                    data-bar-last-beat-step={lastBeatStep}
                                     key={measure.chords[0]?.globalIndex}
                                 >
                                     <span className="bar-number">{barNumber}</span>

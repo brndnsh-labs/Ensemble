@@ -6,26 +6,55 @@ import type { ChartDocument } from '../lib/runtime';
 import * as runtime from '../lib/runtime';
 
 /**
- * A `{ start }`-shaped item's index right after `active`, wrapping to the loop's first item
- * once `active` is the last one inside it (or to item 0 when `loop` is null — the band loops
- * the whole form at the end, so after the last slot comes the top). Shared by the band's slots
- * (schemaVersion 2) and the old engine's `stepMap` (a measure-less chart) — both are performed
- * order already, so the wrap is the only thing that differs from "the next item."
+ * Every written event's `globalIndex`, bucketed by which WRITTEN MEASURE it belongs to (an
+ * ordinal position among every measure in `blocks`, in written order) — the identity
+ * `nextBarIndex` below walks past when a bar holds more than one chord. Shared by a
+ * schemaVersion-2 slot's `.display` and a measure-less chart's own flat index (`display ===
+ * index` there), since both name a written event the same way.
  */
-function nextIndex(
-    items: readonly { start: number }[],
+function measureOfGlobalIndex(blocks: ChartBlock[]): Map<number, number> {
+    const map = new Map<number, number>();
+    let m = 0;
+    for (const block of blocks) {
+        for (const measure of block.measures) {
+            for (const chord of measure.chords) {
+                map.set(chord.globalIndex, m);
+            }
+            m += 1;
+        }
+    }
+    return map;
+}
+
+/**
+ * The next performed item whose WRITTEN BAR differs from `active`'s (#1458's next-bar cue) —
+ * walking forward past every further chord still inside that same bar, not just `active + 1`,
+ * which a bar holding more than one chord would otherwise point the cue at itself with. Wraps to
+ * the loop's first item once none remain inside it, or to item 0 when `loop` is null (the band
+ * loops the whole form at the end, so after the last bar comes the top). Shared by the band's
+ * slots (schemaVersion 2) and the old engine's `stepMap` (a measure-less chart) — both are
+ * performed order already, so the bar-skip and the wrap are the only two rules either needs.
+ */
+function nextBarIndex(
+    items: readonly { start: number; display: number }[],
     active: number,
     loop: { start: number; end: number } | null,
+    measureOf: Map<number, number>,
 ): number | null {
     if (active < 0 || active >= items.length) {
         return null;
     }
-    const inRange = (i: number) =>
+    const activeMeasure = measureOf.get(items[active].display);
+    const inLoop = (i: number) =>
         i >= 0 &&
         i < items.length &&
         (!loop || (items[i].start >= loop.start && items[i].start < loop.end));
-    if (inRange(active + 1)) {
-        return active + 1;
+    let i = active + 1;
+    while (inLoop(i) && measureOf.get(items[i].display) === activeMeasure) {
+        i += 1;
+    }
+    if (inLoop(i)) {
+        return i;
     }
     if (loop) {
         const start = items.findIndex((item) => item.start >= loop.start && item.start < loop.end);
@@ -57,13 +86,19 @@ export function useChartView(current: ChartDocument | null, active: number | nul
     }, [current, band]);
     const displayIndices = useMemo(() => band?.slots.map((slot) => slot.display) ?? [], [band]);
     const displayActive = active === null ? null : (displayIndices[active] ?? active);
+    const measureOf = useMemo(() => measureOfGlobalIndex(blocks), [blocks]);
     /**
-     * The next performed bar's display index (#1458's next-bar cue), wrapping across a repeat,
-     * the form's own loop back to the top, and an active practice loop — see `nextIndex` above.
-     * Read plain, like `displayActive`/`activeEvent` below: this hook already re-runs on every
-     * render while playing (the 60ms poll in `app/ensemble.tsx`), so a fresh `playback` read here
-     * costs nothing and needs no memo — one that only kept `active`/`band` as deps would miss a
-     * loop arming or clearing on a bar that hasn't advanced off yet.
+     * The next performed bar's display index (#1458's next-bar cue), skipping past any further
+     * chords still inside `active`'s own bar, then wrapping across a repeat, the form's own loop
+     * back to the top, and an active practice loop — see `nextBarIndex` above.
+     *
+     * Read plain, not memoized — same as `displayActive`/`activeEvent` below, which read
+     * `runtime.state()` fresh every call for the same reason: this hook has no render boundary of
+     * its own, so it runs again whenever its caller does, including the render `app/ensemble.tsx`
+     * makes when ITS `loopedSectionId` state changes (a genuine value change, so React does not
+     * bail out of it) — which is what makes arming or clearing a practice loop reach this
+     * computation immediately, even on a bar `active` hasn't moved off yet. A `useMemo` keyed on
+     * `[active, band]` alone would miss exactly that render.
      */
     const displayNext = ((): number | null => {
         if (active === null) {
@@ -72,10 +107,11 @@ export function useChartView(current: ChartDocument | null, active: number | nul
         const { loopStartStep, loopEndStep } = runtime.state().playback;
         const loop = loopStartStep >= 0 ? { start: loopStartStep, end: loopEndStep } : null;
         if (band) {
-            const next = nextIndex(band.slots, active, loop);
+            const next = nextBarIndex(band.slots, active, loop, measureOf);
             return next === null ? null : band.slots[next].display;
         }
-        return nextIndex(runtime.state().arranger.stepMap, active, loop);
+        const steps = runtime.state().arranger.stepMap.map((step, i) => ({ ...step, display: i }));
+        return nextBarIndex(steps, active, loop, measureOf);
     })();
     const activeEvent =
         active === null
