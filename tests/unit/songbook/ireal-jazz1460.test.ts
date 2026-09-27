@@ -243,4 +243,95 @@ describe('the Jazz 1460 playlist fixtures (#1447)', () => {
             }),
         );
     });
+
+    it('imports One For My Baby at 61 performed bars, landing its closing fermata on the chord it precedes (#1451)', () => {
+        // The chart writes its one fermata as a prefix on the final measure ("fG6"), the pattern
+        // #1451 fixes: ireal-score.ts's 'f' branch cites infojunkie/ireal-musicxml's tokenizer +
+        // converter for why a prefix fermata lands on the chord it precedes, not the one before it.
+        const { document } = importFixture('one-for-my-baby');
+        expect(performedBarCount(document)).toBe(61);
+        expectCanonicalRoundTrip(document);
+        const measures = document.chart.score.sections[0].measures;
+        const last = measures[measures.length - 1];
+        expect(last.content).toEqual({
+            kind: 'events',
+            events: [{ kind: 'chord', symbol: 'G6', duration: [4, 1], fermata: true }],
+        });
+    });
+
+    it('imports Round Midnight at 41 performed bars, resolving its "W" invisible-root placeholder (#1452)', () => {
+        // Bar 9 of the chart is "Ebm | Ebm/D | Ebm7/Db" written as "Ebm,Ebm/D,W" is not quite
+        // it — the actual token is "7,W/D,-bE" (Ebm, then "W/D", i.e. Ebm's root+quality with
+        // W's own slash bass D) — the chromatic descending-bass walk-down the tune is known for.
+        // ireal-score.ts's 'W' branch cites infojunkie/ireal-musicxml converter.js for why W
+        // copies the nearest preceding chord's root+quality and applies its own slash bass.
+        const { document, song } = importFixture('round-midnight');
+        expect(performedBarCount(document)).toBe(41);
+        expectCanonicalRoundTrip(document);
+        const measures = document.chart.score.sections[0].measures;
+        expect(measures[8].content).toEqual({
+            kind: 'events',
+            events: [
+                { kind: 'chord', symbol: 'Ebm', duration: [1, 1] },
+                { kind: 'chord', symbol: 'Ebm/D', duration: [1, 1] },
+                { kind: 'chord', symbol: 'Ebm7/Db', duration: [2, 1] },
+            ],
+        });
+        expect(song.diagnostics).toContainEqual(
+            expect.objectContaining({
+                severity: 'warning',
+                message: expect.stringContaining('dropped'),
+            }),
+        );
+    });
+
+    // #1453: multi-chord cells in meters other than 4/4, per infojunkie/ireal-musicxml
+    // converter.js's `adjustChordsDuration()` — see `CELL_BEATS` and `multiChordDurations` in
+    // ireal-score.ts for the full citation. One real Jazz 1460 chart per shipped meter; 6/8 has
+    // none in this playlist (its one 6/8 chart, Litha, has no multi-chord bar) and, like 3/4, is
+    // not shipped yet (see `SHIPPED_MULTI_CHORD_METERS`'s own comment) — covered only by the
+    // synthetic unit tests in ireal-import.test.ts.
+    it('still refuses 502 Blues — its 3/4 multi-chord bars are a held-back scope decision, not a bug', () => {
+        // 3/4's 0.5 beat-per-cell weight makes a plain two-chord bar split 1.5+1.5, landing on the
+        // "and" of beat 2 in most waltzes (measured at 168 of 181 such bars across 43 Jazz 1460
+        // songs); the reference converter's own comment calls this specific algorithm "unknown",
+        // so it needs an explicit by-ear check against iReal Pro's own playback before shipping.
+        const result = parseIRealImport(fixture('502-blues'));
+        expect(result.songs).toHaveLength(1);
+        expect(result.songs[0].diagnostics).toContainEqual(
+            expect.objectContaining({
+                severity: 'error',
+                message: expect.stringContaining('Multi-chord cell timing'),
+            }),
+        );
+        expect(result.songs[0].score).toBeUndefined();
+    });
+
+    it('imports Take Five at 24 performed bars, splitting its 5/4 vamp bar 3 beats + 2', () => {
+        const { document } = importFixture('take-five');
+        expect(document.chart.score.meter).toBe('5/4');
+        expect(performedBarCount(document)).toBe(24);
+        expectCanonicalRoundTrip(document);
+        expect(document.chart.score.sections[0].measures[0].content).toEqual({
+            kind: 'events',
+            events: [
+                { kind: 'chord', symbol: 'Ebm', duration: [3, 1] },
+                { kind: 'chord', symbol: 'Bbm7', duration: [2, 1] },
+            ],
+        });
+    });
+
+    it('imports West Coast Blues at 36 performed bars, splitting a 6/4 bar into two equal halves', () => {
+        const { document } = importFixture('west-coast-blues');
+        expect(document.chart.score.meter).toBe('6/4');
+        expect(performedBarCount(document)).toBe(36);
+        expectCanonicalRoundTrip(document);
+        expect(document.chart.score.sections[0].measures[3].content).toEqual({
+            kind: 'events',
+            events: [
+                { kind: 'chord', symbol: 'Bm7', duration: [3, 1] },
+                { kind: 'chord', symbol: 'E7', duration: [3, 1] },
+            ],
+        });
+    });
 });

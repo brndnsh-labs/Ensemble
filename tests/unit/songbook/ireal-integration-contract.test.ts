@@ -171,7 +171,13 @@ describe('iReal integration contracts: source to the production playback adapter
     it.each([
         ['unsupported chord', 'T44[C   |Cnotachord   |G7   Z'],
         ['empty interior measure', 'T44[C   |   |G7   Z'],
-        ['unroundable harmonic thirds', 'T44[C,Dm,G7Z'],
+        // "C,Dm,G7" (3 chords, no spacing) used to be refused here as "unroundable harmonic
+        // thirds" under the old proportional-width duration formula; #1453's cited round-robin
+        // replacement (infojunkie/ireal-musicxml converter.js's `adjustChordsDuration()`) pads it
+        // to a clean [2,1,1] quarter-note split instead — see ireal-import.test.ts's "rounds a
+        // 4/4 bar's under-filled cells" test. Five chords genuinely exceed 4/4's 4 beats, though,
+        // so that case still belongs in this refusal list.
+        ['more chords than the meter has beats for', 'T44[C,Dm,Em,F,G7Z'],
         ['unknown staff instruction', 'T44[C   |!   |G7   Z'],
     ])('does not adopt a partial playable chart after %s', (_label, body) => {
         const source = openProtocol(body);
