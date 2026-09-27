@@ -1759,6 +1759,14 @@ dialog textarea {
         scroll-behavior: auto;
         transition: none;
     }
+    /* `*` above can't reach this: `.chart-scroll { scroll-behavior: smooth }` is a class
+       selector, outranking the universal selector on specificity regardless of media query
+       membership. Repeat the override at the same specificity so source order decides it (#1458
+       patch review P1-5). Belt-and-suspenders for `Element.scrollTo`'s own JS-side
+       `behavior: 'instant'`, which does not depend on this rule but should agree with it. */
+    .chart-scroll {
+        scroll-behavior: auto;
+    }
 }
 
 .loading {
@@ -1780,8 +1788,9 @@ dialog textarea {
 }
 /* Following's next-bar cue (#1458): a quiet outline, not a fill, so it reads as "coming up"
    rather than "playing now" even where it lands on the same bar as `.active` (a one-bar loop).
-   `data-next="soon"` (the playing bar's last beat) thickens and darkens the same outline —
-   set imperatively by the look-ahead scroll's own poll, not a React re-render. */
+   `data-next="soon"` (the playing bar's last felt pulse) thickens and darkens the same outline —
+   ordinary React state (`nextSoon`, `app/ensemble.tsx`), edge-triggered off a 60ms poll of the
+   engine so it flips only twice a bar, not a DOM write bypassing React. */
 .bar[data-next] {
     box-shadow: inset 0 0 0 2px var(--bar-next);
     border-radius: 4px;
