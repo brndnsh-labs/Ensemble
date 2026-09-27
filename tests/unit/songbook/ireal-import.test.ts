@@ -275,6 +275,14 @@ describe('bounded source-preserving iReal import', () => {
         blocked('T44[W   Z');
     });
 
+    it('refuses "W" right after N.C., rather than reaching past it to an older chord', () => {
+        // Independent review finding: converter.js's `case 'n':` pushes N.C. into
+        // `this.measure.chords` like any other chord (its `.note` is 'n', which isn't one of the
+        // switch's special x/r/p/W/' ' cases), so W's own reverse search for "the nearest measure
+        // with a chord" would try to copy the N.C. entry, not skip past it to the C before it.
+        blocked('T44[C |n |W Z');
+    });
+
     it('falls back to the preceding chord when a fermata is not immediately followed by one', () => {
         // A comma then only blank cells before the bar closes never gives the 'f' a chord to
         // group forward with. Per the same converter.js citation, `cell.annots.forEach` then

@@ -498,16 +498,20 @@ function readBars(
             // importer's own '(' branch once the synthesized chord below is on the cell stack.
             // Scoped to a preceding CHORD specifically (not N.C./hold, which the reference's own
             // `this.measure.chords` conflates with real chords in a way this importer's typed
-            // events don't model, and not a blank/rest cell, which never becomes a "chord" in
-            // either reference): if the nearest preceding event isn't a chord, refuse rather than
-            // invent what W should copy.
-            const previous = [...bars.flatMap((bar) => bar.cells), ...current.cells]
+            // events don't model): find the NEAREST preceding event — skipping only cell-less
+            // blanks/repeats, which never carry an event in either model — and refuse unless that
+            // nearest one is itself a chord. Reaching PAST a non-chord event (e.g. "C |n |W")
+            // to copy an older chord instead would invent a target the reference doesn't support
+            // either: converter.js's `case 'n':` pushes N.C. into `this.measure.chords` like any
+            // other chord, so W's own `measures.slice().reverse().find(m => m.chords.length)`
+            // search stops right there too — it would try to copy the N.C. entry, not skip it.
+            const nearest = [...bars.flatMap((bar) => bar.cells), ...current.cells]
                 .reverse()
                 .map((cell) => cell?.event)
-                .find((event) => event?.kind === 'chord');
+                .find((event) => event !== undefined);
             const rootQuality =
-                previous?.kind === 'chord'
-                    ? /^([A-G][#b]?)(.*?)(?:\/[A-G][#b]?)?$/.exec(previous.symbol)
+                nearest?.kind === 'chord'
+                    ? /^([A-G][#b]?)(.*?)(?:\/[A-G][#b]?)?$/.exec(nearest.symbol)
                     : null;
             if (!rootQuality) {
                 fail(bars.length, 'A slash-root placeholder needs an earlier chord to copy.');
