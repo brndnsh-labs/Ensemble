@@ -5,6 +5,8 @@ import {
     deletionKey,
     identifier,
     localRevision,
+    type OpenedAt,
+    openedKey,
     type PendingDeletion,
     type RemoteCandidate,
     type RemoteOutcome,
@@ -12,7 +14,9 @@ import {
     type SavedSong,
     type SaveOperation,
     type SaveRefusalReason,
+    type Star,
     snapshot,
+    starKey,
     type UnsupportedReason,
 } from './protocol';
 
@@ -145,6 +149,31 @@ export function savedDeletion(
         operationId: value.operationId,
         expectedRevision: value.expectedRevision,
     };
+}
+
+/**
+ * Re-prove a stored "opened at" row (#1440) against the scope AND its own key — the same posture
+ * `savedCandidate`/`savedDeletion` take, and for the same reason: `meta` is one generic keyed
+ * store shared by every namespace in this file, so the key is part of the record's identity.
+ */
+export function savedOpenedAt(value: OpenedAt, scope: AccountScope, id: string): OpenedAt {
+    owned(value, scope, id);
+    if (value.key !== openedKey(scope.ownerId, id)) {
+        throw new Error('Stored opened-at record does not match its key.');
+    }
+    if (typeof value.openedAt !== 'string' || !Number.isFinite(Date.parse(value.openedAt))) {
+        throw new Error('Invalid opened-at timestamp.');
+    }
+    return { key: value.key, ownerId: scope.ownerId, documentId: id, openedAt: value.openedAt };
+}
+
+/** Re-prove a stored star (#1440) the same way — presence is the whole fact. */
+export function savedStar(value: Star, scope: AccountScope, id: string): Star {
+    owned(value, scope, id);
+    if (value.key !== starKey(scope.ownerId, id)) {
+        throw new Error('Stored star does not match its key.');
+    }
+    return { key: value.key, ownerId: scope.ownerId, documentId: id };
 }
 
 export function savedOperation(

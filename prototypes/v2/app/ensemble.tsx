@@ -54,12 +54,20 @@ import * as repository from '../lib/repository';
 import type { ChartDocument } from '../lib/runtime';
 import * as runtime from '../lib/runtime';
 import {
+    allSongsSortPreference,
+    forgetOpened as forgetOpenedGuest,
+    forgetStar as forgetStarGuest,
+    openedAtMap as guestOpenedAtMap,
+    starredIds as guestStarredIds,
     hasDeclinedV1Import,
     lastOpenedSong,
+    recordOpened as recordOpenedGuest,
+    rememberAllSongsSort,
     rememberSong,
     rememberV1Import,
     rememberV1ImportDecline,
     rememberV1SessionMark,
+    setStarred as setStarredGuest,
     v1ImportLedger,
     v1SessionMark,
 } from '../lib/session';
@@ -82,13 +90,16 @@ import { SyncStatus, useAccountLibrary } from './account/library';
 import { type AccountDialogMode, SignInDialog } from './account/sign-in';
 import { SignOutDialog, type SignOutMode } from './account/sign-out';
 import { useAccountSession, useAccountsSwitch } from './account/use-account-session';
+import { AllSongs } from './all-songs';
 import { ChartSheet } from './chart-sheet';
+import { DeleteGuestSongDialog } from './delete-guest-song';
 import { EditPanel } from './edit-panel';
 import { FeelSheet, type FeelSnapshot } from './feel-sheet';
 import { ImportDialog } from './import-dialog';
 import type { MeasureEditorHandle } from './measure-editor';
 import { SongHeader } from './song-header';
 import { SongMenu } from './song-menu';
+import { SongRowMenu, type SongRowMenuTarget } from './song-row-menu';
 import { type FeaturedSummary, Songbook } from './songbook';
 import { SoundsPanel } from './sounds-panel';
 import { StandardsBrowser } from './standards-browser';
@@ -343,6 +354,10 @@ export default function Ensemble() {
     const [lastOpened, setLastOpened] = useState<string | null>(null);
     const [editorRequest, setEditorRequest] = useState(0);
     const revealedEditorRequest = useRef(0);
+    // #1440 — set just before an `editorRequest` bump that should focus the title field instead
+    // of the reveal effect's usual first-textarea target (a row-menu Rename opening the song to
+    // recover a live draft, review P1). Read and cleared by that same effect.
+    const focusTitleOnReveal = useRef(false);
     const [search, setSearch] = useState('');
     const [playing, setPlaying] = useState(false);
     const [playbackPending, setPlaybackPending] = useState(false);
@@ -387,6 +402,53 @@ export default function Ensemble() {
     // library list while no chart is on the stand. Opening a standard clears it the same way
     // opening a saved song does.
     const [standardsOpen, setStandardsOpen] = useState(false);
+    // The All songs page (#1440): a third songbook-home view, alongside the standards browser.
+    const [allSongsOpen, setAllSongsOpen] = useState(false);
+    // Where focus returns on leaving either sub-view (#1440 review P3). Held HERE, not inside
+    // `StandardsBrowser`/`AllSongs`: this shell survives the view swap that remounts `Songbook`
+    // (and its entry buttons) on every return, so a ref captured inside the sub-view itself would
+    // always be pointing at a node the swap has already thrown away by the time focus needs it —
+    // see either component's own note on why.
+    const standardsEntryRef = useRef<HTMLButtonElement>(null);
+    const allSongsEntryRef = useRef<HTMLButtonElement>(null);
+    // Per-device star set and opened-at map (#1440) — never document fields, and scoped to
+    // whichever songbook is live the same way `songs` itself is (guest `localStorage`, or the
+    // account database read through `accountSync`). Refreshed by the effect beside the account
+    // library read below, and updated directly by `toggleStar`/`recordOpenedPreference`.
+    const [starred, setStarredState] = useState<Set<string>>(() => new Set());
+    const [openedAt, setOpenedAtState] = useState<Map<string, string>>(() => new Map());
+    // The row ⋯ menu (#1440), shared by the All songs page and the songbook home. One dialog
+    // instance for whichever row is targeted, per `SongRowMenu`'s own note on why.
+    const [rowMenuFor, setRowMenuFor] = useState<SongRowMenuTarget | null>(null);
+    const rowMenuDialogRef = useRef<HTMLDialogElement>(null);
+    // The guest-only delete confirm (#1440).
+    const [guestDeleteTarget, setGuestDeleteTarget] = useState<{
+        id: string;
+        title: string;
+        hasRecovery: boolean;
+    } | null>(null);
+    const guestDeleteDialogRef = useRef<HTMLDialogElement>(null);
+    // The row menu's account delete confirm (#1440 review P2) — reuses `DeleteSongDialog`, the
+    // same tombstone route the stand's own "Song actions" uses (`deleteOpen` below), but bound to
+    // a row target instead of `current`: this one must never navigate to open the song, since the
+    // musician may only be asking to delete it, not to visit it.
+    const [rowDeleteTarget, setRowDeleteTarget] = useState<{ id: string; title: string } | null>(
+        null,
+    );
+    const [rowDeleteFailure, setRowDeleteFailure] = useState<string | null>(null);
+    const rowDeleteDialogRef = useRef<HTMLDialogElement>(null);
+    // The songbook's own status line (#1440 review P2) — set only by row actions (renamed,
+    // duplicated, deleted, "hasn't reached your account yet"), NEVER the stand's `message`
+    // (`open()` always sets one, and reusing it here showed a stale stand status on every visit
+    // to the songbook — review's own finding on the previous fix). Cleared at the start of the
+    // next row action and on leaving the songbook, so nothing stale lingers into an unrelated
+    // later visit.
+    const [homeNotice, setHomeNoticeState] = useState('');
+    // Which row THIS TAB's own delete just removed (#1440 review P5) — read once by
+    // `Songbook`/`AllSongs` to decide whether a shrinking list is worth moving focus for. Never
+    // set for a sync-driven removal (another device's delete, a library refresh), which must not
+    // steal focus from wherever the musician actually is.
+    const [deletedRowId, setDeletedRowId] = useState<string | null>(null);
     // Set only when the Clipboard API is unavailable or the write is rejected
     // (notably the Playwright WebKit project, which grants no clipboard
     // permission) — the visible fallback the acceptance criteria calls for.
@@ -565,6 +627,17 @@ export default function Ensemble() {
         standStore?.store === 'account' &&
         !standMismatch &&
         sync.observation?.remoteRevision != null;
+    /**
+     * The row-menu Delete confirm's own eligibility (#1440 review P2) — `inAccount` minus the
+     * two clauses that are about the STAND specifically (`standStore`/`standMismatch`): a row
+     * target is never the chart on the stand, so neither concept applies. What is shared is the
+     * one real question, asked of whichever document `requestDeleteRow` pointed the watch at: has
+     * the cloud ever confirmed this song at all? A `null` `remoteRevision` here is the same "never
+     * uploaded" state the stand's own song menu hides its Delete button for — see `inAccount`'s
+     * doc comment above — so this dialog does not render for it either, rather than opening on an
+     * action with nothing to do.
+     */
+    const rowInAccount = accountsOn && signedIn && sync.observation?.remoteRevision != null;
     /**
      * Is the Save at the head of this song's outbox refused, and which way (#1267)?
      *
@@ -1023,7 +1096,13 @@ export default function Ensemble() {
         if (editing && !busy && editorRequest !== revealedEditorRequest.current) {
             // Reveal the actual input, including an already-open editor's selected section.
             revealedEditorRequest.current = editorRequest;
-            const input = editPanel.current?.querySelector<HTMLTextAreaElement>('textarea');
+            // #1440 — a row-menu Rename that opened the song to recover a live draft asks for
+            // the title field instead of the usual first chord textarea.
+            const focusTitle = focusTitleOnReveal.current;
+            focusTitleOnReveal.current = false;
+            const input = focusTitle
+                ? editPanel.current?.querySelector<HTMLInputElement>('#title')
+                : editPanel.current?.querySelector<HTMLTextAreaElement>('textarea');
             input?.focus({ preventScroll: true });
             editPanel.current?.scrollIntoView({ block: 'start' });
             input?.scrollIntoView({ block: 'nearest' });
@@ -1080,6 +1159,36 @@ export default function Ensemble() {
                 if (alive) {
                     setError(e instanceof Error ? e.message : String(e));
                 }
+            });
+        return () => {
+            alive = false;
+        };
+    }, [sync.owner, sync.libraryVersion]);
+    // #1440 — the star set and opened-at map follow whichever songbook is live, the same gate
+    // `accountSongs` uses above: `sync.owner` publishes only once the loop has attached, so the
+    // first read cannot race it, and a sign-out (owner going null) falls straight back to the
+    // guest reads. `libraryVersion` is not read in the body — see the comment on the effect above.
+    // `alive` guards the same race the sibling effect does (review #1440 P2): a slow account read
+    // started before a sign-out must not land after it and overwrite the guest sets it already
+    // fell back to.
+    // biome-ignore lint/correctness/useExhaustiveDependencies: deliberate re-run trigger.
+    useEffect(() => {
+        if (sync.owner === null) {
+            setStarredState(guestStarredIds());
+            setOpenedAtState(guestOpenedAtMap());
+            return;
+        }
+        let alive = true;
+        Promise.all([accountSync.starredIds(), accountSync.openedAtMap()])
+            .then(([ids, map]) => {
+                if (alive) {
+                    setStarredState(ids);
+                    setOpenedAtState(map);
+                }
+            })
+            .catch(() => {
+                // Best-effort preference read; the songbook still renders without star/opened
+                // data, and the next sign-in/out or library-version bump tries again.
             });
         return () => {
             alive = false;
@@ -1168,6 +1277,69 @@ export default function Ensemble() {
             deleteDialogRef.current?.close();
         }
     }, [deleteOpen, inAccount]);
+    useEffect(() => {
+        if (rowMenuFor) {
+            rowMenuDialogRef.current?.showModal();
+        } else {
+            rowMenuDialogRef.current?.close();
+        }
+    }, [rowMenuFor]);
+    useEffect(() => {
+        if (guestDeleteTarget) {
+            guestDeleteDialogRef.current?.showModal();
+        } else {
+            guestDeleteDialogRef.current?.close();
+        }
+    }, [guestDeleteTarget]);
+    // Closes itself if `rowInAccount` goes false while open (the same posture the stand's own
+    // `deleteOpen` effect takes) — a queued Save landing mid-confirm, or the account detaching,
+    // must not leave a confirm button pointed at a state that no longer supports it. Releases the
+    // watch/claim on the way out like every other exit (#1440 review P2) — without it, this path
+    // left `activeDocumentId`/the watch pointed at the row forever, so a later download pass kept
+    // flagging it as a candidate long after the confirm step itself was gone. Inlined rather than
+    // calling `closeRowDeleteConfirm` so this effect's dependency list stays exhaustive without
+    // naming a plain function that is recreated every render.
+    useEffect(() => {
+        if (!rowInAccount) {
+            if (rowDeleteTarget) {
+                setRowDeleteTarget(null);
+                accountSync.setActiveDocument(null);
+                void accountSync.watch(null);
+            }
+            return;
+        }
+        if (rowDeleteTarget) {
+            rowDeleteDialogRef.current?.showModal();
+        } else {
+            rowDeleteDialogRef.current?.close();
+        }
+    }, [rowDeleteTarget, rowInAccount]);
+    // Focus returns to the entry point on the way back from either sub-view (#1440 review P3),
+    // rather than falling to `<body>` — see `standardsEntryRef`'s own note above for why this has
+    // to live here rather than inside `StandardsBrowser`/`AllSongs`. Guarded by the PREVIOUS value
+    // so this only fires on the true→false transition, never on the render that first opens one.
+    const wasStandardsOpen = useRef(false);
+    useEffect(() => {
+        if (wasStandardsOpen.current && !standardsOpen) {
+            standardsEntryRef.current?.focus();
+        }
+        wasStandardsOpen.current = standardsOpen;
+    }, [standardsOpen]);
+    const wasAllSongsOpen = useRef(false);
+    useEffect(() => {
+        if (wasAllSongsOpen.current && !allSongsOpen) {
+            allSongsEntryRef.current?.focus();
+        }
+        wasAllSongsOpen.current = allSongsOpen;
+    }, [allSongsOpen]);
+    // The songbook's own status line is cleared on leaving it (#1440 review P2) — opening a chart
+    // shows the STAND's own status instead, and a later, unrelated return to the songbook must
+    // not resurrect whatever a row action said minutes ago.
+    useEffect(() => {
+        if (current) {
+            setHomeNoticeState('');
+        }
+    }, [current]);
     /**
      * #1351 patch R1 — read which account this device HOLDS, from storage.
      *
@@ -1592,9 +1764,13 @@ export default function Ensemble() {
                 accountSync.rememberOpened(id, stand.ownerId).catch(() => {
                     /* A preference nobody can store is still a chart just opened. */
                 });
+                // #1440's per-song map, alongside this function's own single Continue-card
+                // pointer — same owner, same fence.
+                recordOpenedPreference(id, stand.ownerId);
             }
         } else {
             rememberSong(id);
+            recordOpenedPreference(id, null);
         }
         setLastOpened(id);
     }
@@ -1960,7 +2136,14 @@ export default function Ensemble() {
         }
         return [...held, ...slots].sort((a, b) => b.capturedAt.localeCompare(a.capturedAt));
     }
-    async function open(document: ChartDocument) {
+    /**
+     * Returns the resolved `{ current, saved }` pair it just committed to state (#1440 review
+     * P4) — a caller that needs to act on the FRESH chart right after opening (rather than
+     * `current`/`saved`'s own stale closure snapshot from before this ran) reads it from here.
+     */
+    async function open(
+        document: ChartDocument,
+    ): Promise<{ current: ChartDocument; saved: ChartDocument }> {
         const { recovery, unreadable } = await retainedDraftFor(document);
         // A retained draft opens exactly as the musician left it; only the stored song is
         // upgraded (`withFollowFeel`, #1405).
@@ -1976,7 +2159,8 @@ export default function Ensemble() {
         }
         runtime.load(next);
         const onDevice = runtime.withLoadedSounds(next);
-        setSaved(next === stored ? onDevice : stored);
+        const savedBaseline = next === stored ? onDevice : stored;
+        setSaved(savedBaseline);
         setCurrent(onDevice);
         // The songbook this chart came from AND the account it belongs to, for as long as it is
         // on the stand (#1311). From the SESSION, not `sync.owner` — see `liveStand` for why the
@@ -2011,6 +2195,7 @@ export default function Ensemble() {
                 : 'Saved on this device',
         );
         selectSection(next);
+        return { current: onDevice, saved: savedBaseline };
     }
     /** Commits the open shared draft as a new, independently-owned library document. */
     async function keepSharedCopy() {
@@ -2102,6 +2287,336 @@ export default function Ensemble() {
         return fresh;
     }
     /**
+     * Star or unstar one song (#1440) — applied to the visible state immediately, then persisted.
+     * A failed persist leaves the toggle as it visually is for the rest of this render; the next
+     * sign-in/out or library-version bump (the effect above) reconciles it either way.
+     */
+    function toggleStar(id: string) {
+        setHomeNoticeState('');
+        const next = !starred.has(id);
+        setStarredState((previous) => {
+            const updated = new Set(previous);
+            if (next) {
+                updated.add(id);
+            } else {
+                updated.delete(id);
+            }
+            return updated;
+        });
+        if (signedIn) {
+            accountSync.setStarred(id, next, sync.owner).catch(() => {
+                /* Best-effort preference; the visible toggle already applied. */
+            });
+        } else {
+            setStarredGuest(id, next);
+        }
+    }
+    /**
+     * Records this song as opened just now (#1440) — a per-song preference, alongside the
+     * existing single Continue-card pointer `rememberOpened` (below) already writes. Never a
+     * document edit: this touches neither `songs`/`operations` nor the guest `documents` store.
+     *
+     * `owner` is the STAND's resolved owner (`rememberOpened`'s own `stand.ownerId`, already
+     * checked against `standBelongsElsewhere`), not a fresh read of `sync.owner` — the two can
+     * differ for one render while an account attach is settling, and this must land in the same
+     * songbook the chart itself was just bound to, never a guess at the live one.
+     */
+    function recordOpenedPreference(id: string, owner: string | null) {
+        if (owner !== null) {
+            accountSync.recordOpened(id, owner).catch(() => {
+                /* A preference nobody can store is still a chart just opened. */
+            });
+        } else {
+            recordOpenedGuest(id);
+        }
+        setOpenedAtState((previous) => {
+            const updated = new Map(previous);
+            updated.set(id, new Date().toISOString());
+            return updated;
+        });
+    }
+    function closeRowMenu() {
+        setRowMenuFor(null);
+    }
+    function openRowMenu(id: string, title: string) {
+        // The next row action starting clears whatever the LAST one said (#1440 review P2) — an
+        // Export or a Star from this new menu would otherwise leave an unrelated "Renamed to…"
+        // sitting on screen indefinitely.
+        setHomeNoticeState('');
+        setRowMenuFor({ id, title });
+    }
+    /**
+     * Renames a song by id (#1440) — never requires it to be the chart on the stand: row menus
+     * render only while `current` is null, so there is no "already open" case here (review #1440
+     * P5 — an earlier `isOpen`/`setCurrent` branch tested exactly that unreachable state).
+     *
+     * A live draft — this writer's or another's, OR this tab's own in-memory `volatileDrafts`
+     * fallback (review #1440 P4 — the earlier version consulted only `retainedDraftFor`, missing
+     * exactly the case `open()` itself also protects) — must never be silently destroyed by an
+     * in-place rename (review #1440 P1): an account Save retires every writer's older drafts, and
+     * a guest rename bumps `updatedAt`, which is what stops `recoveryFor` from ever offering that
+     * slot again. `retainedDraftFor`'s `unreadable` flag fails CLOSED here too (review #1440 P4):
+     * a draft read that FAILED is not evidence there is no draft, so it takes the same "open
+     * instead" branch as finding one, rather than gambling on an in-place rename.
+     *
+     * The song opens instead — through the normal `open()` path, which recovers whichever draft
+     * applies exactly as opening always does — and the title the musician just typed into the row
+     * menu is carried forward as a fresh edit on top of it (review #1440 P4: discarding it was the
+     * earlier version's other gap), focused in the stand's own title field, leaving the Save to
+     * the musician. Only a song with nothing at all to lose renames in place.
+     */
+    function renameRow(title: string) {
+        const target = rowMenuFor;
+        if (!target) {
+            return;
+        }
+        closeRowMenu();
+        const trimmed = title.slice(0, 150);
+        void run(async () => {
+            const fresh = await refreshSongs();
+            const document = fresh.find((s) => s.id === target.id);
+            if (!document) {
+                throw new Error('Song no longer exists.');
+            }
+            const { recovery, unreadable } = await retainedDraftFor(document);
+            if (recovery || unreadable || volatileDrafts.current.has(document.id)) {
+                const opened = await open(document);
+                draft({ ...opened.current, title: trimmed }, opened.saved);
+                focusTitleOnReveal.current = true;
+                setEditing(true);
+                setEditorRequest((n) => n + 1);
+                setMessage(
+                    unreadable && !recovery
+                        ? 'Couldn’t confirm whether this song has unsaved changes — opened it here instead of renaming in place. Your new title is filled in; Save to keep it.'
+                        : 'This song has unsaved changes — opened it here so renaming won’t lose them. Your new title is filled in; Save to keep it.',
+                );
+                return;
+            }
+            if (signedIn) {
+                await storeSave({ ...document, title: trimmed }, document.revision, {
+                    owner: sync.owner,
+                    stand: false,
+                });
+            } else {
+                // The guest songbook's own rename (#1440) — reuses `save`'s compare-and-swap
+                // rather than a hand-rolled read-then-write here.
+                await repository.rename(target.id, trimmed);
+            }
+            await refreshSongs();
+            setHomeNoticeState(`Renamed to “${trimmed}”`);
+        });
+    }
+    /**
+     * Duplicates a song by id (#1440) — "<title> copy" under a fresh id, in whichever songbook
+     * the original lives in. `owner: null` (never `sync.owner`), like a brand-new song or an
+     * import: this mints an id nobody has claimed yet, and `storeSave`'s own note on `intent.owner`
+     * is explicit that a fresh id belongs to whichever account is live, not to a stand binding.
+     */
+    function duplicateRow() {
+        const target = rowMenuFor;
+        if (!target) {
+            return;
+        }
+        closeRowMenu();
+        void run(async () => {
+            const fresh = await refreshSongs();
+            const document = fresh.find((s) => s.id === target.id);
+            if (!document) {
+                throw new Error('Song no longer exists.');
+            }
+            // `createdAt`/`updatedAt` reset to now, as `keepSharedCopy` does (review #1440 P3):
+            // the guest `repository.save` honours a brand-new row's OWN `createdAt` (deliberately,
+            // for v1-import provenance), so leaving the original's here would make a fresh copy
+            // sort as if it were made back when the original was.
+            const now = new Date().toISOString();
+            const copyDocument = {
+                ...document,
+                id: crypto.randomUUID(),
+                title: `${document.title.slice(0, 145)} copy`,
+                revision: 0,
+                createdAt: now,
+                updatedAt: now,
+            };
+            await storeSave(copyDocument, null, { owner: null, stand: false });
+            await refreshSongs();
+            setHomeNoticeState('Duplicated');
+        });
+    }
+    /**
+     * What a row's Export should actually write (#1440 review P3) — the retained draft, if one
+     * exists, the same as the stand's own Export always writes whatever is live on the stand
+     * rather than silently falling back to the last committed version. The committed document
+     * otherwise.
+     */
+    async function exportableRowDocument(id: string): Promise<ChartDocument | null> {
+        const document = songs.find((s) => s.id === id);
+        if (!document) {
+            return null;
+        }
+        const { recovery } = await retainedDraftFor(document);
+        return recovery?.document ?? document;
+    }
+    function exportRow() {
+        const target = rowMenuFor;
+        if (!target) {
+            return;
+        }
+        void run(async () => {
+            const document = await exportableRowDocument(target.id);
+            if (document) {
+                exportDocument(document);
+            }
+        });
+    }
+    /**
+     * Delete… from the row menu (#1440). An account song ALWAYS goes through the existing
+     * tombstone route (`accountSync.deleteFromCloud`, the same call `deleteFromAccount` makes) —
+     * never a local-only delete. A guest song deletes locally through its own confirm step below.
+     *
+     * Unlike the stand's own "Song actions → Delete from my account", this must NEVER navigate
+     * (review #1440 P2): the musician asked to delete a row, not to visit it, and opening it first
+     * — the earlier approach — loaded the chart, wrote the Continue pointer and an opened-at
+     * timestamp, and stranded the musician on the stand if they cancelled. `setActiveDocument`/
+     * `watch` gets the same `sync.observation` the confirm step needs without any of that; it is
+     * released again in `closeRowDeleteConfirm` below.
+     *
+     * A song the cloud has never acknowledged (`remoteRevision` still null — a queued-but-unsent
+     * Save, most commonly) has nothing to delete there yet. The stand's own song menu handles this
+     * by simply not rendering its Delete button (`inAccount`'s doc comment); this can't know that
+     * before asking, so it asks, then explains rather than opening a dialog with a dead confirm.
+     */
+    function requestDeleteRow() {
+        const target = rowMenuFor;
+        if (!target) {
+            return;
+        }
+        closeRowMenu();
+        if (signedIn) {
+            void run(async () => {
+                accountSync.setActiveDocument(target.id);
+                await accountSync.watch(target.id);
+                if (accountSync.getSnapshot().observation?.remoteRevision == null) {
+                    releaseRowDeleteClaim();
+                    setHomeNoticeState(
+                        'This song hasn’t finished syncing to your account yet — there’s nothing there to delete.',
+                    );
+                    return;
+                }
+                setRowDeleteFailure(null);
+                setRowDeleteTarget({ id: target.id, title: target.title });
+            });
+        } else {
+            setGuestDeleteTarget({
+                id: target.id,
+                title: target.title,
+                hasRecovery: repository.recoverySlotCount(target.id) > 0,
+            });
+        }
+    }
+    function exportGuestDeleteTarget() {
+        const target = guestDeleteTarget;
+        if (!target) {
+            return;
+        }
+        void run(async () => {
+            const document = await exportableRowDocument(target.id);
+            if (document) {
+                exportDocument(document);
+            }
+        });
+    }
+    /**
+     * Drops the active claim/watch `requestDeleteRow` set up (#1440 review P2/P3) — never the
+     * dialog state, so both the confirm step's own Cancel AND the effect that un-eligibility
+     * closes it from can call this without fighting over who clears `rowDeleteTarget`.
+     */
+    function releaseRowDeleteClaim() {
+        accountSync.setActiveDocument(null);
+        void accountSync.watch(null);
+    }
+    /** Cancel — the confirm step's own close, routed through the one release function (#1440 P2). */
+    function closeRowDeleteConfirm() {
+        setRowDeleteTarget(null);
+        releaseRowDeleteClaim();
+    }
+    function exportRowDeleteTarget() {
+        const target = rowDeleteTarget;
+        if (!target) {
+            return;
+        }
+        void run(async () => {
+            const document = await exportableRowDocument(target.id);
+            if (document) {
+                exportDocument(document);
+            }
+        });
+    }
+    /**
+     * The row menu's account delete (#1440 review P2) — the same `commitCloudDelete` commit
+     * `deleteFromAccount` shares, reached without ever putting this song on the stand.
+     */
+    function deleteRowFromAccount() {
+        const target = rowDeleteTarget;
+        if (!target) {
+            return;
+        }
+        const owner = sync.owner;
+        void run(async () => {
+            const result = await commitCloudDelete(target.id, owner, {
+                setFailure: setRowDeleteFailure,
+                dialogOpen: () => !!rowDeleteDialogRef.current?.open,
+            });
+            if (result === null) {
+                return;
+            }
+            setDeletedRowId(target.id);
+            closeRowDeleteConfirm();
+            await refreshSongs();
+            setHomeNoticeState(result.message);
+        });
+    }
+    /**
+     * The guest songbook's own delete (#1440) — local-only, never used for an account song.
+     *
+     * Never needs to clear the stand: row menus render only while `current` is null, so the
+     * target here can never be the open chart (review #1440 P5 — an earlier branch tested that
+     * unreachable state). Deleting the Continue song or a song with a live draft both resolve by
+     * inertness instead: `lastOpenedSong`'s stale pointer (like the account's own `lastOpenedKey`)
+     * is never read as proof a song still exists — `continuedSave`'s `.find` against the freshly
+     * re-read `songs` list is, so a pointer left behind after this runs is simply never matched.
+     */
+    function deleteGuestSong() {
+        const target = guestDeleteTarget;
+        if (!target) {
+            return;
+        }
+        void run(async () => {
+            await repository.remove(target.id);
+            forgetOpenedGuest(target.id);
+            forgetStarGuest(target.id);
+            setStarredState((previous) => {
+                if (!previous.has(target.id)) {
+                    return previous;
+                }
+                const updated = new Set(previous);
+                updated.delete(target.id);
+                return updated;
+            });
+            setOpenedAtState((previous) => {
+                if (!previous.has(target.id)) {
+                    return previous;
+                }
+                const updated = new Map(previous);
+                updated.delete(target.id);
+                return updated;
+            });
+            setDeletedRowId(target.id);
+            setGuestDeleteTarget(null);
+            await refreshSongs();
+            setHomeNoticeState('Deleted');
+        });
+    }
+    /**
      * Commits a version and, signed in, queues those exact bytes for the owner and asks the loop
      * to send them. Save never waits for the network: an offline Save is an ordinary successful
      * Save with an upload still owed, which is the whole reason local safety and cloud
@@ -2175,27 +2690,69 @@ export default function Ensemble() {
         }
     }
     /**
+     * The one place `accountSync.deleteFromCloud` is called (#1440 review P3) — shared by the
+     * stand's own route (`deleteFromAccount`) and the row menu's (`deleteRowFromAccount`), so the
+     * two cannot drift on what a refusal means or on pruning this device's own guest-namespace
+     * recovery slot for the id on a genuinely clean delete (an earlier version of the row route
+     * dropped that half entirely).
+     *
+     * The active claim is dropped BEFORE the request goes out — `reconcile`'s preservation rule
+     * retains anything "active", so deleting with the song still claimed would retain the very
+     * copy the musician just asked to remove — and restored to `documentId` on a failure or
+     * refusal, since both callers want the same thing then: a retry, or the confirm step if still
+     * open, keeps reading THIS song's own observation rather than whatever the watch fell back to.
+     * `setFailure`/`dialogOpen` are the one caller-specific part — which failure state to set, and
+     * which dialog's open-ness decides whether `setError` also has to carry the refusal, since a
+     * step already dismissed while the request was in flight has nowhere else to show it.
+     *
+     * Returns `null` on both a refusal and a rethrown exception (`run()`'s own catch turns the
+     * exception into the shell's error line, same as before this was extracted) — a caller only
+     * has more to do when this resolves to an actual `'deleted'` result.
+     */
+    async function commitCloudDelete(
+        documentId: string,
+        owner: string | null,
+        options: { setFailure: (message: string) => void; dialogOpen: () => boolean },
+    ): Promise<CloudDeleteResult | null> {
+        accountSync.setActiveDocument(null);
+        let result: CloudDeleteResult;
+        try {
+            result = await accountSync.deleteFromCloud(documentId, owner);
+        } catch (failure) {
+            accountSync.setActiveDocument(documentId);
+            options.setFailure(failure instanceof Error ? failure.message : String(failure));
+            throw failure;
+        }
+        if (result.kind === 'refused') {
+            accountSync.setActiveDocument(documentId);
+            options.setFailure(result.message);
+            if (!options.dialogOpen()) {
+                setError(result.message);
+            }
+            return null;
+        }
+        if (!result.retained) {
+            // The account copy is gone and this device kept nothing — a retained draft is one of
+            // the things that would have made it `retained`, so since #1299 the only thing left to
+            // drop is this writer's guest-namespace recovery slot from before it. Otherwise the
+            // deleted song reappears as a recovery offer on the next visit.
+            try {
+                repository.clearOwnRecovery(documentId);
+            } catch {
+                /* Recovery is a convenience; a stale entry is not worth failing the delete. */
+            }
+        }
+        return result;
+    }
+    /**
      * Delete the open chart from the cloud (#1270) — the one destructive account operation in the
      * product, and deliberately not a side effect of anything else.
-     *
-     * The chart gives up its ACTIVE claim before the request goes out, and that is the point.
-     * `reconcile`'s preservation rule counts the chart on the stand as local work worth keeping, so
-     * deleting with the song still claimed would retain the very copy the musician just asked to
-     * remove — and leave it in the account songbook list, flagged, with no way to finish the job. A
-     * draft or an unsent Save still retains it, which is that rule working as intended: that work
-     * exists nowhere else.
      *
      * The claim is dropped through `setActiveDocument` rather than by unmounting the chart, so a
      * refused delete leaves the musician exactly where they were. It is called explicitly rather
      * than left to the `useAccountLibrary` effect that normally mirrors `current?.id`: effects run
      * after the render that follows a state change, and the loop reads `activeDocumentId` at the
      * moment it commits.
-     *
-     * Every path that leaves the record in place gives the claim back, THROWN paths included. A
-     * delete can fail by exception as well as by refusal — a session that went away mid-request, a
-     * reply this build could not read, storage that would not commit — and none of those is
-     * evidence the cloud copy is gone. An unprotected chart on the stand is exactly what the next
-     * download pass is allowed to adopt a remote body or a tombstone over.
      */
     function deleteFromAccount() {
         if (!current) {
@@ -2215,31 +2772,14 @@ export default function Ensemble() {
                 setError(OWNER_MESSAGES.mismatch);
                 return;
             }
-            accountSync.setActiveDocument(null);
-            let result: CloudDeleteResult;
-            try {
-                result = await accountSync.deleteFromCloud(documentId, owner);
-            } catch (failure) {
-                accountSync.setActiveDocument(documentId);
-                // Written to the confirm step as well, because that step is modal: everything
-                // behind it is inert, so a reason rendered only in the shell's error line is one
-                // the musician cannot read until they dismiss the thing they were answering.
-                setDeleteFailure(failure instanceof Error ? failure.message : String(failure));
-                // Rethrown, not swallowed: `run()` is what turns it into that error line, which
-                // is what carries the reason if the step was dismissed while this was in flight.
-                throw failure;
-            }
-            if (result.kind === 'refused') {
+            const result = await commitCloudDelete(documentId, owner, {
+                setFailure: setDeleteFailure,
+                dialogOpen: () => !!deleteDialogRef.current?.open,
+            });
+            if (result === null) {
                 // Nothing was deleted, so nothing about this session changes: the chart keeps its
                 // claim and the dialog stays open carrying the reason. Closing it and dropping a
                 // toast would leave the musician guessing whether it worked.
-                accountSync.setActiveDocument(documentId);
-                setDeleteFailure(result.message);
-                if (!deleteDialogRef.current?.open) {
-                    // The confirm step was dismissed while the request was in flight, so the line
-                    // above has nowhere to render. The reason still has to reach the musician.
-                    setError(result.message);
-                }
                 return;
             }
             runtime.stop();
@@ -2248,19 +2788,12 @@ export default function Ensemble() {
             setSaved(null);
             bindStand(null);
             clearBuffers();
-            if (!result.retained) {
-                // The account copy is gone and this device kept nothing — a retained draft is one
-                // of the things that would have made it `retained`, so since #1299 the only thing
-                // left to drop is this writer's slot from before it. Otherwise the deleted song
-                // reappears as a recovery offer on the next visit.
-                try {
-                    repository.clearOwnRecovery(documentId);
-                } catch {
-                    /* Recovery is a convenience; a stale entry is not worth failing the delete. */
-                }
-            }
+            setDeletedRowId(documentId);
             await refreshSongs();
-            setMessage(result.message);
+            // The songbook's own line (#1440 review P2), not the stand's `message`: this delete
+            // just closed the chart and landed back on the songbook, and `message` has no
+            // audience there — see `homeNotice`'s own doc comment.
+            setHomeNoticeState(result.message);
         });
     }
     /**
@@ -2711,6 +3244,11 @@ export default function Ensemble() {
                 throw new Error('Song no longer exists.');
             }
             await open(document);
+            // #1440 — this is also the All songs page's own `onOpenSong`, and unlike
+            // `openStandard` a real song has no "leaving" gesture of its own here: without this,
+            // `goHome` (which never resets either sub-view flag) would land back on the All
+            // songs page instead of the library list `standardsOpen`'s reset already keeps true.
+            setAllSongsOpen(false);
             track('chart_opened', { source: 'songbook' });
         });
     }
@@ -3509,6 +4047,27 @@ export default function Ensemble() {
                     }}
                 />
             )}
+            {/*
+             * The songbook's own status line (#1440 review P2) — "Renamed to…", "Duplicated",
+             * "Deleted", or the row-delete "hasn't finished syncing" explanation — said somewhere
+             * that is actually ON SCREEN while browsing the songbook, and never the STAND's own
+             * `message` (`open()` sets one on every open, which showed up as a stale leftover
+             * status on every later visit to the songbook before this — the review's own finding
+             * on the previous fix). Always mounted, with only its text changing, so a screen
+             * reader actually announces a row action's outcome (fixes P3 #5 in the same review):
+             * an element that pops into existence already containing text is not guaranteed an
+             * announcement the way a live region's TEXT CHANGE is.
+             */}
+            {!current && (
+                <div
+                    className="status-banner"
+                    role="status"
+                    data-testid="shell-message"
+                    data-empty={!homeNotice}
+                >
+                    <span>{homeNotice}</span>
+                </div>
+            )}
             {!ready ? (
                 <main className="loading">
                     <h1>Getting the band together.</h1>
@@ -3516,12 +4075,34 @@ export default function Ensemble() {
                 </main>
             ) : !current && standardsOpen ? (
                 <StandardsBrowser onBack={() => setStandardsOpen(false)} onOpen={openStandard} />
+            ) : !current && allSongsOpen ? (
+                <AllSongs
+                    songs={songbookLoading ? [] : songs}
+                    accountLibrary={signedIn}
+                    starred={starred}
+                    openedAt={openedAt}
+                    remoteCandidates={remoteCandidateRows}
+                    busy={busy}
+                    initialSort={allSongsSortPreference()}
+                    onSortChange={rememberAllSongsSort}
+                    onBack={() => setAllSongsOpen(false)}
+                    onOpenSong={openSong}
+                    onToggleStar={toggleStar}
+                    onOpenRowMenu={openRowMenu}
+                    lastRemovedId={deletedRowId}
+                />
             ) : !current ? (
                 <Songbook
                     songs={songbookLoading ? [] : songs}
                     featured={featured}
                     onOpenFeatured={openFeatured}
                     onBrowseStandards={() => setStandardsOpen(true)}
+                    standardsEntryRef={standardsEntryRef}
+                    starred={starred}
+                    onToggleStar={toggleStar}
+                    onOpenRowMenu={openRowMenu}
+                    onOpenAllSongs={() => setAllSongsOpen(true)}
+                    allSongsEntryRef={allSongsEntryRef}
                     continued={!!continuedSave}
                     busy={busy}
                     offline={offline.label}
@@ -3547,6 +4128,7 @@ export default function Ensemble() {
                     onImport={() => setImporting(true)}
                     onNewSong={newSong}
                     onOpenSong={openSong}
+                    lastRemovedId={deletedRowId}
                     v1Import={
                         // An offer the app opened by itself is for the GUEST songbook and is
                         // not shown over an account library (patch R2); one the musician
@@ -4118,6 +4700,43 @@ export default function Ensemble() {
                     onExport={() => void run(exportSong)}
                     onConfirm={deleteFromAccount}
                     onClose={() => setDeleteOpen(false)}
+                />
+            )}
+            <SongRowMenu
+                dialogRef={rowMenuDialogRef}
+                song={rowMenuFor}
+                starred={!!rowMenuFor && starred.has(rowMenuFor.id)}
+                busy={busy}
+                onClose={closeRowMenu}
+                onToggleStar={() => rowMenuFor && toggleStar(rowMenuFor.id)}
+                onRename={renameRow}
+                onDuplicate={duplicateRow}
+                onExport={exportRow}
+                onDelete={requestDeleteRow}
+            />
+            {guestDeleteTarget && (
+                <DeleteGuestSongDialog
+                    dialogRef={guestDeleteDialogRef}
+                    title={guestDeleteTarget.title}
+                    busy={busy}
+                    hasRecovery={guestDeleteTarget.hasRecovery}
+                    onExport={exportGuestDeleteTarget}
+                    onConfirm={deleteGuestSong}
+                    onClose={() => setGuestDeleteTarget(null)}
+                />
+            )}
+            {rowDeleteTarget && rowInAccount && (
+                <DeleteSongDialog
+                    dialogRef={rowDeleteDialogRef}
+                    title={rowDeleteTarget.title}
+                    online={account.online}
+                    busy={busy}
+                    unsavedEdits={false}
+                    pendingCount={sync.observation?.pendingCount ?? 0}
+                    failure={rowDeleteFailure}
+                    onExport={exportRowDeleteTarget}
+                    onConfirm={deleteRowFromAccount}
+                    onClose={closeRowDeleteConfirm}
                 />
             )}
         </div>

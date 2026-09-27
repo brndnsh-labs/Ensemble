@@ -26,15 +26,18 @@ export function StandardsBrowser({ onBack, onOpen }: StandardsBrowserProps) {
     const entries = STANDARDS.filter((entry) => shelf === 'all' || entry.shelf === shelf);
     const heading = useRef<HTMLHeadingElement>(null);
     // A view switch, not a dialog, but it earns the same courtesy: opening it moves focus onto
-    // its own heading (never left behind on whatever button was clicked), and leaving it gives
-    // focus back to that button rather than dropping it on `<body>`. `document.activeElement` at
-    // mount time is the button that opened this — captured once, restored on unmount.
+    // its own heading, never left behind on whatever button was clicked.
+    //
+    // Restoring focus on the way OUT does not belong here (#1440 review P3): this component and
+    // the songbook it returns to are siblings in `app/ensemble.tsx`'s view swap, so returning
+    // UNMOUNTS this and MOUNTS a fresh `Songbook` in the same commit — a `document.activeElement`
+    // captured at mount time is that fresh mount's button's PREDECESSOR, already removed from the
+    // document by the time an unmount cleanup could focus it, so the call was always a no-op and
+    // focus fell to `<body>`. The shell owns that instead, with a ref onto the actual entry point
+    // (`app/ensemble.tsx`'s `standardsEntryRef`), which survives the remount because the shell
+    // does not.
     useEffect(() => {
-        const opener = document.activeElement as HTMLElement | null;
         heading.current?.focus();
-        return () => {
-            opener?.focus?.();
-        };
     }, []);
     return (
         <main className="home standards-browser">

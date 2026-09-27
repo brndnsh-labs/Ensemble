@@ -17,6 +17,7 @@ export default defineConfig({
             'tests/browser/account-keep-both.browser.test.ts',
             'tests/browser/account-adopt-candidate.browser.test.ts',
             'tests/browser/account-sign-out.browser.test.ts',
+            'tests/browser/account-library-prefs.browser.test.ts',
         ],
         browser: {
             enabled: true,

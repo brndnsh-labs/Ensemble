@@ -9,12 +9,20 @@
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
+    allSongsSortPreference,
     countInPreference,
+    forgetOpened,
+    forgetStar,
     hasDeclinedV1Import,
+    openedAtMap,
+    recordOpened,
+    rememberAllSongsSort,
     rememberCountIn,
     rememberV1Import,
     rememberV1ImportDecline,
     rememberV1SessionMark,
+    setStarred,
+    starredIds,
     v1ImportLedger,
     v1SessionMark,
 } from './session';
@@ -195,5 +203,82 @@ describe('the v1 session mark', () => {
             store.set('ensemble-v2-preview:v1-session-import', raw);
             expect(v1SessionMark()).toBeNull();
         }
+    });
+});
+
+describe('per-song opened-at (#1440)', () => {
+    it('is empty on a fresh device', () => {
+        expect(openedAtMap().size).toBe(0);
+    });
+
+    it('records a timestamp readable back from the map', () => {
+        recordOpened('song-1');
+        const map = openedAtMap();
+        expect(map.has('song-1')).toBe(true);
+        expect(Number.isFinite(Date.parse(map.get('song-1')!))).toBe(true);
+    });
+
+    it('holds one row per song, not one `localStorage` key per song', () => {
+        recordOpened('song-1');
+        recordOpened('song-2');
+        expect(store.size).toBe(1);
+        expect(openedAtMap().size).toBe(2);
+    });
+
+    it('forgetOpened drops one song without disturbing the others', () => {
+        recordOpened('song-1');
+        recordOpened('song-2');
+        forgetOpened('song-1');
+        const map = openedAtMap();
+        expect(map.has('song-1')).toBe(false);
+        expect(map.has('song-2')).toBe(true);
+    });
+
+    it('drops an unreadable ledger to "never opened" rather than throwing', () => {
+        store.set('ensemble-v2-preview:opened-at', 'not json');
+        expect(openedAtMap().size).toBe(0);
+    });
+});
+
+describe('starred songs (#1440)', () => {
+    it('is empty on a fresh device', () => {
+        expect(starredIds().size).toBe(0);
+    });
+
+    it('stars and unstars a song', () => {
+        setStarred('song-1', true);
+        expect(starredIds()).toEqual(new Set(['song-1']));
+        setStarred('song-1', false);
+        expect(starredIds()).toEqual(new Set());
+    });
+
+    it('forgetStar unstars without touching other stars', () => {
+        setStarred('song-1', true);
+        setStarred('song-2', true);
+        forgetStar('song-1');
+        expect(starredIds()).toEqual(new Set(['song-2']));
+    });
+
+    it('drops an unreadable ledger to "nothing starred" rather than throwing', () => {
+        store.set('ensemble-v2-preview:starred', 'not json');
+        expect(starredIds().size).toBe(0);
+    });
+});
+
+describe('the All songs sort preference (#1440)', () => {
+    it('is unset on a fresh device', () => {
+        expect(allSongsSortPreference()).toBeNull();
+    });
+
+    it('round-trips every sort option', () => {
+        for (const sort of ['title', 'recentOpened', 'recentAdded', 'composer', 'tempo'] as const) {
+            rememberAllSongsSort(sort);
+            expect(allSongsSortPreference()).toBe(sort);
+        }
+    });
+
+    it('rejects a hand-edited value instead of trusting it', () => {
+        store.set('ensemble-v2-preview:all-songs-sort', 'nonsense');
+        expect(allSongsSortPreference()).toBeNull();
     });
 });
