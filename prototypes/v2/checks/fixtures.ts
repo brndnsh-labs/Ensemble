@@ -340,11 +340,19 @@ function starterDocuments(): ChartDocument[] {
  * navigates to the songbook so they're what it reads on boot. Not `page.addInitScript`: the
  * write is genuinely async (`indexedDB`, unlike `asHeldDevice`'s synchronous `localStorage`
  * write), and an init script's returned promise does not block the page's OWN scripts — so the
- * app's first boot can race the write and read an empty store. A real navigation first, then an
- * awaited `page.evaluate`, then a reload has no such race.
+ * app's first boot can race the write and read an empty store.
+ *
+ * The write happens on `build.json`, a same-origin page that runs none of the app, and only then
+ * does the app load, ONCE. An earlier version loaded the app, wrote, and reloaded. That reload
+ * landed in the middle of the service worker's first install (which precaches the whole shell),
+ * and on CI's slower WebKit the interrupted install never produced a controller, failing
+ * `semantic-chart.spec.ts`'s offline reopen twice running. For the same reason, a spec that
+ * wants the app at another URL passes it as `path` rather than navigating again straight after:
+ * leaving the app mid-boot surfaces WebKit teardown rejections (`[object Event]`,
+ * `Context is stopped`) as `pageerror`s in any spec that collects them.
  */
-export async function seedStarters(page: Page): Promise<void> {
-    await page.goto(appUrl());
+export async function seedStarters(page: Page, path = ''): Promise<void> {
+    await page.goto(appUrl('build.json'));
     await page.evaluate(async (docs: ChartDocument[]) => {
         const db = await new Promise<IDBDatabase>((resolve, reject) => {
             const request = indexedDB.open('ensemble-v2-preview', 1);
@@ -363,5 +371,5 @@ export async function seedStarters(page: Page): Promise<void> {
         });
         db.close();
     }, starterDocuments());
-    await page.reload();
+    await page.goto(appUrl(path));
 }

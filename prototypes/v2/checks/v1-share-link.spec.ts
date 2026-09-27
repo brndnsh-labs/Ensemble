@@ -132,8 +132,7 @@ test("a linked genre swings like the picked genre: a Blues link's swing is the B
 test('a garbage v1 link says so and leaves the songbook working', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
-    await seedStarters(page);
-    await page.goto(appUrl('?s=not-a-real-payload&key=C&bpm=120'));
+    await seedStarters(page, '?s=not-a-real-payload&key=C&bpm=120');
 
     // Scoped to the app's own banner: Next's route announcer also carries `role="alert"`.
     await expect(page.locator('.error-banner[role="alert"]')).toContainText(
