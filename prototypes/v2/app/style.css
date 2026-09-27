@@ -187,8 +187,8 @@ html [hidden] {
    button. The search and the two actions are the songbook home's alone; on the All songs and
    standards views the bar carries the wordmark and the account button only. */
 .site-header {
-    min-height: 72px;
-    padding: 12px 42px;
+    min-height: 60px;
+    padding: 8px 42px;
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto auto;
     grid-template-areas: "brand search tools account";
@@ -2984,7 +2984,7 @@ html[data-theme="stage"] {
 .section-sub {
     font-size: 12px;
     color: var(--muted);
-    margin: -6px 0 16px;
+    margin: -6px 0 10px;
 }
 .text-link {
     display: inline-flex;
@@ -2996,15 +2996,17 @@ html[data-theme="stage"] {
     color: var(--accent);
     white-space: nowrap;
 }
-/* "Pick up where you left off": the song's own first bars, never a sample. */
+/* "Pick up where you left off": the song's own first bars, never a sample. One label (#1459): the
+   state phrase leads `.continue-meta` instead of sitting above the title as its own eyebrow — the
+   page's "Your songbook" heading right above already reads as one. */
 .continue-card {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 380px);
-    gap: 28px;
+    gap: 20px;
     background: var(--surface);
     border: 1px solid var(--line);
     border-radius: var(--radius);
-    padding: 26px 28px;
+    padding: 18px 22px;
 }
 .continue-copy {
     display: flex;
@@ -3012,16 +3014,13 @@ html[data-theme="stage"] {
     align-items: flex-start;
     min-width: 0;
 }
-.continue-copy .eyebrow {
-    color: var(--accent);
-}
 .home .continue-copy h2 {
     font-family: Georgia, "Times New Roman", serif;
     font-weight: 400;
-    font-size: 30px;
-    letter-spacing: -0.5px;
+    font-size: 22px;
+    letter-spacing: -0.3px;
     line-height: 1.2;
-    margin: 10px 0 6px;
+    margin: 0 0 4px;
     overflow-wrap: anywhere;
 }
 .continue-meta {
@@ -3034,7 +3033,7 @@ html[data-theme="stage"] {
     flex-wrap: wrap;
     gap: 9px;
     margin-top: auto;
-    padding-top: 22px;
+    padding-top: 12px;
 }
 .continue-bars {
     min-width: 0;
@@ -3045,7 +3044,7 @@ html[data-theme="stage"] {
     letter-spacing: 0.08em;
     text-transform: uppercase;
     color: var(--muted);
-    margin-bottom: 12px;
+    margin-bottom: 6px;
 }
 .continue-grid {
     list-style: none;
@@ -3053,7 +3052,7 @@ html[data-theme="stage"] {
     padding: 0;
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    row-gap: 14px;
+    row-gap: 8px;
     font-family: Georgia, "Times New Roman", serif;
     font-size: 17px;
     color: var(--ink);
@@ -3069,13 +3068,16 @@ html[data-theme="stage"] {
 .continue-grid li:last-child {
     border-right: 1px solid var(--bar-line-strong);
 }
-/* Recently opened: title plus one muted fact, the facts in columns on a wide screen and in one
-   meta line on a phone. */
+/* Recently opened: two lines (#1459) — the title, then one meta line: composer (or genre) · key ·
+   tempo. `.song-link` keeps a 44px min-height of its own — it is a `<button>`, so the site-wide
+   "every control is at least 44px" check measures IT, not just the row's padding — matching the
+   star/⋯ buttons beside it (`.home-table .icon-button`, below) so the row's height comes out the
+   same either way. */
 .home-table .song-link {
     flex-direction: column;
     align-items: flex-start;
     justify-content: center;
-    gap: 2px;
+    gap: 1px;
     min-height: 44px;
 }
 .home-table .song-name {
@@ -3085,10 +3087,38 @@ html[data-theme="stage"] {
 .home-table .more-cell {
     width: 44px;
 }
+/* Both `.icon-button`s in this table keep the full 44px hit target regardless of row height —
+   the row's padding shrinks around them, not the buttons themselves (#1459). */
+.home-table .icon-button {
+    width: 44px;
+    height: 44px;
+}
+.home-table .song-row td {
+    padding-top: 2px;
+    padding-bottom: 2px;
+}
+/* One line, never wrapping to a third: `.song-detail` keeps the composer/genre text alone (see
+   the doc comment at its call site — `songLink()`'s exact-match filter depends on that), and
+   `.song-meta` is the sibling span that appends key/tempo on the same visual line. */
+.song-meta-line {
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+}
 .song-meta {
-    display: none;
     font-size: 11px;
     color: var(--muted);
+}
+/* The laptop shows the opened time in its own column; the phone shows it on the meta line. */
+.song-ago {
+    display: none;
+}
+/* The phone-only "SONG" column header (#1459): present for assistive tech, not shown when it is
+   the one visible header over a single content column. */
+.song-col-header {
+    white-space: nowrap;
 }
 .home-table .song-marker,
 .search-list .song-marker {
@@ -3238,8 +3268,8 @@ html[data-theme="stage"] {
     flex-wrap: wrap;
     justify-content: space-between;
     gap: 8px 16px;
-    margin-top: 44px;
-    padding-top: 17px;
+    margin-top: 28px;
+    padding-top: 12px;
     border-top: 1px solid var(--line);
     font-size: 11px;
     line-height: 1.6;
@@ -3250,10 +3280,10 @@ html[data-theme="stage"] {
 }
 @media (max-width: 760px) {
     .site-header {
-        padding: 10px 16px;
+        padding: 6px 16px;
         grid-template-columns: minmax(0, 1fr) auto;
         grid-template-areas: "brand account";
-        gap: 10px;
+        gap: 8px;
     }
     .site-header[data-home="true"] {
         grid-template-areas:
@@ -3278,27 +3308,30 @@ html[data-theme="stage"] {
         min-height: 44px;
     }
     .home {
-        padding: 20px 16px 24px;
+        padding: 16px 16px 16px;
     }
     .home .home-library {
-        margin-bottom: 12px;
+        margin-bottom: 10px;
     }
     .home-section {
-        margin-top: 28px;
+        margin-top: 20px;
     }
     .text-link {
         min-height: 44px;
     }
     .continue-card {
         grid-template-columns: minmax(0, 1fr);
-        gap: 18px;
-        padding: 20px;
+        gap: 10px;
+        padding: 12px 14px;
     }
     .home .continue-copy h2 {
-        font-size: 26px;
+        font-size: 19px;
     }
     .continue-actions {
-        padding-top: 16px;
+        padding-top: 8px;
+    }
+    .continue-bars-label {
+        margin-bottom: 4px;
     }
     /* The phone's compact card shows the first four bars. */
     .continue-grid li:nth-child(n + 5) {
@@ -3307,19 +3340,37 @@ html[data-theme="stage"] {
     .continue-grid li:nth-child(4) {
         border-right: 1px solid var(--bar-line-strong);
     }
-    .home-table .icon-button {
-        width: 44px;
-        height: 44px;
+    /* The row's own padding shrinks further on the phone than the 2px laptop base, but the
+       44px `.icon-button` (set unconditionally now, see above) keeps the same hit target — the
+       phone target is ~54px (44 + 5+5 padding), the laptop's is ~48px (44 + 2+2). */
+    .home-table .song-row td {
+        padding-top: 5px;
+        padding-bottom: 5px;
     }
-    .home-table .song-link {
-        min-height: 52px;
+    /* The lone "SONG" header over a single visible column (#1459) — kept for assistive tech,
+       not shown, rather than removed from the DOM. */
+    .home-table .song-ago {
+        display: inline;
     }
-    .song-meta {
-        display: block;
+    /* Every header cell's text is visually hidden on the phone, so the header row collapses to
+       nothing instead of leaving its bottom padding as a gap above the first row. */
+    .home-table thead th {
+        padding: 0;
+    }
+    .home-table th.song-col-header {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
     }
     .shelf-columns {
         grid-template-columns: minmax(0, 1fr);
-        gap: 20px;
+        gap: 14px;
     }
     .shelf-items {
         flex-direction: row;
@@ -3329,19 +3380,16 @@ html[data-theme="stage"] {
         padding-bottom: 6px;
     }
     .shelf-items li {
-        flex: 0 0 152px;
+        flex: 0 0 210px;
         scroll-snap-align: start;
     }
+    /* Shorter cards (#1459, ~64px): the play button sits beside the title, same as the laptop's
+       shelf column, instead of stacked above it in its own tall block. */
     .shelf-items .standard-item {
-        flex-direction: column;
-        align-items: flex-start;
         height: 100%;
-        padding: 12px;
+        padding: 12px 14px;
         border: 1px solid var(--line);
         background: var(--surface);
-    }
-    .shelf-items .standard-title {
-        white-space: normal;
     }
     .home h1 {
         font-size: 34px;
