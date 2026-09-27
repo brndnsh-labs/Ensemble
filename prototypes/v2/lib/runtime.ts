@@ -62,7 +62,14 @@ import {
     type SwingSub,
 } from '@engine/types';
 import { getFrequency, transposeKeyName } from '@engine/utils';
-import { auditionMidis, type BandChart, bandChart, sectionSteps, slotAt } from './band-chart';
+import {
+    auditionMidis,
+    type BandChart,
+    bandChart,
+    barAt,
+    sectionSteps,
+    slotAt,
+} from './band-chart';
 import {
     downloadExportResult,
     renderBandMixToWav,
@@ -1426,13 +1433,23 @@ export function bandChartView(): BandChart | null {
 }
 
 /**
- * The song position sounding right now, in the same sixteenth-note steps the chart sheet's
- * `start`/`end` fields use — or null while stopped or counting in. A pure read of the band
- * host's audio-clock tick (`songTick()`), for a caller (the Following look-ahead scroll, #1458)
- * that needs finer-than-chord-change resolution without a new polled state field: it samples
- * this on its own cadence rather than the chart re-rendering every tick.
+ * Is playback in the last FELT pulse of its performed bar right now (#1458's Following
+ * look-ahead)? A dotted quarter in 6/8, not a raw eighth — the band's own `Meter.pulses`
+ * skeleton (`BandChart.bars`), never `TIME_SIGNATURES.stepsPerBeat`.
+ *
+ * Pure engine read off `songTick()` directly, not the chart's `active`/`lastActiveChordIndex`
+ * state: `active` is published by `followPlayhead`'s own 50ms poll and React only commits it on
+ * its next render, so a caller on a DIFFERENT poll (the Following look-ahead's, #1458) that read
+ * `active`'s bar from the DOM could still see the bar just left for a whole tick after `songTick()`
+ * had already crossed into the next one — firing "last beat" a bar early, at the new bar's
+ * downbeat. Reading the bar straight from the timeline via `tick` has no such lag: it always
+ * names whichever bar `tick` is ACTUALLY in, this instant. False while stopped or counting in.
  */
-export function currentStep(): number | null {
+export function inLastBeat(): boolean {
     const tick = band?.songTick();
-    return tick == null ? null : tick / STEP_TICKS;
+    if (tick == null || !bandView) {
+        return false;
+    }
+    const bar = barAt(bandView, tick);
+    return bar !== null && tick >= bar.lastPulseStart;
 }

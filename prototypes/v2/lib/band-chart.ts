@@ -43,12 +43,28 @@ export interface BandSlot {
     display: number;
 }
 
+/**
+ * One performed bar's tick span and where its last FELT pulse begins (a dotted quarter in 6/8,
+ * not a raw eighth) — the band's own `Meter.pulses` skeleton, not `TIME_SIGNATURES.stepsPerBeat`,
+ * so 6/8, 7/8 and 12/8 read correctly. Used by the Following look-ahead's last-beat cue (#1458),
+ * off `songTick()` directly rather than the chart's own `active` state, which a render can still
+ * be showing for the bar just left after the tick has already crossed into the next one.
+ */
+export interface BandBar {
+    start: number;
+    end: number;
+    lastPulseStart: number;
+}
+
 export interface BandChart {
     blocks: ChartBlock[];
     /** Every written event in written order; a chord's `globalIndex` is its index here. */
     chords: BandChartChord[];
     /** Every performed event in performance order. */
     slots: BandSlot[];
+    /** Every performed bar's tick span, in performance order — `bars[i]` is the visit at
+     * `timeline.bars[i]`, the same index space `form`/`slotAt` walk. */
+    bars: BandBar[];
     /** Each section visit's step range, for practice loops. */
     sections: { id: string; start: number; end: number }[];
 }
@@ -103,9 +119,15 @@ export function bandChart(score: SemanticScore, timeline: Timeline): BandChart {
     });
 
     const slots: BandSlot[] = [];
+    const bars: BandBar[] = [];
     const placed = new Set<number>();
     form.forEach((visit, i) => {
         const bar = timeline.bars[i];
+        bars.push({
+            start: bar.start,
+            end: bar.start + bar.meter.barTicks,
+            lastPulseStart: bar.start + bar.meter.pulses[bar.meter.pulses.length - 1],
+        });
         const { first, offsets } = written[visit.sectionIndex][visit.measureIndex];
         offsets.forEach((offset, j) => {
             const from = bar.start + offset;
@@ -152,6 +174,7 @@ export function bandChart(score: SemanticScore, timeline: Timeline): BandChart {
         blocks: writtenBlocks(score, (id) => measures.get(id)),
         chords,
         slots,
+        bars,
         sections: timeline.visits.map((visit) => {
             const last = timeline.bars[visit.firstBar + visit.barCount - 1];
             return {
@@ -179,6 +202,25 @@ export function slotAt(chart: BandChart, tick: number): number {
         }
     }
     return -1;
+}
+
+/** The performed BAR under a song tick, or null past the end — for the Following look-ahead's
+ * last-beat cue (#1458), which needs the whole bar's span, not one chord's. */
+export function barAt(chart: BandChart, tick: number): BandBar | null {
+    let lo = 0;
+    let hi = chart.bars.length - 1;
+    while (lo <= hi) {
+        const mid = (lo + hi) >> 1;
+        const bar = chart.bars[mid];
+        if (tick < bar.start) {
+            hi = mid - 1;
+        } else if (tick >= bar.end) {
+            lo = mid + 1;
+        } else {
+            return bar;
+        }
+    }
+    return null;
 }
 
 /**
