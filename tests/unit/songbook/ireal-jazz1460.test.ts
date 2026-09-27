@@ -258,4 +258,30 @@ describe('the Jazz 1460 playlist fixtures (#1447)', () => {
             events: [{ kind: 'chord', symbol: 'G6', duration: [4, 1], fermata: true }],
         });
     });
+
+    it('imports Round Midnight at 41 performed bars, resolving its "W" invisible-root placeholder (#1452)', () => {
+        // Bar 9 of the chart is "Ebm | Ebm/D | Ebm7/Db" written as "Ebm,Ebm/D,W" is not quite
+        // it — the actual token is "7,W/D,-bE" (Ebm, then "W/D", i.e. Ebm's root+quality with
+        // W's own slash bass D) — the chromatic descending-bass walk-down the tune is known for.
+        // ireal-score.ts's 'W' branch cites infojunkie/ireal-musicxml converter.js for why W
+        // copies the nearest preceding chord's root+quality and applies its own slash bass.
+        const { document, song } = importFixture('round-midnight');
+        expect(performedBarCount(document)).toBe(41);
+        expectCanonicalRoundTrip(document);
+        const measures = document.chart.score.sections[0].measures;
+        expect(measures[8].content).toEqual({
+            kind: 'events',
+            events: [
+                { kind: 'chord', symbol: 'Ebm', duration: [1, 1] },
+                { kind: 'chord', symbol: 'Ebm/D', duration: [1, 1] },
+                { kind: 'chord', symbol: 'Ebm7/Db', duration: [2, 1] },
+            ],
+        });
+        expect(song.diagnostics).toContainEqual(
+            expect.objectContaining({
+                severity: 'warning',
+                message: expect.stringContaining('dropped'),
+            }),
+        );
+    });
 });

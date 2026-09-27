@@ -165,10 +165,21 @@ function readBars(
     //   would index `[-1]` and crash the reference converter, so this importer refuses it too
     //   rather than inventing a cross-bar target the reference itself does not support.
     let pendingFermata = false;
+    // Implicit reopen after `]`/`}`/`Z` (#1452), established from infojunkie/ireal-musicxml
+    // converter.js's `convertMeasures()`: a new measure starts when `cell.bars` carries an
+    // explicit opening mark OR — regardless of `.bars` — `!this.measure && (cell.chord ||
+    // cell.annots.length || cell.comments.length)`, i.e. real content with no open measure starts
+    // one anyway. parser.js's tokenizer never assigns an opening mark to the cell right after a
+    // close (`]`/`}`/`Z` only appends the closing character to the PREVIOUS cell's `.bars`; see
+    // the '|[]{}Z' branch below — the cell that follows gets none), so this is the common way the
+    // rule fires. `addCell` is where every event-bearing/blank/repeat cell is created, so setting
+    // `inside` unconditionally here is exactly that rule: real content always has somewhere to
+    // land. It is deliberately lazy — nothing forces a reopen at the moment `]`/`}`/`Z` is read —
+    // so a bar explicitly reopened by a following `|`/`[`/`{` (e.g. this importer's own
+    // `{C |N1F }|N2G7 Z` repeat/ending test) is untouched: `inside` is already true by the time
+    // any cell is added.
     function addCell(cell: Cell | null) {
-        if (!inside) {
-            fail(bars.length, 'Music needs an opening barline.');
-        }
+        inside = true;
         if (current.cells.length >= 64) {
             fail(bars.length, 'The bar has too many rhythm cells.');
         }
@@ -463,6 +474,43 @@ function readBars(
         } else if (char === 'n' || char === 'p') {
             addCell({ event: { kind: char === 'n' ? 'no-chord' : 'hold', duration: [1, 1] } });
             offset++;
+        } else if (char === 'W') {
+            // Invisible-root placeholder (#1452), established from infojunkie/ireal-musicxml
+            // converter.js's `case 'W':`: it copies the previous chord's root+quality — searching
+            // the current measure first, then reverse-searching earlier measures for the nearest
+            // one with a chord (`measures.slice().reverse().find(m => m.chords.length)`) — then
+            // OVERWRITES the copy's slash bass with W's own (`chord.over = cell.chord.over`, which
+            // is absent/undefined when W has none, dropping any slash the copied chord had) and
+            // its own alternate (`chord.alternate = cell.chord.alternate`). parser.js's
+            // `chordRegex2` gives W's own grammar: `/^([ Wp])()()(\/[A-G][#b]?)?(\(.*?\))?/` — an
+            // optional slash bass, then an optional alternate in parens; the alternate needs no
+            // special handling here, since a following "(...)" is already picked up by this
+            // importer's own '(' branch once the synthesized chord below is on the cell stack.
+            // Scoped to a preceding CHORD specifically (not N.C./hold, which the reference's own
+            // `this.measure.chords` conflates with real chords in a way this importer's typed
+            // events don't model, and not a blank/rest cell, which never becomes a "chord" in
+            // either reference): if the nearest preceding event isn't a chord, refuse rather than
+            // invent what W should copy.
+            const previous = [...bars.flatMap((bar) => bar.cells), ...current.cells]
+                .reverse()
+                .map((cell) => cell?.event)
+                .find((event) => event?.kind === 'chord');
+            const rootQuality =
+                previous?.kind === 'chord'
+                    ? /^([A-G][#b]?)(.*?)(?:\/[A-G][#b]?)?$/.exec(previous.symbol)
+                    : null;
+            if (!rootQuality) {
+                fail(bars.length, 'A slash-root placeholder needs an earlier chord to copy.');
+            }
+            const slash = /^\/([A-G][#b]?)/.exec(body.slice(offset + 1));
+            addCell({
+                event: {
+                    kind: 'chord',
+                    symbol: rootQuality[1] + rootQuality[2] + (slash ? `/${slash[1]}` : ''),
+                    duration: [1, 1],
+                },
+            });
+            offset += 1 + (slash ? slash[0].length : 0);
         } else {
             const chord = chordAt(body, offset);
             if (!chord) {

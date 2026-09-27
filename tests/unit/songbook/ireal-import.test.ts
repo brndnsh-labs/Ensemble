@@ -176,6 +176,36 @@ describe('bounded source-preserving iReal import', () => {
         expect(score('T44[C   ][G7  Z').sections[0].measures).toHaveLength(2);
     });
 
+    it('implicitly reopens a bar after a close with no reopening bracket (#1452)', () => {
+        // Established: infojunkie/ireal-musicxml converter.js's `convertMeasures()` starts a new
+        // measure whenever `!this.measure && (cell.chord || cell.annots.length ||
+        // cell.comments.length)` — real content with no open measure opens one regardless of
+        // `cell.bars` — and parser.js's tokenizer never assigns an opening mark to the cell right
+        // after `]`/`}`/`Z` (only the PRECEDING cell's `.bars` gets the closing character).
+        expect(score('T44[C   ]D   Z').sections[0].measures.map((bar) => bar.content)).toEqual([
+            { kind: 'events', events: [{ kind: 'chord', symbol: 'C', duration: [4, 1] }] },
+            { kind: 'events', events: [{ kind: 'chord', symbol: 'D', duration: [4, 1] }] },
+        ]);
+        expect(score('T44{C   }D   Z').sections[0].measures.map((bar) => bar.content)).toEqual([
+            { kind: 'events', events: [{ kind: 'chord', symbol: 'C', duration: [4, 1] }] },
+            { kind: 'events', events: [{ kind: 'chord', symbol: 'D', duration: [4, 1] }] },
+        ]);
+        // An implicit reopen gets a plain barline, same as the reference's empty `cell.bars`: no
+        // repeat-start, unlike an explicit '{'.
+        expect(score('T44{C   }D   Z').sections[0].measures[1].start).toBeUndefined();
+    });
+
+    it('does not disturb an explicitly reopened bar with a numbered ending (#1452 regression guard)', () => {
+        // #1447 found that a naive implicit-reopen implementation broke this exact shape: an
+        // ending-start marker on a bar that IS explicitly reopened by '|' right after the
+        // preceding repeat-end '}'. The fix is scoped to real content arriving with no open bar
+        // (checked lazily in `addCell`), so an explicit '|' here must leave this untouched.
+        const bars = score('T44*A{C   |N1F   }|N2G7  Z').sections[0].measures;
+        expect(bars).toHaveLength(3);
+        expect(bars[1].end).toEqual([{ kind: 'repeat-end', times: 2 }]);
+        expect(bars[2].start).toEqual([{ kind: 'ending-start', passes: [2] }]);
+    });
+
     it('maps one- and two-bar repeats to their earlier authored sources', () => {
         const bars = score('T44[C   |F   | r |   |x   Z').sections[0].measures;
         expect(bars.slice(2).map((bar) => bar.content)).toEqual([
@@ -211,6 +241,34 @@ describe('bounded source-preserving iReal import', () => {
             { kind: 'events', events: [{ kind: 'no-chord', duration: [4, 1] }] },
             { kind: 'events', events: [{ kind: 'hold', duration: [4, 1] }] },
         ]);
+    });
+
+    it('resolves the "W" invisible-root placeholder against the nearest preceding chord (#1452)', () => {
+        // Established: infojunkie/ireal-musicxml converter.js's `case 'W':` copies the previous
+        // chord's root+quality, then overwrites the copy's slash bass with W's own (dropping any
+        // slash the copied chord had, when W specifies none) and its own alternate. parser.js's
+        // `chordRegex2` gives W's grammar: an optional `/[A-G][#b]?` slash, then an optional
+        // `(...)` alternate — the alternate needs no special handling, since a following "(...)"
+        // is already picked up by this importer's own '(' branch.
+        expect(score('T44[C  W  Z').sections[0].measures[0].content).toEqual({
+            kind: 'events',
+            events: [
+                { kind: 'chord', symbol: 'C', duration: [2, 1] },
+                { kind: 'chord', symbol: 'C', duration: [2, 1] },
+            ],
+        });
+        expect(score('T44[C   ]W/EZ').sections[0].measures[1].content).toEqual({
+            kind: 'events',
+            events: [{ kind: 'chord', symbol: 'C/E', duration: [4, 1] }],
+        });
+        expect(score('T44[C   ]W(D7)Z').sections[0].measures[1].content).toEqual({
+            kind: 'events',
+            events: [{ kind: 'chord', symbol: 'C', duration: [4, 1], alternates: ['D7'] }],
+        });
+    });
+
+    it('refuses "W" with no preceding chord to copy', () => {
+        blocked('T44[W   Z');
     });
 
     it('falls back to the preceding chord when a fermata is not immediately followed by one', () => {
