@@ -1,8 +1,10 @@
 import type { Page } from '@playwright/test';
 import {
     backToSongbook,
+    closeSongActions,
     createAccountThroughDialog,
     newSongOnTheStand,
+    openSongActions,
     openWithAccounts,
     releaseApi,
     shapeApi,
@@ -210,7 +212,9 @@ test('a second device signing into the same account is offered nothing, and queu
     // dialog, which only ever claimed the local half.
     await expect(page.getByTestId('library-loading')).toHaveCount(0);
     await page.locator('.song-link', { hasText: guestTitles[0] }).first().click();
+    await openSongActions(page);
     await expect(page.getByTestId('sync-cloud')).toHaveText('Saved to your account');
+    await closeSongActions(page);
 
     // Device two: its own cookie jar, its own IndexedDB, its own guest songbook — and the same
     // three seeded guest songs, under the same ids. Only the passkey is carried over.

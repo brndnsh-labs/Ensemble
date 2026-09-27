@@ -1,9 +1,11 @@
 import type { Page } from '@playwright/test';
 import {
     backToSongbook,
+    closeSongActions,
     dismissAdoptGuestPrompt,
     newSongOnTheStand,
     openSong,
+    openSongActions,
     openWithAccounts,
     revealEditor,
     saveAndUpload,
@@ -177,7 +179,9 @@ test('two devices save the same version: the loser keeps both, and nothing is lo
         await expect(second.getByTestId('conflict-title')).toHaveText('Changed on another device');
         // Refused by the cloud and still perfectly safe here — the whole reason local safety and
         // cloud confirmation are two separate facts.
+        await openSongActions(second);
         await expect(second.getByTestId('sync-local')).toHaveText('Saved on this device');
+        await closeSongActions(second);
 
         // Waited on the RESPONSE, not the chip: the refused Save carried this same title, so the
         // only reading that cannot be a moment stale is the one the account accepted (`ok()`; the
@@ -192,10 +196,12 @@ test('two devices save the same version: the loser keeps both, and nothing is lo
         await expect(
             second.getByRole('heading', { name: 'Our take — kept', exact: true }),
         ).toBeVisible();
+        await openSongActions(second);
         await expect(second.getByTestId('sync-cloud')).toHaveText('Saved to your account');
         // The stand reads the name the songbook filed it under, so nothing claims an edit nobody
         // made — and the next plain Save cannot quietly rename it back.
         await expect(second.getByTestId('sync-local')).toHaveText('Saved on this device');
+        await closeSongActions(second);
 
         // The create the resolution queued is a request the account has never seen.
         expectFreshIdentity(saves());
@@ -247,7 +253,9 @@ test('a Save the account can no longer hold becomes a song of its own', async ({
         await revealEditor(second);
         await second.context().setOffline(true);
         await saveAs(second, 'Set list two');
+        await openSongActions(second);
         await expect(second.getByTestId('sync-cloud')).toContainText('Waiting to upload');
+        await closeSongActions(second);
 
         // Device one deletes the song from the account (#1270).
         await openSong(page, 'Set list');
@@ -275,7 +283,9 @@ test('a Save the account can no longer hold becomes a song of its own', async ({
         await expect(
             second.getByRole('heading', { name: 'Set list two — kept', exact: true }),
         ).toBeVisible();
+        await openSongActions(second);
         await expect(second.getByTestId('sync-cloud')).toHaveText('Saved to your account');
+        await closeSongActions(second);
 
         expectFreshIdentity(saves());
 
@@ -340,7 +350,9 @@ test('a bar typed but not applied survives keeping both, and its retained draft 
         // ...and THEN the musician types a bar and reaches for the banner without applying it.
         const bar = second.getByLabel('Chords in this bar');
         await bar.fill('F');
+        await openSongActions(second);
         await expect(second.getByTestId('sync-local')).toHaveText('Unsaved changes');
+        await closeSongActions(second);
 
         const uploaded = uploadOf(second, 'Study mine');
         await second.getByTestId('conflict-keep-both').click();
@@ -354,7 +366,9 @@ test('a bar typed but not applied survives keeping both, and its retained draft 
             second.getByRole('heading', { name: 'Study mine — kept', exact: true }),
         ).toBeVisible();
         await expect(bar).toHaveValue('F');
+        await openSongActions(second);
         await expect(second.getByTestId('sync-local')).toHaveText('Unsaved changes');
+        await closeSongActions(second);
 
         const sent = saves();
         const refusedId = sent[0].documentId;

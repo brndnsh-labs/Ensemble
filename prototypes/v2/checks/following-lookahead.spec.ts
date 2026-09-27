@@ -230,7 +230,47 @@ async function trackScrollCalls(page: Page): Promise<void> {
             }
             return (orig as (opts?: unknown) => void).call(this, opts);
         };
+        // Every change of the playing bar, timestamped IN the page (#1460 CI flake): a timing
+        // assertion measured from the test's own poll loses the poll interval plus an `evaluate`
+        // round trip on CI WebKit, which once shrank a ~400ms delay under a 250ms floor.
+        const v = window as unknown as {
+            __activeChanges: { time: number; activeId: string | null }[];
+        };
+        v.__activeChanges = [];
+        const watch = () => {
+            new MutationObserver((records) => {
+                for (const r of records) {
+                    const el = r.target as HTMLElement;
+                    if (el.getAttribute('data-active') === 'true') {
+                        v.__activeChanges.push({
+                            time: Date.now(),
+                            activeId: el.getAttribute('data-measure-id'),
+                        });
+                    }
+                }
+            }).observe(document.documentElement, {
+                subtree: true,
+                attributes: true,
+                attributeFilter: ['data-active'],
+            });
+        };
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', watch);
+        } else {
+            watch();
+        }
     });
+}
+
+/** The in-page time the playing bar last became `activeId` at or before `before` (ms epoch). */
+async function activatedAt(page: Page, activeId: string, before: number): Promise<number | null> {
+    const changes = await page.evaluate(
+        () =>
+            (window as unknown as { __activeChanges: { time: number; activeId: string | null }[] })
+                .__activeChanges,
+    );
+    const hit = changes.filter((c) => c.activeId === activeId && c.time <= before).at(-1);
+    return hit ? hit.time : null;
 }
 
 function scrollCalls(page: Page): Promise<ScrollCall[]> {
@@ -575,6 +615,9 @@ test('the jump-ahead fires in the last felt beat (not the downbeat), and fires a
         if (!t0) {
             throw new Error('C3 never became active');
         }
+        // The poll saw C3 up to one interval plus a round trip late; measure from the page's
+        // own record of the change instead.
+        t0 = (await activatedAt(page, 'C3', t0)) ?? t0;
         const jump = (await scrollCalls(page)).find(
             (c) =>
                 c.cls === 'chart-scroll' &&
@@ -594,16 +637,19 @@ test('the jump-ahead fires in the last felt beat (not the downbeat), and fires a
     // The window below is deliberately wide (patch review P3-4, after an earlier ~210ms margin
     // proved thin under CI WebKit): comfortably below both possible trigger points at its floor,
     // comfortably inside the bar at its ceiling, so it stays meaningful without chasing the exact
-    // millisecond either constant produces.
+    // millisecond either constant produces. Both ends are measured in the page: from the render
+    // that marked C3 active to the jump's own `scrollTo`. The regression this guards (the jump in
+    // the SAME render as the new bar, patch review P1-2) measures ~0ms; the floor sits well clear
+    // of both that and the ~400ms trigger less the ~60ms poll that publishes `active`.
     const lap1 = await nextJumpCallDelay();
-    expect(lap1, 'the jump should not fire at (or near) the downbeat').toBeGreaterThanOrEqual(250);
+    expect(lap1, 'the jump should not fire at (or near) the downbeat').toBeGreaterThanOrEqual(200);
     expect(lap1, 'the jump should fire within the SAME bar it is for').toBeLessThanOrEqual(900);
 
     const lap2 = await nextJumpCallDelay();
     expect(
         lap2,
         'the jump should fire again on lap 2, not stay spent after lap 1',
-    ).toBeGreaterThanOrEqual(250);
+    ).toBeGreaterThanOrEqual(200);
     expect(lap2).toBeLessThanOrEqual(900);
 
     await page.getByRole('button', { name: 'Stop playback', exact: true }).click();

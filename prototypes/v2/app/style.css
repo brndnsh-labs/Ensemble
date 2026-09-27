@@ -747,6 +747,20 @@ html [hidden] {
     padding: 25px 48px 40px;
     scroll-behavior: smooth;
 }
+/* Re-review P3 — `.chart-scroll` is a `<div tabIndex={0}>` (arrow-key scrolling), not one of the
+   `button`/`a`/`input`/`select` the global `:focus-visible` rule already covers, so it fell back
+   to the browser's own default `:focus` ring on ANY focus — including the Resume-follow pill's
+   `.focus({ preventScroll: true })` after a plain pointer tap, which is not a keyboard action and
+   must not draw a ring around the whole chart. `:focus-visible` alone (never plain `:focus`) is
+   what tells the two apart: it matches a real Tab-to-focus, not a programmatic call from a click
+   handler. */
+.chart-scroll:focus {
+    outline: none;
+}
+.chart-scroll:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+}
 .sheet {
     max-width: 1040px;
     margin: 0 auto;
@@ -962,37 +976,109 @@ html [hidden] {
     font-size: 12px;
     padding: 10px 0;
 }
-.playback-footer {
-    border-top: 1px solid var(--line);
-    min-height: 39px;
+/* #1460 review P2 #1/#4 — one fixed, bottom-centred STACK holding the message toast, the
+   sync-failure notice and the Resume-follow pill, in normal flex-column flow. This is what makes
+   the three unable to ever overlap or mask one another: the old single fixed-position toast let
+   an undismissed sync failure hide every later "Link copied"/"Saved" message (they shared one
+   slot), and the pill and the toast could overlap by a few px at some viewport sizes (independent
+   `bottom` offsets, no shared layout). None of the three below claims flow height on its own any
+   more (the chart gets that back) — only this container is `position: fixed`. It must not cover
+   the playing row — with #1458's look-ahead the playing row sits in the top third of
+   `.chart-scroll`, so a bottom-anchored stack only ever reaches bars further ahead. */
+.stand-stack {
+    position: fixed;
+    left: 50%;
+    bottom: 20px;
+    transform: translateX(-50%);
+    z-index: 60;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    max-width: calc(100vw - 28px);
+    /* Re-review P3 — the empty `.stand-toast` collapses to zero size (below), but the STACK
+       CONTAINER itself is a full-width-capped, fixed-position box sitting over the bottom of the
+       chart at every moment, whether or not anything inside it is currently showing — on phone
+       widths that silently ate taps meant for the chord grid underneath. `none` here, `auto` on
+       each visible child, so only the toast/notice/pill themselves ever intercept a tap. */
+    pointer-events: none;
+}
+/* Always mounted (`data-empty` collapses it) for the same reason `.status-banner` is: a live
+   region's TEXT CHANGE is announced reliably, a freshly-inserted one is not (#1440). */
+.stand-toast {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    padding: 8px 34px;
-    background: var(--paper);
-    font-size: 10px;
-    color: var(--muted);
-    gap: 8px;
+    gap: 10px;
+    padding: 12px 18px;
+    background: var(--ink);
+    color: var(--surface);
+    font-size: 12px;
+    line-height: 1.5;
+    box-shadow: var(--shadow);
+    border-radius: 12px;
+    max-width: 100%;
+    pointer-events: auto;
+}
+.stand-toast[data-empty="true"] {
+    padding: 0;
+    max-width: 0;
+    max-height: 0;
+    overflow: hidden;
+}
+/* A `warning`-tone message (review P2 #3): persists until its own close button, unlike the
+   auto-dismiss `info` tone — the accent palette is the visual cue telling the two apart, the
+   same "a decision is waiting" language `.conflict-banner` already uses, never the danger
+   palette (that is spent on things that were actually lost). */
+.stand-toast[data-tone="warning"] {
+    background: var(--accent-light);
+    color: var(--accent);
+}
+/* #1460 review P2 #2 — the sync-failure notice, its own element (not a tone of `.stand-toast`
+   any more) so a standing failure can never mask a later message. Review P3: accent, not danger
+   — the account will retry, or the musician has an explicit way out (Keep both / a fresh Save);
+   nothing here was lost the way the danger palette implies. */
+.stand-sync-failure {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 18px;
+    background: var(--accent-light);
+    color: var(--accent);
+    font-size: 12px;
+    line-height: 1.5;
+    box-shadow: var(--shadow);
+    border-radius: 12px;
+    max-width: 100%;
+    pointer-events: auto;
+}
+.toast-close {
     flex-shrink: 0;
-}
-.footer-state {
+    min-width: 44px;
+    min-height: 44px;
     display: flex;
-    gap: 8px;
     align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    line-height: 1;
+    color: inherit;
 }
-.footer-state .dot {
-    color: var(--green);
-}
-.follow-btn {
-    font-size: 11px;
-    color: var(--green);
+/* #1460 — Resume follow, in the same stack. Shown only while playing with Following off (a
+   musician scrolled away); tapping it turns Following back on and hides it, the only direction
+   this control still offers — turning Following OFF stays a scroll/wheel/touch gesture, same as
+   before. */
+.resume-follow-pill {
     display: flex;
     align-items: center;
     gap: 6px;
-}
-.follow-btn svg {
-    width: 13px;
-    height: 13px;
+    min-height: 44px;
+    padding: 0 18px;
+    background: var(--green);
+    color: var(--on-ink);
+    font-size: 13px;
+    font-weight: 600;
+    border-radius: 22px;
+    box-shadow: var(--shadow);
+    pointer-events: auto;
 }
 .edit-panel {
     width: 286px;
@@ -1256,21 +1342,6 @@ dialog textarea {
     padding: 13px;
     font-size: 12px;
     line-height: 1.65;
-}
-.toast {
-    position: fixed;
-    bottom: 55px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 60;
-    padding: 13px 19px;
-    background: var(--ink);
-    color: var(--surface);
-    font-size: 12px;
-    box-shadow: var(--shadow);
-    border-radius: 10px;
-    max-width: calc(100vw - 28px);
-    text-align: center;
 }
 .prototype-toggle {
     font-size: 10px;
@@ -1583,16 +1654,20 @@ dialog textarea {
         line-height: 1.5;
         align-items: flex-start;
     }
-    .playback-footer {
-        padding: 9px 16px;
-        font-size: 9px;
-        min-height: 40px;
+    .stand-stack {
+        left: 16px;
+        right: 16px;
+        bottom: 14px;
+        transform: none;
+        max-width: none;
     }
-    .playback-footer .footer-tip {
-        display: none;
+    .stand-toast,
+    .stand-sync-failure {
+        font-size: 11px;
     }
-    .follow-btn {
-        font-size: 10px;
+    .resume-follow-pill {
+        font-size: 12px;
+        padding: 0 14px;
     }
     .workspace-body.editing {
         display: flex;
@@ -1731,9 +1806,18 @@ dialog textarea {
     .song-actions .btn {
         padding: 7px 8px;
     }
-    .playback-footer {
-        min-height: 28px;
-        padding: 5px 20px;
+    .stand-stack {
+        bottom: 10px;
+        gap: 6px;
+    }
+    .stand-toast,
+    .stand-sync-failure {
+        padding: 8px 14px;
+        font-size: 10px;
+    }
+    .resume-follow-pill {
+        /* min-height stays 44px (acceptance: tap targets never shrink below it, even here). */
+        font-size: 11px;
     }
     .workspace-body.editing {
         display: flex;
@@ -1845,6 +1929,20 @@ dialog textarea {
     margin-top: 20px;
     max-height: 35dvh;
     overflow: auto;
+}
+/* #1460 — the three sync facts, moved into Song actions from the stand's now-removed footer. */
+.song-menu-status {
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
+}
+.song-menu-status-label {
+    margin: 0 0 8px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--muted);
 }
 .recovery-list summary {
     cursor: pointer;
@@ -2442,8 +2540,17 @@ dialog textarea {
     padding: 8px 24px;
     gap: 16px;
 }
+/* #1460 — the bottom padding clears the fixed `.stand-stack` (it no longer claims any of
+   `.chart-scroll`'s own flow height the way the removed footer did): the last row can still
+   scroll fully clear of it. Re-review P3 — 108px is the ORIGINAL floor, sized for the common
+   case (the message toast, or the toast plus the pill); it does not grow just because the stack
+   COULD hold a third thing. `--stand-stack-height` (set by the `ResizeObserver` in
+   `app/ensemble.tsx`) is the stack's OWN actual current height, 0 when nothing shows, so `max()`
+   only asks for more room while the stack genuinely needs it — a chart that fit before this
+   story still fits, and the last row still clears the stack on the rare render where all three
+   are up. */
 .song-open .chart-scroll {
-    padding: 12px 24px 24px;
+    padding: 12px 24px max(108px, calc(var(--stand-stack-height, 0px) + 28px));
 }
 .song-open .sheet {
     max-width: 1200px;
@@ -2486,10 +2593,6 @@ dialog textarea {
 .song-open .section-name {
     font-size: var(--section-name-size, 11px);
 }
-.song-open .playback-footer {
-    min-height: 28px;
-    padding: 6px 24px;
-}
 .performance-focus .song-subtitle,
 .performance-focus .mode-switch,
 .performance-focus .save-btn,
@@ -2521,12 +2624,6 @@ dialog textarea {
         --chord-size: 27px;
         --section-letter-size: 12px;
     }
-}
-.playback-footer [role="status"] {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
 }
 @media (max-width: 760px) {
     .sound-panel {
@@ -2567,7 +2664,8 @@ dialog textarea {
         margin-left: 0;
     }
     .song-open .chart-scroll {
-        padding: 10px 14px 24px;
+        /* #1460 — 100px is the original phone-width floor; see the base rule's note. */
+        padding: 10px 14px max(100px, calc(var(--stand-stack-height, 0px) + 24px));
     }
     .song-open .tempo-control .step {
         width: 28px;
@@ -2575,9 +2673,6 @@ dialog textarea {
     }
     .song-open .band-toggle {
         min-height: 36px;
-    }
-    .song-open .playback-footer {
-        padding: 6px 12px;
     }
     .performance-focus .song-heading {
         flex-basis: 0;

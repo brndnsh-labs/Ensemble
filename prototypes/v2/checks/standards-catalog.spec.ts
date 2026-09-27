@@ -75,7 +75,7 @@ test('opening a standard lands an unsaved draft that plays and changes key/feel;
     await row.getByRole('button', { name: 'Open' }).click();
 
     await expect(page.getByRole('heading', { name: '12-Bar Blues', exact: true })).toBeVisible();
-    await expect(page.locator('.playback-footer [role="status"]')).toContainText(
+    await expect(page.getByTestId('stand-toast')).toContainText(
         'Opened a standard · not saved yet',
     );
     await expect(page.locator('.bar').first().locator('.chord')).toHaveText(['C7']);

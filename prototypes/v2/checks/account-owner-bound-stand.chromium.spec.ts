@@ -4,8 +4,10 @@ import { ACCOUNT_DATABASE } from '../lib/sync/protocol';
 import {
     backToSongbook,
     CODE_SHAPE,
+    closeSongActions,
     dismissAdoptGuestPrompt,
     newSongOnTheStand,
+    openSongActions,
     openWithAccounts,
     revealEditor,
     saveAndUpload,
@@ -191,7 +193,9 @@ test('a chart from another account is exportable but can never be saved into the
     // And the chip does not invite the upload either. "Not in your account yet" is what this read
     // as before the projection learned the state: true only in the least useful sense, about a
     // song that is fully saved in somebody else's library.
+    await openSongActions(page);
     await expect(page.getByTestId('sync-cloud')).toHaveText('Belongs to another account');
+    await closeSongActions(page);
 
     // Pressing Play is a `run()`, and `run()` clears the shell's transient error line. The
     // mismatch is a standing fact, not an event, so it survives it — this is the assertion the
@@ -200,7 +204,9 @@ test('a chart from another account is exportable but can never be saved into the
     await expect(page.getByRole('button', { name: 'Stop playback', exact: true })).toBeEnabled();
     await page.getByRole('button', { name: 'Stop playback', exact: true }).click();
     await expect(mismatch).toHaveText(OWNER_MESSAGES.mismatch);
+    await openSongActions(page);
     await expect(page.getByTestId('sync-cloud')).toHaveText('Belongs to another account');
+    await closeSongActions(page);
     // The transient line really is empty, so the assertions below cannot be reading a leftover.
     const errorText = page.locator('.error-banner[role="alert"] span');
     await expect(errorText).toHaveCount(0);
@@ -226,12 +232,13 @@ test('a chart from another account is exportable but can never be saved into the
     await expect(save).toBeEnabled();
     // And it is not reported as a failure of this device, which is the one store working
     // perfectly here (#1311 patch review R5).
+    await openSongActions(page);
     await expect(page.getByTestId('sync-local')).not.toHaveText('Save failed on this device');
 
     // Export is the way out the sentence names, and it writes the version that was refused —
     // 'Set list two' is the EDITED title, so this is the in-tab draft and not a committed copy.
     // A refusal that stranded the work would be a worse outcome than the leak it prevented.
-    await page.getByRole('button', { name: 'Song actions' }).click();
+    // Song actions is already open from the sync check above.
     const download = page.waitForEvent('download');
     await page.getByRole('button', { name: 'Export file', exact: true }).click();
     const exported = await download;
@@ -267,7 +274,9 @@ test('a chart from another account is exportable but can never be saved into the
     // The stand is now B's OWN copy, under a fresh identity, so there is no mismatch left to
     // report — and the chip reads a real cloud fact again rather than the foreign one.
     await expect(mismatch).toHaveCount(0);
+    await openSongActions(page);
     await expect(page.getByTestId('sync-cloud')).not.toHaveText('Belongs to another account');
+    await closeSongActions(page);
     // The copy is B's; A's document id still has nothing under B, and still never uploaded.
     expect(await accountRowsFor(page, documentId)).toEqual({
         owner: 1,

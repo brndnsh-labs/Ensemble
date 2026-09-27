@@ -2,9 +2,11 @@ import type { Page } from '@playwright/test';
 import { ACCOUNT_DATABASE } from '../lib/sync/protocol';
 import {
     backToSongbook,
+    closeSongActions,
     dismissAdoptGuestPrompt,
     newSongOnTheStand,
     openSong,
+    openSongActions,
     openWithAccounts,
     revealEditor,
     saveAndUpload,
@@ -63,7 +65,9 @@ async function signInOnSecondDevice(page: Page): Promise<void> {
 async function retitleWithoutSaving(page: Page, title: string): Promise<void> {
     await page.getByLabel('Song title').fill(title);
     await expect(page.getByText('Draft recovered on this device')).toBeVisible();
+    await openSongActions(page);
     await expect(page.getByTestId('sync-local')).toHaveText('Unsaved changes');
+    await closeSongActions(page);
 }
 
 /** One of the loop's four triggers, with nothing else going on. */
@@ -170,7 +174,9 @@ test('a newer version in the account is surfaced, and adopting it replaces the s
             'A newer version is in your account',
         );
         await expect(page.getByLabel('Song title')).toHaveValue('Shared tune — my words');
+        await openSongActions(page);
         await expect(page.getByTestId('sync-local')).toHaveText('Unsaved changes');
+        await closeSongActions(page);
 
         // ...and the songbook marks the row, which is the one surface that shows the whole library
         // at once. The row still reads its COMMITTED title — the experiment is not a version.
@@ -198,8 +204,10 @@ test('a newer version in the account is surfaced, and adopting it replaces the s
             page.getByRole('heading', { name: 'Shared tune v2', exact: true }),
         ).toBeVisible();
         await expect(page.getByTestId('conflict-banner')).toHaveCount(0);
+        await openSongActions(page);
         await expect(page.getByTestId('sync-local')).toHaveText('Saved on this device');
         await expect(page.getByTestId('sync-cloud')).toHaveText('Saved to your account');
+        await closeSongActions(page);
 
         // Which is what a reload has to find: one song, no marker, no recovered draft.
         await page.reload();
@@ -207,7 +215,9 @@ test('a newer version in the account is surfaced, and adopting it replaces the s
         await expect(songTitles(page)).toHaveText(['Shared tune v2']);
         await expect(page.getByTestId('song-newer-in-account')).toHaveCount(0);
         await openSong(page, 'Shared tune v2');
+        await openSongActions(page);
         await expect(page.getByTestId('sync-local')).toHaveText('Saved on this device');
+        await closeSongActions(page);
 
         // And this device can save again with no conflict at all: the record it is building on is
         // the revision the account actually holds, which is what adopting it was for.
@@ -302,7 +312,9 @@ test('an open chart with no edits gets the honest sentence, and adopts', async (
 
         // A saves nothing and types nothing — the chart is simply open, which is enough to hold
         // the record against the download.
+        await openSongActions(page);
         await expect(page.getByTestId('sync-local')).toHaveText('Saved on this device');
+        await closeSongActions(page);
         await saveAndUpload(second, 'Shared tune v2');
         await syncPass(page);
 
@@ -326,7 +338,9 @@ test('an open chart with no edits gets the honest sentence, and adopts', async (
             page.getByRole('heading', { name: 'Shared tune v2', exact: true }),
         ).toBeVisible();
         await expect(page.getByTestId('conflict-banner')).toHaveCount(0);
+        await openSongActions(page);
         await expect(page.getByTestId('sync-cloud')).toHaveText('Saved to your account');
+        await closeSongActions(page);
     } finally {
         await fresh.close();
     }
@@ -419,7 +433,9 @@ test('cancelling the confirm step changes nothing at all', async ({
 
         // Nothing adopted, nothing discarded, and the offer still on the table.
         await expect(page.getByLabel('Song title')).toHaveValue('Shared tune — my words');
+        await openSongActions(page);
         await expect(page.getByTestId('sync-local')).toHaveText('Unsaved changes');
+        await closeSongActions(page);
         await expect(page.getByTestId('conflict-banner')).toHaveAttribute(
             'data-conflict',
             'candidate',

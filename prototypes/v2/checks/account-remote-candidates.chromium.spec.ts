@@ -2,9 +2,11 @@ import type { Page } from '@playwright/test';
 import { ACCOUNT_DATABASE } from '../lib/sync/protocol';
 import {
     backToSongbook,
+    closeSongActions,
     dismissAdoptGuestPrompt,
     newSongOnTheStand,
     openSong,
+    openSongActions,
     openWithAccounts,
     saveAndUpload,
     signUp,
@@ -172,7 +174,9 @@ test('a body from a newer schema is marked, banners with no action, and never of
     await expect(page.getByRole('heading', { name: 'Field notes', exact: true })).toBeVisible();
     // The chip stays honest about the one thing storage actually confirmed: this device's own
     // committed copy, which the unsupported body never touched.
+    await openSongActions(page);
     await expect(page.getByTestId('sync-cloud')).toHaveText('Saved to your account');
+    await closeSongActions(page);
 });
 
 /**

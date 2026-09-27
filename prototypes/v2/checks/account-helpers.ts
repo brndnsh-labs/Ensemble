@@ -190,6 +190,31 @@ export async function newSongOnTheStand(page: Page): Promise<void> {
     await expect(page.getByRole('button', { name: 'Song actions' })).toBeEnabled();
 }
 
+/**
+ * Open Song actions to read the sync facts (#1460): `SyncStatus` moved from the stand's own
+ * footer into a "Status" section here, so every spec that used to read `sync-status`/
+ * `sync-local`/`sync-cloud`/`sync-offline`/`sync-failure` directly off the stand now opens this
+ * dialog first. Waits on the section itself, not just the dialog, since a signed-out/guest chart
+ * opens the SAME dialog with no Status section at all.
+ */
+export async function openSongActions(page: Page): Promise<void> {
+    await page.getByRole('button', { name: 'Song actions' }).click();
+    await expect(page.getByTestId('sync-status')).toBeVisible();
+}
+
+/**
+ * `<dialog>` is modal (`showModal()`), so nothing on the stand behind it — Save, Play, another
+ * row — is reachable until this closes it. Scoped to `song-menu` specifically (its "Close"
+ * button text is not unique on the page: the always-mounted `SongRowMenu` has its own), and
+ * waits for the dialog to actually leave its open state rather than just for the click to
+ * register, since a caller's very next line is often exactly one of those now-inert controls.
+ */
+export async function closeSongActions(page: Page): Promise<void> {
+    const dialog = page.getByTestId('song-menu');
+    await dialog.getByRole('button', { name: 'Close', exact: true }).click();
+    await expect(dialog).not.toHaveAttribute('open', '');
+}
+
 /** Retitle and commit. The Save button going disabled is the shell's own "committed" signal. */
 export async function saveAs(page: Page, title: string): Promise<void> {
     const save = page.getByRole('button', { name: 'Save', exact: true });
@@ -211,7 +236,10 @@ export async function saveAndUpload(page: Page, title: string): Promise<void> {
     const uploaded = uploadOf(page, title);
     await saveAs(page, title);
     await uploaded;
+    // #1460 — the sync chip moved into Song actions.
+    await openSongActions(page);
     await expect(page.getByTestId('sync-cloud')).toHaveText('Saved to your account');
+    await closeSongActions(page);
 }
 
 /**

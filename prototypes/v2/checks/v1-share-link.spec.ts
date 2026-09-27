@@ -76,9 +76,7 @@ test('an old v1 share link opens as an unsaved draft; Keep a copy persists it an
     // The same unsaved-shared-draft state a v2 `#chart=` link opens in — the header's own
     // wording — with the older link's note in the status line beside it.
     await expect(page.locator('.song-subtitle')).toContainText('Opened from a shared link');
-    await expect(page.locator('.playback-footer [role="status"]')).toContainText(
-        'Opened from an older shared link',
-    );
+    await expect(page.getByTestId('stand-toast')).toContainText('Opened from an older shared link');
     // The chart itself: the chords the link carried, in the notation it asked for.
     await expect(page.locator('.bar').first().locator('.chord')).toHaveText(['C7']);
     await expect(page.getByLabel('Tempo', { exact: true })).toHaveValue('96');

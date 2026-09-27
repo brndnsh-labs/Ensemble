@@ -23,7 +23,12 @@ import {
     type RemoteCandidateKind,
     type SyncSnapshot,
 } from '../../lib/account/sync-loop';
-import { type Progress, projectSyncStatus, type StatusFacts } from '../../lib/sync/status';
+import {
+    type Progress,
+    projectSyncStatus,
+    type StatusFacts,
+    type StatusView,
+} from '../../lib/sync/status';
 
 // Module scope keeps both references stable across renders, which is what `useSyncExternalStore`
 // requires to avoid resubscribing (and re-rendering) on every pass.
@@ -168,7 +173,12 @@ export interface SyncStatusProps {
     sync: SyncSnapshot;
 }
 
-export function SyncStatus({
+/**
+ * The projection `SyncStatus` renders, factored out so #1460's stand-level failure notice
+ * (`syncFailureNotice` below) can read the exact same facts without duplicating the activity
+ * derivation or the `'deleted'`-candidate correction.
+ */
+function deriveSyncView({
     savedRevision,
     editing,
     lastSave,
@@ -178,7 +188,7 @@ export function SyncStatus({
     foreign,
     candidateKind,
     sync,
-}: SyncStatusProps) {
+}: SyncStatusProps): { view: StatusView; cloudLabel: string } {
     const observation = sync.observation;
     // `status.ts` refuses "sending" without an observed, non-empty queue, and it is right to:
     // claiming an upload is in flight with nothing to send would invent progress the outbox
@@ -196,8 +206,6 @@ export function SyncStatus({
         cloud: { observation, activity, foreign },
         offline: { shell, documents: sync.documents, sounds },
     });
-    const songs = counted('Songs', view.offline.documents);
-    const soundFiles = counted('Sounds', view.offline.sounds);
     // #1362 — `status.ts` reads the record's stale `remoteRevision`, never a candidate: a download
     // that preserves a `'deleted'` candidate beside a HELD record (`commitDeleted`) never clears
     // the record's own `remoteRevision`, on purpose — that field is what the record used to mirror,
@@ -211,6 +219,73 @@ export function SyncStatus({
             : view.cloud.status === 'refused'
               ? CLOUD_REFUSAL_LABELS[view.cloud.refused ?? 'refused']
               : CLOUD_LABELS[view.cloud.status];
+    return { view, cloudLabel };
+}
+
+/**
+ * #1460 review P2 #2 — the stand's own notice, keyed by the underlying FACT rather than by its
+ * rendered sentence, so a caller can tell "the same failure, reworded" from "a genuinely
+ * different one" without string-matching (P3: a 413 moving from `sync.failure`'s pass-level
+ * message to `CLOUD_REFUSAL_LABELS`'s per-document one is still the SAME fact and must not
+ * reappear after being dismissed just because the words changed — see the export below).
+ */
+export interface StandSyncFailure {
+    text: string;
+    /** Stable across a re-word of the same underlying fact; never the sentence itself. */
+    key: string;
+}
+
+/**
+ * #1460 — the one fact worth surfacing on the STAND itself, without opening Song actions: a
+ * failure NOTHING ELSE already says. Everything else `SyncStatus` shows (three routine facts)
+ * moved into the menu; a `foreign` reading already has its own permanent banner
+ * (`OWNER_MESSAGES.mismatch`, driven by the same `standMismatch` this component's `foreign` prop
+ * carries), so it is deliberately not repeated here.
+ *
+ * Re-review P2 #1 — a local Save failure is checked FIRST and DOES surface here, reversing the
+ * previous round's assumption that the top `.error-banner` alone covers it: `run()` opens with
+ * `setError('')`, so the very next `run()` anywhere — opening Song actions to go check, pressing
+ * Play, a feel change — wipes that banner while the local failure is still true. The stand's own
+ * notice is keyed independently (`local:save-failed`) and stays up until the NEXT Save actually
+ * succeeds, regardless of what else runs in between. `expired`/reauth is still excluded: that
+ * banner (`account-expired-banner`, driven by `heldWithoutSession`) is a storage-derived fact,
+ * not a `run()`-cleared one, so it genuinely does persist on its own.
+ *
+ * Re-review P3 — a pass-level `too-large`/`refused` failure (`sync.failure.reason`) is keyed as
+ * `refused:<kind>`, the SAME namespace `view.cloud.status === 'refused'`'s per-document reading
+ * uses below: a 413 that gets re-worded between the two forms across passes is still one fact,
+ * and must not reappear after being dismissed just because the words changed.
+ *
+ * Null means nothing is left to say here: no local Save failure, no expired-session pass
+ * failure, no other pass-level retry/reauth failure, and the cloud has not permanently refused
+ * this document.
+ */
+export function syncFailureNotice(props: SyncStatusProps): StandSyncFailure | null {
+    const { view } = deriveSyncView(props);
+    if (view.local.status === 'save-failed') {
+        return { text: LOCAL_LABELS['save-failed'], key: 'local:save-failed' };
+    }
+    if (props.sync.failure !== null) {
+        const { reason } = props.sync.failure;
+        if (reason === 'expired') {
+            return null;
+        }
+        const key =
+            reason === 'too-large' || reason === 'refused' ? `refused:${reason}` : `pass:${reason}`;
+        return { text: props.sync.failure.message, key };
+    }
+    if (view.cloud.status === 'refused') {
+        const refused = view.cloud.refused ?? 'refused';
+        return { text: CLOUD_REFUSAL_LABELS[refused], key: `refused:${refused}` };
+    }
+    return null;
+}
+
+export function SyncStatus(props: SyncStatusProps) {
+    const { view, cloudLabel } = deriveSyncView(props);
+    const { sync } = props;
+    const songs = counted('Songs', view.offline.documents);
+    const soundFiles = counted('Sounds', view.offline.sounds);
     return (
         <div className="sync-status" data-testid="sync-status">
             <span className="sync-fact" data-testid="sync-local">

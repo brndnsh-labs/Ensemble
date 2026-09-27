@@ -2,10 +2,12 @@ import type { Download, Page } from '@playwright/test';
 import { DELETE_CONFIRMATION } from '../app/account/delete-account';
 import {
     backToSongbook,
+    closeSongActions,
     countStepUps,
     dismissAdoptGuestPrompt,
     newSongOnTheStand,
     openSong,
+    openSongActions,
     openWithAccounts,
     refuseOnceWithFreshAuthRequired,
     revealEditor,
@@ -127,6 +129,11 @@ test('deleting an account: typed confirmation, an export offer, a step-up, and n
     // again. The guest songbook is exactly as it was — a different library, never touched.
     await expect(page.getByTestId('account-sign-in')).toHaveText('Sign in');
     await expect(page.getByTestId('account-expired-banner')).toHaveCount(0);
+    // #1460 review P3 — this used to call the stand's OWN `message` toast, which is never
+    // mounted here: the account page only opens with no chart on the stand.
+    await expect(page.getByTestId('shell-message')).toContainText(
+        'Account deleted · your guest songbook is unchanged',
+    );
     await expect(page.getByTestId('library-heading')).toHaveText('Your songbook');
     await expect(songTitles(page)).toHaveText(guestSongs); // web-first, retries (#1330)
     expect(await sessionStatus(page)).toBe(401);
@@ -180,7 +187,9 @@ test('a second device is refused after the deletion, and keeps its own work expo
         await revealEditor(second);
         await second.context().setOffline(true);
         await saveAs(second, 'Road take two');
+        await openSongActions(second);
         await expect(second.getByTestId('sync-cloud')).toContainText('Waiting to upload');
+        await closeSongActions(second);
 
         // Device one deletes the account.
         await openDeleteStep(page);
@@ -192,7 +201,9 @@ test('a second device is refused after the deletion, and keeps its own work expo
         // queued under no longer exists — and this device says so rather than pretending.
         await second.context().setOffline(false);
         await expect(second.getByTestId('account-expired-banner')).toBeVisible();
+        await openSongActions(second);
         await expect(second.getByTestId('sync-local')).toHaveText('Saved on this device');
+        await closeSongActions(second);
         expect(await sessionStatus(second)).toBe(401);
         // The refusal never recreated the document server-side either: nothing on that origin
         // answers for this account any more.
