@@ -117,6 +117,13 @@ interface SongbookProps {
     onImportV1: () => void;
     /** `declined` is the card's own answer — see `V1ImportCard` (#1274 patch N1). */
     onDismissV1: (declined: boolean) => void;
+    /** Per-device star set (#1440) — same source the row ⋯ menu's Star/Unstar writes through. */
+    starred: ReadonlySet<string>;
+    onToggleStar: (id: string) => void;
+    /** Opens the row ⋯ menu (Star/Unstar, Rename, Duplicate, Export file, Delete…) for one song. */
+    onOpenRowMenu: (id: string, title: string) => void;
+    /** #1440's full-library page — the "All N songs →" link a large songbook needs. */
+    onOpenAllSongs: () => void;
 }
 
 export function Songbook({
@@ -141,6 +148,10 @@ export function Songbook({
     v1Import,
     onImportV1,
     onDismissV1,
+    starred,
+    onToggleStar,
+    onOpenRowMenu,
+    onOpenAllSongs,
 }: SongbookProps) {
     // A map, not `.find`: both this list and the account library are capped at 2,000, and the
     // pair of them scanned against each other is the one place that product would be paid for.
@@ -215,6 +226,20 @@ export function Songbook({
                             />
                         </label>
                     </div>
+                    {!loading && songs.length > 0 && (
+                        // #1440 — the large-library escape hatch: this list stays capped by
+                        // whatever `songs` the shell hands it, and grows unbounded once #1443's
+                        // whole-playlist imports land.
+                        <p className="all-songs-link">
+                            <button
+                                className="btn"
+                                data-testid="all-songs-link"
+                                onClick={onOpenAllSongs}
+                            >
+                                All {songs.length} songs →
+                            </button>
+                        </p>
+                    )}
                     {loading && (
                         <p className="library-loading" role="status" data-testid="library-loading">
                             {accountLibrary
@@ -246,9 +271,15 @@ export function Songbook({
                     <table className="song-table" hidden={loading}>
                         <thead>
                             <tr>
+                                <th>
+                                    <span className="sr">Star</span>
+                                </th>
                                 <th>Song</th>
                                 <th>Key</th>
                                 <th className="hide-mobile">Tempo</th>
+                                <th>
+                                    <span className="sr">More actions</span>
+                                </th>
                             </tr>
                         </thead>
                         <tbody>
@@ -256,8 +287,24 @@ export function Songbook({
                                 .filter((s) => s.title.toLowerCase().includes(search.toLowerCase()))
                                 .map((s) => {
                                     const candidateKind = remoteCandidateKinds.get(s.id) ?? null;
+                                    const isStarred = starred.has(s.id);
                                     return (
                                         <tr className="song-row" key={s.id}>
+                                            <td>
+                                                <button
+                                                    className="icon-button star-toggle"
+                                                    aria-pressed={isStarred}
+                                                    aria-label={
+                                                        isStarred
+                                                            ? `Unstar ${s.title}`
+                                                            : `Star ${s.title}`
+                                                    }
+                                                    disabled={busy}
+                                                    onClick={() => onToggleStar(s.id)}
+                                                >
+                                                    {isStarred ? '★' : '☆'}
+                                                </button>
+                                            </td>
                                             <td>
                                                 <button
                                                     className="song-link"
@@ -267,6 +314,13 @@ export function Songbook({
                                                     <span className="song-glyph">♪</span>
                                                     <span>
                                                         <span className="song-name">{s.title}</span>
+                                                        {/* Per-row storage-location repetition
+                                                            is fixed on the All songs page (#1440);
+                                                            left as-is here since dozens of OTHER
+                                                            specs across this suite select rows by
+                                                            this exact accessible name ("<title>
+                                                            <genre> · Saved locally"), and this
+                                                            table's own redesign is #1441's. */}
                                                         <span className="song-detail">
                                                             {genreOf(s)} ·{' '}
                                                             {accountLibrary
@@ -317,6 +371,16 @@ export function Songbook({
                                             </td>
                                             <td className="hide-mobile">
                                                 {s.chart.performance.bpm}
+                                            </td>
+                                            <td>
+                                                <button
+                                                    className="icon-button row-more"
+                                                    aria-label={`More actions for ${s.title}`}
+                                                    disabled={busy}
+                                                    onClick={() => onOpenRowMenu(s.id, s.title)}
+                                                >
+                                                    ⋯
+                                                </button>
                                             </td>
                                         </tr>
                                     );

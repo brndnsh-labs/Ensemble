@@ -16,6 +16,9 @@ import {
     lastOpenedKey,
     localRevision,
     MAX_PENDING_SAVES,
+    type OpenedAt,
+    openedKey,
+    openedPrefix,
     type PendingDeletion,
     type PreparedDelete,
     type PreparedSave,
@@ -27,7 +30,10 @@ import {
     type SaveOperation,
     type SaveReceipt,
     type SaveRefusalReason,
+    type Star,
     snapshot,
+    starKey,
+    starPrefix,
 } from './protocol';
 import {
     copyScope,
@@ -35,8 +41,10 @@ import {
     savedCandidate,
     savedDeletion,
     savedDraft,
+    savedOpenedAt,
     savedOperation,
     savedSong,
+    savedStar,
 } from './records';
 
 export const DEFAULT_LIST_LIMIT = 50;
@@ -412,8 +420,10 @@ export class AccountSongbook {
      * sequence is `switchAccount(null)` — which bumps the generation, so a late reply for this
      * account can no longer commit anything — and then this. Passing the old scope here would fail
      * that very fence, and passing the new one would not describe these records at all. The owner
-     * is instead the explicit bound on all six ranges, so this can only ever reach the account it
-     * was named with.
+     * is instead the explicit bound on every range below, so this can only ever reach the account
+     * it was named with. The opened-at and star preferences (#1440) go with the rest: they are
+     * per-owner device data exactly like the last-opened pointer, and a device that has forgotten
+     * an account must not keep naming that account's songs as starred or recently opened.
      *
      * One transaction: a sign-out that removed the songs and left the outbox behind would leave
      * queued Saves for an account this device no longer holds, and the next sign-in as that same
@@ -434,7 +444,12 @@ export class AccountSongbook {
             // — the same windows `remoteCandidates` reads through. The `'active'` pointer sorts
             // below both prefixes and is never in range: this must not delete the fence it is
             // being run underneath.
-            for (const prefix of [candidatePrefix(ownerId), deletionPrefix(ownerId)]) {
+            for (const prefix of [
+                candidatePrefix(ownerId),
+                deletionPrefix(ownerId),
+                openedPrefix(ownerId),
+                starPrefix(ownerId),
+            ]) {
                 tx.table('meta').delete(IDBKeyRange.bound(prefix, `${prefix}￿`, false, true));
             }
             // One key rather than a range: there is exactly one per owner (#1299). It names a song
@@ -765,6 +780,80 @@ export class AccountSongbook {
                 tx.table('meta').get(lastOpenedKey(scope.ownerId)),
                 (value: LastOpened | undefined) => tx.finish(storedLastOpened(value, scope)),
             );
+        });
+    }
+
+    /**
+     * Record this song as opened just now (#1440) — a per-device preference, distinct from
+     * `rememberOpened`'s single Continue-card pointer: this is one row per document, and the All
+     * songs page's Recently-opened sort/filter reads every one of them, not just the newest.
+     *
+     * Never a document edit: opening a chart must not bump `updatedAt`/`revision` or queue a Save,
+     * and this write touches neither the `songs` table nor the outbox.
+     */
+    async recordOpened(scope: AccountScope, documentId: string): Promise<void> {
+        scope = copyScope(scope);
+        identifier(documentId);
+        return this.database.run('readwrite', scope, (tx) => {
+            tx.table('meta').put({
+                key: openedKey(scope.ownerId, documentId),
+                ownerId: scope.ownerId,
+                documentId,
+                openedAt: new Date().toISOString(),
+            } satisfies OpenedAt);
+            tx.finish(undefined);
+        });
+    }
+
+    /**
+     * Every song this account has opened on this device, id to timestamp (#1440). The whole
+     * prefix range in one read — cheap regardless of library size, since a row here is four
+     * scalars, not a chart body; the All songs page's cost is elsewhere (reading `songs` itself).
+     */
+    async openedAtMap(scope: AccountScope): Promise<Map<string, string>> {
+        scope = copyScope(scope);
+        return this.database.run('readonly', scope, (tx) => {
+            const prefix = openedPrefix(scope.ownerId);
+            const range = IDBKeyRange.bound(prefix, `${prefix}￿`, false, true);
+            tx.read(tx.table('meta').getAll(range), (rows: OpenedAt[]) => {
+                const map = new Map<string, string>();
+                for (const row of rows) {
+                    const valid = savedOpenedAt(row, scope, row.documentId);
+                    map.set(valid.documentId, valid.openedAt);
+                }
+                tx.finish(map);
+            });
+        });
+    }
+
+    /** Star or unstar one song on this device (#1440). Presence in the store is the whole fact. */
+    async setStarred(scope: AccountScope, documentId: string, starred: boolean): Promise<void> {
+        scope = copyScope(scope);
+        identifier(documentId);
+        return this.database.run('readwrite', scope, (tx) => {
+            const key = starKey(scope.ownerId, documentId);
+            if (starred) {
+                tx.table('meta').put({ key, ownerId: scope.ownerId, documentId } satisfies Star);
+            } else {
+                tx.table('meta').delete(key);
+            }
+            tx.finish(undefined);
+        });
+    }
+
+    /** Every song this account has starred on this device (#1440). */
+    async starredIds(scope: AccountScope): Promise<Set<string>> {
+        scope = copyScope(scope);
+        return this.database.run('readonly', scope, (tx) => {
+            const prefix = starPrefix(scope.ownerId);
+            const range = IDBKeyRange.bound(prefix, `${prefix}￿`, false, true);
+            tx.read(tx.table('meta').getAll(range), (rows: Star[]) => {
+                const ids = new Set<string>();
+                for (const row of rows) {
+                    ids.add(savedStar(row, scope, row.documentId).documentId);
+                }
+                tx.finish(ids);
+            });
         });
     }
 

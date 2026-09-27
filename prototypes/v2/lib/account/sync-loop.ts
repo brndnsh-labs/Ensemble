@@ -749,6 +749,21 @@ export interface SyncLoop {
     rememberOpened(documentId: string, owner: string | null): Promise<void>;
     lastOpened(): Promise<string | null>;
     /**
+     * Record one song as opened just now (#1440) — the All songs page's per-song counterpart to
+     * `rememberOpened`'s single Continue-card pointer. Fenced on `owner` for the same reason every
+     * write here is: this is a document id under an account's own `meta`, and one belonging to
+     * somebody else's library there is a leak of what this device opened.
+     */
+    recordOpened(documentId: string, owner: string | null): Promise<void>;
+    /** Every song this account has opened here, id to timestamp (#1440). */
+    openedAtMap(): Promise<Map<string, string>>;
+    /**
+     * Star or unstar one song on this device (#1440). Fenced on `owner` like `recordOpened`.
+     */
+    setStarred(documentId: string, starred: boolean, owner: string | null): Promise<void>;
+    /** Every song this account has starred here (#1440). */
+    starredIds(): Promise<Set<string>>;
+    /**
      * Delete one document from the cloud (#1270): an explicit ONLINE operation with a frozen,
      * retry-safe operation id, never a side effect of removing a local copy. Sends immediately
      * rather than joining the outbox — a delete is a deliberate human act that must report its own
@@ -1505,6 +1520,18 @@ export function createSyncLoop(
         },
         async lastOpened() {
             return songbook.lastOpened(await settledScope());
+        },
+        async recordOpened(documentId, owner) {
+            await songbook.recordOpened(await ownedScope(owner), documentId);
+        },
+        async openedAtMap() {
+            return songbook.openedAtMap(await settledScope());
+        },
+        async setStarred(documentId, starred, owner) {
+            await songbook.setStarred(await ownedScope(owner), documentId, starred);
+        },
+        async starredIds() {
+            return songbook.starredIds(await settledScope());
         },
         async deleteFromCloud(documentId, owner) {
             const current = await settledScope();

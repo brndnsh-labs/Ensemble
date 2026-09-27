@@ -109,7 +109,7 @@ function v1KeysUnchanged(page: import('@playwright/test').Page) {
 
 /** How many songbook rows carry the one stable v1-session document id. */
 function v1SessionRows(page: import('@playwright/test').Page) {
-    return page.getByRole('button', { name: 'Last session from the old Ensemble' }).count();
+    return page.locator('.song-link', { hasText: 'Last session from the old Ensemble' }).count();
 }
 
 test('brings v1 songs into the songbook, plays one, and leaves v1 untouched', async ({ page }) => {
@@ -124,11 +124,11 @@ test('brings v1 songs into the songbook, plays one, and leaves v1 untouched', as
 
     await card.getByRole('button', { name: 'Import' }).click();
     await expect(page.getByTestId('v1-import-result')).toHaveText('Imported 3');
-    await expect(page.getByRole('button', { name: 'My Tune' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Minor thing' })).toBeVisible();
+    await expect(page.locator('.song-link', { hasText: 'My Tune' })).toBeVisible();
+    await expect(page.locator('.song-link', { hasText: 'Minor thing' })).toBeVisible();
     expect(await v1KeysUnchanged(page)).toEqual({ state: true, presets: true });
 
-    await page.getByRole('button', { name: 'My Tune' }).click();
+    await page.locator('.song-link', { hasText: 'My Tune' }).click();
     await expect(page.getByRole('heading', { name: 'My Tune', exact: true })).toBeVisible();
     await expect(page.getByLabel('Tempo', { exact: true })).toHaveValue('96');
     await page.getByRole('button', { name: 'Start playback', exact: true }).click();
@@ -172,7 +172,7 @@ test('declining is permanent, and the song menu brings the import back', async (
     }
 
     // The way back: open any song — a saved song is enough, the standards catalog does not matter here.
-    await page.getByRole('button', { name: 'Blue pocket' }).first().click();
+    await page.locator('.song-link', { hasText: 'Blue pocket' }).first().click();
     await openImportFromTheMenu();
     await page.getByTestId('v1-import').getByRole('button', { name: 'Import' }).click();
     await expect(page.getByTestId('v1-import-result')).toHaveText('Imported 3');
@@ -181,7 +181,7 @@ test('declining is permanent, and the song menu brings the import back', async (
 
     // And again. The heading is a promise, so with everything already here it does not
     // offer to bring three songs over — and there is nothing to press but Done.
-    await page.getByRole('button', { name: 'My Tune' }).click();
+    await page.locator('.song-link', { hasText: 'My Tune' }).click();
     await openImportFromTheMenu();
     const second = page.getByTestId('v1-import');
     await expect(
@@ -191,7 +191,7 @@ test('declining is permanent, and the song menu brings the import back', async (
     await expect(second.getByRole('button', { name: 'Import' })).toHaveCount(0);
     await second.getByRole('button', { name: 'Done' }).click();
     expect(await v1SessionRows(page)).toBe(1);
-    await expect(page.getByRole('button', { name: 'My Tune' })).toHaveCount(1);
+    await expect(page.locator('.song-link', { hasText: 'My Tune' })).toHaveCount(1);
     expect(await v1KeysUnchanged(page)).toEqual({ state: true, presets: true });
 });
 
@@ -232,7 +232,7 @@ test('lists v1 data it cannot read instead of quietly importing nothing', async 
     await expect(result).toContainText(
         'Saved progression “Broken tune” — its chords could not be read.',
     );
-    await expect(page.getByRole('button', { name: 'Good tune' })).toBeVisible();
+    await expect(page.locator('.song-link', { hasText: 'Good tune' })).toBeVisible();
     // The unreadable blob is still exactly as v1 left it: nothing repaired, nothing removed.
     expect(await page.evaluate(() => localStorage.getItem('ensemble_currentState'))).toBe(
         '{"sections":[{"label":"Verse"',
@@ -246,7 +246,7 @@ test('lists v1 data it cannot read instead of quietly importing nothing', async 
     await expect(page.getByTestId('v1-import')).toHaveCount(0);
 
     // … and the way back still lists it, with its reason, for anyone who goes looking.
-    await page.getByRole('button', { name: 'Good tune' }).click();
+    await page.locator('.song-link', { hasText: 'Good tune' }).click();
     await page.getByRole('button', { name: 'Song actions' }).click();
     await page.getByTestId('bring-over-v1').click();
     await expect(page.getByTestId('v1-import').getByTestId('v1-import-problems')).toContainText(
@@ -276,7 +276,7 @@ test('Done never records the permanent decline', async ({ page }) => {
     expect(await declined(page)).toBe(false);
 
     // Everything is here now, so the menu path offers nothing — and its Done is still Done.
-    await page.getByRole('button', { name: 'My Tune' }).click();
+    await page.locator('.song-link', { hasText: 'My Tune' }).click();
     await page.getByRole('button', { name: 'Song actions' }).click();
     await page.getByTestId('bring-over-v1').click();
     const card = page.getByTestId('v1-import');
@@ -332,7 +332,7 @@ test('dismissing an unreadable-only card settles it without declining', async ({
     expect(await declined(page)).toBe(false);
 
     // And the way back still says what is wrong with it.
-    await page.getByRole('button', { name: 'Blue pocket' }).first().click();
+    await page.locator('.song-link', { hasText: 'Blue pocket' }).first().click();
     await page.getByRole('button', { name: 'Song actions' }).click();
     await page.getByTestId('bring-over-v1').click();
     await expect(page.getByTestId('v1-import').getByTestId('v1-import-problems')).toContainText(

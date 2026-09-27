@@ -19,6 +19,160 @@ export function rememberSong(id: string): void {
     }
 }
 
+const OPENED_AT = 'ensemble-v2-preview:opened-at';
+
+/**
+ * Per-song "opened at" timestamps (#1440) — one row per document, distinct from `lastOpenedSong`
+ * above (which only ever answers for the single most-recently-opened chart, the Continue card's
+ * fact). The All songs page's Recently-opened sort and filter need every song's own timestamp.
+ *
+ * A single JSON object keyed by document id rather than one `localStorage` key per song: a
+ * songbook can hold thousands of entries, and one key per song would mean scanning every stored
+ * key (`localStorage.key(i)`) the way `lib/repository.ts`'s recovery slots do — appropriate there
+ * because a recovery slot is per-writer-per-document, but this is one small preference per
+ * document, cheap to keep as one blob.
+ *
+ * A device-local preference, never a document edit: opening a chart never bumps its
+ * `updatedAt`/`revision` and never queues a Save, and this write touches neither.
+ */
+export function openedAtMap(): Map<string, string> {
+    const map = new Map<string, string>();
+    let raw: string | null = null;
+    try {
+        raw = localStorage.getItem(OPENED_AT);
+    } catch {
+        return map;
+    }
+    if (!raw) {
+        return map;
+    }
+    try {
+        const parsed: unknown = JSON.parse(raw);
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+            return map;
+        }
+        for (const [id, stamp] of Object.entries(parsed)) {
+            if (typeof stamp === 'string' && Number.isFinite(Date.parse(stamp))) {
+                map.set(id, stamp);
+            }
+        }
+    } catch {
+        // An unreadable ledger only costs "never opened" for everything; never block startup.
+    }
+    return map;
+}
+
+/** Records this song as opened just now. See `openedAtMap` for what this deliberately is not. */
+export function recordOpened(id: string): void {
+    const map = openedAtMap();
+    map.set(id, new Date().toISOString());
+    try {
+        localStorage.setItem(OPENED_AT, JSON.stringify(Object.fromEntries(map)));
+    } catch {
+        // Best-effort preference; the chart still opens either way.
+    }
+}
+
+/** Drops one song's opened-at row — deleting it must not leave a dangling entry behind (#1440). */
+export function forgetOpened(id: string): void {
+    const map = openedAtMap();
+    if (!map.delete(id)) {
+        return;
+    }
+    try {
+        localStorage.setItem(OPENED_AT, JSON.stringify(Object.fromEntries(map)));
+    } catch {
+        // Best-effort preference; nothing downstream depends on this succeeding.
+    }
+}
+
+const STARRED = 'ensemble-v2-preview:starred';
+
+/**
+ * Starred songs (#1440) — a per-device preference, stored the same way `openedAtMap` is: one
+ * small JSON blob rather than a key per song. #1443 migrates this into a synced built-in
+ * "Starred" collection; until then it lives here, beside the rest of this file's device-only
+ * conveniences.
+ */
+export function starredIds(): Set<string> {
+    const ids = new Set<string>();
+    let raw: string | null = null;
+    try {
+        raw = localStorage.getItem(STARRED);
+    } catch {
+        return ids;
+    }
+    if (!raw) {
+        return ids;
+    }
+    try {
+        const parsed: unknown = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+            for (const id of parsed) {
+                if (typeof id === 'string') {
+                    ids.add(id);
+                }
+            }
+        }
+    } catch {
+        // An unreadable ledger only costs "nothing starred"; never block startup on it.
+    }
+    return ids;
+}
+
+export function setStarred(id: string, starred: boolean): void {
+    const ids = starredIds();
+    const changed = starred ? !ids.has(id) : ids.has(id);
+    if (!changed) {
+        return;
+    }
+    if (starred) {
+        ids.add(id);
+    } else {
+        ids.delete(id);
+    }
+    try {
+        localStorage.setItem(STARRED, JSON.stringify([...ids]));
+    } catch {
+        // Best-effort preference; the toggle still applies for this render.
+    }
+}
+
+/** Drops one song's star, if any — deleting a starred song must not leave a dangling id (#1440). */
+export function forgetStar(id: string): void {
+    setStarred(id, false);
+}
+
+const ALL_SONGS_SORT = 'ensemble-v2-preview:all-songs-sort';
+export type AllSongsSort = 'title' | 'recentOpened' | 'recentAdded' | 'composer' | 'tempo';
+const ALL_SONGS_SORTS: readonly AllSongsSort[] = [
+    'title',
+    'recentOpened',
+    'recentAdded',
+    'composer',
+    'tempo',
+];
+
+/** The All songs page's remembered sort choice (#1440) — a device preference, unset by default. */
+export function allSongsSortPreference(): AllSongsSort | null {
+    try {
+        const stored = localStorage.getItem(ALL_SONGS_SORT);
+        return stored !== null && (ALL_SONGS_SORTS as readonly string[]).includes(stored)
+            ? (stored as AllSongsSort)
+            : null;
+    } catch {
+        return null;
+    }
+}
+
+export function rememberAllSongsSort(sort: AllSongsSort): void {
+    try {
+        localStorage.setItem(ALL_SONGS_SORT, sort);
+    } catch {
+        // The live choice still applies for this render; only the memory is lost.
+    }
+}
+
 const THEME = 'ensemble-v2-preview:theme';
 export type ThemeChoice = 'day' | 'stage';
 

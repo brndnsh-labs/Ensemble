@@ -3,11 +3,11 @@
  * tests that need the REAL repository rather than a stand-in for it (#1274).
  *
  * Node and happy-dom ship no IndexedDB. Rather than pull in a new dependency, this implements
- * exactly what `open()`/`save()`/`list()` call: one database, one object store keyed by `id`,
- * `get`/`put`/`getAll`, and transaction completion that fires only once every request it
- * dispatched — including one queued synchronously from inside another request's `onsuccess`,
- * which is precisely what `save()`'s read-modify-write does. Same spirit as this repo's manual
- * `Storage` mock for the v1 writers.
+ * exactly what `open()`/`save()`/`list()`/`remove()`/`rename()` call: one database, one object
+ * store keyed by `id`, `get`/`put`/`getAll`/`delete`, and transaction completion that fires only
+ * once every request it dispatched — including one queued synchronously from inside another
+ * request's `onsuccess`, which is precisely what `save()`'s read-modify-write does. Same spirit
+ * as this repo's manual `Storage` mock for the v1 writers.
  *
  * `reset()` empties the store WITHOUT replacing the database object, because `repository.ts`
  * holds on to its `open()` promise for the module's lifetime: a second
@@ -67,6 +67,16 @@ export function installFakeIndexedDB(): FakeIndexedDB {
                     tx.pending++;
                     queueMicrotask(() => {
                         request.result = [...store.values()];
+                        request.onsuccess?.();
+                        settle();
+                    });
+                    return request;
+                },
+                delete(key: string) {
+                    const request = makeRequest<void>();
+                    tx.pending++;
+                    queueMicrotask(() => {
+                        store.delete(key);
                         request.onsuccess?.();
                         settle();
                     });

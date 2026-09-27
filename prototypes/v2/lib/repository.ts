@@ -123,6 +123,54 @@ export async function save(
 }
 
 /**
+ * Delete one song from the guest songbook (#1440) — the local-only counterpart to the account
+ * songbook's tombstone route (`app/account/delete-song.tsx`), which this must never stand in for:
+ * an account song deletes through that route alone, never a local-only removal.
+ *
+ * Every writer's recovery slot for this id goes with it. A deleted song's draft is an orphan by
+ * definition — leaving it behind would resurrect the song as a "recovered draft" the next time
+ * this device's storage is scanned by id, which is exactly the dangling state deleting is meant
+ * to leave none of.
+ */
+export async function remove(id: string): Promise<void> {
+    const db = await open();
+    await new Promise<void>((resolve, reject) => {
+        const tx = db.transaction(STORE, 'readwrite');
+        tx.objectStore(STORE).delete(id);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(new Error('Delete failed. Storage may be unavailable.'));
+        tx.onabort = () => reject(new Error('Delete was interrupted.'));
+    });
+    clearRecovery(id);
+}
+
+/**
+ * Rename one song in place (#1440) — the title only, everything else untouched. Reuses `save`'s
+ * own compare-and-swap and `updatedAt`/`revision` bump rather than duplicating it, so a rename
+ * "syncs like any Save" by construction instead of by a second copy of that rule.
+ */
+export async function rename(id: string, title: string): Promise<ChartDocument> {
+    const db = await open();
+    const current = await new Promise<ChartDocument>((resolve, reject) => {
+        const tx = db.transaction(STORE, 'readonly');
+        const request = tx.objectStore(STORE).get(id);
+        request.onerror = () => reject(new Error('Unable to read your local songbook.'));
+        request.onsuccess = () => {
+            if (!request.result) {
+                reject(new Error('Song no longer exists.'));
+                return;
+            }
+            try {
+                resolve(validated(request.result));
+            } catch (error) {
+                reject(error);
+            }
+        };
+    });
+    return save({ ...current, title }, current.revision);
+}
+
+/**
  * Synchronous, per-writer recovery protects the final edit on close.
  *
  * A GUEST chart's, and only a guest chart's (#1299): an account chart's unsaved experiment is

@@ -15,6 +15,16 @@ export function genreOf(document: ChartDocument): string {
     return chartGenre(document.chart.band.groove);
 }
 
+/**
+ * The chart's composer, when known (#1440) — carried by a v2 iReal import's own metadata
+ * (`ChartDocumentV2.metadata.composer`). A v1-schema document has nowhere to store one; `''`
+ * there and for a v2 document with none, so a caller can treat "no composer" as one shape rather
+ * than branching on `schemaVersion` itself.
+ */
+export function composerOf(document: ChartDocument): string {
+    return document.schemaVersion === 2 ? (document.metadata?.composer ?? '') : '';
+}
+
 export function validateDocument(candidate: unknown): ChartDocument {
     const result = validateAnyChartDocument(candidate);
     if (result.kind !== 'ok') {

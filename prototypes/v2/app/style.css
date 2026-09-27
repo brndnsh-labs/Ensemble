@@ -3055,3 +3055,154 @@ html[data-theme="stage"] {
     gap: 10px;
     align-items: center;
 }
+
+/* The songbook home's link into #1440's All songs page. */
+.all-songs-link {
+    margin: -6px 0 14px;
+}
+
+/* The All songs page (#1440). `.home` supplies the page's max-width/padding/heading styles;
+   everything below is additional to that shared shell. */
+.all-songs {
+    max-width: 1100px;
+}
+.all-songs-back {
+    background: none;
+    border: 0;
+    padding: 0;
+    color: inherit;
+    font: inherit;
+}
+.all-songs-count {
+    color: var(--muted);
+    font-weight: 400;
+}
+.all-songs-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 22px;
+}
+.all-songs-toolbar .search {
+    flex: 1;
+    min-width: 180px;
+}
+.all-songs-toolbar .search input {
+    width: 100%;
+}
+.all-songs-select select {
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: inherit;
+    padding: 8px 10px;
+    border-radius: 7px;
+    font-size: 12px;
+}
+.all-songs-layout {
+    display: grid;
+    grid-template-columns: 168px minmax(0, 1fr) auto;
+    gap: 26px;
+    align-items: start;
+}
+.filter-rail {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    position: sticky;
+    top: 20px;
+}
+.filter-item {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    text-align: left;
+    padding: 9px 11px;
+    border-radius: 8px;
+    font-size: 13px;
+    color: var(--muted);
+}
+.filter-item:hover {
+    background: var(--hover);
+}
+.filter-item[aria-pressed="true"] {
+    background: var(--chip);
+    color: var(--ink);
+    font-weight: 620;
+}
+.filter-count {
+    color: var(--muted-soft);
+    font-variant-numeric: tabular-nums;
+}
+.all-songs-content {
+    min-width: 0;
+}
+.all-songs-empty {
+    color: var(--muted);
+    font-size: 13px;
+    padding: 30px 0;
+    text-align: center;
+}
+.all-songs-storage-note {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 14px;
+}
+.song-composer,
+.song-opened {
+    font-size: 12px;
+}
+.star-toggle {
+    font-size: 17px;
+    color: var(--muted-soft);
+}
+.star-toggle[aria-pressed="true"] {
+    color: var(--yellow);
+}
+.az-index {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    position: sticky;
+    top: 20px;
+}
+.az-index button {
+    width: 22px;
+    height: 18px;
+    font-size: 10px;
+    color: var(--muted-soft);
+    border-radius: 4px;
+}
+.az-index button:hover {
+    background: var(--hover);
+    color: var(--ink);
+}
+/* The shared row ⋯ menu (#1440), a compact action list rather than the full song menu's grid. */
+.row-menu-actions {
+    flex-direction: column;
+    align-items: stretch;
+}
+.row-menu-actions .btn {
+    justify-content: flex-start;
+}
+.row-menu-divider {
+    border: 0;
+    border-top: 1px solid var(--line);
+    margin: 4px 0;
+    width: 100%;
+}
+@media (max-width: 760px) {
+    .all-songs-layout {
+        grid-template-columns: minmax(0, 1fr);
+    }
+    .filter-rail {
+        flex-direction: row;
+        flex-wrap: wrap;
+        position: static;
+    }
+    .az-index {
+        flex-direction: row;
+        flex-wrap: wrap;
+        position: static;
+        justify-content: center;
+    }
+}

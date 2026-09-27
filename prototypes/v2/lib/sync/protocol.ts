@@ -134,6 +134,57 @@ export interface LastOpened {
     documentId: string;
 }
 
+/**
+ * Per-song "opened at" (#1440), one row per document rather than `lastOpenedKey`'s one row per
+ * owner — the All songs page's Recently-opened sort and filter need every song's own timestamp,
+ * not only the single most-recent one `lastOpenedKey` already answers for the Continue card.
+ * Same `meta` store, same reasoning as the candidate/deletion/last-opened namespaces above: no
+ * IndexedDB version bump, no new destructive-data decision. `'opened:'` sorts strictly between
+ * `'last-opened:'` and `'remote:'`, so no existing prefix range can see it and it cannot see one.
+ *
+ * A device-local preference, never a document field: opening a chart never bumps its
+ * `updatedAt`/`revision` and never queues a Save, and this row does not either.
+ */
+export function openedPrefix(ownerId: string): string {
+    identifier(ownerId);
+    return `opened:${ownerId}:`;
+}
+
+export function openedKey(ownerId: string, documentId: string): string {
+    identifier(documentId);
+    return `${openedPrefix(ownerId)}${documentId}`;
+}
+
+export interface OpenedAt {
+    key: string;
+    ownerId: string;
+    documentId: string;
+    openedAt: string;
+}
+
+/**
+ * Starred songs (#1440), one row per starred document — presence is the whole fact, so there is
+ * no value beyond the identity fields. #1443 migrates this into a synced built-in "Starred"
+ * collection; until then it is a per-device, per-owner preference in the same `meta` store as the
+ * rest of this file's namespaces. `'star:'` sorts strictly between `'remote:'` and the end of the
+ * key space, so it cannot collide with any prefix range above.
+ */
+export function starPrefix(ownerId: string): string {
+    identifier(ownerId);
+    return `star:${ownerId}:`;
+}
+
+export function starKey(ownerId: string, documentId: string): string {
+    identifier(documentId);
+    return `${starPrefix(ownerId)}${documentId}`;
+}
+
+export interface Star {
+    key: string;
+    ownerId: string;
+    documentId: string;
+}
+
 /** The stored frozen delete. Four scalars: everything the canonical request bytes are made of. */
 export interface PendingDeletion {
     key: string;
