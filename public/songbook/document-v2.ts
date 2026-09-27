@@ -1,7 +1,9 @@
 import {
     decodeJson,
     encodeValidated,
+    type PreparedCandidate,
     prepareCandidate,
+    preparedSubtree,
     readVersion,
     validatePreparedChartDocument,
 } from './codec.js';
@@ -27,7 +29,9 @@ const UNSAFE_METADATA = /[<>\u0000-\u001f\u007f]/;
  * structural walk — callers that hold raw, untrusted input must call
  * {@link validateChartDocumentV2} instead.
  */
-function validatePreparedChartDocumentV2(prepared: unknown): CodecDecodeResult<ChartDocumentV2> {
+function validatePreparedChartDocumentV2(
+    prepared: PreparedCandidate,
+): CodecDecodeResult<ChartDocumentV2> {
     const version = readVersion(prepared, 2, prepared);
     if (version.kind !== 'current') {
         return version;
@@ -115,32 +119,34 @@ function validatePreparedChartDocumentV2(prepared: unknown): CodecDecodeResult<C
     // which already went through the full walk and JSON round trip as a whole — so they're
     // already guaranteed acyclic, accessor- and toJSON-free, and within the document's
     // depth/size bounds — and the rest is a small fixed literal this function authors itself.
-    const envelope = validatePreparedChartDocument({
-        schemaVersion: 1,
-        id: root.id,
-        title: root.title,
-        createdAt: root.createdAt,
-        updatedAt: root.updatedAt,
-        revision: root.revision,
-        chart: {
-            performance: chart.performance,
-            band: chart.band,
-            arrangement: {
-                key: 'C',
-                isMinor: false,
-                timeSignature: '4/4',
-                grouping: null,
-                notation: 'name',
-                sections: [{ id: 'validation-only', label: 'Validation', value: 'C' }],
+    const envelope = validatePreparedChartDocument(
+        preparedSubtree({
+            schemaVersion: 1,
+            id: root.id,
+            title: root.title,
+            createdAt: root.createdAt,
+            updatedAt: root.updatedAt,
+            revision: root.revision,
+            chart: {
+                performance: chart.performance,
+                band: chart.band,
+                arrangement: {
+                    key: 'C',
+                    isMinor: false,
+                    timeSignature: '4/4',
+                    grouping: null,
+                    notation: 'name',
+                    sections: [{ id: 'validation-only', label: 'Validation', value: 'C' }],
+                },
             },
-        },
-    });
+        }),
+    );
     if (envelope.kind !== 'ok') {
         return envelope;
     }
     // `chart.score` is a subtree of `prepared` (the whole document already went through
     // `prepareCandidate`), so it is revalidated without a second structural walk/round trip.
-    const score = validatePreparedSemanticScore(chart.score);
+    const score = validatePreparedSemanticScore(preparedSubtree(chart.score));
     if (score.kind === 'invalid') {
         return {
             kind: 'invalid',
@@ -153,7 +159,7 @@ function validatePreparedChartDocumentV2(prepared: unknown): CodecDecodeResult<C
     if (score.kind !== 'ok') {
         return score;
     }
-    return { kind: 'ok', value: prepared as ChartDocumentV2 };
+    return { kind: 'ok', value: prepared as unknown as ChartDocumentV2 };
 }
 
 /** Additive reader: this does not change the version used by existing storage or shares. */

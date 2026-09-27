@@ -1,4 +1,4 @@
-import { prepareCandidate } from './codec.js';
+import { type PreparedCandidate, prepareCandidate } from './codec.js';
 import { resolveScoreContext } from './score-context.js';
 import { addScoreDurations, scoreDuration, scoreMeter } from './score-duration.js';
 import { isScoreChord } from './score-text.js';
@@ -314,7 +314,9 @@ function events(value: unknown, path: string, length: ScoreDuration): void {
  * bounded tree cannot itself exceed those bounds). Does NOT re-run the structural walk —
  * callers that hold raw, untrusted input must call {@link validateSemanticScore} instead.
  */
-export function validatePreparedSemanticScore(prepared: unknown): CodecDecodeResult<SemanticScore> {
+export function validatePreparedSemanticScore(
+    prepared: PreparedCandidate,
+): CodecDecodeResult<SemanticScore> {
     try {
         const root = object(prepared, '$', [
             'notation',
@@ -502,7 +504,7 @@ export function validatePreparedSemanticScore(prepared: unknown): CodecDecodeRes
                 `Missing ${ref.kind} destination.`,
             );
         }
-        return { kind: 'ok', value: prepared as SemanticScore };
+        return { kind: 'ok', value: prepared as unknown as SemanticScore };
     } catch (error) {
         return {
             kind: 'invalid',
