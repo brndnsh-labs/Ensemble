@@ -170,7 +170,7 @@ describe('iReal integration contracts: source to the production playback adapter
 
     it.each([
         ['unsupported chord', 'T44[C   |Cnotachord   |G7   Z'],
-        ['empty interior measure', 'T44[C   |]G7   Z'],
+        ['empty interior measure', 'T44[C   |   |G7   Z'],
         ['unroundable harmonic thirds', 'T44[C,Dm,G7Z'],
         ['unknown staff instruction', 'T44[C   |!   |G7   Z'],
     ])('does not adopt a partial playable chart after %s', (_label, body) => {

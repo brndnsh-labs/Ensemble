@@ -72,6 +72,27 @@ function fail(bar: number, message: string): never {
     throw new Error(`Bar ${bar + 1}: ${message}`);
 }
 
+// Text that reads as playback-relevant even though this importer never applies it — worth a
+// note so the musician knows it was seen and set aside, not silently dropped.
+const PLAYBACK_TEXT = /D\.[CS]\.|\b(?:break|stop|hold|fine|coda|segno|repeat|ending|rit|tempo)\b/i;
+// Text that specifically references a Fine/Coda/Segno marker or a numbered-ending jump. Only
+// this narrower class may relax mapNavigation's unpaired-marker check: a "Bass break" or "rit."
+// annotation must never silence a genuinely orphaned coda/segno/fine sign elsewhere in the chart
+// just because unrelated playback-flavored text happened to appear somewhere too (#1447 review).
+const NAVIGATION_REFERENCE =
+    /D\.[CS]\.|\b(?:coda|segno|fine)\b|\bal\s+\d+(?:st|nd|rd|th)\s+ending\b/i;
+
+const MAX_NOTES = 20;
+/** Bounds a diagnostics list so a pathological chart (thousands of ownerless alternates or
+ * orphaned markers) cannot produce an unbounded number of warnings. */
+function boundedNotes(notes: string[]): string[] {
+    if (notes.length <= MAX_NOTES) {
+        return notes;
+    }
+    const kept = notes.slice(0, MAX_NOTES - 1);
+    return [...kept, `…and ${notes.length - kept.length} more.`];
+}
+
 function newBar(meter: string): WrittenBar {
     return { cells: [], meter, start: [], end: [], notes: [], close: '' };
 }
@@ -95,11 +116,22 @@ function chordAt(body: string, offset: number): string | undefined {
     return best;
 }
 
+interface ParseSignals {
+    /** A genuine navigation reference (D.C./D.S., coda/segno/fine, "al Nth ending") was left
+     * unmapped, so an otherwise-orphaned Fine/Coda/Segno marker should be tolerated rather than
+     * treated as a hard error. Never set by ordinary playback-flavored prose ("Bass break",
+     * "rit.") — see NAVIGATION_REFERENCE. */
+    unmappedNavigation: boolean;
+    droppedAlternates: number;
+    lastDroppedAlternate: string;
+    notedEndMark: boolean;
+}
+
 function readBars(
     body: string,
     modern: boolean,
     notes: string[],
-    flags: { unmappedJump: boolean },
+    signals: ParseSignals,
 ): WrittenBar[] {
     const bars: WrittenBar[] = [];
     // iReal defaults an unmarked chart to common time until a T-token overrides it (established:
@@ -191,13 +223,15 @@ function readBars(
             }
             offset += 3;
         } else if (modern && body.startsWith('Kcl', offset)) {
-            // Compressed barline + same-bar repeat-previous-measure cell. Established mapping:
-            // infojunkie/ireal-musicxml src/lib/parser.js `unscramble()`:
-            // `r.replace(/Kcl/g, '| x').replace(/LZ/g, ' |').replace(/XyQ/g, '   ')`.
-            // Equivalent to the two literal characters "| x": close this measure, then start the
-            // next one with the standalone repeat-previous-measure cell.
+            // Compressed barline + blank cell + same-bar repeat-previous-measure cell.
+            // Established mapping: infojunkie/ireal-musicxml src/lib/parser.js `unscramble()`:
+            // `r.replace(/Kcl/g, '| x').replace(/LZ/g, ' |').replace(/XyQ/g, '   ')`. Expanded to
+            // the exact three literal characters "| x" (not just "|x") so cell positions match
+            // the reference: a barline closes this measure, then the space and the repeat cell
+            // both land in the next one (#1447 review).
             closeBar('|');
             inside = true;
+            addCell(null);
             addCell({ repeat: 'one' });
             offset += 3;
         } else if (modern && body.startsWith('LZ', offset)) {
@@ -215,18 +249,27 @@ function readBars(
             }
             offset++;
         } else if (char === ',') {
-            // A comma is the grammar's own spacing token, interchangeable with a literal space
-            // (established: ironss/accompaniser irealb_parser.lua's `space <- ' ' / ',' / %nl`).
-            // Ensemble additionally uses one following a chord to mark a sub-cell boundary
-            // narrower than a blank cell (see the exact-spacing tests); with nothing before it
-            // in this bar it carries no such meaning and is pure alignment padding, so it is
-            // always safe to skip rather than reject.
+            // A comma clears the pending cell rather than emitting one of its own (established:
+            // infojunkie/ireal-musicxml src/lib/parser.js's cell-annotation switch, `case ',':
+            // cell = null;` — unlike a space, which always advances to a new cell). Ensemble
+            // additionally uses one following a chord to mark a sub-cell boundary narrower than
+            // a blank cell (see the exact-spacing tests); with nothing before it in this bar it
+            // carries no such meaning and is pure alignment padding, so it is always safe to
+            // skip rather than reject (#1447 review).
             offset++;
         } else if (char === 'U') {
-            // Documented visual-only marker ("ending measure for player"): established by both
-            // pianosnake/ireal-reader's Parser.js (`{ token: 'U', description: 'Ending measure
-            // for player' }`) and ironss/accompaniser's irealb_parser.lua `unknown` production,
-            // which lists it alongside 's'/'l'/'Y' as inert layout tokens. Adds no cell.
+            // "U" marks the end of the performance on the final chorus (established: infojunkie/
+            // ireal-musicxml src/lib/converter.js's `case 'U': // END, treated as Fine`;
+            // pianosnake/ireal-reader's Parser.js calls it "Ending measure for player"; ironss/
+            // accompaniser's irealb_parser.lua lists it in its `unknown` production alongside
+            // 's'/'l'). Kept as an annotation rather than a synthesized jump — the band still
+            // loops the written form — with one note per song, not one per occurrence
+            // (#1447 review).
+            if (!signals.notedEndMark) {
+                notes.push('An end-of-performance mark is kept as text; the band loops the form.');
+                signals.notedEndMark = true;
+            }
+            current.notes.push({ text: 'U', cell: current.cells.length, above: false });
             offset++;
         } else if ('|[]{}Z'.includes(char)) {
             closeBar(char);
@@ -260,7 +303,9 @@ function readBars(
             current.notes.push({ text: mark, cell: 0, above: true });
             offset += 2;
         } else if (char === 'Y' || char === 's' || char === 'l') {
-            // Officially visual-only: vertical spacing and chord glyph size do not add cells.
+            // Officially visual-only, both established in ironss/accompaniser's irealb_parser.lua:
+            // 'Y' is vertical spacing, its own `vspace` production; 's'/'l' (chord glyph size) are
+            // in the separate `unknown` production. Neither adds a cell.
             offset++;
         } else if (char === 'N') {
             const pass = Number(body[offset + 1]);
@@ -291,19 +336,26 @@ function readBars(
             if (!text || text.includes('<') || /[\r\n\t]/.test(text)) {
                 fail(bars.length, 'Staff text must be bounded plain text.');
             }
-            const jump = /^D\.([CS])\. al (Fine|Coda)$/.exec(text);
+            // The compressed empty-cell token can appear inside staff text too — the established
+            // substitution (infojunkie/ireal-musicxml's unscramble()) is a blind string replace
+            // over the whole body, not cell-scoped — and iReal's own writers are loose about case
+            // and surrounding whitespace in this free-text field. Normalize before classifying,
+            // so "XyQ Fine"/"XyQFine" (Moon Rays, The Chicken) and " D.S. al coda "/"D.C. al CODA"
+            // read as the plain instruction they display once rendered (#1447 review).
+            const normalized = (modern ? text.replace(/XyQ/g, '   ') : text).trim();
+            const jump = /^D\.([CS])\. al (fine|coda)$/i.exec(normalized);
             if (jump) {
                 if (current.jump) {
                     fail(bars.length, 'The bar has more than one jump.');
                 }
                 current.jump = {
-                    from: jump[1] === 'C' ? 'start' : 'segno',
-                    destination: jump[2] === 'Fine' ? 'fine' : 'coda',
+                    from: jump[1].toUpperCase() === 'C' ? 'start' : 'segno',
+                    destination: jump[2].toLowerCase() === 'fine' ? 'fine' : 'coda',
                 };
-            } else if (text === 'Fine') {
+            } else if (normalized === 'Fine') {
                 current.end.push({ kind: 'fine', label: `fine-${++fines}` });
-            } else if (/^\d+x$/.test(text)) {
-                const times = Number(text.slice(0, -1));
+            } else if (/^\d+x$/.test(normalized)) {
+                const times = Number(normalized.slice(0, -1));
                 if (times < 2 || times > 64 || current.repeatTimes) {
                     fail(bars.length, 'Use one repeat count from 2x to 64x.');
                 }
@@ -318,21 +370,29 @@ function readBars(
                 // jump for it (so the performed order is never silently wrong) plus a warning
                 // through the import diagnostics when the text reads as playback-relevant,
                 // rather than refusing the whole chart over text safe to leave unapplied (#1447).
-                if (
-                    /D\.[CS]\.|\b(?:break|stop|hold|fine|coda|segno|repeat|ending|rit|tempo)\b/i.test(
-                        text,
-                    )
-                ) {
+                // Only a text that genuinely REFERENCES a Fine/Coda/Segno marker or a numbered
+                // ending may relax the unpaired-marker check below — ordinary playback prose
+                // ("Bass break", "rit.") must never silence a genuinely orphaned marker elsewhere.
+                if (PLAYBACK_TEXT.test(normalized)) {
                     notes.push(
-                        `A staff-text instruction ("${text}") is preserved as text only; it is not applied to the performed order.`,
+                        `A staff-text instruction ("${normalized}") is preserved as text only; it is not applied to the performed order.`,
                     );
-                    flags.unmappedJump = true;
+                    if (NAVIGATION_REFERENCE.test(normalized)) {
+                        signals.unmappedNavigation = true;
+                    }
                 }
-                current.notes.push({
-                    text,
-                    cell: current.cells.length,
-                    above: !!raised && Number(raised[1]) >= 36,
-                });
+                // A raised editorial tag with nothing but whitespace inside it (e.g. "<*66  >")
+                // normalizes to an empty string, which the score's display-text validator
+                // rejects outright (`text().length > 0`) — unlike the original untrimmed
+                // whitespace, which passed harmlessly. There is nothing to display or invent
+                // here, so skip the annotation rather than fail the whole chart over it.
+                if (normalized) {
+                    current.notes.push({
+                        text: normalized,
+                        cell: current.cells.length,
+                        above: !!raised && Number(raised[1]) >= 36,
+                    });
+                }
             }
             offset = end + 1;
         } else if (char === '(') {
@@ -344,11 +404,12 @@ function readBars(
             if (previous?.kind !== 'chord') {
                 // ScoreEvent only carries `alternates` on a chord event; there is nowhere to put
                 // one following a blank cell, a repeat cell or N.C./hold. Keep the chart
-                // importable per #1447: drop the alternate and note it rather than failing the
-                // whole song over data the semantic score has no slot for.
-                notes.push(
-                    `An alternate chord ("${canonicalChord(alternate)}") with no owning chord was dropped from the import.`,
-                );
+                // importable per #1447: drop the alternate rather than failing the whole song
+                // over data the semantic score has no slot for. Counted, not noted individually
+                // — a pathological chart could repeat this token thousands of times — and
+                // summarized into one bounded note in scoreFromIRealBody (#1447 review).
+                signals.droppedAlternates++;
+                signals.lastDroppedAlternate = canonicalChord(alternate);
             } else {
                 previous.alternates = [...(previous.alternates ?? []), canonicalChord(alternate)];
                 if (previous.alternates.length > 8) {
@@ -427,7 +488,11 @@ function timedEvents(bar: WrittenBar, index: number): ScoreEvent[] {
     });
 }
 
-function mapNavigation(bars: WrittenBar[], tolerateUnpairedMarkers: boolean): void {
+function mapNavigation(
+    bars: WrittenBar[],
+    notes: string[],
+    tolerateUnpairedMarkers: boolean,
+): void {
     const markers = bars.flatMap((bar, index) => [
         ...bar.start.map((direction) => ({ direction, index, edge: 'start' })),
         ...bar.end.map((direction) => ({ direction, index, edge: 'end' })),
@@ -491,12 +556,22 @@ function mapNavigation(bars: WrittenBar[], tolerateUnpairedMarkers: boolean): vo
             repeats: 'skip',
         });
     }
-    if (
-        !tolerateUnpairedMarkers &&
-        !jumps.length &&
-        markers.some(({ direction }) => ['coda', 'fine', 'segno'].includes(direction.kind))
-    ) {
-        fail(0, 'Unpaired navigation symbols need an explicit supported jump.');
+    if (!jumps.length) {
+        const orphaned = markers.filter(({ direction }) =>
+            ['coda', 'fine', 'segno'].includes(direction.kind),
+        );
+        if (orphaned.length) {
+            if (!tolerateUnpairedMarkers) {
+                fail(0, 'Unpaired navigation symbols need an explicit supported jump.');
+            }
+            // The text that earned this tolerance is already noted; also name each marker left
+            // dangling, so the musician sees exactly what got ignored (#1447 review).
+            for (const { direction, index } of orphaned) {
+                notes.push(
+                    `The ${direction.kind} sign in bar ${index + 1} has no supported jump and is ignored.`,
+                );
+            }
+        }
     }
 }
 
@@ -511,12 +586,17 @@ export function scoreFromIRealBody(
         throw new Error('The stored key signature is unsupported.');
     }
     const notes: string[] = [];
-    const flags = { unmappedJump: false };
-    const bars = readBars(body, modern, notes, flags);
-    // An unmapped D.C./D.S. text (e.g. "al Nth ending") is imported as inert annotation only, so
-    // a Fine/Coda/Segno marker it would otherwise have paired with is expected to be unpaired
-    // here; the warning already pushed to `notes` is the honest signal, not a hard failure.
-    mapNavigation(bars, flags.unmappedJump);
+    const signals: ParseSignals = {
+        unmappedNavigation: false,
+        droppedAlternates: 0,
+        lastDroppedAlternate: '',
+        notedEndMark: false,
+    };
+    const bars = readBars(body, modern, notes, signals);
+    // An unmapped navigation reference (e.g. "al Nth ending") is imported as inert annotation
+    // only, so a Fine/Coda/Segno marker it would otherwise have paired with is expected to be
+    // unpaired here; mapNavigation notes each one by name rather than hard-failing.
+    mapNavigation(bars, notes, signals.unmappedNavigation);
     const id = (bar: number) => `ireal-${index + 1}-bar-${bar + 1}`;
     const measures: ScoreMeasure[] = [];
     let pendingTwo = false;
@@ -583,5 +663,19 @@ export function scoreFromIRealBody(
     // Authored validity alone permits unresolved form. Import also proves a bounded route;
     // lane/quality/meter playback capability remains the host adapter's separate decision.
     compileScoreForm(checked.value);
-    return { score: checked.value, notes };
+    // Dropped alternates are aggregated into one note (never one per occurrence — a pathological
+    // chart could repeat "(D)" thousands of times), placed first, then the whole list is bounded
+    // so no chart can produce an unbounded diagnostics list (#1447 review).
+    const allNotes: string[] = [];
+    if (signals.droppedAlternates === 1) {
+        allNotes.push(
+            `An alternate chord ("${signals.lastDroppedAlternate}") with no owning chord was dropped from the import.`,
+        );
+    } else if (signals.droppedAlternates > 1) {
+        allNotes.push(
+            `${signals.droppedAlternates} alternate chords with nothing to attach to were dropped from the import.`,
+        );
+    }
+    allNotes.push(...notes);
+    return { score: checked.value, notes: boundedNotes(allNotes) };
 }

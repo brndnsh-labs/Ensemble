@@ -23,6 +23,23 @@ function blocked(body: string) {
     expect(parsed.songs[0]?.diagnostics.some((entry) => entry.severity === 'error')).toBe(true);
 }
 
+/** A body under ~41 characters stays byte-identical through the reversible permutation
+ * (decodeIRealMusic's "final 50/51-character tail is unchanged" case never triggers the
+ * reflection, since the whole encoded value is shorter than that), so it can be written
+ * literally here without hand-reversing the scramble — only for tokens gated on the modern
+ * (irealb) format, which `open()` above cannot exercise. */
+function modernOpen(body: string, title = 'Original modern study', key = 'C'): string {
+    const fields = [title, 'Ensemble', '', 'Swing', key, '', `1r34LbKcu7${body}`, '', '0', '0'];
+    return `irealb://${fields.map(encodeURIComponent).join('=')}`;
+}
+
+function modernScore(body: string) {
+    const parsed = parseIRealImport(modernOpen(body));
+    expect(parsed.songs[0]?.diagnostics.filter((entry) => entry.severity === 'error')).toEqual([]);
+    expect(parsed.songs[0]?.score).toBeDefined();
+    return parsed.songs[0]!;
+}
+
 describe('bounded source-preserving iReal import', () => {
     it('decodes the supplied sanitized modern Blues without losing empty header fields or refs', () => {
         const fixture = fixtures.realExport;
@@ -201,12 +218,23 @@ describe('bounded source-preserving iReal import', () => {
         });
     });
 
-    it('treats the documented "U" player marker as visual-only, like Y/s/l', () => {
-        const content = score('T44[C UZ').sections[0].measures[0].content;
-        expect(content).toEqual({
+    it('treats the documented "U" player marker as an annotation, not a synthesized jump', () => {
+        // "U" marks END on the final chorus (infojunkie/ireal-musicxml converter.js treats it as
+        // Fine; pianosnake calls it "Ending measure for player"). The loop form is unaffected —
+        // it is kept as text, not built into a jump — with exactly one note for the song.
+        const source = open('T44[C UZ');
+        const parsed = parseIRealImport(source);
+        const song = parsed.songs[0];
+        expect(song.score?.sections[0].measures[0].content).toEqual({
             kind: 'events',
             events: [{ kind: 'chord', symbol: 'C', duration: [4, 1] }],
         });
+        expect(song.score?.sections[0].measures[0].annotations).toEqual([
+            { text: 'U', at: [4, 1], placement: 'below' },
+        ]);
+        expect(
+            song.diagnostics.filter((entry) => entry.message.includes('end-of-performance')),
+        ).toHaveLength(1);
     });
 
     it('drops an alternate chord with nowhere to attach and notes it, instead of blocking the song', () => {
@@ -245,6 +273,105 @@ describe('bounded source-preserving iReal import', () => {
             ...(from === 'S' ? { segno: 'segno-1' } : {}),
             destination: { kind: 'fine', label: 'fine-1' },
         });
+    });
+
+    it.each(['D.C. al coda', 'D.C. al CODA', ' D.S. al Coda ', '  D.S. al coda'])(
+        'maps a "%s" al Coda variant that differs only in case or whitespace, not just the exact spelling',
+        (phrase) => {
+            // 6 Jazz 1460 songs write this with different casing/whitespace than the exact
+            // "D.C./D.S. al Fine/Coda" spelling; trim + match case-insensitively so they map onto
+            // real navigation instead of falling to the unmapped-text annotation (#1447 review).
+            const from = phrase.trim().startsWith('D.S.') ? 'S' : 'C';
+            const source = open(
+                `T44[C   |${from === 'S' ? 'S' : ''}F   Q|G7   <${phrase}>Z[QD7   Z`,
+            );
+            const parsed = parseIRealImport(source);
+            const song = parsed.songs[0];
+            // Exactly the one standard warning every import gets — no "preserved as text" note,
+            // proving this mapped onto real navigation rather than merely avoiding a hard block.
+            expect(song.diagnostics).toHaveLength(1);
+            expect(song.score?.sections[0].measures[2].end).toContainEqual(
+                expect.objectContaining({
+                    kind: 'jump',
+                    destination: expect.objectContaining({ kind: 'coda' }),
+                }),
+            );
+        },
+    );
+
+    it.each([
+        ['XyQ Fine', '<XyQ Fine>'],
+        ['XyQFine (no space, The Chicken)', '<XyQFine>'],
+    ])(
+        'expands the compressed empty-cell token inside staff text before reading it: %s',
+        (_label, tag) => {
+            // Moon Rays writes "XyQ Fine" and The Chicken writes "XyQFine" — the established
+            // substitution (infojunkie/ireal-musicxml's unscramble()) is a blind string replace over
+            // the whole body, not cell-scoped, so it applies inside staff text too (#1447 review).
+            // Modern-only (the substitution is a modern-export compression), so this needs the
+            // irealb encoding, not the open-protocol `open()` helper above.
+            const song = modernScore(`T44[C   ${tag}|F   <D.C. al Fine>Z`);
+            expect(song.score?.sections[0].measures[0].end).toEqual([
+                { kind: 'fine', label: 'fine-1' },
+            ]);
+            expect(song.score?.sections[0].measures[1].end).toContainEqual({
+                kind: 'jump',
+                from: 'start',
+                repeats: 'skip',
+                destination: { kind: 'fine', label: 'fine-1' },
+            });
+        },
+    );
+
+    it('drops a raised editorial tag that normalizes to nothing, instead of failing the chart', () => {
+        // A raised tag with only whitespace inside it (e.g. iReal's "<*66  >") trims to an empty
+        // string, which the score's display-text validator rejects outright — unlike the
+        // original untrimmed whitespace, which passed harmlessly. Confirmed against real Jazz
+        // 1460 songs (Cabin in the Sky, I'll Never Smile Again, Lonely Woman) that regressed when
+        // trimming staff text was added for #1447's case/whitespace fix.
+        const content = score('T44[C<*66  >   Z').sections[0].measures[0];
+        expect(content.content).toEqual({
+            kind: 'events',
+            events: [{ kind: 'chord', symbol: 'C', duration: [4, 1] }],
+        });
+        expect(content.annotations).toBeUndefined();
+    });
+
+    it('refuses a chart where unrelated playback text ("Break") would otherwise silence a real orphaned coda', () => {
+        // P1 regression (#1447 review): a broad playback-keyword match must never relax the
+        // unpaired-marker check — only text that genuinely REFERENCES a Fine/Coda/Segno marker
+        // or a numbered ending may do that. Real charts hitting this: Aisha, Horace-Scope,
+        // Liberia, Mc Jolt.
+        blocked('T44[C   |F   Q|G7 <Break>  |C   Z[QD7   |G7   Z');
+    });
+
+    it('caps the notes list so a pathological chart cannot produce an unbounded number of warnings', () => {
+        // 25 distinct staff-text warnings, plus the importer's own standard warning: bounded to
+        // 20 notes (19 kept + one "…and N more" summary) plus that standard warning, not 26.
+        const source = open(`T44[${'C <Break>   |'.repeat(25)}C   Z`);
+        const parsed = parseIRealImport(source);
+        const song = parsed.songs[0];
+        expect(song.score).toBeDefined();
+        expect(song.diagnostics).toHaveLength(21);
+        expect(
+            song.diagnostics.filter((entry) => /…and \d+ more\.$/.test(entry.message)),
+        ).toHaveLength(1);
+    });
+
+    it('aggregates many ownerless alternate chords into a single bounded note, not one per occurrence', () => {
+        // The reviewed attack: repeating "(D)" thousands of times must not produce thousands of
+        // diagnostics.
+        const source = open(`T44[${'C (D)   |'.repeat(15)}C   Z`);
+        const parsed = parseIRealImport(source);
+        const song = parsed.songs[0];
+        expect(song.score).toBeDefined();
+        expect(song.diagnostics).toContainEqual(
+            expect.objectContaining({
+                severity: 'warning',
+                message:
+                    '15 alternate chords with nothing to attach to were dropped from the import.',
+            }),
+        );
     });
 
     it('imports a chart with a "D.C. al Nth ending" instruction as text, with a warning, rather than blocking it', () => {

@@ -175,10 +175,12 @@ describe('the Jazz 1460 playlist fixtures (#1447)', () => {
 
     it('imports Cherokee, preserving its unmapped "D.C. al 2nd ending" as text with a warning', () => {
         // Cherokee's full performed form is 64 bars if the D.C. is actually taken, but jumping to
-        // a specific numbered ending is not modeled by ScoreDestination's 'ending' kind yet —
-        // score-form.ts's navigation() explicitly rejects it as unimplemented. This importer
+        // a specific numbered ending needs ScoreDestination's 'ending' kind implemented in the
+        // shared score-form.ts — its own story (a design call on navigation every chart shares,
+        // not a parser-token fix), which the #1447 PR/issue files as a follow-up. This importer
         // preserves the instruction as inert text (never silently flattening a wrong form) and
         // imports the written 36 bars / 48 performed-without-the-jump instead of guessing a form.
+        // Accepted for this story at 48, not the aspirational 64.
         const { document, song } = importFixture('cherokee');
         expect(performedBarCount(document)).toBe(48);
         expectCanonicalRoundTrip(document);
@@ -186,6 +188,14 @@ describe('the Jazz 1460 playlist fixtures (#1447)', () => {
             expect.objectContaining({
                 severity: 'warning',
                 message: expect.stringContaining('D.C. al 2nd ending'),
+            }),
+        );
+        // The Fine mark on the first ending (bar 20) is now orphaned, since the D.C. that would
+        // have referenced it is left unmapped — named explicitly, not just silently tolerated.
+        expect(song.diagnostics).toContainEqual(
+            expect.objectContaining({
+                severity: 'warning',
+                message: expect.stringContaining('fine sign in bar 20'),
             }),
         );
     });
@@ -207,7 +217,8 @@ describe('the Jazz 1460 playlist fixtures (#1447)', () => {
         // The chart's own coda markers ('Q'...'Q') are real, but "Original takes Coda every
         // time" is prose, not one of the fixed D.C./D.S. al Fine/Coda phrases this importer maps
         // to a real jump. Inventing a jump from free text would risk silently producing a wrong
-        // form (#1171); importing the full written form with an honest warning does not.
+        // form (#1171); importing the full written form with an honest warning does not. Same
+        // follow-up as Cherokee above would let this reach its aspirational 32 instead of 36.
         const { document, song } = importFixture('i-got-rhythm');
         expect(performedBarCount(document)).toBe(36);
         expectCanonicalRoundTrip(document);
@@ -215,6 +226,20 @@ describe('the Jazz 1460 playlist fixtures (#1447)', () => {
             expect.objectContaining({
                 severity: 'warning',
                 message: expect.stringContaining('Original takes Coda every time'),
+            }),
+        );
+        // Both of the chart's own coda signs are now orphaned, named explicitly rather than just
+        // silently tolerated.
+        expect(song.diagnostics).toContainEqual(
+            expect.objectContaining({
+                severity: 'warning',
+                message: expect.stringContaining('coda sign in bar 23'),
+            }),
+        );
+        expect(song.diagnostics).toContainEqual(
+            expect.objectContaining({
+                severity: 'warning',
+                message: expect.stringContaining('coda sign in bar 26'),
             }),
         );
     });
