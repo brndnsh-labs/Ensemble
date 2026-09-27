@@ -962,18 +962,30 @@ html [hidden] {
     font-size: 12px;
     padding: 10px 0;
 }
-/* #1460 — the stand's toast, replacing the footer's single status line. Fixed and centred so it
-   never claims flow height (the chart gets that back), and it must not cover the playing row —
-   with #1458's look-ahead the playing row sits in the top third of `.chart-scroll`, so a
-   bottom-anchored overlay only ever reaches bars further ahead. Always mounted (`data-empty`
-   collapses it) for the same reason `.status-banner` is: a live region's TEXT CHANGE is
-   announced reliably, a freshly-inserted one is not (#1440). */
-.stand-toast {
+/* #1460 review P2 #1/#4 — one fixed, bottom-centred STACK holding the message toast, the
+   sync-failure notice and the Resume-follow pill, in normal flex-column flow. This is what makes
+   the three unable to ever overlap or mask one another: the old single fixed-position toast let
+   an undismissed sync failure hide every later "Link copied"/"Saved" message (they shared one
+   slot), and the pill and the toast could overlap by a few px at some viewport sizes (independent
+   `bottom` offsets, no shared layout). None of the three below claims flow height on its own any
+   more (the chart gets that back) — only this container is `position: fixed`. It must not cover
+   the playing row — with #1458's look-ahead the playing row sits in the top third of
+   `.chart-scroll`, so a bottom-anchored stack only ever reaches bars further ahead. */
+.stand-stack {
     position: fixed;
     left: 50%;
     bottom: 20px;
     transform: translateX(-50%);
     z-index: 60;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    max-width: calc(100vw - 28px);
+}
+/* Always mounted (`data-empty` collapses it) for the same reason `.status-banner` is: a live
+   region's TEXT CHANGE is announced reliably, a freshly-inserted one is not (#1440). */
+.stand-toast {
     display: flex;
     align-items: center;
     gap: 10px;
@@ -984,7 +996,7 @@ html [hidden] {
     line-height: 1.5;
     box-shadow: var(--shadow);
     border-radius: 12px;
-    max-width: calc(100vw - 28px);
+    max-width: 100%;
 }
 .stand-toast[data-empty="true"] {
     padding: 0;
@@ -992,12 +1004,30 @@ html [hidden] {
     max-height: 0;
     overflow: hidden;
 }
-/* An undismissed sync failure (#1460 Touches #3): persists until closed, unlike the auto-dismiss
-   `message` tone above it — the danger palette, not `--ink`, is the only visual cue telling the
-   two apart, since both otherwise share the same shape. */
-.stand-toast[data-tone="error"] {
-    background: var(--danger-bg);
-    color: var(--danger);
+/* A `warning`-tone message (review P2 #3): persists until its own close button, unlike the
+   auto-dismiss `info` tone — the accent palette is the visual cue telling the two apart, the
+   same "a decision is waiting" language `.conflict-banner` already uses, never the danger
+   palette (that is spent on things that were actually lost). */
+.stand-toast[data-tone="warning"] {
+    background: var(--accent-light);
+    color: var(--accent);
+}
+/* #1460 review P2 #2 — the sync-failure notice, its own element (not a tone of `.stand-toast`
+   any more) so a standing failure can never mask a later message. Review P3: accent, not danger
+   — the account will retry, or the musician has an explicit way out (Keep both / a fresh Save);
+   nothing here was lost the way the danger palette implies. */
+.stand-sync-failure {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 18px;
+    background: var(--accent-light);
+    color: var(--accent);
+    font-size: 12px;
+    line-height: 1.5;
+    box-shadow: var(--shadow);
+    border-radius: 12px;
+    max-width: 100%;
 }
 .toast-close {
     flex-shrink: 0;
@@ -1010,16 +1040,11 @@ html [hidden] {
     line-height: 1;
     color: inherit;
 }
-/* #1460 — Resume follow, floating at the bottom of the chart. Shown only while playing with
-   Following off (a musician scrolled away); tapping it turns Following back on and hides it,
-   the only direction this control still offers — turning Following OFF stays a scroll/wheel/
-   touch gesture, same as before. */
+/* #1460 — Resume follow, in the same stack. Shown only while playing with Following off (a
+   musician scrolled away); tapping it turns Following back on and hides it, the only direction
+   this control still offers — turning Following OFF stays a scroll/wheel/touch gesture, same as
+   before. */
 .resume-follow-pill {
-    position: fixed;
-    left: 50%;
-    bottom: 76px;
-    transform: translateX(-50%);
-    z-index: 59;
     display: flex;
     align-items: center;
     gap: 6px;
@@ -1294,21 +1319,6 @@ dialog textarea {
     padding: 13px;
     font-size: 12px;
     line-height: 1.65;
-}
-.toast {
-    position: fixed;
-    bottom: 55px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 60;
-    padding: 13px 19px;
-    background: var(--ink);
-    color: var(--surface);
-    font-size: 12px;
-    box-shadow: var(--shadow);
-    border-radius: 10px;
-    max-width: calc(100vw - 28px);
-    text-align: center;
 }
 .prototype-toggle {
     font-size: 10px;
@@ -1621,16 +1631,18 @@ dialog textarea {
         line-height: 1.5;
         align-items: flex-start;
     }
-    .stand-toast {
+    .stand-stack {
         left: 16px;
         right: 16px;
         bottom: 14px;
         transform: none;
         max-width: none;
+    }
+    .stand-toast,
+    .stand-sync-failure {
         font-size: 11px;
     }
     .resume-follow-pill {
-        bottom: 66px;
         font-size: 12px;
         padding: 0 14px;
     }
@@ -1771,14 +1783,17 @@ dialog textarea {
     .song-actions .btn {
         padding: 7px 8px;
     }
-    .stand-toast {
+    .stand-stack {
         bottom: 10px;
+        gap: 6px;
+    }
+    .stand-toast,
+    .stand-sync-failure {
         padding: 8px 14px;
         font-size: 10px;
     }
     .resume-follow-pill {
         /* min-height stays 44px (acceptance: tap targets never shrink below it, even here). */
-        bottom: 50px;
         font-size: 11px;
     }
     .workspace-body.editing {
@@ -2504,9 +2519,11 @@ dialog textarea {
 }
 /* #1460 — the bottom padding clears the fixed toast AND the resume-follow pill (both
    `position: fixed`, so they no longer claim any of `.chart-scroll`'s own flow height the way
-   the removed footer did): the last row can still scroll fully clear of both. */
+   the removed footer did): the last row can still scroll fully clear of all three, even with the
+   message toast, the sync-failure notice AND the Resume-follow pill stacked at once (review
+   P2 #1 made that a real, reachable state instead of three things sharing one slot). */
 .song-open .chart-scroll {
-    padding: 12px 24px 108px;
+    padding: 12px 24px 200px;
 }
 .song-open .sheet {
     max-width: 1200px;
@@ -2620,8 +2637,9 @@ dialog textarea {
         margin-left: 0;
     }
     .song-open .chart-scroll {
-        /* #1460 — clears the phone-width toast + resume pill; see the base rule's note. */
-        padding: 10px 14px 100px;
+        /* #1460 — clears the phone-width stack (toast + sync-failure notice + pill); see the
+           base rule's note. */
+        padding: 10px 14px 180px;
     }
     .song-open .tempo-control .step {
         width: 28px;

@@ -485,17 +485,22 @@ export default function Ensemble() {
     // "still the sentence from four seconds ago": two Saves in a row often produce the exact same
     // text, and a dependency on `message` alone would not re-arm the timer for the second one.
     // `setMessage` is a plain function, not the raw state setter, so every one of this file's
-    // existing call sites keeps working unchanged.
+    // existing call sites keeps working unchanged; a `tone` of `'warning'` (review P2 #3) is for
+    // a sentence that needs deliberate reading or action — it persists with its own close button
+    // instead of auto-dismissing.
+    type MessageTone = 'info' | 'warning';
     const [message, setMessageState] = useState('');
+    const [messageTone, setMessageToneState] = useState<MessageTone>('info');
     const [messageToken, setMessageToken] = useState(0);
-    function setMessage(text: string) {
+    function setMessage(text: string, options?: { tone?: MessageTone }) {
         setMessageToken((token) => token + 1);
         setMessageState(text);
+        setMessageToneState(options?.tone ?? 'info');
     }
-    // #1460 — a sync failure the musician has closed on the stand, held by the FAILURE TEXT so a
-    // later, different failure (or the same one recurring after the fact cleared) shows again
-    // rather than staying silenced forever. Reset by the effect beside `standSyncFailure` below.
-    const [dismissedSyncFailure, setDismissedSyncFailure] = useState<string | null>(null);
+    // Review P2 #1/#5 — the auto-dismiss timer is paused while the toast has the pointer or
+    // focus, so a musician reading (or about to click the close button on) a message it would
+    // otherwise clear out from under them gets the time back.
+    const [toastHeld, setToastHeld] = useState(false);
     // An audition/share link's `?autoplay=1` (#1382): browsers block audio before a gesture,
     // so this arms one instead of playing immediately — the shared-link effect sets it, and
     // the gesture effect below clears it on the first pointer or key event anywhere on the page.
@@ -1167,11 +1172,13 @@ export default function Ensemble() {
             );
             consumeLink();
             if (older.kind === 'ok') {
+                // #1460 review P2 #3 — "tap anywhere to play" is no longer baked into this note:
+                // it is derived reactively from `pendingAutoplay` (`pendingAutoplayHint`) so it
+                // stays lit for exactly as long as autoplay is armed, not just the ~4s an `info`
+                // message gets.
                 openSharedDraft(
                     older.document,
-                    older.autoplay
-                        ? 'Opened from an older shared link · not saved yet · tap anywhere to play'
-                        : 'Opened from an older shared link · not saved yet',
+                    'Opened from an older shared link · not saved yet',
                     true,
                 );
                 if (older.autoplay) {
@@ -2066,6 +2073,10 @@ export default function Ensemble() {
             // starts; the toast that replaced the footer no longer has "Band is playing" to
             // silently outrank it, so this clears it explicitly.
             setMessage('');
+            // Review P3 — a scroll while STOPPED already turns Following off (`chart-scroll`'s
+            // handler); without this, pressing Play then landed on a stand that was playing,
+            // unfollowed, with the Resume-follow pill already showing before anything moved.
+            setFollowing(true);
             const next = updateChart();
             setEditing(false);
             setShowControls(false);
@@ -2581,13 +2592,17 @@ export default function Ensemble() {
         setAdoptRemoteFailure(null);
         setEditing(false);
         setFollowing(true);
-        setMessage(
-            recovery
-                ? recovery.conflict
-                    ? 'Recovered draft is based on an older save. Save a copy to keep both.'
-                    : 'Recovered your unsaved setup'
-                : 'Saved on this device',
-        );
+        if (recovery?.conflict) {
+            // #1460 review P2 #3 — this needs reading time and a decision (Save a copy), not a
+            // ~4s window: `warning` persists with its own close button.
+            setMessage('Recovered draft is based on an older save. Save a copy to keep both.', {
+                tone: 'warning',
+            });
+        } else if (recovery) {
+            setMessage('Recovered your unsaved setup');
+        } else {
+            setMessage('Saved on this device');
+        }
         selectSection(next);
         return { current: onDevice, saved: savedBaseline };
     }
@@ -2900,11 +2915,18 @@ export default function Ensemble() {
                 focusTitleOnReveal.current = true;
                 setEditing(true);
                 setEditorRequest((n) => n + 1);
-                setMessage(
-                    unreadable && !recovery
-                        ? 'Couldn’t confirm whether this song has unsaved changes — opened it here instead of renaming in place. Your new title is filled in; Save to keep it.'
-                        : 'This song has unsaved changes — opened it here so renaming won’t lose them. Your new title is filled in; Save to keep it.',
-                );
+                if (unreadable && !recovery) {
+                    // #1460 review P2 #3 — an uncertain outcome the musician should actually
+                    // read, not a sentence that clears itself in ~4s.
+                    setMessage(
+                        'Couldn’t confirm whether this song has unsaved changes — opened it here instead of renaming in place. Your new title is filled in; Save to keep it.',
+                        { tone: 'warning' },
+                    );
+                } else {
+                    setMessage(
+                        'This song has unsaved changes — opened it here so renaming won’t lose them. Your new title is filled in; Save to keep it.',
+                    );
+                }
                 return;
             }
             if (signedIn) {
@@ -3667,7 +3689,11 @@ export default function Ensemble() {
                 setError(failure.message);
                 return;
             }
-            setMessage('Signed out · your guest songbook is unchanged');
+            // #1460 review P3 — Sign out is only reachable from the songbook header (hidden while
+            // a chart is open), so `current` is already null by the time this runs and the
+            // stand's `message` toast would never be mounted to show it. `homeNotice` is the
+            // songbook's own status line for exactly this kind of "state just changed" sentence.
+            setHomeNoticeState('Signed out · your guest songbook is unchanged');
         });
     }
     /**
@@ -3760,7 +3786,10 @@ export default function Ensemble() {
             setError(failure.message);
             return;
         }
-        setMessage('Account deleted · your guest songbook is unchanged');
+        // #1460 review P3 — same reasoning as sign-out above: the account page only opens from
+        // the songbook header (hidden while a chart is open), so `current` is already null and
+        // `homeNotice` is the line that will actually be on screen.
+        setHomeNoticeState('Account deleted · your guest songbook is unchanged');
     }
     function openSong(id: string) {
         void run(async () => {
@@ -4349,51 +4378,84 @@ export default function Ensemble() {
     // #1460 — moved from the footer into Song actions's own "Status" section.
     const syncStatus = syncStatusProps && <SyncStatus {...syncStatusProps} />;
     /**
-     * #1460 acceptance: "a forced sync failure / expired session shows a persistent notice on the
-     * stand without opening the menu". `null` while the musician has already closed THIS exact
-     * failure (`dismissedSyncFailure`); the effect below clears that the moment the fact itself
-     * does, so a later — even textually identical — failure is never silenced by an old dismissal.
+     * #1460 acceptance, review P2 #2 — "a forced sync failure / expired session shows a
+     * persistent notice on the stand without opening the menu", but ONLY for a fact nothing else
+     * already says: a local Save failure has the top `.error-banner` (`run()`'s catch), and an
+     * expired/reauth session has `account-expired-banner` (`heldWithoutSession`) — both excluded
+     * inside `syncFailureNotice` itself, so this is retry/offline pass failures and permanent
+     * cloud refusals only. `dismissedSyncFailureKey` is the underlying FACT (a failure reason or
+     * a refused kind), never the rendered sentence (review P3): a 413 re-worded between
+     * `sync.failure`'s pass-level message and `CLOUD_REFUSAL_LABELS`'s per-document one must not
+     * reappear just because the words changed.
      */
     const standSyncFailure = syncStatusProps ? syncFailureNotice(syncStatusProps) : null;
+    const [dismissedSyncFailureKey, setDismissedSyncFailureKey] = useState<string | null>(null);
     const standSyncFailureVisible =
-        standSyncFailure !== null && standSyncFailure !== dismissedSyncFailure;
+        standSyncFailure !== null && standSyncFailure.key !== dismissedSyncFailureKey;
+    // Review P3 — clears the dismissal the moment the VISIBLE fact moves on from it, not only
+    // when it goes null: without this, a fact that goes A → B → A (never passing through null in
+    // between — a retry failure whose wording flips back and forth across passes) would find its
+    // second "A" still matching the stale dismissal and stay silenced forever.
     useEffect(() => {
-        if (standSyncFailure === null) {
-            setDismissedSyncFailure(null);
-        }
-    }, [standSyncFailure]);
+        setDismissedSyncFailureKey((prev) =>
+            prev !== null && prev !== standSyncFailure?.key ? null : prev,
+        );
+    }, [standSyncFailure?.key]);
     /**
-     * #1460 — the stand's toast, replacing the footer's single-slot status line. Same priority
-     * order the footer used (busy outranks everything): while `busy`, the sound-download progress
-     * pins the toast open with no timer; otherwise an undismissed sync failure (persistent, its
-     * own close button) outranks a transient `message` (auto-dismissed below). "Band is playing"
-     * and the offline label are gone outright, not just deprioritized — neither is read here at
-     * all (acceptance: they appear nowhere on the stand).
+     * Review P3 — "Updating…" must not flash on every `run()`: the busy toast only shows once
+     * `soundProgress` actually has something to say, or `busy` has held for ~300ms without one.
      */
-    const standNoticeTone: 'busy' | 'error' | 'info' = busy
+    const [busyToastVisible, setBusyToastVisible] = useState(false);
+    useEffect(() => {
+        if (!busy) {
+            setBusyToastVisible(false);
+            return;
+        }
+        if (soundProgress) {
+            setBusyToastVisible(true);
+            return;
+        }
+        const timer = window.setTimeout(() => setBusyToastVisible(true), 300);
+        return () => window.clearTimeout(timer);
+    }, [busy, soundProgress]);
+    /**
+     * Review P2 #3 — an armed `?autoplay=1` link's hint is derived from `pendingAutoplay` itself,
+     * not captured once into `message` text: the link's own note (below) still auto-dismisses
+     * after ~4s like any other `info` message, but "tap anywhere to play" must stay lit for as
+     * long as autoplay is actually armed, however long that takes.
+     */
+    const pendingAutoplayHint = pendingAutoplay ? 'tap anywhere to play' : null;
+    /**
+     * #1460 — the stand's message toast, replacing the footer's single-slot status line. Busy
+     * (debounced above) outranks a `message`; within `message`, `'warning'` persists with its own
+     * close button, `'info'` auto-dismisses below. "Band is playing" and the offline label are
+     * gone outright, not read here at all (acceptance: they appear nowhere on the stand). Review
+     * P2 #1 — this is its OWN element now: a standing sync failure no longer masks it (see the
+     * `.stand-stack` markup below).
+     */
+    const toastTone: 'busy' | 'warning' | 'info' = busyToastVisible
         ? 'busy'
-        : standSyncFailureVisible
-          ? 'error'
+        : messageTone === 'warning' && message
+          ? 'warning'
           : 'info';
-    const standNoticeText =
-        standNoticeTone === 'busy'
+    const toastText =
+        toastTone === 'busy'
             ? soundProgress || 'Updating…'
-            : standNoticeTone === 'error'
-              ? standSyncFailure
-              : message;
-    // Auto-dismiss a plain `message` ~4s after it is actually SHOWN (masked time under the busy
-    // spinner or a sync failure doesn't count against it) — never `error`, which the old top-of-
-    // page banner (unrelated to this toast, `.error-banner` above) already handles its own way.
-    // `messageToken` re-arms the timer for two identical messages in a row; it is deliberately
-    // unread in the body below.
+            : [message || null, pendingAutoplayHint].filter(Boolean).join(' · ') || null;
+    // Auto-dismiss a plain `info` message ~4s after it is actually SHOWN (masked time under the
+    // busy spinner doesn't count against it, nor does the toast being hovered/focused — review
+    // P2 #3/#5) — never `warning`, which persists until its own close button, and never the old
+    // top-of-page banner (unrelated to this toast, `.error-banner` above), which handles errors
+    // its own way. `messageToken` re-arms the timer for two identical messages in a row; it is
+    // deliberately unread in the body below.
     // biome-ignore lint/correctness/useExhaustiveDependencies: see above.
     useEffect(() => {
-        if (standNoticeTone !== 'info' || !message) {
+        if (toastTone !== 'info' || !message || toastHeld) {
             return;
         }
         const timer = window.setTimeout(() => setMessageState(''), 4000);
         return () => window.clearTimeout(timer);
-    }, [message, messageToken, standNoticeTone]);
+    }, [message, messageToken, toastTone, toastHeld]);
 
     // The songbook home itself, not the stand or one of its two sub-views (#1441): the top bar's
     // search, Import chart and New song belong to this view only.
@@ -5100,47 +5162,102 @@ export default function Ensemble() {
                         />
                     </div>
                     {/*
-                     * #1460 — the footer's toggle ("Following"/"Resume follow", either direction)
-                     * is gone. Wheel/touch/scroll-key already turn Following off (`chart-scroll`'s
-                     * own handlers above); the only control left is the way back, and only while
-                     * there is something to resume TO. `setFollowing(true)` alone is enough to
-                     * "re-apply the row scroll immediately" (acceptance): the effect above that
-                     * resets `followRowTop`/`followJumpedFor` the instant `following` turns true
-                     * runs before the look-ahead scroll effect that reads them, in the same pass.
+                     * #1460 — one fixed, bottom-centred stack (review P2 #1/#4): the message
+                     * toast, the sync-failure notice and the Resume-follow pill each get their
+                     * own element in normal flex-column flow, so none can ever overlap or mask
+                     * another (the old single-slot toast let a standing sync failure hide every
+                     * later "Link copied"/"Saved" message; the pill and the toast could overlap
+                     * by a few px at some viewport sizes). Order top-to-bottom: message, failure,
+                     * pill — the pill stays the reachable-most control.
                      */}
-                    {playbackActive && !following && (
-                        <button
-                            className="resume-follow-pill"
-                            data-testid="resume-follow"
-                            onClick={() => setFollowing(true)}
+                    <div className="stand-stack">
+                        {/*
+                         * The footer's single status line is now this toast: no longer able to
+                         * say "Band is playing" or the offline label at all. Always mounted with
+                         * an empty state (`data-empty`), same reasoning as `homeNotice`'s status
+                         * line (#1440): a freshly-inserted region is not reliably announced, but
+                         * a live region's TEXT CHANGE is.
+                         */}
+                        <div
+                            className="stand-toast"
+                            role="status"
+                            data-testid="stand-toast"
+                            data-tone={toastTone}
+                            data-empty={!toastText}
+                            onMouseEnter={() => setToastHeld(true)}
+                            onMouseLeave={() => setToastHeld(false)}
+                            onFocus={() => setToastHeld(true)}
+                            onBlur={() => setToastHeld(false)}
                         >
-                            ↓ Resume follow
-                        </button>
-                    )}
-                    {/*
-                     * #1460 — the footer's single status line is now a toast: bottom-centre,
-                     * fixed (so it never claims flow height the chart could use — see the
-                     * acceptance's before/after height numbers), and no longer able to say "Band
-                     * is playing" or the offline label at all. Always mounted with an empty state
-                     * (`data-empty`), same reasoning as `homeNotice`'s status line (#1440): a
-                     * freshly-inserted region is not reliably announced, but a live region's TEXT
-                     * CHANGE is.
-                     */}
-                    <div
-                        className="stand-toast"
-                        role="status"
-                        data-testid="stand-toast"
-                        data-tone={standNoticeTone}
-                        data-empty={!standNoticeText}
-                    >
-                        <span>{standNoticeText}</span>
-                        {standNoticeTone === 'error' && (
-                            <button
-                                className="toast-close"
-                                aria-label="Dismiss"
-                                onClick={() => setDismissedSyncFailure(standSyncFailure)}
+                            <span>{toastText}</span>
+                            {/*
+                             * Review P2 #5 — a REPEAT of the exact same sentence (two Saves in a
+                             * row) is otherwise invisible to assistive tech: React bails out of
+                             * re-rendering a text node whose value hasn't changed, so nothing in
+                             * the live region actually mutates for a screen reader to notice, and
+                             * the second announcement never happens. This hidden counter changes
+                             * on every `setMessage` call regardless (`messageToken`), giving the
+                             * region a real mutation to react to without adding anything to what
+                             * is actually read — `aria-hidden` drops its own text from the
+                             * accessible tree, but the mutation itself still re-triggers the
+                             * region's announcement of `toastText` beside it.
+                             */}
+                            <span aria-hidden="true" className="sr">
+                                {messageToken}
+                            </span>
+                            {toastTone === 'warning' && (
+                                <button
+                                    className="toast-close"
+                                    aria-label="Dismiss"
+                                    onClick={() => setMessageState('')}
+                                >
+                                    ×
+                                </button>
+                            )}
+                        </div>
+                        {/*
+                         * Review P2 #1 — hidden while Song actions is open: it renders the SAME
+                         * fact in its own "Status" section (`sync-failure`), and both are
+                         * `role="status"` live regions, so leaving this one mounted too would
+                         * announce the one change twice.
+                         */}
+                        {standSyncFailureVisible && standSyncFailure && !menu && (
+                            <div
+                                className="stand-sync-failure"
+                                role="status"
+                                data-testid="stand-sync-failure"
                             >
-                                ×
+                                <span>{standSyncFailure.text}</span>
+                                <button
+                                    className="toast-close"
+                                    aria-label="Dismiss"
+                                    onClick={() => setDismissedSyncFailureKey(standSyncFailure.key)}
+                                >
+                                    ×
+                                </button>
+                            </div>
+                        )}
+                        {/*
+                         * The footer's toggle ("Following"/"Resume follow", either direction) is
+                         * gone. Wheel/touch/scroll-key already turn Following off (`chart-scroll`'s
+                         * own handlers above); the only control left is the way back, and only
+                         * while there is something to resume TO. `setFollowing(true)` alone is
+                         * enough to "re-apply the row scroll immediately" (acceptance): the effect
+                         * above that resets `followRowTop`/`followJumpedFor` the instant
+                         * `following` turns true runs before the look-ahead scroll effect that
+                         * reads them, in the same pass. Focus moves to the chart itself on
+                         * activation (review P3) since this button unmounts the instant it fires.
+                         */}
+                        {playbackActive && !following && (
+                            <button
+                                className="resume-follow-pill"
+                                data-testid="resume-follow"
+                                onClick={() => {
+                                    setFollowing(true);
+                                    scroll.current?.focus();
+                                }}
+                            >
+                                <span aria-hidden="true">↓</span> Resume follow
                             </button>
                         )}
                     </div>

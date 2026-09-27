@@ -899,4 +899,26 @@ test('all existing feels and key/mutes survive a save; long charts scroll legibl
     await expect(page.getByRole('button', { name: 'Stop playback' })).toBeEnabled();
     await page.locator('.chart-scroll').press('PageDown');
     await expect(page.getByTestId('resume-follow')).toBeVisible();
+
+    // #1460 review P3 spec gap — tapping the pill re-applies the scroll: on this overflowing
+    // 64-bar chart, scrolling several rows further away first proves the playing row was
+    // genuinely out of view, not still in view by coincidence.
+    const scrollEl = page.locator('.chart-scroll');
+    const activeInView = () =>
+        scrollEl.evaluate((el) => {
+            const active = el.querySelector('.bar[data-active="true"]');
+            if (!active) {
+                return null;
+            }
+            const sr = el.getBoundingClientRect();
+            const ar = active.getBoundingClientRect();
+            return ar.top >= sr.top && ar.bottom <= sr.bottom;
+        });
+    await page.locator('.chart-scroll').press('PageDown');
+    await page.locator('.chart-scroll').press('PageDown');
+    await expect.poll(activeInView).toBe(false);
+    await page.getByTestId('resume-follow').click();
+    await expect(page.getByTestId('resume-follow')).toHaveCount(0);
+    await expect.poll(activeInView).toBe(true);
+    await page.getByRole('button', { name: 'Stop playback' }).click();
 });

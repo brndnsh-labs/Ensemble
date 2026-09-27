@@ -161,6 +161,11 @@ test('sign-out names the work it would destroy, then leaves nothing of that acco
     await expect(page.getByTestId('account-sign-in')).toBeVisible();
     await expect(page.getByTestId('account-sign-in')).toHaveText('Sign in');
     await expect(page.getByTestId('account-expired-banner')).toHaveCount(0);
+    // #1460 review P3 — this used to call the stand's OWN `message` toast, which is never
+    // mounted here: sign-out only reaches this point after the chart has already closed.
+    await expect(page.getByTestId('shell-message')).toContainText(
+        'Signed out · your guest songbook is unchanged',
+    );
     await expect(page.getByTestId('library-heading')).toHaveText('Your songbook');
     // Web-first, so it retries while the guest library re-renders after sign-out (#1330).
     await expect(songTitles(page)).toHaveText(guestSongs);
@@ -206,12 +211,11 @@ test('an expired session pauses the outbox, says so everywhere, and loses no que
     await page.context().clearCookies();
     await page.context().setOffline(false);
 
-    // #1460 acceptance — the SAME expired-session failure is a persistent notice on the stand,
-    // readable without opening Song actions at all.
-    const standNotice = page.getByTestId('stand-toast');
-    await expect(standNotice).toHaveAttribute('data-tone', 'error');
-    await expect(standNotice).toContainText('Saved on this device');
-    await expect(standNotice).toContainText('sign in again to upload it');
+    // #1460 review P2 #2 — an expired/reauth session already has `account-expired-banner`
+    // (`heldWithoutSession`), so `syncFailureNotice` returns null for it: the stand's OWN notice
+    // must not say the same fact a second time in a second place.
+    await expect(page.getByTestId('account-expired-banner')).toBeVisible();
+    await expect(page.getByTestId('stand-sync-failure')).toHaveCount(0);
 
     // The outbox pauses and says why, leading with the local truth — never a server code.
     await openSongActions(page);

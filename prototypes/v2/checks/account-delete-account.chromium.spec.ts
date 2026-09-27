@@ -129,6 +129,11 @@ test('deleting an account: typed confirmation, an export offer, a step-up, and n
     // again. The guest songbook is exactly as it was — a different library, never touched.
     await expect(page.getByTestId('account-sign-in')).toHaveText('Sign in');
     await expect(page.getByTestId('account-expired-banner')).toHaveCount(0);
+    // #1460 review P3 — this used to call the stand's OWN `message` toast, which is never
+    // mounted here: the account page only opens with no chart on the stand.
+    await expect(page.getByTestId('shell-message')).toContainText(
+        'Account deleted · your guest songbook is unchanged',
+    );
     await expect(page.getByTestId('library-heading')).toHaveText('Your songbook');
     await expect(songTitles(page)).toHaveText(guestSongs); // web-first, retries (#1330)
     expect(await sessionStatus(page)).toBe(401);

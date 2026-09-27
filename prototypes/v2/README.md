@@ -167,7 +167,7 @@ local browser projects and never deploys.
   full settings inventory, section-practice controls and visualizer are later work. A feel
   change during playback verifies (and downloads) its sounds while the band keeps playing, then
   swaps in at the next bar using the engine's own staged-feel path, without expanding the focused
-  chart; the footer reports preparation and the pending bar honestly. A failed change stops,
+  chart; the stand's toast reports preparation and the pending bar honestly. A failed change stops,
   restores the previous setup and resumes only if that setup's sounds are still verified; Stop
   cancels a pending restart. Do not use this as the only copy of important writing yet.
 - Four bars per laptop/tablet row, two per portrait phone row, scrolling rather than pagination.

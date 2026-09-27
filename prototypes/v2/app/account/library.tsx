@@ -223,26 +223,47 @@ function deriveSyncView({
 }
 
 /**
- * #1460 — the one fact worth surfacing on the STAND itself, without opening Song actions: a
- * failure. Everything else `SyncStatus` shows (three routine facts) moved into the menu; a
- * `foreign` reading already has its own permanent banner (`OWNER_MESSAGES.mismatch`, driven by
- * the same `standMismatch` this component's `foreign` prop carries), so it is deliberately not
- * repeated here — the two would otherwise say the same thing in two places the instant a chart
- * mismatch outranked every other cloud reading.
- *
- * Null means nothing is wrong: no pass-level retry/reauth failure, the last local Save landed,
- * and the cloud has not permanently refused this document.
+ * #1460 review P2 #2 — the stand's own notice, keyed by the underlying FACT rather than by its
+ * rendered sentence, so a caller can tell "the same failure, reworded" from "a genuinely
+ * different one" without string-matching (P3: a 413 moving from `sync.failure`'s pass-level
+ * message to `CLOUD_REFUSAL_LABELS`'s per-document one is still the SAME fact and must not
+ * reappear after being dismissed just because the words changed — see the export below).
  */
-export function syncFailureNotice(props: SyncStatusProps): string | null {
-    if (props.sync.failure !== null) {
-        return props.sync.failure.message;
-    }
+export interface StandSyncFailure {
+    text: string;
+    /** Stable across a re-word of the same underlying fact; never the sentence itself. */
+    key: string;
+}
+
+/**
+ * #1460 — the one fact worth surfacing on the STAND itself, without opening Song actions: a
+ * failure NOTHING ELSE already says. Everything else `SyncStatus` shows (three routine facts)
+ * moved into the menu; a `foreign` reading already has its own permanent banner
+ * (`OWNER_MESSAGES.mismatch`, driven by the same `standMismatch` this component's `foreign` prop
+ * carries), so it is deliberately not repeated here. Review P2 #2 widens the exclusion to the
+ * other two facts that already have their own top-of-stand say: a local Save failure is the
+ * `.error-banner` `run()`'s catch already raised (`storeSave` re-throws past `setSaveFailed`),
+ * and an expired/reauth session is `account-expired-banner` (`heldWithoutSession`) — saying
+ * either again here would be the same fact twice in two places.
+ *
+ * Null means nothing is left to say here: no local Save failure, no expired-session pass
+ * failure, no other pass-level retry/reauth failure, and the cloud has not permanently refused
+ * this document.
+ */
+export function syncFailureNotice(props: SyncStatusProps): StandSyncFailure | null {
     const { view } = deriveSyncView(props);
     if (view.local.status === 'save-failed') {
-        return LOCAL_LABELS['save-failed'];
+        return null;
+    }
+    if (props.sync.failure !== null) {
+        if (props.sync.failure.reason === 'expired') {
+            return null;
+        }
+        return { text: props.sync.failure.message, key: `pass:${props.sync.failure.reason}` };
     }
     if (view.cloud.status === 'refused') {
-        return CLOUD_REFUSAL_LABELS[view.cloud.refused ?? 'refused'];
+        const refused = view.cloud.refused ?? 'refused';
+        return { text: CLOUD_REFUSAL_LABELS[refused], key: `refused:${refused}` };
     }
     return null;
 }
