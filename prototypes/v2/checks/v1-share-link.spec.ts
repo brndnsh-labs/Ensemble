@@ -1,4 +1,4 @@
-import { appUrl, expect, test } from './fixtures';
+import { appUrl, expect, seedStarters, test } from './fixtures';
 
 /**
  * Old v1 `?s=` share links landing on the v2 stand (#1279).
@@ -39,7 +39,7 @@ async function withoutClipboard(page: import('@playwright/test').Page) {
 /** A REAL `#chart=` fragment, minted by the app itself for the starter blues. */
 async function chartFragment(page: import('@playwright/test').Page): Promise<string> {
     await withoutClipboard(page);
-    await page.goto(appUrl());
+    await seedStarters(page);
     await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
     await page.getByRole('button', { name: 'Song actions' }).click();
     await page.getByRole('button', { name: 'Copy link', exact: true }).click();
@@ -119,7 +119,7 @@ test("a linked genre swings like the picked genre: a Blues link's swing is the B
         await page.getByRole('button', { name: 'Close feel' }).click();
         return { swing, grid };
     };
-    await page.goto(appUrl());
+    await seedStarters(page);
     await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
     const picked = await swingOf();
     expect(picked).toEqual({ swing: '100', grid: '8th' });
@@ -132,6 +132,7 @@ test("a linked genre swings like the picked genre: a Blues link's swing is the B
 test('a garbage v1 link says so and leaves the songbook working', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
+    await seedStarters(page);
     await page.goto(appUrl('?s=not-a-real-payload&key=C&bpm=120'));
 
     // Scoped to the app's own banner: Next's route announcer also carries `role="alert"`.

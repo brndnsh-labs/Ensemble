@@ -63,7 +63,7 @@ test('sign-out names the work it would destroy, then leaves nothing of that acco
     // #1330 — `openWithAccounts` waits for the hero heading, which renders before the library
     // rows do, and with accounts on the list is held back until the first session read answers.
     // A bare `allInnerTexts()` here captured `[]` on a slow runner, and the closing comparison
-    // then measured the real three starters against that empty array (v2-suite red on #1325,
+    // then measured the real three seeded guest songs against that empty array (v2-suite red on #1325,
     // green on rerun). Wait for the rows, and say out loud that there were some.
     await expect(page.getByTestId('library-loading')).toHaveCount(0);
     await expect(songTitles(page)).not.toHaveCount(0);

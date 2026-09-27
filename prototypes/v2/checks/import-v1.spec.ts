@@ -1,4 +1,4 @@
-import { appUrl, expect, test } from './fixtures';
+import { appUrl, expect, seedStarters, test } from './fixtures';
 
 /**
  * The v1 import offer, end to end (#1274).
@@ -152,7 +152,7 @@ test('brings v1 songs into the songbook, plays one, and leaves v1 untouched', as
  */
 test('declining is permanent, and the song menu brings the import back', async ({ page }) => {
     await seedV1Profile(page);
-    await page.goto(appUrl());
+    await seedStarters(page);
     // The button that declines is the one that SAYS so (patch N1).
     await expect(page.getByTestId('v1-import').getByRole('button', { name: 'Done' })).toHaveCount(
         0,
@@ -171,8 +171,7 @@ test('declining is permanent, and the song menu brings the import back', async (
         await expect(page.getByTestId('v1-import')).toBeVisible();
     }
 
-    // The way back: open any song, then the permanent menu entry.
-    // A starter is listed twice (the library table and the Quick Jam tiles); either opens it.
+    // The way back: open any song — a saved song is enough, the standards catalog does not matter here.
     await page.getByRole('button', { name: 'Blue pocket' }).first().click();
     await openImportFromTheMenu();
     await page.getByTestId('v1-import').getByRole('button', { name: 'Import' }).click();
@@ -316,7 +315,7 @@ test('dismissing an unreadable-only card settles it without declining', async ({
     await page.addInitScript(() => {
         localStorage.setItem('ensemble_currentState', '{"sections":[{"label":"Verse"');
     });
-    await page.goto(appUrl());
+    await seedStarters(page);
     const card = page.getByTestId('v1-import');
     await expect(
         card.getByRole('heading', { name: 'Some music in the old Ensemble could not be read' }),

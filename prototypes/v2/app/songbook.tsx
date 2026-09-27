@@ -9,6 +9,16 @@ import { arrangementOf, genreOf } from '../lib/documents';
 import { v1OfferDeclines } from '../lib/import-v1';
 import type { ChartDocument } from '../lib/runtime';
 
+/** The featured card's display facts (#1439) — a saved song's, or a standard's. See `featured`. */
+export interface FeaturedSummary {
+    id: string;
+    title: string;
+    genre: string;
+    bpm: number;
+    key: string;
+    isMinor: boolean;
+}
+
 /** The v1 import offer (#1274). Counts and copy only; the shell owns the work. */
 export interface V1ImportOffer {
     /**
@@ -80,10 +90,16 @@ interface SongbookProps {
      * Always empty for a guest songbook, which no account can advance underneath.
      */
     remoteCandidates: readonly { id: string; kind: RemoteCandidateKind }[];
-    /** The card at the top: the last-opened song (with any recovered draft), else a starter. */
-    featured: ChartDocument | null;
-    /** True when `featured` is the song the musician last had open. */
+    /**
+     * The card at the top: the last-opened song (with any recovered draft), else a standard
+     * (#1439) when there's nothing of the musician's own yet. A plain summary rather than a
+     * `ChartDocument` since one of those two sources never has a live document to read.
+     */
+    featured: FeaturedSummary | null;
+    /** True when `featured` is the song the musician last had open (never true for a standard). */
     continued: boolean;
+    /** Opens the standards browse surface (#1439). */
+    onBrowseStandards: () => void;
     busy: boolean;
     offline: string;
     search: string;
@@ -107,6 +123,7 @@ export function Songbook({
     remoteCandidates,
     featured,
     continued,
+    onBrowseStandards,
     busy,
     offline,
     search,
@@ -150,9 +167,8 @@ export function Songbook({
                                 </span>
                                 <h3>{featured.title}</h3>
                                 <p>
-                                    {genreOf(featured)} · {featured.chart.performance.bpm} BPM ·{' '}
-                                    {arrangementOf(featured).key}
-                                    {arrangementOf(featured).isMinor ? 'm' : ''}
+                                    {featured.genre} · {featured.bpm} BPM · {featured.key}
+                                    {featured.isMinor ? 'm' : ''}
                                 </p>
                                 <button
                                     className="btn"
@@ -309,26 +325,21 @@ export function Songbook({
                     </p>
                 </div>
                 <aside>
+                    {/* #1439 — replaces the old Quick Jam tiles (a filter on the now-retired
+                        seeded `starter-*` songs) with an entry point to the full standards
+                        catalog: blues forms, jazz standards and genre grooves, none of them
+                        written to storage until Save. The browse surface itself is `#1441`'s to
+                        redesign; this story keeps the home minimal but truthful. */}
                     <section className="quick-jam">
                         <span className="eyebrow">No blank page required</span>
-                        <h2>Just start playing.</h2>
-                        <p>Pick a chart, change the key or the feel, and make it your own.</p>
-                        {songs
-                            .filter((s) => s.id.startsWith('starter-'))
-                            .map((s) => (
-                                <button
-                                    className="jam-tile"
-                                    key={s.id}
-                                    disabled={busy}
-                                    onClick={() => onOpenSong(s.id)}
-                                >
-                                    <span className="jam-symbol">♭</span>
-                                    <span>
-                                        <strong>{genreOf(s)}</strong>
-                                        <small>{s.title}</small>
-                                    </span>
-                                </button>
-                            ))}
+                        <h2>Play a standard.</h2>
+                        <p>
+                            Blues forms, jazz standards and genre grooves — pick one, change the key
+                            or the feel, and make it your own.
+                        </p>
+                        <button className="btn" disabled={busy} onClick={onBrowseStandards}>
+                            Browse standards →
+                        </button>
                     </section>
                     <section className="sync-card">
                         <h3>Your band, wherever you play.</h3>
@@ -341,14 +352,14 @@ export function Songbook({
                             </p>
                         ) : (
                             <p>
-                                Accounts and cloud songbooks are a later stage. The stand is
-                                device-local, with real playback and portable Ensemble files.
+                                Sign in to save your songbook to an account and open it on another
+                                device. Until then, your songs stay on this device.
                             </p>
                         )}
                         <p className="preview-note">
-                            iReal import and chord discovery are not implemented here yet. Open a
-                            song and use its menu's "Copy link" to share it — the link opens as an
-                            unsaved draft, with no account needed.
+                            Import an iReal Pro or Ensemble chart file with the button above, or
+                            open a song and use its menu's "Copy link" to share it — the link opens
+                            as an unsaved draft, with no account needed.
                         </p>
                     </section>
                 </aside>

@@ -1,4 +1,4 @@
-import { appUrl, expect, test } from './fixtures';
+import { appUrl, expect, seedStarters, test } from './fixtures';
 
 // Deterministic across both projects (Desktop Chrome and the WebKit-based
 // `webkit-phone` project, which grants no clipboard permission by default,
@@ -16,7 +16,7 @@ test('shares a link that reopens as an unsaved draft; Keep a copy persists it an
     context,
 }) => {
     await withoutClipboard(page);
-    await page.goto(appUrl());
+    await seedStarters(page);
     await page.getByRole('button', { name: 'Blue pocket Blues · Saved locally' }).click();
     await expect(page.getByRole('heading', { name: 'Blue pocket' })).toBeVisible();
 

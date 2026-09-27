@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test';
 import { RECOVERY_CODE_SHAPE } from '../lib/account/messages';
-import { appUrl, editorRevealed, expect } from './fixtures';
+import { editorRevealed, expect, seedStarters } from './fixtures';
 
 /**
  * The account specs' shared page driving (#1262, extracted for #1263).
@@ -127,9 +127,16 @@ export const CODE_SHAPE = RECOVERY_CODE_SHAPE;
  * plain URL, no parameter. Deliberately not `?accounts=on`: every account spec then rides the
  * real default, so a regression that took the entry point away from an ordinary visitor fails
  * here rather than hiding behind an opt-in nobody types any more.
+ *
+ * Seeds the three `lib/starters.ts`-shaped guest songs (`seedStarters`, #1439) before landing:
+ * a fresh guest songbook is genuinely empty now that starter seeding is retired, but every
+ * account spec that reads this page's guest library — the adoption offer, a sync scenario, a
+ * `dismissAdoptGuestPrompt` the sign-in flow triggers — expects something in it, the same way a
+ * fresh preview always had three starters before #1439. No caller of this helper wants an empty
+ * guest songbook; one that genuinely does should seed nothing itself instead of calling this.
  */
 export async function openWithAccounts(page: Page): Promise<void> {
-    await page.goto(appUrl());
+    await seedStarters(page);
     await expect(page.getByRole('heading', { name: 'Let’s play something.' })).toBeVisible();
 }
 

@@ -404,6 +404,30 @@ html [hidden] {
     font-size: 12px;
     outline: none;
 }
+.shelf-chips {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+}
+.shelf-chip {
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--muted);
+    padding: 7px 13px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 550;
+    cursor: pointer;
+}
+.shelf-chip[aria-selected="true"] {
+    background: var(--ink);
+    color: var(--on-ink);
+    border-color: var(--ink);
+}
+.standards-preview {
+    font-family: Georgia, "Times New Roman", serif;
+    letter-spacing: -0.2px;
+}
 .song-table {
     width: 100%;
     border-collapse: collapse;

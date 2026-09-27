@@ -46,7 +46,8 @@
  * that conversion blocks the WHOLE song on one unparseable bar, which is the wrong
  * failure mode for an import whose only other option is losing the song outright. Every
  * imported document therefore lands as `schemaVersion: 1` — read-only until the user
- * makes an "editable copy" — the same landing state a v2 starter song has.
+ * makes an "editable copy" — the same landing state an old `starter-*` song has (`lib/starters.ts`
+ * retired seeding new ones in #1439; a device that already saved one keeps it as-is).
  */
 
 import { KEY_ORDER, TIME_SIGNATURES } from '../../../public/config.js';
@@ -181,8 +182,8 @@ export type V1ImportLedger = ReadonlyMap<string, string>;
 /**
  * Defaults for the fields a v1 save does not carry: trading with the player (v1 had none),
  * plus the whole band for a saved chord progression, which stores only chords. Taken from a
- * document already in the v2 songbook — the same baseline `lib/starters.ts` and the iReal
- * import dialog use — as a chart is written today (`writtenSettings`).
+ * document already in the v2 songbook — the same baseline the iReal import dialog uses — as a
+ * chart is written today (`writtenSettings`).
  */
 export interface V1ImportContext {
     performance: ChartPerformance;

@@ -68,7 +68,7 @@ test('a cloud delete reaches the other device: clean mirror dropped, divergent w
         await second.getByTestId('account-sign-in').click();
         await second.getByTestId('account-do-sign-in').click();
         await expect(second.getByRole('button', { name: 'Sign out' })).toBeVisible();
-        // A fresh profile: its own guest starters, none of them in the account, so #1268's
+        // A fresh profile: its own seeded guest songs (`openWithAccounts`, #1439), none of them in the account, so #1268's
         // prompt opens here too once the download lands (`account-helpers.ts`).
         await dismissAdoptGuestPrompt(second);
         await expect(songTitles(second)).toHaveText(['Scratch take', 'Set list']);

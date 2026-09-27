@@ -46,8 +46,9 @@ test('signing in offers to add this device’s songs; adopting reaches the accou
     await openWithAccounts(page);
     await expect(page.getByTestId('library-loading')).toHaveCount(0);
     const guestTitles = await songTitles(page).allInnerTexts();
-    // A fresh guest songbook seeds three starters (`lib/starters.ts`); there is something to
-    // offer, and starters are not filtered out of the offer (documented in `adopt-guest.ts`).
+    // `openWithAccounts` seeds three guest songs (`seedStarters`, #1439 — the fixture's job
+    // now that `lib/starters.ts` no longer auto-seeds); there is something to offer, and none
+    // of the three are filtered out of the offer (documented in `adopt-guest.ts`).
     expect(guestTitles.length).toBeGreaterThan(0);
 
     await createAccountThroughDialog(page);
@@ -171,8 +172,9 @@ test('declining is remembered — reloading and signing back in does not reopen 
 });
 
 /**
- * The #1268 patch-review P0, on two real devices: guest starters carry the SAME literal ids
- * (`starter-blues`…) on every device, so a second device signing into the same account derives the
+ * The #1268 patch-review P0, on two real devices: the seeded guest fixture carries the SAME
+ * literal ids (`starter-blues`…, `seedStarters`) on every device, so a second device signing into
+ * the same account derives the
  * same deterministic account document ids for songs the first device has already adopted. Offering
  * them again is what re-queued a Save for a document the account already holds — and under the
  * deterministic OPERATION id this story shipped with, the server answered `operation_mismatch`
@@ -211,7 +213,7 @@ test('a second device signing into the same account is offered nothing, and queu
     await expect(page.getByTestId('sync-cloud')).toHaveText('Saved to your account');
 
     // Device two: its own cookie jar, its own IndexedDB, its own guest songbook — and the same
-    // three starters, under the same ids. Only the passkey is carried over.
+    // three seeded guest songs, under the same ids. Only the passkey is carried over.
     const [passkey] = await authenticator.credentials();
     const fresh = await browser.newContext({ baseURL: accountApi.origin });
     try {
@@ -221,7 +223,7 @@ test('a second device signing into the same account is offered nothing, and queu
         await spare.addCredential(passkey);
         await openWithAccounts(second);
         await expect(second.getByTestId('library-loading')).toHaveCount(0);
-        // The precondition that made this a P0: the same titles, from the same starter ids.
+        // The precondition that made this a P0: the same titles, from the same seeded ids.
         expect((await songTitles(second).allInnerTexts()).slice().sort()).toEqual(
             guestTitles.slice().sort(),
         );

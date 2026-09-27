@@ -5,6 +5,9 @@ import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test as base, expect, type Page } from '@playwright/test';
+import type { ChartDocument } from '../lib/documents';
+import { validateDocument } from '../lib/documents';
+import { bandForGenre } from '../lib/standards';
 import { basePathFromEnv } from '../scripts/base-path.mjs';
 
 export { expect } from '@playwright/test';
@@ -258,4 +261,102 @@ export const accountTest = test.extend<{ accountApi: AccountApi }>({
  */
 export async function editorRevealed(page: Page): Promise<void> {
     await expect(page.locator('.edit-panel textarea').first()).toBeFocused();
+}
+
+/**
+ * The three sample songs `lib/starters.ts` used to auto-seed into every fresh guest songbook,
+ * before #1439 retired that seeding for the read-only standards catalog. A pre-#1439 spec that
+ * opens one of these by name — `'Blue pocket'` (Blues, C), `'Minor swing sketch'` (Jazz, A minor)
+ * or `'After hours'` (Bossa, C) — still needs SOME device that already has it; this fixture
+ * writes the same three documents straight into the guest store, under the same ids
+ * (`starter-<genre>`) two independently-fresh device profiles used to land on by construction —
+ * `checks/account-adopt-guest.chromium.spec.ts`'s P0 depends on that.
+ */
+const STARTER_SAMPLES = [
+    [
+        'starter-blues',
+        'Blue pocket',
+        'Blues',
+        'C',
+        'C7 | F7 | C7 | C7 | F7 | F7 | C7 | C7 | G7 | F7 | C7 | G7',
+        110,
+    ],
+    [
+        'starter-jazz',
+        'Minor swing sketch',
+        'Jazz',
+        'A',
+        'Am6 | Am6 | Dm6 | Dm6 | E7 | E7 | Am6 | E7',
+        160,
+    ],
+    [
+        'starter-bossa',
+        'After hours',
+        'Bossa',
+        'C',
+        'Dm7 | G7 | Cmaj7 | A7 | Dm7 | G7 | Cmaj7 | Cmaj7',
+        125,
+    ],
+] as const;
+
+function starterDocuments(): ChartDocument[] {
+    const base = Date.now();
+    // Distinct, DESCENDING timestamps in listed order (blues newest) — `repository.list()` sorts
+    // by `updatedAt` descending, and a spec that opens "the" featured/continue-card song expects
+    // it to be `starter-blues` (the old fallback `songs.find(s => s.id === 'starter-blues')`
+    // named explicitly), the same way three sequential `lib/starters.ts` saves used to land.
+    return STARTER_SAMPLES.map(([id, title, genre, key, value, bpm], index) => {
+        const stamp = new Date(base - index * 1000).toISOString();
+        return validateDocument({
+            schemaVersion: 1,
+            id,
+            title,
+            createdAt: stamp,
+            updatedAt: stamp,
+            revision: 0,
+            chart: {
+                arrangement: {
+                    key,
+                    isMinor: key === 'A',
+                    timeSignature: '4/4',
+                    grouping: null,
+                    notation: 'name',
+                    sections: [{ id: 'a', label: 'A', value, repeat: 1 }],
+                },
+                performance: { bpm, seed: '', randomizeSeed: false },
+                band: bandForGenre(genre),
+            },
+        });
+    });
+}
+
+/**
+ * Writes the three starter documents (above) directly into this page's guest IndexedDB, then
+ * navigates to the songbook so they're what it reads on boot. Not `page.addInitScript`: the
+ * write is genuinely async (`indexedDB`, unlike `asHeldDevice`'s synchronous `localStorage`
+ * write), and an init script's returned promise does not block the page's OWN scripts — so the
+ * app's first boot can race the write and read an empty store. A real navigation first, then an
+ * awaited `page.evaluate`, then a reload has no such race.
+ */
+export async function seedStarters(page: Page): Promise<void> {
+    await page.goto(appUrl());
+    await page.evaluate(async (docs: ChartDocument[]) => {
+        const db = await new Promise<IDBDatabase>((resolve, reject) => {
+            const request = indexedDB.open('ensemble-v2-preview', 1);
+            request.onupgradeneeded = () =>
+                request.result.createObjectStore('documents', { keyPath: 'id' });
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+        await new Promise<void>((resolve, reject) => {
+            const tx = db.transaction('documents', 'readwrite');
+            for (const doc of docs) {
+                tx.objectStore('documents').put(doc);
+            }
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+        });
+        db.close();
+    }, starterDocuments());
+    await page.reload();
 }
