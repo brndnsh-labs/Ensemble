@@ -18,6 +18,7 @@ import {
     compileTimeline,
     type PassMemory,
     type PassWindow,
+    PPQ,
     performPass,
     secondsAt,
     type Timeline,
@@ -469,6 +470,46 @@ export class BandHost {
         const now = audio.currentTime;
         const segment = this.segments.find((s) => s.start <= now && now < this.endTime(s));
         return segment ? this.tickAt(segment, now) : null;
+    }
+
+    /**
+     * Is `tick` in the last FELT pulse of its performed bar — a dotted quarter in 6/8, the
+     * band's own `Meter.pulses` skeleton, not a raw eighth — OR within `leadMs` of real time
+     * before the barline, whichever starts earlier (#1458's Following look-ahead, patch review
+     * P3-1). At a fast tempo the last pulse alone can be shorter than a `behavior: 'smooth'`
+     * scroll needs to finish before the barline (240 bpm's last quarter is 250ms, well under a
+     * ~600ms scroll on a tall chart); at a normal or slow tempo the last pulse already covers
+     * `leadMs` on its own, so this changes nothing there — the two thresholds converge to the
+     * same tick the moment a beat is at least `leadMs` long.
+     *
+     * A method here rather than on `BandChart` (`bars`/`barAt`, `lib/band-chart.ts`) because
+     * this reads `this.timeline` directly, which exists for a measure-less (v1) chart too —
+     * `runtime.ts`'s `scoreForBand` converts one before it ever reaches the host, so the SAME
+     * timeline plays either schema — while `BandChart` itself is built only for schemaVersion 2
+     * (P2-2: the old `!bandView` gate wrongly denied v1 charts this cue and the jump-ahead both).
+     */
+    inLastPulse(tick: number, leadMs = 600): boolean {
+        const bars = this.timeline?.bars;
+        if (!bars?.length) {
+            return false;
+        }
+        let lo = 0;
+        let hi = bars.length - 1;
+        while (lo <= hi) {
+            const mid = (lo + hi) >> 1;
+            const bar = bars[mid];
+            const end = bar.start + bar.meter.barTicks;
+            if (tick < bar.start) {
+                hi = mid - 1;
+            } else if (tick >= end) {
+                lo = mid + 1;
+            } else {
+                const lastPulseStart = bar.start + bar.meter.pulses[bar.meter.pulses.length - 1];
+                const leadTicks = ((leadMs / 1000) * PPQ * this.bpm) / 60;
+                return tick >= Math.min(lastPulseStart, end - leadTicks);
+            }
+        }
+        return false;
     }
 
     /**

@@ -127,6 +127,32 @@ describe('bandChart', () => {
         expect(sectionSteps(view, 'a')).toEqual({ start: 0, end: 64 });
         expect(sectionSteps(view, 'b')).toEqual({ start: 64, end: 80 });
         expect(sectionSteps(view, 'nope')).toBeNull();
+        // Each performed bar is its own `slots[].bar` value, m1's repeated PASSES included
+        // — the multi-chord bar (m1: C, G) puts two slots in bar 0, not one each in bars 0 and 1
+        // (#1458 patch review P1-1), and m1's second pass gets bar 2, not bar 0 again (P2-1).
+        expect(view.slots.map((s) => s.bar)).toEqual([0, 0, 1, 2, 2, 3, 4]);
+    });
+
+    it('a one-bar written repeat (`||: F7 :|| x4`) gives each of its 4 passes its own performed bar', () => {
+        const oneBarRepeat = song([
+            {
+                id: 'a',
+                label: 'A',
+                repeat: 1,
+                measures: [
+                    {
+                        id: 'm1',
+                        content: { kind: 'events', events: [chord('F7', 4)] },
+                        start: [{ kind: 'repeat-start' }],
+                        end: [{ kind: 'repeat-end', times: 4 }],
+                    },
+                ],
+            },
+        ]);
+        const view = bandChart(oneBarRepeat, compileTimeline(oneBarRepeat));
+        // One written event, performed 4 times — display never changes, `bar` counts the passes.
+        expect(view.slots.map((s) => s.display)).toEqual([0, 0, 0, 0]);
+        expect(view.slots.map((s) => s.bar)).toEqual([0, 1, 2, 3]);
     });
 });
 

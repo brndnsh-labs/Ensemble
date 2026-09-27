@@ -1424,3 +1424,24 @@ export function state(): EnsembleState {
 export function bandChartView(): BandChart | null {
     return bandView;
 }
+
+/**
+ * Is playback in the last FELT pulse of its performed bar right now, or already within the
+ * jump-ahead's fixed real-time lead of the barline at a fast tempo (#1458's Following
+ * look-ahead)? `BandHost.inLastPulse` does the actual work, off `this.timeline` directly rather
+ * than `bandChartView()` — that reads the SAME timeline `runtime.ts`'s `scoreForBand` compiles
+ * for a measure-less (v1) chart too, so this works for v1 exactly like a schemaVersion-2 chart
+ * (P2-2: the old `!bandView` gate wrongly denied v1 charts this cue and the jump-ahead both).
+ *
+ * Pure engine read off `songTick()` directly, not the chart's `active`/`lastActiveChordIndex`
+ * state: `active` is published by `followPlayhead`'s own 50ms poll and React only commits it on
+ * its next render, so a caller on a DIFFERENT poll (the Following look-ahead's, #1458) that read
+ * `active`'s bar from the DOM could still see the bar just left for a whole tick after `songTick()`
+ * had already crossed into the next one — firing "last beat" a bar early, at the new bar's
+ * downbeat. Reading the bar straight from the timeline via `tick` has no such lag: it always
+ * names whichever bar `tick` is ACTUALLY in, this instant. False while stopped or counting in.
+ */
+export function inLastBeat(): boolean {
+    const tick = band?.songTick();
+    return tick != null && (band?.inLastPulse(tick) ?? false);
+}

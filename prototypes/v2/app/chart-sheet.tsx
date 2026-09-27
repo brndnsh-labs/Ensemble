@@ -52,6 +52,13 @@ interface ChartSheetProps {
     blocks: ChartBlock[];
     /** Display index of the sounding chord, or null while stopped. */
     displayActive: number | null;
+    /** Display index of the next performed bar (#1458), wrapping across a repeat, the form's
+     * own loop and an active practice loop — see `useChartView`'s `displayNext`. Null while
+     * stopped, or when the chart has nothing after `displayActive` to point at. */
+    displayNext: number | null;
+    /** Following's look-ahead scroll (`app/ensemble.tsx`) is in the playing bar's last beat —
+     * strengthens the next-bar cue from a quiet outline to a stronger one. */
+    nextSoon: boolean;
     /** The performed event under the playhead, in steps. */
     activeEvent: { start: number; end: number } | null;
     writtenBars: Map<string, WrittenBar>;
@@ -75,6 +82,8 @@ export function ChartSheet({
     current,
     blocks,
     displayActive,
+    displayNext,
+    nextSoon,
     activeEvent,
     writtenBars,
     writtenSections,
@@ -284,6 +293,9 @@ export function ChartSheet({
                             const endingEndBefore = writtenBar?.start?.some(
                                 (mark) => mark.kind === 'ending-end',
                             );
+                            const isNext = measure.chords.some(
+                                (c) => c.globalIndex === displayNext,
+                            );
                             return (
                                 <div
                                     className={`bar ${measure.chords.some((c) => c.globalIndex === displayActive) ? 'active' : ''} ${i === block.measures.length - 1 ? 'end' : ''} ${repeatStart ? 'repeat-start' : ''} ${repeatEnd ? 'repeat-end' : ''} ${endingStart ? 'ending-start' : ''} ${endingEnd ? 'ending-end' : ''}`}
@@ -291,6 +303,7 @@ export function ChartSheet({
                                     data-active={measure.chords.some(
                                         (c) => c.globalIndex === displayActive,
                                     )}
+                                    data-next={isNext ? (nextSoon ? 'soon' : 'true') : undefined}
                                     key={measure.chords[0]?.globalIndex}
                                 >
                                     <span className="bar-number">{barNumber}</span>
