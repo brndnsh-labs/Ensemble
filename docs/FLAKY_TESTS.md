@@ -26,6 +26,14 @@ flake (measure its fail-rate, classify it, and append an entry here).
 
 ## Registry
 
+### 🟢 `prototypes/v2/checks/following-lookahead.spec.ts` — "the jump-ahead fires in the last felt beat (not the downbeat), and fires again on the next lap"
+
+- **Class:** e2e-timing (the measurement's reference point, not the app).
+- **Symptom:** `v2-suite (webkit-phone)` on CI, 3 workers sharing the runner: `the jump should fire again on lap 2, not stay spent after lap 1`, expected `>= 200`, received `199`. Re-run passed. Not reproduced unloaded: 30 local WebKit runs and 16 more at `--workers=4` logged 322-407ms, no outliers.
+- **Root cause:** the delay was measured from the paint of `data-active="C3"`. The app publishes `active` from a 60ms poll and React paints it, while the jump fires off `runtime.inLastBeat()`, a read of the engine's own tick. So the paint lags the real barline by the poll plus any main-thread stall, and the delay shrinks by exactly that lag. The jump fired on time; the ruler was late. A stall of ~120ms over the ~385ms baseline is enough to cross 200. Reproduced deterministically by blocking the page's main thread 300ms at C3's barline: paint-relative delay read 60-194ms on 16/16 laps (the old assertion fails on every one), barline-relative stayed 339-422ms.
+- **Fix (2026-09-28):** the floor is measured from the tightest bound the two paints give on C3's real barline, `min(C3 paint, next bar's paint - one bar)`. Each paint is at or after its barline, so the bound is at or after the true one and the delay from it can only under-read, and both paints must stall for it to read low. The 200ms floor is unchanged. The 900ms ceiling stays paint-relative (a paint lag can only tighten it). Mutation-tested: an `inLastPulse` that is always true (jump in the new bar's own render) reads 12ms and fails the floor, with or without the injected stall.
+- **Last seen:** 2026-09-28 (CI, WebKit `webkit-phone`).
+
 ### 🟢 `prototypes/v2/checks/ireal-import.spec.ts` — "multi-chord repeated bars imports and highlights exact performed visits on the compact stand"
 
 - **Class:** e2e-timing (DOM sampling, not the band).

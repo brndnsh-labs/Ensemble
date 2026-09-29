@@ -266,15 +266,32 @@ async function trackScrollCalls(page: Page): Promise<void> {
     });
 }
 
-/** The in-page time the playing bar last became `activeId` at or before `before` (ms epoch). */
-async function activatedAt(page: Page, activeId: string, before: number): Promise<number | null> {
+/**
+ * The in-page times the playing bar became `activeId` (the last such change at or before
+ * `before`, ms epoch) and then became the NEXT bar (the first change after it to a different
+ * id, or null if none has landed yet).
+ */
+async function activatedAround(
+    page: Page,
+    activeId: string,
+    before: number,
+): Promise<{ at: number; next: number | null } | null> {
     const changes = await page.evaluate(
         () =>
             (window as unknown as { __activeChanges: { time: number; activeId: string | null }[] })
                 .__activeChanges,
     );
-    const hit = changes.filter((c) => c.activeId === activeId && c.time <= before).at(-1);
-    return hit ? hit.time : null;
+    let index = -1;
+    changes.forEach((c, i) => {
+        if (c.activeId === activeId && c.time <= before) {
+            index = i;
+        }
+    });
+    if (index < 0) {
+        return null;
+    }
+    const next = changes.slice(index + 1).find((c) => c.activeId !== activeId);
+    return { at: changes[index].time, next: next?.time ?? null };
 }
 
 function scrollCalls(page: Page): Promise<ScrollCall[]> {
@@ -571,6 +588,9 @@ test('a measure-less (v1) chart gets the next-bar cue and "soon" too', async ({ 
     await page.getByRole('button', { name: 'Stop playback', exact: true }).click();
 });
 
+/** One bar at 240bpm in 4/4, in ms. */
+const BAR_MS = 1000;
+
 test('the jump-ahead fires in the last felt beat (not the downbeat), and fires again on the next lap', async ({
     page,
 }) => {
@@ -587,10 +607,10 @@ test('the jump-ahead fires in the last felt beat (not the downbeat), and fires a
 
     /**
      * When did the jump-ahead's OWN `scrollForJump` call fire for the NEXT time C3 becomes
-     * active (relative to when this is called) — measured as wall-clock time since that
-     * occurrence's downbeat. Each call starts counting fresh from the current moment, so calling
-     * this twice in a row measures two SUCCESSIVE occurrences (lap 1, then lap 2) — not "wait for
-     * two more after this point", which a call keyed on an absolute occurrence number would.
+     * active (relative to when this is called)? Each call starts counting fresh from the current
+     * moment, so calling this twice in a row measures two SUCCESSIVE occurrences (lap 1, then
+     * lap 2) — not "wait for two more after this point", which a call keyed on an absolute
+     * occurrence number would.
      *
      * Reads the scroll call's own timestamp rather than polling `getBoundingClientRect()` for
      * "is bar 1 visible yet": a `behavior: 'smooth'` scroll (this test isn't under reduced
@@ -604,8 +624,19 @@ test('the jump-ahead fires in the last felt beat (not the downbeat), and fires a
      * very TOP of the document (bar 1 is first; the row-scroll effect's own calls for C3 itself
      * land near the BOTTOM, on an 8-bar chart) — either alone could accidentally match something
      * else; together they can't.
+     *
+     * Returns two delays, both wall-clock ms to the jump's own `scrollTo`:
+     *  - `sincePaint`: from the render that marked C3 active. The app publishes `active` off a 60ms
+     *    poll and React paints it, so that render lags the engine's real barline by the poll plus
+     *    any main-thread stall (a CI WebKit worker sharing a runner stalls for 100ms+). It can only
+     *    UNDER-state how far into the bar the jump fired.
+     *  - `sinceBarline`: from the tightest bound the two paints give on C3's real barline. C3's own
+     *    paint is at or after its barline, and the NEXT bar's paint is at or after C3's END, one
+     *    bar length later — so `min(C3 paint, next paint - BAR_MS)` is at or after the true
+     *    barline, and a delay from it is at or under the true one. Both paints must stall by the
+     *    floor's margin for it to read low; a jump firing at the downbeat reads ~0 from either.
      */
-    async function nextJumpCallDelay(): Promise<number> {
+    async function nextJumpCallDelay(): Promise<{ sincePaint: number; sinceBarline: number }> {
         let lastId: string | null = null;
         let t0 = 0;
         const deadline = Date.now() + 20_000;
@@ -626,18 +657,21 @@ test('the jump-ahead fires in the last felt beat (not the downbeat), and fires a
         }
         // The poll saw C3 up to one interval plus a round trip late; measure from the page's
         // own record of the change instead.
-        t0 = (await activatedAt(page, 'C3', t0)) ?? t0;
+        const around = await activatedAround(page, 'C3', t0);
+        const paintedAt = around?.at ?? t0;
         const jump = (await scrollCalls(page)).find(
             (c) =>
                 c.cls === 'chart-scroll' &&
-                c.time >= t0 &&
+                c.time >= paintedAt &&
                 c.activeId === 'C3' &&
                 (c.top ?? 999) < 50,
         );
         if (!jump) {
             throw new Error('no jump-to-bar-1 scroll call found for this occurrence');
         }
-        return jump.time - t0;
+        const barlineBound =
+            around?.next != null ? Math.min(paintedAt, around.next - BAR_MS) : paintedAt;
+        return { sincePaint: jump.time - paintedAt, sinceBarline: jump.time - barlineBound };
     }
 
     // A 1s bar (240bpm, 4/4): `runtime.inLastBeat()` now fires at the EARLIER of the last felt
@@ -646,20 +680,30 @@ test('the jump-ahead fires in the last felt beat (not the downbeat), and fires a
     // The window below is deliberately wide (patch review P3-4, after an earlier ~210ms margin
     // proved thin under CI WebKit): comfortably below both possible trigger points at its floor,
     // comfortably inside the bar at its ceiling, so it stays meaningful without chasing the exact
-    // millisecond either constant produces. Both ends are measured in the page: from the render
-    // that marked C3 active to the jump's own `scrollTo`. The regression this guards (the jump in
-    // the SAME render as the new bar, patch review P1-2) measures ~0ms; the floor sits well clear
-    // of both that and the ~400ms trigger less the ~60ms poll that publishes `active`.
+    // millisecond either constant produces. Both ends are measured in the page, to the jump's own
+    // `scrollTo`. The regression this guards (the jump in the SAME render as the new bar, patch
+    // review P1-2) measures ~0ms from the barline; the floor sits well clear of both that and the
+    // ~400ms trigger. The floor is measured from the barline bound `nextJumpCallDelay` derives,
+    // not from C3's paint alone: that paint lags the engine by the 60ms poll plus any main-thread
+    // stall, and a stalled CI worker once read 199 here for a jump that fired on time (#1463
+    // follow-up). The ceiling can only be tightened by that lag, never broken, so it keeps the
+    // paint.
     const lap1 = await nextJumpCallDelay();
-    expect(lap1, 'the jump should not fire at (or near) the downbeat').toBeGreaterThanOrEqual(200);
-    expect(lap1, 'the jump should fire within the SAME bar it is for').toBeLessThanOrEqual(900);
+    expect(
+        lap1.sinceBarline,
+        'the jump should not fire at (or near) the downbeat',
+    ).toBeGreaterThanOrEqual(200);
+    expect(
+        lap1.sincePaint,
+        'the jump should fire within the SAME bar it is for',
+    ).toBeLessThanOrEqual(900);
 
     const lap2 = await nextJumpCallDelay();
     expect(
-        lap2,
+        lap2.sinceBarline,
         'the jump should fire again on lap 2, not stay spent after lap 1',
     ).toBeGreaterThanOrEqual(200);
-    expect(lap2).toBeLessThanOrEqual(900);
+    expect(lap2.sincePaint).toBeLessThanOrEqual(900);
 
     await page.getByRole('button', { name: 'Stop playback', exact: true }).click();
 });
