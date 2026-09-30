@@ -602,3 +602,81 @@ describe('keeping mine as a new song with an EMPTY queue (#1362)', () => {
         expect(await book.keepBoth(scope, DOC)).toBe('none');
     });
 });
+
+/**
+ * #1430 — the new line's record is committed NOW, so a moved draft that kept its own older
+ * `capturedAt` read as superseded by it the moment it landed: never offered again, and retired by
+ * the next Save. Two live drafts (another tab's older experiment beside this one's) and a stale
+ * one, through both routes into a fresh identity.
+ */
+describe('keeping both keeps every live draft live (#1430)', () => {
+    /** The rule `liveDraft` and the loop's draft offer (`sync-loop.ts`'s `liveDrafts`) apply. */
+    async function liveUnder(documentId: string): Promise<string[]> {
+        const song = await book.read(scope, documentId);
+        expect(song).not.toBe(null);
+        return (await book.drafts(scope, documentId))
+            .filter((draft) => draft.capturedAt >= song!.document.updatedAt)
+            .sort((a, b) => b.capturedAt.localeCompare(a.capturedAt))
+            .map((draft) => draft.writerId);
+    }
+
+    /** Two drafts live against the saved record, a millisecond apart, and one it supersedes. */
+    async function draftsAgainstRecord() {
+        const saved = await book.read(scope, DOC);
+        const at = (ms: number) =>
+            new Date(Date.parse(saved!.document.updatedAt) + ms).toISOString();
+        for (const [writerId, title, capturedAt] of [
+            ['writer-older', 'Older experiment', at(1)],
+            ['writer-newer', 'Newer experiment', at(2)],
+            ['writer-stale', 'Stale words', '2000-01-01T00:00:00.000Z'],
+        ]) {
+            await putRawDraft({
+                ownerId: OWNER,
+                documentId: DOC,
+                writerId,
+                document: chart(title, DOC, 0),
+                baseRevision: 0,
+                capturedAt,
+            });
+        }
+        expect(await liveUnder(DOC)).toEqual(['writer-newer', 'writer-older']);
+        // The keep-both commit lands strictly after both drafts were captured.
+        await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+
+    it('after a refused Save', async () => {
+        await saveAndConfirm('Set list', 'cloud-1', null);
+        await saveAndRefuse('Mine', 0, chart('Their take', DOC, 7));
+        await draftsAgainstRecord();
+
+        const resolution = await book.keepBoth(scope, DOC);
+        if (resolution === 'none') {
+            throw new Error('Expected a conflict to resolve.');
+        }
+        expect(await book.drafts(scope, resolution.documentId)).toHaveLength(3);
+        // Newest still first, and the stale row still superseded.
+        expect(await liveUnder(resolution.documentId)).toEqual(['writer-newer', 'writer-older']);
+    });
+
+    it('after the account deleted the song with nothing queued', async () => {
+        await saveAndConfirm('Set list', 'cloud-1', null);
+        await draftsAgainstRecord();
+        expect(
+            await book.reconcile(
+                scope,
+                { kind: 'deleted', documentId: DOC, revision: 'cloud-9' },
+                { active: false },
+            ),
+        ).toBe('retained-deleted');
+
+        const resolution = await book.keepBoth(scope, DOC);
+        if (resolution === 'none') {
+            throw new Error('Expected a resolution.');
+        }
+        expect(resolution.document.title).toBe('Newer experiment — kept');
+        expect(await book.drafts(scope, resolution.documentId)).toHaveLength(3);
+        // The newer draft IS the new record now, so only the other tab's experiment is still
+        // one: left live, the source would be an unsaved experiment identical to the record.
+        expect(await liveUnder(resolution.documentId)).toEqual(['writer-older']);
+    });
+});
