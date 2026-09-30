@@ -139,8 +139,8 @@ const placementSeed = (barStep: number, lane: string, voiceIndex: number): numbe
  * exactly 0 when the knob is off.
  *
  * `spread` is the ± maximum at full knob — normally a profile's `timeSpread`,
- * but taken as a scalar so a lane with its own per-style character (harmony's
- * `timingJitter`) can pass that instead of allocating a throwaway profile.
+ * but taken as a scalar so a lane with its own per-style character (the chords' strum
+ * jitter) can pass that instead of allocating a throwaway profile.
  */
 export function humanizePlacement(
     barStep: number,

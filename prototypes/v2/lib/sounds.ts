@@ -169,7 +169,7 @@ async function seed(): Promise<void> {
  * it. Re-keying is safe precisely because the keys are content-addressed: the `?asset=<sha256>`
  * that survives the move is the same digest `asset()` verifies the bytes against on every read,
  * so a move that corrupted anything would be caught at the next read rather than played.
- * Someone who installed all thirteen packs for a gig keeps them through the flip.
+ * Someone who installed every pack for a gig keeps them through the flip.
  *
  * Root build only, never awaited by startup, and safe to run twice: an entry is removed from
  * its old key only once the new one reads back, so a failure part-way leaves the cache whole

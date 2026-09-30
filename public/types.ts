@@ -952,7 +952,7 @@ export interface InstrumentBus {
     readonly reverb: GainNode;
     /** Bus EQ entry node (highpass by default; per-instrument tone shaping follows). */
     readonly eq: BiquadFilterNode;
-    /** Stereo panner — populated for chords and harmonies only, `null` otherwise. */
+    /** Stereo panner — populated for chords only, `null` otherwise. */
     readonly panner: StereoPannerNode | null;
     /** Sidechain ducking gain node — populated for bass only, `null` otherwise. */
     readonly sidechain: GainNode | null;

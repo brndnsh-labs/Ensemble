@@ -10,7 +10,7 @@
  * - **Chords** write a BOOLEAN. `true` is a CC-only carrier (a sustain-pedal event
  *   with no pitch); `false` is an audible note, including a deliberately quiet ghost
  *   articulation.
- * - **Soloist, harmony and drums** never write the field at all, so they always read
+ * - **Soloist and drums** never write the field at all, so they always read
  *   `undefined` — which normalizes to "open", the same as `0`.
  *
  * A bare truthiness test collapses the two. That is how every palm-muted bass note

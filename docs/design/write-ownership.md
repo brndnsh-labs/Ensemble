@@ -25,7 +25,7 @@ trade layer, the density mirror) survive only as history in §5. The law itself 
 > hydration. Runtime systems never write it. Runtime modulation lives in a paired
 > `runtime-derived` field and is combined at **read** time.
 
-A `document` field (persisted, share-URL encoded — `chords.density`, `harmony.complexity`,
+A `document` field (persisted, share-URL encoded — `chords.density`, `groove.swing`,
 `soloist.enabled`) or a `preferences` field (persisted, device-local) represents a decision the
 *user* made. Nothing about a conductor tick, a trade-block boundary, or an intensity ramp is user
 intent, no matter how musically justified the modulation is — so none of those systems may ever
@@ -176,6 +176,9 @@ mechanism these two incidents happened to travel through is gone. `soloist.trade
 `playback.conductorHarmonyComplexity` remain `runtime-derived` in the manifest even though
 nothing currently writes them.
 
+*Amended 2026-09-29 (#1436):* the harmony lane is gone from state — `harmony.complexity` and
+`playback.conductorHarmonyComplexity` with it. The #1064 incident above stays as history.
+
 ## 6. How to apply this
 
 When a runtime system needs to modulate a `document`- or `preferences`-owned field during
@@ -185,8 +188,8 @@ playback:
    `document`/`preferences` in `STATE_OWNERSHIP_MANIFEST`, that field's only legitimate writers are
    the UI dispatch and state hydration.
 2. **Add a sibling `runtime-derived` field** for the runtime system's own opinion
-   (`playback.conductorVelocity` / `conductorHarmonyComplexity` are the live precedents;
-   `conductorDensity` and `soloist.tradeSilenced` were, until #1424). Classify it in
+   (`playback.conductorVelocity` is the live precedent; `conductorDensity` and
+   `soloist.tradeSilenced` were, until #1424, and `conductorHarmonyComplexity` until #1436). Classify it in
    `STATE_OWNERSHIP_MANIFEST` immediately — the `satisfies` guard fails typecheck until you do.
 3. **Compose at the read site**, not upstream of it: the one place the value actually gets used
    (a generation engine, `isInstrumentActiveAtStep`, a scheduler velocity computation) is where

@@ -126,7 +126,7 @@ export function shouldUseRootlessVoicing(
 
 /**
  * Lowest MIDI the comp voices to. Deliberately NOT bass-aware (#1313): tick-logic's
- * `enforceRegisterSlotting` clamps every chords/harmony note to 52-84 one note at
+ * `enforceRegisterSlotting` clamps every chords note to 52-84 one note at
  * a time, so a lower parse floor (the old bass-off 43) only ever produced voicings
  * whose bottom notes were then folded up INDIVIDUALLY — re-inverting the chord
  * (Dm9 from D3 became F-A-C-D-E, an F6/9) and clustering it. "The comp states the

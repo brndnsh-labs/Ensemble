@@ -2,7 +2,7 @@
  * synth-audit Epic 6 (Packs) S5 — pitched sample playback.
  *
  * Sampled *drums* reuse `playPercussiveStrike` (it already takes an
- * `AudioBuffer`). Pitched instruments — chords/piano, harmony/strings,
+ * `AudioBuffer`). Pitched instruments — chords/piano, bass/upright,
  * soloist/brass — need this: play a decoded sample buffer at an arbitrary
  * target pitch by `playbackRate`-shifting from the nearest multi-sampled zone,
  * through a click-free envelope, into the instrument's existing `[name]Gain`
@@ -190,9 +190,8 @@ export function pickZone(zones: readonly SampleZone[], targetMidi: number): Samp
  * Fold a target note down by whole octaves so it never sits more than
  * `maxUpshift` semitones above the pack's highest sampled zone (#755). An
  * instrument's register can exceed its pack's sampled range — the soloist runs
- * to MIDI 90 but nylon tops out at 84, sax at 79; harmony runs to 84 but the
- * strings top at 74 — so without this the top zone gets pitch-shifted *up*
- * several semitones, and upward-resampling a plucked/blown sample rings thin and
+ * to MIDI 90 but nylon tops out at 84, sax at 79 — so without this the top zone
+ * gets pitch-shifted *up* several semitones, and upward-resampling a plucked/blown sample rings thin and
  * metallic (aliasing + a shifted formant), which a brightening tone tilt then
  * drags into earshot. Folding by octaves keeps the pitch class (musically
  * coherent — the same note, an octave down) while landing on a zone the sampler
