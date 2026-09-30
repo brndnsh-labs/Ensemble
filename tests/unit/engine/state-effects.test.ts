@@ -43,31 +43,30 @@ describe('State Effects Handler', () => {
 
     it('reconciles URL genre effects after boot while restoring explicit groove settings (#1000)', async () => {
         __resetPackCacheForTest();
-        markPackInstalled('horns-section', true);
+        markPackInstalled('upright-bass', true);
         stateMap = {
             playback: { isPlaying: false },
             chords: { autoSound: false, voice: 'pack:clavinet' },
-            bass: { autoSound: false, voice: 'synth' },
+            bass: { autoSound: true, voice: 'synth' },
             soloist: {
                 autoSound: false,
                 voice: 'synth',
                 autoMode: false,
                 mode: 'monophonic',
             },
-            harmony: { autoSound: true, voice: 'synth' },
             groove: { autoSound: false, voice: 'synth' },
         };
 
         await reconcileUrlGenreOnBoot(
             stateMap,
-            'Funk',
+            'Jazz',
             { swing: 73, swingSub: '8th', humanize: 9 },
             dispatch,
         );
 
         expect(dispatch).toHaveBeenCalledWith(ACTIONS.SET_INSTRUMENT_VOICE, {
-            module: 'harmony',
-            voice: 'pack:horns-section',
+            module: 'bass',
+            voice: 'pack:upright-bass',
             auto: true,
         });
         expect(dispatch).not.toHaveBeenCalledWith(
@@ -94,29 +93,29 @@ describe('State Effects Handler', () => {
     describe('genre auto-follow on SET_GENRE_FEEL (#675)', () => {
         beforeEach(() => {
             __resetPackCacheForTest();
-            // Harmony in Auto mode, currently on synth; other lanes absent (skipped).
-            stateMap.harmony = { autoSound: true, voice: 'synth' };
+            // Bass in Auto mode, currently on synth; other lanes absent (skipped).
+            stateMap.bass = { autoSound: true, voice: 'synth' };
         });
 
         it('switches an Auto lane to the genre-mapped pack when installed', () => {
-            markPackInstalled('horns-section', true);
+            markPackInstalled('upright-bass', true);
             handleEffects(
-                { type: ACTIONS.SET_GENRE_FEEL, payload: { genreName: 'Funk' } },
+                { type: ACTIONS.SET_GENRE_FEEL, payload: { genreName: 'Jazz' } },
                 stateMap,
                 { dispatch },
             );
             expect(dispatch).toHaveBeenCalledWith(ACTIONS.SET_INSTRUMENT_VOICE, {
-                module: 'harmony',
-                voice: 'pack:horns-section',
+                module: 'bass',
+                voice: 'pack:upright-bass',
                 auto: true,
             });
         });
 
         it('leaves a pinned lane (autoSound:false) untouched', () => {
-            stateMap.harmony = { autoSound: false, voice: 'synth' };
-            markPackInstalled('horns-section', true);
+            stateMap.bass = { autoSound: false, voice: 'synth' };
+            markPackInstalled('upright-bass', true);
             handleEffects(
-                { type: ACTIONS.SET_GENRE_FEEL, payload: { genreName: 'Funk' } },
+                { type: ACTIONS.SET_GENRE_FEEL, payload: { genreName: 'Jazz' } },
                 stateMap,
                 { dispatch },
             );
@@ -124,10 +123,10 @@ describe('State Effects Handler', () => {
         });
 
         it('does not write when the mapped sound already matches (no churn)', () => {
-            markPackInstalled('horns-section', true);
-            stateMap.harmony = { autoSound: true, voice: 'pack:horns-section' };
+            markPackInstalled('upright-bass', true);
+            stateMap.bass = { autoSound: true, voice: 'pack:upright-bass' };
             handleEffects(
-                { type: ACTIONS.SET_GENRE_FEEL, payload: { genreName: 'Funk' } },
+                { type: ACTIONS.SET_GENRE_FEEL, payload: { genreName: 'Jazz' } },
                 stateMap,
                 { dispatch },
             );
@@ -135,31 +134,31 @@ describe('State Effects Handler', () => {
         });
 
         it('falls back to synth (no auto-download) when the mapped pack is not installed', () => {
-            // Auto lane currently pinned-by-prior-state to the horns pack, but it
+            // Auto lane currently pinned-by-prior-state to the upright pack, but it
             // is no longer installed → auto-follow recovers it to synth.
-            stateMap.harmony = { autoSound: true, voice: 'pack:horns-section' };
+            stateMap.bass = { autoSound: true, voice: 'pack:upright-bass' };
+            handleEffects(
+                { type: ACTIONS.SET_GENRE_FEEL, payload: { genreName: 'Jazz' } },
+                stateMap,
+                { dispatch },
+            );
+            expect(dispatch).toHaveBeenCalledWith(ACTIONS.SET_INSTRUMENT_VOICE, {
+                module: 'bass',
+                voice: 'synth',
+                auto: true,
+            });
+        });
+
+        it('uses synth for a genre with no bass mapping', () => {
+            markPackInstalled('upright-bass', true);
+            stateMap.bass = { autoSound: true, voice: 'pack:upright-bass' };
             handleEffects(
                 { type: ACTIONS.SET_GENRE_FEEL, payload: { genreName: 'Funk' } },
                 stateMap,
                 { dispatch },
             );
             expect(dispatch).toHaveBeenCalledWith(ACTIONS.SET_INSTRUMENT_VOICE, {
-                module: 'harmony',
-                voice: 'synth',
-                auto: true,
-            });
-        });
-
-        it('uses synth for a genre with no harmony mapping', () => {
-            markPackInstalled('horns-section', true);
-            stateMap.harmony = { autoSound: true, voice: 'pack:horns-section' };
-            handleEffects(
-                { type: ACTIONS.SET_GENRE_FEEL, payload: { genreName: 'Hip Hop' } },
-                stateMap,
-                { dispatch },
-            );
-            expect(dispatch).toHaveBeenCalledWith(ACTIONS.SET_INSTRUMENT_VOICE, {
-                module: 'harmony',
+                module: 'bass',
                 voice: 'synth',
                 auto: true,
             });

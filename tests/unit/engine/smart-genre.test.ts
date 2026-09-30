@@ -45,7 +45,7 @@ vi.mock('../../../public/controllers/app-controller.js', () => ({
 }));
 
 describe('Smart Genre System', () => {
-    let playback, chords, bass, soloist, harmony, groove;
+    let playback, chords, bass, soloist, groove;
 
     beforeEach(() => {
         const state = getState();
@@ -53,7 +53,6 @@ describe('Smart Genre System', () => {
         chords = state.chords;
         bass = state.bass;
         soloist = state.soloist;
-        harmony = state.harmony;
         groove = state.groove;
 
         resetAllStateForTest();
@@ -64,7 +63,6 @@ describe('Smart Genre System', () => {
         chords.style = 'smart';
         bass.style = 'smart';
         soloist.style = 'smart';
-        harmony.style = 'smart';
         groove.genreFeel = 'Rock';
     });
 
@@ -148,7 +146,6 @@ describe('Smart Genre System', () => {
                 chord: 'funk',
                 bass: 'funk',
                 soloist: 'blues',
-                harmony: 'horns',
             };
 
             dispatch(ACTIONS.SET_GENRE_FEEL, payload);
@@ -166,9 +163,6 @@ describe('Smart Genre System', () => {
 
             // Check Soloist
             expect(soloist.style).toBe('blues');
-
-            // Check Harmony
-            expect(harmony.style).toBe('horns');
         });
 
         it('should set appropriate instrument styles for each smart genre configuration', () => {

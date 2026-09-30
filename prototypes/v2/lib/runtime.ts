@@ -488,7 +488,7 @@ function rebuild(): void {
     // Silences whatever is still sounding. (Its worker flush does nothing: no worker runs.)
     flushBuffers();
     restoreGains(getState());
-    for (const lane of ['groove', 'bass', 'chords', 'harmony', 'soloist'] as const) {
+    for (const lane of ['groove', 'bass', 'chords', 'soloist'] as const) {
         syncBusReverbSend(getState(), lane);
     }
 }
@@ -513,7 +513,7 @@ export function initialize(): Promise<void> {
             // really holds. Local and bounded (`seedInstalledSounds`); no network.
             await seedInstalledSounds();
             // Guest startup must not download audio without an install/selection gesture.
-            for (const module of ['groove', 'bass', 'chords', 'harmony', 'soloist'] as const) {
+            for (const module of ['groove', 'bass', 'chords', 'soloist'] as const) {
                 param(module, 'autoSound', false);
             }
             subscribe((action, state, context) => {
@@ -938,7 +938,6 @@ function applyGenre(name: string): void {
     param('chords', 'style', genre.chord);
     param('bass', 'style', genre.bass ?? 'smart');
     param('soloist', 'style', genre.soloist ?? 'smart');
-    param('harmony', 'style', genre.harmony);
 }
 
 function apply(content: DocumentContent): void {
@@ -1173,10 +1172,12 @@ export function setTempo(bpm: number): void {
     dispatch(ACTIONS.SET_BPM, Math.max(40, Math.min(240, Math.round(bpm))));
 }
 /** `InstrumentModule`'s state-slice name for the drum lane; the telemetry event names it `drums`. */
-const TELEMETRY_PART: Record<
-    InstrumentModule,
-    'drums' | 'bass' | 'chords' | 'harmony' | 'soloist'
-> = { groove: 'drums', bass: 'bass', chords: 'chords', harmony: 'harmony', soloist: 'soloist' };
+const TELEMETRY_PART: Record<InstrumentModule, 'drums' | 'bass' | 'chords' | 'soloist'> = {
+    groove: 'drums',
+    bass: 'bass',
+    chords: 'chords',
+    soloist: 'soloist',
+};
 
 export function setEnabled(module: InstrumentModule, enabled: boolean): void {
     if (getState()[module].enabled !== enabled) {

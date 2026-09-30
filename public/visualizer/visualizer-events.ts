@@ -1,4 +1,4 @@
-export type VisualizerTrackId = 'drums' | 'bass' | 'chords' | 'harmony' | 'soloist';
+export type VisualizerTrackId = 'drums' | 'bass' | 'chords' | 'soloist';
 
 export interface VisualizerNoteEvent {
     type: 'note';

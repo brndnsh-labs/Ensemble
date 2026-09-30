@@ -17,7 +17,6 @@ vi.mock('../../../public/state.js', () => {
             buffer: new Map(),
             lastPlayedFreq: null,
         }),
-        harmony: { enabled: false },
         groove: { enabled: true },
         vizState: { enabled: true },
         playback: { step: 0 },
@@ -37,10 +36,7 @@ vi.mock('../../../public/state.js', () => {
 vi.mock('../../../public/engine/engine.js', () => ({
     restoreGains: vi.fn(),
     killSoloistNote: vi.fn(),
-    killHarmonyNote: vi.fn(),
-    releaseHarmonyVoicing: vi.fn(),
     killSoloistBus: vi.fn(),
-    killHarmonyBus: vi.fn(),
 }));
 
 describe('Soloist Power Logic', () => {

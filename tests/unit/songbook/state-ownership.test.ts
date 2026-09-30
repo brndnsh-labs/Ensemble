@@ -7,7 +7,7 @@ import { STATE_OWNERSHIP_MANIFEST } from '../../../public/songbook/state-ownersh
 describe('Songbook state ownership manifest (#1044)', () => {
     it('records the settled ownership decisions exactly once', () => {
         expect(STATE_OWNERSHIP_MANIFEST.arranger.notation).toBe('document');
-        for (const lane of ['chords', 'bass', 'soloist', 'harmony', 'groove'] as const) {
+        for (const lane of ['chords', 'bass', 'soloist', 'groove'] as const) {
             expect(STATE_OWNERSHIP_MANIFEST[lane].volume).toBe('document');
             expect(STATE_OWNERSHIP_MANIFEST[lane].reverb).toBe('document');
         }

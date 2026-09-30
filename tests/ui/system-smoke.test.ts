@@ -186,13 +186,10 @@ vi.mock('../../public/engine/engine.js', () => ({
     killBassBus: vi.fn(),
     killSoloistBus: vi.fn(),
     killDrumBus: vi.fn(),
-    killHarmonyBus: vi.fn(),
     killAllPianoNotes: vi.fn(),
     killSoloistNote: vi.fn(),
     killBassNote: vi.fn(),
     killDrumNote: vi.fn(),
-    killHarmonyNote: vi.fn(),
-    releaseHarmonyVoicing: vi.fn(),
     updateSustain: vi.fn(),
     getVisualTime: () => 0,
 }));

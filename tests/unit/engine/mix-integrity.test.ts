@@ -20,7 +20,6 @@ vi.mock('../../../public/state.js', () => {
     const mockChords = { volume: 1.0, enabled: true, reverb: 0.2 };
     const mockBass = { volume: 1.0, enabled: true, reverb: 0.05 };
     const mockSoloist = makeSoloistMock({ volume: 1.0, enabled: true, reverb: 0.6 });
-    const mockHarmony = { volume: 1.0, enabled: true, reverb: 0.4 };
     const mockGroove = { volume: 1.0, enabled: true, reverb: 0.2, audioBuffers: { noise: {} } };
     const mockMidi = { enabled: false, muteLocal: false };
     const mockArranger = {};
@@ -38,7 +37,6 @@ vi.mock('../../../public/state.js', () => {
         chords: mockChords,
         bass: mockBass,
         soloist: mockSoloist,
-        harmony: mockHarmony,
         groove: mockGroove,
         midi: mockMidi,
         arranger: mockArranger,
@@ -68,7 +66,6 @@ vi.mock('../../../public/config.js', () => ({
         chords: 0.13,
         bass: 0.1575,
         soloist: 0.15,
-        harmonies: 0.1,
         drums: 0.26,
     },
     TIME_SIGNATURES: {},
@@ -216,11 +213,6 @@ describe('Mix & Signal Integrity Audit', () => {
         const bassTarget =
             playback.audioGraph.bass.gain.gain.exponentialRampToValueAtTime.mock.calls[0][0];
         expect(bassTarget).toBeCloseTo(0.1575, 4);
-
-        // Harmony target should be 1.0 * 0.1 = 0.1
-        const harmonyTarget =
-            playback.audioGraph.harmonies.gain.gain.exponentialRampToValueAtTime.mock.calls[0][0];
-        expect(harmonyTarget).toBeCloseTo(0.1, 4);
     });
 
     it('should ensure the saturator uses an oversampled soft-clip curve', () => {
@@ -240,20 +232,18 @@ describe('Mix & Signal Integrity Audit', () => {
         const bassGain = graph.bass.gain.gain.setTargetAtTime.mock.calls[0][0];
         const chordsGain = graph.chords.gain.gain.setTargetAtTime.mock.calls[0][0];
         const soloistGain = graph.soloist.gain.gain.setTargetAtTime.mock.calls[0][0];
-        const harmonyGain = graph.harmonies.gain.gain.setTargetAtTime.mock.calls[0][0];
 
-        const totalInstrumentGain = drumGain + bassGain + chordsGain + soloistGain + harmonyGain;
+        const totalInstrumentGain = drumGain + bassGain + chordsGain + soloistGain;
 
-        // Verification: The hidden trims should keep the unity-default sum safe (~0.7975)
+        // Verification: The hidden trims should keep the unity-default sum safe (~0.6975)
         expect(totalInstrumentGain).toBeLessThan(1.0);
         // Recalculating expected:
         // Drums: 1.0 * 0.26 = 0.26
         // Bass: 1.0 * 0.1575 = 0.1575
         // Chords: 1.0 * 0.13 = 0.13
         // Soloist: 1.0 * 0.15 = 0.15
-        // Harmony: 1.0 * 0.1 = 0.1
-        // Total = 0.7975
-        expect(totalInstrumentGain).toBeCloseTo(0.7975, 4);
+        // Total = 0.6975
+        expect(totalInstrumentGain).toBeCloseTo(0.6975, 4);
     });
 
     it('should calculate master gain correctly (Headroom Check)', () => {

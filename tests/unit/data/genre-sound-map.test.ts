@@ -201,30 +201,28 @@ describe('genre → sound map (#675)', () => {
 
     describe('autoVoiceForGenre', () => {
         it('returns the mapped pack voice when installed', () => {
-            // Funk → horns on the harmony lane (a known map entry).
-            expect(autoVoiceForGenre('Funk', 'harmony', allInstalled)).toBe('pack:horns-section');
-            expect(autoVoiceForGenre('Bossa', 'harmony', allInstalled)).toBe(
-                'pack:strings-ensemble',
-            );
+            // Funk → clavinet on the chords lane (a known map entry).
+            expect(autoVoiceForGenre('Funk', 'chords', allInstalled)).toBe('pack:clavinet');
+            expect(autoVoiceForGenre('Bossa', 'chords', allInstalled)).toBe('pack:grand');
         });
 
         it('falls back to synth when the mapped pack is NOT installed (no auto-download)', () => {
-            expect(autoVoiceForGenre('Funk', 'harmony', noneInstalled)).toBe('synth');
+            expect(autoVoiceForGenre('Funk', 'chords', noneInstalled)).toBe('synth');
         });
 
         it('falls back to synth for an unmapped genre', () => {
-            // Hip Hop has no harmony mapping → synth pad.
-            expect(autoVoiceForGenre('Hip Hop', 'harmony', allInstalled)).toBe('synth');
+            // Hip Hop maps only its keys → the soloist stays the synth.
+            expect(autoVoiceForGenre('Hip Hop', 'soloist', allInstalled)).toBe('synth');
         });
 
         it('falls back to synth for an unmapped module', () => {
-            // No genre maps the bass lane today.
+            // Funk maps no bass pack (the synth electric is its bass).
             expect(autoVoiceForGenre('Funk', 'bass', allInstalled)).toBe('synth');
         });
 
         it('falls back to synth for an undefined / unknown genre', () => {
-            expect(autoVoiceForGenre(undefined, 'harmony', allInstalled)).toBe('synth');
-            expect(autoVoiceForGenre('NotAGenre', 'harmony', allInstalled)).toBe('synth');
+            expect(autoVoiceForGenre(undefined, 'chords', allInstalled)).toBe('synth');
+            expect(autoVoiceForGenre('NotAGenre', 'chords', allInstalled)).toBe('synth');
         });
     });
 });

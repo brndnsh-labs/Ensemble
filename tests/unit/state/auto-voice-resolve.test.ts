@@ -18,13 +18,12 @@ import { ACTIONS, type EnsembleState } from '../../../public/types.js';
 
 /** Minimal state with per-lane {autoSound, voice} — only what the loop reads. */
 function makeState(
-    lanes: Partial<Record<'chords' | 'harmony' | 'bass', { autoSound: boolean; voice: string }>>,
+    lanes: Partial<Record<'chords' | 'bass', { autoSound: boolean; voice: string }>>,
     soloist: { autoSound?: boolean; voice?: string; autoMode?: boolean; mode?: string } = {},
     genre = '',
 ): EnsembleState {
     return {
         chords: { autoSound: false, voice: 'synth', ...lanes.chords },
-        harmony: { autoSound: false, voice: 'synth', ...lanes.harmony },
         bass: { autoSound: false, voice: 'synth', ...lanes.bass },
         soloist: {
             autoSound: false,
@@ -89,26 +88,26 @@ describe('resolveAutoVoices (#683 install → instantly better)', () => {
         expect(dispatch).not.toHaveBeenCalled();
     });
 
-    it('resolves chords and harmony together for one genre (coherent pairing)', () => {
-        // Funk → clavinet (chords) + horns (harmony); both Auto, both installed.
-        markPackInstalled('clavinet', true);
-        markPackInstalled('horns-section', true);
+    it('resolves chords and bass together for one genre (coherent pairing)', () => {
+        // Jazz → grand (chords) + upright (bass); both Auto, both installed.
+        markPackInstalled('grand', true);
+        markPackInstalled('upright-bass', true);
         const dispatch = vi.fn();
         const state = makeState({
             chords: { autoSound: true, voice: 'synth' },
-            harmony: { autoSound: true, voice: 'synth' },
+            bass: { autoSound: true, voice: 'synth' },
         });
 
-        resolveAutoVoices(state, 'Funk', dispatch);
+        resolveAutoVoices(state, 'Jazz', dispatch);
 
         expect(dispatch).toHaveBeenCalledWith(ACTIONS.SET_INSTRUMENT_VOICE, {
             module: 'chords',
-            voice: 'pack:clavinet',
+            voice: 'pack:grand',
             auto: true,
         });
         expect(dispatch).toHaveBeenCalledWith(ACTIONS.SET_INSTRUMENT_VOICE, {
-            module: 'harmony',
-            voice: 'pack:horns-section',
+            module: 'bass',
+            voice: 'pack:upright-bass',
             auto: true,
         });
     });

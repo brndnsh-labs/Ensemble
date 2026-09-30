@@ -30,7 +30,7 @@ export interface ResolvedSampledZone {
  */
 export function resolveSampledZone(
     state: EnsembleState,
-    graphKey: Extract<keyof AudioGraph, 'bass' | 'soloist' | 'harmonies'>,
+    graphKey: Extract<keyof AudioGraph, 'bass' | 'soloist'>,
     packId: string,
     freq: number,
 ): ResolvedSampledZone | null {

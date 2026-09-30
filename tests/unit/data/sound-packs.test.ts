@@ -42,7 +42,7 @@ describe('sound-packs catalog', () => {
         // with baked-in ambience need less so we don't stack room-on-hall.
         expect(reverbSendForPack('clavinet')).toBeGreaterThan(1); // bone-dry DI
         expect(reverbSendForPack('hammond-organ')).toBeGreaterThan(1); // dry emulation
-        expect(reverbSendForPack('strings-ensemble')).toBeLessThan(1); // baked hall
+        expect(reverbSendForPack('upright-bass')).toBeLessThan(1); // recorded room
         expect(reverbSendForPack('acoustic-kit')).toBeLessThan(1); // recorded room
         // Synth voice (null) and unknown/uncalibrated ids → unchanged send.
         expect(reverbSendForPack(null)).toBe(1);

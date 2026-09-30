@@ -238,8 +238,9 @@ export interface Section {
 
 /**
  * Instrument lanes that a section can override on/off. Names match the state slices
- * (`groove` = drums, `chords` = keys/comping, etc.) but the UI labels these as
- * Drums / Bass / Chords / Harmony / Solo.
+ * (`groove` = drums, `chords` = keys/comping, etc.). `harmony` is kept only because charts
+ * store these keys (`Section.instruments`): the band has no harmony lane, but an old chart's
+ * override round-trips unchanged rather than being dropped on its next save (#1436).
  */
 export type SectionInstrumentKey = 'groove' | 'bass' | 'chords' | 'harmony' | 'soloist';
 
@@ -320,8 +321,8 @@ export interface ConductorState {
  */
 export type InstrumentVoice = 'synth' | `pack:${string}`;
 
-/** The five instrument modules that carry a sound source (`voice`). */
-export type InstrumentModule = 'groove' | 'bass' | 'chords' | 'harmony' | 'soloist';
+/** The four instrument modules that carry a sound source (`voice`). */
+export type InstrumentModule = 'groove' | 'bass' | 'chords' | 'soloist';
 
 export interface GrooveState {
     /** Whether the drum engine is active. */
@@ -898,35 +899,6 @@ export interface SoloistState {
     readonly audio: SoloistAudio;
 }
 
-export interface HarmonyState {
-    /** Whether the harmony engine is active. */
-    readonly enabled: boolean;
-    /** Which synthesis voice this instrument uses (synth-audit A/B). */
-    readonly voice: InstrumentVoice;
-    /** Sound-source mode: Auto (follow genre) vs pinned to `voice` (#675). */
-    readonly autoSound: boolean;
-    /** Volume level. */
-    readonly volume: number;
-    /** Reverb level. */
-    readonly reverb: number;
-    /** Map of scheduled notes from the worker. */
-    readonly buffer: Map<number, any>;
-    /** Base MIDI octave. */
-    readonly octave: number;
-    /** Playing style ID (e.g., 'horns', 'strings'). */
-    readonly style: string;
-    /** Local complexity override (0.0 - 1.0). */
-    readonly complexity: number;
-    /** Short-term memory for current section hooks. */
-    readonly motifBuffer: any[];
-    /** 16-bit mask of the current rhythmic motif (16th notes). */
-    readonly rhythmicMask: number;
-    /** Array of recently played MIDI notes. */
-    readonly lastMidis: number[];
-    /** Currently playing polyphonic voices. */
-    readonly activeVoices: any[];
-}
-
 export interface MidiOutput {
     id: string;
     name: string;
@@ -945,8 +917,6 @@ export interface MidiState {
     readonly bassChannel: number;
     /** MIDI channel for Soloist (1-16). */
     readonly soloistChannel: number;
-    /** MIDI channel for Harmonies (1-16). */
-    readonly harmonyChannel: number;
     /** MIDI channel for Drums (1-16). */
     readonly drumsChannel: number;
     /** Global MIDI latency offset in ms. */
@@ -959,8 +929,6 @@ export interface MidiState {
     readonly bassOctave: number;
     /** Octave offset for soloist. */
     readonly soloistOctave: number;
-    /** Octave offset for harmonies. */
-    readonly harmonyOctave: number;
     /** Octave offset for drums. */
     readonly drumsOctave: number;
     /** Velocity scaling factor. */
@@ -1052,7 +1020,6 @@ export interface AudioGraph {
     readonly chords: InstrumentBus;
     readonly bass: InstrumentBus;
     readonly soloist: InstrumentBus;
-    readonly harmonies: InstrumentBus;
     readonly drums: InstrumentBus;
 }
 
@@ -1161,13 +1128,6 @@ export interface GlobalContext {
     readonly currentKey: string | null;
     /** Dynamic velocity modifier (0.0-1.0) applied by Conductor. */
     readonly conductorVelocity: number;
-    /**
-     * Auto-conductor's computed harmony complexity for the current band
-     * intensity/ending state, or `null` before the conductor has ever run.
-     * `harmony.complexity` is the user's own `document`-owned field, never
-     * written by the conductor (#1064); readers compose the two at READ time.
-     */
-    readonly conductorHarmonyComplexity: number | null;
     /** Master output volume. */
     readonly masterVolume: number;
     /** Whether the metronome count-in is enabled. */
@@ -1220,7 +1180,6 @@ export interface EnsembleState {
     groove: GrooveState;
     bass: BassState;
     soloist: SoloistState;
-    harmony: HarmonyState;
     chords: ChordState;
     conductor: ConductorState;
     vizState: VisualizerState;
@@ -1296,7 +1255,6 @@ export interface ActionPayloadSetGenreFeel {
     chord?: string;
     bass?: string;
     soloist?: string;
-    harmony?: string;
 }
 
 export interface ActionPayloadShowToast {

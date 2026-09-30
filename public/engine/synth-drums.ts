@@ -758,9 +758,6 @@ function getBandLayerCount(state: EnsembleState, step: number): number {
     if (isInstrumentActiveAtStep(state, 'chords', musicalStep)) {
         layers++;
     }
-    if (isInstrumentActiveAtStep(state, 'harmony', musicalStep)) {
-        layers++;
-    }
     if (isInstrumentActiveAtStep(state, 'soloist', musicalStep)) {
         layers++;
     }

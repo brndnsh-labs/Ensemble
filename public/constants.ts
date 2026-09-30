@@ -3,7 +3,6 @@ export const MODULES = {
     SOLOIST: 'soloist',
     DRUMS_VIS: 'drums_vis',
     CHORDS: 'chords',
-    HARMONIES: 'harmonies',
     PLAYBACK: 'playback',
     GROOVE: 'groove',
     ARRANGER: 'arranger',

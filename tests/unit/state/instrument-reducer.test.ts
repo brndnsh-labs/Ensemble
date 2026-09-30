@@ -1,15 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import {
-    bass,
-    chords,
-    harmony,
-    instrumentReducer,
-    soloist,
-} from '../../../public/state/instruments.js';
+import { bass, chords, instrumentReducer, soloist } from '../../../public/state/instruments.js';
 import { ACTIONS, type Mutable } from '../../../public/types.js';
 import { resetAllStateForTest } from '../../utils/reset-state.js';
 
-const mutableHarmony = harmony as Mutable<typeof harmony>;
+const mutableChords = chords as Mutable<typeof chords>;
 
 describe('Instrument Reducer', () => {
     beforeEach(() => {
@@ -35,8 +29,8 @@ describe('Instrument Reducer', () => {
     it('should set volume and reverb for modules', () => {
         instrumentReducer({ type: ACTIONS.SET_VOLUME, payload: { module: 'chords', value: 0.8 } });
         expect(chords.volume).toBe(0.8);
-        instrumentReducer({ type: ACTIONS.SET_REVERB, payload: { module: 'harmony', value: 0.2 } });
-        expect(harmony.reverb).toBe(0.2);
+        instrumentReducer({ type: ACTIONS.SET_REVERB, payload: { module: 'bass', value: 0.2 } });
+        expect(bass.reverb).toBe(0.2);
     });
 
     it('should set soloist mode', () => {
@@ -48,40 +42,39 @@ describe('Instrument Reducer', () => {
         it('pins the source when auto:false (a manual pick)', () => {
             instrumentReducer({
                 type: ACTIONS.SET_INSTRUMENT_VOICE,
-                payload: { module: 'harmony', voice: 'pack:strings-ensemble', auto: false },
+                payload: { module: 'chords', voice: 'pack:grand', auto: false },
             });
-            expect(harmony.voice).toBe('pack:strings-ensemble');
-            expect(harmony.autoSound).toBe(false);
+            expect(chords.voice).toBe('pack:grand');
+            expect(chords.autoSound).toBe(false);
         });
 
         it('keeps Auto on when auto:true (genre auto-follow)', () => {
-            mutableHarmony.autoSound = false;
+            mutableChords.autoSound = false;
             instrumentReducer({
                 type: ACTIONS.SET_INSTRUMENT_VOICE,
-                payload: { module: 'harmony', voice: 'pack:horns-section', auto: true },
+                payload: { module: 'chords', voice: 'pack:rhodes', auto: true },
             });
-            expect(harmony.voice).toBe('pack:horns-section');
-            expect(harmony.autoSound).toBe(true);
+            expect(chords.voice).toBe('pack:rhodes');
+            expect(chords.autoSound).toBe(true);
         });
 
         it('leaves the mode untouched when auto is omitted (bare voice reset)', () => {
-            mutableHarmony.autoSound = true;
+            mutableChords.autoSound = true;
             instrumentReducer({
                 type: ACTIONS.SET_INSTRUMENT_VOICE,
-                payload: { module: 'harmony', voice: 'synth' },
+                payload: { module: 'chords', voice: 'synth' },
             });
-            expect(harmony.voice).toBe('synth');
-            expect(harmony.autoSound).toBe(true);
+            expect(chords.voice).toBe('synth');
+            expect(chords.autoSound).toBe(true);
         });
     });
 
     it('should handle SET_GENRE_FEEL for all instruments', () => {
-        const payload = { chord: 'pad', bass: 'slap', soloist: 'shred', harmony: 'strings' };
+        const payload = { chord: 'pad', bass: 'slap', soloist: 'shred' };
         instrumentReducer({ type: ACTIONS.SET_GENRE_FEEL, payload });
         expect(chords.style).toBe('pad');
         expect(bass.style).toBe('slap');
         expect(soloist.style).toBe('shred');
-        expect(harmony.style).toBe('strings');
     });
 
     it('drops deprecated soloist payload keys instead of resurrecting them (#866 compat shim)', () => {
@@ -164,31 +157,15 @@ describe('Instrument Reducer', () => {
             }
         });
 
-        it('should update harmony parameters', () => {
-            const params = {
-                enabled: true,
-                volume: 0.1,
-                instrument: 'Trumpet',
-            };
-            for (const [p, v] of Object.entries(params)) {
-                instrumentReducer({
-                    type: ACTIONS.SET_PARAM,
-                    payload: { module: 'harmony', param: p, value: v },
-                });
-                expect((harmony as any)[p]).toEqual(v);
+        it('writes nothing for the retired harmony lane (#1436)', () => {
+            for (const module of ['harmony', 'harmonies']) {
+                expect(
+                    instrumentReducer({
+                        type: ACTIONS.SET_PARAM,
+                        payload: { module, param: 'volume', value: 0.8 },
+                    }),
+                ).toBe(false);
             }
-        });
-
-        it('should alias harmonies module to harmony', () => {
-            instrumentReducer({
-                type: ACTIONS.SET_PARAM,
-                payload: {
-                    module: 'harmonies',
-                    param: 'volume',
-                    value: 0.8,
-                },
-            });
-            expect(harmony.volume).toEqual(0.8);
         });
     });
 });

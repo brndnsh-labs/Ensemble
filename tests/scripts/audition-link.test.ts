@@ -93,7 +93,8 @@ describe('ad-hoc audition links', () => {
         const payload = band(url);
         expect(payload.s.e).toBe(1);
         expect(payload.c.e).toBe(0);
-        expect(payload.h.e).toBe(0);
+        // The retired harmony lane is accepted and ignored (#1436).
+        expect(payload.h).toBeUndefined();
         expect(payload.b).toBeUndefined(); // untouched: keeps the genre's own setup
         expect(payload.g).toBeUndefined(); // never emitted: it would pin swing
         // A block with only `e` would reset the octave to hydration's fallback.

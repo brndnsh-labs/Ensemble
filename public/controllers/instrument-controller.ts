@@ -6,8 +6,6 @@ import {
     killChordBus,
     killDrumBus,
     killDrumNote,
-    killHarmonyBus,
-    killHarmonyNote,
     killSoloistBus,
     killSoloistNote,
     restoreGains,
@@ -44,31 +42,28 @@ export function handleTap(setBpmRef: (bpm: number) => void): void {
 }
 
 export function flushBuffers(): void {
-    const { bass, soloist, chords, harmony } = getState();
+    const { bass, soloist, chords } = getState();
     // 1. Clear local buffers
     bass.buffer.clear();
     soloist.audio.buffer.clear();
     chords.buffer.clear();
-    harmony.buffer.clear();
 
     // 2. Kill current sounds and buses
     killAllPianoNotes(stateMap);
     killSoloistNote(stateMap);
     killBassNote(stateMap);
     killDrumNote(stateMap);
-    killHarmonyNote(stateMap);
 
     killChordBus(stateMap);
     killBassBus(stateMap);
     killSoloistBus(stateMap);
     killDrumBus(stateMap);
-    killHarmonyBus(stateMap);
 
     restoreGains(stateMap);
 }
 
 function flushBuffer(...types: string[]): void {
-    const { chords, bass, soloist, harmony } = getState();
+    const { chords, bass, soloist } = getState();
     const has = (lane: string) => types.includes(lane) || types.includes('all');
     if (has('bass')) {
         if (bass.lastPlayedFreq !== null) {
@@ -92,11 +87,6 @@ function flushBuffer(...types: string[]): void {
         killAllPianoNotes(stateMap);
         killChordBus(stateMap);
     }
-    if (has('harmony')) {
-        harmony.buffer.clear();
-        killHarmonyNote(stateMap);
-        killHarmonyBus(stateMap);
-    }
     if (has('groove')) {
         killDrumNote(stateMap);
         killDrumBus(stateMap);
@@ -105,14 +95,13 @@ function flushBuffer(...types: string[]): void {
 }
 
 export function togglePower(type: string): void {
-    const { groove, vizState, chords, bass, soloist, harmony } = getState();
-    const normalizedType = type === 'chords' ? 'chord' : type === 'harmonies' ? 'harmony' : type;
+    const { groove, vizState, chords, bass, soloist } = getState();
+    const normalizedType = type === 'chords' ? 'chord' : type;
 
     const stateMap = {
         chord: chords,
         bass: bass,
         soloist: soloist,
-        harmony: harmony,
         groove: groove,
         viz: vizState,
     };
@@ -161,7 +150,7 @@ export function togglePower(type: string): void {
     // without). Muting the bass is "I'm playing that part", so the comp has to be
     // re-voiced NOW or it keeps the rootless shapes with nothing stating the root.
     // Mutate -> validate -> flush. Flush every lane that reads the re-voiced progression
-    // (chords + harmony, not just the bass buffer) — but NOT the drums or the
+    // (the chords, not just the bass buffer) — but NOT the drums or the
     // soloist: a player muting the bass mid-groove must not hear the time hiccup.
     const bassToggled = normalizedType === 'bass';
     if (bassToggled) {
@@ -171,8 +160,8 @@ export function togglePower(type: string): void {
     }
 
     if (bassToggled) {
-        flushBuffer('bass', 'chord', 'harmony');
-    } else if (['chord', 'soloist', 'harmony'].includes(normalizedType)) {
+        flushBuffer('bass', 'chord');
+    } else if (['chord', 'soloist'].includes(normalizedType)) {
         flushBuffer(normalizedType);
     } else {
         restoreGains(getState());

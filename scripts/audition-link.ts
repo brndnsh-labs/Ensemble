@@ -2,13 +2,7 @@ import process from 'node:process';
 import { pathToFileURL } from 'node:url';
 import { TIME_SIGNATURES } from '../public/config.js';
 import { GENRE_NAMES } from '../public/data/smart-genres.js';
-import {
-    bass,
-    chords,
-    harmony,
-    MIXER_SETTINGS_VERSION,
-    soloist,
-} from '../public/state/instruments.js';
+import { bass, chords, MIXER_SETTINGS_VERSION, soloist } from '../public/state/instruments.js';
 import { encodeBase64Unicode } from '../public/state/share-codec.js';
 import type { ChordDensity, SharedBandPayload } from '../public/types.js';
 import { DEFAULT_MIX_REPORT_SCENES } from './mix-report-utils.js';
@@ -27,8 +21,11 @@ interface SceneShape {
 // The parts a link can switch. Drums are deliberately absent: the `bnd` groove block also
 // carries swing/humanize, so emitting one just to flip `enabled` would pin swing to a number
 // and override the genre's own feel — the thing most auditions are listening for.
-const SWITCHABLE_PARTS = ['soloist', 'bass', 'chords', 'harmony'] as const;
+const SWITCHABLE_PARTS = ['soloist', 'bass', 'chords'] as const;
 type Part = (typeof SWITCHABLE_PARTS)[number];
+// The old engine's harmony lane is gone (#1436), but written listen menus still pass
+// `--off=chords,harmony`: accepted and ignored, with a note, rather than an error.
+const RETIRED_PART = 'harmony';
 const DENSITIES: readonly ChordDensity[] = ['thin', 'standard', 'rich'];
 
 interface CliArgs {
@@ -46,6 +43,8 @@ interface CliArgs {
     density?: ChordDensity | null;
     on?: Part[];
     off?: Part[];
+    /** `--on`/`--off` named the retired harmony lane, which the link then ignores. */
+    retiredPart?: boolean;
 }
 
 // The v2 stand's dev server (`npm --prefix prototypes/v2 run dev`) at its default `/v2` base.
@@ -65,7 +64,7 @@ function parseParts(flag: string, value: string): Part[] {
     return value
         .split(',')
         .map((part) => part.trim())
-        .filter(Boolean)
+        .filter((part) => part && part !== RETIRED_PART)
         .map((part) => {
             if (!(SWITCHABLE_PARTS as readonly string[]).includes(part)) {
                 throw new Error(`${flag}: unknown part "${part}" (${SWITCHABLE_PARTS.join(', ')})`);
@@ -123,10 +122,11 @@ function parseArgs(argv: string[]): CliArgs {
                 throw new Error(`--density: expected one of ${DENSITIES.join(', ')}`);
             }
             out.density = density;
-        } else if (arg.startsWith('--on=')) {
-            out.on = parseParts('--on', arg.slice('--on='.length));
-        } else if (arg.startsWith('--off=')) {
-            out.off = parseParts('--off', arg.slice('--off='.length));
+        } else if (arg.startsWith('--on=') || arg.startsWith('--off=')) {
+            const flag = arg.startsWith('--on=') ? '--on' : '--off';
+            const value = arg.slice(flag.length + 1);
+            out[flag === '--on' ? 'on' : 'off'] = parseParts(flag, value);
+            out.retiredPart ||= value.split(',').some((part) => part.trim() === RETIRED_PART);
         } else if (arg === '--no-autoplay') {
             out.autoplay = false;
         } else if (arg === '--help' || arg === '-h') {
@@ -215,16 +215,6 @@ function buildBandParam(args: CliArgs): string | null {
             d: args.density || 'standard',
         };
     }
-    if (switched.has('harmony')) {
-        band.h = {
-            e: flag('harmony', harmony.enabled),
-            s: harmony.style,
-            o: harmony.octave,
-            v: harmony.volume,
-            r: harmony.reverb,
-            c: harmony.complexity,
-        };
-    }
     return encodeBase64Unicode(JSON.stringify(band));
 }
 
@@ -256,10 +246,7 @@ export function buildAuditionLink(scene: SceneShape, args: CliArgs): string {
     if (dropped.length > 0) {
         process.stderr.write(`note: the v2 stand ignores ${dropped.join(', ')} in this link\n`);
     }
-    // The band engine has no harmony lane (docs/design/band-engine.md) and no v2 surface
-    // shows a control to mute one, so switching it here has nothing to attach to — unlike the
-    // other three `SWITCHABLE_PARTS`, which the v2 reader does honor (#1382).
-    if ((args.on || []).includes('harmony') || (args.off || []).includes('harmony')) {
+    if (args.retiredPart) {
         process.stderr.write(
             "note: the v2 stand has no harmony lane; this link's harmony switch has no effect\n",
         );

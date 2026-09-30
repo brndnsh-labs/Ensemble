@@ -20,9 +20,6 @@ vi.mock('../../../public/engine/engine.js', () => ({
     killChordBus: vi.fn(),
     killDrumBus: vi.fn(),
     killDrumNote: vi.fn(),
-    killHarmonyBus: vi.fn(),
-    killHarmonyNote: vi.fn(),
-    releaseHarmonyVoicing: vi.fn(),
     killSoloistBus: vi.fn(),
     killSoloistNote: vi.fn(),
     restoreGains: vi.fn(),
@@ -84,14 +81,6 @@ vi.mock('../../../public/state.js', () => {
             sessionSteps: 0,
             buffer: { clear: vi.fn(), set: vi.fn(), size: 0, delete: vi.fn() },
         }),
-        harmony: {
-            style: 'smart',
-            octave: 4,
-            enabled: true,
-            volume: 0.5,
-            complexity: 0.5,
-            buffer: { clear: vi.fn(), set: vi.fn(), size: 0, delete: vi.fn() },
-        },
         vizState: { enabled: true },
         midi: {},
     };
@@ -120,7 +109,6 @@ describe('Instrument Controller', () => {
         state.chords.enabled = true;
         state.bass.enabled = true;
         state.soloist.enabled = true;
-        state.harmony.enabled = true;
         state.groove.enabled = true;
         state.vizState.enabled = true;
 
@@ -214,9 +202,8 @@ describe('Instrument Controller', () => {
             expect(order(ChordsEngine.validateProgression)).toBeLessThan(
                 order(Engine.killAllPianoNotes),
             );
-            // The comp and pads read the re-voiced progression too...
+            // The comp reads the re-voiced progression too...
             expect(Engine.killAllPianoNotes).toHaveBeenCalled();
-            expect(Engine.killHarmonyNote).toHaveBeenCalled();
             expect(Engine.killBassNote).toHaveBeenCalled();
             // ...but the time must not hiccup: drums and soloist ring through.
             expect(Engine.killDrumNote).not.toHaveBeenCalled();
@@ -237,12 +224,12 @@ describe('Instrument Controller', () => {
             });
         });
 
-        it('should handle chord/harmony alias names', () => {
-            InstrumentController.togglePower('harmonies');
+        it('should handle the chords alias name', () => {
+            InstrumentController.togglePower('chords');
             expect(dispatch).toHaveBeenCalledWith(
                 ACTIONS.SET_PARAM,
                 expect.objectContaining({
-                    module: 'harmony',
+                    module: 'chords',
                 }),
             );
         });
