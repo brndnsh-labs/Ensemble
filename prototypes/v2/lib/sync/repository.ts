@@ -264,7 +264,7 @@ function storedLastOpened(value: LastOpened | undefined, scope: AccountScope): s
  * does a row for a document with no saved record at all: there is no committed version for it to
  * be older than, and the draft is then the only copy of that music here.
  */
-function liveDraft(row: Draft, song: SavedSong | null): boolean {
+function liveDraft(row: Draft, song: Pick<SavedSong, 'document'> | null): boolean {
     if (!row || typeof row.capturedAt !== 'string') {
         return true;
     }
@@ -317,7 +317,10 @@ function operations<T>(
  * the local line under `freshDocumentId` from `source`'s bytes and title, as an ordinary queued
  * create (`base: { revision: null }`, local revision 0), and move every retained draft for
  * `documentId` onto it. A row this build cannot validate is left in place rather than moved —
- * preserved, not moved, and never a reason to abort the resolution.
+ * preserved, not moved, and never a reason to abort the resolution. `replaced` is the record the
+ * drafts were experiments on (null when there was none): a draft live against it (`liveDraft`)
+ * stays live against the new line (#1430) — except `sourceWriter`'s, the draft the new line was
+ * minted from, whose music the new record now IS.
  *
  * Deliberately does NOT touch the original id — the refused-Save route (adopt the remote version,
  * or drop the id entirely) and the bare-`deleted`-candidate route (always drop it) settle that
@@ -336,6 +339,8 @@ function keepMineAsNewSong(
     operationId: string,
     rows: Draft[],
     source: ChartDocument,
+    replaced: Pick<SavedSong, 'document'> | null,
+    sourceWriter: string | null,
 ): ChartDocument {
     const now = new Date().toISOString();
     // `createdAt` is carried: this is the same piece of music under a new identity, not a song
@@ -367,26 +372,45 @@ function keepMineAsNewSong(
         wireBody: null,
         status: 'queued',
     } satisfies SaveOperation);
+    const drafts: Draft[] = [];
     for (const row of rows) {
-        let moved: Draft;
         try {
             const draft = savedDraft(row, scope, documentId);
-            moved = {
+            drafts.push({
                 ...draft,
                 documentId: freshDocumentId,
                 document: snapshot({ ...draft.document, id: freshDocumentId }),
                 // The experiment is unchanged; what it is an experiment ON is the create above,
                 // so its base is that revision — always 0, because the create is always a create.
                 baseRevision: carried.revision,
-            };
+            });
         } catch {
             // One row this build cannot validate must not abort the only exit from a terminal
             // conflict. It is left where it is rather than moved or destroyed: unreadable here
             // is not the same as worthless, and nothing else has a copy.
-            continue;
         }
+    }
+    // The new record's `updatedAt` is now, so a moved draft keeping its own `capturedAt` would
+    // read as superseded by it the moment it lands (`liveDraft`) — never offered again, and
+    // retired by the next Save (#1430). A draft that was live against the record it replaced is
+    // re-stamped to this moment, a millisecond apart in its original order so the newest is
+    // still the newest; one already stamped later keeps its own. A superseded one keeps its
+    // stamp and stays superseded, and so does the source draft: left live, it would be an
+    // "unsaved experiment" identical to the saved record, for the life of the song.
+    const restamped = new Map<Draft, string>();
+    drafts
+        .filter((draft) => draft.writerId !== sourceWriter && liveDraft(draft, replaced))
+        .sort((a, b) => (a.capturedAt < b.capturedAt ? -1 : a.capturedAt > b.capturedAt ? 1 : 0))
+        .forEach((draft, i) => {
+            const at = new Date(Date.parse(now) + i).toISOString();
+            restamped.set(draft, draft.capturedAt >= at ? draft.capturedAt : at);
+        });
+    for (const moved of drafts) {
         tx.table('drafts').delete([scope.ownerId, documentId, moved.writerId]);
-        tx.table('drafts').put(moved);
+        tx.table('drafts').put({
+            ...moved,
+            capturedAt: restamped.get(moved) ?? moved.capturedAt,
+        } satisfies Draft);
     }
     return carried;
 }
@@ -1350,6 +1374,8 @@ export class AccountSongbook {
                                                 operationId,
                                                 rows,
                                                 source,
+                                                song,
+                                                newestDraft?.writerId ?? null,
                                             );
                                             // The candidate row described this divergence, and it
                                             // is settled either way.
@@ -1414,6 +1440,10 @@ export class AccountSongbook {
                                     operationId,
                                     rows,
                                     latest,
+                                    // `save()` advances the saved record with the queue, so
+                                    // its newest entry is the record the drafts were read against.
+                                    { document: latest },
+                                    null,
                                 );
                                 // A `version` or `deleted` observation described a divergence this
                                 // call has just settled. An `unsupported` one did not: it is this
