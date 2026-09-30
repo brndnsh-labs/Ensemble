@@ -1093,18 +1093,34 @@ export default function Ensemble() {
                     setError(String(e.message || e));
                 }
             });
-        const timer = window.setInterval(() => {
-            const state = runtime.state();
-            setPlaying(state.playback.isPlaying);
-            setActive(state.playback.isPlaying ? state.chords.lastActiveChordIndex : null);
+        // The stand follows the performance every animation frame while it plays (#1240), reading
+        // the playhead straight off the engine: a fixed-period sample of it could step over a
+        // chord shorter than the period (a sixteenth at 240 bpm is 62.5ms). Stopped, a 60ms
+        // check notices playback started anywhere else — the lock screen's media controls. A
+        // hidden page gets no frames, so a slower timer still notices playback stopping there.
+        let frame = 0;
+        let idle = 0;
+        const follow = () => {
+            window.cancelAnimationFrame(frame);
+            window.clearTimeout(idle);
+            const playingNow = runtime.state().playback.isPlaying;
+            const slot = playingNow ? runtime.playheadSlot() : -1;
+            setPlaying(playingNow);
+            // No slot while counting in or between two queued segments: the pointer holds.
+            setActive((previous) => (!playingNow ? null : slot >= 0 ? slot : previous));
             setLoopedSectionId(runtime.loopedSection());
-            setCountInBeat(state.playback.isCountingIn ? state.playback.countInBeat : null);
+            setCountInBeat(runtime.countInBeat());
             // #1458 — a pure engine read off the live song tick, not the ACTIVE bar's rendered DOM
-            // node: React hasn't necessarily committed `active`'s new value yet on the very tick
+            // node: React hasn't necessarily committed `active`'s new value yet on the very frame
             // playback crosses a barline, so reading the OLD bar's DOM attributes here would still
-            // see the bar just left for a whole poll tick after the engine had already moved on.
+            // see the bar just left after the engine had already moved on.
             setNextSoon(runtime.inLastBeat());
-        }, 60);
+            if (playingNow) {
+                frame = window.requestAnimationFrame(follow);
+            }
+            idle = window.setTimeout(follow, playingNow ? 250 : 60);
+        };
+        follow();
         const preventLoss = (event: BeforeUnloadEvent) => {
             if (volatileDrafts.current.size || pendingText.current) {
                 event.preventDefault();
@@ -1114,7 +1130,8 @@ export default function Ensemble() {
         window.addEventListener('beforeunload', preventLoss);
         return () => {
             alive = false;
-            window.clearInterval(timer);
+            window.cancelAnimationFrame(frame);
+            window.clearTimeout(idle);
             window.removeEventListener('beforeunload', preventLoss);
         };
     }, []);

@@ -248,9 +248,8 @@ for (const study of [
             });
         });
         await page.getByRole('button', { name: 'Start playback', exact: true }).click();
-        // Two whole laps and the start of a third. The painted pointer is a SAMPLE of the
-        // performance, so a chord can be missed at a busy moment (the lap wrap, on CI
-        // WebKit); the matcher forgives a couple of dropped samples, never a wrong visit.
+        // Two whole laps and the start of a third. From the first wrap on, every visit must
+        // be painted (#1240); only the first lap may lose a visit or two while playback starts.
         await expect
             .poll(() => visits.length, { timeout: 30_000 })
             .toBeGreaterThan(study.visits.length * 2);

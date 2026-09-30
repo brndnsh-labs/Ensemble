@@ -576,7 +576,8 @@ function ensureCymbalBuffer(
         return groove.audioBuffers.noise;
     }
     if (!groove.audioBuffers[profile.key]) {
-        groove.audioBuffers[profile.key] = createMetallicBuffer(audioCtx, profile);
+        groove.audioBuffers[profile.key] =
+            finishWarming(groove, profile.key) ?? createMetallicBuffer(audioCtx, profile);
     }
     return groove.audioBuffers[profile.key];
 }
@@ -640,7 +641,7 @@ function getVariedCymbalBuffer(
     }
     // Still filling — synthesize one more distinct buffer and use it now.
     if (pool.length < CYMBAL_POOL_SIZE) {
-        const fresh = createMetallicBuffer(audioCtx, profile);
+        const fresh = finishWarming(groove, poolKey) ?? createMetallicBuffer(audioCtx, profile);
         pool.push(fresh);
         return fresh;
     }
@@ -2794,7 +2795,19 @@ function playDrumSoundCurrent(
     }
 }
 
-function createMetallicBuffer(audioCtx: AudioContext, profile: CymbalBufferProfile): AudioBuffer {
+/** A metallic buffer part-way through its render, resumable where it stopped. */
+interface MetallicRender {
+    buffer: AudioBuffer;
+    /** Render on until `deadline` (a `performance.now()` time) or the end; true once complete. */
+    render(deadline: number): boolean;
+}
+
+/**
+ * `createMetallicBuffer`'s render, one resumable pass: the same draws in the same order, so a
+ * buffer rendered in slices is the buffer rendered at once. It checks the clock every
+ * `METALLIC_SLICE_SAMPLES` samples rather than every sample.
+ */
+function startMetallicBuffer(audioCtx: AudioContext, profile: CymbalBufferProfile): MetallicRender {
     const sampleRate = audioCtx.sampleRate;
     const requestedLength = Math.max(1, Math.floor(sampleRate * profile.duration));
     const buffer = audioCtx.createBuffer(1, requestedLength, sampleRate);
@@ -2804,32 +2817,147 @@ function createMetallicBuffer(audioCtx: AudioContext, profile: CymbalBufferProfi
     const partialWeights = profile.partials.map(() => 0.7 + Math.random() * 0.45);
     const transientSamples = Math.max(1, Math.floor(sampleRate * 0.008));
     let smoothed = 0;
+    let i = 0;
 
-    for (let i = 0; i < data.length; i++) {
-        const t = i / sampleRate;
-        let metallic = 0;
+    return {
+        buffer,
+        render(deadline: number): boolean {
+            while (i < data.length) {
+                const end = Math.min(data.length, i + METALLIC_SLICE_SAMPLES);
+                for (; i < end; i++) {
+                    const t = i / sampleRate;
+                    let metallic = 0;
 
-        for (let p = 0; p < profile.partials.length; p++) {
-            const partialEnv = Math.exp(-t * (profile.partialDecay + p * profile.partialSpread));
-            metallic +=
-                (Math.sin(
-                    TAU * profile.baseFreq * profile.partials[p] * detunes[p] * t + phases[p],
-                ) *
-                    partialWeights[p] *
-                    partialEnv) /
-                (1 + p * 0.26);
-        }
+                    for (let p = 0; p < profile.partials.length; p++) {
+                        const partialEnv = Math.exp(
+                            -t * (profile.partialDecay + p * profile.partialSpread),
+                        );
+                        metallic +=
+                            (Math.sin(
+                                TAU * profile.baseFreq * profile.partials[p] * detunes[p] * t +
+                                    phases[p],
+                            ) *
+                                partialWeights[p] *
+                                partialEnv) /
+                            (1 + p * 0.26);
+                    }
 
-        const noiseEnv = Math.exp(-t * profile.noiseDecay);
-        const noise = (Math.random() * 2 - 1) * profile.noiseMix * noiseEnv;
-        const transient =
-            i < transientSamples
-                ? (1 - i / transientSamples) * profile.transientMix * (Math.random() * 2 - 1)
-                : 0;
-        const raw = (metallic / profile.partials.length) * profile.metalMix + noise + transient;
-        smoothed = smoothed * profile.smooth + raw * (1 - profile.smooth);
-        data[i] = Math.tanh(smoothed * profile.saturation);
+                    const noiseEnv = Math.exp(-t * profile.noiseDecay);
+                    const noise = (Math.random() * 2 - 1) * profile.noiseMix * noiseEnv;
+                    const transient =
+                        i < transientSamples
+                            ? (1 - i / transientSamples) *
+                              profile.transientMix *
+                              (Math.random() * 2 - 1)
+                            : 0;
+                    const raw =
+                        (metallic / profile.partials.length) * profile.metalMix + noise + transient;
+                    smoothed = smoothed * profile.smooth + raw * (1 - profile.smooth);
+                    data[i] = Math.tanh(smoothed * profile.saturation);
+                }
+                if (i < data.length && performance.now() >= deadline) {
+                    return false;
+                }
+            }
+            return true;
+        },
+    };
+}
+
+// About 21 ms of audio at 48 kHz: well under a millisecond of work between clock reads.
+const METALLIC_SLICE_SAMPLES = 1024;
+
+function createMetallicBuffer(audioCtx: AudioContext, profile: CymbalBufferProfile): AudioBuffer {
+    const render = startMetallicBuffer(audioCtx, profile);
+    render.render(Number.POSITIVE_INFINITY);
+    return render.buffer;
+}
+
+/**
+ * Renders `warmDrumBuffers` has started, by the `audioBuffers` key each will land under (a
+ * cymbal's own key, or its `#pool` key for the pool's next member). Keyed by the cache they fill,
+ * so they live and die with it.
+ */
+const warming = new WeakMap<object, Map<string, MetallicRender>>();
+
+function warmingFor(groove: GrooveState): Map<string, MetallicRender> {
+    let pending = warming.get(groove.audioBuffers);
+    if (!pending) {
+        pending = new Map();
+        warming.set(groove.audioBuffers, pending);
     }
+    return pending;
+}
 
-    return buffer;
+/** A hit that needs a buffer the warm-up has started finishes it rather than starting over. */
+function finishWarming(groove: GrooveState, key: string): AudioBuffer | null {
+    const pending = warmingFor(groove);
+    const render = pending.get(key);
+    if (!render) {
+        return null;
+    }
+    render.render(Number.POSITIVE_INFINITY);
+    pending.delete(key);
+    return render.buffer;
+}
+
+/**
+ * The metallic buffers the synth kit renders on a cymbal's first hits, most urgent first. The
+ * crash is 9 s of additive synthesis, and its first hit is usually a section arrival or the
+ * wrap into the next lap — the moment the chart most needs painting (#1240). The pooled cymbals
+ * fill on their first four hits each.
+ */
+const WARM_ORDER: ReadonlyArray<readonly [CymbalName, 'single' | 'pool']> = [
+    ['Crash', 'single'],
+    ['Ride', 'pool'],
+    ['HiHat', 'pool'],
+    ['Open', 'pool'],
+    ['China', 'single'],
+];
+
+/**
+ * Render the synth kit's cymbal buffers ahead of their first hits, until `deadline` (a
+ * `performance.now()` time), so no hit renders one on the main thread mid-performance. Returns
+ * true once every buffer is in place; call again with a fresh deadline until it does. A render
+ * left part-way is finished by the hit that needs it. A sampled kit plays its own hats and ride,
+ * so only the crash and china are warmed for it: a pack without one (no clean CC0 china exists)
+ * falls back to the synth's on that hit. Nothing to do before audio is up.
+ */
+export function warmDrumBuffers(state: EnsembleState, deadline: number): boolean {
+    const audio = state.playback.audio;
+    const { groove } = state;
+    if (!audio) {
+        return true;
+    }
+    const sampled = resolveInstrumentSource(groove.voice).kind === 'sample';
+    const pending = warmingFor(groove);
+    for (const [name, kind] of WARM_ORDER) {
+        if (sampled && kind === 'pool') {
+            continue;
+        }
+        const profile = CYMBAL_BUFFER_PROFILES[name];
+        const key = kind === 'single' ? profile.key : `${profile.key}#pool`;
+        const missing = () =>
+            kind === 'single'
+                ? !groove.audioBuffers[key]
+                : (groove.audioBuffers[key]?.length ?? 0) < CYMBAL_POOL_SIZE;
+        while (missing()) {
+            let render = pending.get(key);
+            if (!render) {
+                render = startMetallicBuffer(audio, profile);
+                pending.set(key, render);
+            }
+            if (!render.render(deadline)) {
+                return false;
+            }
+            pending.delete(key);
+            if (kind === 'single') {
+                groove.audioBuffers[key] = render.buffer;
+            } else {
+                groove.audioBuffers[key] ??= [];
+                groove.audioBuffers[key].push(render.buffer);
+            }
+        }
+    }
+    return true;
 }

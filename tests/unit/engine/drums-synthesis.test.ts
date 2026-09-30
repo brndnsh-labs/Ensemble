@@ -95,6 +95,7 @@ vi.mock('../../../public/engine/audio-graph-utils.js', async (importOriginal) =>
     safeDisconnect: vi.fn(),
 }));
 
+import { registerPackBuffer } from '../../../public/engine/instrument-registry.js';
 import {
     getCymbalMixScale,
     getCymbalVoiceConfig,
@@ -105,6 +106,7 @@ import {
     getTomKeyTuneSemitones,
     getTomVoiceConfig,
     playDrumSound,
+    warmDrumBuffers,
 } from '../../../public/engine/synth-drums.js';
 import { getState } from '../../../public/state.js';
 
@@ -603,5 +605,131 @@ describe('Drum Synthesis', () => {
 
         expect(playback.audio.createBufferSource).toHaveBeenCalled();
         expect(playback.audio.createBiquadFilter).toHaveBeenCalled();
+    });
+});
+
+/**
+ * #1240 — the cymbals' metallic buffers are rendered ahead of their first hits, in slices, so no
+ * hit renders nine seconds of crash on the main thread mid-performance.
+ */
+describe('warming the cymbal buffers', () => {
+    const PAST = 0; // any `performance.now()` is past it: one slice per call
+    const NEVER = Number.POSITIVE_INFINITY;
+
+    /** A seeded `Math.random`, so two renders can be compared sample for sample. */
+    function seeded(seed: number) {
+        let a = seed;
+        return vi.spyOn(Math, 'random').mockImplementation(() => {
+            a = (a + 0x6d2b79f5) | 0;
+            let t = Math.imul(a ^ (a >>> 15), 1 | a);
+            t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        });
+    }
+
+    function warmFully(deadline: number): number {
+        let calls = 1;
+        while (!warmDrumBuffers(getState(), deadline)) {
+            calls++;
+        }
+        return calls;
+    }
+
+    const snapshot = () =>
+        Object.fromEntries(
+            [
+                'crashMetal',
+                'chinaMetal',
+                'rideMetal#pool',
+                'hihatMetal#pool',
+                'openHatMetal#pool',
+            ].map((key) => {
+                const value = groove.audioBuffers[key];
+                const buffers = Array.isArray(value) ? value : [value];
+                return [key, buffers.map((b) => Array.from(b.getChannelData(0)))];
+            }),
+        );
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        groove.audioBuffers = { noise: {} };
+        groove.voice = 'synth';
+        playback.audio.currentTime = 10;
+        // Buffers as long as asked for, so a render really spans many slices. A low rate keeps
+        // the test quick without changing the slicing: a 9 s crash is still 36 slices.
+        playback.audio.sampleRate = 4096;
+        playback.audio.createBuffer.mockImplementation((_channels, length) => {
+            const data = new Float32Array(length);
+            return { length, getChannelData: () => data };
+        });
+    });
+
+    it('renders every buffer the synth kit would, and says when it is done', () => {
+        expect(warmFully(PAST)).toBeGreaterThan(36);
+        expect(groove.audioBuffers.crashMetal.length).toBe(9 * 4096);
+        expect(groove.audioBuffers.chinaMetal).toBeDefined();
+        for (const pool of ['rideMetal#pool', 'hihatMetal#pool', 'openHatMetal#pool']) {
+            expect(groove.audioBuffers[pool]).toHaveLength(4);
+        }
+        expect(warmDrumBuffers(getState(), PAST)).toBe(true);
+    });
+
+    it('renders the same buffers in slices as in one go', () => {
+        const random = seeded(1240);
+        warmFully(NEVER);
+        const whole = snapshot();
+        random.mockRestore();
+
+        groove.audioBuffers = { noise: {} };
+        seeded(1240);
+        warmFully(PAST);
+        expect(snapshot()).toEqual(whole);
+        vi.restoreAllMocks();
+    });
+
+    it('leaves a warmed cymbal nothing to render on its hit', () => {
+        warmFully(NEVER);
+        const warmed = { ...groove.audioBuffers };
+        const pools = ['rideMetal#pool', 'hihatMetal#pool', 'openHatMetal#pool'].map((key) => [
+            ...groove.audioBuffers[key],
+        ]);
+        playDrumSound(getState(), 'Crash', 10, 1.0);
+        for (let hit = 0; hit < 6; hit++) {
+            playDrumSound(getState(), 'HiHat', 10.1 + hit * 0.1, 1.0);
+            playDrumSound(getState(), 'Open', 10.12 + hit * 0.1, 1.0);
+            playDrumSound(getState(), 'Ride', 10.15 + hit * 0.1, 1.0);
+        }
+        // The very buffers the warm-up rendered, and no more: nothing metallic rendered on a hit.
+        expect(groove.audioBuffers.crashMetal).toBe(warmed.crashMetal);
+        expect(
+            ['rideMetal#pool', 'hihatMetal#pool', 'openHatMetal#pool'].map((key) => [
+                ...groove.audioBuffers[key],
+            ]),
+        ).toEqual(pools);
+    });
+
+    it('finishes a half-rendered crash on its hit instead of starting over', () => {
+        // Two slices into the crash, the first thing warmed.
+        warmDrumBuffers(getState(), PAST);
+        warmDrumBuffers(getState(), PAST);
+        expect(groove.audioBuffers.crashMetal).toBeUndefined();
+        expect(playback.audio.createBuffer).toHaveBeenCalledTimes(1);
+
+        playDrumSound(getState(), 'Crash', 10, 1.0);
+        const crash = groove.audioBuffers.crashMetal;
+        expect(playback.audio.createBuffer).toHaveBeenCalledTimes(1);
+        // Rendered to its end, and the warm-up moves on rather than rendering it again.
+        expect(crash.getChannelData(0).at(-1)).not.toBe(0);
+        warmFully(NEVER);
+        expect(groove.audioBuffers.crashMetal).toBe(crash);
+    });
+
+    it('warms only the crash and china a sampled kit may fall back to', () => {
+        registerPackBuffer('warm-test-kit', 'kick', {});
+        groove.voice = 'pack:warm-test-kit';
+        expect(warmDrumBuffers(getState(), NEVER)).toBe(true);
+        expect(groove.audioBuffers.crashMetal).toBeDefined();
+        expect(groove.audioBuffers.chinaMetal).toBeDefined();
+        expect(playback.audio.createBuffer).toHaveBeenCalledTimes(2);
     });
 });

@@ -21,8 +21,6 @@ export const playback = deepSignal<GlobalContext>({
     loopStartStep: -1,
     loopEndStep: -1,
     drawQueue: [],
-    isCountingIn: false,
-    countInBeat: 0,
     isDrawing: false,
     wakeLock: null,
     bandIntensity: DEFAULT_BAND_INTENSITY,

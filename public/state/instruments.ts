@@ -31,7 +31,6 @@ export const chords = deepSignal<ChordState>({
     style: 'smart',
     volume: 1.0,
     reverb: INSTRUMENT_REVERB_DEFAULTS.chords,
-    lastActiveChordIndex: null,
     scheduledChordIndex: null,
     buffer: new Map(),
     rhythmicMask: 0,

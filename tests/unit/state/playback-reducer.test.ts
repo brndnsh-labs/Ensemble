@@ -121,8 +121,6 @@ describe('Playback Reducer', () => {
                 scheduleAheadTime: 0.3,
                 step: 16,
                 drawQueue: [{ event: 'test' }],
-                isCountingIn: true,
-                countInBeat: 2,
                 isDrawing: true,
                 theme: 'light',
                 wakeLock: { lock: true },
