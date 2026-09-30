@@ -50,8 +50,6 @@ export const STATE_OWNERSHIP_MANIFEST = {
         loopStartStep: 'runtime-derived',
         loopEndStep: 'runtime-derived',
         drawQueue: 'runtime-derived',
-        isCountingIn: 'runtime-derived',
-        countInBeat: 'runtime-derived',
         isDrawing: 'runtime-derived',
         wakeLock: 'runtime-derived',
         // The chart's energy (`ChartPerformance.energy`, DECISION 2026-09-26): the user is
@@ -133,7 +131,6 @@ export const STATE_OWNERSHIP_MANIFEST = {
         style: 'document',
         volume: 'document',
         reverb: 'document',
-        lastActiveChordIndex: 'runtime-derived',
         scheduledChordIndex: 'runtime-derived',
         buffer: 'runtime-derived',
         rhythmicMask: 'runtime-derived',

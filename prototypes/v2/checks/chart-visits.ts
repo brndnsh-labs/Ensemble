@@ -8,33 +8,31 @@ const visitKey = (visit: ChartVisit) => `${visit.name}@${visit.start}-${visit.en
 /**
  * Assert the stand's painted chord pointer followed `lap`, repeated, in order.
  *
- * What the DOM shows is a SAMPLE of the performance, not every frame of it: the
- * runtime publishes `chords.lastActiveChordIndex` off a 50ms interval (`followPlayhead`) and React paints
- * the result, so a main-thread stall longer than a chord drops that chord from
- * the chart even though the audio — scheduled ahead on the audio thread — is
- * unaffected. Under CI contention (three WebKit workers on a four-core runner)
- * that happens at the lap wrap, where the turnaround does the most work: an
- * instrumented run caught F@44-60 followed directly by Dm@8-12, with C@0-8's
- * ~500ms window painted in neither the mutation records nor an independent
- * requestAnimationFrame sampler.
+ * The stand reads the playhead every animation frame (#1240), so a chord goes
+ * unpainted only if the main thread stalls for longer than it lasts. The lap
+ * wrap used to be such a stall: the drummer's first crash rendered its nine
+ * seconds of cymbal on the main thread right there, and under CI contention a
+ * whole ~500ms chord went unpainted. That is fixed (`warmDrumBuffers`), so from
+ * the first wrap on NO visit may be skipped.
  *
- * So assert the musical claim rather than the frame-rate one. Every visit the
- * stand DID paint must be the next one the form calls for, the form must wrap,
- * and every chord in it must be reached. A wrong chord, a wrong step span, an
- * out-of-order visit, a skipped wrap or a chord that never appears at all still
- * fails; only a bounded number of dropped SAMPLES is forgiven.
+ * Starting playback is the one stall left. Under heavy contention WebKit can
+ * block the main thread outside any script while the audio device comes up, so
+ * the first lap may miss up to `firstLapDrops` visits. Every visit the stand DID
+ * paint must still be the next one the form calls for, the form must wrap, and
+ * every chord in it must be reached: a wrong chord, a wrong step span, an
+ * out-of-order visit, a skipped wrap or a chord that never appears still fails.
  */
 export function expectVisitsFollowForm(
     observed: ChartVisit[],
     lap: ChartVisit[],
-    { laps = 2, maxDroppedSamples = 2 } = {},
+    { laps = 2, firstLapDrops = 2 } = {},
 ) {
     // Walk the form as an endless repetition rather than a fixed window: a
-    // dropped sample pushes the run into a later lap, and cutting at a fixed
-    // number of visits would then compare a shifted slice and fail for the very
-    // reason this matcher exists to forgive.
+    // dropped visit in the first lap shifts the run, and cutting at a fixed
+    // number of visits would then compare a shifted slice.
     const trail = () =>
         `painted: ${observed.map(visitKey).join(' -> ')}\nform:    ${lap.map(visitKey).join(' -> ')}`;
+    const startup: string[] = [];
     const dropped: string[] = [];
     let cursor = 0;
     for (const visit of observed) {
@@ -43,7 +41,7 @@ export function expectVisitsFollowForm(
             visitKey(lap[cursor % lap.length]) !== visitKey(visit) &&
             cursor - resume < lap.length
         ) {
-            dropped.push(visitKey(lap[cursor % lap.length]));
+            (cursor < lap.length ? startup : dropped).push(visitKey(lap[cursor % lap.length]));
             cursor += 1;
         }
         expect(
@@ -58,9 +56,12 @@ export function expectVisitsFollowForm(
     ).toBeGreaterThanOrEqual(laps * lap.length + 1);
     expect(
         dropped,
-        `the chart skipped more than ${maxDroppedSamples} visits, which is a stalled main ` +
-            `thread rather than a sampling hiccup.\n${trail()}`,
-    ).toHaveLength(Math.min(dropped.length, maxDroppedSamples));
+        `the chart skipped a visit after the first wrap: a main-thread stall mid-performance.\n${trail()}`,
+    ).toEqual([]);
+    expect(
+        startup,
+        `the chart skipped more than ${firstLapDrops} visits while playback started.\n${trail()}`,
+    ).toHaveLength(Math.min(startup.length, firstLapDrops));
 
     // Drop-tolerant coverage: a sample lost in one lap is covered by the next,
     // but a chord the form never reaches at all is absent from every lap.

@@ -31,6 +31,7 @@ import {
     startPlatformAudioAndWakeLock,
     stopPlatformAudioAndWakeLock,
 } from '@engine/engine/platform-orchestrator';
+import { warmDrumBuffers } from '@engine/engine/synth-drums';
 import { transposeChordText } from '@engine/engine/transpose';
 import { unlockAudio } from '@engine/platform';
 import { chartGenre } from '@engine/songbook/codec';
@@ -166,7 +167,7 @@ function bandAutoComp(genre: string | undefined): InstrumentVoice | null {
 let band: BandHost | null = null;
 let bandSeed = '';
 let bandScore: { key: string; score: SemanticScore } | null = null;
-let playhead: ReturnType<typeof setInterval> | null = null;
+let drumWarmup: ReturnType<typeof setTimeout> | null = null;
 /**
  * The chart sheet's view of the open score, read from the score and its timeline
  * (`band-chart.ts`). Null for a measure-less chart, which the old engine's maps still draw.
@@ -296,62 +297,64 @@ function startBand(freshPlay = false): void {
     );
     param('playback', 'isPlaying', true);
     track('play_started');
-    playhead ??= setInterval(followPlayhead, 50);
+    warmDrums();
 }
+
+/**
+ * Render the synth kit's cymbals ahead of their first hits (`warmDrumBuffers`), a few
+ * milliseconds per task so the stand keeps painting between them. Left to the hit, the crash's
+ * nine seconds of additive synthesis ran on the main thread at the lap wrap and stalled the
+ * chart for up to a second under load (#1240).
+ */
+function warmDrums(): void {
+    if (drumWarmup) {
+        return;
+    }
+    const slice = () => {
+        drumWarmup = null;
+        if (!warmDrumBuffers(getState(), performance.now() + DRUM_WARM_SLICE_MS)) {
+            drumWarmup = setTimeout(slice, 0);
+        }
+    };
+    drumWarmup = setTimeout(slice, 0);
+}
+
+// Short enough that a warm-up task never holds a frame, even when the CPU is shared.
+const DRUM_WARM_SLICE_MS = 4;
 
 function stopBand(): void {
     band?.stop();
-    if (playhead) {
-        clearInterval(playhead);
-        playhead = null;
-    }
-    param('chords', 'lastActiveChordIndex', null);
     if (getState().playback.isPlaying) {
         param('playback', 'isPlaying', false);
-    }
-    // A Stop pressed mid count-in must clear the indicator too — `band.stop()` above already
-    // dropped the host's own count-in bookkeeping, so nothing would otherwise turn this off.
-    if (getState().playback.isCountingIn) {
-        param('playback', 'isCountingIn', false);
     }
     dispatch(ACTIONS.SET_START_STEP, 0);
     stopPlatformAudioAndWakeLock();
     void killAllNotes(getState());
 }
 
-/** Publish the written event under the playhead for the chart sheet, as the old scheduler did. */
-function followPlayhead(): void {
-    // While the count-in clicks, the chart must not advance: report the beat instead of a
-    // tick, and leave `chords.lastActiveChordIndex` exactly where playback will resume it.
-    const countInBeat = band?.countingInBeat() ?? null;
-    const { playback } = getState();
-    if (countInBeat !== null) {
-        if (!playback.isCountingIn) {
-            param('playback', 'isCountingIn', true);
-        }
-        if (playback.countInBeat !== countInBeat) {
-            param('playback', 'countInBeat', countInBeat);
-        }
-        return;
-    }
-    if (playback.isCountingIn) {
-        param('playback', 'isCountingIn', false);
-    }
+/**
+ * The chart slot sounding this instant, or -1 when none is: stopped, counting in, or between two
+ * queued segments. A pure read off `songTick()`, for the stand to call every animation frame
+ * (#1240): publishing it through state on a poll made the chart a sample of a sample, and a
+ * chord shorter than the two periods together could go unpainted.
+ */
+export function playheadSlot(): number {
     const tick = band?.songTick();
     if (tick == null) {
-        return;
+        return -1;
     }
-    const { arranger, chords } = getState();
-    let index: number;
     if (bandView) {
-        index = slotAt(bandView, tick);
-    } else {
-        const step = Math.floor(tick / STEP_TICKS);
-        index = arranger.stepMap.findIndex((entry) => entry.start <= step && step < entry.end);
+        return slotAt(bandView, tick);
     }
-    if (index >= 0 && index !== chords.lastActiveChordIndex) {
-        param('chords', 'lastActiveChordIndex', index);
-    }
+    const step = Math.floor(tick / STEP_TICKS);
+    return getState().arranger.stepMap.findIndex(
+        (entry) => entry.start <= step && step < entry.end,
+    );
+}
+
+/** The count-in beat sounding now (0 is "1"), or null when no count-in is. */
+export function countInBeat(): number | null {
+    return band?.countingInBeat() ?? null;
 }
 
 /** Keep the band in step with every change the app makes to the shared state. */
@@ -1433,13 +1436,12 @@ export function bandChartView(): BandChart | null {
  * for a measure-less (v1) chart too, so this works for v1 exactly like a schemaVersion-2 chart
  * (P2-2: the old `!bandView` gate wrongly denied v1 charts this cue and the jump-ahead both).
  *
- * Pure engine read off `songTick()` directly, not the chart's `active`/`lastActiveChordIndex`
- * state: `active` is published by `followPlayhead`'s own 50ms poll and React only commits it on
- * its next render, so a caller on a DIFFERENT poll (the Following look-ahead's, #1458) that read
- * `active`'s bar from the DOM could still see the bar just left for a whole tick after `songTick()`
- * had already crossed into the next one — firing "last beat" a bar early, at the new bar's
- * downbeat. Reading the bar straight from the timeline via `tick` has no such lag: it always
- * names whichever bar `tick` is ACTUALLY in, this instant. False while stopped or counting in.
+ * Pure engine read off `songTick()` directly, not the chart's `active` slot: React only commits
+ * `active` on its next render, so a caller that read `active`'s bar from the DOM (the Following
+ * look-ahead's, #1458) could still see the bar just left after `songTick()` had already crossed
+ * into the next one — firing "last beat" a bar early, at the new bar's downbeat. Reading the bar
+ * straight from the timeline via `tick` has no such lag: it always names whichever bar `tick` is
+ * ACTUALLY in, this instant. False while stopped or counting in.
  */
 export function inLastBeat(): boolean {
     const tick = band?.songTick();

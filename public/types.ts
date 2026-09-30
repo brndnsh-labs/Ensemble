@@ -407,8 +407,6 @@ export interface ChordState {
     readonly volume: number;
     /** Reverb send amount. */
     readonly reverb: number;
-    /** Index of the currently playing chord (UI). */
-    readonly lastActiveChordIndex: number | null;
     /** Index of the last scheduled chord (Internal). */
     readonly scheduledChordIndex: number | null;
     /** Scheduled notes buffer. */
@@ -1100,10 +1098,6 @@ export interface GlobalContext {
     readonly loopEndStep: number;
     /** Queue of normalized visual events waiting to be rendered. */
     readonly drawQueue: VisualizerQueuedEvent[];
-    /** Whether the metronome count-in is active. */
-    readonly isCountingIn: boolean;
-    /** Current beat of the count-in (0-3). */
-    readonly countInBeat: number;
     /** Whether the visualizer loop is active. */
     readonly isDrawing: boolean;
     /** The screen wake lock object. */

@@ -24,11 +24,11 @@ existing document field from an engine/conductor path.
 ## Effects & reactivity (`state/state-effects.ts`)
 
 7. **Any side effect on the global dispatch subscriber (`handleEffects`) fires on every single
-   dispatch.** During playback the runtime's playhead publishes `chords.lastActiveChordIndex`
-   at every chord change (`followPlayhead`), and the band's own settings sync (`syncBand`) runs
-   on every dispatch too. A **debounced** effect hung off `handleEffects` gets its timer reset
-   on every one of those — starved, not just deferred. A *new* debounced/coalesced subscriber
-   effect needs an exclusion list for the high-frequency actions. v1's session save solved it
+   dispatch**, and so does the band's own settings sync (`syncBand`). Playback no longer
+   dispatches per chord — the stand reads the playhead straight off the runtime each frame
+   (`playheadSlot`, #1240) — but a **debounced** effect hung off `handleEffects` still gets its
+   timer reset by every dispatch in a burst: starved, not just deferred. A *new* debounced/
+   coalesced subscriber effect needs an exclusion list for the high-frequency actions. v1's session save solved it
    that way (a `TRANSIENT_PERSIST_ACTIONS` denylist) until it was deleted with v1's load/save
    layer (#1424); nothing debounced hangs off `handleEffects` today.
 
