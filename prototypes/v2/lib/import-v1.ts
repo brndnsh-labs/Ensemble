@@ -58,7 +58,11 @@ import { hydrateVoice } from '../../../public/engine/instrument-registry.js';
 import { resolveSoloistMode } from '../../../public/engine/soloist-mode-policy.js';
 import { isValidTimeSignatureGrouping } from '../../../public/meter.js';
 import { normalizeSongSeed, stripDangerousChars } from '../../../public/sanitize.js';
-import { validateChartDocument, writtenSettings } from '../../../public/songbook/codec.js';
+import {
+    validateChartDocument,
+    writtenChart,
+    writtenSettings,
+} from '../../../public/songbook/codec.js';
 import type {
     ChartBand,
     ChartContent,
@@ -953,13 +957,25 @@ export interface V1ImportRun {
     now?: string;
 }
 
-/** Does the songbook's copy still hold exactly what an import put there? */
+/**
+ * Does the songbook's copy still hold exactly what an import put there? Compared as written
+ * today (`writtenChart`, the stand's own dirty check): a copy imported by an older build still
+ * stores fields today's conversion no longer writes (the old engine's settings,
+ * `lastChordPreset`), and those alone are not a change worth a rewrite (#1433).
+ */
 function sameContent(candidate: ChartDocument, existing: V1ExistingDocument['document']): boolean {
-    return (
-        candidate.title === existing.title &&
-        candidate.schemaVersion === existing.schemaVersion &&
-        JSON.stringify(candidate.chart) === JSON.stringify(existing.chart)
-    );
+    if (candidate.title !== existing.title || candidate.schemaVersion !== existing.schemaVersion) {
+        return false;
+    }
+    try {
+        return (
+            JSON.stringify(writtenChart(candidate.chart)) ===
+            JSON.stringify(writtenChart(existing.chart as ChartContent))
+        );
+    } catch {
+        // A stored chart that is not a chart of this schema at all holds something else.
+        return false;
+    }
 }
 
 /**

@@ -36,6 +36,7 @@ import {
 import {
     ConflictError,
     list as repositoryList,
+    remove as repositoryRemove,
     save as repositorySave,
 } from '../../../prototypes/v2/lib/repository.js';
 import {
@@ -1116,6 +1117,60 @@ describe('re-running the import', () => {
         const third = await runImport(atTempo(multiSection, 76));
         expect(third.failures).toEqual([]);
         expect((await sessionDocument())?.chart.performance.bpm).toBe(76);
+    });
+
+    /**
+     * The session as a build before #1423/#1424 landed it: the same song, still storing the old
+     * engine's `complexity` and v1's `lastChordPreset`, at revision 0 — and from before the
+     * session mark existed, so revision 0 is the only evidence nothing here edited it.
+     */
+    async function legacyImport() {
+        await runImport(multiSection);
+        const landed = (await sessionDocument())!;
+        if (landed.schemaVersion !== 1) {
+            throw new Error('Expected the v1 session as a sections chart.');
+        }
+        const { chart } = landed;
+        await repositoryRemove(V1_SESSION_ID);
+        await repositorySave(
+            {
+                ...landed,
+                chart: {
+                    ...chart,
+                    arrangement: { ...chart.arrangement, lastChordPreset: 'Last session' },
+                    performance: { ...chart.performance, complexity: 0.5 },
+                },
+            },
+            null,
+        );
+        store.delete(V1_IMPORT_LEDGER_KEY);
+        store.delete(V1_SESSION_MARK_KEY);
+        const stored = (await sessionDocument())!;
+        expect(stored.revision).toBe(0);
+        expect(stored.chart).toHaveProperty('arrangement.lastChordPreset');
+        return stored;
+    }
+
+    it('rewrites nothing for unchanged v1 bytes when only legacy fields differ (#1433)', async () => {
+        const stored = await legacyImport();
+
+        const rerun = await runImport(multiSection, undefined, { wholeFinding: true });
+        expect(rerun.updated).toEqual([]);
+        expect(rerun.failures).toEqual([]);
+        expect(rerun.alreadyPresent).toBe(1);
+        // Not rewritten: the stored copy, legacy fields and all, is exactly as it was.
+        expect(await sessionDocument()).toEqual(stored);
+    });
+
+    it('still updates a legacy-carrying copy when the v1 bytes really changed (#1433)', async () => {
+        await legacyImport();
+
+        const rerun = await runImport(atTempo(multiSection, 88), undefined, { wholeFinding: true });
+        expect(rerun.failures).toEqual([]);
+        expect(rerun.updated.map((document) => document.id)).toEqual([V1_SESSION_ID]);
+        const updated = (await sessionDocument())!;
+        expect(updated.chart.performance.bpm).toBe(88);
+        expect(updated.revision).toBe(1);
     });
 
     it('leaves a copy that was edited here alone, and says so', async () => {

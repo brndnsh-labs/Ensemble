@@ -2,7 +2,7 @@
 
 import { KEY_ORDER } from '@engine/config';
 import { decodeChartLink, encodeChartLink } from '@engine/songbook/chart-link';
-import { writtenArrangement, writtenSettings } from '@engine/songbook/codec';
+import { writtenChart } from '@engine/songbook/codec';
 import type { SemanticScore } from '@engine/songbook/score-types';
 import type { InstrumentVoice } from '@engine/types';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -116,19 +116,13 @@ import { useOfflineInstall } from './use-offline-install';
 import { useStageTheme } from './use-stage-theme';
 
 /**
- * The chart as it would be written today: an old chart's legacy fields (still stored, since
- * charts shed them lazily on their next save) left out and its genre read once. Comparing this,
- * not the raw stored chart, keeps a change undone by hand on an old chart from reading as an
- * edit — which would otherwise hold an account draft against every later remote advance.
+ * Compared as written today (`writtenChart`), not as stored: a change undone by hand on an old
+ * chart, which still carries its legacy fields, must not read as an edit — which would
+ * otherwise hold an account draft against every later remote advance.
  */
-const written = (chart: ChartDocument['chart']) => ({
-    ...chart,
-    ...writtenSettings(chart),
-    ...('arrangement' in chart ? { arrangement: writtenArrangement(chart.arrangement) } : {}),
-});
-
 const same = (a: ChartDocument, b: ChartDocument) =>
-    a.title === b.title && JSON.stringify(written(a.chart)) === JSON.stringify(written(b.chart));
+    a.title === b.title &&
+    JSON.stringify(writtenChart(a.chart)) === JSON.stringify(writtenChart(b.chart));
 
 /**
  * Which songbook the chart on the stand came from — and, for an account chart, WHOSE account

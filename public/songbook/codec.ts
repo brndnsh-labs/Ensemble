@@ -858,6 +858,22 @@ export function writtenArrangement(arrangement: ChartArrangement): ChartArrangem
     return written;
 }
 
+/**
+ * A whole chart as it would be written today — {@link writtenSettings} and, for a chart with
+ * one, {@link writtenArrangement} — for asking whether two charts hold the same music. An old
+ * chart keeps its legacy fields until its next save, so comparing the raw stored copies would
+ * call a chart changed when only a field today's app no longer writes differs.
+ */
+export function writtenChart<C extends Pick<ChartContent, 'performance' | 'band'>>(chart: C): C {
+    return {
+        ...chart,
+        ...writtenSettings(chart),
+        ...('arrangement' in chart
+            ? { arrangement: writtenArrangement(chart.arrangement as ChartArrangement) }
+            : {}),
+    };
+}
+
 function validateChartContent(
     ctx: ValidationContext,
     candidate: unknown,
