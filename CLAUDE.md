@@ -113,7 +113,7 @@ One runtime per page, independent of React mounts. `initialize()` seeds the inst
 
 ### State (`public/state.ts`, `public/state/`)
 
-- Domain slices: `playback`, `arranger`, `groove`, `chords`, `bass`, `soloist`, `harmony`, `midi`, `vizState`, `conductor` — each a `deepSignal`.
+- Domain slices: `playback`, `arranger`, `groove`, `chords`, `bass`, `soloist`, `midi`, `vizState`, `conductor` — each a `deepSignal`.
 - **All writes go through `dispatch(ACTIONS.TYPE, payload)`.** Never mutate state directly in components or controllers.
 - Hosts read with `getState()` and listen with `subscribe()` (`public/state.ts`). In v2 only `lib/runtime.ts` does either; React state lives in the shell, not in the slices.
 - `public/state/state-effects.ts` owns cross-module side effects kept deliberately outside reducers.
@@ -210,7 +210,7 @@ The only Playwright suite is the app's: `prototypes/v2/checks/`, config in `prot
 
 ### Vitest browser mode (`tests/browser/`)
 
-The few engine tests that need a **real `OfflineAudioContext`** (reverb-tail decay, harmony click-free) run here — headless Chromium via `@vitest/browser-playwright`, config in `vitest.browser.config.ts`, command `npm run test:browser`. Node-mode `npm test` (happy-dom) has no Web Audio, so these can't live there. Not folded into `npm run ci` (the `checks` job installs no browser); the CI `e2e-tests` job runs them, with `npm run test:sync`.
+The few engine tests that need a **real `OfflineAudioContext`** (reverb-tail decay, reverb stability) run here — headless Chromium via `@vitest/browser-playwright`, config in `vitest.browser.config.ts`, command `npm run test:browser`. Node-mode `npm test` (happy-dom) has no Web Audio, so these can't live there. Not folded into `npm run ci` (the `checks` job installs no browser); the CI `e2e-tests` job runs them, with `npm run test:sync`.
 
 ### Biome
 

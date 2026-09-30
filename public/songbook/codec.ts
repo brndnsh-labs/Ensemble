@@ -46,6 +46,7 @@ const NOTATIONS = new Set(['roman', 'name', 'nns']);
 const SOLOIST_MODES = new Set(['monophonic', 'guitar']);
 const SOLOIST_TRADE_MODES = new Set(['manual', 'sections', 'loops']);
 const SOLOIST_TRADE_WITH = new Set(['off', 'soloist', 'drums']);
+// `harmony` is a retired lane (#1436), kept so an old chart's section override round-trips.
 const SECTION_INSTRUMENTS = ['groove', 'bass', 'chords', 'harmony', 'soloist'] as const;
 const PROTOTYPE_MEMBER_NAMES = new Set(Object.getOwnPropertyNames(Object.prototype));
 const GROOVE_PATTERN_LANE_NAMES = new Set<string>(CHART_GROOVE_PATTERN_LANE_NAMES);

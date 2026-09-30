@@ -12,8 +12,7 @@
  * (or any genre not listed) resolves to `synth` — the safe, always-present
  * fallback — as does a mapped pack that isn't installed.
  *
- * The **harmony** and **chords** lanes have packs to map; soloist/groove
- * generalize here as their packs' auto-mappings are chosen by ear.
+ * Each lane's pack mappings are chosen by ear.
  */
 
 import { packIdFromVoice } from '../engine/instrument-registry.js';
@@ -24,9 +23,8 @@ export const GENRE_SOUND_MAP: Readonly<
     Record<string, Partial<Record<InstrumentModule, InstrumentVoice>>>
 > = {
     // Each genre's lanes are chosen to pair coherently rather than fight: a
-    // chords keyboard, a harmony section, a soloist lead, a bass, and a drum kit
-    // that share the idiom. (#682 chords/harmony · #694 soloist · #695 drums ·
-    // #697 bass.)
+    // chords keyboard, a soloist lead, a bass, and a drum kit that share the idiom.
+    // (#682 chords · #694 soloist · #695 drums · #697 bass.)
     // bass — upright (#697): a pizzicato double bass for the acoustic combo
     //   (jazz/bossa/blues walking, singer-songwriter, country); everything else
     //   keeps the synth electric (the only electric-bass voice we have).
@@ -41,7 +39,6 @@ export const GENRE_SOUND_MAP: Readonly<
     //   • clavinet → funk's percussive plucked comp
     //   • electric-guitar-rhythm → Metal's crunch power chords (#698)
     //   • grand    → Rock (stays the piano; users can override to the guitar)
-    // harmony — the section answering the changes (horns vs. string pad vs. synth).
     // soloist — three real leads, each only where idiomatic (everything else keeps
     //   the synth lead — one voice on every genre would wear thin):
     //   • sax (#694)          → jazz/blues blowing (blues flips to harp once #699
@@ -60,7 +57,6 @@ export const GENRE_SOUND_MAP: Readonly<
     //   metal aggression — the synth kit's tighter transient is closer).
     Funk: {
         chords: 'pack:clavinet',
-        harmony: 'pack:horns-section',
         soloist: 'pack:electric-guitar-clean',
         groove: 'pack:acoustic-kit',
     },
@@ -68,61 +64,52 @@ export const GENRE_SOUND_MAP: Readonly<
     // reduces to power chords (root+5+oct) under this voice, since distorted
     // triads mud up. Rock keeps the grand piano (Brandon's call — stay close to
     // today's default; users can hand-override to the guitar).
-    Metal: { chords: 'pack:electric-guitar-rhythm', harmony: 'pack:horns-section' },
+    Metal: { chords: 'pack:electric-guitar-rhythm' },
     'Ska-Punk': {
         chords: 'pack:hammond-organ',
-        harmony: 'pack:horns-section',
         groove: 'pack:acoustic-kit',
     },
     Jazz: {
         chords: 'pack:grand',
-        harmony: 'pack:horns-section',
         soloist: 'pack:sax-alto',
         bass: 'pack:upright-bass',
         groove: 'pack:acoustic-kit',
     },
     Blues: {
         chords: 'pack:hammond-organ',
-        harmony: 'pack:horns-section',
         soloist: 'pack:sax-alto',
         bass: 'pack:upright-bass',
         groove: 'pack:acoustic-kit',
     },
     Reggae: {
         chords: 'pack:hammond-organ',
-        harmony: 'pack:horns-section',
         groove: 'pack:acoustic-kit',
     },
-    // Sustained string pad — genres that want a lush bed under the changes.
     Rock: {
         chords: 'pack:grand',
-        harmony: 'pack:strings-ensemble',
         soloist: 'pack:electric-guitar-driven',
         groove: 'pack:acoustic-kit',
     },
-    Disco: { chords: 'pack:rhodes', harmony: 'pack:strings-ensemble', groove: 'pack:acoustic-kit' },
+    Disco: { chords: 'pack:rhodes', groove: 'pack:acoustic-kit' },
     Country: {
         chords: 'pack:grand',
-        harmony: 'pack:strings-ensemble',
         soloist: 'pack:electric-guitar-clean',
         bass: 'pack:upright-bass',
         groove: 'pack:acoustic-kit',
     },
     Acoustic: {
         chords: 'pack:grand',
-        harmony: 'pack:strings-ensemble',
         soloist: 'pack:nylon-guitar',
         bass: 'pack:upright-bass',
         groove: 'pack:acoustic-kit',
     },
     Bossa: {
         chords: 'pack:grand',
-        harmony: 'pack:strings-ensemble',
         soloist: 'pack:nylon-guitar',
         bass: 'pack:upright-bass',
         groove: 'pack:acoustic-kit',
     },
-    // Neo-Soul — Rhodes on the keys (#655); no harmony pack fit yet → synth pad.
+    // Neo-Soul — Rhodes on the keys (#655).
     'Neo-Soul': { chords: 'pack:rhodes', groove: 'pack:acoustic-kit' },
     // Hip Hop — Rhodes keys (#655); groove stays the synth kit (programmed beats).
     'Hip Hop': { chords: 'pack:rhodes' },

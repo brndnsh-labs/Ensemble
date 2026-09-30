@@ -163,7 +163,6 @@ interface DrumMixState {
 //   center +0.25 — Soloist (bus offset; per-note ±0.05 jitter on top)
 //   left   -0.2  — Snare/Sidestick/Brush
 //   left   -0.3  — Chords (at bus)
-//   right  +0.3  — Harmony (at bus)
 //   right  +0.35 — HiHat / Open / Crash / Ride / China / shaker family
 //   spread ±0.25 — Toms / Conga / Bongo (per-hit randomized)
 const RIGHT_PANNED_INSTRUMENTS = new Set([
@@ -758,9 +757,6 @@ function getBandLayerCount(state: EnsembleState, step: number): number {
     if (isInstrumentActiveAtStep(state, 'chords', musicalStep)) {
         layers++;
     }
-    if (isInstrumentActiveAtStep(state, 'harmony', musicalStep)) {
-        layers++;
-    }
     if (isInstrumentActiveAtStep(state, 'soloist', musicalStep)) {
         layers++;
     }
@@ -776,6 +772,8 @@ export function getCymbalMixScale(
     step = state.playback?.step ?? 0,
 ): number {
     const bandIntensity = clamp01(state.playback?.bandIntensity ?? 0.5);
+    // Over 4, the lane count before the harmony lane went (#1436): kept so the cymbal mix
+    // for today's three pitched lanes is unchanged.
     const crowding = getBandLayerCount(state, step) / 4;
     const genreFeel = state.groove?.genreFeel;
     const instrumentBase =

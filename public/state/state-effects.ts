@@ -22,7 +22,7 @@ interface HandleEffectsContext {
 }
 
 /** Lanes that follow the genre when in Auto mode (#675). */
-const AUTO_FOLLOW_MODULES: InstrumentModule[] = ['chords', 'bass', 'soloist', 'harmony', 'groove'];
+const AUTO_FOLLOW_MODULES: InstrumentModule[] = ['chords', 'bass', 'soloist', 'groove'];
 
 /**
  * Resolve every Auto-mode lane's voice to what `genre` maps to right now, and

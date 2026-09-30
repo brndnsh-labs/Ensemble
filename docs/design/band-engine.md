@@ -268,8 +268,8 @@ open even when that lane is off live. The listening-gate tools (`mix:report` and
 it) render through the same function, `renderBandPasses`: they compose a scene in node
 (`scripts/band-scene.ts`) and hand the events to the page's render bridge
 (`lib/render-bridge.ts`), so what they measure is what the export writes.
-`app/band-lanes.ts`'s `visibleLanes` drops harmony from every lane-driven control (transport
-mute chips, the Sounds panel). The `.mid` export is the same stream through `band/sinks/midi.ts`:
+`app/band-lanes.ts`'s `visibleLanes` lists the band's four lanes for every lane-driven control
+(transport mute chips, the Sounds panel); the old harmony lane is gone from state too (#1436). The `.mid` export is the same stream through `band/sinks/midi.ts`:
 the song once through with its ending, a lead track only when the lead played.
 
 **The chart sheet** draws a score from the score and its timeline (`prototypes/v2/lib/band-chart.ts`),

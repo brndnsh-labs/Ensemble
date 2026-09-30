@@ -11,7 +11,7 @@ import { ACTIONS, type InstrumentModule } from '../../public/types.js';
 import { enterGenre } from '../utils/genre-entry.js';
 
 // Approved defaults, independent of the tables under test. In particular, the
-// Acoustic preset is still arp + strings; optional players are tested separately.
+// Acoustic preset is still arp; optional players are tested separately.
 const ROUTES = [
     [
         'Rock',
@@ -19,9 +19,7 @@ const ROUTES = [
         'rock',
         'smart',
         'rock',
-        'smart',
         'grand',
-        'strings-ensemble',
         'electric-guitar-driven',
         '',
         'acoustic-kit',
@@ -32,9 +30,7 @@ const ROUTES = [
         'quarter',
         'jazz',
         'bird',
-        'horns',
         'grand',
-        'horns-section',
         'sax-alto',
         'upright-bass',
         'acoustic-kit',
@@ -45,75 +41,33 @@ const ROUTES = [
         'funk',
         'funk',
         'funk',
-        'horns',
         'clavinet',
-        'horns-section',
         'electric-guitar-clean',
         '',
         'acoustic-kit',
     ],
-    [
-        'Disco',
-        'Disco',
-        'disco',
-        'smart',
-        'disco',
-        'smart',
-        'rhodes',
-        'strings-ensemble',
-        '',
-        '',
-        'acoustic-kit',
-    ],
-    ['Hip Hop', 'Hip Hop', 'hiphop', 'smart', 'hiphop', 'smart', 'rhodes', '', '', '', ''],
+    ['Disco', 'Disco', 'disco', 'smart', 'disco', 'rhodes', '', '', 'acoustic-kit'],
+    ['Hip Hop', 'Hip Hop', 'hiphop', 'smart', 'hiphop', 'rhodes', '', '', ''],
     [
         'Blues',
         'Blues',
         'blues',
         'jazz',
         'blues',
-        'horns',
         'hammond-organ',
-        'horns-section',
         'sax-alto',
         'upright-bass',
         'acoustic-kit',
     ],
-    [
-        'Neo-Soul',
-        'Neo-Soul',
-        'neo',
-        'smart',
-        'neo',
-        'strings',
-        'rhodes',
-        '',
-        '',
-        '',
-        'acoustic-kit',
-    ],
-    [
-        'Reggae',
-        'Reggae',
-        'dub',
-        'smart',
-        'reggae',
-        'smart',
-        'hammond-organ',
-        'horns-section',
-        '',
-        '',
-        'acoustic-kit',
-    ],
+    ['Neo-Soul', 'Neo-Soul', 'neo', 'smart', 'neo', 'rhodes', '', '', 'acoustic-kit'],
+    ['Reggae', 'Reggae', 'dub', 'smart', 'reggae', 'hammond-organ', '', '', 'acoustic-kit'],
     [
         'Acoustic',
         'Acoustic',
         'acoustic',
         'arp',
         'acoustic',
-        'strings',
         'grand',
-        'strings-ensemble',
         'nylon-guitar',
         'upright-bass',
         'acoustic-kit',
@@ -124,9 +78,7 @@ const ROUTES = [
         'bossa',
         'jazz',
         'bossa',
-        'strings',
         'grand',
-        'strings-ensemble',
         'nylon-guitar',
         'upright-bass',
         'acoustic-kit',
@@ -137,41 +89,25 @@ const ROUTES = [
         'country',
         'strum-country',
         'country',
-        'smart',
         'grand',
-        'strings-ensemble',
         'electric-guitar-clean',
         'upright-bass',
         'acoustic-kit',
     ],
-    [
-        'Metal',
-        'Metal',
-        'metal',
-        'power-metal',
-        'metal',
-        'smart',
-        'electric-guitar-rhythm',
-        'horns-section',
-        '',
-        '',
-        '',
-    ],
+    ['Metal', 'Metal', 'metal', 'power-metal', 'metal', 'electric-guitar-rhythm', '', '', ''],
     [
         'Ska-Punk',
         'Ska',
         'walking-ska',
         'ska-upstroke',
         'ska-horns',
-        'horns',
         'hammond-organ',
-        'horns-section',
         '',
         '',
         'acoustic-kit',
     ],
 ];
-const MODULES: InstrumentModule[] = ['chords', 'harmony', 'soloist', 'bass', 'groove'];
+const MODULES: InstrumentModule[] = ['chords', 'soloist', 'bass', 'groove'];
 
 afterEach(() => __resetPackCacheForTest());
 
@@ -179,36 +115,32 @@ it('pins routes for exactly the thirteen selectable genres', () => {
     expect(ROUTES.map(([genre]) => genre).sort()).toEqual([...GENRE_NAMES].sort());
 });
 
-describe.each(ROUTES)(
-    '%s preset entry',
-    (genre, feel, bass, chords, soloist, harmony, ...packs) => {
-        it('applies the real default players and installed Auto sounds, then falls back when absent', async () => {
-            for (const pack of SOUND_PACKS) {
-                markPackInstalled(pack.id, true);
-            }
-            const state = await enterGenre(genre);
-            expect(state.groove.lastSmartGenre).toBe(genre);
-            expect(state.groove.genreFeel).toBe(feel);
-            expect([
-                state.bass.style,
-                state.chords.style,
-                state.soloist.style,
-                state.harmony.style,
-            ]).toEqual([bass, chords, soloist, harmony]);
-            for (const [index, module] of MODULES.entries()) {
-                expect(state[module].autoSound, module).toBe(true);
-                expect(state[module].voice, module).toBe(
-                    packs[index] ? `pack:${packs[index]}` : 'synth',
-                );
-            }
-            __resetPackCacheForTest();
-            resolveAutoVoices(state, genre, dispatch);
-            for (const module of MODULES) {
-                expect(state[module].voice, module).toBe('synth');
-            }
-        });
-    },
-);
+describe.each(ROUTES)('%s preset entry', (genre, feel, bass, chords, soloist, ...packs) => {
+    it('applies the real default players and installed Auto sounds, then falls back when absent', async () => {
+        for (const pack of SOUND_PACKS) {
+            markPackInstalled(pack.id, true);
+        }
+        const state = await enterGenre(genre);
+        expect(state.groove.lastSmartGenre).toBe(genre);
+        expect(state.groove.genreFeel).toBe(feel);
+        expect([state.bass.style, state.chords.style, state.soloist.style]).toEqual([
+            bass,
+            chords,
+            soloist,
+        ]);
+        for (const [index, module] of MODULES.entries()) {
+            expect(state[module].autoSound, module).toBe(true);
+            expect(state[module].voice, module).toBe(
+                packs[index] ? `pack:${packs[index]}` : 'synth',
+            );
+        }
+        __resetPackCacheForTest();
+        resolveAutoVoices(state, genre, dispatch);
+        for (const module of MODULES) {
+            expect(state[module].voice, module).toBe('synth');
+        }
+    });
+});
 
 // Neo-Soul is an explicit style override, not a default/UI-availability claim:
 // its Rhodes default makes the Modern/Open -> Grand source override observable.

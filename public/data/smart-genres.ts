@@ -1,6 +1,5 @@
 const GENRE_DEFAULTS = {
     chord: 'smart',
-    harmony: 'smart',
 };
 
 type GenreOverride = Partial<typeof GENRE_DEFAULTS> & {
@@ -45,7 +44,6 @@ const GENRE_OVERRIDES = {
         chord: 'jazz',
         bass: 'quarter',
         soloist: 'bird',
-        harmony: 'horns',
         meters: ['4/4', '3/4', '6/8'], // swing · jazz waltz · All Blues
     },
     Funk: {
@@ -55,7 +53,6 @@ const GENRE_OVERRIDES = {
         soloist: 'funk',
         // #856 — guitar-idiom lead: tasteful 2-voice chord-stab double-stops.
         soloistMode: 'guitar',
-        harmony: 'horns',
     },
     Disco: {
         feel: 'Disco',
@@ -76,7 +73,6 @@ const GENRE_OVERRIDES = {
         chord: 'jazz',
         bass: 'blues',
         soloist: 'blues',
-        harmony: 'horns',
         meters: ['4/4', '12/8', '6/8'], // straight/shuffle · slow blues · All Blues
     },
     'Neo-Soul': {
@@ -86,7 +82,6 @@ const GENRE_OVERRIDES = {
         // #567 — neo's quartal/guitarDouble color is polyphony-gated; default to
         // guitar (2-voice) so the signature double-stops are live in normal playback.
         soloistMode: 'guitar',
-        harmony: 'strings',
     },
     Reggae: {
         feel: 'Reggae',
@@ -99,9 +94,7 @@ const GENRE_OVERRIDES = {
     },
     Acoustic: {
         feel: 'Acoustic',
-        // The chords lane plays a fingerpick arpeggio (the 'arp' style); the
-        // strings harmony holds the sustained pad underneath — each instrument
-        // on its idiomatic gesture. See accompaniment.ts + harmony-styles.ts.
+        // The chords lane plays a fingerpick arpeggio (the 'arp' style).
         chord: 'arp',
         bass: 'acoustic',
         // #592: the Acoustic genre plays its hand-tuned 'acoustic' profile
@@ -110,7 +103,6 @@ const GENRE_OVERRIDES = {
         soloist: 'acoustic',
         // #856 — guitar-idiom lead: fingerstyle double-stops on the synth lead too.
         soloistMode: 'guitar',
-        harmony: 'strings',
         meters: ['4/4', '3/4'], // ballads & waltz-time singer-songwriter
     },
     Bossa: {
@@ -118,7 +110,6 @@ const GENRE_OVERRIDES = {
         chord: 'jazz',
         bass: 'bossa',
         soloist: 'bossa',
-        harmony: 'strings',
     },
     Country: {
         feel: 'Country',
@@ -140,7 +131,6 @@ const GENRE_OVERRIDES = {
         chord: 'ska-upstroke',
         bass: 'walking-ska',
         soloist: 'ska-horns',
-        harmony: 'horns',
     },
 } satisfies Record<string, GenreOverride>;
 
@@ -240,8 +230,8 @@ function feelToCanon(feel: string | null | undefined): string | null {
  *
  * The UI and `groove.lastSmartGenre` speak genre NAMES; the engine and
  * `groove.genreFeel` speak FEELS, and every feel-keyed table (`GENRE_POCKET`, the
- * groove `strategies` map, `SMART_SCALE_STYLE_MAP`, `DROP_FRIENDLY_GENRES`, harmony
- * styles) misses on a name. Share URLs carry the feel (`sharing.ts` emits
+ * groove `strategies` map, `SMART_SCALE_STYLE_MAP`, `DROP_FRIENDLY_GENRES`) misses
+ * on a name. Share URLs carry the feel (`sharing.ts` emits
  * `groove.genreFeel`), but hand-written and older links carry the name — accept both,
  * and return `null` for anything in neither keyspace so callers reject it instead of
  * writing a phantom key into `genreFeel` (#1130 / #1200).

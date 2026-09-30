@@ -21,17 +21,9 @@ import { killBassNote } from './synth-bass.js';
 // Facade: Re-export synthesis logic from specialized modules
 import { killAllPianoNotes, playNote } from './synth-chords.js';
 import { killDrumNote } from './synth-drums.js';
-import { killHarmonyNote } from './synth-harmonies.js';
 import { killSoloistNote } from './synth-soloist.js';
 
-export {
-    killAllPianoNotes,
-    killBassNote,
-    killDrumNote,
-    killHarmonyNote,
-    killSoloistNote,
-    playNote,
-};
+export { killAllPianoNotes, killBassNote, killDrumNote, killSoloistNote, playNote };
 
 let isChromium: boolean | null = null;
 export function _resetChromiumCheck() {
@@ -42,7 +34,7 @@ export function initAudio(
     state: EnsembleState,
     options: { audioContext?: AudioContext; enableWatchdog?: boolean } = {},
 ) {
-    const { playback, groove, chords, bass, soloist, harmony, midi } = state;
+    const { playback, groove, chords, bass, soloist, midi } = state;
     const providedAudioContext = options.audioContext;
     const usingOfflineContext = Boolean(
         providedAudioContext &&
@@ -214,12 +206,6 @@ export function initAudio(
                 mult: MIXER_GAIN_MULTIPLIERS.soloist,
             },
             {
-                name: MODULES.HARMONIES,
-                key: 'harmony' as const,
-                state: harmony,
-                mult: MIXER_GAIN_MULTIPLIERS.harmonies,
-            },
-            {
                 name: 'drums',
                 key: 'groove' as const,
                 state: groove,
@@ -250,7 +236,7 @@ export function initAudio(
             busEQ.frequency.setValueAtTime(20, playback.audio.currentTime); // Neutral by default
 
             // Per-bus struct fields, populated by the branch below. `busEqEntry`
-            // is the EQ node the bus struct exposes (chords/bass/soloist/harmonies
+            // is the EQ node the bus struct exposes (chords/bass/soloist
             // expose `busEQ`; drums exposes its own highpass).
             let busEqEntry: BiquadFilterNode = busEQ;
             let busPanner: StereoPannerNode | null = null;
@@ -359,45 +345,6 @@ export function initAudio(
                 panner.connect(masterGain);
 
                 busPanner = panner;
-            } else if (m.name === 'harmonies') {
-                // Harmony bus character (synth-audit Epic 1 S5): the old
-                // bus was a single +1 dB peaking filter at 1.2 kHz — an
-                // inaudible no-op, the thinnest bus in the mixer. Harmony
-                // is a *sweetener* layer that should float above the chord
-                // comp, so the bus now does two things:
-                //
-                // 1. Low-mid scoop — peaking 500 Hz, Q 1.0, -3 dB. The
-                //    chord bus owns the low-mids (its lowshelf sits at
-                //    350 Hz); scooping harmony here keeps it from
-                //    competing with the comp and muddying that band.
-                const scoop = playback.audio.createBiquadFilter();
-                scoop.type = 'peaking';
-                scoop.frequency.setValueAtTime(500, playback.audio.currentTime);
-                scoop.Q.setValueAtTime(1.0, playback.audio.currentTime);
-                scoop.gain.setValueAtTime(-3, playback.audio.currentTime);
-
-                // 2. Air high-shelf — +3 dB from 7.5 kHz up. Sits well
-                //    above the chord bus's 2.5 kHz presence lift, so the
-                //    harmony gets its own presence/air slot rather than
-                //    fighting the chords for the same band.
-                const air = playback.audio.createBiquadFilter();
-                air.type = 'highshelf';
-                air.frequency.setValueAtTime(7500, playback.audio.currentTime);
-                air.gain.setValueAtTime(3, playback.audio.currentTime);
-
-                // Epic 7 S1 widened from +0.2 to +0.3: harmony stays opposite
-                // the chord bus (-0.3) and gives the upper-mid air content
-                // a dedicated right-side slot.
-                const panner = playback.audio.createStereoPanner();
-                panner.pan.setValueAtTime(0.3, playback.audio.currentTime);
-
-                gainNode.connect(busEQ);
-                busEQ.connect(scoop);
-                scoop.connect(air);
-                air.connect(panner);
-                panner.connect(masterGain);
-
-                busPanner = panner;
             } else if (m.name === 'drums') {
                 const drumsHP = playback.audio.createBiquadFilter();
                 drumsHP.type = 'highpass';
@@ -478,7 +425,6 @@ export function initAudio(
             buses.chords &&
             buses.bass &&
             buses.soloist &&
-            buses.harmonies &&
             buses.drums
         ) {
             const audioGraph: AudioGraph = {
@@ -493,7 +439,6 @@ export function initAudio(
                 chords: buses.chords,
                 bass: buses.bass,
                 soloist: buses.soloist,
-                harmonies: buses.harmonies,
                 drums: buses.drums,
             };
             (playback as Mutable<typeof playback>).audioGraph = audioGraph; // @direct-mutation
@@ -526,7 +471,6 @@ export function initAudio(
             chords.voice,
             bass.voice,
             soloist.voice,
-            harmony.voice,
             groove.voice,
         ]);
     }
@@ -552,10 +496,6 @@ export function killSoloistBus(state: EnsembleState) {
     killBus(state, state.playback.audioGraph?.soloist);
 }
 
-export function killHarmonyBus(state: EnsembleState) {
-    killBus(state, state.playback.audioGraph?.harmonies);
-}
-
 export function killDrumBus(state: EnsembleState) {
     killBus(state, state.playback.audioGraph?.drums);
 }
@@ -569,11 +509,10 @@ export async function killAllNotes(state: EnsembleState) {
     killBassNote(state);
     killDrumNote(state);
     killSoloistNote(state);
-    killHarmonyNote(state);
 }
 
 export function restoreGains(state: EnsembleState) {
-    const { playback, chords, bass, soloist, harmony, groove, midi } = state;
+    const { playback, chords, bass, soloist, groove, midi } = state;
     if (!playback.audio) {
         return;
     }
@@ -600,13 +539,6 @@ export function restoreGains(state: EnsembleState) {
             mult: MIXER_GAIN_MULTIPLIERS.soloist,
             name: 'soloist',
             key: 'soloist' as const,
-        },
-        {
-            node: graph?.harmonies.gain ?? null,
-            state: harmony,
-            mult: MIXER_GAIN_MULTIPLIERS.harmonies,
-            name: 'harmonies',
-            key: 'harmony' as const,
         },
         {
             node: graph?.drums.gain ?? null,

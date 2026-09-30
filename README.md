@@ -1,6 +1,6 @@
 # Ensemble
 
-Ensemble is a browser-based **virtual band**. Write or import a chord chart, pick a feel, and a full rhythm section — drums, bass, chords, harmony, and an improvising soloist — plays it in real time, right in the browser.
+Ensemble is a browser-based **virtual band**. Write or import a chord chart, pick a feel, and a full rhythm section — drums, bass, chords and an improvising soloist — plays it in real time, right in the browser.
 
 It is built for practice first: mute the part you play and play along with a band that keeps steady time.
 

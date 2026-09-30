@@ -712,8 +712,8 @@ const LANE_REVERB = { chords: 0.3, bass: 0.05, soloist: 0.6, groove: 0.2 } as co
  * engine plays entirely off `band.groove.genre` (`chartGenre`) at playback time, so nothing
  * genre-specific needs to be pre-resolved through a live dispatch. This keeps the catalog
  * buildable — and testable in plain Node — without booting audio or engine state. Every lane
- * follows the sounds this device has installed (`autoSound: true`, #1405); the soloist and
- * harmony lanes start off, matching the app's own defaults (`public/state/instruments.ts`).
+ * follows the sounds this device has installed (`autoSound: true`, #1405); the soloist lane
+ * starts off, matching the app's own defaults (`public/state/instruments.ts`).
  *
  * Exported for `checks/fixtures.ts`'s `seedStarters` too: many specs pre-date the standards
  * catalog and still open a genre-accurate fixture song by name (the old `lib/starters.ts` seeding
@@ -747,10 +747,9 @@ export function bandForGenre(genre: string): ChartBand {
             volume: 1,
             reverb: LANE_REVERB.soloist,
         },
-        // No `harmony`: it's the old engine's lane (the band engine has nothing for it to
-        // play — `feel-sheet.spec.ts`), and `writtenSettings` already omits it from a chart
-        // written today. A catalog chart should look exactly like one, not carry a legacy field
-        // nothing reads.
+        // No `harmony`: it's the old engine's lane (the band has none, #1436), and
+        // `writtenSettings` already omits it from a chart written today. A catalog chart should
+        // look exactly like one, not carry a legacy field nothing reads.
         groove: {
             enabled: true,
             voice: 'synth',

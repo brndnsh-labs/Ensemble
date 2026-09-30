@@ -1,7 +1,7 @@
 import { arranger, arrangerReducer } from './state/arranger.js';
 import { conductor } from './state/conductor.js';
 import { groove, grooveReducer } from './state/groove.js';
-import { bass, chords, harmony, instrumentReducer, soloist } from './state/instruments.js';
+import { bass, chords, instrumentReducer, soloist } from './state/instruments.js';
 import { midi, midiReducer } from './state/midi.js';
 // Import Modular State Slices
 import { playback, playbackReducer } from './state/playback.js';
@@ -14,7 +14,6 @@ export const stateMap: EnsembleState = {
     bass,
     soloist,
     groove,
-    harmony,
     arranger,
     vizState,
     midi,

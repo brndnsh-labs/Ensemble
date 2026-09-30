@@ -69,7 +69,7 @@ The ground-up replacement for the generative engine, the default since 2026-09-2
 | `public/state/playback.ts` | BPM, transport, and volume. | `playback` |
 | `public/state/arranger.ts` | Chords, sections, time signature, and key. | `arranger` |
 | `public/state/groove.ts` | Genre, swing, humanize and the drum lane's mix. | `groove` |
-| `public/state/instruments.ts` | Per-instrument synthesis parameters. | `bass`, `soloist`, `harmony` |
+| `public/state/instruments.ts` | Per-instrument synthesis parameters. | `bass`, `soloist`, `chords` |
 | `public/state/midi.ts` | WebMIDI routing and local muting state. | `midi` |
 | `public/state/visualizer.ts` | `vizState.enabled`: whether the scheduler queues visualizer note events (no visualizer ships; only the old engine's scheduler reads it, and the app no longer runs it). | `vizState` |
 | `public/state/conductor.ts` | Macro-arc, intensity drift, and form iteration state. | `conductor` |
@@ -146,7 +146,6 @@ The ground-up replacement for the generative engine, the default since 2026-09-2
 | `public/engine/synth-bass.ts` | Sub-bass and Growl synthesis. |
 | `public/engine/synth-chords.ts` | Polyphonic piano/pad synthesis. |
 | `public/engine/synth-drums.ts` | Procedural percussion synthesis. |
-| `public/engine/synth-harmonies.ts` | Background "Stab" and "Pad" synthesis. |
 | `public/engine/synth-soloist.ts` | Lead instrument synthesis and glides. |
 | `public/engine/wav-encoder.ts` | Minimal 16-bit PCM WAV encoder shared by the in-app audio export and the Node-side `mix-report --write-wav` path. |
 

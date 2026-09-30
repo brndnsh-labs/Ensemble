@@ -311,48 +311,6 @@ export const SOUND_PACKS: readonly SoundPack[] = [
         // clean source like the driven lead. This first cut reuses the lead crunch.
     },
     {
-        id: 'strings-ensemble',
-        name: 'String Ensemble',
-        description: 'A sampled violin-ensemble pad — real sustained strings for the harmony.',
-        attribution:
-            'VSCO-2 Community Edition (Violin Ensemble, sustain) by Versilian Studios — CC0 1.0 (public domain)',
-        approxSizeMB: 0.5,
-        instruments: ['harmony'],
-        // Calibrated 2026-06-22 (#660) via `mix-report --calibrate-pack=harmony:strings-ensemble`:
-        // RMS-match to the synth pad is 5.7×. The ensemble is markedly brighter than
-        // the synth pad (+1029 Hz mean centroid — reads louder than its RMS), so
-        // seated a touch under the match at 5× (the tool flags "trust the listen
-        // pass" for cross-timbre balance). Plays above unity — the seam passes this
-        // straight to playSampledNote, which bounds it at MAX_SAMPLE_PEAK and the
-        // master limiter catches stacked-voice peaks. Confirm/adjust by ear.
-        gain: 5,
-        // Tone tilt (#755): the VSCO strings read ~1029 Hz brighter than the synth
-        // pad they replace on the harmony bus (the widest mismatch in the catalog),
-        // so the strongest darkening of the seeded set rounds the top end into the
-        // pad's seat. Seeded from the centroid Δ, ear-locked 2026-06-23 on ensembletest.
-        toneTiltDb: -2.5,
-        // VSCO ensemble carries its own hall — pull the send back so we don't
-        // stack the algorithmic hall on the recorded room (mud). #686 start.
-        reverbSend: 0.7,
-    },
-    {
-        id: 'horns-section',
-        name: 'Horn Section',
-        description: 'Sampled trumpet stabs — a punchy brass section for the harmony.',
-        attribution:
-            'VSCO-2 Community Edition (Trumpet, staccato) by Versilian Studios — CC0 1.0 (public domain)',
-        approxSizeMB: 0.2,
-        instruments: ['harmony'],
-        // Calibrated 2026-06-22 (#661) via `mix-report --calibrate-pack=harmony:horns-section`:
-        // RMS-match to the synth harmony is 1.67× (stabs are hot/punchy, so far less
-        // lift than the strings pad). Seated at 1.5× — a touch under the match since
-        // the brass is brighter (+701 Hz) and transient (peak energy reads louder
-        // than RMS); on funk it already sits at/over the synth. Confirm by ear.
-        gain: 1.5,
-        // Some recorded room on the stabs — a slight pull-back. #686 start.
-        reverbSend: 0.9,
-    },
-    {
         id: 'acoustic-kit',
         name: 'Acoustic Drum Kit',
         description:

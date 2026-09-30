@@ -8,7 +8,6 @@ import {
     killBassBus,
     killChordBus,
     killDrumBus,
-    killHarmonyBus,
     killSoloistBus,
     restoreGains,
     syncBusReverbSend,
@@ -34,11 +33,6 @@ vi.mock('../../../public/engine/synth-chords.js', () => ({
 vi.mock('../../../public/engine/synth-drums.js', () => ({
     killDrumNote: vi.fn(),
     playDrumSound: vi.fn(),
-}));
-vi.mock('../../../public/engine/synth-harmonies.js', () => ({
-    killHarmonyNote: vi.fn(),
-    releaseHarmonyVoicing: vi.fn(),
-    playHarmonyNote: vi.fn(),
 }));
 vi.mock('../../../public/engine/synth-soloist.js', () => ({
     killSoloistNote: vi.fn(),
@@ -76,7 +70,6 @@ describe('Engine Bus Management', () => {
                     chords: bus(),
                     bass: bus(),
                     soloist: bus(),
-                    harmonies: bus(),
                     drums: bus(),
                 },
                 modals: {},
@@ -84,7 +77,6 @@ describe('Engine Bus Management', () => {
             chords: { enabled: true, volume: 1.0, reverb: 0.2, voice: 'synth' },
             bass: { enabled: true, volume: 1.0, reverb: 0.2, voice: 'synth' },
             soloist: makeSoloistMock({ enabled: true, volume: 1.0, reverb: 0.2, voice: 'synth' }),
-            harmony: { enabled: true, volume: 1.0, reverb: 0.2, voice: 'synth' },
             groove: { enabled: true, volume: 1.0, reverb: 0.2, voice: 'synth' },
             midi: { enabled: false, muteLocal: false },
             arranger: { sections: [] },
@@ -105,11 +97,6 @@ describe('Engine Bus Management', () => {
 
         it('should kill soloist bus', () => {
             killSoloistBus(state);
-            expect(mockGain.gain.cancelScheduledValues).toHaveBeenCalled();
-        });
-
-        it('should kill harmony bus', () => {
-            killHarmonyBus(state);
             expect(mockGain.gain.cancelScheduledValues).toHaveBeenCalled();
         });
 
@@ -152,7 +139,7 @@ describe('Engine Bus Management', () => {
         });
 
         it('keeps every globally muted bus audible when a section forces the lane on', () => {
-            for (const lane of ['chords', 'bass', 'soloist', 'harmony', 'groove']) {
+            for (const lane of ['chords', 'bass', 'soloist', 'groove']) {
                 state[lane].enabled = false;
             }
             state.arranger.sections = [
@@ -162,7 +149,6 @@ describe('Engine Bus Management', () => {
                         chords: true,
                         bass: true,
                         soloist: true,
-                        harmony: true,
                         groove: true,
                     },
                 },
@@ -171,7 +157,7 @@ describe('Engine Bus Management', () => {
 
             restoreGains(state);
 
-            expect(mockGain.gain.setTargetAtTime).toHaveBeenCalledTimes(5);
+            expect(mockGain.gain.setTargetAtTime).toHaveBeenCalledTimes(4);
             expect(
                 mockGain.gain.setTargetAtTime.mock.calls.every(
                     ([target]: [number]) => target > 0.0001,
@@ -200,12 +186,12 @@ describe('Engine Bus Management', () => {
             ).toHaveBeenCalledWith(0.2, 10.0, 0.04);
         });
 
-        it('maps the harmony module to the harmonies bus and cuts a roomy pack send', () => {
-            state.harmony.voice = 'pack:strings-ensemble';
-            syncBusReverbSend(state, 'harmony');
-            const expected = 0.2 * reverbSendForPack('strings-ensemble');
+        it('maps the groove module to the drums bus and cuts a roomy pack send', () => {
+            state.groove.voice = 'pack:acoustic-kit';
+            syncBusReverbSend(state, 'groove');
+            const expected = 0.2 * reverbSendForPack('acoustic-kit');
             expect(
-                state.playback.audioGraph.harmonies.reverb.gain.setTargetAtTime,
+                state.playback.audioGraph.drums.reverb.gain.setTargetAtTime,
             ).toHaveBeenCalledWith(expected, 10.0, 0.04);
             expect(expected).toBeLessThan(0.2); // baked room → pulled back
         });

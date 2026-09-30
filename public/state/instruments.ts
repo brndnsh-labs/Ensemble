@@ -1,16 +1,9 @@
 import { deepSignal } from 'deepsignal/core';
 import { resolveSoloistMode } from '../engine/soloist-mode-policy.js';
-import type {
-    Action,
-    BassState,
-    ChordState,
-    HarmonyState,
-    Mutable,
-    SoloistState,
-} from '../types.js';
+import type { Action, BassState, ChordState, Mutable, SoloistState } from '../types.js';
 import { ACTIONS } from '../types.js';
 
-export type { BassState, ChordState, HarmonyState, SoloistState };
+export type { BassState, ChordState, SoloistState };
 
 import { groove, isGrooveModule } from './groove.js';
 
@@ -20,7 +13,6 @@ export const INSTRUMENT_REVERB_DEFAULTS = Object.freeze({
     chords: 0.3,
     bass: 0.05,
     soloist: 0.6,
-    harmony: 0.4,
     groove: 0.2,
 });
 
@@ -133,22 +125,6 @@ export const soloist = deepSignal<SoloistState>({
         lastPlayedFreq: null,
         lastNoteEnd: 0,
     },
-});
-
-export const harmony = deepSignal<HarmonyState>({
-    enabled: false,
-    voice: 'synth',
-    autoSound: true,
-    volume: 1.0,
-    reverb: INSTRUMENT_REVERB_DEFAULTS.harmony,
-    buffer: new Map(),
-    octave: 60,
-    style: 'smart',
-    complexity: 0.5,
-    motifBuffer: [],
-    lastMidis: [],
-    activeVoices: [],
-    rhythmicMask: 0,
 });
 
 /**
@@ -299,8 +275,6 @@ const instrumentStateMap: Record<string, any> = {
     bass,
     sb: soloist,
     soloist,
-    hb: harmony,
-    harmony,
     gb: groove,
     groove,
 };
@@ -309,11 +283,9 @@ export function instrumentReducer(action: Action): boolean {
     const c = chords as Mutable<typeof chords>;
     const b = bass as Mutable<typeof bass>;
     const s = soloist as Mutable<typeof soloist>;
-    const h = harmony as Mutable<typeof harmony>;
     switch (action.type) {
         case ACTIONS.SET_PARAM: {
-            const modKey =
-                action.payload.module === 'harmonies' ? 'harmony' : action.payload.module;
+            const modKey = action.payload.module;
             // Soloist params are flat at the wire but nested in state — route them.
             if (modKey === 'soloist' || modKey === 'sb') {
                 applySoloistPayload(soloist, { [action.payload.param]: action.payload.value });
@@ -375,9 +347,6 @@ export function instrumentReducer(action: Action): boolean {
             }
             if (action.payload.soloist) {
                 s.style = action.payload.soloist;
-            }
-            if (action.payload.harmony) {
-                h.style = action.payload.harmony;
             }
             return true;
     }

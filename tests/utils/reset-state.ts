@@ -4,7 +4,6 @@ import { type GrooveState, groove } from '../../public/state/groove.js';
 import {
     bass,
     chords,
-    harmony,
     INSTRUMENT_REVERB_DEFAULTS,
     soloist,
 } from '../../public/state/instruments.js';
@@ -48,7 +47,6 @@ export function resetAllStateForTest(): void {
     p.sessionTimer = 5;
     p.applyPresetSettings = false;
     p.conductorVelocity = 1.0;
-    p.conductorHarmonyComplexity = null;
     p.songMode = true;
     p.masterVolume = 0.4;
 
@@ -94,14 +92,12 @@ export function resetAllStateForTest(): void {
     m.chordsChannel = 1;
     m.bassChannel = 2;
     m.soloistChannel = 3;
-    m.harmonyChannel = 4;
     m.drumsChannel = 10;
     m.latency = 0;
     m.muteLocal = true;
     m.chordsOctave = 0;
     m.bassOctave = 0;
     m.soloistOctave = 0;
-    m.harmonyOctave = 0;
     m.drumsOctave = 0;
     m.velocitySensitivity = 1.0;
 
@@ -183,14 +179,4 @@ export function resetAllStateForTest(): void {
     aud.lastRenderedFreq = null;
     aud.lastPlayedFreq = null;
     aud.lastNoteEnd = 0;
-
-    const h = harmony as Mutable<typeof harmony>;
-    h.enabled = false;
-    h.volume = 1.0;
-    h.reverb = INSTRUMENT_REVERB_DEFAULTS.harmony;
-    h.octave = 60;
-    h.style = 'smart';
-    h.complexity = 0.5;
-    h.voice = 'synth';
-    h.autoSound = true;
 }

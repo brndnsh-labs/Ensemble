@@ -56,7 +56,7 @@ const NEUTRAL_COLOR: HumanizedNote = { velocityMult: 1, detuneCents: 0 };
 
 /**
  * Per-instrument feel profiles. A drummer plays tighter than a soloist, so the
- * spreads widen across `drums → bass → chords → harmonies → soloist`. Drums
+ * spreads widen across `drums → bass → chords → soloist`. Drums
  * carry no detune (the kit voices have no meaningful pitch in this sense).
  *
  * why these magnitudes (#1068): the pre-remodel spreads (drums ±10 ms at knob
@@ -78,7 +78,6 @@ export const HUMANIZE_PROFILES: Record<string, HumanizeProfile> = {
     drums: { timeSpread: 0.018, velSpread: 0.1, detuneSpread: 0 },
     bass: { timeSpread: 0.022, velSpread: 0.12, detuneSpread: 3 },
     chords: { timeSpread: 0.026, velSpread: 0.12, detuneSpread: 4 },
-    harmonies: { timeSpread: 0.028, velSpread: 0.12, detuneSpread: 5 },
     soloist: { timeSpread: 0.034, velSpread: 0.14, detuneSpread: 7 },
 };
 
@@ -140,8 +139,8 @@ const placementSeed = (barStep: number, lane: string, voiceIndex: number): numbe
  * exactly 0 when the knob is off.
  *
  * `spread` is the ± maximum at full knob — normally a profile's `timeSpread`,
- * but taken as a scalar so a lane with its own per-style character (harmony's
- * `timingJitter`) can pass that instead of allocating a throwaway profile.
+ * but taken as a scalar so a lane with its own per-style character (the chords' strum
+ * jitter) can pass that instead of allocating a throwaway profile.
  */
 export function humanizePlacement(
     barStep: number,

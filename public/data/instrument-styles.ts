@@ -64,6 +64,8 @@ export const SOLOIST_STYLES: StyleEntry[] = [
     { id: 'acoustic', name: 'Acoustic', category: 'Country/Folk' },
 ];
 
+// The retired harmony lane's styles (#1436): kept only so the codec can still validate the
+// legacy `ChartBand.harmony` lane an old chart carries (`isKnownHarmonyStyle`).
 const HARMONY_STYLES: StyleEntry[] = [
     { id: 'smart', name: 'Smart (Auto)', category: 'Experimental' },
     { id: 'horns', name: 'Horns (Stabs)', category: 'Modern' },

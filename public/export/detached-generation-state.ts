@@ -106,11 +106,6 @@ export function cloneStateForDetachedGeneration(liveState: EnsembleState): Ensem
                 lastNoteEnd: 0,
             },
         },
-        harmony: {
-            ...liveState.harmony,
-            buffer: new Map(),
-            activeVoices: [],
-        },
         vizState: { ...liveState.vizState, enabled: false },
         midi: { ...liveState.midi, enabled: false, muteLocal: true },
         conductor: { ...liveState.conductor },

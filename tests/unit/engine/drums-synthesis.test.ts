@@ -66,12 +66,10 @@ vi.mock('../../../public/state.js', () => {
         lastRideGain: null,
         lastCrashGain: null,
     };
-    const mockHarmony = { enabled: false };
 
     const mockStateMap = {
         playback: mockPlayback,
         groove: mockGroove,
-        harmony: mockHarmony,
     };
 
     return {
@@ -436,7 +434,6 @@ describe('Drum Synthesis', () => {
             groove: { genreFeel: 'Jazz' },
             bass: { enabled: true },
             chords: { enabled: true },
-            harmony: { enabled: false },
             soloist: makeSoloistMock({ enabled: false }),
         };
         const rockState = {
@@ -444,7 +441,6 @@ describe('Drum Synthesis', () => {
             groove: { genreFeel: 'Rock' },
             bass: { enabled: true },
             chords: { enabled: true },
-            harmony: { enabled: false },
             soloist: makeSoloistMock({ enabled: false }),
         };
 
@@ -460,7 +456,6 @@ describe('Drum Synthesis', () => {
             groove: { genreFeel: 'Jazz' },
             bass: { enabled: true },
             chords: { enabled: true },
-            harmony: { enabled: false },
             soloist: makeSoloistMock({ enabled: false }),
         };
         const ride = getCymbalVoiceConfig('Ride', 1.0, 0.45);
@@ -479,14 +474,12 @@ describe('Drum Synthesis', () => {
             playback: { bandIntensity: 0.45 },
             bass: { enabled: true },
             chords: { enabled: false },
-            harmony: { enabled: false },
             soloist: makeSoloistMock({ enabled: false }),
         };
         const fullBandState = {
             playback: { bandIntensity: 0.95 },
             bass: { enabled: true },
             chords: { enabled: true },
-            harmony: { enabled: true },
             soloist: makeSoloistMock({ enabled: true }),
         };
 
@@ -502,11 +495,11 @@ describe('Drum Synthesis', () => {
         const sections = [
             {
                 id: 'full',
-                instruments: { bass: true, chords: true, harmony: true, soloist: true },
+                instruments: { bass: true, chords: true, soloist: true },
             },
             {
                 id: 'sparse',
-                instruments: { bass: false, chords: false, harmony: false, soloist: false },
+                instruments: { bass: false, chords: false, soloist: false },
             },
         ];
         const arranger = {
@@ -522,7 +515,6 @@ describe('Drum Synthesis', () => {
             arranger,
             bass: { enabled: false },
             chords: { enabled: false },
-            harmony: { enabled: false },
             soloist: makeSoloistMock({ enabled: false }),
         };
         const forcedSparseState = {
@@ -535,7 +527,6 @@ describe('Drum Synthesis', () => {
             arranger,
             bass: { enabled: true },
             chords: { enabled: true },
-            harmony: { enabled: true },
             soloist: makeSoloistMock({ enabled: true }),
         };
 
@@ -550,7 +541,6 @@ describe('Drum Synthesis', () => {
             playback: { bandIntensity: 0.95 },
             bass: { enabled: true },
             chords: { enabled: true },
-            harmony: { enabled: true },
             soloist: makeSoloistMock({ enabled: true }),
         };
 

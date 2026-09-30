@@ -28,7 +28,7 @@ interface TelemetryEventData {
     session_class: { device: 'mobile' | 'tablet' | 'desktop' };
     play_started: undefined;
     genre_changed: { genre: string };
-    part_toggled: { part: 'drums' | 'bass' | 'chords' | 'harmony' | 'soloist' };
+    part_toggled: { part: 'drums' | 'bass' | 'chords' | 'soloist' };
     chart_opened: { source: 'songbook' | 'import' | 'standard' };
     chart_created: undefined;
     chart_imported: { format: 'ireal' | 'v1' | 'file' };

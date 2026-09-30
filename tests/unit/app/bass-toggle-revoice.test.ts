@@ -21,8 +21,6 @@ vi.mock('../../../public/engine/engine.js', () => ({
     killChordBus: vi.fn(),
     killDrumBus: vi.fn(),
     killDrumNote: vi.fn(),
-    killHarmonyBus: vi.fn(),
-    killHarmonyNote: vi.fn(),
     killSoloistBus: vi.fn(),
     killSoloistNote: vi.fn(),
     restoreGains: vi.fn(),
