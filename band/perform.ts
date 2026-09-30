@@ -17,8 +17,13 @@ import { feelFor, STYLES } from './styles/index.js';
 import type { BarContext } from './styles/types.js';
 import { nearestMidi } from './theory/pitch.js';
 
-/** What each lane remembers across bars (and across passes of a looping song). */
-export type PassMemory = Record<Lane, unknown>;
+/**
+ * What each lane remembers across bars (and across passes of a looping song), plus the last
+ * bass note sounded — the pitch a fermata's held bass is found near (`holdFermatas`). A lane
+ * owns its own memory, but the fermata is written over the whole pass after the lanes play, so
+ * its reference is carried here for a pass that resumes on (or starts at) a fermata bar.
+ */
+export type PassMemory = Record<Lane, unknown> & { lastBass?: number };
 
 export interface PassOptions {
     /** 0 for the first time through the song (or the first lap of a loop), 1 for the next… */
@@ -147,7 +152,22 @@ export function performPass(
     }
 
     const yielded = instrument.family === 'keyboard' ? yieldToLead(events) : events;
-    const fermatas = holdFermatas(yielded, timeline, plans);
+    const fermatas = holdFermatas(yielded, timeline, plans, options.memory?.lastBass);
+    // Each snapshot (and the memory the next pass continues from) takes the last bass note
+    // sounded before its barline, after the fermatas have been held — what the full pass's
+    // `holdFermatas` hears from a later fermata, whatever bar a resume starts at.
+    const bassLine = fermatas
+        .filter((e): e is PitchedNote => e.lane === 'bass')
+        .sort((a, b) => a.tick - b.tick);
+    let lastBass = options.memory?.lastBass;
+    let next = 0;
+    for (let i = window.from; i < window.to; i++) {
+        while (next < bassLine.length && bassLine[next].tick < bars[i].start) {
+            lastBass = bassLine[next++].midi;
+        }
+        snapshots[i].lastBass = lastBass;
+    }
+    memory.lastBass = bassLine.at(-1)?.midi ?? lastBass;
     const held =
         instrument.legato && !comp.percussive ? sustain(fermatas, timeline, plans) : fermatas;
     const felt = applyFeel(held, timeline, feelFor(style, instrument.family), {
@@ -255,6 +275,7 @@ function holdFermatas(
     events: BandEvent[],
     timeline: Timeline,
     plans: { lanes: Record<Lane, boolean> }[],
+    lastBassBefore: number | undefined,
 ): BandEvent[] {
     const spans = timeline.spans.filter((s) => s.fermata);
     if (!spans.length) {
@@ -316,13 +337,21 @@ function holdFermatas(
             );
         }
         if (plan.lanes.bass && span.chord) {
+            // The latest bass note before the span — by tick, since an earlier fermata's held
+            // note is appended after the notes that follow it. None in this pass (it resumed
+            // here) → the one sounded before the pass began.
             let lastBass: PitchedNote | undefined;
             for (const e of before) {
-                if (e.lane === 'bass') {
+                if (e.lane === 'bass' && (!lastBass || e.tick >= lastBass.tick)) {
                     lastBass = e;
                 }
             }
-            const midi = nearestMidi(span.chord.bass, lastBass?.midi ?? 38, 28, 52);
+            const midi = nearestMidi(
+                span.chord.bass,
+                lastBass?.midi ?? lastBassBefore ?? 38,
+                28,
+                52,
+            );
             out.push({
                 lane: 'bass',
                 midi,
