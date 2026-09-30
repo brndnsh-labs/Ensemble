@@ -13,6 +13,7 @@ import { performPass } from './perform.js';
 import { STYLE_IDS } from './styles/index.js';
 import { FIXTURES, score } from './test/scores.js';
 import { fifthOf } from './theory/chord.js';
+import { nearestMidi } from './theory/pitch.js';
 
 const BAR = PPQ * 4;
 
@@ -90,14 +91,6 @@ describe.each(STYLE_IDS)('%s resume parity', (styleId) => {
                 for (const pass of [0, 1, 2, 3] as const) {
                     const full = performPass(timeline, settings, { pass, looping: true });
                     for (let from = 1; from < timeline.bars.length; from++) {
-                        if (timeline.bars[from].spans.some((s) => s.fermata)) {
-                            // Known gap, not this story's: a fermata bar with nothing played
-                            // before it in the window can't see the bass note it should
-                            // continue from (`holdFermatas` reads this pass's own already-
-                            // generated events for that, not `memory`) — flagged separately,
-                            // not fixed here.
-                            continue;
-                        }
                         const resumed = performPass(timeline, settings, {
                             pass,
                             looping: true,
@@ -282,6 +275,38 @@ describe('fermatas', () => {
         expect(events.filter((e) => e.bar === 1)).toEqual([]);
         const rings = events.filter((e) => e.lane !== 'drums' && e.tick + e.dur >= 2 * BAR - 1);
         expect(rings.length).toBeGreaterThan(0);
+    });
+
+    it('hold the bass near the note just before, even after an earlier fermata', () => {
+        // Bar 1's held note is appended after the bars that follow it: the second fermata
+        // must still hear bar 4's last note, and a resume at any bar must hear the same.
+        const timeline = compileTimeline(
+            score([{ label: 'A', bars: 'C | F | G7 | C | Bb | Eb | C', fermataBars: [1, 5] }]),
+        );
+        const failures: string[] = [];
+        for (const style of STYLE_IDS) {
+            const settings = { ...DEFAULT_SETTINGS, style, seed: 'f' };
+            const full = performPass(timeline, settings, { pass: 0, looping: true });
+            const bass = full.events.filter((e): e is PitchedNote => e.lane === 'bass');
+            const held = bass.find((e) => e.bar === 5);
+            const before = bass.filter((e) => e.bar === 4).at(-1);
+            if (held && before && held.midi !== nearestMidi(3, before.midi, 28, 52)) {
+                failures.push(`${style} holds ${held.midi} after ${before.midi}`);
+            }
+            for (let from = 1; from < timeline.bars.length; from++) {
+                const resumed = performPass(timeline, settings, {
+                    pass: 0,
+                    looping: true,
+                    memory: full.snapshots[from],
+                    window: { from, to: timeline.bars.length, wrapTo: 0, origin: 0 },
+                });
+                const expected = JSON.stringify(full.events.filter((e) => e.bar >= from));
+                if (JSON.stringify(resumed.events) !== expected) {
+                    failures.push(`${style} from ${from}`);
+                }
+            }
+        }
+        expect(failures).toEqual([]);
     });
 });
 
