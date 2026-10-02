@@ -26,7 +26,11 @@ import { nearestMidi } from './theory/pitch.js';
 export type PassMemory = Record<Lane, unknown> & { lastBass?: number };
 
 export interface PassOptions {
-    /** 0 for the first time through the song (or the first lap of a loop), 1 for the next… */
+    /**
+     * 0 for the first time through the song (or the first lap of a loop), 1 for the next… A
+     * counted chart's timeline holds all its choruses, and each bar's chorus is added to this
+     * (`planBars`'s `passAt`), so one pass over it plays every chorus as its own time through.
+     */
     pass: number;
     /** Whether the performance continues after this pass (fills lead on; no ending). */
     looping: boolean;
@@ -34,6 +38,13 @@ export interface PassOptions {
     memory?: PassMemory;
     /** The bars to play, in order, and where they lead. Defaults to the whole song. */
     window?: PassWindow;
+    /**
+     * Generate only the window's bars before this one; the window still says where the
+     * performance goes and where it ends. A counted chart's live performance is generated a
+     * chorus at a time (`BandHost`), each chorus resuming from the memory the one before left,
+     * as a settings change resumes a pass at a barline. Defaults to the window's end.
+     */
+    until?: number;
 }
 
 export interface PassResult {
@@ -56,9 +67,10 @@ export function performPass(
     const lead = style.lead?.idiom;
     const leadProfile = LEAD_INSTRUMENTS[settings.lead];
     const window = options.window ?? fullWindow(timeline);
+    const until = Math.min(options.until ?? window.to, window.to);
     // Trading with the drummer needs a drummer who can solo in this style.
     const drumSolos = Boolean(style.drums.solos);
-    const plans = planBars(timeline, settings, { ...options, window, drumSolos });
+    const plans = planBars(timeline, settings, { ...options, window, until, drumSolos });
     // Where the pass wraps, the next bar belongs to the next pass, whose lanes can differ (the
     // fours may open with the drummer alone): what it plays is taken from that pass's plan.
     // That next pass is always a fresh lap (a loop always restarts at the top), never a
@@ -84,9 +96,11 @@ export function performPass(
     const events: BandEvent[] = [];
     const snapshots: PassMemory[] = [];
 
-    for (let i = window.from; i < window.to; i++) {
+    for (let i = window.from; i < until; i++) {
         const bar = bars[i];
         const plan = plans[i];
+        // The band's pass at this bar: a counted chart's chorus is its time through the song.
+        const pass = options.pass + bar.visit.chorus;
         snapshots[i] = { ...memory };
         const nextIndex = i + 1 < window.to ? i + 1 : options.looping ? window.wrapTo : -1;
         // The bar after the window is planned by the pass that plays it. "Is the next bar an
@@ -110,7 +124,7 @@ export function performPass(
             heard,
             instrument,
             lead: leadProfile,
-            pass: options.pass,
+            pass,
             looping: options.looping,
             rng: (purpose, scope = 'bar') =>
                 scope === 'song'
@@ -124,7 +138,7 @@ export function performPass(
                             bar.visit.sectionIndex,
                             purpose,
                         )
-                      : rng(settings.seed, style.id, lane, options.pass, bar.index, purpose),
+                      : rng(settings.seed, style.id, lane, pass, bar.index, purpose),
         });
         if (plan.lanes.drums) {
             const out = style.drums.play(context('drums'), memory.drums);
@@ -151,8 +165,11 @@ export function performPass(
         }
     }
 
+    // The bar at `until` is planned only so the last generated bar knows where it leads; it
+    // is not played here, so nothing below may write into it.
+    const played = until < window.to ? plans.slice(0, until) : plans;
     const yielded = instrument.family === 'keyboard' ? yieldToLead(events) : events;
-    const fermatas = holdFermatas(yielded, timeline, plans, options.memory?.lastBass);
+    const fermatas = holdFermatas(yielded, timeline, played, options.memory?.lastBass);
     // Each snapshot (and the memory the next pass continues from) takes the last bass note
     // sounded before its barline, after the fermatas have been held — what the full pass's
     // `holdFermatas` hears from a later fermata, whatever bar a resume starts at.
@@ -161,7 +178,7 @@ export function performPass(
         .sort((a, b) => a.tick - b.tick);
     let lastBass = options.memory?.lastBass;
     let next = 0;
-    for (let i = window.from; i < window.to; i++) {
+    for (let i = window.from; i < until; i++) {
         while (next < bassLine.length && bassLine[next].tick < bars[i].start) {
             lastBass = bassLine[next++].midi;
         }
@@ -169,7 +186,7 @@ export function performPass(
     }
     memory.lastBass = bassLine.at(-1)?.midi ?? lastBass;
     const held =
-        instrument.legato && !comp.percussive ? sustain(fermatas, timeline, plans) : fermatas;
+        instrument.legato && !comp.percussive ? sustain(fermatas, timeline, played) : fermatas;
     const felt = applyFeel(held, timeline, feelFor(style, instrument.family), {
         ...settings,
         strumMs: instrument.strumMs,

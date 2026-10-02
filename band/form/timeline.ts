@@ -287,6 +287,31 @@ function impliedTensions(spans: ChordSpan[]): void {
     });
 }
 
+const CHORUSES = new WeakMap<Timeline, { first: number; end: number }[]>();
+
+/**
+ * The bars of the chorus bar `index` belongs to: `first` up to (not including) `end`. A counted
+ * chart (`SemanticScore.choruses`, #1475) unrolls every chorus into one timeline, and what the
+ * band shapes over "the song" — a solo chorus's arc — is one chorus of it, as it is one lap of
+ * an uncounted chart, whose single chorus is the whole timeline.
+ */
+export function chorusBars(timeline: Timeline, index: number): { first: number; end: number } {
+    let spans = CHORUSES.get(timeline);
+    if (!spans) {
+        spans = [];
+        for (const bar of timeline.bars) {
+            const last = spans.at(-1);
+            if (last && timeline.bars[last.first].visit.chorus === bar.visit.chorus) {
+                last.end = bar.index + 1;
+            } else {
+                spans.push({ first: bar.index, end: bar.index + 1 });
+            }
+        }
+        CHORUSES.set(timeline, spans);
+    }
+    return spans.find((span) => index < span.end) ?? { first: 0, end: timeline.bars.length };
+}
+
 /** The chord sounding at a tick (N.C. → null). */
 export function chordAt(timeline: Timeline, tick: number): ChordFacts | null {
     const span = timeline.spans.find((s) => s.start <= tick && tick < s.end);

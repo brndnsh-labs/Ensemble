@@ -57,8 +57,11 @@ export interface BandChart {
     chords: BandChartChord[];
     /** Every performed event in performance order. */
     slots: BandSlot[];
-    /** Each section visit's step range, for practice loops. */
-    sections: { id: string; start: number; end: number }[];
+    /**
+     * Each section visit's step range, for practice loops, and which chorus of a counted
+     * performance (`SemanticScore.choruses`) it belongs to — 0 throughout an uncounted chart.
+     */
+    sections: { id: string; start: number; end: number; chorus: number }[];
 }
 
 /** The timeline's own rounding (`durationTicks` in `band/form/timeline.ts`), so slots meet its spans exactly. */
@@ -167,6 +170,7 @@ export function bandChart(score: SemanticScore, timeline: Timeline): BandChart {
                 id: visit.id,
                 start: timeline.bars[visit.firstBar].start / STEP_TICKS,
                 end: (last.start + last.meter.barTicks) / STEP_TICKS,
+                chorus: visit.chorus,
             };
         }),
     };
@@ -192,13 +196,19 @@ export function slotAt(chart: BandChart, tick: number): number {
 
 /**
  * A section's whole span in steps, every visit collapsed into one window — the same rule as
- * `getSectionStepBounds`, which reads the old engine's section map instead.
+ * `getSectionStepBounds`, which reads the old engine's section map instead. A counted chart
+ * (#1475) performs its form once per chorus, so only the visits of the FIRST chorus that plays
+ * the section count: practising a section loops one time through it (its written repeats
+ * included), never a window stretched from chorus 1 to chorus N. That first chorus is chorus 0
+ * for the form, and the last for a last-chorus coda, which only it plays.
  */
 export function sectionSteps(chart: BandChart, id: string): { start: number; end: number } | null {
-    const visits = chart.sections.filter((section) => section.id === id);
-    if (!visits.length) {
+    const all = chart.sections.filter((section) => section.id === id);
+    if (!all.length) {
         return null;
     }
+    const first = Math.min(...all.map((visit) => visit.chorus));
+    const visits = all.filter((visit) => visit.chorus === first);
     return {
         start: Math.min(...visits.map((visit) => visit.start)),
         end: Math.max(...visits.map((visit) => visit.end)),

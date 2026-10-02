@@ -186,13 +186,21 @@ expression devices take turns rather than stack; one peak note per cycle.
       trade as paused, and says why (`runtime.tradeBlocked`, mirroring the plan's gate). A pass
       resumed at a barline (a settings change) trades exactly as the full pass, and changing
       the trade mid-turn replans the turn (the lead keys a trade's plan by its shape).
-    - `.mid` and WAV export render the first time through, so they never contain a trade.
+    - `.mid` and WAV export render the first time through, so they never contain a trade —
+      unless the chart counts its choruses, when they render every chorus (below).
     - Why it isn't automatic: an earlier cut had the band trade fours with the drummer on
       its own after three solo choruses. Brandon's call: the band dropping out unasked doesn't
       fit a practice app. Trading is something the player asks for.
   - The cycle is the arrangement's (`arrange/cycle.ts`): the plan carries each bar's lead role
     (`BarPlan.lead`), so the lead, the drummer and the rhythm section agree on whose turn it
     is.
+  - **A counted chart** (`SemanticScore.choruses`, #1475) is one timeline holding every chorus,
+    played once as pass 0. Each bar's chorus is added to the pass (`planBars`'s `passAt`), so
+    the second chorus is the band's second time through: the head, then solos or trades, the
+    pass lift, trading turns counted from each chorus's top, a solo's arc shaped over its own
+    chorus (`chorusBars`). Only the very last bar differs from a loop's lap: it plays the
+    held ending a non-looping pass always has. An uncounted chart's chorus is always 0, so it
+    plays exactly as before.
 - **Phrases, and the space between them.** Each four-bar phrase of the timeline is a slot the
   lead plays in or rests in. A phrase is planned whole at its first bar and kept in memory, so
   any barline can resume it. Most slots leave room: a phrase plays two or three bars and
@@ -257,6 +265,14 @@ schedules everything due in the next 150 ms on a 25 ms timer.
 - **A staged genre** is committed at once; `setGenre` then waits for the barline where the band
   first plays it (`BandHost.changeHeard`), so "Switching feel at the next bar" reads true.
 - **The chart pointer** follows `songTick()` to the written event under it (`slotAt`).
+- **A counted chart** (#1475) is not looped: the host performs its timeline once, generating a
+  chorus per segment (`PassOptions.until`: the rest of the window still plans the next bar and
+  the ending), each resuming from the memory the one before left. When the last segment's final
+  bar ends, the host stops by itself and calls `onEnd`; the runtime brings the transport to
+  stopped by Stop's own path, except that the last notes ring out (as an export's release tail
+  does) instead of being cut. A practice loop ignores the count; released, the performance
+  carries on from the bar after it to its end. `render()` builds the export the same chorus
+  at a time, so it is exactly the performance that plays.
 
 A pass is generated on the main thread (about 5–7 ms for 32 bars on a desktop), two seconds
 before it is needed.

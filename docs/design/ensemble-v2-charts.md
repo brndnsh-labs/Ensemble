@@ -185,8 +185,13 @@ than guesses, a last-chorus coda that is not on the same boundary as its `via` s
 one in the chart, one whose departure is inside a repeated passage or repeated section (which
 pass is the last time?), one whose arrival is behind its departure, and, for now, any chart
 that also has a D.C./D.S. jump: the departure is then passed both before and after the jump.
-Stopping the band after the last chorus and the chorus-count control are #1475; how iReal's
-unpaired coda signs map onto this is #1476.
+The band plays a counted chart once and stops (#1475): every chorus, the last-chorus coda on
+the final one, then the transport returns to stopped at the end of the last bar, its notes
+ringing out as they do at the end of an export. A section practice loop ignores the count and
+loops its section as written in the first chorus that plays it. `.mid` and audio export render
+the whole counted performance. The Edit panel's **Choruses** select sets the count: Loop (the
+default, which removes the field) or 1–16; a chart that already counts more keeps its number.
+How iReal's unpaired coda signs map onto this is #1476.
 
 The current form grammar pairs repeat barlines within each section (an unmatched end repeat
 starts at that section's beginning). An explicit start must close in the same section; repeated

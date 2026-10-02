@@ -13,6 +13,10 @@
  * (pass 0 = head, passes 1..N traded, pass N+1 = head, …), the alternation restarting fresh at
  * the top of each block. `null`/`0` choruses keeps trading forever, running the turns on
  * across every pass instead — the original behavior.
+ *
+ * A counted chart's choruses (`SectionVisit.chorus`, #1475) are its times through the song: the
+ * plan hands `leadRole` the pass plus the bar's chorus, so the head, solos and trades follow
+ * the choruses of one performance exactly as they follow the laps of a looping one.
  */
 import type { TradeSettings } from '../core/types.js';
 import type { Bar, Timeline } from '../form/timeline.js';
@@ -90,6 +94,11 @@ const TURNS = new WeakMap<Timeline, Map<number, Turns>>();
  * A chorus cut into turns of `length` bars, counted from the top (the intro is the band's).
  * A turn never spans an intro (a D.C. can replay one mid-form): the bars before it end on a
  * short turn. A chorus that doesn't divide evenly ends on one too. Computed once per chart.
+ *
+ * A counted chart's timeline holds every chorus (`SectionVisit.chorus`, #1475): each is cut
+ * from its own top, exactly as an uncounted chart's one chorus is every time round, so `turn`
+ * counts within the bar's chorus and `count` is one chorus's turns. Only the last chorus can
+ * differ (a last-chorus coda adds bars), and no chorus follows it to be miscounted.
  */
 function turnsOf(timeline: Timeline, length: number): Turns {
     const byLength = TURNS.get(timeline) ?? new Map<number, Turns>();
@@ -98,26 +107,34 @@ function turnsOf(timeline: Timeline, length: number): Turns {
     if (cached) {
         return cached;
     }
-    const runs: number[][] = [];
+    const runs: { chorus: number; bars: number[] }[] = [];
     let current: number[] = [];
     for (const bar of timeline.bars) {
         if (isIntro(bar)) {
             current = [];
             continue;
         }
-        if (!current.length || current.length === length) {
+        const chorus = bar.visit.chorus;
+        if (!current.length || current.length === length || runs.at(-1)?.chorus !== chorus) {
             current = [];
-            runs.push(current);
+            runs.push({ chorus, bars: current });
         }
         current.push(bar.index);
     }
     const of = new Map<number, { turn: number; from: number; bars: number; at: number }>();
-    runs.forEach((bars, turn) => {
+    const first = runs[0]?.chorus;
+    let count = 0;
+    let turn = 0;
+    runs.forEach(({ chorus, bars }, i) => {
+        turn = i > 0 && runs[i - 1].chorus === chorus ? turn + 1 : 0;
+        if (chorus === first) {
+            count++;
+        }
         bars.forEach((index, at) => {
             of.set(index, { turn, from: bars[0], bars: bars.length, at });
         });
     });
-    const turns = { count: runs.length, of };
+    const turns = { count, of };
     byLength.set(length, turns);
     return turns;
 }
