@@ -341,6 +341,58 @@ describe('BandHost counted choruses', () => {
         expect(bassIn(timeline.bars.length - 1)).toEqual([0]);
     });
 
+    it('a loop released on the last section ends with the lead on the resolved tonic too (#1482)', () => {
+        // The lap's phrase was planned as a loop, against the written ii–V; released, the lap
+        // ends from its next barline, and the lead must hear the tonic the band resolves to.
+        const audio = fakeAudioContext(10);
+        const state = fakeState(audio);
+        const host = new BandHost({ state: () => state, silence: () => {} });
+        const score = {
+            ...song([
+                {
+                    id: 'a',
+                    label: 'A',
+                    repeat: 1,
+                    measures: [
+                        bar('a1', [chord('C', 4)]),
+                        bar('a2', [chord('Am7', 4)]),
+                        bar('a3', [chord('Fmaj7', 4)]),
+                        bar('a4', [chord('Dm7', 2), chord('G7', 2)]),
+                    ],
+                },
+            ]),
+            choruses: 1,
+        };
+        host.setScore(score);
+        const timeline = compileTimeline(score);
+        const band = {
+            ...DEFAULT_SETTINGS,
+            seed: 'ensemble',
+            lanes: { drums: true, bass: true, comp: true, lead: true },
+        };
+        host.start(band, BPM, 0, { from: 0, to: timeline.ticks });
+        // Into the second lap's first bar, then release.
+        run(host, audio, 10.1, 10.1 + 4.25 * BAR_S);
+        host.setLoop(null);
+        const internals = host as unknown as {
+            segments: { pass: number; ends: boolean; events: BandEvent[] }[];
+        };
+        const lap = internals.segments.find((s) => s.pass === 1)!;
+        expect(lap.ends).toBe(true);
+        const inLast = (lane: string) =>
+            lap.events.flatMap((e) =>
+                e.lane === lane && e.bar === 3 && !(e.lane !== 'drums' && e.muted)
+                    ? [e.lane === 'drums' ? -1 : e.midi % 12]
+                    : [],
+            );
+        const tonic = [0, 4, 7]; // rock ends on the triad
+        expect(inLast('bass')).toEqual([0]);
+        expect(inLast('comp').every((pc) => tonic.includes(pc))).toBe(true);
+        // Planned as a loop, the lead sang A and F over this bar against the written Dm7 G7;
+        // replanned for the ending, whatever it plays there is a tone of the tonic.
+        expect(inLast('lead').every((pc) => tonic.includes(pc))).toBe(true);
+    });
+
     it('plays every chorus, the coda only in the last, and stops at the end of its final bar', () => {
         const audio = fakeAudioContext(10);
         const state = fakeState(audio);

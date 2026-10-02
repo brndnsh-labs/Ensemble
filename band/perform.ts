@@ -149,7 +149,18 @@ export function performPass(
             timeline,
             bar: plan.ending && ending?.index === i ? ending : bar,
             plan,
-            next: nextIndex >= 0 ? { bar: bars[nextIndex], plan: nextPlan } : null,
+            // The bar before the held ending hears the chord the band is about to hold, so its
+            // approach notes walk into the tonic rather than into a turnaround nobody plays.
+            next:
+                nextIndex >= 0
+                    ? {
+                          bar:
+                              nextPlan.ending && ending?.index === nextIndex
+                                  ? ending
+                                  : bars[nextIndex],
+                          plan: nextPlan,
+                      }
+                    : null,
             heard,
             instrument,
             lead: leadProfile,

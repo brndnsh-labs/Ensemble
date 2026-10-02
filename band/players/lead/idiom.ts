@@ -988,10 +988,15 @@ export function leadIdiom(book: LeadBook): PitchedIdiom {
             const slotStart = role.kind === 'trade' ? role.from : bar.index - bar.phrase.bar;
             // A trade's turn is keyed by its shape too, so changing the trade mid-turn replans
             // it rather than keeping a plan made for another length (or for a solo chorus).
+            // And a pass that ends on a resolved tonic keys its slots by that chord: a phrase
+            // planned while the pass looped (a practice loop released on the last section, its
+            // lap regenerated from a barline as the ending) or under another style's ending is
+            // replanned against the chord the band now holds, not kept against the written one.
+            const resolved = ctx.ending?.spans[0]?.chord?.symbol;
             const slot =
-                role.kind === 'trade'
+                (role.kind === 'trade'
                     ? `${ctx.pass}:t${role.from}:${role.bars}:${role.turn}:${role.with}`
-                    : `${ctx.pass}:${slotStart}`;
+                    : `${ctx.pass}:${slotStart}`) + (resolved ? `:end:${resolved}` : '');
             let next = memory;
             if (memory.slot !== slot) {
                 // The arrangement decided the slot's job; every bar of a slot has the same one.
