@@ -614,10 +614,83 @@ describe('bounded source-preserving iReal import', () => {
         );
     });
 
-    it('imports a chart with a "D.C. al Nth ending" instruction as text, with a warning, rather than blocking it', () => {
-        // The official iReal chord-symbol guide documents "al [N]th ending" alongside al
-        // Fine/al Coda, but jumping to a specific earlier repeat pass is not modeled by
-        // ScoreDestination's 'ending' kind yet (score-form.ts rejects it as unimplemented).
+    // A head bar, a repeat with two endings, then a bridge whose text sits a bar before the
+    // closing barline. The Fine is in the ending the jump takes.
+    const second = (text: string) => `T44[D   |{C   |N1F   }|N2G   <Fine>]|E7 <${text}>|A7   Z`;
+    it.each([
+        ['D.C. al 2nd End.', 'start', 2, second('D.C. al 2nd End.')],
+        ['D.C. al 2nd ending', 'start', 2, second('D.C. al 2nd ending')],
+        ['d.c. al 2nd end.', 'start', 2, second('d.c. al 2nd end.')],
+        ['D.S. al 2nd End.', 'segno', 2, second('D.S. al 2nd End.').replace('[D', '[SD')],
+        [
+            'D.C. al 1st Ending',
+            'start',
+            1,
+            'T44[D   |{C   |N1F   <Fine>}|N2G   ]|E7 <D.C. al 1st Ending>|A7   Z',
+        ],
+    ])('maps "%s" to an al-ending jump (#1473)', (_, from, pass, body) => {
+        const measures = score(body).sections[0].measures;
+        // The jump takes effect at the closing barline, a bar after its text.
+        expect(measures.at(-1)?.end).toEqual([
+            {
+                kind: 'jump',
+                from,
+                ...(from === 'segno' ? { segno: 'segno-1' } : {}),
+                destination: { kind: 'ending', pass },
+                repeats: 'skip',
+            },
+        ]);
+        expect(measures.at(-2)?.annotations).toBeUndefined();
+    });
+
+    it('performs a mapped D.C. al 2nd End. through the shared score form', () => {
+        const body = 'T44{C   |N1F   }|N2G   <Fine>]|E7   <D.C. al 2nd End.>|A7   Z';
+        const parsed = parseIRealImport(open(body));
+        const song = parsed.songs[0];
+        expect(song.diagnostics.filter((entry) => entry.severity === 'error')).toEqual([]);
+        const plan = prepareScorePlayback(song.score);
+        // C F | C G | E7 A7 | D.C.: C G, Fine.
+        expect(plan.visits.map(({ measureIndex }) => measureIndex)).toEqual([
+            0, 1, 0, 2, 3, 4, 0, 2,
+        ]);
+    });
+
+    it.each([
+        // No Fine to stop at.
+        ['T44{C   |N1F   }|N2G   ]|E7 <D.C. al 2nd End.>|A7   Z', []],
+        // A coda sign beside it (Round Midnight's written outro): which ends the form is unsourced.
+        [
+            'T44{C   |N1F   }|N2G   <Fine>]|E7 <D.C. al 2nd End.>|A7   ][QD7   Z',
+            ['The coda sign in bar 6'],
+        ],
+        // A sign between the text and the closing barline it would take effect at.
+        ['T44{C   |N1F   }|N2G   ]|E7 <D.C. al 2nd End.>|A7   <Fine>Z', []],
+    ])(
+        'keeps an al-ending it cannot apply as inert text with its note, as before #1473: %s',
+        (body, orphans) => {
+            const parsed = parseIRealImport(open(body));
+            const song = parsed.songs[0];
+            expect(song.score).toBeDefined();
+            const measures = song.score!.sections[0].measures;
+            expect(measures.flatMap((measure) => measure.end ?? [])).not.toContainEqual(
+                expect.objectContaining({ kind: 'jump' }),
+            );
+            expect(measures[3].annotations).toEqual([
+                expect.objectContaining({ text: 'D.C. al 2nd End.', placement: 'below' }),
+            ]);
+            const messages = song.diagnostics.map(({ message }) => message);
+            expect(messages).toContain(
+                'A staff-text instruction ("D.C. al 2nd End.") is preserved as text only; it is not applied to the performed order.',
+            );
+            for (const orphan of orphans) {
+                expect(messages).toContainEqual(expect.stringContaining(orphan));
+            }
+        },
+    );
+
+    it('imports a chart with a "D.C. al Nth ending" it cannot apply as text, with a warning, rather than blocking it', () => {
+        // No repeat and no Fine: the instruction cannot be applied (#1473), so it stays the
+        // inert text it always was, never a guessed jump or a refused chart.
         const source = open('T44[C   |F   <D.C. al 2nd ending>Z');
         const parsed = parseIRealImport(source);
         const song = parsed.songs[0];
