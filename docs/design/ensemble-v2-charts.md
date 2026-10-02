@@ -44,7 +44,8 @@ The implemented batch adds source-preserving import review, context-checked one-
 resolution, and bounded native D.C./D.S. to end/Fine/coda. Global performed order is authoritative;
 the written stand uses detached display maps for bypassed bars. Native repeat-after-jump policy
 is explicit (`play` restarts repeats, `skip` selects final passes), not inferred for ambiguous
-iReal forms. Jump commands within repeats and al-Nth-ending destinations remain blocked.
+iReal forms. Jump commands within repeats remain blocked; al-Nth-ending destinations are
+implemented (#1473, below).
 The optional document `importSource` holds inert original text and its format, not runtime state.
 This is additive preview work, not production adoption or complete iReal compatibility.
 
@@ -193,6 +194,26 @@ the whole counted performance. The Edit panel's **Choruses** select sets the cou
 default, which removes the field) or 1–16; a chart that already counts more keeps its number.
 How iReal's unpaired coda signs map onto this is #1476.
 
+D.C./D.S. al Nth ending (#1473), `destination: { kind: 'ending', pass }`, follows iReal Pro's
+own definition (https://www.irealpro.com/learn/repeats-endings-and-jumps/): "D.C. al 2nd ending
+returns to the top, skips the first ending, and takes the second", and it "needs a Fine to mark
+where to stop". After the return, the one repeat with an ending N is played once (as its pass N),
+straight into ending N, and the performance goes on to the first Fine on the way; the chorus
+ends there. Like every jump it is taken afresh in each chorus. The compiler refuses, rather than
+guesses: no repeat with ending N after the return point, or more than one; any other repeat in
+the replayed passage (one around the return point, around or inside the taken repeat, before the
+Fine, or a repeated section), since whether it replays after the jump is undocumented (#1476); a
+Fine before ending N; another jump on the way; and no Fine before the route comes back to the
+command. Unlike other jumps, the command may sit inside a final ending, as iReal charts write it
+(a last ending runs to the section's end): only a command the form reaches more than once has
+ambiguous timing. The iReal importer maps "D.C./D.S. al 1st/2nd/3rd End." (iReal's spelling)
+and "... ending". Since "the jump only takes effect at that closing barline", the jump sits at
+the closing barline of its text's bar, or of the next bar when that bar is bare (no sign,
+rehearsal mark, staff text or meter change), as charts set the long text one bar early. It is
+applied only as the chart's one jump, with one Fine between the return point and the jump, no
+coda sign, and a route the score form accepts. Otherwise the text is imported exactly as before:
+the inert annotation, with its note.
+
 The current form grammar pairs repeat barlines within each section (an unmatched end repeat
 starts at that section's beginning). An explicit start must close in the same section; repeated
 regions cannot cross or share an ambiguous start. Nesting is capped at 16. Ending pass sets
@@ -296,7 +317,7 @@ fixture for this specific export, not general import or by-ear compatibility.
 | Qualities and slash bass | Wider authored vocabulary; conservative existing-engine subset playable | Complete official vocabulary mapping and harmonic-identity fixtures; no partial matches. |
 | Whole-section repeats | Native playback/display implemented; authoring remains limited | Distinguish section repetition, written repeat barlines and player chorus count; broader editor/import coverage. |
 | Repeat barlines and first/second endings | Native compact display/edit/play and conservative import within sections | Real-device audition and cross-section repeat forms. |
-| D.C./D.S., coda, Fine | Native global traversal and conservative unambiguous import implemented | Al-Nth-ending destinations, jumps inside repeats, ambiguous import repeat policy and physical-device audition. |
+| D.C./D.S., coda, Fine | Native global traversal, al-Nth-ending destinations and conservative unambiguous import implemented | Jumps inside repeats, repeats replayed after a jump, ambiguous import repeat policy and physical-device audition. |
 | N.C., holds, alternate chords, fermatas | Authored events represented; playback pending | Per-lane meaning, editing and faithful import mapping. |
 | Other rhythmic notation, rests and pushes | Inventory and represent without guessing equivalence | Current protocol/app fixtures and explicit lane semantics. |
 | Meter/key changes | Native bar editing, sticky contexts and supported-meter playback tested; the song's own meter is set from the Edit panel (#1371), re-dividing equal-length bars and blocking — never rounding — on a bar whose written lengths cannot follow | Real-device and audible acceptance; source import mapping; a section-level key/meter surface. |

@@ -254,9 +254,21 @@ function failAt(score: SemanticScore, boundary: Boundary, message: string): neve
     );
 }
 
-function expansionLimit(): never {
+/**
+ * `choruses`: fewer choruses would help, because the whole counted performance is over the limit.
+ * Otherwise the message is the one uncounted charts always had.
+ */
+function expansionLimit(choruses = false): never {
     throw new Error(
-        'This chart expands beyond the playback limit of 16,384 measures. Reduce repeats.',
+        `This chart expands beyond the playback limit of 16,384 measures. Reduce repeats${choruses ? ' or choruses' : ''}.`,
+    );
+}
+
+function jumpInRepeat(score: SemanticScore, boundary: Boundary): never {
+    failAt(
+        score,
+        boundary,
+        'Jump timing inside a repeated passage is ambiguous. Place the D.C./D.S. command after the complete repeat and its endings in a section that plays once.',
     );
 }
 
@@ -316,27 +328,20 @@ function navigation(score: SemanticScore, forms: Node[][]) {
             } else {
                 const boundary = boundaries.get(boundaryKey(sectionIndex, node.index, 'end'));
                 if (
-                    boundary?.directions.some((direction) => direction.kind === 'jump') &&
+                    boundary?.directions.some(
+                        // An al-ending jump is held to the exact rule instead: see compileScoreForm.
+                        (direction) =>
+                            direction.kind === 'jump' && direction.destination.kind !== 'ending',
+                    ) &&
                     (nested || score.sections[sectionIndex].repeat > 1)
                 ) {
-                    failAt(
-                        score,
-                        boundary,
-                        'Jump timing inside a repeated passage is ambiguous. Place the D.C./D.S. command after the complete repeat and its endings in a section that plays once.',
-                    );
+                    jumpInRepeat(score, boundary);
                 }
             }
         }
     }
     forms.forEach((form, sectionIndex) => checkCommandOwnership(form, sectionIndex, false));
     for (const { jump, boundary } of commands) {
-        if (jump.destination.kind === 'ending') {
-            failAt(
-                score,
-                boundary,
-                'D.C./D.S. al ending is not supported yet: its owning repeat and stopping Fine must be explicit. Use an explicit Fine or coda destination.',
-            );
-        }
         const start = jump.from === 'start' ? 0 : markers.get(jump.segno!)!.position;
         if (start >= boundary.position) {
             failAt(score, boundary, 'A D.C./D.S. jump must return to an earlier boundary.');
@@ -356,8 +361,170 @@ function navigation(score: SemanticScore, forms: Node[][]) {
     return {
         boundaries,
         commands,
+        markers,
         lastChorus: lastChorusCoda(score, markers, commands, lastChoruses),
     };
+}
+
+type RouteVisit = Omit<ScoreFormVisit, 'chorus'>;
+
+function firstBar(node: Node): number {
+    return node.kind === 'bar' ? node.index : firstBar(node.body[0] ?? node.endings[0].body[0]);
+}
+
+function lastBar(node: Node): number {
+    if (node.kind === 'bar') {
+        return node.index;
+    }
+    const tail = node.endings.at(-1)?.body ?? node.body;
+    return lastBar(tail[tail.length - 1]);
+}
+
+/**
+ * "D.C./D.S. al Nth ending" (#1473), after iReal Pro's own definition
+ * (https://www.irealpro.com/learn/repeats-endings-and-jumps/): "D.C. al 2nd ending returns to
+ * the top, skips the first ending, and takes the second. It also needs a Fine to mark where to
+ * stop." After the return, the one repeat with an ending N is played once, straight into ending
+ * N, and the performance goes on to the Fine. Returns the performed route from the return point
+ * to that Fine, so every chorus that takes the jump plays the same bars.
+ *
+ * Refused rather than guessed: no repeat with ending N after the return point, or more than one;
+ * any other repeat (an enclosing one, a nested one, a later one, a repeated section) before the
+ * Fine, since whether it replays after the jump is undocumented; a Fine before ending N; another
+ * jump on the way; and no Fine before the route comes back round to the command itself.
+ */
+function endingRoute(
+    score: SemanticScore,
+    forms: Node[][],
+    boundaries: Map<string, Boundary>,
+    command: { jump: Jump; boundary: Boundary },
+    pass: number,
+    landing: Boundary | undefined,
+): RouteVisit[] {
+    const refuse = (message: string): never => failAt(score, command.boundary, message);
+    const returnPoint = landing?.position ?? 0;
+    const offsets: number[] = [];
+    score.sections.reduce((offset, section, sectionIndex) => {
+        offsets[sectionIndex] = offset;
+        return offset + section.measures.length;
+    }, 0);
+
+    const targets: Node[] = [];
+    function collect(nodes: Node[], sectionIndex: number) {
+        for (const node of nodes) {
+            if (node.kind !== 'repeat') {
+                continue;
+            }
+            if (
+                offsets[sectionIndex] + firstBar(node) >= returnPoint &&
+                node.endings.some((ending) => ending.passes.includes(pass))
+            ) {
+                targets.push(node);
+            }
+            collect(node.body, sectionIndex);
+            for (const ending of node.endings) {
+                collect(ending.body, sectionIndex);
+            }
+        }
+    }
+    forms.forEach(collect);
+    if (!targets.length) {
+        refuse(
+            `D.C./D.S. al ending ${pass} needs a repeat with an ending ${pass} after its return point.`,
+        );
+    }
+    if (targets.length > 1) {
+        refuse(
+            `More than one repeat after the D.C./D.S. return point has an ending ${pass}; which one the jump takes is ambiguous.`,
+        );
+    }
+    const [target] = targets;
+    const otherRepeat = (): never =>
+        refuse(
+            `Another repeat lies in the passage replayed after the D.C./D.S. al ending ${pass}; whether it repeats again is not documented.`,
+        );
+
+    const route: RouteVisit[] = [];
+    let inEnding = false;
+    /** True when the boundary holds the Fine that ends the route. */
+    function cross(boundary: Boundary | undefined): boolean {
+        for (const direction of boundary?.directions ?? []) {
+            if (direction === command.jump) {
+                refuse(
+                    `D.C./D.S. al ending ${pass} needs a Fine after ending ${pass}, before the jump.`,
+                );
+            }
+            if (direction.kind === 'jump') {
+                refuse(
+                    'A second jump is reached before the active Fine or coda; the navigation destination is ambiguous.',
+                );
+            }
+        }
+        if (!boundary?.directions.some((direction) => direction.kind === 'fine')) {
+            return false;
+        }
+        if (!inEnding) {
+            refuse(
+                `The Fine comes before ending ${pass} in the passage replayed after the D.C./D.S.; the jump would stop before its ending.`,
+            );
+        }
+        return true;
+    }
+    function play(sectionIndex: number, nodes: Node[], repeatPasses: number[]): boolean {
+        for (const node of nodes) {
+            if (node.kind === 'repeat') {
+                otherRepeat();
+            } else {
+                const at = (edge: 'start' | 'end') =>
+                    boundaries.get(boundaryKey(sectionIndex, node.index, edge));
+                if (cross(at('start'))) {
+                    return true;
+                }
+                route.push({
+                    sectionIndex,
+                    measureIndex: node.index,
+                    sectionPass: 0,
+                    repeatPasses: [...repeatPasses],
+                });
+                if (cross(at('end'))) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    // A D.S. sign on an end boundary is crossed as the route sets off, as on the tape.
+    if (landing?.edge === 'end' && cross(landing)) {
+        return route;
+    }
+    for (const [sectionIndex, form] of forms.entries()) {
+        for (const node of form) {
+            const first = offsets[sectionIndex] + firstBar(node);
+            if (offsets[sectionIndex] + lastBar(node) < returnPoint) {
+                continue;
+            }
+            if (first < returnPoint || score.sections[sectionIndex].repeat > 1) {
+                otherRepeat();
+            }
+            if (node === target && node.kind === 'repeat') {
+                if (play(sectionIndex, node.body, [pass])) {
+                    return route;
+                }
+                inEnding = true;
+                const ending = node.endings.find((entry) => entry.passes.includes(pass))!;
+                if (play(sectionIndex, ending.body, [pass])) {
+                    return route;
+                }
+            } else if (play(sectionIndex, [node], [])) {
+                return route;
+            }
+        }
+    }
+    // Unreachable while the command follows its return point: the route meets it first.
+    return refuse(
+        `D.C./D.S. al ending ${pass} needs a Fine after ending ${pass}, before the jump.`,
+    );
 }
 
 /**
@@ -496,8 +663,35 @@ export function compileScoreForm(candidate: unknown): ScoreFormVisit[] {
     }
     const score = checked.value;
     const forms = score.sections.map(sectionForm);
-    const { boundaries, commands, lastChorus } = navigation(score, forms);
+    const { boundaries, commands, markers, lastChorus } = navigation(score, forms);
     const play = performanceTape(score, forms, boundaries, 'play');
+    const endingRoutes = new Map<Jump, RouteVisit[]>();
+    for (const { jump, boundary } of commands) {
+        if (jump.destination.kind !== 'ending') {
+            continue;
+        }
+        // An al-ending jump may sit in a final ending, as iReal charts write it: the last ending
+        // runs to the section's end, so "D.C. al 2nd ending" lands inside the 2nd ending it names
+        // (Cherokee). Only a jump the form reaches more than once has ambiguous timing.
+        if (
+            play.steps.filter((step) => step.kind === 'boundary' && step.boundary === boundary)
+                .length > 1
+        ) {
+            jumpInRepeat(score, boundary);
+        }
+        const landing = jump.from === 'start' ? undefined : markers.get(jump.segno!)!;
+        endingRoutes.set(
+            jump,
+            endingRoute(
+                score,
+                forms,
+                boundaries,
+                { jump, boundary },
+                jump.destination.pass,
+                landing,
+            ),
+        );
+    }
     const skip = commands.some(({ jump }) => jump.repeats === 'skip')
         ? performanceTape(score, forms, boundaries, 'skip')
         : play;
@@ -572,6 +766,12 @@ export function compileScoreForm(candidate: unknown): ScoreFormVisit[] {
         let cursor = 0;
         let active: { jump: Jump; boundary: Boundary } | undefined;
 
+        function perform(visit: RouteVisit) {
+            if (visits.length >= MAX_MEASURES) {
+                expansionLimit(score.choruses !== undefined);
+            }
+            visits.push({ ...visit, repeatPasses: [...visit.repeatPasses], chorus });
+        }
         function target(label: string, boundary: Boundary): number {
             const index = tape.markers.get(label)?.[0];
             if (index === undefined) {
@@ -586,10 +786,7 @@ export function compileScoreForm(candidate: unknown): ScoreFormVisit[] {
         while (cursor < tape.steps.length) {
             const step = tape.steps[cursor++];
             if (step.kind === 'measure') {
-                if (visits.length >= MAX_MEASURES) {
-                    expansionLimit();
-                }
-                visits.push({ ...step.visit, repeatPasses: [...step.visit.repeatPasses], chorus });
+                perform(step.visit);
                 continue;
             }
             const { boundary } = step;
@@ -643,6 +840,12 @@ export function compileScoreForm(candidate: unknown): ScoreFormVisit[] {
                 );
             }
             used.add(jump);
+            const route = endingRoutes.get(jump);
+            if (route) {
+                // The al-ending route was checked whole before the first chorus, Fine included.
+                route.forEach(perform);
+                return;
+            }
             active = { jump, boundary };
             tape = jump.repeats === 'skip' ? skip : play;
             cursor = jump.from === 'start' ? 0 : target(jump.segno!, boundary);

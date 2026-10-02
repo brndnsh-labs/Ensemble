@@ -19,6 +19,16 @@ interface StaffText {
     cell: number;
     above: boolean;
 }
+interface WrittenJump {
+    from: 'start' | 'segno';
+    destination: 'fine' | 'coda' | 'ending';
+    pass?: number;
+    /**
+     * An al-ending (#1473) is read as inert text: its annotation, and the index of its import
+     * note. Applying the jump removes both.
+     */
+    text?: { annotation: StaffText; noteAt: number };
+}
 interface WrittenBar {
     cells: (Cell | null)[];
     meter: string;
@@ -26,7 +36,9 @@ interface WrittenBar {
     end: ScoreDirection[];
     notes: StaffText[];
     close: string;
-    jump?: { from: 'start' | 'segno'; destination: 'fine' | 'coda' };
+    jump?: WrittenJump;
+    /** Two al-ending texts in one bar: neither is applied (#1473). */
+    ambiguousJump?: boolean;
     repeatTimes?: number;
 }
 
@@ -434,8 +446,13 @@ function readBars(
             // read as the plain instruction they display once rendered (#1447 review).
             const normalized = (modern ? text.replace(/XyQ/g, '   ') : text).trim();
             const jump = /^D\.([CS])\. al (fine|coda)$/i.exec(normalized);
+            // iReal's own spellings are "D.C. al 2nd End." and its 1st/3rd siblings (its editor
+            // menu; infojunkie/ireal-musicxml converter.js maps the same six D.C./D.S. strings);
+            // charts also write them out as "ending" (#1473).
+            const alEnding = /^D\.([CS])\. al (1st|2nd|3rd) (?:end\.|ending)$/i.exec(normalized);
             if (jump) {
-                if (current.jump) {
+                // An al-ending read earlier in this bar stays the inert text it was before #1473.
+                if (current.jump && !current.jump.text) {
                     fail(bars.length, 'The bar has more than one jump.');
                 }
                 current.jump = {
@@ -451,10 +468,9 @@ function readBars(
                 }
                 current.repeatTimes = times;
             } else {
+                const noteAt = notes.length;
                 // Any other bounded staff text — a navigation phrase this importer doesn't map
-                // ("D.C. al Nth ending": documented iReal vocabulary, but jumping to a specific
-                // earlier repeat pass is not modeled by ScoreDestination's 'ending' kind yet —
-                // score-form.ts's navigation() explicitly rejects it as unimplemented), or a
+                // (say "D.C. al 4th ending", beyond iReal's three numbered endings), or a
                 // free-text performance note ("Original takes Coda every time") — is kept as
                 // inert annotation. #1171's honest boundary is satisfied by never guessing a
                 // jump for it (so the performed order is never silently wrong) plus a warning
@@ -482,6 +498,21 @@ function readBars(
                         cell: current.cells.length,
                         above: !!raised && Number(raised[1]) >= 36,
                     });
+                }
+                // An al-ending (#1473) is read as exactly that inert text, note and tolerance;
+                // mapNavigation takes the text back out only when it applies the jump, so an
+                // al-ending it cannot apply imports as it did before. Beside another jump text in
+                // its bar, which one holds is a guess, so the al-ending stays text.
+                if (alEnding && current.jump?.text) {
+                    current.jump = undefined;
+                    current.ambiguousJump = true;
+                } else if (alEnding && !current.jump && !current.ambiguousJump) {
+                    current.jump = {
+                        from: alEnding[1].toUpperCase() === 'C' ? 'start' : 'segno',
+                        destination: 'ending',
+                        pass: Number(alEnding[2][0]),
+                        text: { annotation: current.notes.at(-1)!, noteAt },
+                    };
                 }
             }
             offset = end + 1;
@@ -681,62 +712,152 @@ function timedEvents(bar: WrittenBar, index: number): ScoreEvent[] {
     return events.map((event, i) => ({ ...event!, duration: durations[i] }));
 }
 
+type Marker = { direction: ScoreDirection; index: number; edge: string };
+
+/**
+ * Where an iReal "D.C./D.S. al Nth ending" (#1473) takes effect, or undefined when this importer
+ * cannot apply it. iReal: "End the measure that holds the D.C. or D.S. text with a final barline
+ * ... because the jump only takes effect at that closing barline", and "D.C. al 2nd ending ...
+ * also needs a Fine to mark where to stop" (https://www.irealpro.com/learn/repeats-endings-and-jumps/).
+ * Charts habitually set the long text one bar early so that its line ends at that barline
+ * (Cherokee, and every such Jazz 1460 chart this applies to), so the jump may move on to the next
+ * bar's closing barline. Only one bar, and only a bare one: no sign, rehearsal mark, staff text or
+ * meter change, so the jump never carries the form past anything a reader would see. Al
+ * Fine/Coda keep #1447's stricter rule that the text's own bar closes.
+ */
+function alEndingClose(
+    bars: WrittenBar[],
+    markers: Marker[],
+    index: number,
+    jump: WrittenJump,
+): number | undefined {
+    let at = index;
+    if (!']Z'.includes(bars[index].close)) {
+        const next = bars[index + 1];
+        if (
+            !next ||
+            !']Z'.includes(next.close) ||
+            bars[index].end.length ||
+            next.start.length ||
+            next.end.length ||
+            next.notes.length ||
+            next.jump ||
+            next.meter !== bars[index].meter
+        ) {
+            return undefined;
+        }
+        at = index + 1;
+    }
+    const of = (kind: string) => markers.filter(({ direction }) => direction.kind === kind);
+    const signs = of('segno');
+    const fines = of('fine');
+    if (jump.from === 'segno' && (signs.length !== 1 || signs[0].index >= index)) {
+        return undefined;
+    }
+    const from = jump.from === 'segno' ? signs[0].index : 0;
+    // One Fine between the return point and the jump, and no coda sign to make it ambiguous.
+    // score-form.ts holds the route itself to the rule; scoreFromIRealBody falls back to text
+    // when it refuses.
+    if (
+        fines.length !== 1 ||
+        fines[0].index < from ||
+        fines[0].index >= index ||
+        of('coda').length
+    ) {
+        return undefined;
+    }
+    return at;
+}
+
+/**
+ * Map the chart's D.C./D.S. text to jumps. An al-ending is applied only when `applyAlEnding` and
+ * alEndingClose allow; otherwise it stays the inert text readBars read it as. Returns whether
+ * one was applied.
+ */
 function mapNavigation(
     bars: WrittenBar[],
     notes: string[],
     tolerateUnpairedMarkers: boolean,
-): void {
-    const markers = bars.flatMap((bar, index) => [
+    applyAlEnding: boolean,
+): boolean {
+    const markers: Marker[] = bars.flatMap((bar, index) => [
         ...bar.start.map((direction) => ({ direction, index, edge: 'start' })),
         ...bar.end.map((direction) => ({ direction, index, edge: 'end' })),
     ]);
-    const jumps = bars.flatMap((bar, index) => (bar.jump ? [{ bar, index, jump: bar.jump }] : []));
+    const written = bars.flatMap((bar, index) =>
+        bar.jump ? [{ bar, index, jump: bar.jump }] : [],
+    );
+    const closes = new Map<WrittenJump, number>();
+    for (const { bar, index, jump } of written) {
+        if (!jump.text) {
+            continue;
+        }
+        const close =
+            applyAlEnding && written.length === 1
+                ? alEndingClose(bars, markers, index, jump)
+                : undefined;
+        if (close === undefined) {
+            // Never refuse a chart that imported before, never guess a jump: the text, note and
+            // tolerance stay exactly as they were before #1473.
+            bar.jump = undefined;
+            continue;
+        }
+        closes.set(jump, close);
+        // Applied: it is a jump now, not inert text with a "not applied" note.
+        bar.notes.splice(bar.notes.indexOf(jump.text.annotation), 1);
+        notes.splice(jump.text.noteAt, 1);
+    }
+    const jumps = written.filter(({ bar }) => bar.jump);
     if (jumps.length > 1) {
         fail(jumps[1].index, 'Multiple navigation jumps need a verified import policy.');
     }
-    for (const { bar, index, jump } of jumps) {
-        if (!']Z'.includes(bar.close)) {
-            fail(index, 'D.C./D.S. needs a final closing barline in iReal.');
-        }
-        if (
-            markers.some(({ direction }) =>
-                ['repeat-start', 'repeat-end', 'ending-start'].includes(direction.kind),
-            )
-        ) {
-            fail(index, 'Repeats after an iReal jump need a verified playback policy.');
-        }
-        const signs = markers.filter(({ direction }) => direction.kind === 'segno');
-        const fines = markers.filter(({ direction }) => direction.kind === 'fine');
-        const codas = markers.filter(({ direction }) => direction.kind === 'coda');
-        if (jump.from === 'segno' && (signs.length !== 1 || signs[0].index >= index)) {
-            fail(index, 'D.S. requires exactly one earlier segno.');
-        }
-        const from = jump.from === 'segno' ? signs[0].index : 0;
-        if (jump.destination === 'fine') {
+    for (const { index, jump } of jumps) {
+        const close = closes.get(jump);
+        const bar = bars[close ?? index];
+        if (close === undefined) {
+            if (!']Z'.includes(bar.close)) {
+                fail(index, 'D.C./D.S. needs a final closing barline in iReal.');
+            }
             if (
-                fines.length !== 1 ||
-                fines[0].index < from ||
-                fines[0].index >= index ||
-                codas.length
+                markers.some(({ direction }) =>
+                    ['repeat-start', 'repeat-end', 'ending-start'].includes(direction.kind),
+                )
+            ) {
+                fail(index, 'Repeats after an iReal jump need a verified playback policy.');
+            }
+            const signs = markers.filter(({ direction }) => direction.kind === 'segno');
+            const fines = markers.filter(({ direction }) => direction.kind === 'fine');
+            const codas = markers.filter(({ direction }) => direction.kind === 'coda');
+            if (jump.from === 'segno' && (signs.length !== 1 || signs[0].index >= index)) {
+                fail(index, 'D.S. requires exactly one earlier segno.');
+            }
+            const from = jump.from === 'segno' ? signs[0].index : 0;
+            if (jump.destination === 'fine') {
+                if (
+                    fines.length !== 1 ||
+                    fines[0].index < from ||
+                    fines[0].index >= index ||
+                    codas.length
+                ) {
+                    fail(
+                        index,
+                        'D.C./D.S. al Fine requires one reachable earlier Fine and no ambiguous coda.',
+                    );
+                }
+            } else if (
+                codas.length !== 2 ||
+                codas[0].edge !== 'end' ||
+                codas[1].edge !== 'start' ||
+                codas[0].index < from ||
+                codas[0].index >= index ||
+                codas[1].index <= index ||
+                fines.length
             ) {
                 fail(
                     index,
-                    'D.C./D.S. al Fine requires one reachable earlier Fine and no ambiguous coda.',
+                    'Al Coda requires an earlier end-of-bar departure and a later start-of-bar coda target.',
                 );
             }
-        } else if (
-            codas.length !== 2 ||
-            codas[0].edge !== 'end' ||
-            codas[1].edge !== 'start' ||
-            codas[0].index < from ||
-            codas[0].index >= index ||
-            codas[1].index <= index ||
-            fines.length
-        ) {
-            fail(
-                index,
-                'Al Coda requires an earlier end-of-bar departure and a later start-of-bar coda target.',
-            );
         }
         bar.end.push({
             kind: 'jump',
@@ -745,7 +866,9 @@ function mapNavigation(
             destination:
                 jump.destination === 'fine'
                     ? { kind: 'fine', label: 'fine-1' }
-                    : { kind: 'coda', via: 'coda-1', target: 'coda-2' },
+                    : jump.destination === 'ending'
+                      ? { kind: 'ending', pass: jump.pass! }
+                      : { kind: 'coda', via: 'coda-1', target: 'coda-2' },
             repeats: 'skip',
         });
     }
@@ -766,6 +889,7 @@ function mapNavigation(
             }
         }
     }
+    return closes.size > 0;
 }
 
 /** Original parser of the documented open token grammar, not an upstream tolerant parser. */
@@ -778,6 +902,21 @@ export function scoreFromIRealBody(
     if (!/^[A-G][#b]?-?$/.test(key)) {
         throw new Error('The stored key signature is unsupported.');
     }
+    // An al-ending the shared score form refuses (another repeat on its route, say) is read
+    // again as the inert text it was before #1473, rather than refusing the whole import.
+    return (
+        buildScore(body, key, index, modern, true) ?? buildScore(body, key, index, modern, false)!
+    );
+}
+
+/** Null when an applied al-ending (#1473) leaves a score the score form refuses. */
+function buildScore(
+    body: string,
+    key: string,
+    index: number,
+    modern: boolean,
+    applyAlEnding: boolean,
+): { score: SemanticScore; notes: string[] } | null {
     const notes: string[] = [];
     const signals: ParseSignals = {
         unmappedNavigation: false,
@@ -786,10 +925,11 @@ export function scoreFromIRealBody(
         notedEndMark: false,
     };
     const bars = readBars(body, modern, notes, signals);
-    // An unmapped navigation reference (e.g. "al Nth ending") is imported as inert annotation
-    // only, so a Fine/Coda/Segno marker it would otherwise have paired with is expected to be
-    // unpaired here; mapNavigation notes each one by name rather than hard-failing.
-    mapNavigation(bars, notes, signals.unmappedNavigation);
+    // An unmapped navigation reference (e.g. "Original takes Coda every time", or an al-ending
+    // mapNavigation cannot apply) is imported as inert annotation only, so a Fine/Coda/Segno
+    // marker it would otherwise have paired with is expected to be unpaired here; mapNavigation
+    // notes each one by name rather than hard-failing.
+    const applied = mapNavigation(bars, notes, signals.unmappedNavigation, applyAlEnding);
     const id = (bar: number) => `ireal-${index + 1}-bar-${bar + 1}`;
     const measures: ScoreMeasure[] = [];
     let pendingTwo = false;
@@ -846,6 +986,9 @@ export function scoreFromIRealBody(
         sections: [{ id: `ireal-${index + 1}-section`, label: 'Chart', repeat: 1, measures }],
     };
     const checked = validateSemanticScore(score);
+    if (checked.kind !== 'ok' && applied) {
+        return null;
+    }
     if (checked.kind !== 'ok') {
         throw new Error(
             checked.kind === 'invalid'
@@ -855,7 +998,14 @@ export function scoreFromIRealBody(
     }
     // Authored validity alone permits unresolved form. Import also proves a bounded route;
     // lane/quality/meter playback capability remains the host adapter's separate decision.
-    compileScoreForm(checked.value);
+    try {
+        compileScoreForm(checked.value);
+    } catch (error) {
+        if (applied) {
+            return null;
+        }
+        throw error;
+    }
     // Dropped alternates are aggregated into one note (never one per occurrence — a pathological
     // chart could repeat "(D)" thousands of times), placed first, then the whole list is bounded
     // so no chart can produce an unbounded diagnostics list (#1447 review).
