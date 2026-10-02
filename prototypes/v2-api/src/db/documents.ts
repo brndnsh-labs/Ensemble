@@ -60,6 +60,12 @@ export interface ManifestEntry {
     revision: string;
     deleted: boolean;
     bytes: number;
+    /**
+     * The stored document's own `kind` (#1474), present only when it has one — a collection's
+     * `'collection'`. A chart carries no `kind`, so a chart's entry is byte-identical to what it
+     * was before collections existed, and a tombstone has no body to read one from.
+     */
+    kind?: string;
 }
 
 export interface ManifestPage {
@@ -80,6 +86,12 @@ type RawManifestRow = {
     /** SQLite has no boolean: the `UNION` legs select the literals 0 and 1. */
     deleted: number;
     bytes: number;
+    /**
+     * The body's own top-level `kind` when it is a string (#1474), else NULL — always NULL for a
+     * chart, which has none, and for a tombstone, which has no body. Guarded by `json_valid` so a
+     * row that is somehow not JSON reads as kind-less rather than failing the whole page.
+     */
+    kind: string | null;
 };
 
 interface RawDocument {
@@ -200,11 +212,15 @@ export function listManifest(
     const after = page.after ?? '';
     const rows = db
         .prepare(
-            `SELECT document_id, revision, 0 AS deleted, length(CAST(body AS BLOB)) AS bytes
+            `SELECT document_id, revision, 0 AS deleted, length(CAST(body AS BLOB)) AS bytes,
+                    CASE WHEN json_valid(body) THEN
+                        CASE WHEN json_type(body, '$.kind') = 'text'
+                             THEN json_extract(body, '$.kind') END
+                    END AS kind
                FROM documents
               WHERE owner_id = ? AND document_id > ?
              UNION ALL
-             SELECT t.document_id, t.revision, 1 AS deleted, 0 AS bytes
+             SELECT t.document_id, t.revision, 1 AS deleted, 0 AS bytes, NULL AS kind
                FROM tombstones t
               WHERE t.owner_id = ? AND t.document_id > ?
                 AND NOT EXISTS (SELECT 1 FROM documents d
@@ -218,6 +234,8 @@ export function listManifest(
         revision: row.revision,
         deleted: row.deleted === 1,
         bytes: row.bytes,
+        // Only when the body names one (#1474): a chart's entry stays exactly what it was.
+        ...(typeof row.kind === 'string' ? { kind: row.kind } : {}),
     }));
     // The lookahead row existing means `entries` holds `limit` rows, and the floor of 1 means
     // that is at least one — so the last entry is always there when this branch is taken.

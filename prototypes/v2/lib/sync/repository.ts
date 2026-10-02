@@ -1,3 +1,4 @@
+import { resolvedSongIds } from '../collections';
 import {
     HOME_FILL_SPARE,
     type HomeRead,
@@ -11,14 +12,17 @@ import { AccountDatabase, type Transaction } from './database';
 import {
     type AccountScope,
     type ChartDocument,
+    type CollectionDocument,
     candidateKey,
     candidatePrefix,
+    collectionSnapshot,
     type Draft,
     deleteBody,
     deleteReply,
     deletionKey,
     deletionPrefix,
     digest,
+    documentKind,
     identifier,
     type LastOpened,
     LocalRevisionError,
@@ -35,19 +39,23 @@ import {
     type RemoteOutcome,
     remoteRevision,
     reply,
+    type SavedCollection,
     type SavedSong,
     type SaveOperation,
     type SaveReceipt,
     type SaveRefusalReason,
     type Star,
+    type SyncDocument,
     snapshot,
     starKey,
     starPrefix,
+    syncDocument,
 } from './protocol';
 import {
     copyScope,
     remoteOutcome,
     savedCandidate,
+    savedCollection,
     savedDeletion,
     savedDraft,
     savedOpenedAt,
@@ -72,6 +80,45 @@ export interface SongPage {
     /** Null at end of list. Never a promise that the next page sees the same library. */
     nextAfterDocumentId: string | null;
 }
+
+/** One bounded page of this owner's collections, in `SongPage`'s shape and cursor grammar. */
+export interface CollectionPage {
+    collections: SavedCollection[];
+    /** Null at end of list. Never a promise that the next page sees the same library. */
+    nextAfterDocumentId: string | null;
+}
+
+/**
+ * A collection as a reader shows it (#1474): the stored record, plus the songs in it that resolve
+ * on this device right now, in the collection's own order. `document.songIds` is what a Save
+ * builds on and is never pruned; `resolvedSongIds` is the view (`resolvedSongIds` in
+ * `lib/collections.ts`).
+ */
+export interface CollectionListing extends SavedCollection {
+    resolvedSongIds: string[];
+}
+
+/**
+ * What a library download observed about one collection (#1474). Narrower than `RemoteOutcome`:
+ * there is no `unsupported` kind, because a collection body this build cannot read is reported
+ * by the download pass and never stored — see `reconcileCollection`.
+ */
+export type CollectionOutcome =
+    | { kind: 'version'; documentId: string; revision: string; document: CollectionDocument }
+    | { kind: 'deleted'; documentId: string; revision: string };
+
+/**
+ * `deleteCollection`'s answer. Only `'removed'` changed anything:
+ *
+ * - `'removed'`: the collection never reached the account and nothing of it can be in flight, so
+ *   the local record and its queued Saves are the only copy, and they are gone.
+ * - `'cloud'`: the account holds it. Removing it is the explicit online delete — `prepareDelete`,
+ *   the request, then `acknowledgeDelete` — exactly as for a song, never a local-only removal.
+ * - `'queued'`: a Save of it may already be at the server (its request is frozen). Removing it
+ *   locally could orphan a cloud copy this device then re-downloads; the outbox settles it first.
+ * - `'missing'`: nothing here by that id.
+ */
+export type CollectionDeletion = 'removed' | 'cloud' | 'queued' | 'missing';
 
 /**
  * What `reconcile` did. One term per preservation rule, so a caller never has to infer it.
@@ -288,28 +335,164 @@ function liveDrafts<T>(
     );
 }
 
-function operations<T>(
+/**
+ * One document's queued Saves, re-proved and in local-revision order. `decode` is the kind the
+ * caller is prepared to hold (`savedOperation`): the chart paths use `operations` below, which
+ * refuses anything but a chart exactly as before #1474; the paths that move any document — the
+ * outbox's `prepare`/`acknowledge`/`refuse`, `queued` — pass `syncDocument`.
+ */
+function queueOf<T, D extends SyncDocument>(
     tx: Transaction<T>,
     scope: AccountScope,
     id: string,
-    consume: (ops: SaveOperation[]) => void,
+    decode: (candidate: unknown) => D,
+    consume: (ops: SaveOperation<D>[]) => void,
 ) {
     tx.read(
         tx
             .table('operations')
             .index('song')
             .getAll([scope.ownerId, id], MAX_PENDING_SAVES + 1),
-        (ops: SaveOperation[]) => {
+        (ops: SaveOperation<SyncDocument>[]) => {
             if (ops.length > MAX_PENDING_SAVES) {
                 throw new Error('Account queue exceeds the supported limit.');
             }
             consume(
                 ops
-                    .map((op) => savedOperation(op, scope, id))
+                    .map((op) => savedOperation(op, scope, id, decode))
                     .sort((a, b) => a.localRevision - b.localRevision),
             );
         },
     );
+}
+
+function operations<T>(
+    tx: Transaction<T>,
+    scope: AccountScope,
+    id: string,
+    consume: (ops: SaveOperation[]) => void,
+) {
+    queueOf(tx, scope, id, snapshot, consume);
+}
+
+/**
+ * `commitDeleted`'s collection half (#1474), shared by the same two callers: a downloaded tombstone
+ * (`reconcileCollection`) and this device's own acknowledged delete (`acknowledgeDelete`). Simpler
+ * than a chart's because a collection has no drafts and is never "on the stand": the only local
+ * work that can exist for it is a queued Save — and no candidate row is written for a held one,
+ * because that Save is already the record of the divergence. Sent, it meets the tombstone as a
+ * `'gone'` conflict (`acknowledge`), which is where the musician is told.
+ */
+function commitCollectionDeleted(
+    tx: Pick<Transaction<never>, 'table'>,
+    scope: AccountScope,
+    documentId: string,
+    collection: SavedCollection | null,
+    held: boolean,
+    expected: string | null | undefined,
+): ReconcileOutcome {
+    if (!collection) {
+        return 'unchanged';
+    }
+    if (held || collection.remoteRevision === null || collection.remoteRevision !== expected) {
+        return 'retained-deleted';
+    }
+    tx.table('collections').delete([scope.ownerId, documentId]);
+    tx.table('meta').delete(deletionKey(scope.ownerId, documentId));
+    return 'removed';
+}
+
+/**
+ * The write half of `saveCollection`, inside its transaction: `save`'s queue rules for a chart,
+ * restated for a collection's record. A refused head (#1298) retires with everything chained
+ * behind it; otherwise the new operation chains onto the newest queued one, or onto the record's
+ * confirmed remote revision when nothing is queued.
+ */
+function enqueueCollection(
+    tx: Pick<Transaction<never>, 'table'>,
+    scope: AccountScope,
+    document: CollectionDocument,
+    previous: SavedCollection | null,
+    expected: number | null,
+    operationId: string,
+    queue: SaveOperation<CollectionDocument>[],
+): SavedCollection {
+    const refusedHead = queue[0]?.status === 'refused' ? queue[0] : null;
+    const retired = refusedHead ? queue : [];
+    const active = refusedHead ? [] : queue;
+    if (active.length >= MAX_PENDING_SAVES) {
+        throw new Error('Too many pending Saves for this collection. Sync before saving again.');
+    }
+    const now = new Date().toISOString();
+    const saved = collectionSnapshot({
+        ...document,
+        revision: expected === null ? 0 : expected + 1,
+        createdAt: previous?.document.createdAt ?? now,
+        updatedAt: now,
+    });
+    const record: SavedCollection = {
+        ownerId: scope.ownerId,
+        documentId: saved.id,
+        document: saved,
+        remoteRevision: previous?.remoteRevision ?? null,
+    };
+    const predecessor = active.at(-1);
+    for (const stale of retired) {
+        tx.table('operations').delete([scope.ownerId, stale.operationId]);
+    }
+    tx.table('collections').put(record);
+    tx.table('operations').add({
+        ownerId: scope.ownerId,
+        documentId: saved.id,
+        operationId,
+        localRevision: saved.revision,
+        snapshot: saved,
+        base: predecessor
+            ? { operationId: predecessor.operationId }
+            : { revision: record.remoteRevision },
+        wireBody: null,
+        status: 'queued',
+    } satisfies SaveOperation<CollectionDocument>);
+    return record;
+}
+
+/**
+ * The saved record under one id, of whichever kind holds it (#1474): the song when there is one,
+ * else the collection, else null. Two reads inside the caller's transaction; a song wins because
+ * every chart path that was here before collections asked `songs` alone and must see what it did.
+ */
+function savedRecord<T>(
+    tx: Transaction<T>,
+    scope: AccountScope,
+    documentId: string,
+    consume: (
+        record:
+            | { kind: 'chart'; saved: SavedSong }
+            | { kind: 'collection'; saved: SavedCollection }
+            | null,
+    ) => void,
+) {
+    tx.read(tx.table('songs').get([scope.ownerId, documentId]), (song: SavedSong | undefined) => {
+        if (song) {
+            return consume({ kind: 'chart', saved: savedSong(song, scope, documentId) });
+        }
+        tx.read(
+            tx.table('collections').get([scope.ownerId, documentId]),
+            (row: SavedCollection | undefined) => {
+                const collection = storedCollection(row, scope, documentId);
+                consume(collection ? { kind: 'collection', saved: collection } : null);
+            },
+        );
+    });
+}
+
+/** One stored collection row, re-proved, or null. Shared by every collection read below. */
+function storedCollection(
+    row: SavedCollection | undefined,
+    scope: AccountScope,
+    documentId: string,
+): SavedCollection | null {
+    return row ? savedCollection(row, scope, documentId) : null;
 }
 
 /**
@@ -449,8 +632,8 @@ export class AccountSongbook {
     }
 
     /**
-     * Remove every record this device holds for one account (#1269) — songs, the outbox and its
-     * receipts, drafts, preserved remote candidates, frozen deletions and the `last-opened`
+     * Remove every record this device holds for one account (#1269) — songs, collections (#1474),
+     * the outbox and its receipts, drafts, preserved remote candidates, frozen deletions and the `last-opened`
      * preference (#1299). Nothing else is touched:
      * the guest songbook lives in a different database entirely, and another owner's records are
      * outside every range below.
@@ -476,6 +659,7 @@ export class AccountSongbook {
             // owner's. It holds for the two- and three-element key paths alike.
             const owned = IDBKeyRange.bound([ownerId], [ownerId, []], false, true);
             tx.table('songs').delete(owned);
+            tx.table('collections').delete(owned);
             tx.table('operations').delete(owned);
             tx.table('receipts').delete(owned);
             tx.table('drafts').delete(owned);
@@ -618,6 +802,234 @@ export class AccountSongbook {
     }
 
     /**
+     * One document's queued Saves, of EITHER kind (#1474) — what the outbox re-reads, where
+     * `pending` is the chart-only read the stand and the sign-out preflight use. Never mixed up:
+     * `pending` keeps refusing a collection's queue rather than handing a chart path one.
+     */
+    async queued(scope: AccountScope, documentId: string): Promise<SaveOperation<SyncDocument>[]> {
+        scope = copyScope(scope);
+        identifier(documentId);
+        return this.database.run('readonly', scope, (tx) =>
+            queueOf(tx, scope, documentId, syncDocument, tx.finish),
+        );
+    }
+
+    /** One collection's queued Saves (#1474), proved to be a collection's. */
+    async pendingCollection(
+        scope: AccountScope,
+        documentId: string,
+    ): Promise<SaveOperation<CollectionDocument>[]> {
+        scope = copyScope(scope);
+        identifier(documentId);
+        return this.database.run('readonly', scope, (tx) =>
+            queueOf(tx, scope, documentId, collectionSnapshot, tx.finish),
+        );
+    }
+
+    /** One saved collection (#1474), or null. */
+    async readCollection(scope: AccountScope, documentId: string): Promise<SavedCollection | null> {
+        scope = copyScope(scope);
+        identifier(documentId);
+        return this.database.run('readonly', scope, (tx) => {
+            tx.read(
+                tx.table('collections').get([scope.ownerId, documentId]),
+                (row: SavedCollection | undefined) =>
+                    tx.finish(storedCollection(row, scope, documentId)),
+            );
+        });
+    }
+
+    /**
+     * One bounded page of this owner's collections, ordered by document ID — `list`'s exact
+     * contract over the `collections` store (#1474), for the readers that walk the library in id
+     * order: the outbox pass and the library download's local diff.
+     */
+    async collectionPage(scope: AccountScope, options: ListOptions = {}): Promise<CollectionPage> {
+        scope = copyScope(scope);
+        if (!options || typeof options !== 'object' || Array.isArray(options)) {
+            throw new Error('Invalid list options.');
+        }
+        const { afterDocumentId, limit = DEFAULT_LIST_LIMIT } = options;
+        if (!Number.isSafeInteger(limit) || limit < 1 || limit > MAX_LIST_LIMIT) {
+            throw new Error(`List limit must be an integer between 1 and ${MAX_LIST_LIMIT}.`);
+        }
+        if (afterDocumentId !== undefined) {
+            identifier(afterDocumentId);
+        }
+        return this.database.run('readonly', scope, (tx) => {
+            // The same owner-tight bounds `list` pages songs with; see it for why.
+            const range = IDBKeyRange.bound(
+                afterDocumentId === undefined ? [scope.ownerId] : [scope.ownerId, afterDocumentId],
+                [scope.ownerId, []],
+                afterDocumentId !== undefined,
+                true,
+            );
+            tx.read(tx.table('collections').getAll(range, limit + 1), (rows: SavedCollection[]) => {
+                const validated = rows.map((row) => {
+                    identifier(row?.documentId);
+                    return savedCollection(row, scope, row.documentId);
+                });
+                const collections = validated.slice(0, limit);
+                tx.finish({
+                    collections,
+                    nextAfterDocumentId:
+                        validated.length > limit
+                            ? collections[collections.length - 1].documentId
+                            : null,
+                });
+            });
+        });
+    }
+
+    /**
+     * Every collection this owner has here (#1474), in document-ID order, each with the songs in
+     * it that resolve on this device. One transaction, so the songs a collection resolves against
+     * are the songs this same moment holds.
+     *
+     * A song id that does not resolve is filtered from `resolvedSongIds` and KEPT in
+     * `document.songIds`: a song this device has not downloaded yet is the common case on a fresh
+     * device, and a list pruned against a partial download would be uploaded by the next Save of
+     * it — losing the musician's order for a song that exists. Deleting a song never rewrites a
+     * collection either; an id that no longer resolves is simply not shown.
+     *
+     * Bounded by the server's per-owner document cap, which collections count toward. Like
+     * `list`, a record that does not validate fails the read rather than being skipped.
+     */
+    async listCollections(scope: AccountScope): Promise<CollectionListing[]> {
+        scope = copyScope(scope);
+        const owned = IDBKeyRange.bound([scope.ownerId], [scope.ownerId, []], false, true);
+        return this.database.run('readonly', scope, (tx) => {
+            tx.read(tx.table('songs').getAllKeys(owned), (keys: IDBValidKey[]) => {
+                const songs = new Set(keys.map((key) => (key as [string, string])[1]));
+                tx.read(
+                    tx.table('collections').getAll(owned, MAX_REMOTE_CANDIDATES + 1),
+                    (rows: SavedCollection[]) => {
+                        if (rows.length > MAX_REMOTE_CANDIDATES) {
+                            throw new Error('Account collections exceed the supported limit.');
+                        }
+                        tx.finish(
+                            rows.map((row) => {
+                                identifier(row?.documentId);
+                                const saved = savedCollection(row, scope, row.documentId);
+                                return {
+                                    ...saved,
+                                    resolvedSongIds: resolvedSongIds(saved.document, (id) =>
+                                        songs.has(id),
+                                    ),
+                                };
+                            }),
+                        );
+                    },
+                );
+            });
+        });
+    }
+
+    /**
+     * Explicit Save of one collection (#1474): `save`'s contract over the `collections` store, in
+     * one transaction — compare the local revision, write the record, queue an immutable
+     * operation for the outbox. Every rule `save` states about operation ids, a refused head and
+     * the pending-queue bound holds here for the same reasons. There are no drafts to retire: a
+     * collection edit IS its Save, nothing about it is an unsaved experiment.
+     *
+     * An id this owner already uses for a SONG is refused. Ids are unique per owner across kinds
+     * (the account holds both in one table), and a collection written over a song's id would be
+     * two documents the outbox and the server could no longer tell apart.
+     */
+    async saveCollection(
+        scope: AccountScope,
+        candidate: unknown,
+        expected: number | null,
+    ): Promise<SavedCollection> {
+        scope = copyScope(scope);
+        const document = collectionSnapshot(candidate);
+        localRevision(expected);
+        // Always fresh, never caller-supplied — `save` says why.
+        const operationId = crypto.randomUUID();
+        return this.database.run('readwrite', scope, (tx) => {
+            tx.read(
+                tx.table('songs').getKey([scope.ownerId, document.id]),
+                (song: IDBValidKey | undefined) => {
+                    if (song !== undefined) {
+                        throw new Error('This id already belongs to a song.');
+                    }
+                    tx.read(
+                        tx.table('collections').get([scope.ownerId, document.id]),
+                        (row: SavedCollection | undefined) => {
+                            const previous = storedCollection(row, scope, document.id);
+                            if (
+                                expected === null
+                                    ? previous
+                                    : previous?.document.revision !== expected
+                            ) {
+                                throw new LocalRevisionError();
+                            }
+                            queueOf(tx, scope, document.id, collectionSnapshot, (queue) => {
+                                tx.finish(
+                                    enqueueCollection(
+                                        tx,
+                                        scope,
+                                        document,
+                                        previous,
+                                        expected,
+                                        operationId,
+                                        queue,
+                                    ),
+                                );
+                            });
+                        },
+                    );
+                },
+            );
+        });
+    }
+
+    /**
+     * Remove one collection (#1474) — LOCALLY only when that is the whole truth. See
+     * `CollectionDeletion` for each answer; the rule is that a local removal is never how a
+     * collection the account holds, or may hold, leaves this device:
+     *
+     * - confirmed by the cloud (`remoteRevision` set): `'cloud'`, nothing touched — the explicit
+     *   online delete (`prepareDelete` → request → `acknowledgeDelete`) is the only way, and its
+     *   tombstone is what stops another device re-creating it;
+     * - never confirmed, but a Save of it is frozen (it may have reached the server with its reply
+     *   lost): `'queued'`, nothing touched — the outbox learns which;
+     * - never confirmed and nothing frozen: the record and its queued Saves are the only copy that
+     *   exists anywhere, and they go together, in one transaction.
+     *
+     * Deleting a collection never deletes its songs (#1443 decision 3); nothing here reads them.
+     * Refusing to delete a built-in collection is the caller's rule (#1477), not storage's.
+     */
+    async deleteCollection(scope: AccountScope, documentId: string): Promise<CollectionDeletion> {
+        scope = copyScope(scope);
+        identifier(documentId);
+        return this.database.run('readwrite', scope, (tx) => {
+            tx.read(
+                tx.table('collections').get([scope.ownerId, documentId]),
+                (row: SavedCollection | undefined) => {
+                    const collection = storedCollection(row, scope, documentId);
+                    if (!collection) {
+                        return tx.finish('missing');
+                    }
+                    if (collection.remoteRevision !== null) {
+                        return tx.finish('cloud');
+                    }
+                    queueOf(tx, scope, documentId, collectionSnapshot, (queue) => {
+                        if (queue.some((operation) => operation.wireBody !== null)) {
+                            return tx.finish('queued');
+                        }
+                        for (const operation of queue) {
+                            tx.table('operations').delete([scope.ownerId, operation.operationId]);
+                        }
+                        tx.table('collections').delete([scope.ownerId, documentId]);
+                        tx.finish('removed');
+                    });
+                },
+            );
+        });
+    }
+
+    /**
      * One bounded page of this owner's saved songs, ordered by document ID.
      *
      * The cursor is a local pagination token and never an authorization: the owner fence in
@@ -691,6 +1103,17 @@ export class AccountSongbook {
         // server-side `conflict` enforces remotely.
         const operationId = crypto.randomUUID();
         return this.database.run('readwrite', scope, (tx) => {
+            // One id space per owner across kinds (#1474 review R1): a song never takes a
+            // collection's id, the mirror of `saveCollection`'s check. Requested first, so its
+            // callback runs first and its refusal aborts before the song read below acts.
+            tx.read(
+                tx.table('collections').getKey([scope.ownerId, document.id]),
+                (collection: IDBValidKey | undefined) => {
+                    if (collection !== undefined) {
+                        throw new Error('This id already belongs to a collection.');
+                    }
+                },
+            );
             tx.read(
                 tx.table('songs').get([scope.ownerId, document.id]),
                 (previous: SavedSong | undefined) => {
@@ -1007,54 +1430,53 @@ export class AccountSongbook {
     ): Promise<PreparedSave | 'idle' | 'conflict' | 'refused'> {
         scope = copyScope(scope);
         identifier(documentId);
-        const operation = await this.database.run<SaveOperation | 'idle' | 'conflict' | 'refused'>(
-            'readwrite',
-            scope,
-            (tx) => {
-                operations(tx, scope, documentId, (queue) => {
-                    const head = queue[0];
-                    if (!head) {
-                        return tx.finish('idle');
+        // Either kind (#1474): the outbox moves charts and collections alike, through one queue.
+        const operation = await this.database.run<
+            SaveOperation<SyncDocument> | 'idle' | 'conflict' | 'refused'
+        >('readwrite', scope, (tx) => {
+            queueOf(tx, scope, documentId, syncDocument, (queue) => {
+                const head = queue[0];
+                if (!head) {
+                    return tx.finish('idle');
+                }
+                if (head.status === 'conflict') {
+                    return tx.finish('conflict');
+                }
+                if (head.status === 'refused') {
+                    return tx.finish('refused');
+                }
+                if (head.wireBody !== null) {
+                    return tx.finish(head);
+                }
+                const freeze = (revision: string | null) => {
+                    if (revision !== null) {
+                        remoteRevision(revision);
                     }
-                    if (head.status === 'conflict') {
-                        return tx.finish('conflict');
-                    }
-                    if (head.status === 'refused') {
-                        return tx.finish('refused');
-                    }
-                    if (head.wireBody !== null) {
-                        return tx.finish(head);
-                    }
-                    const freeze = (revision: string | null) => {
-                        if (revision !== null) {
-                            remoteRevision(revision);
+                    head.wireBody = JSON.stringify({
+                        protocolVersion: 1,
+                        ownerId: scope.ownerId,
+                        documentId,
+                        operationId: head.operationId,
+                        expectedRevision: revision,
+                        document: syncDocument(head.snapshot),
+                    });
+                    tx.table('operations').put(head);
+                    tx.finish(head);
+                };
+                if ('revision' in head.base) {
+                    return freeze(head.base.revision);
+                }
+                tx.read(
+                    tx.table('receipts').get([scope.ownerId, head.base.operationId]),
+                    (receipt: SaveReceipt | undefined) => {
+                        if (!receipt || receipt.documentId !== documentId) {
+                            throw new Error('The preceding Save has no confirmed receipt.');
                         }
-                        head.wireBody = JSON.stringify({
-                            protocolVersion: 1,
-                            ownerId: scope.ownerId,
-                            documentId,
-                            operationId: head.operationId,
-                            expectedRevision: revision,
-                            document: snapshot(head.snapshot),
-                        });
-                        tx.table('operations').put(head);
-                        tx.finish(head);
-                    };
-                    if ('revision' in head.base) {
-                        return freeze(head.base.revision);
-                    }
-                    tx.read(
-                        tx.table('receipts').get([scope.ownerId, head.base.operationId]),
-                        (receipt: SaveReceipt | undefined) => {
-                            if (!receipt || receipt.documentId !== documentId) {
-                                throw new Error('The preceding Save has no confirmed receipt.');
-                            }
-                            freeze(receipt.revision);
-                        },
-                    );
-                });
-            },
-        );
+                        freeze(receipt.revision);
+                    },
+                );
+            });
+        });
         if (typeof operation === 'string') {
             return operation;
         }
@@ -1085,8 +1507,8 @@ export class AccountSongbook {
         return this.database.run('readwrite', scope, (tx) => {
             tx.read(
                 tx.table('operations').get([scope.ownerId, request.operationId]),
-                (operation: SaveOperation | undefined) => {
-                    if (!operation) {
+                (stored: SaveOperation<SyncDocument> | undefined) => {
+                    if (!stored) {
                         tx.read(
                             tx.table('receipts').get([scope.ownerId, request.operationId]),
                             (receipt: SaveReceipt | undefined) => {
@@ -1104,7 +1526,15 @@ export class AccountSongbook {
                         );
                         return;
                     }
-                    operation = savedOperation(operation, scope, request.documentId);
+                    // Either kind (#1474), and the kind decides which store the acknowledgement
+                    // lands in: a collection's record is in `collections`, a chart's in `songs`.
+                    const operation = savedOperation(
+                        stored,
+                        scope,
+                        request.documentId,
+                        syncDocument,
+                    );
+                    const kind = documentKind(operation.snapshot);
                     if (
                         operation.wireBody !== request.body ||
                         operation.documentId !== request.documentId
@@ -1118,22 +1548,44 @@ export class AccountSongbook {
                         return tx.finish('conflict');
                     }
                     if (response.kind === 'conflict') {
+                        // `reply()` accepts a remote of either kind; only one of the operation's
+                        // own kind may be preserved beside it. Another kind under this id is not
+                        // a version of this document at all — the account holds the id as the
+                        // other kind — so it is parked exactly as a missing document is, with NO
+                        // remote (#1474 review R1). Throwing here instead would leave the head
+                        // queued, re-sent and rejected on every pass, and since a storage-side
+                        // throw ends the drain, every document after this id would never upload.
+                        // The current server never sends one (`commitSave` answers a cross-kind
+                        // write with `remote: null`); this is the defence for one that did.
+                        const remote =
+                            response.remote !== null &&
+                            documentKind(response.remote.document) !== kind
+                                ? null
+                                : response.remote;
                         operation.status = 'conflict';
-                        operation.remote = response.remote;
+                        operation.remote = remote;
                         tx.table('operations').put(operation);
                         return tx.finish('conflict');
                     }
+                    const table = kind === 'collection' ? 'collections' : 'songs';
                     tx.read(
-                        tx.table('songs').get([scope.ownerId, request.documentId]),
-                        (song: SavedSong | undefined) => {
-                            if (!song) {
+                        tx.table(table).get([scope.ownerId, request.documentId]),
+                        (row: SavedSong | SavedCollection | undefined) => {
+                            if (!row) {
                                 throw new Error(
                                     'Saved song missing; acknowledgement was not applied.',
                                 );
                             }
-                            song = savedSong(song, scope, request.documentId);
-                            // Do not replace song.document: it may already hold a newer local Save.
-                            tx.table('songs').put({ ...song, remoteRevision: response.revision });
+                            const record =
+                                kind === 'collection'
+                                    ? savedCollection(
+                                          row as SavedCollection,
+                                          scope,
+                                          request.documentId,
+                                      )
+                                    : savedSong(row as SavedSong, scope, request.documentId);
+                            // Do not replace the document: it may already hold a newer local Save.
+                            tx.table(table).put({ ...record, remoteRevision: response.revision });
                             tx.table('receipts').add({
                                 ownerId: scope.ownerId,
                                 documentId: request.documentId,
@@ -1185,12 +1637,13 @@ export class AccountSongbook {
         identifier(documentId);
         identifier(operationId);
         return this.database.run('readwrite', scope, (tx) => {
-            operations(tx, scope, documentId, (queue) => {
+            // Either kind (#1474): the step-over is about the outbox head, whatever it holds.
+            queueOf(tx, scope, documentId, syncDocument, (queue) => {
                 const head = queue[0];
                 if (head?.status !== 'queued' || head.operationId !== operationId) {
                     return tx.finish('none');
                 }
-                const refused: SaveOperation = { ...head, status: 'refused', reason };
+                const refused: SaveOperation<SyncDocument> = { ...head, status: 'refused', reason };
                 tx.table('operations').put(refused);
                 tx.finish('refused');
             });
@@ -1651,34 +2104,29 @@ export class AccountSongbook {
             scope,
             (tx) => {
                 const key = deletionKey(scope.ownerId, documentId);
-                tx.read(
-                    tx.table('songs').get([scope.ownerId, documentId]),
-                    (stored: SavedSong | undefined) => {
-                        const song = stored ? savedSong(stored, scope, documentId) : null;
-                        if (!song || song.remoteRevision === null) {
-                            tx.table('meta').delete(key);
-                            return tx.finish(song ? 'unconfirmed' : 'missing');
+                // Either kind (#1474): a collection is deleted through this same frozen request.
+                savedRecord(tx, scope, documentId, (record) => {
+                    const song = record?.saved ?? null;
+                    if (!song || song.remoteRevision === null) {
+                        tx.table('meta').delete(key);
+                        return tx.finish(song ? 'unconfirmed' : 'missing');
+                    }
+                    const expectedRevision = song.remoteRevision;
+                    tx.read(tx.table('meta').get(key), (existing: PendingDeletion | undefined) => {
+                        if (existing !== undefined) {
+                            return tx.finish(savedDeletion(existing, scope, documentId));
                         }
-                        const expectedRevision = song.remoteRevision;
-                        tx.read(
-                            tx.table('meta').get(key),
-                            (existing: PendingDeletion | undefined) => {
-                                if (existing !== undefined) {
-                                    return tx.finish(savedDeletion(existing, scope, documentId));
-                                }
-                                const record: PendingDeletion = {
-                                    key,
-                                    ownerId: scope.ownerId,
-                                    documentId,
-                                    operationId: crypto.randomUUID(),
-                                    expectedRevision,
-                                };
-                                tx.table('meta').put(record);
-                                tx.finish(record);
-                            },
-                        );
-                    },
-                );
+                        const record: PendingDeletion = {
+                            key,
+                            ownerId: scope.ownerId,
+                            documentId,
+                            operationId: crypto.randomUUID(),
+                            expectedRevision,
+                        };
+                        tx.table('meta').put(record);
+                        tx.finish(record);
+                    });
+                });
             },
         );
         if (typeof frozen === 'string') {
@@ -1764,28 +2212,44 @@ export class AccountSongbook {
                     { key: candidateKey(scope.ownerId, documentId), ownerId: scope.ownerId },
                     observed,
                 );
-            tx.read(
-                tx.table('songs').get([scope.ownerId, documentId]),
-                (stored: SavedSong | undefined) => {
-                    const song = stored ? savedSong(stored, scope, documentId) : null;
-                    liveDrafts(tx, scope, documentId, song, (drafts: number) => {
-                        operations(tx, scope, documentId, (queue) => {
-                            const held = active || drafts > 0 || queue.length > 0;
-                            tx.finish(
-                                commitDeleted(
-                                    tx,
-                                    scope,
-                                    documentId,
-                                    candidateRecord,
-                                    song,
-                                    held,
-                                    request.expectedRevision,
-                                ),
-                            );
-                        });
+            savedRecord(tx, scope, documentId, (record) => {
+                if (record?.kind === 'collection') {
+                    // A collection's delete (#1474) settles through the collection half of the
+                    // same rule. An id with neither record falls through to the chart rule below
+                    // exactly as it always did.
+                    const collection = record.saved;
+                    queueOf(tx, scope, documentId, collectionSnapshot, (queue) =>
+                        tx.finish(
+                            commitCollectionDeleted(
+                                tx,
+                                scope,
+                                documentId,
+                                collection,
+                                queue.length > 0,
+                                request.expectedRevision,
+                            ),
+                        ),
+                    );
+                    return;
+                }
+                const song = record?.saved ?? null;
+                liveDrafts(tx, scope, documentId, song, (drafts: number) => {
+                    operations(tx, scope, documentId, (queue) => {
+                        const held = active || drafts > 0 || queue.length > 0;
+                        tx.finish(
+                            commitDeleted(
+                                tx,
+                                scope,
+                                documentId,
+                                candidateRecord,
+                                song,
+                                held,
+                                request.expectedRevision,
+                            ),
+                        );
                     });
-                },
-            );
+                });
+            });
         });
     }
 
@@ -1898,9 +2362,23 @@ export class AccountSongbook {
             const key = candidateKey(scope.ownerId, documentId);
             const candidate = (): RemoteCandidate =>
                 Object.assign({ key, ownerId: scope.ownerId }, observed);
+            // One id space per owner across kinds (#1474 review R1): an id this device holds as a
+            // COLLECTION is not a chart's to write, so a chart observation for it writes nothing —
+            // not a song beside the collection, not a candidate. Requested first, so it is known
+            // before the song read's callback runs.
+            let heldAsCollection = false;
+            tx.read(
+                tx.table('collections').getKey([scope.ownerId, documentId]),
+                (collection: IDBValidKey | undefined) => {
+                    heldAsCollection = collection !== undefined;
+                },
+            );
             tx.read(
                 tx.table('songs').get([scope.ownerId, documentId]),
                 (stored: SavedSong | undefined) => {
+                    if (heldAsCollection) {
+                        return tx.finish(observed.kind === 'deleted' ? 'unchanged' : 'superseded');
+                    }
                     const song = stored ? savedSong(stored, scope, documentId) : null;
                     liveDrafts(tx, scope, documentId, song, (drafts: number) => {
                         operations(tx, scope, documentId, (queue) => {
@@ -1983,6 +2461,106 @@ export class AccountSongbook {
                             tx.table('meta').delete(key);
                             tx.finish('advanced');
                         });
+                    });
+                },
+            );
+        });
+    }
+
+    /**
+     * Apply one remote observation to a COLLECTION (#1474): `reconcile`'s commit rule for the
+     * `collections` store, in one transaction under the same fence, with the same compare-and-swap
+     * base (`expectedRemoteRevision`, asked before anything else).
+     *
+     * Simpler than a chart's, because a collection has no drafts and is never on the stand: the
+     * only local work that can hold one is its own queued Save (or a record the cloud never
+     * confirmed). And nothing is preserved beside a held collection — no candidate row — because
+     * that queued Save already IS the record of the divergence: the outbox sends before the
+     * download in every pass, so it meets the newer revision as a `'conflict'` carrying exactly
+     * the remote version a candidate would have kept. So a held collection, and one whose record
+     * moved under the plan, both answer `'superseded'`: nothing written, re-planned next pass.
+     */
+    async reconcileCollection(
+        scope: AccountScope,
+        outcome: CollectionOutcome,
+        options: Pick<ReconcileOptions, 'expectedRemoteRevision'> = {},
+    ): Promise<ReconcileOutcome> {
+        scope = copyScope(scope);
+        if (!options || typeof options !== 'object' || Array.isArray(options)) {
+            throw new Error('Invalid reconcile options.');
+        }
+        const expected = options.expectedRemoteRevision;
+        if (expected !== undefined && expected !== null) {
+            remoteRevision(expected);
+        }
+        // Validated and rebuilt before the transaction opens, as `remoteOutcome` does for a chart.
+        if (!outcome || typeof outcome !== 'object') {
+            throw new Error('Invalid remote observation.');
+        }
+        identifier(outcome.documentId);
+        remoteRevision(outcome.revision);
+        const documentId = outcome.documentId;
+        const revision = outcome.revision;
+        let document: CollectionDocument | null = null;
+        if (outcome.kind === 'version') {
+            document = collectionSnapshot(outcome.document);
+            if (document.id !== documentId) {
+                throw new Error('Remote version identity does not match its document.');
+            }
+        } else if (outcome.kind !== 'deleted') {
+            throw new Error('Unknown remote observation kind.');
+        }
+        return this.database.run('readwrite', scope, (tx) => {
+            // The mirror of `reconcile`'s check (#1474 review R1): an id this device holds as a
+            // SONG is not a collection's to write, so nothing is written beside it.
+            let heldAsSong = false;
+            tx.read(
+                tx.table('songs').getKey([scope.ownerId, documentId]),
+                (song: IDBValidKey | undefined) => {
+                    heldAsSong = song !== undefined;
+                },
+            );
+            tx.read(
+                tx.table('collections').get([scope.ownerId, documentId]),
+                (row: SavedCollection | undefined) => {
+                    if (heldAsSong) {
+                        return tx.finish(document === null ? 'unchanged' : 'superseded');
+                    }
+                    const collection = storedCollection(row, scope, documentId);
+                    queueOf(tx, scope, documentId, collectionSnapshot, (queue) => {
+                        const held = queue.length > 0;
+                        if (document === null) {
+                            return tx.finish(
+                                commitCollectionDeleted(
+                                    tx,
+                                    scope,
+                                    documentId,
+                                    collection,
+                                    held,
+                                    expected,
+                                ),
+                            );
+                        }
+                        if (collection && collection.remoteRevision === revision) {
+                            return tx.finish('unchanged');
+                        }
+                        if (
+                            (collection ? collection.remoteRevision : undefined) !== expected ||
+                            held ||
+                            collection?.remoteRevision === null
+                        ) {
+                            // The record moved under the plan (a Save acknowledged, or a local
+                            // removal), or local work holds it. Either way this body is not this
+                            // device's to write; see the method comment.
+                            return tx.finish('superseded');
+                        }
+                        tx.table('collections').put({
+                            ownerId: scope.ownerId,
+                            documentId,
+                            document,
+                            remoteRevision: revision,
+                        } satisfies SavedCollection);
+                        tx.finish('advanced');
                     });
                 },
             );

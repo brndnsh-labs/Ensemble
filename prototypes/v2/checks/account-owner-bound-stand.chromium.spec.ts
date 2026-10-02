@@ -257,6 +257,8 @@ test('a chart from another account is exportable but can never be saved into the
         receipts: 0,
         drafts: 0,
         meta: 0,
+        // The account database's version-2 store (#1474).
+        collections: 0,
     });
 
     // Nothing was uploaded for it either, so the refusal was a refusal all the way down.
@@ -285,6 +287,8 @@ test('a chart from another account is exportable but can never be saved into the
         receipts: 0,
         drafts: 0,
         meta: 0,
+        // The account database's version-2 store (#1474).
+        collections: 0,
     });
     expect(uploads).toBe(0);
 
@@ -307,6 +311,8 @@ test('a chart from another account is exportable but can never be saved into the
         receipts: 0,
         drafts: 0,
         meta: 0,
+        // The account database's version-2 store (#1474).
+        collections: 0,
     });
     expect(uploads).toBe(0);
 });

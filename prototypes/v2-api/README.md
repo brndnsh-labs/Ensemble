@@ -281,6 +281,19 @@ table is `src/db/save.ts` (`commitSave`, one `withTransaction`); the route is
 | Create or update over a tombstone; update of an id the owner never had | `409 … kind: 'conflict', remote: null` |
 | Any decoder refusal — including an envelope `ownerId` that is not the session's account | `400 { error: 'malformed_request' }` |
 | Owner at a storage cap (#1234) — create at `MAX_DOCUMENTS_PER_OWNER`, or a write crossing `MAX_BYTES_PER_OWNER` | `409 { error: 'quota_exceeded' }` — nothing written |
+| Any Save — create, stale or exact-revision update — whose id the owner holds as the OTHER kind (a collection at a chart's id, or the reverse, #1474) | `409 … kind: 'conflict', revision: <current>, remote: null` — a document never changes kind, and no reply carries a body of the other kind |
+
+**Two document kinds, one table (#1474).** The `document` slot holds a chart or a collection
+(`prototypes/v2/lib/collections.ts`: `{ kind: 'collection', schemaVersion: 1, id, name, revision,
+createdAt, updatedAt, songIds, builtIn? }`). A chart carries no `kind` at all, so every chart
+request, stored body and reply is byte-for-byte what it was before collections existed; the
+shared decoder (`syncDocument` in `lib/sync/protocol.ts`) dispatches on `kind` and refuses any
+other value. A collection is stored, read, deleted and tombstoned through exactly the routes
+below, its ids share the owner's one id space, and it counts toward `MAX_DOCUMENTS_PER_OWNER`
+like any other row (`test/http/documents-collections.test.ts`). `commitSave` decides kind
+(`documentKindOf`) BEFORE any revision branch: any Save whose id holds the other kind is a
+conflict with no remote, because there is no version of THIS document there to resolve against —
+so neither a create nor a stale update can hand a client a body of the wrong kind.
 
 Design points worth knowing before changing it:
 
@@ -381,7 +394,7 @@ cursor-expiry machinery — do not add one. The manifest query is `listManifest`
 
 | Request | Reply |
 | --- | --- |
-| `GET /api/documents` | `200 { documents: [{ documentId, revision, deleted, bytes }], nextAfterDocumentId }` |
+| `GET /api/documents` | `200 { documents: [{ documentId, revision, deleted, bytes, kind? }], nextAfterDocumentId }` — `kind` only on a live row whose document names one (`'collection'`, #1474): absent for every chart, so a chart's row is unchanged, and absent on a tombstone, which has no body to read it from |
 | `GET /api/documents?after=<id>&limit=<n>` | the next page; `nextAfterDocumentId` is `null` exactly at the end of the library |
 | `GET /api/documents/:id` | `200 { documentId, revision, document }` — the stored bytes verbatim |
 | Absent id, tombstoned id, or another owner's id | `404 { error: 'not_found' }` — one status, one body, all three |

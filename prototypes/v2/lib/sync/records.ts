@@ -1,8 +1,10 @@
 import {
     type AccountScope,
     candidateKey,
+    collectionSnapshot,
     type Draft,
     deletionKey,
+    documentKind,
     identifier,
     localRevision,
     type OpenedAt,
@@ -11,10 +13,12 @@ import {
     type RemoteCandidate,
     type RemoteOutcome,
     remoteRevision,
+    type SavedCollection,
     type SavedSong,
     type SaveOperation,
     type SaveRefusalReason,
     type Star,
+    type SyncDocument,
     snapshot,
     starKey,
     type UnsupportedReason,
@@ -41,6 +45,28 @@ export function savedSong(value: SavedSong, scope: AccountScope, id: string): Sa
     const document = snapshot(value.document);
     if (document.id !== id) {
         throw new Error('Stored chart identity does not match its record.');
+    }
+    if (value.remoteRevision !== null) {
+        remoteRevision(value.remoteRevision);
+    }
+    return {
+        ownerId: scope.ownerId,
+        documentId: id,
+        document,
+        remoteRevision: value.remoteRevision,
+    };
+}
+
+/** `savedSong`'s collection half (#1474): the same ownership, identity and revision proofs. */
+export function savedCollection(
+    value: SavedCollection,
+    scope: AccountScope,
+    id: string,
+): SavedCollection {
+    owned(value, scope, id);
+    const document = collectionSnapshot(value.document);
+    if (document.id !== id) {
+        throw new Error('Stored collection identity does not match its record.');
     }
     if (value.remoteRevision !== null) {
         remoteRevision(value.remoteRevision);
@@ -176,15 +202,33 @@ export function savedStar(value: Star, scope: AccountScope, id: string): Star {
     return { key: value.key, ownerId: scope.ownerId, documentId: id };
 }
 
+/**
+ * Re-prove one stored queued Save. `decode` says which kind the caller is prepared to hold: a
+ * chart path passes nothing and so keeps refusing anything but a chart, exactly as before #1474;
+ * the paths that move any document (`prepare`, `acknowledge`, `refuse`, the outbox) pass
+ * `syncDocument`, and a collection path passes `collectionSnapshot`.
+ */
 export function savedOperation(
-    value: SaveOperation,
+    value: SaveOperation<SyncDocument>,
     scope: AccountScope,
     id: string,
-): SaveOperation {
+): SaveOperation;
+export function savedOperation<D extends SyncDocument>(
+    value: SaveOperation<SyncDocument>,
+    scope: AccountScope,
+    id: string,
+    decode: (candidate: unknown) => D,
+): SaveOperation<D>;
+export function savedOperation(
+    value: SaveOperation<SyncDocument>,
+    scope: AccountScope,
+    id: string,
+    decode: (candidate: unknown) => SyncDocument = snapshot,
+): SaveOperation<SyncDocument> {
     owned(value, scope, id);
     identifier(value.operationId);
     localRevision(value.localRevision);
-    const document = snapshot(value.snapshot);
+    const document = decode(value.snapshot);
     if (
         document.id !== id ||
         document.revision !== value.localRevision ||
@@ -236,8 +280,10 @@ export function savedOperation(
         }
         if (value.remote !== null) {
             remoteRevision(value.remote.revision);
-            const remote = snapshot(value.remote.document);
-            if (remote.id !== id) {
+            // The same decoder as the snapshot, so a conflict can only ever preserve a remote
+            // version of the operation's own kind.
+            const remote = decode(value.remote.document);
+            if (remote.id !== id || documentKind(remote) !== documentKind(document)) {
                 throw new Error('Invalid remote conflict identity.');
             }
         }

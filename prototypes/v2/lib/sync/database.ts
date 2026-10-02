@@ -1,6 +1,16 @@
 import { ACCOUNT_DATABASE, AccountChangedError, type AccountScope } from './protocol';
 
-export const TABLES = ['songs', 'operations', 'receipts', 'drafts', 'meta'] as const;
+export const TABLES = ['songs', 'operations', 'receipts', 'drafts', 'meta', 'collections'] as const;
+
+/**
+ * Version 2 (#1474) adds the `collections` store and nothing else. The upgrade is additive by
+ * construction: each step only CREATES what its version introduced, keyed on the version the
+ * database is coming from, so a version-1 database keeps every existing store and every row in it
+ * untouched (`tests/browser/account-collections.browser.test.ts` proves the rows byte-identical).
+ * Never add a step here that reads, rewrites or deletes existing records — that is a migration,
+ * a separate decision with its own brakes.
+ */
+export const ACCOUNT_DATABASE_VERSION = 2;
 export type Table = (typeof TABLES)[number];
 
 interface ActiveAccount {
@@ -30,26 +40,37 @@ export class AccountDatabase {
     private open(): Promise<IDBDatabase> {
         if (!this.opening) {
             const opening = new Promise<IDBDatabase>((resolve, reject) => {
-                const request = indexedDB.open(this.name, 1);
+                const request = indexedDB.open(this.name, ACCOUNT_DATABASE_VERSION);
                 let failed = false;
-                request.onupgradeneeded = () => {
+                request.onupgradeneeded = (event) => {
                     const db = request.result;
-                    db.createObjectStore('songs', { keyPath: ['ownerId', 'documentId'] });
-                    const operations = db.createObjectStore('operations', {
-                        keyPath: ['ownerId', 'operationId'],
-                    });
-                    operations.createIndex('song', ['ownerId', 'documentId']);
-                    db.createObjectStore('receipts', { keyPath: ['ownerId', 'operationId'] });
-                    const drafts = db.createObjectStore('drafts', {
-                        keyPath: ['ownerId', 'documentId', 'writerId'],
-                    });
-                    drafts.createIndex('song', ['ownerId', 'documentId']);
-                    // Generic keyed store, four namespaces: the `'active'` account pointer, the
-                    // `remote:<owner>:<document>` candidates a library download preserves, the
-                    // `delete:<owner>:<document>` frozen deletions (#1270) and the
-                    // `last-opened:<owner>` preference (#1299). See `candidateKey`, `deletionKey`
-                    // and `lastOpenedKey` in `protocol.ts` for why they all live here.
-                    db.createObjectStore('meta', { keyPath: 'key' });
+                    if (event.oldVersion < 1) {
+                        db.createObjectStore('songs', { keyPath: ['ownerId', 'documentId'] });
+                        const operations = db.createObjectStore('operations', {
+                            keyPath: ['ownerId', 'operationId'],
+                        });
+                        operations.createIndex('song', ['ownerId', 'documentId']);
+                        db.createObjectStore('receipts', { keyPath: ['ownerId', 'operationId'] });
+                        const drafts = db.createObjectStore('drafts', {
+                            keyPath: ['ownerId', 'documentId', 'writerId'],
+                        });
+                        drafts.createIndex('song', ['ownerId', 'documentId']);
+                        // Generic keyed store, four namespaces: the `'active'` account pointer, the
+                        // `remote:<owner>:<document>` candidates a library download preserves, the
+                        // `delete:<owner>:<document>` frozen deletions (#1270) and the
+                        // `last-opened:<owner>` preference (#1299). See `candidateKey`,
+                        // `deletionKey` and `lastOpenedKey` in `protocol.ts` for why they all
+                        // live here.
+                        db.createObjectStore('meta', { keyPath: 'key' });
+                    }
+                    if (event.oldVersion < 2) {
+                        // The collection half of `songs` (#1474): one row per (owner, collection),
+                        // keyed exactly like a song so every owner-bounded range reads both alike.
+                        // Its queued Saves share `operations` and `receipts` with the songs', which
+                        // is why it lives in THIS database: a Save and its acknowledgement commit
+                        // the record and the outbox in one transaction.
+                        db.createObjectStore('collections', { keyPath: ['ownerId', 'documentId'] });
+                    }
                 };
                 request.onblocked = () => {
                     failed = true;

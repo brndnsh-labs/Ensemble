@@ -154,6 +154,8 @@ function stubSongbook(overrides: Record<string, unknown> = {}): AccountSongbook 
     return {
         remoteCandidates: async () => [],
         list: async () => ({ songs: [], nextAfterDocumentId: null }),
+        // The collections store the pass also diffs (#1474); empty, so these rows are all songs.
+        collectionPage: async () => ({ collections: [], nextAfterDocumentId: null }),
         reconcile: async () => 'unchanged',
         ...overrides,
     } as unknown as AccountSongbook;

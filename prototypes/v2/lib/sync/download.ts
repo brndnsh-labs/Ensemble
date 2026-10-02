@@ -1,8 +1,11 @@
 import { validateChartDocument } from '../../../../public/songbook/codec.js';
+import { decodeCollection } from '../collections';
 import {
     AccountChangedError,
     type AccountScope,
     type ChartDocument,
+    type CollectionDocument,
+    collectionSnapshot,
     identifier,
     type RemoteOutcome,
     remoteRevision,
@@ -10,7 +13,12 @@ import {
     type UnsupportedReason,
 } from './protocol';
 import { copyScope } from './records';
-import { type AccountSongbook, MAX_LIST_LIMIT, type ReconcileOutcome } from './repository';
+import {
+    type AccountSongbook,
+    type CollectionOutcome,
+    MAX_LIST_LIMIT,
+    type ReconcileOutcome,
+} from './repository';
 import type { Progress } from './status';
 
 /**
@@ -78,6 +86,14 @@ export interface ManifestRow {
     revision: string;
     deleted: boolean;
     bytes: number;
+    /**
+     * Which kind of document a LIVE row is (#1474). Absent for a chart, exactly as a chart document
+     * carries no `kind` — so a chart row is the row it always was — and absent on a tombstone,
+     * which needs none: a deleted id is matched against whichever local record holds it. Any other
+     * string is a kind this build does not know, and the row is left alone (`planLibraryDownload`)
+     * rather than fetched into a store that cannot hold it.
+     */
+    kind?: string;
 }
 
 export interface ManifestPage {
@@ -126,6 +142,8 @@ export interface LocalMirror {
      * in the way, and the moment that work is resolved the same row has to be free to advance.
      */
     quarantinedRevision: string | null;
+    /** `'collection'` for a record in the `collections` store (#1474); absent for a song. */
+    kind?: 'collection';
 }
 
 export interface PlannedDocument {
@@ -139,6 +157,11 @@ export interface PlannedDocument {
      * consequences for whether a remote body may become the local song.
      */
     expectedRemoteRevision?: string | null;
+    /**
+     * `'collection'` when the row is a collection's (#1474): its body is decoded as one and its
+     * commit is `reconcileCollection`. Absent for a chart, so a chart's plan is unchanged.
+     */
+    kind?: 'collection';
 }
 
 export interface LibraryPlan {
@@ -146,7 +169,7 @@ export interface LibraryPlan {
     fetch: PlannedDocument[];
     /** Deleted rows this device still has a saved record for. */
     tombstone: PlannedDocument[];
-    /** Rows needing no request and no write at all. */
+    /** Rows needing no request and no write at all — including a kind this build does not know. */
     unchanged: string[];
     /**
      * Saved records no manifest row mentions. NEVER deleted: absence from the manifest is not
@@ -154,7 +177,11 @@ export interface LibraryPlan {
      * restore, a document created below the cursor mid-pass, or a bug.
      */
     absent: string[];
-    /** Live rows, and how many of them a saved record already mirrors at that same revision. */
+    /**
+     * Live CHART rows, and how many of them a saved record already mirrors at that same revision.
+     * Collections are not counted (#1474): this is the songbook's offline-readiness fact
+     * (`status.ts`), and a collection is not a song a musician can open without a connection.
+     */
     documents: { required: number; mirrored: number };
 }
 
@@ -274,11 +301,17 @@ function readManifestPage(value: unknown): ManifestPage {
         if (typeof row.deleted !== 'boolean') {
             throw new Error('Invalid manifest row deletion flag.');
         }
+        // Absent for a chart (#1474). Present, it must at least be a short string: an unknown
+        // kind is a future server's and is skipped, but a non-string is a broken frame.
+        if (row.kind !== undefined && (typeof row.kind !== 'string' || row.kind.length > 64)) {
+            throw new Error('Invalid manifest row kind.');
+        }
         return {
             documentId: row.documentId,
             revision: row.revision,
             deleted: row.deleted,
             bytes: integer(row.bytes, 'Manifest row bytes', 0, Number.MAX_SAFE_INTEGER),
+            ...(row.kind === undefined ? {} : { kind: row.kind }),
         } satisfies ManifestRow;
     });
     const next = record.nextAfterDocumentId;
@@ -368,7 +401,14 @@ export function planLibraryDownload(
     rows: readonly ManifestRow[],
     local: readonly LocalMirror[],
 ): LibraryPlan {
-    const mirrors = new Map(local.map((mirror) => [mirror.documentId, mirror]));
+    // One map per kind (#1474): a live row is diffed only against a record of its own kind, so a
+    // chart's plan is exactly what it was before collections existed.
+    const charts = new Map(
+        local.filter((mirror) => mirror.kind !== 'collection').map((m) => [m.documentId, m]),
+    );
+    const collections = new Map(
+        local.filter((mirror) => mirror.kind === 'collection').map((m) => [m.documentId, m]),
+    );
     const listed = new Set<string>();
     const plan: LibraryPlan = {
         fetch: [],
@@ -379,25 +419,41 @@ export function planLibraryDownload(
     };
     for (const row of rows) {
         listed.add(row.documentId);
-        const mirror = mirrors.get(row.documentId);
-        // Undefined rather than null when there is no SAVED record: a mirror that exists only to
-        // carry a quarantined revision has no record for a commit to compare against.
-        const expectedRemoteRevision = mirror?.saved ? mirror.remoteRevision : undefined;
         if (row.deleted) {
-            if (mirror?.saved) {
+            // A tombstone names no kind: it acts on whichever saved record holds the id.
+            const chart = charts.get(row.documentId);
+            const collection = collections.get(row.documentId);
+            const mirror = chart?.saved ? chart : collection?.saved ? collection : undefined;
+            if (mirror) {
                 plan.tombstone.push({
                     documentId: row.documentId,
                     revision: row.revision,
-                    expectedRemoteRevision,
+                    expectedRemoteRevision: mirror.remoteRevision,
+                    ...(mirror === collection ? { kind: 'collection' as const } : {}),
                 });
             } else {
                 plan.unchanged.push(row.documentId);
             }
             continue;
         }
-        plan.documents.required += 1;
+        const isCollection = row.kind === 'collection';
+        if (row.kind !== undefined && !isCollection) {
+            // A kind this build cannot store: nothing to fetch and nothing to count. The app
+            // update that brings its decoder will find it on its own first pass.
+            plan.unchanged.push(row.documentId);
+            continue;
+        }
+        const mirror = (isCollection ? collections : charts).get(row.documentId);
+        // Undefined rather than null when there is no SAVED record: a mirror that exists only to
+        // carry a quarantined revision has no record for a commit to compare against.
+        const expectedRemoteRevision = mirror?.saved ? mirror.remoteRevision : undefined;
+        if (!isCollection) {
+            plan.documents.required += 1;
+        }
         if (mirror?.saved && mirror.remoteRevision === row.revision) {
-            plan.documents.mirrored += 1;
+            if (!isCollection) {
+                plan.documents.mirrored += 1;
+            }
             plan.unchanged.push(row.documentId);
             continue;
         }
@@ -409,6 +465,7 @@ export function planLibraryDownload(
             documentId: row.documentId,
             revision: row.revision,
             expectedRemoteRevision,
+            ...(isCollection ? { kind: 'collection' as const } : {}),
         });
     }
     for (const mirror of local) {
@@ -673,6 +730,31 @@ async function libraryDownloadPass(
                 });
             }
         }
+        // The collections (#1474), paged the same way. Nothing is ever quarantined for one: a
+        // collection body this build cannot read is reported, not stored (see Pass 3).
+        let after: string | undefined;
+        for (let page = 0; ; page++) {
+            if (page >= LOCAL_PAGE_CEILING) {
+                throw new Error('Local library paging did not terminate.');
+            }
+            const listing = await songbook.collectionPage(scope, {
+                limit: MAX_LIST_LIMIT,
+                ...(after === undefined ? {} : { afterDocumentId: after }),
+            });
+            for (const collection of listing.collections) {
+                local.push({
+                    documentId: collection.documentId,
+                    saved: true,
+                    remoteRevision: collection.remoteRevision,
+                    quarantinedRevision: null,
+                    kind: 'collection',
+                });
+            }
+            if (listing.nextAfterDocumentId === null) {
+                break;
+            }
+            after = listing.nextAfterDocumentId;
+        }
     } catch (error) {
         if (error instanceof AccountChangedError) {
             throw error;
@@ -696,16 +778,32 @@ async function libraryDownloadPass(
         });
         buckets[result].push(outcome.documentId);
     };
+    /** A collection's commit (#1474): never "on the stand", so there is no `isActive` to ask. */
+    const commitCollection = async (
+        planned: PlannedDocument,
+        outcome: CollectionOutcome,
+    ): Promise<void> => {
+        const result = await songbook.reconcileCollection(scope, outcome, {
+            expectedRemoteRevision: planned.expectedRemoteRevision,
+        });
+        buckets[result].push(outcome.documentId);
+    };
+    const collectionIds = new Set(
+        [...plan.fetch, ...plan.tombstone]
+            .filter((planned) => planned.kind === 'collection')
+            .map((planned) => planned.documentId),
+    );
 
     // Tombstones first: they need no network, so a run that dies mid-download still applies the
     // removals it had already proved from explicit tombstone rows.
     let tombstoned = 0;
     for (const row of plan.tombstone) {
-        await commit(row, {
+        const deleted = {
             kind: 'deleted',
             documentId: row.documentId,
             revision: row.revision,
-        });
+        } as const;
+        await (row.kind === 'collection' ? commitCollection(row, deleted) : commit(row, deleted));
         tombstoned += 1;
     }
 
@@ -756,6 +854,40 @@ async function libraryDownloadPass(
                 // A frame this broken says nothing about the document: there is nothing to
                 // preserve and nothing resolved, so the run keeps going and stays incomplete.
                 fail(planned.documentId, 'malformed-body', detailOf(error));
+                continue;
+            }
+            if (planned.kind === 'collection') {
+                // A collection (#1474). One the canonical decoder accepts is committed like a
+                // chart's body. A NEWER collection schema is reported as `unsupported` and resolved
+                // — but, unlike a chart's, not preserved: there is no candidate store for a kind
+                // nothing shows yet, so it is simply fetched again next pass until an app update
+                // can read it. Anything else is corrupt content, refused exactly as a chart's is.
+                let collection: CollectionDocument | null = null;
+                try {
+                    collection = collectionSnapshot(frame.document);
+                } catch {
+                    collection = null;
+                }
+                if (collection && collection.id === planned.documentId) {
+                    await commitCollection(planned, {
+                        kind: 'version',
+                        documentId: planned.documentId,
+                        revision: frame.revision,
+                        document: collection,
+                    });
+                    resolved += 1;
+                    continue;
+                }
+                if (!collection && decodeCollection(frame.document).kind === 'future-version') {
+                    buckets.unsupported.push(planned.documentId);
+                    resolved += 1;
+                    continue;
+                }
+                fail(
+                    planned.documentId,
+                    'malformed-body',
+                    'The downloaded body is not a valid collection.',
+                );
                 continue;
             }
             const document = decodeBody(frame.document, planned.documentId);
@@ -819,6 +951,9 @@ async function libraryDownloadPass(
     buckets.unchanged.push(...plan.unchanged);
     return report(complete, plan.absent, {
         required: plan.documents.required,
-        verified: plan.documents.mirrored + buckets.advanced.length,
+        // Charts only, like `documents.required` (#1474): an advanced collection is not a song.
+        verified:
+            plan.documents.mirrored +
+            buckets.advanced.filter((documentId) => !collectionIds.has(documentId)).length,
     });
 }
