@@ -175,15 +175,22 @@ table, Save, read and delete routes; and the same per-owner document cap.
   so there is no later musician action to wait for. Every other failure — offline, a server error,
   a full account, an expired session — still waits for a real trigger. The sentence is
   `RATE_LIMIT_RESUMES`.
-- **An account import waits for a verified library (#1478 review R1).** Room and duplicates are
-  counted against this device's copy of the account, so a device part-way through downloading it
-  is refused before anything is written ("still downloading your account library (X of Y)"):
+- **An account import waits for a settled library (#1478 review R1, C1–C4).** Room and duplicates
+  are counted against this device's copy of the account, so a device part-way through downloading
+  it is refused before anything is written ("still downloading your account library (X of Y)"):
   otherwise a playlist another device already imported finds no duplicates, passes a cap this
-  device is nowhere near, and the server takes creates until `quota_exceeded`. The room counted is
-  `heldByAccount` — this device's rows, or the verified manifest's charts plus its collections,
-  whichever is larger. Offline, a library verified earlier in the same page load still counts
-  (the server stays the authority for anything added since); a device that has never verified
-  the library in this page load is refused.
+  device is nowhere near, and the server takes creates until `quota_exceeded`. Each download that
+  pages the whole manifest reports `LibraryFacts`: the live charts and collections it lists,
+  the charts settled without a copy here (held beside a draft or the open chart, needing an app
+  update, missing, malformed — `unverifiable`), and the charts not yet fetched for a transient
+  reason (`unsettled`). Only `unsettled` refuses; `unverifiable` charts are counted for room and
+  named to the musician as not checked for duplicates. The room is `heldByAccount`: the larger of
+  this device's rows and the manifest's charts plus the larger of its collections and this
+  device's. The import dialog starts a pass as soon as a playlist is read, so the check is made
+  against that pass. The facts of an EARLIER pass in the same page load are used only when the
+  latest pass read no manifest (offline, a failed page); a device that has settled nothing in this
+  page load is refused. The residual window is honest: another device can add documents between
+  that pass and the write, and the server's cap stays the authority.
 - **Guest collections are adopted with guest songs** (`adoptGuestCollections`): song ids remapped to
   the ids those songs are adopted under, the guest Starred merged into the account's. When every
   guest song is already in the account, the offer still opens if a guest collection holds songs

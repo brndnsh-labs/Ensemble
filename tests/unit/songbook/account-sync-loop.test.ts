@@ -9,11 +9,13 @@ import {
     libraryCheck,
     OWNER_MESSAGES,
     RATE_LIMIT_RESUMES,
+    resumeDelay,
     SIGN_OUT_MESSAGES,
     SYNC_MESSAGES,
 } from '../../../prototypes/v2/lib/account/sync-loop.js';
+import { backoffWait, type LibraryFacts } from '../../../prototypes/v2/lib/sync/download.js';
 import { MAX_PENDING_SAVES, type PreparedSave } from '../../../prototypes/v2/lib/sync/protocol.js';
-import type { AccountSongbook } from '../../../prototypes/v2/lib/sync/repository.js';
+import { type AccountSongbook, heldByAccount } from '../../../prototypes/v2/lib/sync/repository.js';
 import { accountChart } from '../../utils/account-songbook-fixture.js';
 
 /**
@@ -2541,33 +2543,74 @@ describe('the sync loop adopts a preserved remote version on the musician’s wo
     });
 });
 
-describe('what a playlist import may assume about the account (#1478 review R1)', () => {
-    it('counts the verified manifest, refuses part-way, and falls back to this page’s last verified count', () => {
-        expect(libraryCheck({ required: 40, verified: 40 }, null)).toEqual({
+describe('what a playlist import may assume about the account (#1478 review R1, C1)', () => {
+    const facts = (overrides: Partial<LibraryFacts> = {}): LibraryFacts => ({
+        charts: 40,
+        collections: 2,
+        unverifiable: 0,
+        unsettled: 0,
+        ...overrides,
+    });
+
+    it('decides on the latest settled manifest, refuses only rows still to fetch, and falls back to this page’s last settled facts', () => {
+        expect(libraryCheck(facts(), null)).toEqual({ kind: 'verified', facts: facts() });
+        // Settled-but-unverifiable rows (held, needing an update, missing, malformed) never refuse.
+        expect(libraryCheck(facts({ unverifiable: 3 }), null)).toEqual({
             kind: 'verified',
-            remoteCharts: 40,
+            facts: facts({ unverifiable: 3 }),
         });
-        const partWay = libraryCheck({ required: 1_461, verified: 400 }, 1_461);
+        const partWay = libraryCheck(facts({ charts: 1_461, unsettled: 1_061 }), facts());
         expect(partWay.kind).toBe('unverified');
-        // Part-way outranks an earlier verified count: the account now holds more than that.
+        // Part-way outranks an earlier settled count: the account now holds more than that.
         expect(partWay).toMatchObject({
             message: expect.stringContaining('(400 of 1,461 songs)'),
         });
-        expect(libraryCheck({ required: null, verified: null }, 12)).toEqual({
+        expect(libraryCheck(null, facts({ charts: 12 }))).toEqual({
             kind: 'verified',
-            remoteCharts: 12,
+            facts: facts({ charts: 12 }),
         });
-        expect(libraryCheck({ required: null, verified: null }, null)).toMatchObject({
+        expect(libraryCheck(null, null)).toMatchObject({
             kind: 'unverified',
             message: expect.stringContaining('hasn’t checked your account library yet'),
         });
     });
+
+    it('counts room as the larger of this device’s rows and the manifest’s charts and collections (C4)', () => {
+        expect(heldByAccount(10, 1)).toBe(10);
+        expect(heldByAccount(10, 1, { charts: 1_990, collections: 5 })).toBe(1_995);
+        expect(heldByAccount(10, 7, { charts: 1_990, collections: 5 })).toBe(1_997);
+        // Rows queued here that the manifest does not list yet still count (C7).
+        expect(heldByAccount(1_990, 1, { charts: 0, collections: 0 })).toBe(1_990);
+    });
+});
+
+describe('the back-off wait is always a bounded, finite number (#1478 review C5)', () => {
+    it('clamps the server’s Retry-After and refuses non-finite ones', () => {
+        expect(backoffWait(null)).toBe(60_000);
+        expect(backoffWait(Number.NaN)).toBe(60_000);
+        expect(backoffWait(Number.POSITIVE_INFINITY)).toBe(60_000);
+        expect(backoffWait(0)).toBe(1_000);
+        expect(backoffWait(-30)).toBe(1_000);
+        expect(backoffWait(20)).toBe(20_000);
+        expect(backoffWait(86_400)).toBe(60_000);
+    });
+
+    it('arms the resume only for a finite wait still ahead, clamped to a second and a minute', () => {
+        expect(resumeDelay(Number.NaN, 0)).toBeNull();
+        expect(resumeDelay(0, 0)).toBeNull();
+        expect(resumeDelay(-5_000, 0)).toBeNull();
+        expect(resumeDelay(1_000, 999)).toBe(1_000);
+        expect(resumeDelay(45_000, 0)).toBe(45_000);
+        expect(resumeDelay(Number.MAX_SAFE_INTEGER, 0)).toBe(60_000);
+        expect(resumeDelay(Number.POSITIVE_INFINITY, 0)).toBeNull();
+    });
 });
 
 describe('the rate-limit sentence (#1478 review R2)', () => {
-    it('says what actually resumes the upload, and promises no timer', () => {
+    it('says what actually resumes the upload: by itself while open, or on coming back', () => {
         expect(SYNC_MESSAGES.rateLimited).toContain(RATE_LIMIT_RESUMES);
         expect(SYNC_MESSAGES.rateLimited).not.toMatch(/shortly|try again/i);
+        expect(RATE_LIMIT_RESUMES).toMatch(/by itself.*while Ensemble is open.*come back/);
         expect(SYNC_MESSAGES.rateLimited.startsWith('Saved on this device')).toBe(true);
     });
 });
@@ -2600,6 +2643,8 @@ describe('a rate-limited upload resumes by itself when the back-off ends (#1478)
         const queued = new Set(ids);
         /** What storage reports as waiting; null follows the queue. */
         const waiting: { value: number | null } = { value: null };
+        /** Run inside the waiting read: what another tab or the shell does meanwhile. */
+        const hooks: { onWaiting?: () => Promise<void> } = {};
         const songbook = stubSongbook({
             list: async (
                 _scope: unknown,
@@ -2625,21 +2670,33 @@ describe('a rate-limited upload resumes by itself when the back-off ends (#1478)
                 queued.delete(request.documentId);
                 return 'committed';
             },
-            songsWaiting: async () => waiting.value ?? queued.size,
+            songsWaiting: async () => {
+                await hooks.onWaiting?.();
+                return waiting.value ?? queued.size;
+            },
             clearAccount: async () => {},
         });
-        return { songbook, queued, waiting };
+        return { songbook, queued, waiting, hooks };
     }
 
     /** The account API with the server's Save budget: `perMinute` Saves a rolling minute window. */
-    function limitedApi(options: { perMinute?: number; failure?: ApiResult<unknown> } = {}) {
+    function limitedApi(
+        options: {
+            perMinute?: number;
+            failure?: ApiResult<unknown>;
+            /** What the manifest answers; the empty manifest by default. */
+            manifest?: () => ApiResult<unknown>;
+        } = {},
+    ) {
         const perMinute = options.perMinute ?? 120;
         let windowStart = Date.now();
         let used = 0;
         let posts = 0;
         const api = {
             get: vi.fn(async (path: string) =>
-                path.startsWith('/api/auth/session') ? SESSION_OK : EMPTY_MANIFEST,
+                path.startsWith('/api/auth/session')
+                    ? SESSION_OK
+                    : (options.manifest?.() ?? EMPTY_MANIFEST),
             ),
             post: vi.fn(async (): Promise<ApiResult<unknown>> => {
                 posts += 1;
@@ -2689,12 +2746,12 @@ describe('a rate-limited upload resumes by itself when the back-off ends (#1478)
     }
 
     async function attached(count: number, options: Parameters<typeof limitedApi>[0] = {}) {
-        const { songbook, queued, waiting } = queue(count);
+        const { songbook, queued, waiting, hooks } = queue(count);
         const { api, posts } = limitedApi(options);
         const loop = createSyncLoop(api, createAccountSession(api), songbook);
         await loop.attach(OWNER);
         const counter = passes(loop);
-        return { loop, queued, waiting, posts, counter };
+        return { loop, queued, waiting, hooks, posts, counter };
     }
 
     it('runs exactly one pass when the back-off ends, and then holds no timer', async () => {
@@ -2815,6 +2872,80 @@ describe('a rate-limited upload resumes by itself when the back-off ends (#1478)
             expect(loop.getSnapshot().failure?.reason).not.toBe('rate-limited');
             expect(vi.getTimerCount()).toBe(0);
         }
+    });
+
+    it('a sign-out the server refused inside the back-off re-arms the resume (C2)', async () => {
+        const { loop, posts, counter } = await attached(130);
+        await loop.run();
+        expect(vi.getTimerCount()).toBe(1);
+        expect(await loop.signOut(async () => false)).toBe('kept');
+        // The detach cleared the timer; the kept sign-out's own pass sends nothing and re-arms it.
+        await vi.waitFor(() => expect(vi.getTimerCount()).toBe(1));
+        expect(posts()).toBe(121);
+        expect(loop.getSnapshot().failure?.reason).toBe('rate-limited');
+        const ended = counter.nextEnd();
+        await vi.advanceTimersByTimeAsync(60_000);
+        await ended;
+        expect(posts()).toBe(131);
+        expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it('woken early, it waits out the rest once more rather than giving up or spinning (C6)', async () => {
+        const { loop, posts, counter } = await attached(130);
+        await loop.run();
+        // The clock runs a second behind the timer: it fires inside the back-off.
+        vi.setSystemTime(Date.now() - 1_000);
+        await vi.advanceTimersByTimeAsync(60_000);
+        expect(counter.count()).toBe(1);
+        expect(posts()).toBe(121);
+        expect(vi.getTimerCount()).toBe(1);
+        const ended = counter.nextEnd();
+        await vi.advanceTimersByTimeAsync(1_000);
+        await ended;
+        expect(counter.count()).toBe(2);
+        expect(posts()).toBe(131);
+        expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it('resumes a download the limit cut short, even with nothing in the outbox (C7)', async () => {
+        let manifestCalls = 0;
+        const { loop, counter } = await attached(0, {
+            manifest: () => {
+                manifestCalls += 1;
+                return manifestCalls === 1
+                    ? { ok: false, error: { kind: 'code', code: 'rate_limited', status: 429 } }
+                    : EMPTY_MANIFEST;
+            },
+        });
+        await loop.run();
+        expect(loop.getSnapshot().failure?.reason).toBe('rate-limited');
+        expect(vi.getTimerCount()).toBe(1);
+        const ended = counter.nextEnd();
+        await vi.advanceTimersByTimeAsync(60_000);
+        await ended;
+        expect(manifestCalls).toBe(2);
+        expect(loop.getSnapshot().failure).toBeNull();
+        expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it('a timer from an earlier attachment never runs a pass for a later one (C7)', async () => {
+        const { loop, posts, counter, hooks } = await attached(130);
+        await loop.run();
+        expect(vi.getTimerCount()).toBe(1);
+        // As the timer re-reads the queue, the account is detached and attached again — the same
+        // owner, a new epoch. The fired timer must not run a pass for the new attachment.
+        let once = true;
+        hooks.onWaiting = async () => {
+            if (once) {
+                once = false;
+                loop.detach();
+                await loop.attach(OWNER);
+            }
+        };
+        await vi.advanceTimersByTimeAsync(60_000);
+        await vi.advanceTimersByTimeAsync(0);
+        expect(counter.count()).toBe(1);
+        expect(posts()).toBe(121);
     });
 
     it('walks a 300-song queue through its back-off windows, then stops', async () => {

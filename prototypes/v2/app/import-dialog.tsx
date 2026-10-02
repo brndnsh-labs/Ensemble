@@ -44,7 +44,15 @@ export interface PlaylistImportContext {
      * Signed in: how many documents the account holds, by this device's verified copy of it — or
      * why that cannot be told yet (`libraryCheck`, #1478 review R1). Null for a guest — no cap.
      */
-    accountRoom: (() => Promise<{ held: number } | { refusal: string }>) | null;
+    accountRoom:
+        | (() => Promise<{ held: number; unverifiable: number } | { refusal: string }>)
+        | null;
+    /**
+     * Signed in: start a pass now (#1478 review C3), so the room is checked against what the
+     * account holds NOW rather than an earlier pass's count; `libraryProgress` moving re-asks
+     * `accountRoom` when it lands. Null for a guest.
+     */
+    onRefreshLibrary: (() => void) | null;
     /**
      * Changes whenever the account library download moves (`SyncSnapshot.documents`), so a summary
      * opened mid-download re-asks `accountRoom` as it completes. Null for a guest.
@@ -89,7 +97,13 @@ export function ImportDialog({
     const [mode, setMode] = useState<'all' | 'one'>('all');
     const [includeDuplicates, setIncludeDuplicates] = useState(false);
     const [name, setName] = useState('');
-    const [room, setRoom] = useState<{ held: number } | { refusal: string } | null>(null);
+    const [room, setRoom] = useState<
+        { held: number; unverifiable: number } | { refusal: string } | null
+    >(null);
+    // The long lists render only while their `<details>` is open (review R6): a summary re-renders
+    // on every keystroke in the name field, and a big playlist can list a thousand duplicates.
+    const [showDuplicates, setShowDuplicates] = useState(false);
+    const [showRefused, setShowRefused] = useState(false);
     const [roomError, setRoomError] = useState('');
 
     useEffect(() => {
@@ -200,9 +214,12 @@ export function ImportDialog({
     // every render, and asking again on each one would re-request a read that failed in a loop.
     const wantLibrary = useRef(playlist.onWantLibrary);
     wantLibrary.current = playlist.onWantLibrary;
+    const refreshLibrary = useRef(playlist.onRefreshLibrary);
+    refreshLibrary.current = playlist.onRefreshLibrary;
     useEffect(() => {
         if (plan) {
             wantLibrary.current();
+            refreshLibrary.current?.();
         }
     }, [plan]);
     // biome-ignore lint/correctness/useExhaustiveDependencies: `libraryProgress` is a re-run trigger.
@@ -543,37 +560,50 @@ export function ImportDialog({
                                         />
                                         Import duplicates anyway
                                     </label>
-                                    <details data-testid="playlist-duplicate-list">
+                                    <details
+                                        data-testid="playlist-duplicate-list"
+                                        onToggle={(event) =>
+                                            setShowDuplicates(event.currentTarget.open)
+                                        }
+                                    >
                                         <summary>Which songs</summary>
                                         <ul className="import-diagnostics">
-                                            {summary.duplicates.map((entry) => (
-                                                <li key={entry.index}>
-                                                    <strong>{entry.title}</strong>
-                                                    {entry.composer ? ` (${entry.composer})` : ''}
-                                                    {entry.matched.inSongbook
-                                                        ? ' matches “'
-                                                        : ' repeats “'}
-                                                    {entry.matched.title}”
-                                                    {entry.matched.composer
-                                                        ? ` (${entry.matched.composer})`
-                                                        : ' (no composer)'}
-                                                    {entry.matched.inSongbook
-                                                        ? ', already in your songbook.'
-                                                        : ', earlier in this playlist.'}
-                                                </li>
-                                            ))}
+                                            {(showDuplicates ? summary.duplicates : []).map(
+                                                (entry) => (
+                                                    <li key={entry.index}>
+                                                        <strong>{entry.title}</strong>
+                                                        {entry.composer
+                                                            ? ` (${entry.composer})`
+                                                            : ''}
+                                                        {entry.matched.inSongbook
+                                                            ? ' matches “'
+                                                            : ' repeats “'}
+                                                        {entry.matched.title}”
+                                                        {entry.matched.composer
+                                                            ? ` (${entry.matched.composer})`
+                                                            : ' (no composer)'}
+                                                        {entry.matched.inSongbook
+                                                            ? ', already in your songbook.'
+                                                            : ', earlier in this playlist.'}
+                                                    </li>
+                                                ),
+                                            )}
                                         </ul>
                                     </details>
                                 </div>
                             )}
                             {summary.refused.length > 0 && (
-                                <details className="import-refused" data-testid="playlist-refused">
+                                <details
+                                    className="import-refused"
+                                    data-testid="playlist-refused"
+                                    onToggle={(event) => setShowRefused(event.currentTarget.open)}
+                                >
                                     <summary>
                                         {songs(summary.refused.length)} can’t be imported yet and{' '}
                                         {summary.refused.length === 1 ? 'is' : 'are'} skipped
                                     </summary>
                                     <ul className="import-diagnostics">
-                                        {summary.refused.map((entry) => (
+                                        {(showRefused ? summary.refused : []).map((entry) => (
                                             <li key={entry.index}>
                                                 <strong>{entry.title}</strong>:{' '}
                                                 {entry.reasons.join(' ')}
@@ -593,8 +623,17 @@ export function ImportDialog({
                                           ? 'Checking how much room your account has…'
                                           : (capMessage ??
                                             ('held' in room
-                                                ? `Your account can hold ${count(MAX_REMOTE_CANDIDATES)} songs and collections. Counting what this device has downloaded from it, it would hold ${count(room.held + summary.documents)} after this import.`
+                                                ? `Your account can hold ${count(MAX_REMOTE_CANDIDATES)} songs and collections. By this device’s latest check of it, it would hold ${count(room.held + summary.documents)} after this import.`
                                                 : ''))}
+                                </p>
+                            )}
+                            {room && 'held' in room && room.unverifiable > 0 && (
+                                // Review C1: settled rows this device holds no copy of — counted
+                                // for room, never a reason to refuse, and said rather than hidden.
+                                <p data-testid="playlist-unverifiable">
+                                    {room.unverifiable === 1
+                                        ? '1 song in your account couldn’t be checked for duplicates here (it is open elsewhere, needs an app update, or could not be downloaded). It still counts toward the room.'
+                                        : `${count(room.unverifiable)} songs in your account couldn’t be checked for duplicates here (open elsewhere, needing an app update, or not downloadable). They still count toward the room.`}
                                 </p>
                             )}
                         </>

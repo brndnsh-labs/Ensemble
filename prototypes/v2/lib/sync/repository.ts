@@ -548,13 +548,20 @@ function documentCount<T>(
 }
 
 /**
- * How many documents an import may assume the ACCOUNT holds (#1478 review R1): what this device
- * holds, or — when the caller knows the account's manifest lists more charts than are here — those
- * charts plus this device's collections, whichever is larger. This device's rows alone undercount
- * an account another device filled, and a create past the server's cap ends every outbox pass.
+ * How many documents an import may assume the ACCOUNT holds (#1478 review R1, C4): what this
+ * device holds, or — when the caller knows what the account's manifest lists — its live charts plus
+ * the larger of its live collections and this device's, whichever total is larger. This device's
+ * rows alone undercount an account another device filled; the manifest alone misses what is still
+ * queued here. A create past the server's cap ends every outbox pass.
  */
-export function heldByAccount(local: number, collections: number, remoteCharts?: number): number {
-    return remoteCharts === undefined ? local : Math.max(local, remoteCharts + collections);
+export function heldByAccount(
+    local: number,
+    localCollections: number,
+    remote?: { charts: number; collections: number },
+): number {
+    return remote === undefined
+        ? local
+        : Math.max(local, remote.charts + Math.max(localCollections, remote.collections));
 }
 
 /**
@@ -1339,15 +1346,15 @@ export class AccountSongbook {
         options: {
             pace?: { shouldYield: () => boolean; yieldNow: () => Promise<void> };
             /**
-             * The live charts the account's manifest listed at this device's last verified download
-             * (#1478 review R1). The cap is counted against `heldByAccount`, never this device's
-             * rows alone. The sync loop supplies it, and refuses before this when the library is
-             * not verified at all.
+             * The live charts and collections the account's manifest listed at this device's
+             * latest settled download (#1478 review R1, C4). The cap is counted against
+             * `heldByAccount`, never this device's rows alone. The sync loop supplies it, and
+             * refuses before this when the library is not settled at all.
              */
-            remoteCharts?: number;
+            remote?: { charts: number; collections: number };
         } = {},
     ): Promise<{ songs: number; collection: SavedCollection | null }> {
-        const { pace, remoteCharts } = options;
+        const { pace, remote } = options;
         scope = copyScope(scope);
         identifier(collection.documentId);
         const songs: ChartDocument[] = [];
@@ -1366,7 +1373,7 @@ export class AccountSongbook {
         const collectionOperationId = crypto.randomUUID();
         return this.database.run('readwrite', scope, (tx) => {
             documentCount(tx, scope, (local, collections) => {
-                const held = heldByAccount(local, collections, remoteCharts);
+                const held = heldByAccount(local, collections, remote);
                 tx.read(
                     tx.table('songs').getKey([scope.ownerId, collection.documentId]),
                     (song: IDBValidKey | undefined) => {

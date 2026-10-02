@@ -1,7 +1,10 @@
 import { type HomeSlice, homeRequest } from '../home';
 import {
     BACKOFF_FALLBACK_MS,
+    BACKOFF_MAX_MS,
+    BACKOFF_MIN_MS,
     type LibraryDownloadResult,
+    type LibraryFacts,
     runLibraryDownload,
 } from '../sync/download';
 import { OUTBOX_PAGE_LIMIT, runOutboxPass } from '../sync/drain';
@@ -215,40 +218,43 @@ export interface SyncSnapshot {
 }
 
 /**
- * Why a whole-playlist import into the account cannot be decided yet (#1478 review R1), or null.
+ * Whether a whole-playlist import into the account can be decided now (#1478 review R1, C1).
  *
  * The import counts room and looks for duplicates against what THIS device holds. A device still
  * downloading the account holds a fraction of it: importing a playlist another device already
  * imported would find no duplicates, pass a cap it is nowhere near on this device, and send creates
  * the server takes until it answers `quota_exceeded` — half a duplicate playlist in the account, and
- * every later pass stopped at the refused create. So the import waits for a verified library:
+ * every later pass stopped at the refused create. So the import waits for a SETTLED library:
  *
- * - `current` is this page's latest download (`SyncSnapshot.documents`). Fully verified — every
- *   chart the manifest lists is held here at its revision — is the answer.
- * - Part-way (`verified < required`) is refused, with the count: the account holds more than this
- *   device does, whatever an earlier pass saw.
- * - Unobserved (no manifest read this pass — offline, a failed page, nothing run yet) falls back to
- *   `lastVerified`, the charts a COMPLETE download in this page load listed: a device that verified
- *   its library and then went offline may import, counting what it verified plus everything queued
- *   here; the server stays the authority for anything another device added since. With neither,
- *   it is refused.
+ * - `latest` is what the latest pass that read a complete manifest learned (`LibraryFacts`). Room
+ *   never needed the bodies — the manifest counts every live document — so what blocks is only
+ *   charts not yet fetched for a TRANSIENT reason (`unsettled`: not reached before the pass
+ *   stopped, a network or server failure, a rate limit). Those are "still downloading", with the
+ *   count.
+ * - Charts settled without a copy here (`unverifiable`: held beside a draft or the open chart, a
+ *   body needing an app update, missing, malformed) no download of this plan can change. They are
+ *   counted for room and named to the musician as not checked for duplicates — never a reason to
+ *   refuse forever.
+ * - `latest` null (the latest pass read no manifest — offline, a failed page, nothing run yet)
+ *   falls back to `lastSettled`, the latest settled facts in this page load; the server stays the
+ *   authority for anything another device added since. With neither, it is refused.
  */
 export function libraryCheck(
-    current: Progress,
-    lastVerified: number | null,
-): { kind: 'verified'; remoteCharts: number } | { kind: 'unverified'; message: string } {
-    const { required, verified } = current;
-    if (required !== null && verified !== null) {
-        if (verified >= required) {
-            return { kind: 'verified', remoteCharts: required };
+    latest: LibraryFacts | null,
+    lastSettled: LibraryFacts | null,
+): { kind: 'verified'; facts: LibraryFacts } | { kind: 'unverified'; message: string } {
+    if (latest !== null) {
+        if (latest.unsettled === 0) {
+            return { kind: 'verified', facts: latest };
         }
+        const count = (value: number) => value.toLocaleString('en-US');
         return {
             kind: 'unverified',
-            message: `This device is still downloading your account library (${verified.toLocaleString('en-US')} of ${required.toLocaleString('en-US')} songs), so it can’t yet check for songs you already have or count the room left. Nothing has been imported.`,
+            message: `This device is still downloading your account library (${count(latest.charts - latest.unsettled)} of ${count(latest.charts)} songs), so it can’t yet check for songs you already have or count the room left. Nothing has been imported.`,
         };
     }
-    if (lastVerified !== null) {
-        return { kind: 'verified', remoteCharts: lastVerified };
+    if (lastSettled !== null) {
+        return { kind: 'verified', facts: lastSettled };
     }
     return {
         kind: 'unverified',
@@ -257,14 +263,29 @@ export function libraryCheck(
     };
 }
 
+/**
+ * How long the one resume timer waits (#1478 review C5, C6): the time left in the back-off, or null
+ * when there is none — or when it is not a finite number, which would otherwise make a timer fire
+ * at once. Clamped to [`BACKOFF_MIN_MS`, `BACKOFF_MAX_MS`], so a wait can never become a tight loop
+ * and a far-off floor is walked to in at most a minute at a time.
+ */
+export function resumeDelay(backoffUntil: number, now: number): number | null {
+    const wait = backoffUntil - now;
+    if (!Number.isFinite(wait) || wait <= 0) {
+        return null;
+    }
+    return Math.min(BACKOFF_MAX_MS, Math.max(BACKOFF_MIN_MS, wait));
+}
+
 /** An account import refused because the library is not verified yet (`libraryCheck`). */
 export class LibraryUnverifiedError extends Error {}
 
 /**
  * What happens next after the server asks this device to wait (a 429), in ONE place (#1478 review
  * R2). Since 2026-10-02 the loop resumes by itself when the back-off ends — while the page is open
- * and visible (`armResume`); a hidden tab resumes when it is shown again. The server's wait is
- * `Retry-After` when it sends one (at most its one-minute window) or `BACKOFF_FALLBACK_MS`.
+ * and visible (`armResume`); a hidden tab resumes when it is shown again. The wait is
+ * `BACKOFF_FALLBACK_MS` (a minute) in production, which reads no `Retry-After` today; any wait is
+ * clamped to [`BACKOFF_MIN_MS`, `BACKOFF_MAX_MS`] (`backoffWait`, `resumeDelay`).
  */
 export const RATE_LIMIT_RESUMES =
     'Uploading continues by itself in about a minute while Ensemble is open, or when you come back to it.';
@@ -903,7 +924,9 @@ export interface SyncLoop {
      * decided yet (`libraryCheck`). What the import states against the cap before it writes.
      * Scoped like `listLibrary`.
      */
-    importRoom(owner?: string | null): Promise<{ held: number } | { refusal: string }>;
+    importRoom(
+        owner?: string | null,
+    ): Promise<{ held: number; unverifiable: number } | { refusal: string }>;
     /**
      * A whole iReal playlist, committed and queued as ONE transaction
      * (`AccountSongbook.importPlaylist`): its songs, then the collection holding them. Fenced on
@@ -1089,11 +1112,15 @@ export function createSyncLoop(
      */
     let backoffUntil = 0;
     /**
-     * The live charts the last COMPLETE library download in this page load listed for the attached
-     * account (#1478 review R1), or null — `libraryCheck`'s fallback while a later pass could not
-     * read the manifest (offline). Cleared with the owner.
+     * What the latest pass that ran a download learned about the account (#1478 review R1, C1):
+     * its `LibraryFacts`, null when that pass read no complete manifest, undefined before any.
      */
-    let lastVerified: number | null = null;
+    let latestLibrary: LibraryFacts | null | undefined;
+    /**
+     * The latest SETTLED facts in this page load (no chart unfetched for a transient reason) —
+     * `libraryCheck`'s fallback while the latest pass read no manifest. Cleared with the owner.
+     */
+    let lastSettled: LibraryFacts | null = null;
     /**
      * The one timer this loop ever holds (#1478, DECISION 2026-10-02): a single resume at the end of
      * a rate-limit back-off. See `armResume`. Null whenever nothing is armed.
@@ -1476,11 +1503,6 @@ export function createSyncLoop(
         return outcome();
     }
 
-    /**
-     * One pass: the outbox first, then the download. That order is deliberate — a queued Save is
-     * the musician's own work waiting to leave, and it goes out before this device spends the
-     * shared request budget asking what else is out there.
-     */
     function pageVisible(): boolean {
         return typeof document !== 'undefined' && document.visibilityState === 'visible';
     }
@@ -1516,16 +1538,24 @@ export function createSyncLoop(
      *   big import walks through its windows and stops when the queue is empty.
      */
     function armResume(mine: number, owner: string): void {
-        // Never a second timer: only the end of a pass arms one, and every pass cleared the last
-        // one as it started (`pass`). That clear IS the one-per-window rule.
-        const wait = backoffUntil - Date.now();
-        if (wait <= 0 || !resumeAllowed(mine, owner)) {
+        // Never a second timer: only the end of a pass (or this timer's own early wake-up, below)
+        // arms one, and every pass cleared the last one as it started (`pass`). That clear IS the
+        // one-per-window rule.
+        const wait = resumeDelay(backoffUntil, Date.now());
+        if (wait === null || !resumeAllowed(mine, owner)) {
             return;
         }
         resumeTimer = setTimeout(() => {
             resumeTimer = null;
             void (async () => {
-                if (Date.now() < backoffUntil || !resumeAllowed(mine, owner)) {
+                if (!resumeAllowed(mine, owner)) {
+                    return;
+                }
+                if (Date.now() < backoffUntil) {
+                    // Woken early — a timer may fire a moment before its time, or the clock moved
+                    // (#1478 review C6). Wait out the rest, once more; never a tight loop, since the
+                    // wait is at least `BACKOFF_MIN_MS`.
+                    armResume(mine, owner);
                     return;
                 }
                 // The queue as storage has it NOW — another tab may have drained it meanwhile.
@@ -1538,6 +1568,11 @@ export function createSyncLoop(
         }, wait);
     }
 
+    /**
+     * One pass: the outbox first, then the download. That order is deliberate — a queued Save is
+     * the musician's own work waiting to leave, and it goes out before this device spends the
+     * shared request budget asking what else is out there.
+     */
     async function pass(): Promise<void> {
         const current = scope;
         if (!current) {
@@ -1672,19 +1707,17 @@ export function createSyncLoop(
                         ...result.retainedDeleted,
                     ].some((documentId) => !collectionIds.has(documentId));
                     collectionsChanged ||= collectionIds.size > 0;
-                    if (result.backoffUntil !== undefined) {
-                        // Never shortened: the outbox half may already have met a 429 with a
-                        // longer `Retry-After` than this one carries.
+                    if (result.backoffUntil !== undefined && Number.isFinite(result.backoffUntil)) {
+                        // Never shortened: the outbox half may already have met a 429 that asked
+                        // for longer. A non-finite floor is refused (#1478 review C5): NaN compares
+                        // false against every clock and would let every pass send inside it.
                         backoffUntil = Math.max(backoffUntil, result.backoffUntil);
                     }
                     downloadOwed = result.backoffUntil !== undefined;
                     publish({ documents: result.documents });
-                    if (
-                        result.documents.required !== null &&
-                        result.documents.verified !== null &&
-                        result.documents.verified >= result.documents.required
-                    ) {
-                        lastVerified = result.documents.required;
+                    latestLibrary = result.library;
+                    if (result.library !== null && result.library.unsettled === 0) {
+                        lastSettled = result.library;
                     }
                     failure = failure ?? failureFromDownload(result);
                 } catch (error) {
@@ -1747,7 +1780,8 @@ export function createSyncLoop(
                 }
                 scope = next;
                 backoffUntil = 0;
-                lastVerified = null;
+                latestLibrary = undefined;
+                lastSettled = null;
                 downloadOwed = false;
                 clearResume();
                 publish({
@@ -1777,7 +1811,8 @@ export function createSyncLoop(
             epoch += 1;
             scope = null;
             backoffUntil = 0;
-            lastVerified = null;
+            latestLibrary = undefined;
+            lastSettled = null;
             downloadOwed = false;
             clearResume();
             // `failure` is deliberately NOT cleared. The commonest reason this runs at all is a
@@ -1905,26 +1940,27 @@ export function createSyncLoop(
         },
         async importRoom(owner = null) {
             const current = await heldScope(owner);
-            const check = libraryCheck(state.documents, lastVerified);
+            const check = libraryCheck(latestLibrary ?? null, lastSettled);
             if (check.kind === 'unverified') {
                 return { refusal: check.message };
             }
             const counts = await songbook.documentCounts(current);
             return {
-                held: heldByAccount(counts.documents, counts.collections, check.remoteCharts),
+                held: heldByAccount(counts.documents, counts.collections, check.facts),
+                unverifiable: check.facts.unverifiable,
             };
         },
         async importPlaylist(songs, collection, owner, pace) {
             const current = await ownedScope(owner);
             // Before anything is written (#1478 review R1): room and duplicates are only as good
             // as this device's copy of the account.
-            const check = libraryCheck(state.documents, lastVerified);
+            const check = libraryCheck(latestLibrary ?? null, lastSettled);
             if (check.kind === 'unverified') {
                 throw new LibraryUnverifiedError(check.message);
             }
             const result = await songbook.importPlaylist(current, songs, collection, {
                 pace,
-                remoteCharts: check.remoteCharts,
+                remote: { charts: check.facts.charts, collections: check.facts.collections },
             });
             publish({
                 libraryVersion: state.libraryVersion + 1,
@@ -2295,9 +2331,10 @@ export function createSyncLoop(
                 // outbox, the drafts and the library are untouched, and the musician can retry.
                 await reopen();
                 restore();
-                if (Date.now() >= backoffUntil) {
-                    void loop.run().catch(() => {});
-                }
+                // Always (#1478 review C2): outside a back-off this is the pass the sign-out
+                // interrupted; inside one it sends nothing and re-arms the resume `detach` cleared,
+                // so the chip's "continues by itself" stays true.
+                void loop.run().catch(() => {});
                 return 'kept';
             }
             let cleared = true;

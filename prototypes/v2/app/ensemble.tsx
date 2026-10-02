@@ -3000,8 +3000,10 @@ export default function Ensemble() {
                 // checks duplicates against is re-read and AWAITED before the error re-enables
                 // its button (review R8): a quick retry against the old list would import every
                 // song a second time.
-                await refreshSongs();
+                // The re-read first, and a failing home refresh cannot skip it or replace the
+                // sentence below (review R8 nit).
                 await reloadGuestLibrary();
+                await refreshSongs().catch(() => {});
                 throw new Error(
                     `The songs were imported, but the collection could not be saved: ${failure instanceof Error ? failure.message : String(failure)} Import the playlist again to make it; its songs will be recognized as already in your songbook.`,
                 );
@@ -5084,6 +5086,9 @@ export default function Ensemble() {
                         collections: collections.collections,
                         onWantLibrary: wantLiveLibrary,
                         accountRoom: signedIn ? accountImportRoom : null,
+                        onRefreshLibrary: signedIn
+                            ? () => void accountSync.run().catch(() => {})
+                            : null,
                         libraryProgress: signedIn
                             ? `${sync.documents.verified}/${sync.documents.required}`
                             : null,
