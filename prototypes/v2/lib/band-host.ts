@@ -76,6 +76,14 @@ interface SegmentPlan {
 interface Segment extends SegmentPlan {
     /** Nothing follows: the band stops when this segment ends (a counted chart's last chorus). */
     ends: boolean;
+    /**
+     * A released practice loop's lap: what it leads into instead of another lap. The bar the
+     * song carries on from, or `'again'` for a counted chart's last section, which plays once
+     * more as written and ends. Kept on the lap, not the host, so the segment that follows it
+     * is the same however often it is rebuilt: a settings change (`update()`) drops a queued
+     * follow-on and builds it again (#1484).
+     */
+    released?: number | 'again';
     /** Song-tick range the window covers. */
     from: number;
     to: number;
@@ -272,14 +280,10 @@ export class BandHost {
     private scoreKey = '';
     /** The chart counts its choruses: the band plays them once and stops, never looping. */
     private counted = false;
-    /** A released loop on a counted chart's last section plays it once more, then ends. */
-    private lastLap = false;
     private settings: BandSettings | null = null;
     private bpm = 120;
     private segments: Segment[] = [];
     private loop: Loop | null = null;
-    /** Where the segment after the current one starts, when that isn't the default. */
-    private resumeBar: number | null = null;
     private timer: ReturnType<typeof setInterval> | null = null;
     private nextPass = 0;
     /** The barline where the last settings change is first heard, while it is still to come. */
@@ -347,8 +351,6 @@ export class BandHost {
         this.bpm = bpm;
         this.loop = loop;
         this.nextPass = 0;
-        this.resumeBar = null;
-        this.lastLap = false;
         const fromBar = Math.min(this.barAt(fromTick), this.timeline.bars.length - 1);
         const first = loop ? this.lapPlan(loop) : this.songPlan(fromBar, fromBar);
         let segmentStart = audio.currentTime + 0.1;
@@ -480,8 +482,9 @@ export class BandHost {
         const current = this.current(audio.currentTime);
         if (current) {
             this.segments.length = this.segments.indexOf(current) + 1;
-            this.resumeBar = current.until < this.timeline!.bars.length ? current.until : null;
-            if (this.counted && this.resumeBar === null) {
+            if (current.until < this.timeline!.bars.length) {
+                current.released = current.until;
+            } else if (this.counted) {
                 // A counted chart's last section has nothing after it to carry on into: the
                 // performance ends with it. The lap under way was played as a loop (a fill
                 // back to its top); from its next barline it plays the ending instead, as the
@@ -495,7 +498,7 @@ export class BandHost {
                     current.ends = true;
                 } else {
                     current.looping = true;
-                    this.lastLap = true;
+                    current.released = 'again';
                 }
             }
         }
@@ -692,8 +695,7 @@ export class BandHost {
         if (this.loop) {
             return this.lapPlan(this.loop);
         }
-        if (this.lastLap) {
-            this.lastLap = false;
+        if (last.released === 'again') {
             return {
                 pass: this.nextPass++,
                 window: last.window,
@@ -701,8 +703,7 @@ export class BandHost {
                 looping: false,
             };
         }
-        const resume = this.resumeBar;
-        this.resumeBar = null;
+        const resume = last.released ?? null;
         if (!this.counted) {
             return this.songPlan(resume ?? 0, resume ?? 0);
         }
