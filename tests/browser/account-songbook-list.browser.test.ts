@@ -64,7 +64,7 @@ async function drain(limit: number, instance = book, active = scope): Promise<st
 
 function rawDatabase(): Promise<IDBDatabase> {
     return new Promise<IDBDatabase>((resolve, reject) => {
-        const opening = indexedDB.open(name, 1);
+        const opening = indexedDB.open(name);
         opening.onsuccess = () => resolve(opening.result);
         opening.onerror = () => reject(opening.error);
     });

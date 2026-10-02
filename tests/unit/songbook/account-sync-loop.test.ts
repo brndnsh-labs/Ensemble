@@ -45,7 +45,10 @@ function stubSongbook(overrides: Record<string, unknown> = {}): AccountSongbook 
         switchAccount: async () => SCOPE,
         read: async () => null,
         pending: async () => [],
+        // The kind-agnostic queue read and the collections page the outbox walks (#1474).
+        queued: async () => [],
         list: async () => ({ songs: [], nextAfterDocumentId: null }),
+        collectionPage: async () => ({ collections: [], nextAfterDocumentId: null }),
         remoteCandidates: async () => [],
         reconcile: async () => 'unchanged',
         prepare: async () => 'idle',

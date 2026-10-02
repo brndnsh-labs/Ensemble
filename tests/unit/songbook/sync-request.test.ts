@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
-import { type ChartDocument, snapshot } from '../../../prototypes/v2/lib/sync/protocol.js';
+import {
+    type ChartDocument,
+    documentKind,
+    type SyncDocument,
+    snapshot,
+} from '../../../prototypes/v2/lib/sync/protocol.js';
 import {
     decodeSaveRequest,
     MAX_SAVE_REQUEST_BYTES,
@@ -17,6 +22,14 @@ import { accountChart } from '../../utils/account-songbook-fixture.js';
  */
 
 const OWNER = 'owner-a';
+
+/** The decoder returns either kind since #1474; every request in this file sends a chart. */
+function chart(document: SyncDocument): ChartDocument {
+    if (documentKind(document) !== 'chart') {
+        throw new Error('Expected a chart.');
+    }
+    return document as ChartDocument;
+}
 
 /**
  * Mirrors `AccountSongbook.prepare`'s serialization exactly — including the `snapshot()` call
@@ -144,7 +157,7 @@ describe('accepts exactly what prepare() produces', () => {
         const document = accountChart('\u0153 \u2014 \u65e5\u672c\u8a9e \ud83c\udfba', 'study');
         const body = wire(document);
         const decoded = await decodeSaveRequest(body, OWNER);
-        expect(decoded.document.title).toBe('\u0153 \u2014 \u65e5\u672c\u8a9e \ud83c\udfba');
+        expect(chart(decoded.document).title).toBe('\u0153 \u2014 \u65e5\u672c\u8a9e \ud83c\udfba');
         expect(decoded.digest).toBe(await sha256(body));
     });
 
@@ -230,11 +243,11 @@ describe('accepts exactly what prepare() produces', () => {
         const document = accountChart('A', 'study');
         const body = wire(document);
         const first = await decodeSaveRequest(body, OWNER);
-        first.document.title = 'tampered';
-        first.document.chart.performance.bpm = 999;
+        chart(first.document).title = 'tampered';
+        chart(first.document).chart.performance.bpm = 999;
         const second = await decodeSaveRequest(body, OWNER);
-        expect(second.document.title).toBe('A');
-        expect(second.document.chart.performance.bpm).toBe(120);
+        expect(chart(second.document).title).toBe('A');
+        expect(chart(second.document).chart.performance.bpm).toBe(120);
     });
 
     it('persists nothing and sends nothing', async () => {

@@ -54,7 +54,9 @@ import { sendError } from './errors.js';
  * cursor expiry to build — see `listManifest` in `db/documents.ts` for why an id-ordered keyset
  * page is all the stability a diff needs.
  *
- *   200 `{ documents: [{ documentId, revision, deleted, bytes }], nextAfterDocumentId }`
+ *   200 `{ documents: [{ documentId, revision, deleted, bytes, kind? }], nextAfterDocumentId }`
+ *       — `kind` only on a live row whose document names one: `'collection'` (#1474). A chart
+ *       has no `kind`, so a chart's row is exactly what it was before collections existed.
  *   200 `{ documentId, revision, document }` — one document, its stored bytes verbatim
  *   400 `{ error: 'malformed_request' }` — an unknown/repeated query key, a `limit` that is not
  *       an integer in 1..`MAX_LIST_LIMIT`, or an `after`/`:id` outside the identifier grammar

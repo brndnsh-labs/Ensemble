@@ -125,6 +125,23 @@ export type SaveOutcome =
      */
     | { kind: 'quota_exceeded'; limit: 'documents' | 'bytes'; usage: number; cap: number };
 
+/**
+ * Which document kind a stored or incoming body is (#1474): the `kind` a collection carries, and
+ * `'chart'` for anything without one — a chart has no `kind` field at all. A body that is not
+ * JSON reads as a chart; the write path only ever stores validated JSON, so that branch is a
+ * fixture's, never a decision about real data.
+ */
+function documentKindOf(body: string): string {
+    try {
+        const parsed: unknown = JSON.parse(body);
+        const kind =
+            parsed && typeof parsed === 'object' ? (parsed as { kind?: unknown }).kind : undefined;
+        return typeof kind === 'string' ? kind : 'chart';
+    } catch {
+        return 'chart';
+    }
+}
+
 /** A minted revision satisfies the client's `remoteRevision` grammar (`[A-Za-z0-9._:-]{1,200}`). */
 export function mintRevision(): string {
     return randomUUID();
@@ -164,6 +181,17 @@ export function commitSave(
 
             // 2. Expected revision against the server's current state.
             const current = readDocument(db, ownerId, documentId);
+            // A document never changes KIND (#1474), and that is decided BEFORE any revision
+            // branch: ids are unique per owner across kinds, so a chart's id held by a collection
+            // (or the reverse) is not a version of the document this request is about — in a
+            // create, a stale update or an exact-revision one alike. It answers as a conflict
+            // with NO remote version, the shape of an id this kind does not hold, so no reply ever
+            // hands a client a body of the other kind as though it were "theirs". The client
+            // resolves it as it does a missing document (a fresh id). Reachable only by a client
+            // bug or a collision; the body's own `kind` is the only evidence either side has.
+            if (current !== undefined && documentKindOf(current.body) !== documentKindOf(body)) {
+                return { kind: 'conflict', revision: current.revision, remote: null };
+            }
             if (expectedRevision === null) {
                 // Creating requires absence AND no tombstone: a deleted id is never resurrected.
                 const tombstone = readTombstone(db, ownerId, documentId);

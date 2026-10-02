@@ -268,6 +268,8 @@ test('an expired session clears its account from this device, offline, without a
         receipts: 0,
         drafts: 0,
         meta: 0,
+        // The account database's version-2 store (#1474): sign-out clears it with the rest.
+        collections: 0,
     });
     // The fence itself is all that is left: `switchAccount(null)` names no owner, and the row it
     // wrote is the one thing `clearAccount` deliberately does not reach.
@@ -298,6 +300,8 @@ test('an expired session clears its account from this device, offline, without a
         receipts: 0,
         drafts: 0,
         meta: 0,
+        // The account database's version-2 store (#1474): sign-out clears it with the rest.
+        collections: 0,
     });
 });
 
@@ -439,6 +443,8 @@ test('a device that still holds an account after a RELOAD can still clear it', a
         receipts: 0,
         drafts: 0,
         meta: 0,
+        // The account database's version-2 store (#1474): sign-out clears it with the rest.
+        collections: 0,
     });
     expect(cleared.owner).toBe('');
 });

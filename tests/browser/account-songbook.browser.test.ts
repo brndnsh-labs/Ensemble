@@ -194,7 +194,7 @@ function tick(): Promise<void> {
 /** Direct database access, to plant records no public API can produce. */
 async function rawDatabase(): Promise<IDBDatabase> {
     return new Promise<IDBDatabase>((resolve, reject) => {
-        const opening = indexedDB.open(name, 1);
+        const opening = indexedDB.open(name);
         opening.onsuccess = () => resolve(opening.result);
         opening.onerror = () => reject(opening.error);
     });
@@ -719,7 +719,7 @@ describe('account songbook on real IndexedDB', () => {
         await book.save(scope, accountChart(), null);
         const request = await prepared();
         const raw = await new Promise<IDBDatabase>((resolve) => {
-            const opening = indexedDB.open(name, 1);
+            const opening = indexedDB.open(name);
             opening.onsuccess = () => resolve(opening.result);
         });
         try {

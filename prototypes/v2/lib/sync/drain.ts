@@ -5,8 +5,8 @@ import { type SaveTransport, sendNext } from './send';
 
 /**
  * One caller-driven pass over a bounded slice of an account's outbox — not a background
- * service. Walks at most one page of songs, sending at most one queued Save per visited
- * document, sequentially. The caller decides whether and when to call again; nothing here
+ * service. Walks at most one page of documents — songs and, since #1474, collections, in one
+ * id order (`outboxPage`) — sending at most one queued Save per visited document, sequentially. The caller decides whether and when to call again; nothing here
  * retains a hidden cursor, schedules a retry, or starts from app bootstrap on its own.
  */
 
@@ -29,6 +29,43 @@ export interface OutboxPassResult {
      */
     resumeAfterDocumentId: string | null;
     counts: { idle: number; committed: number; conflict: number; retry: number; refused: number };
+}
+
+/**
+ * The next page of DOCUMENTS after the cursor, of either kind (#1474): this owner's songs and
+ * collections merged in document-id order, which is one key space because ids are unique per owner
+ * across kinds. So the cursor stays one document id, and a caller resuming a sweep — `drain` in
+ * `lib/account/sync-loop.ts` — needs to know nothing about collections.
+ *
+ * Each store is paged to the same limit after the same cursor; the first `limit` ids of the union
+ * are necessarily among those two pages, so the merge is exact. The songs page is still the full
+ * validated `list` read it always was, so a song record that does not validate still fails the
+ * pass rather than being stepped over. Two transactions rather than one: pages were never a
+ * snapshot of the library (`list`), and the cursor is an id, not an offset.
+ */
+async function outboxPage(
+    songbook: AccountSongbook,
+    scope: AccountScope,
+    afterDocumentId: string | undefined,
+): Promise<{ documents: Array<{ documentId: string }>; nextAfterDocumentId: string | null }> {
+    const options = {
+        limit: OUTBOX_PAGE_LIMIT,
+        ...(afterDocumentId === undefined ? {} : { afterDocumentId }),
+    };
+    const songs = await songbook.list(scope, options);
+    const collections = await songbook.collectionPage(scope, options);
+    const merged = [...songs.songs, ...collections.collections]
+        .map((record) => ({ documentId: record.documentId }))
+        .sort((a, b) => (a.documentId < b.documentId ? -1 : a.documentId > b.documentId ? 1 : 0));
+    const documents = merged.slice(0, OUTBOX_PAGE_LIMIT);
+    const more =
+        merged.length > OUTBOX_PAGE_LIMIT ||
+        songs.nextAfterDocumentId !== null ||
+        collections.nextAfterDocumentId !== null;
+    return {
+        documents,
+        nextAfterDocumentId: more && documents.length > 0 ? documents.at(-1)!.documentId : null,
+    };
 }
 
 /**
@@ -72,10 +109,7 @@ export async function runOutboxPass(
         return { kind: 'aborted', resumeAfterDocumentId: incomingCursor, counts };
     }
 
-    const page = await songbook.list(scope, {
-        limit: OUTBOX_PAGE_LIMIT,
-        ...(afterDocumentId === undefined ? {} : { afterDocumentId }),
-    });
+    const page = await outboxPage(songbook, scope, afterDocumentId);
 
     // Cancellation during page loading: the page already loaded, but nothing has been sent,
     // so the whole page is discarded and the pass reports exactly the progress it started
@@ -85,7 +119,7 @@ export async function runOutboxPass(
     }
 
     let cursor = incomingCursor;
-    for (const song of page.songs) {
+    for (const song of page.documents) {
         // No abort check here at the top of the loop: there is no `await` between this point
         // and the last abort check either above (before the first song) or below (at the end
         // of the previous iteration), so `signal.aborted` cannot have changed since one of
