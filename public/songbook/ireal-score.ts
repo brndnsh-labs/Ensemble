@@ -126,6 +126,18 @@ const PLAYBACK_TEXT = /D\.[CS]\.|\b(?:break|stop|hold|fine|coda|segno|repeat|end
 // just because unrelated playback-flavored text happened to appear somewhere too (#1447 review).
 const NAVIGATION_REFERENCE =
     /D\.[CS]\.|\b(?:coda|segno|fine)\b|\bal\s+\d+(?:st|nd|rd|th)\s+ending\b/i;
+// A repeat count, written as the whole staff text in the bar that closes the repeat. iReal's own
+// editor writes "3x" through "8x" (infojunkie/ireal-musicxml converter.js `mapRepeats` lists
+// exactly those strings); the Jazz 1460 playlist's charts also write "x3" (Harlequin), "3X" (Up
+// With The Lark) and "Repeat 3x" (Speak Like A Child), and #1486 adds "3 x", "Play 3x" and
+// "3 times" as equally unambiguous. Matched against the whole text, case-insensitively, so prose
+// that merely contains a count ("3X (for solos only)") is never read as one (#1486).
+const REPEAT_COUNT = /^(?:(?:repeat|play)\s+)?(\d+)\s*x$|^x(\d+)$|^(\d+)\s+times$/i;
+// Text that reads like a repeat count without being one of REPEAT_COUNT's whole-text spellings
+// ("Solos x4", "3X (for solos only)"). It is kept as text, with the same playback note as
+// PLAYBACK_TEXT, so a count this importer does not apply never passes silently (#1486). Ordinal
+// prose ("1st x slow") and a plural "(4xs)" are not counts.
+const COUNT_LIKE_TEXT = /\b\d+\s*x\b|\bx\s*\d+\b|\b\d+\s+times\b/i;
 
 const MAX_NOTES = 20;
 /** Bounds a diagnostics list so a pathological chart (thousands of ownerless alternates or
@@ -450,6 +462,7 @@ function readBars(
             // menu; infojunkie/ireal-musicxml converter.js maps the same six D.C./D.S. strings);
             // charts also write them out as "ending" (#1473).
             const alEnding = /^D\.([CS])\. al (1st|2nd|3rd) (?:end\.|ending)$/i.exec(normalized);
+            const repeatCount = REPEAT_COUNT.exec(normalized);
             if (jump) {
                 // An al-ending read earlier in this bar stays the inert text it was before #1473.
                 if (current.jump && !current.jump.text) {
@@ -461,8 +474,8 @@ function readBars(
                 };
             } else if (normalized === 'Fine') {
                 current.end.push({ kind: 'fine', label: `fine-${++fines}` });
-            } else if (/^\d+x$/.test(normalized)) {
-                const times = Number(normalized.slice(0, -1));
+            } else if (repeatCount) {
+                const times = Number(repeatCount[1] ?? repeatCount[2] ?? repeatCount[3]);
                 if (times < 2 || times > 64 || current.repeatTimes) {
                     fail(bars.length, 'Use one repeat count from 2x to 64x.');
                 }
@@ -479,7 +492,7 @@ function readBars(
                 // Only a text that genuinely REFERENCES a Fine/Coda/Segno marker or a numbered
                 // ending may relax the unpaired-marker check below — ordinary playback prose
                 // ("Bass break", "rit.") must never silence a genuinely orphaned marker elsewhere.
-                if (PLAYBACK_TEXT.test(normalized)) {
+                if (PLAYBACK_TEXT.test(normalized) || COUNT_LIKE_TEXT.test(normalized)) {
                     notes.push(
                         `A staff-text instruction ("${normalized}") is preserved as text only; it is not applied to the performed order.`,
                     );
