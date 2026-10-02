@@ -240,8 +240,9 @@ describe('the Jazz 1460 playlist fixtures (#1447)', () => {
         // The chart's own coda markers ('Q'...'Q') are real, but "Original takes Coda every
         // time" is prose, not one of the fixed D.C./D.S. al Fine/Coda phrases this importer maps
         // to a real jump. Inventing a jump from free text would risk silently producing a wrong
-        // form (#1171); importing the full written form with an honest warning does not. The
-        // iReal last-chorus conventions story (#1476) may let this reach its aspirational 32.
+        // form (#1171); importing the full written form with an honest warning does not. #1476
+        // maps coda signs with no jump text to a last-chorus coda, but not these: the prose says
+        // the original takes the coda EVERY time, which a last-chorus coda would contradict.
         const { document, song } = importFixture('i-got-rhythm');
         expect(performedBarCount(document)).toBe(36);
         expectCanonicalRoundTrip(document);
@@ -265,6 +266,98 @@ describe('the Jazz 1460 playlist fixtures (#1447)', () => {
                 message: expect.stringContaining('coda sign in bar 26'),
             }),
         );
+    });
+
+    // #1476: coda signs with no D.C./D.S. text, as iReal Pro reads them
+    // (https://irealpro.com/how-the-coda-symbol-works-in-ireal-pro/): "the repeats play in full
+    // and the Coda is added once as a tag at the end"; "the main form repeats 5 times, then jumps
+    // to the Coda on the final pass". Imported as a last-chorus coda (#1472) with no chorus count,
+    // so the form loops without the coda until the musician sets one.
+    describe('coda signs with no jump text, as a last-chorus coda (#1476)', () => {
+        /** [chorus, written bar number] for each performed bar. */
+        function performed(document: ChartDocumentV2, choruses?: number) {
+            const score = { ...document.chart.score, ...(choruses ? { choruses } : {}) };
+            return compileScoreForm(score).map(({ chorus, measureIndex }) => [
+                chorus,
+                measureIndex + 1,
+            ]);
+        }
+        const bars = (chorus: number, from: number, to: number) =>
+            Array.from({ length: to - from + 1 }, (_, i) => [chorus, from + i]);
+        const codaNote = (target: number, via: number) =>
+            `The coda at bar ${target} is played once, at the end: with a chorus count set, the last chorus jumps to it from the end of bar ${via}. Until then the form loops without it.`;
+
+        it('imports Blue In Green as its published 10-bar form, its 4-bar coda on the last chorus only', () => {
+            // The written chart, 14 bars in one section, no intro:
+            //   bars  1-10  Gm6 | A7#9 | Dm7 Db7 | Cm7 F7 | Bbmaj7#11 | A7#9 | Dm6 | E7b13 |
+            //               Am7 | Dm7, its departure coda sign at the end of bar 10
+            //   bars 11-14  the coda, its target sign at the start of bar 11:
+            //               Gm6 | A7#9 | Dm6 | Dm6 (fermata)
+            // Performed, uncounted: bars 1-10 looped, the coda never taken = 10 bars a chorus.
+            // That is the tune's published form: Bill Evans's liner notes to Kind of Blue call it
+            // "a 10-measure circular form", and Ted Gioia, "The composition is ten bars long"
+            // (both quoted at https://en.wikipedia.org/wiki/Blue_in_Green). Two choruses: 1-10,
+            // then 1-10 and on into the coda's 11-14 = 24 bars.
+            const { document, song } = importFixture('blue-in-green');
+            expect(document.chart.score.choruses).toBeUndefined();
+            expect(performedBarCount(document)).toBe(10);
+            expect(performed(document)).toEqual(bars(0, 1, 10));
+            expect(performed(document, 2)).toEqual([...bars(0, 1, 10), ...bars(1, 1, 14)]);
+            const measures = document.chart.score.sections[0].measures;
+            expect(measures[9].end).toEqual([
+                { kind: 'coda', label: 'coda-1' },
+                {
+                    kind: 'last-chorus',
+                    destination: { kind: 'coda', via: 'coda-1', target: 'coda-2' },
+                },
+            ]);
+            expect(measures[10].start).toEqual([{ kind: 'coda', label: 'coda-2' }]);
+            expectCanonicalRoundTrip(document);
+            expect(song.diagnostics.map(({ message }) => message)).toEqual([
+                codaNote(11, 10),
+                expect.stringContaining('Stored key is used without transposition'),
+            ]);
+        });
+
+        it('imports Hello Dolly at 32 bars, the last chorus trading its turnaround for the coda tag', () => {
+            // Two 16-bar halves; the departure sign is at the end of bar 30, so the last chorus
+            // leaves out the bar 31-32 turnaround (C6 Ebdim7 | Dm7 G7) and plays the 6-bar tag
+            // (D7 | G7 | D7 | G7 | ...) at 33-38 in its place.
+            const { document, song } = importFixture('hello-dolly');
+            expect(performedBarCount(document)).toBe(32);
+            expect(performed(document)).toEqual(bars(0, 1, 32));
+            expect(performed(document, 2)).toEqual([
+                ...bars(0, 1, 32),
+                ...bars(1, 1, 30),
+                ...bars(1, 33, 38),
+            ]);
+            expectCanonicalRoundTrip(document);
+            expect(song.diagnostics.map(({ message }) => message)).toContain(codaNote(33, 30));
+        });
+
+        it("imports Driftin' at 32 bars: its repeat plays in full every chorus, its vamp coda on the last", () => {
+            // AABA with a first/second-ending repeat (bars 1-10), the bridge (11-18) and the last
+            // A (19-26), the departure at the end of bar 25. The coda (27-29) ends on a repeated
+            // vamp, "Vamp and fade" (28-29, twice).
+            const { document, song } = importFixture('driftin');
+            expect(performedBarCount(document)).toBe(32);
+            const head = (chorus: number) => [
+                ...bars(chorus, 1, 8),
+                ...bars(chorus, 1, 6),
+                ...bars(chorus, 9, 10),
+            ];
+            expect(performed(document)).toEqual([...head(0), ...bars(0, 11, 26)]);
+            expect(performed(document, 2)).toEqual([
+                ...head(0),
+                ...bars(0, 11, 26),
+                ...head(1),
+                ...bars(1, 11, 25),
+                ...bars(1, 27, 29),
+                ...bars(1, 28, 29),
+            ]);
+            expectCanonicalRoundTrip(document);
+            expect(song.diagnostics.map(({ message }) => message)).toContain(codaNote(27, 25));
+        });
     });
 
     it('imports One For My Baby at 61 performed bars, landing its closing fermata on the chord it precedes (#1451)', () => {

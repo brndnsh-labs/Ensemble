@@ -186,8 +186,23 @@ than guesses, a last-chorus coda that is not on the same boundary as its `via` s
 one in the chart, one whose departure is inside a repeated passage or repeated section (which
 pass is the last time?), one whose arrival is behind its departure, and, for now, any chart
 that also has a D.C./D.S. jump: the departure is then passed both before and after the jump.
-Stopping the band after the last chorus and the chorus-count control are #1475; how iReal's
-unpaired coda signs map onto this is #1476.
+Stopping the band after the last chorus and the chorus-count control are #1475.
+
+iReal coda signs with no D.C./D.S. text (#1476) import as a last-chorus coda, after iReal Pro's
+own rule (https://irealpro.com/how-the-coda-symbol-works-in-ireal-pro/): "the repeats play in
+full and the Coda is added once as a tag at the end", "the main form repeats 5 times, then jumps
+to the Coda on the final pass". Only the shape that page draws is mapped: exactly two coda signs
+and no other unpaired sign, the departure at the end of a bar and the target at the start of a
+later one. The import sets no chorus count, so the chart loops without its coda until the
+musician sets one, and a note says so. Everything else is refused with the message it had
+before: a lone coda sign (iReal also lets a chart mark only the coda section, but a last-chorus
+coda departs from a written sign, and inventing one is a guess), a segno or Fine with no jump,
+more than two coda signs, and a pair the score form refuses (a departure inside a repeat). Coda
+signs beside navigation prose ("Original takes Coda every time") stay ignored signs with a note:
+the prose says when the coda is taken. Across the Jazz 1460 playlist, 66 charts now import; 8
+more 3/4 charts with the same pair are still refused, now by their held-back multi-chord bars;
+every other chart's import is unchanged. Repeats replayed after a D.C./D.S. jump are still
+refused: no primary source says whether iReal replays them.
 
 D.C./D.S. al Nth ending (#1473), `destination: { kind: 'ending', pass }`, follows iReal Pro's
 own definition (https://www.irealpro.com/learn/repeats-endings-and-jumps/): "D.C. al 2nd ending
@@ -312,7 +327,7 @@ fixture for this specific export, not general import or by-ear compatibility.
 | Qualities and slash bass | Wider authored vocabulary; conservative existing-engine subset playable | Complete official vocabulary mapping and harmonic-identity fixtures; no partial matches. |
 | Whole-section repeats | Native playback/display implemented; authoring remains limited | Distinguish section repetition, written repeat barlines and player chorus count; broader editor/import coverage. |
 | Repeat barlines and first/second endings | Native compact display/edit/play and conservative import within sections | Real-device audition and cross-section repeat forms. |
-| D.C./D.S., coda, Fine | Native global traversal, al-Nth-ending destinations and conservative unambiguous import implemented | Jumps inside repeats, repeats replayed after a jump, ambiguous import repeat policy and physical-device audition. |
+| D.C./D.S., coda, Fine | Native global traversal, al-Nth-ending destinations, last-chorus codas and conservative unambiguous import implemented | Jumps inside repeats, repeats replayed after a jump, ambiguous import repeat policy and physical-device audition. |
 | N.C., holds, alternate chords, fermatas | Authored events represented; playback pending | Per-lane meaning, editing and faithful import mapping. |
 | Other rhythmic notation, rests and pushes | Inventory and represent without guessing equivalence | Current protocol/app fixtures and explicit lane semantics. |
 | Meter/key changes | Native bar editing, sticky contexts and supported-meter playback tested; the song's own meter is set from the Edit panel (#1371), re-dividing equal-length bars and blocking — never rounding — on a bar whose written lengths cannot follow | Real-device and audible acceptance; source import mapping; a section-level key/meter surface. |
