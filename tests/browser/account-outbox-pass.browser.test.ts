@@ -142,6 +142,7 @@ describe('one bounded outbox pass on real IndexedDB', () => {
             kind: 'complete',
             resumeAfterDocumentId: null,
             counts: { idle: 0, committed: 0, conflict: 0, retry: 0, refused: 0 },
+            collections: { committed: 0, conflict: 0 },
         });
         expect(cloudTransport.calls).toHaveLength(0);
     });
@@ -223,6 +224,7 @@ describe('one bounded outbox pass on real IndexedDB', () => {
             kind: 'retry',
             resumeAfterDocumentId: ids[0],
             counts: { idle: 0, committed: 1, conflict: 0, retry: 1, refused: 0 },
+            collections: { committed: 0, conflict: 0 },
         });
         expect(failing.calls.map((call) => call.documentId)).toEqual([ids[0], ids[1]]);
         const frozenBody = failing.calls[1].body;
@@ -275,6 +277,7 @@ describe('one bounded outbox pass on real IndexedDB', () => {
             kind: 'aborted',
             resumeAfterDocumentId: null,
             counts: { idle: 0, committed: 0, conflict: 0, retry: 0, refused: 0 },
+            collections: { committed: 0, conflict: 0 },
         });
         expect(cloudTransport.calls).toHaveLength(0);
     });
@@ -298,6 +301,7 @@ describe('one bounded outbox pass on real IndexedDB', () => {
             kind: 'aborted',
             resumeAfterDocumentId: null,
             counts: { idle: 0, committed: 0, conflict: 0, retry: 0, refused: 0 },
+            collections: { committed: 0, conflict: 0 },
         });
         expect(cloudTransport.calls).toHaveLength(0);
         listSpy.mockRestore();
@@ -325,6 +329,7 @@ describe('one bounded outbox pass on real IndexedDB', () => {
             kind: 'aborted',
             resumeAfterDocumentId: null,
             counts: { idle: 0, committed: 0, conflict: 0, retry: 0, refused: 0 },
+            collections: { committed: 0, conflict: 0 },
         });
         expect(cloudTransport.calls).toHaveLength(0);
         listSpy.mockRestore();
