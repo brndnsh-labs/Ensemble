@@ -173,31 +173,54 @@ describe('the Jazz 1460 playlist fixtures (#1447)', () => {
         );
     });
 
-    it('imports Cherokee, preserving its unmapped "D.C. al 2nd ending" as text with a warning', () => {
-        // Cherokee's full performed form is 64 bars if the D.C. is actually taken, but jumping to
-        // a specific numbered ending needs ScoreDestination's 'ending' kind implemented in the
-        // shared score-form.ts — its own story (a design call on navigation every chart shares,
-        // not a parser-token fix), which the #1447 PR/issue files as a follow-up. This importer
-        // preserves the instruction as inert text (never silently flattening a wrong form) and
-        // imports the written 36 bars / 48 performed-without-the-jump instead of guessing a form.
-        // Accepted for this story at 48, not the aspirational 64.
+    it('imports Cherokee at 64 performed bars, taking its "D.C. al 2nd ending" to the Fine (#1473)', () => {
+        // The rule (iReal Pro, https://www.irealpro.com/learn/repeats-endings-and-jumps/): "D.C.
+        // al 2nd ending returns to the top, skips the first ending, and takes the second", and
+        // "needs a Fine to mark where to stop"; the jump "only takes effect at that closing
+        // barline". The written chart, 36 bars in one section:
+        //   bars  1-12  A, inside {: Bb6 | % | Fm7 | Bb7 | Ebmaj7 | % | Ab7 | % | Bb6 | % | C7 | %
+        //   bars 13-16  1st ending: Cm7 | G7b9 | Cm7 | F7#5 }       (repeat x2)
+        //   bars 17-20  2nd ending: Cm7 | F7 | Bb6 | % <Fine> ]
+        //   bars 21-36  B: C#m7 | F#7 | Bmaj7 | % | Bm7 | E7 | Amaj7 | % | Am7 | D7 | Gmaj7 | % |
+        //               Gm7 | C7 | Cm7 <D.C. al 2nd ending> | F7#5 ]   (the closing barline)
+        // Performed:
+        //   A1 = bars 1-12 + 1st ending 13-16                 = 16
+        //   A2 = bars 1-12 + 2nd ending 17-20                 = 16
+        //   B  = bars 21-36, D.C. at bar 36's closing barline  = 16
+        //   A3 = bars 1-12 once, straight to 17-20, Fine       = 16
+        // Total 64: the published AABA form, 16+16+16+16. The text sits in bar 35, a bar before
+        // the closing barline where iReal's jump takes effect, so the importer places the jump at
+        // the end of bar 36; jumping at bar 35 instead would drop the bridge's last bar (63).
         const { document, song } = importFixture('cherokee');
-        expect(performedBarCount(document)).toBe(48);
+        expect(performedBarCount(document)).toBe(64);
+        const visits = compileScoreForm(document.chart.score).map(
+            ({ measureIndex }) => measureIndex + 1,
+        );
+        const range = (from: number, to: number) =>
+            Array.from({ length: to - from + 1 }, (_, i) => from + i);
+        expect(visits).toEqual([
+            ...range(1, 16),
+            ...range(1, 12),
+            ...range(17, 36),
+            ...range(1, 12),
+            ...range(17, 20),
+        ]);
         expectCanonicalRoundTrip(document);
-        expect(song.diagnostics).toContainEqual(
-            expect.objectContaining({
-                severity: 'warning',
-                message: expect.stringContaining('D.C. al 2nd ending'),
-            }),
-        );
-        // The Fine mark on the first ending (bar 20) is now orphaned, since the D.C. that would
-        // have referenced it is left unmapped — named explicitly, not just silently tolerated.
-        expect(song.diagnostics).toContainEqual(
-            expect.objectContaining({
-                severity: 'warning',
-                message: expect.stringContaining('fine sign in bar 20'),
-            }),
-        );
+        const measures = document.chart.score.sections[0].measures;
+        expect(measures[35].end).toEqual([
+            {
+                kind: 'jump',
+                from: 'start',
+                destination: { kind: 'ending', pass: 2 },
+                repeats: 'skip',
+            },
+        ]);
+        // The instruction is applied, so it is neither inert text nor a note, and its Fine is
+        // no longer an orphaned sign.
+        expect(measures[34].annotations).toBeUndefined();
+        expect(song.diagnostics.map(({ message }) => message)).toEqual([
+            expect.stringContaining('Stored key is used without transposition'),
+        ]);
     });
 
     it('imports Night And Day at 48 performed bars (unfolding its 1st/2nd-ending repeat)', () => {
@@ -217,8 +240,8 @@ describe('the Jazz 1460 playlist fixtures (#1447)', () => {
         // The chart's own coda markers ('Q'...'Q') are real, but "Original takes Coda every
         // time" is prose, not one of the fixed D.C./D.S. al Fine/Coda phrases this importer maps
         // to a real jump. Inventing a jump from free text would risk silently producing a wrong
-        // form (#1171); importing the full written form with an honest warning does not. Same
-        // follow-up as Cherokee above would let this reach its aspirational 32 instead of 36.
+        // form (#1171); importing the full written form with an honest warning does not. The
+        // iReal last-chorus conventions story (#1476) may let this reach its aspirational 32.
         const { document, song } = importFixture('i-got-rhythm');
         expect(performedBarCount(document)).toBe(36);
         expectCanonicalRoundTrip(document);

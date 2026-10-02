@@ -1,6 +1,8 @@
 /**
  * #1472 before/after differential: a chart with no chorus count and no last-chorus coda compiles
- * to exactly the visits it did before the chorus model existed. Not a snapshot of new output —
+ * to exactly the visits it did before the chorus model existed. #1473 narrows it further: a chart
+ * with a "D.C./D.S. al Nth ending" jump changes on purpose (the frozen compiler refuses every
+ * one), so it is left out; every other chart is still compared. Not a snapshot of new output —
  * every chart is compiled twice, by the live `compileScoreForm` and by the frozen pre-#1472
  * compiler (`tests/fixtures/score-form-pre-1472.ts`), and the two must agree: the same visits
  * (the live ones each carrying `chorus: 0`), or the same refusal.
@@ -39,8 +41,11 @@ vi.mock('../../../public/songbook/score-form.js', async (importOriginal) => {
     };
     const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
-    /** The model this differential speaks for: no chorus count and no last-chorus coda. */
-    function uncounted(candidate: unknown): boolean {
+    /**
+     * The model this differential speaks for: no chorus count, no last-chorus coda (#1472) and
+     * no al-ending jump (#1473).
+     */
+    function inScope(candidate: unknown): boolean {
         try {
             const score = candidate as {
                 choruses?: unknown;
@@ -57,7 +62,12 @@ vi.mock('../../../public/songbook/score-form.js', async (importOriginal) => {
                     [measure?.start, measure?.end].some(
                         (edge) =>
                             Array.isArray(edge) &&
-                            edge.some((direction) => direction?.kind === 'last-chorus'),
+                            edge.some(
+                                (direction) =>
+                                    direction?.kind === 'last-chorus' ||
+                                    (direction?.kind === 'jump' &&
+                                        direction?.destination?.kind === 'ending'),
+                            ),
                     ),
                 ),
             );
@@ -68,7 +78,7 @@ vi.mock('../../../public/songbook/score-form.js', async (importOriginal) => {
     }
 
     function compileScoreForm(candidate: unknown) {
-        if (!uncounted(candidate)) {
+        if (!inScope(candidate)) {
             return live.compileScoreForm(candidate);
         }
         const expected = run(() => before(candidate));

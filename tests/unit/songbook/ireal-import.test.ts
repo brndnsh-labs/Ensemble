@@ -614,10 +614,83 @@ describe('bounded source-preserving iReal import', () => {
         );
     });
 
-    it('imports a chart with a "D.C. al Nth ending" instruction as text, with a warning, rather than blocking it', () => {
-        // The official iReal chord-symbol guide documents "al [N]th ending" alongside al
-        // Fine/al Coda, but jumping to a specific earlier repeat pass is not modeled by
-        // ScoreDestination's 'ending' kind yet (score-form.ts rejects it as unimplemented).
+    // A head bar, a repeat with two endings, then a bridge whose text sits a bar before the
+    // closing barline. The Fine is in the ending the jump takes.
+    const second = (text: string) => `T44[D   |{C   |N1F   }|N2G   <Fine>]|E7 <${text}>|A7   Z`;
+    it.each([
+        ['D.C. al 2nd End.', 'start', 2, second('D.C. al 2nd End.')],
+        ['D.C. al 2nd ending', 'start', 2, second('D.C. al 2nd ending')],
+        ['d.c. al 2nd end.', 'start', 2, second('d.c. al 2nd end.')],
+        ['D.S. al 2nd End.', 'segno', 2, second('D.S. al 2nd End.').replace('[D', '[SD')],
+        [
+            'D.C. al 1st Ending',
+            'start',
+            1,
+            'T44[D   |{C   |N1F   <Fine>}|N2G   ]|E7 <D.C. al 1st Ending>|A7   Z',
+        ],
+    ])('maps "%s" to an al-ending jump (#1473)', (_, from, pass, body) => {
+        const measures = score(body).sections[0].measures;
+        // The jump takes effect at the closing barline, a bar after its text.
+        expect(measures.at(-1)?.end).toEqual([
+            {
+                kind: 'jump',
+                from,
+                ...(from === 'segno' ? { segno: 'segno-1' } : {}),
+                destination: { kind: 'ending', pass },
+                repeats: 'skip',
+            },
+        ]);
+        expect(measures.at(-2)?.annotations).toBeUndefined();
+    });
+
+    it('performs a mapped D.C. al 2nd End. through the shared score form', () => {
+        const body = 'T44{C   |N1F   }|N2G   <Fine>]|E7   <D.C. al 2nd End.>|A7   Z';
+        const parsed = parseIRealImport(open(body));
+        const song = parsed.songs[0];
+        expect(song.diagnostics.filter((entry) => entry.severity === 'error')).toEqual([]);
+        const plan = prepareScorePlayback(song.score);
+        // C F | C G | E7 A7 | D.C.: C G, Fine.
+        expect(plan.visits.map(({ measureIndex }) => measureIndex)).toEqual([
+            0, 1, 0, 2, 3, 4, 0, 2,
+        ]);
+    });
+
+    it.each([
+        // No Fine to stop at.
+        ['T44{C   |N1F   }|N2G   ]|E7 <D.C. al 2nd End.>|A7   Z', []],
+        // A coda sign beside it (Round Midnight's written outro): which ends the form is unsourced.
+        [
+            'T44{C   |N1F   }|N2G   <Fine>]|E7 <D.C. al 2nd End.>|A7   ][QD7   Z',
+            ['The coda sign in bar 6'],
+        ],
+        // A sign between the text and the closing barline it would take effect at.
+        ['T44{C   |N1F   }|N2G   ]|E7 <D.C. al 2nd End.>|A7   <Fine>Z', []],
+    ])(
+        'keeps an al-ending it cannot apply as inert text with its note, as before #1473: %s',
+        (body, orphans) => {
+            const parsed = parseIRealImport(open(body));
+            const song = parsed.songs[0];
+            expect(song.score).toBeDefined();
+            const measures = song.score!.sections[0].measures;
+            expect(measures.flatMap((measure) => measure.end ?? [])).not.toContainEqual(
+                expect.objectContaining({ kind: 'jump' }),
+            );
+            expect(measures[3].annotations).toEqual([
+                expect.objectContaining({ text: 'D.C. al 2nd End.', placement: 'below' }),
+            ]);
+            const messages = song.diagnostics.map(({ message }) => message);
+            expect(messages).toContain(
+                'A staff-text instruction ("D.C. al 2nd End.") is preserved as text only; it is not applied to the performed order.',
+            );
+            for (const orphan of orphans) {
+                expect(messages).toContainEqual(expect.stringContaining(orphan));
+            }
+        },
+    );
+
+    it('imports a chart with a "D.C. al Nth ending" it cannot apply as text, with a warning, rather than blocking it', () => {
+        // No repeat and no Fine: the instruction cannot be applied (#1473), so it stays the
+        // inert text it always was, never a guessed jump or a refused chart.
         const source = open('T44[C   |F   <D.C. al 2nd ending>Z');
         const parsed = parseIRealImport(source);
         const song = parsed.songs[0];
@@ -632,6 +705,140 @@ describe('bounded source-preserving iReal import', () => {
                 message: expect.stringContaining('D.C. al 2nd ending'),
             }),
         );
+    });
+
+    // #1473 review: an al-ending the importer does not apply must import exactly as it did before
+    // #1473. "D.C. al 4th ending" names no iReal ending, so it takes the unchanged inert-text path
+    // on both sides; with the ordinals normalized, the two imports must match byte for byte.
+    function expectImportedAsBefore(body: string) {
+        const now = parseIRealImport(open(body));
+        const before = parseIRealImport(open(body.replace(/ al (1st|2nd|3rd) /g, ' al 4th ')));
+        expect(now.songs[0].score).toBeDefined();
+        expect(now.songs[0].diagnostics.filter((entry) => entry.severity === 'error')).toEqual([]);
+        expect(
+            now.songs[0].score!.sections[0].measures.flatMap((measure) => measure.end ?? []),
+        ).not.toContainEqual(
+            expect.objectContaining({
+                kind: 'jump',
+                destination: expect.objectContaining({ kind: 'ending' }),
+            }),
+        );
+        const normalized = (value: unknown) =>
+            JSON.stringify(value).replace(/ al (1st|2nd|3rd|4th) /g, ' al Nth ');
+        expect(normalized(now)).toBe(normalized({ ...before, source: now.source }));
+        return now.songs[0];
+    }
+
+    it.each([
+        [
+            'another repeat before the return reaches the taken one (an intro vamp)',
+            'T44{D   |D   }[C   |{C   |N1F   }|N2G   <Fine>]|E7 <D.C. al 2nd ending>|A7   Z',
+        ],
+        [
+            'a vamp between the return point and the taken repeat',
+            'T44[C   |{D   |D   }|{C   |N1F   }|N2G   <Fine>]|E7 <D.C. al 2nd ending>|A7   Z',
+        ],
+        [
+            'a later repeat with the same ending (ambiguous)',
+            'T44{C   |N1F   }|N2G   <Fine>]{D   |N1E   }|N2A   ]|E7 <D.C. al 2nd ending>|A7   Z',
+        ],
+        [
+            'its Fine in the repeat body, before ending 2',
+            'T44{C   <Fine>|N1F   }|N2G   ]|E7 <D.C. al 2nd ending>|A7   Z',
+        ],
+        [
+            'no numbered ending at all (invalid authored data)',
+            'T44{C   |F   }|G   <Fine>]|E7 <D.C. al 2nd ending>|A7   Z',
+        ],
+    ])('imports as before when the score form refuses the al-ending: %s', (_, body) => {
+        // The importer's own checks pass; the shared score form refuses the route, so the import
+        // is read again with the al-ending as text instead of being refused.
+        expectImportedAsBefore(body);
+    });
+
+    it.each([
+        // The text sits on the closing bar itself, or one bare bar before it (Cherokee).
+        ['on the closing bar', 'T44{C   |N1F   }|N2G   <Fine>]|E7   |A7 <D.C. al 2nd ending>Z', 4],
+        ['one bar before it', 'T44{C   |N1F   }|N2G   <Fine>]|E7 <D.C. al 2nd ending>|A7   Z', 4],
+    ])('applies an al-ending whose text is %s', (_, body, jumpBar) => {
+        const measures = score(body).sections[0].measures;
+        expect(measures[jumpBar].end).toEqual([
+            expect.objectContaining({ kind: 'jump', destination: { kind: 'ending', pass: 2 } }),
+        ]);
+    });
+
+    it.each([
+        [
+            'two bars before the closing barline',
+            'T44{C   |N1F   }|N2G   <Fine>]|E7 <D.C. al 2nd ending>|A7   |D7   Z',
+        ],
+        [
+            'a rehearsal mark on the next bar',
+            'T44{C   |N1F   }|N2G   <Fine>][*BE7   |A7 <D.C. al 2nd ending>|*CD7   Z',
+        ],
+        [
+            'a meter change on the next bar',
+            'T44{C   |N1F   }|N2G   <Fine>]|E7 <D.C. al 2nd ending>|T34A7   Z',
+        ],
+        [
+            'staff text on the next bar',
+            'T44{C   |N1F   }|N2G   <Fine>]|E7 <D.C. al 2nd ending>|A7 <rit.>Z',
+        ],
+        [
+            'a sign on the next bar',
+            'T44{C   |N1F   }|N2G   <Fine>]|E7 <D.C. al 2nd ending>|QA7   Z',
+        ],
+    ])('keeps the al-ending as text when its closing barline lies past %s', (_, body) => {
+        expectImportedAsBefore(body);
+    });
+
+    it('keeps two al-endings in one bar as text: which one holds would be a guess', () => {
+        // Either alone would apply to this chart (a segno, a repeat with two endings, a Fine).
+        const song = expectImportedAsBefore(
+            'T44[SD   |{C   |N1F   }|N2G   <Fine>]|E7   |A7 <D.C. al 2nd ending><D.S. al 2nd ending>Z',
+        );
+        expect(song.score!.sections[0].measures[5].annotations).toHaveLength(2);
+    });
+
+    it.each([
+        ['after', '<D.C. al Fine><D.C. al 2nd ending>'],
+        ['before', '<D.C. al 2nd ending><D.C. al Fine>'],
+    ])('keeps an al-ending %s an al Fine in its bar as text, applying the al Fine', (_, texts) => {
+        const song = expectImportedAsBefore(`T44[SC   <Fine>|E7   |A7 ${texts}Z`);
+        expect(song.score!.sections[0].measures[2].end).toEqual([
+            expect.objectContaining({
+                kind: 'jump',
+                destination: { kind: 'fine', label: 'fine-1' },
+            }),
+        ]);
+    });
+
+    it('keeps the import notes in their written order when two al-endings stay text', () => {
+        const song = expectImportedAsBefore(
+            'T44{C   |N1F   }|N2G   <Fine>]|E7 <D.C. al 2nd ending>|A7 <rit.>|D7 <D.S. al 1st ending>Z',
+        );
+        expect(song.diagnostics.map(({ message }) => message).slice(0, 3)).toEqual([
+            'A staff-text instruction ("D.C. al 2nd ending") is preserved as text only; it is not applied to the performed order.',
+            'A staff-text instruction ("rit.") is preserved as text only; it is not applied to the performed order.',
+            'A staff-text instruction ("D.S. al 1st ending") is preserved as text only; it is not applied to the performed order.',
+        ]);
+    });
+
+    it.each([
+        [
+            'beside another jump in the chart',
+            'T44[C   <Fine>|D <D.C. al 2nd ending>|E7 <D.C. al Fine>Z',
+        ],
+        [
+            'as a D.S. with no segno',
+            'T44{C   |N1F   }|N2G   <Fine>]|E7 <D.S. al 2nd ending>|A7   Z',
+        ],
+        [
+            'as a D.S. with two segnos',
+            'T44[SD   |{C   |N1F   }|N2G   <Fine>]|SE7 <D.S. al 2nd ending>|A7   Z',
+        ],
+    ])('keeps an al-ending as text %s', (_, body) => {
+        expectImportedAsBefore(body);
     });
 
     it('imports a chart with a free-text playback-flavored comment as a note, rather than blocking it', () => {

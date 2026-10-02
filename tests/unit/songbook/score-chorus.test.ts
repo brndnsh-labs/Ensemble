@@ -74,6 +74,10 @@ function ds(destination: ScoreDestination): ScoreDirection {
     return { kind: 'jump', from: 'segno', segno: 'sign', destination, repeats: 'skip' };
 }
 
+function dc(destination: ScoreDestination): ScoreDirection {
+    return { kind: 'jump', from: 'start', destination, repeats: 'skip' };
+}
+
 describe('chorus count (#1472)', () => {
     it('plays the form once per chorus, numbering each visit from chorus 0', () => {
         const score = { ...scoreFixture([bar('a'), bar('b')]), choruses: 3 };
@@ -131,8 +135,36 @@ describe('chorus count (#1472)', () => {
         });
         // 256 × 64 is exactly 16,384 performed measures; one more bar a chorus is 64 too many.
         expect(compileScoreForm(form(256))).toHaveLength(16_384);
+        // Fewer choruses is a way out for a counted chart, so the message names it.
         expect(() => compileScoreForm(form(257))).toThrow(
-            /beyond the playback limit of 16,384 measures/,
+            'This chart expands beyond the playback limit of 16,384 measures. Reduce repeats or choruses.',
+        );
+        // An uncounted chart's message is the one it always had (the differential compares it).
+        const { choruses: _, ...uncounted } = form(257);
+        uncounted.sections[0].measures[0].start = [{ kind: 'repeat-start' }];
+        uncounted.sections[0].measures[256].end = [{ kind: 'repeat-end', times: 64 }];
+        expect(() => compileScoreForm(uncounted)).toThrow(
+            /^This chart expands beyond the playback limit of 16,384 measures\. Reduce repeats\.$/,
+        );
+        // One chorus alone is over the limit: fewer choruses cannot help, so it is not offered.
+        expect(() => compileScoreForm({ ...uncounted, choruses: 2 })).toThrow(
+            /^This chart expands beyond the playback limit of 16,384 measures\. Reduce repeats\.$/,
+        );
+    });
+
+    it('takes a D.C. al 2nd ending in every chorus (#1473)', () => {
+        const chart = scoreFixture([
+            bar('a', [{ kind: 'repeat-start' }]),
+            bar('one', [{ kind: 'ending-start', passes: [1] }], [{ kind: 'repeat-end', times: 2 }]),
+            bar('two', [{ kind: 'ending-start', passes: [2] }], [{ kind: 'fine', label: 'stop' }]),
+            bar('bridge'),
+            bar('jump', [], [dc({ kind: 'ending', pass: 2 })]),
+        ]);
+        const once = ids(chart);
+        expect(once).toEqual(['a', 'one', 'a', 'two', 'bridge', 'jump', 'a', 'two']);
+        expect(byChorus({ ...chart, choruses: 3 })).toEqual([once, once, once]);
+        expect(compileScoreForm({ ...chart, choruses: 3 }).map(({ chorus }) => chorus)).toEqual(
+            [0, 1, 2].flatMap((chorus) => Array(once.length).fill(chorus)),
         );
     });
 });

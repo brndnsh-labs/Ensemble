@@ -274,7 +274,7 @@ test('semantic revision conflicts keep both takes, and unsupported imports never
         ],
     });
     const beforeImport = await documents(second);
-    // A valid chart the form compiler can't perform yet: a D.C. al 2nd ending.
+    // A valid chart the form compiler refuses: a D.C. al 2nd ending with no Fine to stop at.
     const unsupported = structuredClone(copy);
     const measures = unsupported.chart.score.sections[0].measures;
     measures[0].start = [{ kind: 'repeat-start' }];
@@ -290,7 +290,7 @@ test('semantic revision conflicts keep both takes, and unsupported imports never
         mimeType: 'application/json',
         buffer: Buffer.from(JSON.stringify(unsupported)),
     });
-    await expect(second.locator('.error-banner')).toContainText('not supported yet');
+    await expect(second.locator('.error-banner')).toContainText('needs a Fine');
     expect(await documents(second)).toEqual(beforeImport);
     await expect(second.locator('.bar').first().locator('.chord')).toHaveText(['F', 'G7']);
 });
