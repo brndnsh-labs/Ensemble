@@ -6,9 +6,25 @@
  *
  * The synth voices are mocked out: this suite is about scheduling and timing, not sound, and a
  * fake `AudioContext` has none of the nodes the real voices need.
+ *
+ * Also the counted chart (#1475): N choruses played once, then the host stops by itself.
  */
-import { compileTimeline, DEFAULT_SETTINGS, secondsAt, type Timeline } from '@band/index';
-import type { ScoreEvent, ScoreMeasure, SemanticScore } from '@engine/songbook/score-types';
+import {
+    type BandEvent,
+    compileTimeline,
+    DEFAULT_SETTINGS,
+    type PassMemory,
+    performPass,
+    secondsAt,
+    type Timeline,
+    toMidi,
+} from '@band/index';
+import type {
+    ScoreDirection,
+    ScoreEvent,
+    ScoreMeasure,
+    SemanticScore,
+} from '@engine/songbook/score-types';
 import type { EnsembleState } from '@engine/types';
 import { describe, expect, it, vi } from 'vitest';
 import { BandHost, countInPlan } from './band-host';
@@ -217,3 +233,327 @@ describe('BandHost count-in scheduling', () => {
         host.stop();
     });
 });
+
+/**
+ * A chart that counts its choruses (#1475): the band plays them once, with the last-chorus
+ * coda on the final one, and stops at the end of its final bar; export renders that same
+ * performance. Without a count, the same chart loops forever and never reaches the coda.
+ */
+describe('BandHost counted choruses', () => {
+    const lastChorus: ScoreDirection = {
+        kind: 'last-chorus',
+        destination: { kind: 'coda', via: 'to-coda', target: 'coda' },
+    };
+    /** a1 a2, "To Coda, last chorus" at a2's end, then a one-bar coda straight after. */
+    const codaSong = (choruses?: number): SemanticScore => {
+        const chart = song([
+            {
+                id: 'a',
+                label: 'A',
+                repeat: 1,
+                measures: [
+                    bar('a1', [chord('C', 4)]),
+                    {
+                        ...bar('a2', [chord('G7', 4)]),
+                        end: [{ kind: 'coda', label: 'to-coda' }, lastChorus],
+                    },
+                ],
+            },
+            {
+                id: 'coda',
+                label: 'Coda',
+                repeat: 1,
+                measures: [
+                    { ...bar('c1', [chord('C', 4)]), start: [{ kind: 'coda', label: 'coda' }] },
+                ],
+            },
+        ]);
+        return choruses === undefined ? chart : { ...chart, choruses };
+    };
+    const BPM = 120;
+    /** 4/4 at 120: two seconds a bar. */
+    const BAR_S = 2;
+
+    type Queued = { window: { from: number }; events: BandEvent[] };
+
+    /** Pump the host every 50 ms of audio time from `from` up to (not including) `to`. */
+    function run(
+        host: BandHost,
+        audio: ReturnType<typeof fakeAudioContext>,
+        from: number,
+        to: number,
+    ): void {
+        for (let t = from; t < to - 1e-9; t += 0.05) {
+            audio.currentTime = t;
+            pump(host);
+        }
+    }
+
+    /** Every segment the host queues, in order (read off its private queue after each pump). */
+    function watchSegments(host: BandHost): () => Queued[] {
+        const seen: Queued[] = [];
+        const internals = host as unknown as { segments: Queued[]; pump(): void };
+        const original = internals.pump.bind(host);
+        internals.pump = () => {
+            original();
+            for (const segment of internals.segments) {
+                if (!seen.includes(segment)) {
+                    seen.push(segment);
+                }
+            }
+        };
+        return () => seen;
+    }
+
+    it('plays every chorus, the coda only in the last, and stops at the end of its final bar', () => {
+        const audio = fakeAudioContext(10);
+        const state = fakeState(audio);
+        const onEnd = vi.fn();
+        const host = new BandHost({ state: () => state, silence: () => {}, onEnd });
+        const score = codaSong(2);
+        host.setScore(score);
+        const segments = watchSegments(host);
+        host.start(drumsOnly, BPM, 0, null);
+        const start = 10.1;
+        const timeline = compileTimeline(score);
+        // a1 a2 | a1 a2 c1: the coda is the last chorus's alone.
+        expect(timeline.bars.map((b) => [b.visit.label, b.visit.chorus])).toEqual([
+            ['A', 0],
+            ['A', 0],
+            ['A', 1],
+            ['A', 1],
+            ['Coda', 1],
+        ]);
+        const end = start + secondsAt(timeline, timeline.ticks, BPM);
+        expect(end).toBeCloseTo(start + 5 * BAR_S, 9);
+
+        run(host, audio, start, end);
+        // A hair before the last barline the band is still playing the coda.
+        expect(onEnd).not.toHaveBeenCalled();
+        expect(host.playing).toBe(true);
+        expect(host.songTick()).toBeGreaterThan(timeline.bars[4].start);
+
+        audio.currentTime = end;
+        pump(host);
+        expect(onEnd).toHaveBeenCalledTimes(1);
+        expect(host.playing).toBe(false);
+        expect(host.songTick()).toBeNull();
+
+        // One segment per chorus; every bar was performed, the coda bar included.
+        expect(segments().map((s) => s.window.from)).toEqual([0, 2]);
+        const bars = new Set(segments().flatMap((s) => s.events.map((e) => e.bar)));
+        expect([...bars].sort()).toEqual([0, 1, 2, 3, 4]);
+    });
+
+    it('without a count loops the same chart forever and never takes the coda', () => {
+        const audio = fakeAudioContext(10);
+        const state = fakeState(audio);
+        const onEnd = vi.fn();
+        const host = new BandHost({ state: () => state, silence: () => {}, onEnd });
+        host.setScore(codaSong());
+        expect(compileTimeline(codaSong()).bars.map((b) => b.visit.label)).toEqual(['A', 'A']);
+        const segments = watchSegments(host);
+        host.start(drumsOnly, BPM, 0, null);
+        run(host, audio, 10.1, 10.1 + 4 * 2 * BAR_S);
+        expect(onEnd).not.toHaveBeenCalled();
+        expect(host.playing).toBe(true);
+        expect(segments().length).toBeGreaterThanOrEqual(4);
+        host.stop();
+    });
+
+    it('a practice loop on a counted chart ignores the count and keeps looping', () => {
+        const audio = fakeAudioContext(10);
+        const state = fakeState(audio);
+        const onEnd = vi.fn();
+        const host = new BandHost({ state: () => state, silence: () => {}, onEnd });
+        const score = codaSong(2);
+        host.setScore(score);
+        const barTicks = compileTimeline(score).bars[0].meter.barTicks;
+        host.start(drumsOnly, BPM, 0, { from: 0, to: barTicks });
+        run(host, audio, 10.1, 10.1 + 8 * BAR_S);
+        expect(onEnd).not.toHaveBeenCalled();
+        expect(host.playing).toBe(true);
+        host.stop();
+    });
+
+    it('leaving a practice loop carries the counted performance on to its end', () => {
+        const audio = fakeAudioContext(10);
+        const state = fakeState(audio);
+        const onEnd = vi.fn();
+        const host = new BandHost({ state: () => state, silence: () => {}, onEnd });
+        const score = codaSong(2);
+        host.setScore(score);
+        const segments = watchSegments(host);
+        const barTicks = compileTimeline(score).bars[0].meter.barTicks;
+        host.start(drumsOnly, BPM, 0, { from: 0, to: barTicks });
+        run(host, audio, 10.1, 10.1 + 2.5 * BAR_S);
+        host.setLoop(null);
+        // The lap under way (the third) ends 3 bars in; then the rest of chorus 1 (a2), then
+        // chorus 2 (a1 a2 c1): 7 bars in all. (The fourth lap, queued two seconds ahead, was
+        // dropped when the loop was released.)
+        const end = 10.1 + 7 * BAR_S;
+        run(host, audio, 10.1 + 2.5 * BAR_S, end);
+        expect(onEnd).not.toHaveBeenCalled();
+        expect(
+            segments()
+                .slice(-2)
+                .map((s) => s.window.from),
+        ).toEqual([1, 2]);
+        audio.currentTime = end;
+        pump(host);
+        expect(onEnd).toHaveBeenCalledTimes(1);
+    });
+
+    it('released in the last bar of the last section, it plays once more with the ending, then stops', () => {
+        // No barline is left in the lap to change at: the section plays once more as written,
+        // ending, rather than stopping dead on a fill back to its top.
+        const audio = fakeAudioContext(10);
+        const state = fakeState(audio);
+        const onEnd = vi.fn();
+        const host = new BandHost({ state: () => state, silence: () => {}, onEnd });
+        const score = { ...song([{ ...twoBars.sections[0] }]), choruses: 1 };
+        host.setScore(score);
+        const timeline = compileTimeline(score);
+        const segments = watchSegments(host);
+        host.start(drumsOnly, BPM, 0, { from: 0, to: timeline.ticks });
+        // Into the second lap's last bar (laps are two bars, from 10.1 s), then release.
+        run(host, audio, 10.1, 10.1 + 3.25 * BAR_S);
+        host.setLoop(null);
+        const end = 10.1 + 6 * BAR_S;
+        run(host, audio, 10.1 + 3.25 * BAR_S, end);
+        expect(onEnd).not.toHaveBeenCalled();
+        const last = segments().at(-1) as unknown as { looping: boolean; ends: boolean };
+        expect(last.looping).toBe(false);
+        expect(last.ends).toBe(true);
+        audio.currentTime = end;
+        pump(host);
+        expect(onEnd).toHaveBeenCalledTimes(1);
+    });
+
+    it('released on the last section, the lap under way plays the ending, then stops', () => {
+        // One chorus of a1 a2: a loop on A is a loop on the chart's last section.
+        const audio = fakeAudioContext(10);
+        const state = fakeState(audio);
+        const onEnd = vi.fn();
+        const host = new BandHost({ state: () => state, silence: () => {}, onEnd });
+        const score = { ...song([{ ...twoBars.sections[0] }]), choruses: 1 };
+        host.setScore(score);
+        const timeline = compileTimeline(score);
+        const loop = { from: 0, to: timeline.ticks };
+        host.start(drumsOnly, BPM, 0, loop);
+        // Into the second lap's first bar, then release: its second bar can still change.
+        run(host, audio, 10.1, 10.1 + 2.25 * BAR_S);
+        const internals = host as unknown as {
+            segments: {
+                pass: number;
+                looping: boolean;
+                ends: boolean;
+                events: BandEvent[];
+                snapshots: PassMemory[];
+            }[];
+        };
+        const lap = internals.segments.find((s) => s.pass === 1)!;
+        host.setLoop(null);
+        expect(lap.looping).toBe(false);
+        expect(lap.ends).toBe(true);
+        // Its last bar is now what a performance's last bar plays: the ending, not the fill
+        // back to the top that a lap plays.
+        const ending = performPass(timeline, drumsOnly, {
+            pass: 1,
+            looping: false,
+            memory: lap.snapshots[1],
+            window: { from: 1, to: 2, wrapTo: 0, origin: 0 },
+        });
+        const looped = performPass(timeline, drumsOnly, {
+            pass: 1,
+            looping: true,
+            memory: lap.snapshots[1],
+            window: { from: 1, to: 2, wrapTo: 0, origin: 0 },
+        });
+        const lastBar = JSON.stringify(lap.events.filter((e) => e.bar === 1));
+        expect(lastBar).toBe(JSON.stringify(ending.events));
+        expect(lastBar).not.toBe(JSON.stringify(looped.events));
+        run(host, audio, 10.1 + 2.25 * BAR_S, 10.1 + 4 * BAR_S);
+        expect(onEnd).not.toHaveBeenCalled();
+        audio.currentTime = 10.1 + 4 * BAR_S;
+        pump(host);
+        expect(onEnd).toHaveBeenCalledTimes(1);
+    });
+
+    it('exports exactly the performance it plays: three choruses and the coda', () => {
+        const audio = fakeAudioContext(10);
+        const state = fakeState(audio);
+        const host = new BandHost({ state: () => state, silence: () => {} });
+        const score = codaSong(3);
+        host.setScore(score);
+        const segments = watchSegments(host);
+        // The whole band, on the organ: a held chord is what a chorus seam could cut short.
+        const band = {
+            ...DEFAULT_SETTINGS,
+            comp: 'organ' as const,
+            lanes: { drums: true, bass: true, comp: true, lead: true },
+        };
+        host.start(band, BPM, 0, null);
+        run(host, audio, 10.1, 10.1 + 7 * BAR_S + 0.1);
+        expect(host.playing).toBe(false);
+
+        const { events, timeline } = host.render(band);
+        expect(timeline.bars).toHaveLength(7); // a1 a2 three times, then c1
+        // The export is the performance as one whole pass — the band's own one-shot, made
+        // independently of the host's chorus-at-a-time generation — and it is what played.
+        const whole = performPass(compileTimeline(score), band, { pass: 0, looping: false });
+        expect(JSON.stringify(events)).toBe(JSON.stringify(whole.events));
+        expect(new Set(events.map((e) => e.lane))).toEqual(
+            new Set(['drums', 'bass', 'comp', 'lead']),
+        );
+        expect(JSON.stringify(events)).toBe(
+            JSON.stringify(segments().flatMap((segment) => segment.events)),
+        );
+        const onsets = noteOnTicks(toMidi(events, timeline, { bpm: BPM }));
+        const coda = timeline.bars[6];
+        // The file runs three choruses and the coda: notes in the coda's bar, none past it.
+        expect(onsets.some((tick) => tick >= coda.start)).toBe(true);
+        expect(Math.max(...onsets)).toBeLessThan(timeline.ticks);
+        expect(timeline.ticks).toBe(7 * coda.meter.barTicks);
+    });
+});
+
+/** Every note-on's absolute tick in a type-1 file (the band's writer: no running status). */
+function noteOnTicks(bytes: Uint8Array): number[] {
+    const out: number[] = [];
+    let at = 14;
+    while (at < bytes.length) {
+        const length =
+            (bytes[at + 4] << 24) | (bytes[at + 5] << 16) | (bytes[at + 6] << 8) | bytes[at + 7];
+        const end = at + 8 + length;
+        let i = at + 8;
+        let tick = 0;
+        const readLength = () => {
+            let value = 0;
+            let b: number;
+            do {
+                b = bytes[i++];
+                value = (value << 7) | (b & 0x7f);
+            } while (b & 0x80);
+            return value;
+        };
+        while (i < end) {
+            tick += readLength();
+            const status = bytes[i++];
+            if (status === 0xff) {
+                i++;
+                const skip = readLength();
+                i += skip;
+            } else if ((status & 0xf0) === 0xc0) {
+                i++;
+            } else {
+                if ((status & 0xf0) === 0x90 && bytes[i + 1] > 0) {
+                    out.push(tick);
+                }
+                i += 2;
+            }
+        }
+        at = end;
+    }
+    return out;
+}

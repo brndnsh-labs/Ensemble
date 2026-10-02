@@ -43,9 +43,9 @@ The ground-up replacement for the generative engine, the default since 2026-09-2
 | :--- | :--- | :--- |
 | `band/index.ts` | Public surface for hosts. | `compileTimeline`, `performPass`, `toMidi`, `STYLES` |
 | `band/perform.ts` | The engine: one pass of the song, lanes in order, then feel. | `performPass` |
-| `band/form/timeline.ts` | SemanticScore → performed bars in ticks (form, holds, N.C., fermatas, meters, phrases). | `compileTimeline`, `secondsAt` |
+| `band/form/timeline.ts` | SemanticScore → performed bars in ticks (form, holds, N.C., fermatas, meters, phrases; a counted chart's every chorus). | `compileTimeline`, `secondsAt`, `chorusBars` |
 | `band/theory/chord.ts` | The one chord authority: symbol → `ChordFacts` (tones, family, guides, scale). | `parseChord`, `chordPcs` |
-| `band/arrange/cycle.ts` | What each pass is for: head, solo choruses, or turns traded with the player. | `leadRole`, `CYCLE` |
+| `band/arrange/cycle.ts` | What each pass (or counted chorus) is for: head, solo choruses, or turns traded with the player. | `leadRole`, `CYCLE` |
 | `band/arrange/plan.ts` | Per-bar energy, lanes, fills, crashes, ending, the lead's role. | `planBars`, `energyTier` |
 | `band/feel/feel.ts` | The timing law: swing geometry, lane lean, seeded character. | `applyFeel` |
 | `band/styles/index.ts` | Style registry; each style is one file (`rock.ts`, `jazz.ts`, `funk.ts`, `bossa.ts`, `blues.ts`, `reggae.ts`, `country.ts`, `hiphop.ts`, `disco.ts`, `neosoul.ts`, `metal.ts`, `skapunk.ts`, `acoustic.ts`): feel + drums, bass and comp (keyboard and guitar) idioms, and a lead book where the style has one. | `STYLES`, `feelFor` |
@@ -55,7 +55,7 @@ The ground-up replacement for the generative engine, the default since 2026-09-2
 | `band/sinks/midi.ts` | BandEvent[] → Standard MIDI File. | `toMidi` |
 | `band/test/` | Fixture charts, the invariant suite, the critique (`critique/harness.ts` metric library; `claims/<id>.ts` one claims file per style). | `FIXTURES`, `defineClaims`, `METRICS` |
 | `scripts/band-render.ts` | `npm run band:render` — `.mid` + text grid from node. | CLI |
-| `prototypes/v2/lib/band-host.ts` | Live host for the band engine: segments on the audio clock, regenerate-at-barline, voice adapter (`playBandEvent`) onto today's synth/sample voices, metronome. Driven only by `runtime.ts`. | `BandHost`, `playBandEvent` |
+| `prototypes/v2/lib/band-host.ts` | Live host for the band engine: segments on the audio clock, regenerate-at-barline, voice adapter (`playBandEvent`) onto today's synth/sample voices, metronome. A counted chart plays its choruses once, a chorus per segment, then stops (`onEnd`). Driven only by `runtime.ts`. | `BandHost`, `playBandEvent` |
 | `prototypes/v2/lib/band-export.ts` | The offline render of band events (`renderBandPasses`: passes back to back through `band-host.ts`'s `playBandEvent` against an `OfflineAudioContext`, raw channel data out) and the WAV/stem export built on it, so an export matches live playback. Stems are drums/bass/chords (the comp)/soloist (the lead). | `renderBandPasses`, `renderBandMixToWav`, `renderBandStemsToWav` |
 | `prototypes/v2/lib/band-voices.ts` | The app's names for the band's parts: genre → style, lane sound → comp/lead instrument. Type-only imports, so `scripts/band-scene.ts` reads the same tables in node. | `STYLE_FOR_GENRE`, `COMP_FOR_VOICE`, `LEAD_FOR_VOICE` |
 | `prototypes/v2/lib/render-bridge.ts` | The listening-gate tools' page side, on `window.ensemble`: renders band events it is handed through `renderBandPasses` on pinned lane sounds, returns channels plus a dispatch tap. Installed by `runtime.ts` only in a `NEXT_PUBLIC_RENDER_BRIDGE=1` build. | `installRenderBridge` |

@@ -5400,6 +5400,9 @@ export default function Ensemble() {
                             onTitle={(title) => draft({ ...current, title })}
                             onSongMeter={changeSongMeter}
                             onSongMode={(isMinor) => change(() => runtime.setMode(isMinor), true)}
+                            onChoruses={(choruses) =>
+                                change(() => runtime.setChoruses(choruses), true)
+                            }
                             onSelectMeasure={setMeasureId}
                             onPendingChange={(pending) => {
                                 pendingText.current = pending;

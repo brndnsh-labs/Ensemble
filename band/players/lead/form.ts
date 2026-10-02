@@ -6,7 +6,7 @@
  * and the last phrase of the third winds down so the head can come back in.
  */
 import type { EnergyTier } from '../../arrange/plan.js';
-import type { Timeline } from '../../form/timeline.js';
+import { chorusBars, type Timeline } from '../../form/timeline.js';
 
 export type Density = 'sparse' | 'mid' | 'busy';
 
@@ -40,12 +40,16 @@ export function soloArc(
     energy: EnergyTier,
 ): Arc {
     const bars = timeline.bars;
+    // The arc spans one chorus: of a counted chart, the chorus this slot is in (#1475).
+    const { first, end } = chorusBars(timeline, slotStart);
+    const length = end - first;
+    const chorusStart = bars[first].start;
+    const chorusTicks = bars[end - 1].start + bars[end - 1].meter.barTicks - chorusStart;
     const slotLength = bars[slotStart].phrase.length;
-    const through = bars[slotStart].start / timeline.ticks;
-    const lastSlot = slotStart + slotLength >= bars.length;
+    const through = (bars[slotStart].start - chorusStart) / chorusTicks;
+    const lastSlot = slotStart + slotLength >= end;
     const secondLast =
-        !lastSlot &&
-        slotStart + slotLength + bars[slotStart + slotLength].phrase.length >= bars.length;
+        !lastSlot && slotStart + slotLength + bars[slotStart + slotLength].phrase.length >= end;
     let arc: Arc;
     if (chorus === 1) {
         arc = {
@@ -61,11 +65,11 @@ export function soloArc(
             peak: false,
             windDown: false,
         };
-    } else if (lastSlot && bars.length > slotLength) {
+    } else if (lastSlot && length > slotLength) {
         arc = { density: 'mid', register: 0, peak: false, windDown: true };
     } else {
         // The peak is the phrase before the wind-down (or the only phrase of a short chart).
-        const peak = secondLast || bars.length <= slotLength;
+        const peak = secondLast || length <= slotLength;
         arc = { density: 'busy', register: 3, peak, windDown: false };
     }
     const lift = energy === 'low' ? -1 : energy === 'high' ? 1 : 0;

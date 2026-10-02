@@ -92,10 +92,12 @@ const shuffleKit = drumIdiom({
         // heard: four on the floor without stepping on the snare).
         const feather = ctx.rng('feather', 'section').chance(0.6);
         const drive = feather ? `${kick.slice(0, 4)}g${kick.slice(5, 12)}g${kick.slice(13)}` : kick;
-        // From a section's second visit on, the shuffle moves to the ride, hat foot on 2 and
-        // 4 — the band digs in as the form repeats (a chorus that's already been heard once),
-        // rather than a coin flip with no reason tied to the music. `visit.pass` is the same
-        // for every bar of one visit, so the whole chorus commits together, not bar by bar.
+        // On a section's second WRITTEN pass (its `repeat` count, `visit.pass`), the shuffle
+        // moves to the ride, hat foot on 2 and 4 — the band digs in as the written form repeats,
+        // rather than a coin flip with no reason tied to the music. It is not the loop's lap nor
+        // a counted chart's chorus (both restart the written passes), so a single written
+        // 12-bar blues never reaches the ride. `visit.pass` is the same for every bar of one
+        // visit, so the whole section commits together, not bar by bar.
         return ctx.bar.visit.pass >= 1
             ? { ride: 'x.o.x.o.x.o.x.o.', hatPedal: '....x.......x...', kick: drive, snare }
             : { ...hat('X.o.X.o.X.o.X.o.'), kick: drive, snare };

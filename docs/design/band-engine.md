@@ -186,13 +186,35 @@ expression devices take turns rather than stack; one peak note per cycle.
       trade as paused, and says why (`runtime.tradeBlocked`, mirroring the plan's gate). A pass
       resumed at a barline (a settings change) trades exactly as the full pass, and changing
       the trade mid-turn replans the turn (the lead keys a trade's plan by its shape).
-    - `.mid` and WAV export render the first time through, so they never contain a trade.
+    - `.mid` and WAV export render the first time through, so they never contain a trade —
+      unless the chart counts its choruses, when they render every chorus (below).
     - Why it isn't automatic: an earlier cut had the band trade fours with the drummer on
       its own after three solo choruses. Brandon's call: the band dropping out unasked doesn't
       fit a practice app. Trading is something the player asks for.
   - The cycle is the arrangement's (`arrange/cycle.ts`): the plan carries each bar's lead role
     (`BarPlan.lead`), so the lead, the drummer and the rhythm section agree on whose turn it
     is.
+  - **A counted chart** (`SemanticScore.choruses`, #1475) is one timeline holding every chorus,
+    played once as pass 0. Each bar's chorus is added to the pass (`planBars`'s `passAt`), and
+    every seed, a solo's arc, its opening breath and a looping book's recalled phrase are keyed
+    by the bar's place in its chorus (`chorusBars`), so chorus k plays what lap k of a loop
+    plays: the head, then solos or trades, the pass lift, trading turns counted from each
+    chorus's top.
+  - **It ends on the out-head.** With two or more choruses the last is the head whatever the
+    cycle has reached, and a trade hands back to the band for it (`leadRole`'s
+    `inFinalChorus`): the last chorus of a performance is the melody restated, and a coda or
+    tag hangs off the head, never off a solo. It keeps its pass lift and seeds; only the lead's
+    job changes, so the out-head restates the in-head note for note up to its closing cadence
+    (the head is keyed by section; in its last phrase the in-head leads on into the next
+    chorus, the out-head resolves). The chorus before it never brings the head back
+    (`beforeFinalChorus`): a head that returns mid-performance is there to set up more
+    blowing, and right before the out-head it would only be the melody twice — so a solo
+    there becomes the arc's third, wind-down chorus and a trade runs on — and the solos wind
+    down once: were the chorus before that a third chorus too, it holds the build as a second
+    (a 6-chorus chart: head, 1, 2, 2, 3, head). The solo arc is not otherwise compressed to
+    fit the choruses between (a 4-chorus chart plays solos 1 and 2 of the arc, then the head). Its
+    last bar plays the held ending a non-looping pass always has. An uncounted chart's chorus
+    is always 0 and it has no last chorus, so it plays exactly as before.
 - **Phrases, and the space between them.** Each four-bar phrase of the timeline is a slot the
   lead plays in or rests in. A phrase is planned whole at its first bar and kept in memory, so
   any barline can resume it. Most slots leave room: a phrase plays two or three bars and
@@ -257,9 +279,33 @@ schedules everything due in the next 150 ms on a 25 ms timer.
 - **A staged genre** is committed at once; `setGenre` then waits for the barline where the band
   first plays it (`BandHost.changeHeard`), so "Switching feel at the next bar" reads true.
 - **The chart pointer** follows `songTick()` to the written event under it (`slotAt`).
+- **A counted chart** (#1475) is not looped: the host performs its timeline once, generating a
+  chorus per segment (`PassOptions.until`: the rest of the window still plans the next bar and
+  the ending), each resuming from the memory the one before left. A chunk plays on past its
+  end — at least one bar, and on while the comp has neither struck again nor reached an N.C. or
+  a bar it sits out — and drops those bars, so what the whole pass does across a chorus seam
+  (an organ chord held to its next strike or to a rest, a keyboard voice yielding to the lead)
+  happens live too: the chunks join into the one-shot pass, event for event. (A seam is
+  therefore not a loop wrap, which can do neither.) A sustaining comp (the organ) re-presses
+  at the top of each chorus of a counted chart, as an organist re-articulates where the form
+  starts over, so the look always finds a strike by the next chorus's first bar. It is still
+  bounded at the end of the next chorus — chunks are generated on the main thread inside the
+  scheduler's 150 ms lookahead, so a chunk may cost at most two choruses' bars — but on a real
+  comp that cap never binds: the chunks join into the one-shot pass with no exception (a comp
+  that never struck again would have its hold end at the cap). When the last segment's
+  final bar ends, the host stops by itself and calls `onEnd`; the runtime brings the transport
+  to stopped by Stop's own path, except that the last notes ring out (as an export's release
+  tail does) instead of being cut. A practice loop ignores the count; released, the
+  performance carries on from the bar after it to its end — and released on the chart's last
+  section, the lap under way plays the ending from its next barline (or, with no barline left
+  in it, the section plays once more as written) and the band stops. `render()` builds the
+  export the same chorus at a time, so it is exactly the performance that plays.
 
-A pass is generated on the main thread (about 5–7 ms for 32 bars on a desktop), two seconds
-before it is needed.
+A pass is generated on the main thread, two seconds before it is needed: about 8 ms for 32
+bars with all four lanes (rhythm changes in jazz, measured 2026-10-02 on the dev box), and
+about the same for one chorus of a counted chart however long it is (7–8 ms for a 32-bar
+chorus of a 64-chorus chart, whose look across the seam is one bar). Lookups by tick (`chordAt`, `spanIndexAt`) are binary searches, so a bar's cost does
+not grow with how far into the performance it is.
 
 Audio (WAV/stem) export renders `BandHost.render()`'s events offline (`lib/band-export.ts`)
 through `playBandEvent`, the same voice mapping `BandHost` schedules live with, feel offsets

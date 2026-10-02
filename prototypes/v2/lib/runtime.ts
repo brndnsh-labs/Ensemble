@@ -175,7 +175,11 @@ let drumWarmup: ReturnType<typeof setTimeout> | null = null;
 let bandView: BandChart | null = null;
 
 function bandHost(): BandHost {
-    band ??= new BandHost({ state: getState, silence: () => void killAllNotes(getState()) });
+    band ??= new BandHost({
+        state: getState,
+        silence: () => void killAllNotes(getState()),
+        onEnd: endPerformance,
+    });
     return band;
 }
 
@@ -322,14 +326,20 @@ function warmDrums(): void {
 // Short enough that a warm-up task never holds a frame, even when the CPU is shared.
 const DRUM_WARM_SLICE_MS = 4;
 
-function stopBand(): void {
+/**
+ * `ringOut` lets the notes already sounding finish instead of cutting them: only the end of a
+ * counted performance (`endPerformance`) asks for it.
+ */
+function stopBand(ringOut = false): void {
     band?.stop();
     if (getState().playback.isPlaying) {
         param('playback', 'isPlaying', false);
     }
     dispatch(ACTIONS.SET_START_STEP, 0);
     stopPlatformAudioAndWakeLock();
-    void killAllNotes(getState());
+    if (!ringOut) {
+        void killAllNotes(getState());
+    }
 }
 
 /**
@@ -568,12 +578,28 @@ export function initialize(): Promise<void> {
 }
 
 export function stop(): void {
+    halt(false);
+}
+
+/**
+ * A counted chart's last chorus has played its final bar (#1475): the band has stopped by
+ * itself, so the transport goes to stopped by the same path as pressing Stop — the UI reads
+ * stopped exactly when the band falls silent. One difference: the last notes ring out rather
+ * than being cut at the barline, as they do at the end of the exported performance
+ * (`band-export.ts` renders a release tail after the final bar). Stop is the musician
+ * interrupting; this is the song ending.
+ */
+function endPerformance(): void {
+    halt(true);
+}
+
+function halt(ringOut: boolean): void {
     playIntent++;
     // #1211 — Stop always releases an armed/live practice loop; the drill is a
     // performance-mode overlay on the transport, not a setting that survives it.
     // Stop the band before clearing the loop, so the loop change can't restart it.
     if (band?.playing || getState().playback.isPlaying) {
-        stopBand();
+        stopBand(ringOut);
     }
     clearPracticeLoop();
 }
@@ -1241,6 +1267,31 @@ export function setMode(isMinor: boolean): void {
     }
     const wasPlaying = getState().playback.isPlaying;
     editScore({ ...clone(currentScore), isMinor });
+    if (wasPlaying) {
+        startBand();
+    }
+}
+/**
+ * How many choruses the song plays before the band stops (#1475): `score.choruses`, 1–16 from
+ * the Edit panel. `undefined` is Loop, the default — the field is removed, so the band loops
+ * the form forever as every chart did before. Measure-based charts only, like Song mode
+ * beside it; a playing band restarts from the top, as a mode change does.
+ */
+export function setChoruses(choruses: number | undefined): void {
+    if (!currentScore) {
+        throw new Error('Open a measure-based chart first.');
+    }
+    if (currentScore.choruses === choruses) {
+        return;
+    }
+    const wasPlaying = getState().playback.isPlaying;
+    const next = clone(currentScore);
+    if (choruses === undefined) {
+        delete next.choruses;
+    } else {
+        next.choruses = choruses;
+    }
+    editScore(next);
     if (wasPlaying) {
         startBand();
     }

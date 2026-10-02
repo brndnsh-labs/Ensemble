@@ -287,10 +287,100 @@ function impliedTensions(spans: ChordSpan[]): void {
     });
 }
 
+const CHORUSES = new WeakMap<Timeline, { first: number; end: number }[]>();
+
+/**
+ * The bars of the chorus bar `index` belongs to: `first` up to (not including) `end`. A counted
+ * chart (`SemanticScore.choruses`, #1475) unrolls every chorus into one timeline, and what the
+ * band shapes over "the song" — a solo chorus's arc — is one chorus of it, as it is one lap of
+ * an uncounted chart, whose single chorus is the whole timeline. So a bar's place in the form
+ * is `index - first`: what the band keys its choices on, so chorus k plays what lap k plays.
+ */
+export function chorusBars(timeline: Timeline, index: number): { first: number; end: number } {
+    let byBar = CHORUSES.get(timeline);
+    if (!byBar) {
+        const spans: { first: number; end: number }[] = [];
+        byBar = [];
+        for (const bar of timeline.bars) {
+            const last = spans.at(-1);
+            if (last && timeline.bars[last.first].visit.chorus === bar.visit.chorus) {
+                last.end = bar.index + 1;
+            } else {
+                spans.push({ first: bar.index, end: bar.index + 1 });
+            }
+            byBar.push(spans[spans.length - 1]);
+        }
+        CHORUSES.set(timeline, byBar);
+    }
+    return byBar[index] ?? { first: 0, end: timeline.bars.length };
+}
+
+/**
+ * Is bar `index` in the last chorus of a counted performance of two or more choruses? An
+ * uncounted chart's one chorus loops, so it has no last one; nor does a single counted chorus.
+ */
+export function inFinalChorus(timeline: Timeline, index: number): boolean {
+    const last = timeline.bars.at(-1)?.visit.chorus ?? 0;
+    return last > 0 && timeline.bars[index].visit.chorus === last;
+}
+
+/**
+ * Is bar `index` in the chorus `ahead` choruses before the last of a counted performance (1:
+ * the one that leads into the out-head)? Never, for an uncounted chart, or for the first
+ * chorus (which is always the head).
+ */
+export function beforeFinalChorus(timeline: Timeline, index: number, ahead = 1): boolean {
+    const last = timeline.bars.at(-1)?.visit.chorus ?? 0;
+    return last > ahead && timeline.bars[index].visit.chorus === last - ahead;
+}
+
+/**
+ * The index of the first span starting after `tick` (`spans.length` if none). Spans are in
+ * order of their starts, so this is a binary search: a counted chart's timeline holds every
+ * chorus, and a scan from the top would make each lookup cost the whole performance so far.
+ */
+export function firstSpanAfter(timeline: Timeline, tick: number): number {
+    const { spans } = timeline;
+    let lo = 0;
+    let hi = spans.length;
+    while (lo < hi) {
+        const mid = (lo + hi) >> 1;
+        if (spans[mid].start <= tick) {
+            lo = mid + 1;
+        } else {
+            hi = mid;
+        }
+    }
+    return lo;
+}
+
+/**
+ * The index of the first span sounding at `tick`, or -1 — what `spans.findIndex` over
+ * `start <= tick < end` answers, without the scan (`firstSpanAfter`). What the searches rely
+ * on: spans are sorted by start, and two spans overlap, if at all, by a few ticks at a
+ * barline. That happens when a bar's durations are not whole ticks (a 1/7 of a quarter rounds
+ * to 69 ticks, and seven of them overrun the bar): the last span then ends just past the next
+ * bar's first span's start (the timeline absorbs the rounding there). The walk back finds that
+ * earlier span first, as the scan did — on every chart in the corpus the search returns what
+ * the scan returned (pinned by the property test in `timeline.test.ts`).
+ */
+export function spanIndexAt(timeline: Timeline, tick: number): number {
+    const { spans } = timeline;
+    let first = firstSpanAfter(timeline, tick) - 1;
+    while (first > 0 && spans[first - 1].end > tick) {
+        first--;
+    }
+    for (let i = Math.max(first, 0); i < spans.length && spans[i].start <= tick; i++) {
+        if (tick < spans[i].end) {
+            return i;
+        }
+    }
+    return -1;
+}
+
 /** The chord sounding at a tick (N.C. → null). */
 export function chordAt(timeline: Timeline, tick: number): ChordFacts | null {
-    const span = timeline.spans.find((s) => s.start <= tick && tick < s.end);
-    return span?.chord ?? null;
+    return timeline.spans[spanIndexAt(timeline, tick)]?.chord ?? null;
 }
 
 /** Seconds from tick 0 to `tick` at `bpm`, honouring fermata stretches. */

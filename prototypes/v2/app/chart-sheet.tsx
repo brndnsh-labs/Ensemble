@@ -269,11 +269,15 @@ export function ChartSheet({
                             const notes = writtenBar?.annotations ?? [];
                             const measureRepeat =
                                 writtenBar?.content.kind === 'repeat' ? writtenBar.content : null;
+                            // A last-chorus coda (#1472) is navigation too: "To Coda, last
+                            // chorus" tells the musician where the final chorus goes.
                             const navigation = [
                                 ...(writtenBar?.start ?? []),
                                 ...(writtenBar?.end ?? []),
                             ].filter((mark) =>
-                                ['segno', 'coda', 'fine', 'jump'].includes(mark.kind),
+                                ['segno', 'coda', 'fine', 'jump', 'last-chorus'].includes(
+                                    mark.kind,
+                                ),
                             );
                             const owningSection = writtenSections.get(measure.sectionId ?? '');
                             const sectionSeam =
