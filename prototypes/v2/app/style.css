@@ -3018,6 +3018,52 @@ html[data-theme="stage"] {
     color: var(--muted-soft);
     font-variant-numeric: tabular-nums;
 }
+/* #1477 — the Collections group: a small heading, then the user's collections and "New collection".
+   A long collection name ellipsizes rather than widening the rail. */
+.filter-heading {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 14px 11px 2px;
+}
+.filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.filter-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.filter-new {
+    color: var(--muted);
+    font-style: normal;
+}
+.collection-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+.collection-bar h2 {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+    font-size: 17px;
+    overflow-wrap: anywhere;
+}
+.collection-delete-also {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 13px;
+    margin: 10px 0;
+}
 .all-songs-content {
     min-width: 0;
 }
@@ -3083,6 +3129,20 @@ html[data-theme="stage"] {
         flex-direction: row;
         flex-wrap: wrap;
         position: static;
+    }
+    .filter-heading {
+        flex-basis: 100%;
+        margin: 6px 11px 0;
+    }
+    .filter-group {
+        flex-direction: row;
+        flex-wrap: wrap;
+        flex-basis: 100%;
+        min-width: 0;
+    }
+    .filter-item {
+        max-width: 100%;
+        min-width: 0;
     }
     .az-index {
         flex-direction: row;

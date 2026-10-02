@@ -1,4 +1,4 @@
-import type { AccountScope } from './protocol';
+import { AccountChangedError, type AccountScope } from './protocol';
 import { copyScope } from './records';
 import type { AccountSongbook } from './repository';
 import { type SaveTransport, sendNext } from './send';
@@ -29,6 +29,12 @@ export interface OutboxPassResult {
      */
     resumeAfterDocumentId: string | null;
     counts: { idle: number; committed: number; conflict: number; retry: number; refused: number };
+    /**
+     * The COLLECTION share of `counts.committed` and `counts.conflict` (#1477 review R1) — a
+     * subset, never a separate pile. The sync loop tells the two kinds apart because only a SONG
+     * moving is worth re-reading the whole library for; a star uploading is not.
+     */
+    collections: { committed: number; conflict: number };
 }
 
 /**
@@ -47,16 +53,33 @@ async function outboxPage(
     songbook: AccountSongbook,
     scope: AccountScope,
     afterDocumentId: string | undefined,
-): Promise<{ documents: Array<{ documentId: string }>; nextAfterDocumentId: string | null }> {
+): Promise<{
+    documents: Array<{ documentId: string; collection: boolean }>;
+    nextAfterDocumentId: string | null;
+}> {
     const options = {
         limit: OUTBOX_PAGE_LIMIT,
         ...(afterDocumentId === undefined ? {} : { afterDocumentId }),
     };
     const songs = await songbook.list(scope, options);
-    const collections = await songbook.collectionPage(scope, options);
-    const merged = [...songs.songs, ...collections.collections]
-        .map((record) => ({ documentId: record.documentId }))
-        .sort((a, b) => (a.documentId < b.documentId ? -1 : a.documentId > b.documentId ? 1 : 0));
+    // The collections half has an error boundary of its own (#1477): one collection row this
+    // build cannot read must not stop every SONG from uploading, which is what a rejected page
+    // did. The pass then walks songs alone — every collection waits, none is lost, and the read
+    // is tried again on the next pass. A moved fence is not such a failure: it still ends the
+    // pass, as it does everywhere.
+    const collections = await songbook.collectionPage(scope, options).catch((error: unknown) => {
+        if (error instanceof AccountChangedError) {
+            throw error;
+        }
+        return { collections: [], nextAfterDocumentId: null };
+    });
+    const merged = [
+        ...songs.songs.map((record) => ({ documentId: record.documentId, collection: false })),
+        ...collections.collections.map((record) => ({
+            documentId: record.documentId,
+            collection: true,
+        })),
+    ].sort((a, b) => (a.documentId < b.documentId ? -1 : a.documentId > b.documentId ? 1 : 0));
     const documents = merged.slice(0, OUTBOX_PAGE_LIMIT);
     const more =
         merged.length > OUTBOX_PAGE_LIMIT ||
@@ -104,9 +127,10 @@ export async function runOutboxPass(
     const { afterDocumentId, signal } = options;
     const incomingCursor = afterDocumentId ?? null;
     const counts = { idle: 0, committed: 0, conflict: 0, retry: 0, refused: 0 };
+    const collections = { committed: 0, conflict: 0 };
 
     if (signal?.aborted) {
-        return { kind: 'aborted', resumeAfterDocumentId: incomingCursor, counts };
+        return { kind: 'aborted', resumeAfterDocumentId: incomingCursor, counts, collections };
     }
 
     const page = await outboxPage(songbook, scope, afterDocumentId);
@@ -115,7 +139,7 @@ export async function runOutboxPass(
     // so the whole page is discarded and the pass reports exactly the progress it started
     // with — never a page's worth of songs the caller never asked to visit.
     if (signal?.aborted) {
-        return { kind: 'aborted', resumeAfterDocumentId: incomingCursor, counts };
+        return { kind: 'aborted', resumeAfterDocumentId: incomingCursor, counts, collections };
     }
 
     let cursor = incomingCursor;
@@ -130,6 +154,9 @@ export async function runOutboxPass(
         // transport retry, and must reject this call rather than resolve as lost progress.
         const outcome = await sendNext(songbook, scope, song.documentId, transport);
         counts[outcome] += 1;
+        if (song.collection && (outcome === 'committed' || outcome === 'conflict')) {
+            collections[outcome] += 1;
+        }
         if (outcome === 'retry') {
             // The cursor stays before this document, whether or not abort also fired: the
             // frozen operation is unresolved either way, and resumption must retry it, not
@@ -138,16 +165,17 @@ export async function runOutboxPass(
                 kind: signal?.aborted ? 'aborted' : 'retry',
                 resumeAfterDocumentId: cursor,
                 counts,
+                collections,
             };
         }
         // idle / committed / conflict / refused: this document is safely visited.
         cursor = song.documentId;
         if (signal?.aborted) {
-            return { kind: 'aborted', resumeAfterDocumentId: cursor, counts };
+            return { kind: 'aborted', resumeAfterDocumentId: cursor, counts, collections };
         }
     }
 
     return page.nextAfterDocumentId === null
-        ? { kind: 'complete', resumeAfterDocumentId: null, counts }
-        : { kind: 'more', resumeAfterDocumentId: page.nextAfterDocumentId, counts };
+        ? { kind: 'complete', resumeAfterDocumentId: null, counts, collections }
+        : { kind: 'more', resumeAfterDocumentId: page.nextAfterDocumentId, counts, collections };
 }

@@ -94,6 +94,11 @@ function timestamp(value: unknown): value is string {
     );
 }
 
+/** Can a collection hold this as a song id? The decoder's own rule, for a caller filtering input. */
+export function isCollectionSongId(value: unknown): value is string {
+    return safeString(value, MAX_ID_LENGTH);
+}
+
 /** Does this candidate claim to be a collection at all? A chart carries no `kind`. */
 export function isCollectionCandidate(candidate: unknown): boolean {
     return (
@@ -245,4 +250,148 @@ export function newCollection(name: string, songIds: string[] = []): CollectionD
         updatedAt: now,
         songIds,
     });
+}
+
+/**
+ * A built-in collection asked to do what only a user collection may (#1477 review R2): be deleted,
+ * renamed, lose its built-in mark — or a user collection asked to become one. Refused by STORAGE,
+ * not just by the UI, because a deleted Starred is a tombstone on its fixed id: every device's
+ * next lazy create of it would then meet `remote: null`, and Starred would split.
+ */
+export class BuiltInCollectionError extends Error {
+    constructor(action: 'deleted' | 'changed') {
+        super(
+            action === 'deleted'
+                ? 'Starred is built in and can’t be deleted.'
+                : 'Starred is built in: it can’t be renamed, and no other collection can become it.',
+        );
+    }
+}
+
+/** Throws `BuiltInCollectionError` when `next` would rename or un-mark a built-in, or mint one. */
+export function assertBuiltInKept(
+    previous: CollectionDocument | null,
+    next: CollectionDocument,
+): void {
+    if (previous === null) {
+        return;
+    }
+    if (previous.builtIn !== next.builtIn || (previous.builtIn && previous.name !== next.name)) {
+        throw new BuiltInCollectionError('changed');
+    }
+}
+
+/**
+ * The built-in Starred collection's id (#1477), the same in every songbook — guest and account
+ * alike. Fixed rather than minted, because Starred is created LAZILY on whichever device stars a
+ * song first: two devices that each star offline both create THIS id, so the second Save meets the
+ * first as an ordinary revision conflict that `mergeSongIds` resolves
+ * (`AccountSongbook.mergeCollectionConflicts`). Two random ids would be two Starred collections
+ * forever. Document ids are unique per owner, never across owners, so one constant serves all.
+ */
+export const STARRED_COLLECTION_ID = 'collection-starred';
+export const STARRED_NAME = 'Starred';
+
+/** A new, unsaved Starred collection holding these songs, at its fixed id. */
+export function newStarred(songIds: string[]): CollectionDocument {
+    return {
+        ...newCollection(STARRED_NAME, songIds),
+        id: STARRED_COLLECTION_ID,
+        builtIn: 'starred',
+    };
+}
+
+/**
+ * The Starred collection among these, or null when none exists yet — it is created on the first
+ * star, never before (#1477: an account at the document cap must not be handed a Save it cannot
+ * take). The fixed id wins; any other built-in Starred — one a `'gone'` conflict re-created under
+ * a fresh id (`AccountSongbook.mergeCollectionConflicts`) — is the fallback.
+ */
+export function starredOf<T extends { document: CollectionDocument }>(
+    collections: readonly T[],
+): T | null {
+    return (
+        collections.find((entry) => entry.document.id === STARRED_COLLECTION_ID) ??
+        collections.find((entry) => entry.document.builtIn === 'starred') ??
+        null
+    );
+}
+
+/**
+ * The merge a conflicted collection Save resolves by (#1477, decided on #1443): the union of the
+ * two lists — this device's own order first, then the ids only the other side has, in ITS order.
+ * It never asks and never drops a song either side holds: for Starred that is always right (a star
+ * made on either device survives), and for a user collection it never loses a song. The one thing
+ * a union cannot keep is a REMOVAL made on one side while the other still held the id — that song
+ * comes back, the cheaper of the two mistakes.
+ *
+ * **The cap (#1477 review R7).** A collection holds at most `MAX_COLLECTION_SONGS` ids, so a union
+ * of two full lists must drop some. What is dropped is deterministic: every local id is kept in
+ * its order, then remote-only ids in THEIR order until the cap, so two devices merging the same
+ * pair agree on the result. Dropping ids of songs known to be DELETED before live ones would be
+ * better, but this device cannot tell them apart cheaply: a downloaded tombstone removes the song
+ * record and leaves no local trace, so a deleted song looks exactly like one that has not
+ * downloaded yet, and pruning on "does not resolve here" would throw live songs away on a fresh
+ * device. The cap is hard to reach in practice: the account holds at most 2,000 documents in all,
+ * collections included, so a union past 2,000 ids is mostly dead ids already.
+ */
+export function mergeSongIds(local: readonly string[], remote: readonly string[]): string[] {
+    const merged = [...local];
+    const seen = new Set(local);
+    for (const id of remote) {
+        if (!seen.has(id)) {
+            seen.add(id);
+            merged.push(id);
+        }
+    }
+    return merged.slice(0, MAX_COLLECTION_SONGS);
+}
+
+/**
+ * This collection with one song added at the end, or removed — null when that changes nothing,
+ * so a caller queues no Save for a star that is already a star. Adding past the cap throws the
+ * sentence a musician reads.
+ */
+export function withSong(
+    document: CollectionDocument,
+    songId: string,
+    present: boolean,
+): CollectionDocument | null {
+    const has = document.songIds.includes(songId);
+    if (has === present) {
+        return null;
+    }
+    if (present && document.songIds.length >= MAX_COLLECTION_SONGS) {
+        throw new Error(
+            `“${document.name}” already holds ${MAX_COLLECTION_SONGS} songs, the most a collection can.`,
+        );
+    }
+    return {
+        ...document,
+        songIds: present
+            ? [...document.songIds, songId]
+            : document.songIds.filter((id) => id !== songId),
+    };
+}
+
+/**
+ * The songs in `collectionId` that are in no OTHER collection — what a collection delete's
+ * "also delete the N songs that are in no other collection" option would remove (#1443 decision
+ * 3). Starred counts as another collection: a starred song is kept. Only songs that resolve are
+ * candidates (`resolved`), in the collection's own order.
+ */
+export function songsOnlyIn(
+    collectionId: string,
+    collections: ReadonlyArray<{ document: CollectionDocument; resolvedSongIds: string[] }>,
+): string[] {
+    const target = collections.find((entry) => entry.document.id === collectionId);
+    if (!target) {
+        return [];
+    }
+    const elsewhere = new Set(
+        collections
+            .filter((entry) => entry.document.id !== collectionId)
+            .flatMap((entry) => entry.document.songIds),
+    );
+    return target.resolvedSongIds.filter((id) => !elsewhere.has(id));
 }

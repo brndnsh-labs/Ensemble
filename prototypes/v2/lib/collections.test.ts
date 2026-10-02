@@ -11,10 +11,16 @@ import {
     type CollectionDocument,
     decodeCollection,
     MAX_COLLECTION_SONGS,
+    mergeSongIds,
     newCollection,
+    newStarred,
     resolvedSongIds,
+    STARRED_COLLECTION_ID,
+    songsOnlyIn,
+    starredOf,
     validateAnyDocument,
     validateCollection,
+    withSong,
 } from './collections';
 import { planLibraryDownload } from './sync/download';
 import { collectionSnapshot, digest, syncDocument } from './sync/protocol';
@@ -215,5 +221,75 @@ describe('planLibraryDownload with collections', () => {
         ]);
         expect(plan.unchanged).toEqual(['e']);
         expect(plan.documents).toEqual({ required: 1, mirrored: 0 });
+    });
+});
+
+describe('Starred and the conflict merge (#1477)', () => {
+    it('merges by union: local order first, then the ids only the other side has', () => {
+        expect(mergeSongIds(['b', 'a', 'c'], ['d', 'a', 'e', 'b'])).toEqual([
+            'b',
+            'a',
+            'c',
+            'd',
+            'e',
+        ]);
+        // Never drops a song either side holds, and never duplicates one.
+        expect(mergeSongIds([], ['x'])).toEqual(['x']);
+        expect(mergeSongIds(['x'], [])).toEqual(['x']);
+    });
+
+    it('caps a merge at the collection limit, keeping this device’s own songs first', () => {
+        const local = Array.from({ length: MAX_COLLECTION_SONGS }, (_, i) => `l-${i}`);
+        const merged = mergeSongIds(local, ['r-1']);
+        expect(merged).toHaveLength(MAX_COLLECTION_SONGS);
+        expect(merged).toEqual(local);
+    });
+
+    it('adds a song at the end or removes it, and answers null when nothing would change', () => {
+        const start = collection({ songIds: ['a'] });
+        expect(withSong(start, 'b', true)?.songIds).toEqual(['a', 'b']);
+        expect(withSong(start, 'a', false)?.songIds).toEqual([]);
+        expect(withSong(start, 'a', true)).toBeNull();
+        expect(withSong(start, 'b', false)).toBeNull();
+        expect(() =>
+            withSong(
+                collection({
+                    songIds: Array.from({ length: MAX_COLLECTION_SONGS }, (_, i) => `s-${i}`),
+                }),
+                'one-more',
+                true,
+            ),
+        ).toThrow(/already holds/);
+    });
+
+    it('a new Starred lives at the fixed id, built in, and decodes', () => {
+        const starred = newStarred(['a']);
+        expect(starred.id).toBe(STARRED_COLLECTION_ID);
+        expect(starred.builtIn).toBe('starred');
+        expect(decodeCollection(starred).kind).toBe('ok');
+        // And it is what the account will sync: the fixed id is a sync identifier.
+        expect(collectionSnapshot(starred).id).toBe(STARRED_COLLECTION_ID);
+    });
+
+    it('finds Starred by its fixed id first, then by its built-in mark', () => {
+        const fixed = { document: newStarred([]) };
+        const moved = { document: collection({ id: 'fresh', builtIn: 'starred' }) };
+        const plain = { document: collection({ id: 'set' }) };
+        expect(starredOf([plain, moved, fixed])).toBe(fixed);
+        expect(starredOf([plain, moved])).toBe(moved);
+        expect(starredOf([plain])).toBeNull();
+    });
+
+    it('counts only the songs in no OTHER collection — Starred counts as one', () => {
+        const entries = [
+            {
+                document: collection({ id: 'gig', songIds: ['a', 'b', 'c', 'gone'] }),
+                resolvedSongIds: ['a', 'b', 'c'],
+            },
+            { document: collection({ id: 'practice', songIds: ['b'] }), resolvedSongIds: ['b'] },
+            { document: newStarred(['c']), resolvedSongIds: ['c'] },
+        ];
+        expect(songsOnlyIn('gig', entries)).toEqual(['a']);
+        expect(songsOnlyIn('missing', entries)).toEqual([]);
     });
 });

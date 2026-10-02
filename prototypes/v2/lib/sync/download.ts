@@ -240,6 +240,12 @@ export interface LibraryDownloadResult {
     missing: string[];
     /** Only what a retry could still fix. A quarantined body is in `unsupported`, not here. */
     failures: LibraryDownloadFailure[];
+    /**
+     * The COLLECTIONS among `advanced`, `removed` and `retainedDeleted` (#1477 review R1) — a
+     * subset of those three, listed apart because only a SONG changing is worth re-reading the
+     * whole library for; a collection that moved only needs the collections re-read.
+     */
+    collections: string[];
     /** Present after a 429: epoch ms, on this run's clock, before which nothing should retry. */
     backoffUntil?: number;
     /**
@@ -562,6 +568,7 @@ async function libraryDownloadPass(
 
     const failures: LibraryDownloadFailure[] = [];
     const missing: string[] = [];
+    const collectionsChanged: string[] = [];
     const buckets: Record<ReconcileOutcome, string[]> = {
         advanced: [],
         candidate: [],
@@ -616,6 +623,7 @@ async function libraryDownloadPass(
         absent,
         missing,
         failures,
+        collections: collectionsChanged,
         ...(backoffUntil === undefined ? {} : { backoffUntil }),
         documents,
     });
@@ -787,6 +795,9 @@ async function libraryDownloadPass(
             expectedRemoteRevision: planned.expectedRemoteRevision,
         });
         buckets[result].push(outcome.documentId);
+        if (result === 'advanced' || result === 'removed' || result === 'retained-deleted') {
+            collectionsChanged.push(outcome.documentId);
+        }
     };
     const collectionIds = new Set(
         [...plan.fetch, ...plan.tombstone]
