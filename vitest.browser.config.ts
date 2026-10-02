@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import { playwright } from '@vitest/browser-playwright';
 import { defineConfig } from 'vitest/config';
 
@@ -17,6 +18,13 @@ export default defineConfig({
     // static-assets dir and emit "served at the root path" noise for every
     // engine module. We serve no static assets here, so disable it.
     publicDir: false,
+    // The glob below also picks up the account-storage tests `vitest.sync.config.ts` lists, so
+    // this config needs what they need: the preview's engine alias and Next's inlined base path
+    // (see that config).
+    resolve: {
+        alias: { '@engine': fileURLToPath(new URL('./public', import.meta.url)) },
+    },
+    define: { 'process.env.NEXT_PUBLIC_BASE_PATH': JSON.stringify('/v2') },
     test: {
         include: ['tests/browser/**/*.test.ts'],
         browser: {
