@@ -470,6 +470,8 @@
         "unasserted",
         "unreviewable",
         "pointerdown",
+        "pointerup",
+        "pointerleave",
         "touchend",
         "focusout",
         "mattpocock",

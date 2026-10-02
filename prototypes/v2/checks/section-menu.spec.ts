@@ -87,6 +87,55 @@ test('Loop this section arms the same loop the long-press gesture does, and togg
     await expect(sectionA).toHaveAttribute('aria-pressed', 'false');
 });
 
+/**
+ * #1496: a hold is timed by a 500ms timer, and when the main thread is busy across that timer's
+ * due time both engines handle the queued release FIRST, so a real hold read as a tap and opened
+ * the menu (CI caught it on a loaded WebKit runner). The stall injected here starts after the
+ * press and ends after the release, which reproduces that on every run.
+ */
+test('a hold the page was too busy to time still arms the loop, and a tap through a stall is still a tap (#1496)', async ({
+    page,
+}) => {
+    await newTwoSectionSong(page);
+    const sectionA = page.getByRole('button', {
+        name: 'Section A · hold to practice-loop',
+        exact: true,
+    });
+    // Blocks the main thread for `forMs`, starting `afterMs` into the next press only.
+    const stallNextPress = (afterMs: number, forMs: number) =>
+        page.evaluate(
+            ([afterMs, forMs]) => {
+                window.addEventListener(
+                    'pointerdown',
+                    () => {
+                        window.setTimeout(() => {
+                            const end = performance.now() + forMs;
+                            while (performance.now() < end) {
+                                // busy: nothing else on the page runs until the release has queued
+                            }
+                        }, afterMs);
+                    },
+                    { capture: true, once: true },
+                );
+            },
+            [afterMs, forMs],
+        );
+
+    // A 600ms hold: the timer comes due at 500ms inside a stall from 450ms to 750ms, and the
+    // release queues behind that stall at 600ms.
+    await stallNextPress(450, 300);
+    await sectionA.click({ delay: 600 });
+    await expect(sectionA).toHaveAttribute('aria-pressed', 'true');
+    await expect(sectionA).toHaveAttribute('aria-expanded', 'false');
+
+    // A 100ms tap held up past the 500ms mark by a stall from 50ms to 700ms is still a tap: it
+    // opens the menu and leaves the loop alone.
+    await stallNextPress(50, 650);
+    await sectionA.click({ delay: 100 });
+    await expect(sectionA).toHaveAttribute('aria-expanded', 'true');
+    await expect(sectionA).toHaveAttribute('aria-pressed', 'true');
+});
+
 test('Start here starts a stopped song from that section', async ({ page }) => {
     await newTwoSectionSong(page);
     const sectionB = page.getByRole('button', {

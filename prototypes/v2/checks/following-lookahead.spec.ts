@@ -743,7 +743,9 @@ test('the jump-ahead fires in the last felt beat (not the downbeat), and fires a
 test('data-next wraps inside an active practice loop, keeping both bars visible since they fit together', async ({
     page,
 }) => {
-    test.setTimeout(40_000);
+    // Sixteen bars at 240bpm plus the setup; under contention the whole test took up to 50s,
+    // nearly all of it the starved audio clock (#1496).
+    test.setTimeout(75_000);
     // A 3-bar loop (the section's earlier size) never scrolls its own start out of view in the
     // first place, so `scrollForJump`'s "keep both if they fit" branch was never actually
     // exercised — the loop start was already on screen and the effect returned early before ever
@@ -759,17 +761,18 @@ test('data-next wraps inside an active practice loop, keeping both bars visible 
     await buildLookaheadChart(page, { sectionCBars: 16, sectionDBars: 8 });
     await startHere(page, 'C');
     await pollSamples(page, (s) => s.activeId === 'C1');
-    // "Start here" on a section this far into a much longer chart triggers a real (SMOOTH, not
-    // instant) scroll of its own to bring C1 into view — give it time to settle before a
-    // long-press, whose synthetic pointerdown/pointerup land at FIXED coordinates: a still-moving
-    // page under a 600ms hold can carry the section letter out from under them.
-    await page.waitForTimeout(500);
-    // Arm the loop on C while already inside it (long-press, the same gesture as #1211/#1422).
-    await sectionLetter(page, 'C').click({ delay: 600 });
+    // Arm the loop on C while already inside it, with the section letter's 'L' key: the same
+    // toggle the long-press reaches, without a gesture to time. A long-press here raced the stand
+    // (#1496): Playwright holds a MOUSE at fixed coordinates, and the follow scroll at the next
+    // row change can carry the letter out from under it mid-hold, which cancels the hold. The
+    // gesture itself is pinned by `section-menu.spec.ts` and `semantic-playback.spec.ts`.
+    await sectionLetter(page, 'C').press('l');
     await expect(sectionLetter(page, 'C')).toHaveAttribute('aria-pressed', 'true');
     // Confirm the precondition: three rows into the section, its own start has actually scrolled
-    // out of view — otherwise this test would not be exercising anything P2-4 didn't.
-    await pollSamples(page, (s) => s.activeId === 'C13');
+    // out of view — otherwise this test would not be exercising anything P2-4 didn't. Twelve bars
+    // are twelve seconds at 240bpm, but a CPU-starved WebKit's audio clock can run at under half
+    // of real time: under contention this took up to 31s (#1496), past the poll's 20s default.
+    await pollSamples(page, (s) => s.activeId === 'C13', { timeoutMs: 45_000 });
     expect(
         await inView(page, 'C1'),
         'the loop start should have scrolled out of view three rows into a 16-bar section',
