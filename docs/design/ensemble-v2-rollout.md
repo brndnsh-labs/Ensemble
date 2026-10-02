@@ -74,6 +74,12 @@ a further product decision.
    - **S5 — root-scope offline install and the web manifest move to phase 5.** v2 already has a
      verified service worker at `/v2/` scope; root scope is the basePath flip and the v1-worker
      handover.
+   - **Amendment — DECISION 2026-10-02 (Brandon, #1478): one exception** to the account sync
+     loop running only on events: a one-shot retry at the end of a rate-limit back-off, only while
+     attached, visible and with work queued. A whole-playlist import queues a thousand Saves from
+     one gesture against a 120-a-minute budget, so no later user action exists to resume it. Every
+     other failure still waits for a real trigger. Details: `ensemble-v2-sync.md`, "A
+     rate-limited upload resumes by itself".
 10. **Account deletion ships in phase 3 (#1271)**, pulled forward from stage 7: accounts do not
     launch without a way out.
 11. **Storage posture before prod registration (#1256, closed 2026-09-17).** Accept the

@@ -161,10 +161,20 @@ table, Save, read and delete routes; and the same per-owner document cap.
   bumps `libraryVersion` once for the import and once per pass, never per song. The chip and the
   songbook count `songsWaiting` (queued SONGS, from the operations index's keys alone) so a long
   drain reads as one; `collectionOutbox` reads only collection queues for the same reason. At the
-  server's 120 Saves a minute a 1,350-song import takes at least twelve minutes of passes, and a
-  pass that meets a 429 waits for the next trigger (Save, `online`, visibility) — there is still no
-  timer, and the rate-limit sentence says exactly that (`RATE_LIMIT_RESUMES`, the one string to
-  change if the loop ever resumes by itself).
+  server's 120 Saves a minute a 1,350-song import takes at least twelve minutes of passes.
+- **A rate-limited upload resumes by itself (DECISION 2026-10-02, Brandon, #1478).** The loop's
+  one time-based trigger, amending [rollout decision 9](ensemble-v2-rollout.md): a pass that ends on
+  a 429 arms ONE timer for the end of the back-off (`armResume` in `lib/account/sync-loop.ts`), only
+  while the page is attached to that owner, visible and has work queued (Saves in the outbox, or a
+  download the limit cut short). Every pass clears it as it starts, so whichever trigger runs first
+  is the only one; detaching (sign-out, another owner) clears it. When it fires it re-checks every
+  condition against storage and otherwise does nothing — no rescheduling; a pass that meets the
+  limit again arms the next window, so an import walks through its windows and stops when the
+  queue is empty. A hidden tab resumes on the ordinary visibility trigger. Why only this: a 429 is
+  the server naming a specific wait, and a playlist import queues a thousand Saves from one gesture,
+  so there is no later musician action to wait for. Every other failure — offline, a server error,
+  a full account, an expired session — still waits for a real trigger. The sentence is
+  `RATE_LIMIT_RESUMES`.
 - **An account import waits for a verified library (#1478 review R1).** Room and duplicates are
   counted against this device's copy of the account, so a device part-way through downloading it
   is refused before anything is written ("still downloading your account library (X of Y)"):

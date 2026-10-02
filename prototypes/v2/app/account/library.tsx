@@ -38,7 +38,8 @@ const snapshot = () => accountSync.getSnapshot();
 /**
  * Attaches the loop to the signed-in owner, keeps it pointed at the chart on the stand, and
  * registers the only three passive triggers there are: `online`, a `visibilitychange` back to
- * visible, and — from the shell — an explicit Save. No timer, no background sync.
+ * visible, and — from the shell — an explicit Save. No background sync; the loop's one timer is a
+ * resume at the end of a rate-limit back-off (`armResume`, #1478), which this hook does not own.
  */
 export function useAccountLibrary(
     enabled: boolean,

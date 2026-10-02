@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AccountApi, ApiResult } from '../../../prototypes/v2/lib/account/api.js';
 import { createAccountSession } from '../../../prototypes/v2/lib/account/session.js';
 import {
@@ -2569,5 +2569,270 @@ describe('the rate-limit sentence (#1478 review R2)', () => {
         expect(SYNC_MESSAGES.rateLimited).toContain(RATE_LIMIT_RESUMES);
         expect(SYNC_MESSAGES.rateLimited).not.toMatch(/shortly|try again/i);
         expect(SYNC_MESSAGES.rateLimited.startsWith('Saved on this device')).toBe(true);
+    });
+});
+
+/**
+ * The loop's ONE time-based trigger (#1478, DECISION 2026-10-02): a rate-limited pass with work
+ * queued resumes by itself when the back-off ends — once, only while attached, visible and with
+ * work queued — and every other failure still waits for a real trigger. Fake timers and a fake
+ * server that takes 120 Saves a minute, the production Save budget.
+ */
+describe('a rate-limited upload resumes by itself when the back-off ends (#1478)', () => {
+    const page = { visibilityState: 'visible' as DocumentVisibilityState };
+
+    beforeEach(() => {
+        vi.useFakeTimers();
+        page.visibilityState = 'visible';
+        vi.stubGlobal('document', page);
+    });
+    afterEach(() => {
+        vi.unstubAllGlobals();
+        vi.useRealTimers();
+    });
+
+    /** `count` songs each with one queued Save, drained as they are acknowledged. */
+    function queue(count: number) {
+        const ids = Array.from(
+            { length: count },
+            (_, i) => `song-${String(i + 1).padStart(4, '0')}`,
+        );
+        const queued = new Set(ids);
+        /** What storage reports as waiting; null follows the queue. */
+        const waiting: { value: number | null } = { value: null };
+        const songbook = stubSongbook({
+            list: async (
+                _scope: unknown,
+                options: { afterDocumentId?: string; limit?: number } = {},
+            ) => {
+                const limit = options.limit ?? 50;
+                const rest = ids.filter(
+                    (id) => options.afterDocumentId === undefined || id > options.afterDocumentId,
+                );
+                const songs = rest
+                    .slice(0, limit)
+                    .map((documentId) => ({ documentId, remoteRevision: null }));
+                return {
+                    songs,
+                    nextAfterDocumentId: rest.length > limit ? songs.at(-1)!.documentId : null,
+                };
+            },
+            prepare: async (_scope: unknown, documentId: string) =>
+                queued.has(documentId)
+                    ? { ...PREPARED, documentId, operationId: `op-${documentId}` }
+                    : 'idle',
+            acknowledge: async (_scope: unknown, request: PreparedSave) => {
+                queued.delete(request.documentId);
+                return 'committed';
+            },
+            songsWaiting: async () => waiting.value ?? queued.size,
+            clearAccount: async () => {},
+        });
+        return { songbook, queued, waiting };
+    }
+
+    /** The account API with the server's Save budget: `perMinute` Saves a rolling minute window. */
+    function limitedApi(options: { perMinute?: number; failure?: ApiResult<unknown> } = {}) {
+        const perMinute = options.perMinute ?? 120;
+        let windowStart = Date.now();
+        let used = 0;
+        let posts = 0;
+        const api = {
+            get: vi.fn(async (path: string) =>
+                path.startsWith('/api/auth/session') ? SESSION_OK : EMPTY_MANIFEST,
+            ),
+            post: vi.fn(async (): Promise<ApiResult<unknown>> => {
+                posts += 1;
+                if (options.failure) {
+                    return options.failure;
+                }
+                if (Date.now() - windowStart >= 60_000) {
+                    windowStart = Date.now();
+                    used = 0;
+                }
+                if (used >= perMinute) {
+                    return {
+                        ok: false,
+                        error: { kind: 'code', code: 'rate_limited', status: 429 },
+                    };
+                }
+                used += 1;
+                return { ok: true, value: {}, status: 200 };
+            }),
+        } as unknown as AccountApi;
+        return { api, posts: () => posts };
+    }
+
+    /** Counts passes, and resolves when the next one finishes (its `running` goes false). */
+    function passes(loop: ReturnType<typeof createSyncLoop>) {
+        let count = 0;
+        let running = false;
+        let waiters: Array<() => void> = [];
+        loop.subscribe(() => {
+            const now = loop.getSnapshot().running;
+            if (now && !running) {
+                count += 1;
+            }
+            if (!now && running) {
+                const done = waiters;
+                waiters = [];
+                for (const resolve of done) {
+                    resolve();
+                }
+            }
+            running = now;
+        });
+        return {
+            count: () => count,
+            nextEnd: () => new Promise<void>((resolve) => waiters.push(resolve)),
+        };
+    }
+
+    async function attached(count: number, options: Parameters<typeof limitedApi>[0] = {}) {
+        const { songbook, queued, waiting } = queue(count);
+        const { api, posts } = limitedApi(options);
+        const loop = createSyncLoop(api, createAccountSession(api), songbook);
+        await loop.attach(OWNER);
+        const counter = passes(loop);
+        return { loop, queued, waiting, posts, counter };
+    }
+
+    it('runs exactly one pass when the back-off ends, and then holds no timer', async () => {
+        const { loop, posts, counter } = await attached(130);
+        await loop.run();
+        expect(loop.getSnapshot().failure?.reason).toBe('rate-limited');
+        expect(loop.getSnapshot().failure?.message).toContain(RATE_LIMIT_RESUMES);
+        expect(posts()).toBe(121);
+        expect(vi.getTimerCount()).toBe(1);
+
+        await vi.advanceTimersByTimeAsync(59_000);
+        expect(counter.count()).toBe(1);
+        const ended = counter.nextEnd();
+        await vi.advanceTimersByTimeAsync(1_000);
+        await ended;
+        expect(counter.count()).toBe(2);
+        expect(posts()).toBe(131);
+        expect(loop.getSnapshot().failure).toBeNull();
+        expect(loop.getSnapshot().songsWaiting).toBe(0);
+        expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it('never arms, or fires, for an empty queue', async () => {
+        // Rate-limited, and storage says nothing is left to send (another tab drained it).
+        const empty = await attached(1, { perMinute: 0 });
+        empty.waiting.value = 0;
+        await empty.loop.run();
+        expect(empty.loop.getSnapshot().failure?.reason).toBe('rate-limited');
+        expect(vi.getTimerCount()).toBe(0);
+
+        // Armed with work, and the queue empties before it fires: it does nothing.
+        const later = await attached(2, { perMinute: 0 });
+        await later.loop.run();
+        expect(vi.getTimerCount()).toBe(1);
+        later.queued.clear();
+        await vi.advanceTimersByTimeAsync(60_000);
+        expect(later.counter.count()).toBe(1);
+        expect(later.posts()).toBe(1);
+        expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it('is cleared by detaching, by another owner attaching, and by signing out', async () => {
+        for (const leave of [
+            (loop: ReturnType<typeof createSyncLoop>) => loop.detach(),
+            (loop: ReturnType<typeof createSyncLoop>) => loop.attach('owner-2'),
+            (loop: ReturnType<typeof createSyncLoop>) => loop.signOut(async () => true),
+        ]) {
+            const { loop, posts, counter } = await attached(130);
+            await loop.run();
+            expect(vi.getTimerCount()).toBe(1);
+            await leave(loop);
+            expect(vi.getTimerCount()).toBe(0);
+            await vi.advanceTimersByTimeAsync(120_000);
+            expect(counter.count()).toBe(1);
+            expect(posts()).toBe(121);
+        }
+    });
+
+    it('does not fire on a hidden page; coming back to it resumes, once', async () => {
+        const { loop, posts, counter } = await attached(300);
+        // Hidden when the limit is met: nothing is armed at all.
+        page.visibilityState = 'hidden';
+        await loop.run();
+        expect(posts()).toBe(121);
+        expect(vi.getTimerCount()).toBe(0);
+
+        // Armed while visible, hidden when it fires: it does nothing.
+        page.visibilityState = 'visible';
+        await vi.advanceTimersByTimeAsync(60_000);
+        await loop.run();
+        expect(posts()).toBe(242);
+        expect(vi.getTimerCount()).toBe(1);
+        page.visibilityState = 'hidden';
+        await vi.advanceTimersByTimeAsync(60_000);
+        expect(counter.count()).toBe(2);
+        expect(posts()).toBe(242);
+
+        // The visibility trigger (what `app/account/library.tsx` does) resumes it, and only it.
+        page.visibilityState = 'visible';
+        await loop.run();
+        expect(counter.count()).toBe(3);
+        expect(posts()).toBe(302);
+        await vi.advanceTimersByTimeAsync(120_000);
+        expect(counter.count()).toBe(3);
+        expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it('is replaced, never stacked, and a pass another trigger starts first is the only one', async () => {
+        const { loop, posts, counter } = await attached(130);
+        await loop.run();
+        expect(vi.getTimerCount()).toBe(1);
+
+        // A trigger inside the back-off sends nothing and re-arms the ONE timer.
+        await vi.advanceTimersByTimeAsync(30_000);
+        await loop.run();
+        expect(posts()).toBe(121);
+        expect(vi.getTimerCount()).toBe(1);
+
+        // The back-off passes without the timer firing yet, and a Save's pass gets there first.
+        vi.setSystemTime(Date.now() + 30_000);
+        await loop.run();
+        expect(posts()).toBe(131);
+        expect(vi.getTimerCount()).toBe(0);
+        await vi.advanceTimersByTimeAsync(120_000);
+        expect(counter.count()).toBe(3);
+    });
+
+    it('arms nothing for a failure that is not a rate limit', async () => {
+        for (const failure of [
+            { ok: false, error: { kind: 'network' } },
+            { ok: false, error: { kind: 'code', code: 'quota_exceeded', status: 409 } },
+            { ok: false, error: { kind: 'code', code: 'internal_error', status: 500 } },
+            { ok: false, error: { kind: 'code', code: 'unauthenticated', status: 401 } },
+        ] as ApiResult<unknown>[]) {
+            const { loop } = await attached(5, { failure });
+            await loop.run();
+            expect(loop.getSnapshot().failure).not.toBeNull();
+            expect(loop.getSnapshot().failure?.reason).not.toBe('rate-limited');
+            expect(vi.getTimerCount()).toBe(0);
+        }
+    });
+
+    it('walks a 300-song queue through its back-off windows, then stops', async () => {
+        const { loop, posts, counter } = await attached(300);
+        await loop.run();
+        for (let window = 0; window < 2; window += 1) {
+            expect(vi.getTimerCount()).toBe(1);
+            const ended = counter.nextEnd();
+            await vi.advanceTimersByTimeAsync(60_000);
+            await ended;
+        }
+        // 120 + 120 + 60, each full window also spending the one refused request.
+        expect(counter.count()).toBe(3);
+        expect(posts()).toBe(302);
+        expect(loop.getSnapshot().songsWaiting).toBe(0);
+        expect(loop.getSnapshot().failure).toBeNull();
+        expect(vi.getTimerCount()).toBe(0);
+        await vi.advanceTimersByTimeAsync(600_000);
+        expect(counter.count()).toBe(3);
     });
 });

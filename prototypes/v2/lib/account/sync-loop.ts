@@ -45,15 +45,24 @@ import {
  * `runOutboxPass` and `runLibraryDownload` run, and the one place that turns their outcomes into
  * facts a musician can read.
  *
- * **Event-driven, never scheduled.** A pass runs on exactly five things, all of them moments the
- * musician or the device created: an explicit Save, signing in, the `online` event, a
- * `visibilitychange` back to visible, and a cloud delete the account refused as a conflict (#1270)
- * — that last one because the refusal is otherwise a dead end, not because time passed. There is
- * no timer, no poll and no background sync registration — the rollout's decision 9 keeps this
- * deliberately small, and a loop that runs while nobody is looking is both a battery cost and a
- * class of bug (a pass firing against a half-torn-down session) that nothing in this product
+ * **Event-driven, never scheduled — with one exception.** A pass runs on exactly five things, all
+ * of them moments the musician or the device created: an explicit Save, signing in, the `online`
+ * event, a `visibilitychange` back to visible, and a cloud delete the account refused as a
+ * conflict (#1270) — that last one because the refusal is otherwise a dead end, not because time
+ * passed. There is no poll and no background sync registration — the rollout's decision 9 keeps
+ * this deliberately small, and a loop that runs while nobody is looking is both a battery cost and
+ * a class of bug (a pass firing against a half-torn-down session) that nothing in this product
  * needs. The browser events are registered by the React wrapper (`app/account/library.tsx`); this
  * module only knows `run()`.
+ *
+ * **The one time-based trigger (#1478, DECISION 2026-10-02, Brandon):** a pass that ends on a rate
+ * limit arms ONE timer for the end of the back-off (`armResume`), and only while this page is
+ * attached, visible and still has work queued. A 429 is the server naming a specific wait, not a
+ * failure that a later moment might fix; and a playlist import queues a thousand Saves from ONE
+ * gesture, drained at the server's 120 a minute, so there is no later musician action to wait for
+ * — without it the upload would stop after the first 120 songs of an open tab. Every other
+ * failure (offline, a server error, a full account, an expired session) still waits for a real
+ * trigger: none of them names a moment when trying again would work.
  *
  * **It closes #1261's known gap.** `sendNext` (`lib/sync/send.ts`) collapses every transport
  * rejection to `'retry'` — correct for the outbox, whose whole job is to keep the operation
@@ -253,13 +262,12 @@ export class LibraryUnverifiedError extends Error {}
 
 /**
  * What happens next after the server asks this device to wait (a 429), in ONE place (#1478 review
- * R2). The loop has no timer (see the header comment): the back-off only ends a pass, and the next
- * pass runs on the next trigger — coming back to the tab, coming back online, or a Save. So that is
- * what this says. Were the loop ever to resume by itself after a back-off, this sentence is the
- * only thing that changes.
+ * R2). Since 2026-10-02 the loop resumes by itself when the back-off ends — while the page is open
+ * and visible (`armResume`); a hidden tab resumes when it is shown again. The server's wait is
+ * `Retry-After` when it sends one (at most its one-minute window) or `BACKOFF_FALLBACK_MS`.
  */
 export const RATE_LIMIT_RESUMES =
-    'Uploading continues when you come back to Ensemble or save a song.';
+    'Uploading continues by itself in about a minute while Ensemble is open, or when you come back to it.';
 
 /**
  * Every failure sentence leads with the local truth. A musician whose Save was refused by the
@@ -951,7 +959,7 @@ export interface SyncLoop {
      *
      * Purely local: `AccountSongbook.keepBoth` is one transaction and sends nothing. What follows
      * is the pass it has just made possible — the queue is unblocked and holds a create nobody has
-     * sent, and the musician's own act is the trigger, because there is no timer here.
+     * sent, and the musician's own act is the trigger, because no timer waits on a conflict.
      *
      * `null` when the queue no longer holds a refused Save. The caller is then a moment stale, not
      * wrong, and the fresh observation published below is the answer.
@@ -1075,7 +1083,10 @@ export function createSyncLoop(
     let attaching: Promise<void> | null = null;
     let inFlight: Promise<void> | null = null;
     let rerun = false;
-    /** Epoch-ms floor the server asked for after a 429. No timer waits it out; the next event does. */
+    /**
+     * Epoch-ms floor the server asked for after a 429. Its end is the one moment a timer waits for
+     * (`armResume`, #1478); every pass inside it sends nothing.
+     */
     let backoffUntil = 0;
     /**
      * The live charts the last COMPLETE library download in this page load listed for the attached
@@ -1083,6 +1094,16 @@ export function createSyncLoop(
      * read the manifest (offline). Cleared with the owner.
      */
     let lastVerified: number | null = null;
+    /**
+     * The one timer this loop ever holds (#1478, DECISION 2026-10-02): a single resume at the end of
+     * a rate-limit back-off. See `armResume`. Null whenever nothing is armed.
+     */
+    let resumeTimer: ReturnType<typeof setTimeout> | null = null;
+    /**
+     * The last library download stopped on a rate limit (#1478): the manifest diff is unfinished,
+     * which is work queued even when the outbox is empty. Cleared by a download that is not.
+     */
+    let downloadOwed = false;
 
     function publish(next: Partial<SyncSnapshot>): void {
         const candidate = { ...state, ...next };
@@ -1365,8 +1386,8 @@ export function createSyncLoop(
      * document — and a sweep sends at most ONE queued Save per song (`sync/drain.ts`).
      *
      * So a song with several queued versions needs several sweeps, and this is the only place
-     * that can ask for them: there is no timer here, and the musician's next `online`,
-     * `visibilitychange` or Save may be days away. Sweeping again whenever the previous sweep
+     * that can ask for them: no timer waits on this (the one timer is a rate limit's, #1478),
+     * and the musician's next `online`, `visibilitychange` or Save may be days away. Sweeping again whenever the previous sweep
      * actually committed something is what makes "no timers" safe rather than a queue that
      * silently stalls one version short. A sweep that commits nothing ends the loop, so this
      * cannot spin; `MAX_PENDING_SAVES` is the deepest one song's queue can be, which makes it
@@ -1377,7 +1398,7 @@ export function createSyncLoop(
      * the outbox but wrong as a stop rule, and the durable record is what stops next pass from
      * re-discovering (and re-POSTing) the same rejection. A 413 and an `operation_mismatch` are
      * verdicts on ONE document, not on the server or the network, so ending the sweep there would
-     * park every song behind it behind a document no retry will ever fix — and with no timer here,
+     * park every song behind it behind a document no retry will ever fix — and with no timer for it,
      * "the next trigger" can be days away. So that one song is stepped over — `refusedDocument`
      * marks its head `status: 'refused'` (`AccountSongbook.refuse`, the same transaction shape
      * `acknowledge` uses for `'conflict'`) so `prepare()` answers `'refused'` for it from here on
@@ -1460,11 +1481,71 @@ export function createSyncLoop(
      * the musician's own work waiting to leave, and it goes out before this device spends the
      * shared request budget asking what else is out there.
      */
+    function pageVisible(): boolean {
+        return typeof document !== 'undefined' && document.visibilityState === 'visible';
+    }
+
+    function workQueued(): boolean {
+        return state.songsWaiting + state.collectionSaves > 0 || downloadOwed;
+    }
+
+    function clearResume(): void {
+        if (resumeTimer !== null) {
+            clearTimeout(resumeTimer);
+            resumeTimer = null;
+        }
+    }
+
+    /** Every condition a resume needs, asked when it is armed AND again when it fires. */
+    function resumeAllowed(mine: number, owner: string): boolean {
+        return mine === epoch && scope?.ownerId === owner && pageVisible() && workQueued();
+    }
+
+    /**
+     * Arm the ONE resume a rate-limited pass may leave behind (#1478, DECISION 2026-10-02). Called
+     * only at the end of a pass whose failure is a rate limit, with this page's epoch and owner:
+     *
+     * - only while attached to that owner at that epoch, the page visible and work queued (Saves
+     *   in the outbox, or a download the limit cut short) — never for an empty queue;
+     * - at most one: every pass clears it as it starts — whichever trigger runs first, this timer,
+     *   a Save, `online` or a visible tab, is the only one, and a pass inside the back-off re-arms
+     *   the same single timer — and `detach()` (sign-out, an owner change) clears it too;
+     * - when it fires it asks every condition again — the queue re-read from storage — and that the
+     *   back-off has passed, and otherwise does nothing — no rescheduling. A tab hidden at that moment resumes through the
+     *   ordinary visibility trigger; a pass that meets the limit again arms the next window, so a
+     *   big import walks through its windows and stops when the queue is empty.
+     */
+    function armResume(mine: number, owner: string): void {
+        // Never a second timer: only the end of a pass arms one, and every pass cleared the last
+        // one as it started (`pass`). That clear IS the one-per-window rule.
+        const wait = backoffUntil - Date.now();
+        if (wait <= 0 || !resumeAllowed(mine, owner)) {
+            return;
+        }
+        resumeTimer = setTimeout(() => {
+            resumeTimer = null;
+            void (async () => {
+                if (Date.now() < backoffUntil || !resumeAllowed(mine, owner)) {
+                    return;
+                }
+                // The queue as storage has it NOW — another tab may have drained it meanwhile.
+                await observe();
+                if (!resumeAllowed(mine, owner)) {
+                    return;
+                }
+                await loop.run();
+            })().catch(() => {});
+        }, wait);
+    }
+
     async function pass(): Promise<void> {
         const current = scope;
         if (!current) {
             return;
         }
+        // Whatever started this pass, it is the one: a resume armed by an earlier pass must not
+        // run a second (`armResume`).
+        clearResume();
         const mine = epoch;
         let refusal: Refusal | null = null;
         const transport = capturing(createSaveTransport(api, session), (captured) => {
@@ -1596,6 +1677,7 @@ export function createSyncLoop(
                         // longer `Retry-After` than this one carries.
                         backoffUntil = Math.max(backoffUntil, result.backoffUntil);
                     }
+                    downloadOwed = result.backoffUntil !== undefined;
                     publish({ documents: result.documents });
                     if (
                         result.documents.required !== null &&
@@ -1624,6 +1706,11 @@ export function createSyncLoop(
                 ...(collectionsChanged ? { collectionsVersion: state.collectionsVersion + 1 } : {}),
             });
             await observe();
+            // The one time-based trigger, and only for a rate limit (#1478): after `observe()`, so
+            // the queued-work counts it asks about are this pass's.
+            if (mine === epoch && failure?.reason === 'rate-limited') {
+                armResume(mine, current.ownerId);
+            }
         } finally {
             // Whatever happened — including an early return on a superseded epoch — this pass is
             // no longer running. A stuck `running` flag would leave the chip claiming an upload
@@ -1661,6 +1748,8 @@ export function createSyncLoop(
                 scope = next;
                 backoffUntil = 0;
                 lastVerified = null;
+                downloadOwed = false;
+                clearResume();
                 publish({
                     owner: ownerId,
                     failure: null,
@@ -1689,6 +1778,8 @@ export function createSyncLoop(
             scope = null;
             backoffUntil = 0;
             lastVerified = null;
+            downloadOwed = false;
+            clearResume();
             // `failure` is deliberately NOT cleared. The commonest reason this runs at all is a
             // session that just expired, and the sentence explaining that a Save is still owed is
             // the one thing a musician needs at that moment. `attach()` clears it on the way back
@@ -1964,8 +2055,8 @@ export function createSyncLoop(
                 // the record still names the revision the server refused, and while the chart is
                 // on the stand a download pass can only preserve a candidate, never advance the
                 // record past it. So a pass is asked for here — the musician's own act is the
-                // trigger, as there is no timer — and the sentence names the step that actually
-                // finishes the job: close the chart, let the account sync, reopen.
+                // trigger, as no timer waits on a conflict — and the sentence names the step that
+                // actually finishes the job: close the chart, let the account sync, reopen.
                 void loop.run().catch(() => {});
                 return { kind: 'refused', retry: false, message: DELETE_MESSAGES.changed };
             }
