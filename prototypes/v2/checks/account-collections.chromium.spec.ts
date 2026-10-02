@@ -90,3 +90,79 @@ test('a guest collection arrives in the account on sign-in, and an unsent collec
     await expect(page.getByTestId('sign-out-sync')).toBeVisible();
     await page.getByTestId('sign-out-cancel').click();
 });
+
+/**
+ * #1477 review R3: a guest whose SONGS are all in the account already — here a second device,
+ * whose seeded guest songs carry the same ids the first device adopted — still has its own
+ * Starred to bring over. With no song to offer, the sign-in offer used to stay shut and the
+ * manual one said "Nothing new to add", stranding those stars on the device for good.
+ */
+test('a device whose songs are already in the account is offered its collections, once', async ({
+    page,
+    browser,
+    accountApi,
+}) => {
+    const authenticator = await addVirtualAuthenticator(page);
+    await openWithAccounts(page);
+    await expect(page.getByTestId('library-loading')).toHaveCount(0);
+    await createAccountThroughDialog(page);
+    await page.getByTestId('recovery-not-now').click();
+    await page.getByTestId('adopt-guest-confirm').click();
+    await expect(page.locator('#adopt-guest-title')).toHaveText(
+        /^Copied 3 songs into this device’s account songbook$/,
+    );
+    await page.getByTestId('adopt-guest-done').click();
+    // The songs really reached the account before the second device looks.
+    await expect(page.getByTestId('library-loading')).toHaveCount(0);
+    await page.locator('.song-link', { hasText: 'Blue pocket' }).first().click();
+    await page.getByRole('button', { name: 'Song actions' }).click();
+    await expect(page.getByTestId('sync-cloud')).toHaveText('Saved to your account');
+
+    const [passkey] = await authenticator.credentials();
+    const fresh = await browser.newContext({ baseURL: accountApi.origin });
+    try {
+        const second = await fresh.newPage();
+        const spare = await addVirtualAuthenticator(second);
+        await spare.addCredential(passkey);
+        await openWithAccounts(second);
+        await expect(second.getByTestId('library-loading')).toHaveCount(0);
+        // As a guest on this device: one star.
+        await second.getByTestId('all-songs-link').click();
+        await second.getByRole('button', { name: 'Star Blue pocket' }).click();
+        await expect(second.getByRole('button', { name: /^Starred/ })).toHaveText('Starred 1');
+        await second.getByRole('button', { name: '← Home' }).click();
+
+        await second.getByTestId('account-sign-in').click();
+        await second.getByTestId('account-do-sign-in').click();
+        await expect(second.getByTestId('account-sign-out')).toBeVisible();
+
+        // No song is missing from the account, but this device's Starred is: the offer opens on
+        // its own, about the collections alone.
+        await expect(second.locator('#adopt-guest-title')).toHaveText(
+            'Add this device’s collections to your account?',
+        );
+        await expect(second.getByTestId('adopt-guest-collections-pending')).toBeVisible();
+        await second.getByTestId('adopt-guest-collections').click();
+        await expect(second.locator('#adopt-guest-title')).toHaveText(
+            'Added 1 collection to this device’s account songbook',
+        );
+        await second.getByTestId('adopt-guest-done').click();
+
+        // The account's Starred holds the star, on the account's copy of the song.
+        await expect(second.getByTestId('library-heading')).toHaveText('Your account songbook');
+        await second.getByTestId('all-songs-link').click();
+        await expect(second.getByRole('button', { name: /^Starred/ })).toHaveText('Starred 1');
+        await second.getByRole('button', { name: /^Starred/ }).click();
+        await expect(rows(second)).toHaveText(['Blue pocket']);
+        await second.getByRole('button', { name: '← Home' }).click();
+
+        // Asked again, there is nothing left to add — songs or collections.
+        await second.getByTestId('account-open').click();
+        await second.getByTestId('account-page-adopt-guest').click();
+        await expect(second.locator('#adopt-guest-title')).toHaveText('Nothing new to add');
+        await expect(second.getByTestId('adopt-guest-collections')).toHaveCount(0);
+        await second.getByTestId('adopt-guest-close').click();
+    } finally {
+        await fresh.close();
+    }
+});

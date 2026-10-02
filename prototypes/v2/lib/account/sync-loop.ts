@@ -183,8 +183,18 @@ export interface SyncSnapshot {
      * queue, and it is zero when nothing is attached.
      */
     collectionSaves: number;
-    /** Bumped whenever a pass changed this account's stored library, so a list can re-read. */
+    /**
+     * Bumped whenever a pass changed this account's stored SONGS, so a list can re-read. Never for
+     * a collection alone (#1477 review R1): that re-read validates every song in the library, and
+     * a star uploading must not cost a 2,000-song songbook that.
+     */
     libraryVersion: number;
+    /**
+     * Bumped whenever this account's stored COLLECTIONS moved under a reader — a collection Save
+     * committed, a conflict merged, a download adopted or removed one (#1477 review R1). What the
+     * collections' own reader (`app/use-collections.ts`) re-reads on.
+     */
+    collectionsVersion: number;
 }
 
 /**
@@ -527,6 +537,7 @@ function sameSnapshot(a: SyncSnapshot, b: SyncSnapshot): boolean {
         a.documents.required === b.documents.required &&
         a.documents.verified === b.documents.verified &&
         a.libraryVersion === b.libraryVersion &&
+        a.collectionsVersion === b.collectionsVersion &&
         a.collectionSaves === b.collectionSaves &&
         sameObservation(a.observation, b.observation)
     );
@@ -821,6 +832,12 @@ export interface SyncLoop {
      */
     deleteCollection(documentId: string, owner: string | null): Promise<CloudDeleteResult>;
     /**
+     * Would `deleteCollection` go ahead right now? Null when it would, else the sentence it would
+     * refuse with — asked BEFORE a delete removes any song (#1477 review R4), so "still
+     * uploading" or a built-in stops it with nothing gone. Writes nothing.
+     */
+    collectionDeleteRefusal(documentId: string, owner: string | null): Promise<string | null>;
+    /**
      * Copy this device's #1440 `star:` rows into Starred, once (`AccountSongbook.migrateStars`).
      * Runs a pass when it queued a Save. Fenced on `owner` like every write.
      */
@@ -954,6 +971,7 @@ export function createSyncLoop(
         candidates: NO_UPDATES,
         documents: UNOBSERVED,
         libraryVersion: 0,
+        collectionsVersion: 0,
         collectionSaves: 0,
     };
     let scope: AccountScope | null = null;
@@ -1264,8 +1282,12 @@ export function createSyncLoop(
         current: AccountScope,
         transport: SaveTransport,
         refusedDocument: () => Promise<string | null>,
-    ): Promise<boolean> {
+    ): Promise<{ songs: boolean; collections: boolean }> {
+        // Two facts, never one (#1477 review R1): a song moving re-reads the whole library, a
+        // collection moving re-reads only the collections.
         let changed = false;
+        let collectionsChanged = false;
+        const outcome = () => ({ songs: changed, collections: collectionsChanged });
         for (let sweep = 0; sweep < MAX_PENDING_SAVES; sweep += 1) {
             let committed = 0;
             let cursor: string | undefined;
@@ -1274,14 +1296,18 @@ export function createSyncLoop(
                     ...(cursor === undefined ? {} : { afterDocumentId: cursor }),
                 });
                 committed += result.counts.committed;
-                changed ||= result.counts.committed > 0 || result.counts.conflict > 0;
+                changed ||=
+                    result.counts.committed > result.collections.committed ||
+                    result.counts.conflict > result.collections.conflict;
+                collectionsChanged ||=
+                    result.collections.committed > 0 || result.collections.conflict > 0;
                 if (result.kind !== 'more' || result.resumeAfterDocumentId === null) {
                     // A transport failure ends the drain outright: another sweep would only
                     // fail again on the same song, and the reason is already captured.
                     if (result.kind === 'retry' || result.kind === 'aborted') {
                         const refused = result.kind === 'retry' ? await refusedDocument() : null;
                         if (refused === null) {
-                            return changed;
+                            return outcome();
                         }
                         // Strictly past the refused song, so the page ceiling still bounds this.
                         cursor = refused;
@@ -1307,12 +1333,12 @@ export function createSyncLoop(
                     throw error;
                 }
             }
-            changed ||= merged > 0;
+            collectionsChanged ||= merged > 0;
             if (committed === 0 && merged === 0) {
-                return changed;
+                return outcome();
             }
         }
-        return changed;
+        return outcome();
     }
 
     /**
@@ -1340,6 +1366,7 @@ export function createSyncLoop(
         const backedOff = Date.now() < backoffUntil;
         publish({ running: true, sending: !backedOff });
         let changed = false;
+        let collectionsChanged = false;
         // A pass that does nothing but wait must keep SAYING it is waiting: clearing the sentence
         // here would leave the musician with a queued Save and no explanation for it.
         let failure: SyncFailure | null = backedOff
@@ -1351,7 +1378,7 @@ export function createSyncLoop(
         try {
             if (!backedOff) {
                 try {
-                    changed = await drain(current, transport, async () => {
+                    const drained = await drain(current, transport, async () => {
                         const captured = lastRefusal();
                         if (
                             captured?.error.kind !== 'code' ||
@@ -1375,6 +1402,8 @@ export function createSyncLoop(
                         newlyRefused ||= marked === 'refused';
                         return captured.documentId;
                     });
+                    changed = drained.songs;
+                    collectionsChanged = drained.collections;
                 } catch (error) {
                     if (error instanceof AccountChangedError) {
                         return;
@@ -1437,11 +1466,17 @@ export function createSyncLoop(
                     // writes nothing at all, so there is no stored library change for a re-read to
                     // find. Folding it in would bump `libraryVersion` — and re-render the songbook
                     // — every time a Save raced a download of the previous revision.
-                    changed ||=
-                        result.advanced.length > 0 ||
-                        result.removed.length > 0 ||
-                        result.candidates.length > 0 ||
-                        result.retainedDeleted.length > 0;
+                    //
+                    // A collection the download moved is the collections' re-read, not the
+                    // library's (#1477 review R1): `result.collections` is their share of these.
+                    const collectionIds = new Set(result.collections);
+                    changed ||= [
+                        ...result.advanced,
+                        ...result.removed,
+                        ...result.candidates,
+                        ...result.retainedDeleted,
+                    ].some((documentId) => !collectionIds.has(documentId));
+                    collectionsChanged ||= collectionIds.size > 0;
                     if (result.backoffUntil !== undefined) {
                         // Never shortened: the outbox half may already have met a 429 with a
                         // longer `Retry-After` than this one carries.
@@ -1465,6 +1500,7 @@ export function createSyncLoop(
             publish({
                 failure,
                 ...(changed ? { libraryVersion: state.libraryVersion + 1 } : {}),
+                ...(collectionsChanged ? { collectionsVersion: state.collectionsVersion + 1 } : {}),
             });
             await observe();
         } finally {
@@ -1641,10 +1677,12 @@ export function createSyncLoop(
         async editCollection(documentId, edit, owner) {
             const current = await ownedScope(owner);
             const saved = await songbook.editCollection(current, documentId, edit);
-            // The chip's collection count moves; `libraryVersion` deliberately does not. It means
-            // "the SONGS changed, re-read the list", and a star is not worth re-reading a
-            // 2,000-song library for — the collections' own reader re-reads after its own write.
+            // The chip's collection count moves, and `collectionsVersion` with it — so a write the
+            // collections' reader did not make itself (adopting a guest's collections) is still
+            // re-read. `libraryVersion` deliberately does not: it means "the SONGS changed,
+            // re-read the list", and a star is not worth re-reading a 2,000-song library for.
             if (saved !== null) {
+                publish({ collectionsVersion: state.collectionsVersion + 1 });
                 await observe();
             }
             return saved;
@@ -1654,6 +1692,7 @@ export function createSyncLoop(
             const local = await songbook.deleteCollection(current, documentId);
             if (local === 'removed' || local === 'missing') {
                 if (local === 'removed') {
+                    publish({ collectionsVersion: state.collectionsVersion + 1 });
                     await observe();
                 }
                 return { kind: 'deleted', retained: false, message: COLLECTION_MESSAGES.deleted };
@@ -1666,9 +1705,21 @@ export function createSyncLoop(
                 ? { ...result, message: COLLECTION_MESSAGES.deleted }
                 : result;
         },
+        async collectionDeleteRefusal(documentId, owner) {
+            const current = await ownedScope(owner);
+            try {
+                const local = await songbook.deleteCollection(current, documentId, {
+                    dryRun: true,
+                });
+                return local === 'queued' ? COLLECTION_MESSAGES.uploading : null;
+            } catch (error) {
+                return error instanceof Error ? error.message : String(error);
+            }
+        },
         async migrateStars(owner) {
             const outcome = await songbook.migrateStars(await ownedScope(owner));
             if (outcome === 'migrated') {
+                publish({ collectionsVersion: state.collectionsVersion + 1 });
                 await observe();
                 void loop.run().catch(() => {});
             }

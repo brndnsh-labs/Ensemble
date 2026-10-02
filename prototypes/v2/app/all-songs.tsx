@@ -59,6 +59,13 @@ interface AllSongsProps {
     onNewCollection: () => void;
     onRenameCollection: (collectionId: string, name: string) => void;
     onDeleteCollection: (collectionId: string) => void;
+    /**
+     * The collection THIS TAB's own delete just removed (#1477 review R5), or null — the
+     * `lastRemovedId` rule for collections: only that removal moves focus (to the All songs
+     * filter, since the dialog's own return target, the collection's Delete… button, is gone).
+     * A collection vanishing through a sync never steals focus.
+     */
+    removedCollectionId: string | null;
     /** Per-device opened-at map (#1440), id to ISO timestamp. */
     openedAt: ReadonlyMap<string, string>;
     remoteCandidates: readonly { id: string; kind: RemoteCandidateKind }[];
@@ -119,6 +126,7 @@ export function AllSongs({
     onNewCollection,
     onRenameCollection,
     onDeleteCollection,
+    removedCollectionId,
 }: AllSongsProps) {
     const [view, setViewState] = useState<LibraryView>('all');
     const [genre, setGenre] = useState('');
@@ -130,6 +138,9 @@ export function AllSongs({
     const songs = useMemo(() => library ?? [], [library]);
     const rows = useRef(new Map<string, HTMLTableRowElement>());
     const heading = useRef<HTMLHeadingElement>(null);
+    const allFilter = useRef<HTMLButtonElement>(null);
+    /** The collection whose disappearance just sent the view back to All songs (R5). */
+    const fellBackFrom = useRef<string | null>(null);
     // Same courtesy `StandardsBrowser` gives the standards browse view: opening this moves focus
     // to its own heading. Restoring focus on the way OUT is the shell's job instead (#1440 review
     // P3, `app/ensemble.tsx`'s `allSongsEntryRef`) — see `StandardsBrowser`'s own note on why a
@@ -150,9 +161,21 @@ export function AllSongs({
     // All songs rather than showing an empty list under a name that no longer exists.
     useEffect(() => {
         if (collections !== null && view.startsWith('collection:') && activeCollection === null) {
+            fellBackFrom.current = view.slice('collection:'.length);
             setViewState('all');
         }
     }, [collections, view, activeCollection]);
+    // This tab's own delete of the collection that WAS the view (#1477 review R5): focus goes to
+    // the All songs filter — its Delete… button, where the dialog would return focus, is gone.
+    // A frame later, so the confirm dialog has closed: a modal makes everything outside it inert.
+    useEffect(() => {
+        if (removedCollectionId === null || fellBackFrom.current !== removedCollectionId) {
+            return;
+        }
+        fellBackFrom.current = null;
+        const frame = requestAnimationFrame(() => allFilter.current?.focus());
+        return () => cancelAnimationFrame(frame);
+    }, [removedCollectionId]);
     /** The order the current view's collection keeps, id to position — null outside one. */
     const collectionOrder = useMemo(() => {
         const ids =
@@ -390,6 +413,7 @@ export function AllSongs({
             <div className="all-songs-layout">
                 <nav className="filter-rail" aria-label="Filter your songs">
                     <button
+                        ref={allFilter}
                         className="filter-item"
                         aria-pressed={view === 'all'}
                         onClick={() => setView('all')}

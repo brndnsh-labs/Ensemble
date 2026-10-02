@@ -25,6 +25,10 @@ async function addTo(page: Page, song: string, collection: string): Promise<void
         .getByRole('button', { name: `More actions for ${song}` })
         .click();
     await page.getByTestId('row-menu-add-to-collection').click();
+    // Entering the sub-view moves focus into it (#1477 review R5): the first collection it can join.
+    await expect(
+        page.locator('[data-testid="row-menu-collection"]:not(:disabled)').first(),
+    ).toBeFocused();
     await page.getByTestId('row-menu-collection').filter({ hasText: collection }).click();
     await expect(page.getByTestId('shell-message')).toContainText(
         `Added “${song}” to “${collection}”`,
@@ -38,6 +42,8 @@ async function addToNew(page: Page, song: string, collection: string): Promise<v
         .getByRole('button', { name: `More actions for ${song}` })
         .click();
     await page.getByTestId('row-menu-add-to-collection').click();
+    // With no collection to join yet, focus lands on the name field (#1477 review R5).
+    await expect(page.getByTestId('row-menu-new-collection-input')).toBeFocused();
     await page.getByTestId('row-menu-new-collection-input').fill(collection);
     await page.getByTestId('row-menu-new-collection-save').click();
     await expect(page.getByTestId('shell-message')).toContainText(
@@ -103,6 +109,9 @@ test('a collection keeps its own order, and deleting it keeps every song', async
         'aria-pressed',
         'true',
     );
+    // Focus goes to the All songs filter (#1477 review R5): the Delete… button the dialog would
+    // hand it back to went with the collection.
+    await expect(page.getByRole('button', { name: /^All songs/ })).toBeFocused();
     await expect(page.getByRole('heading', { name: /All songs/ })).toContainText('· 3');
     await expect(rows(page)).toHaveCount(3);
 });
@@ -217,4 +226,59 @@ test('a guest’s device-local stars move into Starred on upgrade, and the old k
     expect(await page.evaluate(() => localStorage.getItem('ensemble-v2-preview:starred'))).toBe(
         legacy,
     );
+});
+
+/**
+ * #1477 review R4: "the songs in no other collection" is decided when the delete is CONFIRMED,
+ * not when its dialog opened — a song that joined another collection meanwhile (another tab, a
+ * sync pass) is no longer in this one alone, and must not be deleted with it.
+ */
+test('“also delete” decides at confirm time, not from the count the dialog opened with', async ({
+    page,
+}) => {
+    await seedStarters(page);
+    await openAllSongs(page);
+    await addToNew(page, 'Minor swing sketch', 'Friday gig');
+    await collectionFilter(page, 'Friday gig').click();
+    await page.getByTestId('collection-delete').click();
+    await expect(page.locator('.collection-delete-also')).toHaveText(
+        'Also delete the 1 song that is in no other collection',
+    );
+
+    // While the dialog is open, another tab puts the same song in a collection of its own.
+    await page.evaluate(async () => {
+        const db = await new Promise<IDBDatabase>((resolve, reject) => {
+            const request = indexedDB.open('ensemble-v2-preview-collections', 1);
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+        await new Promise<void>((resolve, reject) => {
+            const tx = db.transaction('collections', 'readwrite');
+            const now = new Date().toISOString();
+            tx.objectStore('collections').put({
+                kind: 'collection',
+                schemaVersion: 1,
+                id: 'other-tab-set',
+                name: 'Other tab',
+                revision: 0,
+                createdAt: now,
+                updatedAt: now,
+                songIds: ['starter-jazz'],
+            });
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+        });
+        db.close();
+    });
+
+    await page.getByTestId('delete-collection-also-songs').check();
+    await page.getByTestId('delete-collection-confirm').click();
+    await expect(page.getByTestId('shell-message')).toHaveText(
+        'Collection deleted. Its songs are still in your songbook.',
+    );
+    // The song survived: it was in another collection by the time the delete ran.
+    await expect(page.getByRole('heading', { name: /All songs/ })).toContainText('· 3');
+    await expect(
+        page.locator('.all-songs-table .song-name', { hasText: 'Minor swing sketch' }),
+    ).toHaveCount(1);
 });

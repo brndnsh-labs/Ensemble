@@ -248,35 +248,24 @@ export async function adoptGuestCollections(ownerId: string): Promise<AdoptResul
             const songIds = await Promise.all(
                 resolvedSongIds.map((guestId) => adoptedSongId(ownerId, guestId)),
             );
-            if (document.builtIn === 'starred') {
-                if (songIds.length === 0) {
-                    continue;
-                }
-                const listing = await accountSync.listCollections(ownerId);
-                const target = starredOf(listing)?.documentId ?? STARRED_COLLECTION_ID;
-                await accountSync.editCollection(
-                    target,
-                    (current) =>
-                        current
-                            ? mergedOrNull(current, songIds)
-                            : newStarred(songIds.slice(0, MAX_COLLECTION_SONGS)),
-                    ownerId,
-                );
-            } else {
-                const id = `guest-${await stableId('adopt-collection', ownerId, document.id)}`;
-                await accountSync.editCollection(
-                    id,
-                    (current) =>
-                        current
-                            ? mergedOrNull(current, songIds)
-                            : {
-                                  ...newCollection(document.name, songIds),
-                                  id,
-                              },
-                    ownerId,
-                );
+            if (document.builtIn === 'starred' && songIds.length === 0) {
+                continue;
             }
-            adopted += 1;
+            const target = await adoptionTarget(ownerId, document);
+            const saved = await accountSync.editCollection(
+                target,
+                (current) =>
+                    current
+                        ? mergedOrNull(current, songIds)
+                        : document.builtIn === 'starred'
+                          ? newStarred(songIds.slice(0, MAX_COLLECTION_SONGS))
+                          : { ...newCollection(document.name, songIds), id: target },
+                ownerId,
+            );
+            // A rerun that finds the copy already complete queues nothing and counts nothing.
+            if (saved !== null) {
+                adopted += 1;
+            }
         } catch (error) {
             failures.push({
                 guestId: document.id,
@@ -288,6 +277,52 @@ export async function adoptGuestCollections(ownerId: string): Promise<AdoptResul
         void accountSync.run().catch(() => {});
     }
     return { adopted, failures };
+}
+
+/**
+ * The account document a guest collection is adopted INTO: the account's own Starred for the
+ * guest's Starred, else a deterministic id of its own, so a rerun lands on the copy it made.
+ */
+async function adoptionTarget(ownerId: string, document: CollectionDocument): Promise<string> {
+    if (document.builtIn === 'starred') {
+        const listing = await accountSync.listCollections(ownerId);
+        return starredOf(listing)?.documentId ?? STARRED_COLLECTION_ID;
+    }
+    return `guest-${await stableId('adopt-collection', ownerId, document.id)}`;
+}
+
+/**
+ * How many of this device's guest collections still hold songs the account's copy of them does
+ * not (#1477 review R3) — what the adoption offer asks about when every guest SONG is already in
+ * the account (copied by a build from before collections were adopted), and would otherwise say
+ * "nothing new" and leave the guest's Starred and set lists behind for good. Only collections with
+ * songs count: an empty one is not worth a question. Zero after a complete adoption, so a second
+ * run offers nothing.
+ */
+export async function pendingGuestCollections(ownerId: string): Promise<number> {
+    const [collections, listing] = await Promise.all([
+        repository.listCollections(),
+        accountSync.listCollections(ownerId),
+    ]);
+    const held = new Map(listing.map((entry) => [entry.documentId, entry.document]));
+    let pending = 0;
+    for (const { document, resolvedSongIds } of collections) {
+        if (resolvedSongIds.length === 0) {
+            continue;
+        }
+        const songIds = await Promise.all(
+            resolvedSongIds.map((guestId) => adoptedSongId(ownerId, guestId)),
+        );
+        const target =
+            document.builtIn === 'starred'
+                ? (starredOf(listing)?.documentId ?? STARRED_COLLECTION_ID)
+                : `guest-${await stableId('adopt-collection', ownerId, document.id)}`;
+        const current = held.get(target);
+        if (!current || mergedOrNull(current, songIds) !== null) {
+            pending += 1;
+        }
+    }
+    return pending;
 }
 
 /** `current` with `songIds` merged in after its own, or null when that adds nothing. */

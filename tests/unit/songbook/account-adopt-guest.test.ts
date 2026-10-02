@@ -7,6 +7,7 @@ import {
     forgetAdoptionDecision,
     hasDecidedAdoption,
     libraryDownloaded,
+    pendingGuestCollections,
     rememberAdoptionDecision,
 } from '../../../prototypes/v2/lib/account/adopt-guest.js';
 import {
@@ -515,6 +516,29 @@ describe('adoptGuestCollections (#1477)', () => {
         expect(written[0].id).toBe(STARRED_COLLECTION_ID);
         expect(written[0].songIds[0]).toBe('theirs');
         expect(written[0].songIds[1]).toMatch(/^guest-[a-f0-9]{64}$/);
+    });
+
+    it('counts guest collections the account still lacks songs of, and none once adopted (review R3)', async () => {
+        listCollections.mockResolvedValue([
+            { document: guestCollection('s', ['a'], true), resolvedSongIds: ['a'] },
+            { document: guestCollection('gig', ['a']), resolvedSongIds: ['a'] },
+            // An empty one is not worth a question.
+            { document: guestCollection('empty', []), resolvedSongIds: [] },
+        ]);
+        accountCollections.mockResolvedValue([]);
+        expect(await pendingGuestCollections('owner-1')).toBe(2);
+
+        // Adopt them, then ask again against what the account now holds.
+        const written = editsAgainst(new Map());
+        await adoptGuestCollections('owner-1');
+        accountCollections.mockResolvedValue(
+            written.map((document) => ({
+                documentId: document.id,
+                document,
+                resolvedSongIds: document.songIds,
+            })),
+        );
+        expect(await pendingGuestCollections('owner-1')).toBe(0);
     });
 
     it('never creates an empty Starred, and reports a collection it could not add', async () => {

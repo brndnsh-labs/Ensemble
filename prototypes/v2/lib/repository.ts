@@ -1,5 +1,7 @@
 import type { InstrumentModule } from '@engine/types';
 import {
+    assertBuiltInKept,
+    BuiltInCollectionError,
     type CollectionDocument,
     isCollectionSongId,
     MAX_COLLECTION_SONGS,
@@ -517,6 +519,13 @@ export async function saveCollection(
                 tx.abort();
                 return;
             }
+            try {
+                assertBuiltInKept(previous ? validateCollection(previous) : null, document);
+            } catch (error) {
+                failure = error instanceof Error ? error : new Error(String(error));
+                tx.abort();
+                return;
+            }
             committed = validateCollection({
                 ...document,
                 revision: expected === null ? 0 : expected + 1,
@@ -563,6 +572,7 @@ export async function editCollection(
                 if (next.id !== id) {
                     throw new Error('A collection edit cannot change its id.');
                 }
+                assertBuiltInKept(previous, next);
                 committed = validateCollection({
                     ...next,
                     revision: previous === null ? 0 : previous.revision + 1,
@@ -619,9 +629,22 @@ export async function deleteCollection(id: string): Promise<void> {
     const db = await openCollections();
     await new Promise<void>((resolve, reject) => {
         const tx = db.transaction(COLLECTIONS, 'readwrite');
-        tx.objectStore(COLLECTIONS).delete(id);
+        const store = tx.objectStore(COLLECTIONS);
+        let failure: Error | undefined;
+        // Read and delete in one transaction, so a built-in is refused here and not only by the
+        // UI (#1477 review R2).
+        const read = store.get(id);
+        read.onsuccess = () => {
+            if ((read.result as CollectionDocument | undefined)?.builtIn) {
+                failure = new BuiltInCollectionError('deleted');
+                tx.abort();
+                return;
+            }
+            store.delete(id);
+        };
         tx.oncomplete = () => resolve();
-        tx.onerror = () => reject(new Error('Delete failed. Storage may be unavailable.'));
-        tx.onabort = () => reject(new Error('Delete was interrupted.'));
+        tx.onerror = () =>
+            reject(failure || new Error('Delete failed. Storage may be unavailable.'));
+        tx.onabort = () => reject(failure || new Error('Delete was interrupted.'));
     });
 }

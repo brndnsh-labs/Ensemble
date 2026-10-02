@@ -1,5 +1,5 @@
 import type { RefObject } from 'react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { MAX_COLLECTION_NAME } from '../lib/collections';
 import { whenClosed } from './dialog-close';
 
@@ -78,6 +78,22 @@ export function SongRowMenu({
         setNewName('');
     }, [song?.id, song?.title]);
     const renaming = view === 'rename';
+    // Entering "Add to collection…" moves focus INTO it (#1477 review R5), as Rename's autofocus
+    // does: to the first collection the song can join, else the new-collection name field. The
+    // button that opened it is gone with the action list, so focus would otherwise fall to the
+    // dialog itself.
+    const collectionsView = useRef<HTMLFormElement>(null);
+    useEffect(() => {
+        if (view !== 'collections') {
+            return;
+        }
+        const form = collectionsView.current;
+        const target =
+            form?.querySelector<HTMLButtonElement>(
+                '[data-testid="row-menu-collection"]:not(:disabled)',
+            ) ?? form?.querySelector<HTMLInputElement>('input');
+        target?.focus();
+    }, [view]);
     return (
         <dialog
             ref={dialogRef}
@@ -130,6 +146,7 @@ export function SongRowMenu({
                 </form>
             ) : song && view === 'collections' ? (
                 <form
+                    ref={collectionsView}
                     onSubmit={(event) => {
                         event.preventDefault();
                         const trimmed = newName.trim();

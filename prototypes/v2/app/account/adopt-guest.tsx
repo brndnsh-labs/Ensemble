@@ -7,6 +7,7 @@ import {
     adoptGuestCollections,
     adoptGuestSongs,
     computeAdoptCandidates,
+    pendingGuestCollections,
     rememberAdoptionDecision,
 } from '../../lib/account/adopt-guest';
 import { AccountMismatchError } from '../../lib/account/sync-loop';
@@ -58,9 +59,14 @@ export interface AdoptGuestDialogProps {
 
 type Phase =
     | { kind: 'loading' }
-    | { kind: 'empty' }
+    /**
+     * No song to add. `collections` is how many of this device's guest collections still hold
+     * songs the account's copies do not (#1477 review R3) — offered on their own, by a button,
+     * because a guest whose songs were adopted by an older build would otherwise never get them.
+     */
+    | { kind: 'empty'; collections: number }
     /** Nothing can be offered because the account is at its own song cap, which is not "nothing new". */
-    | { kind: 'full'; omitted: number }
+    | { kind: 'full'; omitted: number; collections: number }
     | { kind: 'ask'; candidates: AdoptCandidate[]; omitted: number; room: number }
     | { kind: 'copying'; copied: number; total: number }
     | {
@@ -69,6 +75,8 @@ type Phase =
           failures: AdoptFailure[];
           /** Guest collections that could not be brought along (#1477), apart from songs. */
           collectionFailures: number;
+          /** Guest collections that were (#1477): counted only when a Save was queued. */
+          collectionsAdopted: number;
       }
     | { kind: 'error'; message: string };
 
@@ -96,7 +104,14 @@ export function AdoptGuestDialog({
             ownerId,
             scopeGuestIds === null ? null : new Set(scopeGuestIds),
         ).then(
-            (offer) => {
+            async (offer) => {
+                // With no song to offer, the guest's collections are the question instead (#1477
+                // review R3) — never for a scoped offer, which is about one import's songs. An
+                // unreadable store is not evidence of anything to add: it offers nothing.
+                const collections =
+                    offer.candidates.length === 0 && scopeGuestIds === null
+                        ? await pendingGuestCollections(ownerId).catch(() => 0)
+                        : 0;
                 if (!alive) {
                     return;
                 }
@@ -104,8 +119,8 @@ export function AdoptGuestDialog({
                     offer.candidates.length > 0
                         ? { kind: 'ask', ...offer }
                         : offer.omitted > 0
-                          ? { kind: 'full', omitted: offer.omitted }
-                          : { kind: 'empty' },
+                          ? { kind: 'full', omitted: offer.omitted, collections }
+                          : { kind: 'empty', collections },
                 );
             },
             (error: unknown) => {
@@ -159,9 +174,12 @@ export function AdoptGuestDialog({
         // songs were just adopted under — but only for the WHOLE-songbook offer. A scoped offer
         // (#1359) is about the songs one v1 import brought over, not about this device's lists.
         let collectionFailures = 0;
+        let collectionsAdopted = 0;
         if (!scoped && ownerId !== null) {
             try {
-                collectionFailures = (await adoptGuestCollections(ownerId)).failures.length;
+                const adopted = await adoptGuestCollections(ownerId);
+                collectionFailures = adopted.failures.length;
+                collectionsAdopted = adopted.adopted;
             } catch {
                 collectionFailures = 1;
             }
@@ -174,8 +192,61 @@ export function AdoptGuestDialog({
             adopted: result.adopted,
             failures: result.failures,
             collectionFailures,
+            collectionsAdopted,
         });
     }
+
+    /**
+     * "Add this device's collections" (#1477 review R3): the musician's own answer, so it is
+     * recorded like any other, and the copy is the same idempotent one the song offer runs.
+     */
+    async function runAdoptCollections() {
+        if (ownerId === null) {
+            return;
+        }
+        rememberAdoptionDecision(ownerId);
+        setPhase({ kind: 'copying', copied: 0, total: 0 });
+        let collectionFailures = 0;
+        let collectionsAdopted = 0;
+        try {
+            const adopted = await adoptGuestCollections(ownerId);
+            collectionFailures = adopted.failures.length;
+            collectionsAdopted = adopted.adopted;
+        } catch {
+            collectionFailures = 1;
+        }
+        if (!openRef.current) {
+            return;
+        }
+        setPhase({
+            kind: 'done',
+            adopted: 0,
+            failures: [],
+            collectionFailures,
+            collectionsAdopted,
+        });
+    }
+
+    /** The guest-collections half of the `'empty'` and `'full'` phases (#1477 review R3). */
+    const collectionsOffer = (count: number) =>
+        count > 0 && (
+            <>
+                <p data-testid="adopt-guest-collections-pending">
+                    {count === 1
+                        ? 'This device also has a collection with songs your account’s copy doesn’t include (Starred counts).'
+                        : `This device also has ${count} collections with songs your account’s copies don’t include (Starred counts).`}
+                </p>
+                <div className="dialog-actions">
+                    <button
+                        className="btn primary"
+                        data-testid="adopt-guest-collections"
+                        onClick={() => void runAdoptCollections()}
+                    >
+                        Add this device’s collections
+                    </button>
+                </div>
+            </>
+        );
 
     const busy = phase.kind === 'copying';
 
@@ -199,7 +270,11 @@ export function AdoptGuestDialog({
             )}
             {phase.kind === 'empty' && (
                 <>
-                    <h2 id="adopt-guest-title">Nothing new to add</h2>
+                    <h2 id="adopt-guest-title">
+                        {phase.collections > 0
+                            ? 'Add this device’s collections to your account?'
+                            : 'Nothing new to add'}
+                    </h2>
                     {/* Scoped, this is reached by a v1 rerun as well as by a repeat Add: the
                         import UPDATES the one `v1-session` document in place, and adoption
                         deduplicates by deterministic document id rather than by content (#1268),
@@ -211,6 +286,7 @@ export function AdoptGuestDialog({
                             ? 'Your account already has these songs. A song you’ve already added keeps the version you added — later changes on this device stay on this device.'
                             : 'Every song on this device is already in your account.'}
                     </p>
+                    {collectionsOffer(phase.collections)}
                     <div className="dialog-actions">
                         <button className="btn" data-testid="adopt-guest-close" onClick={onClose}>
                             Close
@@ -226,6 +302,7 @@ export function AdoptGuestDialog({
                         the {phase.omitted} still on this device. Delete a song from your account to
                         make room.
                     </p>
+                    {collectionsOffer(phase.collections)}
                     <div className="dialog-actions">
                         <button className="btn" data-testid="adopt-guest-close" onClick={onClose}>
                             Close
@@ -282,27 +359,33 @@ export function AdoptGuestDialog({
             )}
             {phase.kind === 'copying' && (
                 <>
-                    <h2 id="adopt-guest-title">Adding your songs…</h2>
+                    <h2 id="adopt-guest-title">
+                        {phase.total === 0 ? 'Adding your collections…' : 'Adding your songs…'}
+                    </h2>
                     {/* Songs actually copied, counted after each write (`adoptGuestSongs`): a
                         number published in front of the write would claim a Save that has not
                         happened yet. */}
-                    <p data-testid="adopt-guest-progress">
-                        Copied {phase.copied} of {phase.total}…
-                    </p>
+                    {phase.total > 0 && (
+                        <p data-testid="adopt-guest-progress">
+                            Copied {phase.copied} of {phase.total}…
+                        </p>
+                    )}
                 </>
             )}
             {phase.kind === 'done' && (
                 <>
                     <h2 id="adopt-guest-title">
-                        {phase.adopted === 0
-                            ? 'Nothing was added'
-                            : `Copied ${phase.adopted} ${phase.adopted === 1 ? 'song' : 'songs'} into this device’s account songbook`}
+                        {phase.adopted > 0
+                            ? `Copied ${phase.adopted} ${phase.adopted === 1 ? 'song' : 'songs'} into this device’s account songbook`
+                            : phase.collectionsAdopted > 0
+                              ? `Added ${phase.collectionsAdopted} ${phase.collectionsAdopted === 1 ? 'collection' : 'collections'} to this device’s account songbook`
+                              : 'Nothing was added'}
                     </h2>
                     {/* Two facts, kept apart the way `SyncStatus` keeps them apart: the copy is
                         committed HERE, and the upload is a separate thing the per-song chip
                         reports. "Added to your account" claimed the cloud half before it happened. */}
                     <p>
-                        {phase.adopted > 0 &&
+                        {(phase.adopted > 0 || phase.collectionsAdopted > 0) &&
                             (online
                                 ? 'Uploading to your account now.'
                                 : 'Saved on this device — they’ll upload once you’re back online.')}

@@ -253,6 +253,35 @@ export function newCollection(name: string, songIds: string[] = []): CollectionD
 }
 
 /**
+ * A built-in collection asked to do what only a user collection may (#1477 review R2): be deleted,
+ * renamed, lose its built-in mark — or a user collection asked to become one. Refused by STORAGE,
+ * not just by the UI, because a deleted Starred is a tombstone on its fixed id: every device's
+ * next lazy create of it would then meet `remote: null`, and Starred would split.
+ */
+export class BuiltInCollectionError extends Error {
+    constructor(action: 'deleted' | 'changed') {
+        super(
+            action === 'deleted'
+                ? 'Starred is built in and can’t be deleted.'
+                : 'Starred is built in: it can’t be renamed, and no other collection can become it.',
+        );
+    }
+}
+
+/** Throws `BuiltInCollectionError` when `next` would rename or un-mark a built-in, or mint one. */
+export function assertBuiltInKept(
+    previous: CollectionDocument | null,
+    next: CollectionDocument,
+): void {
+    if (previous === null) {
+        return;
+    }
+    if (previous.builtIn !== next.builtIn || (previous.builtIn && previous.name !== next.name)) {
+        throw new BuiltInCollectionError('changed');
+    }
+}
+
+/**
  * The built-in Starred collection's id (#1477), the same in every songbook — guest and account
  * alike. Fixed rather than minted, because Starred is created LAZILY on whichever device stars a
  * song first: two devices that each star offline both create THIS id, so the second Save meets the
@@ -294,7 +323,17 @@ export function starredOf<T extends { document: CollectionDocument }>(
  * It never asks and never drops a song either side holds: for Starred that is always right (a star
  * made on either device survives), and for a user collection it never loses a song. The one thing
  * a union cannot keep is a REMOVAL made on one side while the other still held the id — that song
- * comes back, the cheaper of the two mistakes. Capped at `MAX_COLLECTION_SONGS`, local first.
+ * comes back, the cheaper of the two mistakes.
+ *
+ * **The cap (#1477 review R7).** A collection holds at most `MAX_COLLECTION_SONGS` ids, so a union
+ * of two full lists must drop some. What is dropped is deterministic: every local id is kept in
+ * its order, then remote-only ids in THEIR order until the cap, so two devices merging the same
+ * pair agree on the result. Dropping ids of songs known to be DELETED before live ones would be
+ * better, but this device cannot tell them apart cheaply: a downloaded tombstone removes the song
+ * record and leaves no local trace, so a deleted song looks exactly like one that has not
+ * downloaded yet, and pruning on "does not resolve here" would throw live songs away on a fresh
+ * device. The cap is hard to reach in practice: the account holds at most 2,000 documents in all,
+ * collections included, so a union past 2,000 ids is mostly dead ids already.
  */
 export function mergeSongIds(local: readonly string[], remote: readonly string[]): string[] {
     const merged = [...local];

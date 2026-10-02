@@ -3,6 +3,7 @@ import type { AccountApi, ApiResult } from '../../prototypes/v2/lib/account/api.
 import { createAccountSession } from '../../prototypes/v2/lib/account/session.js';
 import { createSyncLoop } from '../../prototypes/v2/lib/account/sync-loop.js';
 import {
+    BuiltInCollectionError,
     type CollectionDocument,
     newCollection,
     newStarred,
@@ -468,6 +469,155 @@ describe('two devices star different songs offline (#1477 acceptance)', () => {
         expect(cloud.documents.size).toBe(1);
         const stored = cloud.documents.get(STARRED_COLLECTION_ID)!.document as CollectionDocument;
         expect(new Set(stored.songIds)).toEqual(new Set(['song-phone', 'song-laptop']));
+    });
+});
+
+describe('a collection moving never re-reads the song library (#1477 review R1)', () => {
+    it('a star, a merge and a collection download move collectionsVersion; only a song moves libraryVersion', async () => {
+        const cloud = fakeCloud();
+        const phone = connection(freshName());
+        const laptop = connection(freshName());
+        const phoneScope = (await phone.switchAccount(OWNER))!;
+        const laptopScope = (await laptop.switchAccount(OWNER))!;
+        const phoneLoop = createSyncLoop(cloud.api, createAccountSession(cloud.api), phone);
+        const laptopLoop = createSyncLoop(cloud.api, createAccountSession(cloud.api), laptop);
+        await phoneLoop.attach(OWNER);
+        await laptopLoop.attach(OWNER);
+        await phoneLoop.run();
+        await laptopLoop.run();
+        const versions = (loop: typeof phoneLoop) => ({
+            library: loop.getSnapshot().libraryVersion,
+            collections: loop.getSnapshot().collectionsVersion,
+        });
+        const star = (songId: string) => (current: CollectionDocument | null) =>
+            current ? withSong(current, songId, true) : newStarred([songId]);
+
+        // 1. A star, and the pass that uploads it.
+        const phoneStart = versions(phoneLoop);
+        await phoneLoop.editCollection(STARRED_COLLECTION_ID, star('song-a'), OWNER);
+        const phoneEdited = versions(phoneLoop);
+        await phoneLoop.run();
+        const phoneUploaded = versions(phoneLoop);
+        expect(phoneEdited.library).toBe(phoneStart.library);
+        expect(phoneUploaded.library).toBe(phoneStart.library);
+        expect(phoneUploaded.collections).toBeGreaterThan(phoneEdited.collections);
+        expect(await phone.collectionOutbox(phoneScope)).toEqual({ unsent: 0, refused: 0 });
+
+        // 2. A merge: the laptop's own Starred meets the phone's as a conflict.
+        const laptopStart = versions(laptopLoop);
+        await laptopLoop.editCollection(STARRED_COLLECTION_ID, star('song-b'), OWNER);
+        const laptopEdited = versions(laptopLoop);
+        await laptopLoop.run();
+        const laptopMerged = versions(laptopLoop);
+        expect(
+            (await laptop.readCollection(laptopScope, STARRED_COLLECTION_ID))?.document.songIds,
+        ).toEqual(['song-b', 'song-a']);
+        expect(laptopMerged.library).toBe(laptopStart.library);
+        expect(laptopMerged.collections).toBeGreaterThan(laptopEdited.collections);
+
+        // 3. A collection-only download: the phone adopts the merged list.
+        const phoneBefore = versions(phoneLoop);
+        await phoneLoop.run();
+        const phoneDownloaded = versions(phoneLoop);
+        expect(
+            (await phone.readCollection(phoneScope, STARRED_COLLECTION_ID))?.document.songIds,
+        ).toEqual(['song-b', 'song-a']);
+        expect(phoneDownloaded.library).toBe(phoneBefore.library);
+        expect(phoneDownloaded.collections).toBeGreaterThan(phoneBefore.collections);
+
+        // 4. A song still moves the library: its commit re-reads it, as it always did.
+        await phoneLoop.save(accountChart('Song', 'song-x'), null, null);
+        const phoneSaved = versions(phoneLoop);
+        await phoneLoop.run();
+        expect(versions(phoneLoop).library).toBeGreaterThan(phoneSaved.library);
+        expect((await phone.read(phoneScope, 'song-x'))?.remoteRevision).not.toBeNull();
+    });
+});
+
+describe('Starred is guarded in storage, not only in the UI (#1477 review R2)', () => {
+    async function syncedStarred(songIds: string[]): Promise<void> {
+        await book.editCollection(scope, STARRED_COLLECTION_ID, () => newStarred(songIds));
+        await runOutboxPass(book, scope, committing());
+    }
+
+    it('refuses to delete Starred, locally or in the cloud', async () => {
+        await syncedStarred(['a']);
+        await expect(book.deleteCollection(scope, STARRED_COLLECTION_ID)).rejects.toBeInstanceOf(
+            BuiltInCollectionError,
+        );
+        await expect(
+            book.deleteCollection(scope, STARRED_COLLECTION_ID, { dryRun: true }),
+        ).rejects.toBeInstanceOf(BuiltInCollectionError);
+        // No delete request is ever frozen for it.
+        await expect(book.prepareDelete(scope, STARRED_COLLECTION_ID)).rejects.toBeInstanceOf(
+            BuiltInCollectionError,
+        );
+        expect(await book.readCollection(scope, STARRED_COLLECTION_ID)).not.toBeNull();
+    });
+
+    it('refuses to rename Starred, to un-mark it, or to turn a collection into one', async () => {
+        await syncedStarred(['a']);
+        await expect(
+            book.editCollection(scope, STARRED_COLLECTION_ID, (current) =>
+                current ? { ...current, name: 'Favourites' } : null,
+            ),
+        ).rejects.toBeInstanceOf(BuiltInCollectionError);
+        await expect(
+            book.editCollection(scope, STARRED_COLLECTION_ID, (current) => {
+                if (!current) {
+                    return null;
+                }
+                const { builtIn: _dropped, ...plain } = current;
+                return plain;
+            }),
+        ).rejects.toBeInstanceOf(BuiltInCollectionError);
+        const starred = (await book.readCollection(scope, STARRED_COLLECTION_ID))!.document;
+        await expect(
+            book.saveCollection(scope, { ...starred, name: 'Favourites' }, starred.revision),
+        ).rejects.toBeInstanceOf(BuiltInCollectionError);
+        await book.editCollection(scope, 'set-a', () => ({ ...newCollection('Gig'), id: 'set-a' }));
+        await expect(
+            book.editCollection(scope, 'set-a', (current) =>
+                current ? { ...current, builtIn: 'starred' } : null,
+            ),
+        ).rejects.toBeInstanceOf(BuiltInCollectionError);
+        // Adding a star is still an ordinary edit.
+        expect(
+            await book.editCollection(scope, STARRED_COLLECTION_ID, (current) =>
+                current ? withSong(current, 'b', true) : null,
+            ),
+        ).not.toBeNull();
+    });
+
+    it('a Starred the account no longer has merges INTO the Starred this device holds', async () => {
+        await syncedStarred(['a']);
+        // A second built-in Starred, the shape a tombstoned fixed id would leave behind.
+        await book.editCollection(scope, 'starred-b', () => ({
+            ...newStarred(['z', 'a']),
+            id: 'starred-b',
+        }));
+        const gone: SaveTransport = async (request) => ({
+            ownerId: request.ownerId,
+            documentId: request.documentId,
+            operationId: request.operationId,
+            digest: request.digest,
+            kind: 'conflict',
+            revision: 'cloud-gone',
+            remote: null,
+        });
+        await runOutboxPass(book, scope, gone);
+        expect((await book.pendingCollection(scope, 'starred-b'))[0].status).toBe('conflict');
+
+        expect(await book.mergeCollectionConflicts(scope)).toBe(1);
+
+        // One Starred, holding both — never a fresh-id sibling.
+        expect(await book.readCollection(scope, 'starred-b')).toBeNull();
+        expect(await book.pendingCollection(scope, 'starred-b')).toEqual([]);
+        const collections = await book.listCollections(scope);
+        expect(collections.map((entry) => entry.documentId)).toEqual([STARRED_COLLECTION_ID]);
+        expect(collections[0].document.songIds).toEqual(['a', 'z']);
+        const [queued] = await book.pendingCollection(scope, STARRED_COLLECTION_ID);
+        expect(queued.base).toEqual({ revision: 'cloud-1' });
     });
 });
 

@@ -38,8 +38,12 @@ export interface UseCollectionsOptions {
      * Set before `owner` is, so a write made while the attach settles is still fenced.
      */
     sessionOwner: string | null;
-    /** The loop's "the stored library moved" counter: a pass that merged or downloaded re-reads. */
-    libraryVersion: number;
+    /**
+     * The loop's "the stored COLLECTIONS moved" counter (`SyncSnapshot.collectionsVersion`): a pass
+     * that uploaded, merged or downloaded a collection re-reads. Never `libraryVersion`, whose
+     * bump re-reads the whole song library — which a star must not cost (#1477 review R1).
+     */
+    collectionsVersion: number;
 }
 
 /** One optimistic star: what the musician asked for, and when its write landed (if it has). */
@@ -66,7 +70,7 @@ export function useCollections({
     signedIn,
     owner,
     sessionOwner,
-    libraryVersion,
+    collectionsVersion,
 }: UseCollectionsOptions) {
     const [collections, setCollections] = useState<CollectionEntry[] | null>(null);
     /**
@@ -135,10 +139,10 @@ export function useCollections({
         setCollections(null);
         setPendingStars(new Map());
     }, [owner]);
-    // biome-ignore lint/correctness/useExhaustiveDependencies: `libraryVersion` is a re-run trigger.
+    // biome-ignore lint/correctness/useExhaustiveDependencies: `collectionsVersion` is a re-run trigger.
     useEffect(() => {
         void reload();
-    }, [reload, libraryVersion]);
+    }, [reload, collectionsVersion]);
 
     const starredEntry = useMemo(
         () => (collections ? starredOf(collections) : null),
@@ -286,5 +290,40 @@ export function useCollections({
         [collections, signedIn, sessionOwner],
     );
 
-    return { collections, starred, reload, toggleStar, addSong, create, rename, remove };
+    /**
+     * The live songbook's collections read fresh from storage, not from this render's state —
+     * what a delete decides "the songs in no other collection" from at CONFIRM time (#1477
+     * review R4), since a dialog can stay open while another tab or a sync pass adds a song to
+     * another collection.
+     */
+    const fresh = useCallback(async (): Promise<CollectionEntry[]> => {
+        return signedIn ? accountSync.listCollections(sessionOwner) : repository.listCollections();
+    }, [signedIn, sessionOwner]);
+
+    /**
+     * Null when deleting this collection can go ahead now, else why not — asked before any song
+     * is deleted with it (#1477 review R4). A guest collection has no outbox to wait for.
+     */
+    const deleteRefusal = useCallback(
+        async (collectionId: string): Promise<string | null> => {
+            if (signedIn) {
+                return accountSync.collectionDeleteRefusal(collectionId, sessionOwner);
+            }
+            return null;
+        },
+        [signedIn, sessionOwner],
+    );
+
+    return {
+        collections,
+        starred,
+        reload,
+        toggleStar,
+        addSong,
+        create,
+        rename,
+        remove,
+        fresh,
+        deleteRefusal,
+    };
 }

@@ -11,6 +11,7 @@ import {
     forgetAdoptionDecision,
     hasDecidedAdoption,
     libraryDownloaded,
+    pendingGuestCollections,
 } from '../lib/account/adopt-guest';
 import { stripAccountsParam } from '../lib/account/feature';
 import { heldAccountBanner } from '../lib/account/messages';
@@ -616,6 +617,8 @@ export default function Ensemble() {
     const [collectionDeleteTarget, setCollectionDeleteTarget] =
         useState<CollectionDeleteTarget | null>(null);
     const [collectionDeleteFailure, setCollectionDeleteFailure] = useState<string | null>(null);
+    // The collection THIS TAB's own delete just removed (#1477 review R5) — `deletedRowId`'s rule.
+    const [deletedCollectionId, setDeletedCollectionId] = useState<string | null>(null);
     const collectionDeleteDialogRef = useRef<HTMLDialogElement>(null);
     // The row ⋯ menu (#1440), shared by the All songs page and the songbook home. One dialog
     // instance for whichever row is targeted, per `SongRowMenu`'s own note on why.
@@ -795,7 +798,7 @@ export default function Ensemble() {
         signedIn,
         owner: sync.owner,
         sessionOwner: account.session.status === 'signedIn' ? account.session.owner : null,
-        libraryVersion: sync.libraryVersion,
+        collectionsVersion: sync.collectionsVersion,
     });
     const starred = collections.starred;
     /**
@@ -1914,11 +1917,18 @@ export default function Ensemble() {
         }
         let alive = true;
         void computeAdoptCandidates(owner)
-            .then((offer) => {
-                if (alive && offer.candidates.length === 0) {
+            .then(async (offer) => {
+                // No song to add, but guest collections the account's copies lack (#1477 review
+                // R3) — a guest whose songs an older build already adopted — is an offer too: the
+                // dialog then asks about the collections alone.
+                const collections =
+                    offer.candidates.length === 0
+                        ? await pendingGuestCollections(owner).catch(() => 0)
+                        : 0;
+                if (alive && offer.candidates.length === 0 && collections === 0) {
                     adoptCheckedKey.current = key;
                 }
-                if (alive && offer.candidates.length > 0) {
+                if (alive && (offer.candidates.length > 0 || collections > 0)) {
                     adoptOffered.current = owner;
                     // The sign-in offer is about the whole guest songbook; only an import scopes
                     // one (#1359), and a scope left over from an earlier offer must not narrow it.
@@ -3012,8 +3022,19 @@ export default function Ensemble() {
         void run(async () => {
             setCollectionDeleteFailure(null);
             let deletedSongs = 0;
+            // Decided NOW (#1477 review R4), never from what the dialog counted when it opened:
+            // a song another collection gained meanwhile is no longer "in no other collection".
+            let onlyHere: string[] = [];
             if (alsoDeleteSongs) {
-                for (const songId of target.onlyHere) {
+                // And the collection's own delete is asked first: one still uploading must stop
+                // this before a single song is gone, not after.
+                const refusal = await collections.deleteRefusal(target.collectionId);
+                if (refusal !== null) {
+                    setCollectionDeleteFailure(refusal);
+                    return;
+                }
+                onlyHere = songsOnlyIn(target.collectionId, await collections.fresh());
+                for (const songId of onlyHere) {
                     if (signedIn) {
                         const result = await commitCloudDelete(songId, owner, {
                             setFailure: setCollectionDeleteFailure,
@@ -3040,7 +3061,7 @@ export default function Ensemble() {
                 }
                 setOpenedAtState((previous) => {
                     const updated = new Map(previous);
-                    for (const songId of target.onlyHere) {
+                    for (const songId of onlyHere) {
                         updated.delete(songId);
                     }
                     return updated;
@@ -3058,7 +3079,10 @@ export default function Ensemble() {
                 }
                 return;
             }
+            // Closing the dialog and naming the removal in one render (R5): the page then moves
+            // focus to the All songs filter, after the dialog has let go of it.
             setCollectionDeleteTarget(null);
+            setDeletedCollectionId(target.collectionId);
             if (deletedSongs > 0) {
                 await refreshSongs();
                 message = `Collection deleted, with ${deletedSongs === 1 ? '1 song' : `${deletedSongs} songs`} that were in no other collection.`;
@@ -5011,6 +5035,7 @@ export default function Ensemble() {
                         setCollectionNaming({ kind: 'rename', collectionId, name })
                     }
                     onDeleteCollection={requestDeleteCollection}
+                    removedCollectionId={deletedCollectionId}
                 />
             ) : !current ? (
                 <Songbook

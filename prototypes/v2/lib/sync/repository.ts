@@ -1,4 +1,6 @@
 import {
+    assertBuiltInKept,
+    BuiltInCollectionError,
     isCollectionCandidate,
     MAX_COLLECTION_SONGS,
     mergeSongIds,
@@ -1030,6 +1032,8 @@ export class AccountSongbook {
                             ) {
                                 throw new LocalRevisionError();
                             }
+                            // A built-in stays built in, under its own name (#1477 review R2).
+                            assertBuiltInKept(previous?.document ?? null, document);
                             queueOf(tx, scope, document.id, collectionSnapshot, (queue) => {
                                 tx.finish(
                                     enqueueCollection(
@@ -1067,16 +1071,31 @@ export class AccountSongbook {
      * Refusing to delete a built-in collection is the caller's rule (`useCollections`' `remove`,
      * #1477), not storage's.
      */
-    async deleteCollection(scope: AccountScope, documentId: string): Promise<CollectionDeletion> {
+    async deleteCollection(
+        scope: AccountScope,
+        documentId: string,
+        /**
+         * `dryRun`: answer what a delete WOULD do and write nothing (#1477 review R4) — what a
+         * delete that first removes songs asks, so a collection that turns out to be still
+         * uploading stops the whole thing before a single song is gone.
+         */
+        options: { dryRun?: boolean } = {},
+    ): Promise<CollectionDeletion> {
         scope = copyScope(scope);
         identifier(documentId);
-        return this.database.run('readwrite', scope, (tx) => {
+        const dryRun = options.dryRun === true;
+        return this.database.run(dryRun ? 'readonly' : 'readwrite', scope, (tx) => {
             tx.read(
                 tx.table('collections').get([scope.ownerId, documentId]),
                 (row: SavedCollection | undefined) => {
                     const collection = storedCollection(row, scope, documentId);
                     if (!collection) {
                         return tx.finish('missing');
+                    }
+                    if (collection.document.builtIn) {
+                        // Refused by storage, not only by the UI (#1477 review R2): a tombstone on
+                        // Starred's fixed id would split it across devices.
+                        throw new BuiltInCollectionError('deleted');
                     }
                     queueOf(tx, scope, documentId, collectionSnapshot, (queue) => {
                         if (collection.remoteRevision !== null) {
@@ -1090,6 +1109,9 @@ export class AccountSongbook {
                         }
                         if (queue.some((operation) => operation.wireBody !== null)) {
                             return tx.finish('queued');
+                        }
+                        if (dryRun) {
+                            return tx.finish('removed');
                         }
                         for (const operation of queue) {
                             tx.table('operations').delete([scope.ownerId, operation.operationId]);
@@ -1143,6 +1165,7 @@ export class AccountSongbook {
                             if (document.id !== documentId) {
                                 throw new Error('A collection edit cannot change its id.');
                             }
+                            assertBuiltInKept(previous?.document ?? null, document);
                             const enqueue = () =>
                                 queueOf(tx, scope, documentId, collectionSnapshot, (queue) => {
                                     tx.finish(
@@ -1339,68 +1362,151 @@ export class AccountSongbook {
                         tx.finish(merged);
                     }
                 };
-                for (const documentId of ids) {
-                    identifier(documentId);
-                    tx.read(
-                        tx.table('collections').get([scope.ownerId, documentId]),
-                        (row: SavedCollection | undefined) => {
-                            const record = storedCollection(row, scope, documentId);
-                            queueOf(tx, scope, documentId, collectionSnapshot, (queue) => {
-                                const head = queue[0];
-                                if (!record || head?.status !== 'conflict') {
-                                    return settled();
+                const mergeEach = (starred: Map<string, SavedCollection>) => {
+                    for (const documentId of ids) {
+                        identifier(documentId);
+                        tx.read(
+                            tx.table('collections').get([scope.ownerId, documentId]),
+                            (row: SavedCollection | undefined) => {
+                                const record = storedCollection(row, scope, documentId);
+                                queueOf(tx, scope, documentId, collectionSnapshot, (queue) => {
+                                    const head = queue[0];
+                                    if (!record || head?.status !== 'conflict') {
+                                        return settled();
+                                    }
+                                    for (const operation of queue) {
+                                        tx.table('operations').delete([
+                                            scope.ownerId,
+                                            operation.operationId,
+                                        ]);
+                                    }
+                                    const remote = head.remote;
+                                    const now = new Date().toISOString();
+                                    if (remote && isCollectionCandidate(remote.document)) {
+                                        const theirs = collectionSnapshot(remote.document);
+                                        const document = collectionSnapshot({
+                                            ...record.document,
+                                            songIds: mergeSongIds(
+                                                record.document.songIds,
+                                                theirs.songIds,
+                                            ),
+                                            revision: record.document.revision + 1,
+                                            updatedAt: now,
+                                        });
+                                        tx.table('collections').put({
+                                            ...record,
+                                            document,
+                                            remoteRevision: remote.revision,
+                                        } satisfies SavedCollection);
+                                        queueCollectionSave(tx, scope, document, {
+                                            revision: remote.revision,
+                                        });
+                                        if (starred.has(documentId)) {
+                                            starred.set(documentId, {
+                                                ...record,
+                                                document,
+                                                remoteRevision: remote.revision,
+                                            });
+                                        }
+                                    } else if (
+                                        record.document.builtIn === 'starred' &&
+                                        [...starred.keys()].some((id) => id !== documentId)
+                                    ) {
+                                        // The account has no Starred at this id, but this device
+                                        // holds another one: its stars go THERE, one Save, and this
+                                        // record leaves — never a second Starred beside the first.
+                                        const into = [...starred.values()].find(
+                                            (entry) => entry.documentId !== documentId,
+                                        )!;
+                                        tx.table('collections').delete([scope.ownerId, documentId]);
+                                        tx.table('meta').delete(
+                                            deletionKey(scope.ownerId, documentId),
+                                        );
+                                        starred.delete(documentId);
+                                        queueOf(
+                                            tx,
+                                            scope,
+                                            into.documentId,
+                                            collectionSnapshot,
+                                            (siblingQueue) => {
+                                                const saved = enqueueCollection(
+                                                    tx,
+                                                    scope,
+                                                    collectionSnapshot({
+                                                        ...into.document,
+                                                        songIds: mergeSongIds(
+                                                            into.document.songIds,
+                                                            record.document.songIds,
+                                                        ),
+                                                    }),
+                                                    into,
+                                                    into.document.revision,
+                                                    crypto.randomUUID(),
+                                                    siblingQueue,
+                                                );
+                                                starred.set(into.documentId, saved);
+                                                merged += 1;
+                                                settled();
+                                            },
+                                        );
+                                        return;
+                                    } else {
+                                        const fresh = collectionSnapshot({
+                                            ...record.document,
+                                            id: crypto.randomUUID(),
+                                            revision: 0,
+                                            createdAt: now,
+                                            updatedAt: now,
+                                        });
+                                        tx.table('collections').delete([scope.ownerId, documentId]);
+                                        tx.table('meta').delete(
+                                            deletionKey(scope.ownerId, documentId),
+                                        );
+                                        tx.table('collections').put({
+                                            ownerId: scope.ownerId,
+                                            documentId: fresh.id,
+                                            document: fresh,
+                                            remoteRevision: null,
+                                        } satisfies SavedCollection);
+                                        queueCollectionSave(tx, scope, fresh, { revision: null });
+                                        if (starred.has(documentId)) {
+                                            starred.delete(documentId);
+                                            starred.set(fresh.id, {
+                                                ownerId: scope.ownerId,
+                                                documentId: fresh.id,
+                                                document: fresh,
+                                                remoteRevision: null,
+                                            });
+                                        }
+                                    }
+                                    merged += 1;
+                                    settled();
+                                });
+                            },
+                        );
+                    }
+                };
+                tx.read(
+                    tx.table('collections').getAll(owned, MAX_REMOTE_CANDIDATES + 1),
+                    (all: SavedCollection[]) => {
+                        // Every built-in Starred this owner holds here, kept current as this
+                        // transaction writes: a `'gone'` Starred merges INTO another rather than
+                        // minting a sibling (#1477 review R2). One unreadable row is skipped here —
+                        // it is the per-id read below that decides each merge.
+                        const starred = new Map<string, SavedCollection>();
+                        for (const row of all) {
+                            try {
+                                const saved = savedCollection(row, scope, row.documentId);
+                                if (saved.document.builtIn === 'starred') {
+                                    starred.set(saved.documentId, saved);
                                 }
-                                for (const operation of queue) {
-                                    tx.table('operations').delete([
-                                        scope.ownerId,
-                                        operation.operationId,
-                                    ]);
-                                }
-                                const remote = head.remote;
-                                const now = new Date().toISOString();
-                                if (remote && isCollectionCandidate(remote.document)) {
-                                    const theirs = collectionSnapshot(remote.document);
-                                    const document = collectionSnapshot({
-                                        ...record.document,
-                                        songIds: mergeSongIds(
-                                            record.document.songIds,
-                                            theirs.songIds,
-                                        ),
-                                        revision: record.document.revision + 1,
-                                        updatedAt: now,
-                                    });
-                                    tx.table('collections').put({
-                                        ...record,
-                                        document,
-                                        remoteRevision: remote.revision,
-                                    } satisfies SavedCollection);
-                                    queueCollectionSave(tx, scope, document, {
-                                        revision: remote.revision,
-                                    });
-                                } else {
-                                    const fresh = collectionSnapshot({
-                                        ...record.document,
-                                        id: crypto.randomUUID(),
-                                        revision: 0,
-                                        createdAt: now,
-                                        updatedAt: now,
-                                    });
-                                    tx.table('collections').delete([scope.ownerId, documentId]);
-                                    tx.table('meta').delete(deletionKey(scope.ownerId, documentId));
-                                    tx.table('collections').put({
-                                        ownerId: scope.ownerId,
-                                        documentId: fresh.id,
-                                        document: fresh,
-                                        remoteRevision: null,
-                                    } satisfies SavedCollection);
-                                    queueCollectionSave(tx, scope, fresh, { revision: null });
-                                }
-                                merged += 1;
-                                settled();
-                            });
-                        },
-                    );
-                }
+                            } catch {
+                                // Not a Starred this merge can build on.
+                            }
+                        }
+                        mergeEach(starred);
+                    },
+                );
             });
         });
     }
@@ -2518,6 +2624,10 @@ export class AccountSongbook {
                 const key = deletionKey(scope.ownerId, documentId);
                 // Either kind (#1474): a collection is deleted through this same frozen request.
                 savedRecord(tx, scope, documentId, (record) => {
+                    if (record?.kind === 'collection' && record.saved.document.builtIn) {
+                        // No delete request is ever frozen for a built-in (#1477 review R2).
+                        throw new BuiltInCollectionError('deleted');
+                    }
                     const song = record?.saved ?? null;
                     if (!song || song.remoteRevision === null) {
                         tx.table('meta').delete(key);

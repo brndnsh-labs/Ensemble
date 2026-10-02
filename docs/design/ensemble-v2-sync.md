@@ -130,15 +130,29 @@ table, Save, read and delete routes; and the same per-owner document cap.
 - **Starred is a built-in collection at one fixed id (`collection-starred`), created lazily.** The
   first star creates it — never startup, so an account at the document cap is never handed a Save
   it must refuse (a create this device can see is past the cap is refused locally). Two devices
-  that each star offline both create the fixed id, so they meet as an ordinary conflict and merge,
-  never as two Starred collections. The device-local stars that came before (#1440) are COPIED in
+  that each star offline both create the fixed id, so they meet as an ordinary conflict and merge.
+  What keeps that true is that the fixed id is never tombstoned: Starred cannot be deleted, renamed
+  or un-marked at ANY layer — the UI offers no way, both repositories refuse it
+  (`BuiltInCollectionError`), and no delete request is ever frozen for it (`prepareDelete`). A
+  tombstoned fixed id would answer every device's create with `remote: null`, and each would
+  re-create Starred under its own fresh id. Should that ever happen anyway, the merge moves a
+  `'gone'` Starred's songs INTO another Starred this device holds rather than minting a second
+  one; it cannot unite two devices that never saw each other's, which is why the guard is the
+  guarantee. The device-local stars that came before (#1440) are COPIED in
   once and never deleted: a guest's only while no Starred exists, an account's once per device
   behind a `stars-migrated:<owner>` meta marker written in the same transaction as the Save.
 - **Collections are counted where songs are.** The sign-out preflight reports unsent collection
   Saves apart from songs (they have no file to export), and the sync chip counts them across the
   account, since a collection is never the watched document.
+- **A collection moving never re-reads the song library.** The sync loop publishes two counters:
+  `libraryVersion` only when SONGS changed (a commit, a conflict, a download of a chart), which
+  re-reads and re-validates the whole library, and `collectionsVersion` when collections did (a
+  collection Save committed, a merge, a download of a collection), which re-reads only the
+  collections. A star uploading must not cost a 2,000-song songbook a full re-read.
 - **Guest collections are adopted with guest songs** (`adoptGuestCollections`): song ids remapped to
-  the ids those songs are adopted under, the guest Starred merged into the account's.
+  the ids those songs are adopted under, the guest Starred merged into the account's. When every
+  guest song is already in the account, the offer still opens if a guest collection holds songs
+  the account's copy lacks (`pendingGuestCollections`), and asks about the collections alone.
 
 Client-provided owner IDs are routing hints, never authorization. Every server query uses
 the authenticated owner, including list, receipt lookup, update, delete, export and feedback.
