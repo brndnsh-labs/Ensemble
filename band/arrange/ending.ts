@@ -63,51 +63,61 @@ function isHome(timeline: Timeline, chord: ChordFacts, tick: number, key: KeyCon
     return chord.bass === key.tonic && restsOnTonic(timeline, chord, tick, key);
 }
 
-const BACKED = new WeakMap<Timeline, Map<string, boolean>>();
+/** The key of the bar sounding at `tick` (bars are in order: the last one starting by then). */
+function keyAt(timeline: Timeline, tick: number): KeyContext | undefined {
+    const { bars } = timeline;
+    let lo = 0;
+    let hi = bars.length - 1;
+    while (lo < hi) {
+        const mid = (lo + hi + 1) >> 1;
+        if (bars[mid].start <= tick) {
+            lo = mid;
+        } else {
+            hi = mid - 1;
+        }
+    }
+    return bars[lo]?.key;
+}
 
 /**
- * Does the chart itself rest on this key's tonic somewhere: a tonic-rooted chord in a stable
- * family, in a bar in this key? A chart typed without setting its key reads as C major, so an F
- * tune whose last bar is `Gm7 C7` would otherwise "resolve" to C, and an A minor tune ending on
- * `E7` to C6. A key the chart never sits on is not one to end in, so its written chord stands.
- * A tonic dominant that resolves down a fifth (`C7` → `F`) is a V, not a tonic, and doesn't
- * count; one that doesn't (a blues's `C7` → `C7`, `C7` → `A7`) does.
+ * Does the chart itself rest on this key's tonic somewhere, in a bar in this key? A chart typed
+ * without setting its key reads as C major, so an F tune whose last bar is `Gm7 C7` would
+ * otherwise "resolve" to C, and an A minor tune ending on `E7` to C6. A key the chart never sits
+ * on is not one to end in, so its written chord stands.
+ * - A chart that OPENS on a stable chord on the tonic is in that key outright, whatever follows
+ *   it: a dominant I–IV vamp (`E9 | A9`, `C7 | F7`) falls a fifth from every I, and is still in
+ *   I. (An F blues keyed C opens on F7, an F tune on F, an A minor tune on Am: none backs C.)
+ * - Anywhere else a chord counts when it rests on the tonic (`restsOnTonic`): a tonic dominant
+ *   that falls a fifth to the next chord (`C7` → `F`) is a V there, not a tonic.
+ * Computed afresh on each call (once per pass): a pure scan that usually stops at the first
+ * chord, so the engine keeps no memo between passes.
  */
 function keyBacked(timeline: Timeline, key: KeyContext): boolean {
-    let byKey = BACKED.get(timeline);
-    if (!byKey) {
-        byKey = new Map();
-        BACKED.set(timeline, byKey);
+    const { spans } = timeline;
+    const sameKey = (tick: number) => {
+        const here = keyAt(timeline, tick);
+        return here?.tonic === key.tonic && here.minor === key.minor;
+    };
+    const opening = spans.find((span) => span.chord);
+    if (
+        opening?.chord &&
+        sameKey(opening.start) &&
+        opening.chord.root === key.tonic &&
+        STABLE.has(opening.chord.family)
+    ) {
+        return true;
     }
-    const id = `${key.tonic}:${key.minor}`;
-    const known = byKey.get(id);
-    if (known !== undefined) {
-        return known;
-    }
-    const { spans, bars } = timeline;
-    let backed = false;
-    let b = 0;
-    for (let i = 0; i < spans.length && !backed; i++) {
-        const { chord, start } = spans[i];
-        while (b + 1 < bars.length && bars[b + 1].start <= start) {
-            b++;
-        }
-        const here = bars[b]?.key;
-        backed =
-            !!chord &&
-            !!here &&
-            here.tonic === key.tonic &&
-            here.minor === key.minor &&
-            restsOnTonic(timeline, chord, start, key);
-    }
-    byKey.set(id, backed);
-    return backed;
+    return spans.some(
+        ({ chord, start }) =>
+            !!chord && sameKey(start) && restsOnTonic(timeline, chord, start, key),
+    );
 }
 
 /**
  * The final bar as the band plays it when the pass ends there, or null when it plays the bar
  * as written. It plays as written when:
- * - it holds an N.C.: a written rest is the chart's own ending;
+ * - it opens on an N.C.: a written rest is the chart's own ending (a later N.C. is a stop the
+ *   held chord keeps: it sounds up to it, `perform.ts`);
  * - it carries a fermata: a held chord the chart asks for is a written ending, held as written
  *   (and `holdFermatas` holds the chord the chart writes there). A fermata is how a chart asks
  *   to end off the tonic;
@@ -122,13 +132,15 @@ function keyBacked(timeline: Timeline, key: KeyContext): boolean {
  */
 export function heldEnding(timeline: Timeline, index: number, quality: EndingQuality): Bar | null {
     const bar = timeline.bars[index];
-    if (!bar?.spans.length || bar.spans.some((span) => !span.chord || span.fermata)) {
+    if (!bar?.spans[0]?.chord || bar.spans.some((span) => span.fermata)) {
         return null;
     }
     if (timeline.coda && index === timeline.bars.length - 1) {
         return null;
     }
-    const home = bar.spans.findIndex((span) => isHome(timeline, span.chord!, span.start, bar.key));
+    const home = bar.spans.findIndex(
+        (span) => !!span.chord && isHome(timeline, span.chord, span.start, bar.key),
+    );
     if (home === 0) {
         return null;
     }
@@ -148,19 +160,18 @@ export function heldEnding(timeline: Timeline, index: number, quality: EndingQua
     return heldOn(bar, chord);
 }
 
-/** `bar` played as one chord, struck on its downbeat: the resolution is an arrival. */
+/**
+ * `bar` played as one chord, struck on its downbeat (the resolution is an arrival) and held to
+ * the bar's first written rest, if it has one: the chart's stop stays where it is written.
+ */
 function heldOn(bar: Bar, chord: ChordFacts): Bar {
+    const rest = bar.spans.findIndex((span) => !span.chord);
+    const end = rest > 0 ? bar.spans[rest].start : bar.start + bar.meter.barTicks;
     return {
         ...bar,
         spans: [
-            {
-                start: bar.start,
-                end: bar.start + bar.meter.barTicks,
-                chord,
-                fermata: false,
-                tied: false,
-                attack: true,
-            },
+            { start: bar.start, end, chord, fermata: false, tied: false, attack: true },
+            ...(rest > 0 ? bar.spans.slice(rest) : []),
         ],
     };
 }

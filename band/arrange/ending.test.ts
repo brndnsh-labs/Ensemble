@@ -367,12 +367,39 @@ describe('an ending already home, or written, is played as written', () => {
         }
     });
 
-    it("an N.C. in the last bar is the chart's own stop", () => {
-        const timeline = compileTimeline(
-            score([{ label: 'A', bars: 'C | F | Dm7 | G7:2 N.C.:2' }]),
-        );
+    it("an N.C. on the last downbeat is the chart's own ending", () => {
+        const timeline = compileTimeline(score([{ label: 'A', bars: 'C | F | Dm7 G7 | N.C.' }]));
         for (const style of STYLE_IDS) {
             expect(heldEnding(timeline, 3, STYLES[style].ending), style).toBeNull();
+        }
+    });
+
+    it('a stop later in the last bar: the V resolves, and the tonic sounds up to the rest', () => {
+        // `G7:2 N.C.:2`: the band still resolves the V on the downbeat, and stops where the
+        // chart writes its rest, instead of holding anything through it.
+        const timeline = compileTimeline(
+            score([{ label: 'A', bars: 'C | Am7 | Dm7 | G7:2 N.C.:2' }]),
+        );
+        const bar = timeline.bars[3];
+        const rest = bar.start + bar.meter.barTicks / 2;
+        for (const style of STYLE_IDS) {
+            const ending = heldEnding(timeline, 3, STYLES[style].ending);
+            expect(ending?.spans[0].chord?.root, style).toBe(0);
+            expect(ending?.spans[0].end, style).toBe(rest);
+            const { events } = performPass(timeline, settingsFor(style, 'a'), {
+                pass: 0,
+                looping: false,
+            });
+            const { bass, comp, lead } = lastBar(timeline, events);
+            expect(
+                bass.map((n) => mod12(n.midi)),
+                style,
+            ).toEqual([0]);
+            for (const n of [...bass, ...comp, ...lead]) {
+                // Struck before the rest, and silent by it (a strum's roll may land a hair
+                // late; the note still ends at the rest).
+                expect(n.tick + n.dur, `${style} ${n.lane}`).toBeLessThanOrEqual(rest + 1);
+            }
         }
     });
 
@@ -380,7 +407,12 @@ describe('an ending already home, or written, is played as written', () => {
         // Typed without setting the key, a chart reads as C major. An F tune ending on its
         // ii–V (C7 is its V, resolving to F, not a tonic) and an A minor tune ending on E7 hold
         // their written chord: nothing in either rests on C.
-        for (const bars of ['F | Gm7 C7 | F | Gm7 C7', 'Am | Dm7 | Bm7b5 | E7']) {
+        // An F blues keyed C: its C7s all fall to F7, and it opens on F7, not on C.
+        for (const bars of [
+            'F | Gm7 C7 | F | Gm7 C7',
+            'Am | Dm7 | Bm7b5 | E7',
+            'F7 | Bb7 | F7 | C7 | Gm7 C7',
+        ]) {
             const timeline = compileTimeline(score([{ label: 'A', bars }]));
             const written = timeline.bars[3].spans[0].chord!;
             for (const style of STYLE_IDS) {
@@ -398,9 +430,34 @@ describe('an ending already home, or written, is played as written', () => {
                 ).toEqual([written.bass]);
             }
         }
-        // A blues's C7 that goes anywhere but F (here to G7) is its tonic, and backs the key.
-        const blues = compileTimeline(score([{ label: 'A', bars: 'C7 | F7 | C7 | G7 | Dm7 G7' }]));
-        expect(heldEnding(blues, 4, STYLES.blues.ending)?.spans[0].chord?.root).toBe(0);
+        // Past the opening, a C7 that goes anywhere but F (here to G7) is a tonic, and backs C.
+        const blues = compileTimeline(score([{ label: 'A', bars: 'F7 | C7 | G7 | Dm7 G7' }]));
+        expect(heldEnding(blues, 3, STYLES.blues.ending)?.spans[0].chord?.root).toBe(0);
+    });
+
+    it('a dominant I–IV vamp is in I: it opens there, and its last IV resolves', () => {
+        // Every I7 falls a fifth to the IV7, but a chart that opens on its I is in I.
+        for (const [bars, key, tonic] of [
+            ['E9 | / | A9 | /', 'E', 4],
+            ['C7 | F7', 'C', 0],
+        ] as const) {
+            const timeline = compileTimeline(score([{ label: 'A', bars }], { key }));
+            const last = timeline.bars.length - 1;
+            for (const style of STYLE_IDS) {
+                expect(
+                    heldEnding(timeline, last, STYLES[style].ending)?.spans[0].chord?.root,
+                    `${style} ${bars}`,
+                ).toBe(tonic);
+                const { events } = performPass(timeline, settingsFor(style, 'a'), {
+                    pass: 0,
+                    looping: false,
+                });
+                expect(
+                    lastBar(timeline, events).bass.map((n) => mod12(n.midi)),
+                    `${style} ${bars}`,
+                ).toEqual([tonic]);
+            }
+        }
     });
 
     it('a D.C. al Coda ends the way its coda is written', () => {

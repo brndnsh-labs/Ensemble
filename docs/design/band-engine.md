@@ -287,13 +287,17 @@ minor key the minor equivalents (im6 for jazz and bossa, im9, im7, the minor tri
 - **A bar that gets home itself.** When a later chord of the last bar rests on the tonic (`G7
   C`, `Csus4 Cmaj7`), the band holds that written chord, in its own colour, not the style's.
 - **Written endings stand: how a chart asks to end off the tonic.** A fermata on the last bar,
-  an N.C. anywhere in it, and the last bar of a written coda (`Timeline.coda`: reached through
+  an N.C. on its downbeat, and the last bar of a written coda (`Timeline.coda`: reached through
   a D.C./D.S. al Coda's hop or a counted chart's last-chorus coda) are the chart's own ending,
   played as written. A section merely labelled Tag or Ending is not: a jazz tag is the
-  turnaround repeated before the band resolves it.
+  turnaround repeated before the band resolves it. An N.C. later in the last bar (`G7:2
+  N.C.:2`) is a written stop: the bar still resolves, and the held ending, resolved or not,
+  sounds up to the rest and no further.
 - **The key has to be the chart's.** A chart typed without setting its key reads as C major, so
-  the band resolves only into a key the chart rests on somewhere (a chord resting on its tonic,
-  in a bar in that key). An F tune or an A minor tune left on C keeps its written last chord.
+  the band resolves only into a key the chart is in: one it opens on (a stable chord on the
+  tonic as its first chord, which a dominant I–IV vamp like `E9 | A9` is), or one it rests on
+  somewhere else (a chord resting on its tonic, in a bar in that key). An F tune, an F blues or
+  an A minor tune left on C keeps its written last chord.
 - **Only the ending bar's harmony changes.** The bar before it hears the resolved bar as its
   next, so its approach notes walk into the tonic (a walking bass's line toward its next
   chord, a lead-in); its chords, the comp (which never anticipates an ending) and the drums are

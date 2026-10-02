@@ -145,6 +145,7 @@ export function performPass(
                 ? { ...wrapped, lanes: wrapPlan.lanes, lead: wrapPlan.lead }
                 : wrapped;
         const heard: BarContext['heard'] = { drums: [], bass: [], lead: [] };
+        const barFirst = events.length;
         const context = (lane: Lane): BarContext => ({
             timeline,
             bar: plan.ending && ending?.index === i ? ending : bar,
@@ -203,6 +204,18 @@ export function performPass(
             const out = comp.play(context('comp'), memory.comp);
             memory.comp = out.memory;
             events.push(...out.events);
+        }
+        if (plan.ending) {
+            // A written stop in the last bar (`G7:2 N.C.:2`): the held ending sounds up to it
+            // and no further, resolved or not. The lanes hold their last chord for the bar.
+            const played = ending?.index === i ? ending : bar;
+            const rest = played.spans.find((span, k) => k > 0 && !span.chord);
+            for (let k = barFirst; rest && k < events.length; k++) {
+                const e = events[k];
+                if (e.lane !== 'drums' && e.tick < rest.start && e.tick + e.dur > rest.start) {
+                    events[k] = { ...e, dur: rest.start - e.tick };
+                }
+            }
         }
         const looking = i === through - 1 && i >= until && through < lookLimit;
         if (
