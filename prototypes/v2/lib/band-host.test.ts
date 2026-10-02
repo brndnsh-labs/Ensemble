@@ -7,7 +7,8 @@
  * The synth voices are mocked out: this suite is about scheduling and timing, not sound, and a
  * fake `AudioContext` has none of the nodes the real voices need.
  *
- * Also the counted chart (#1475): N choruses played once, then the host stops by itself.
+ * Also the counted chart (#1475): N choruses played once, then the host stops by itself; and
+ * releasing a practice loop (#1484).
  */
 import {
     type BandEvent,
@@ -102,6 +103,37 @@ const drumsOnly = {
  * real timers — `pump` is private, but TypeScript's `private` erases at runtime. */
 function pump(host: BandHost): void {
     (host as unknown as { pump(): void }).pump();
+}
+
+type Queued = { window: { from: number }; events: BandEvent[] };
+
+/** Pump the host every 50 ms of audio time from `from` up to (not including) `to`. */
+function run(
+    host: BandHost,
+    audio: ReturnType<typeof fakeAudioContext>,
+    from: number,
+    to: number,
+): void {
+    for (let t = from; t < to - 1e-9; t += 0.05) {
+        audio.currentTime = t;
+        pump(host);
+    }
+}
+
+/** Every segment the host queues, in order (read off its private queue after each pump). */
+function watchSegments(host: BandHost): () => Queued[] {
+    const seen: Queued[] = [];
+    const internals = host as unknown as { segments: Queued[]; pump(): void };
+    const original = internals.pump.bind(host);
+    internals.pump = () => {
+        original();
+        for (const segment of internals.segments) {
+            if (!seen.includes(segment)) {
+                seen.push(segment);
+            }
+        }
+    };
+    return () => seen;
 }
 
 describe('countInPlan', () => {
@@ -273,37 +305,6 @@ describe('BandHost counted choruses', () => {
     const BPM = 120;
     /** 4/4 at 120: two seconds a bar. */
     const BAR_S = 2;
-
-    type Queued = { window: { from: number }; events: BandEvent[] };
-
-    /** Pump the host every 50 ms of audio time from `from` up to (not including) `to`. */
-    function run(
-        host: BandHost,
-        audio: ReturnType<typeof fakeAudioContext>,
-        from: number,
-        to: number,
-    ): void {
-        for (let t = from; t < to - 1e-9; t += 0.05) {
-            audio.currentTime = t;
-            pump(host);
-        }
-    }
-
-    /** Every segment the host queues, in order (read off its private queue after each pump). */
-    function watchSegments(host: BandHost): () => Queued[] {
-        const seen: Queued[] = [];
-        const internals = host as unknown as { segments: Queued[]; pump(): void };
-        const original = internals.pump.bind(host);
-        internals.pump = () => {
-            original();
-            for (const segment of internals.segments) {
-                if (!seen.includes(segment)) {
-                    seen.push(segment);
-                }
-            }
-        };
-        return () => seen;
-    }
 
     it('plays every chorus, the coda only in the last, and stops at the end of its final bar', () => {
         const audio = fakeAudioContext(10);
@@ -515,6 +516,81 @@ describe('BandHost counted choruses', () => {
         expect(onsets.some((tick) => tick >= coda.start)).toBe(true);
         expect(Math.max(...onsets)).toBeLessThan(timeline.ticks);
         expect(timeline.ticks).toBe(7 * coda.meter.barTicks);
+    });
+});
+
+/**
+ * Releasing a practice loop: the lap under way finishes, then the song carries on from the bar
+ * after the loop. A settings change after the release regenerates what is still to come, and
+ * must regenerate it from the same place (#1484).
+ */
+describe('BandHost releasing a practice loop', () => {
+    const BPM = 120;
+    /** 4/4 at 120: two seconds a bar. */
+    const BAR_S = 2;
+    /** A (two bars) then B (two bars): a loop on A has a song to carry on into. */
+    const aThenB = song([
+        {
+            id: 'a',
+            label: 'A',
+            repeat: 1,
+            measures: [bar('a1', [chord('C', 4)]), bar('a2', [chord('F', 4)])],
+        },
+        {
+            id: 'b',
+            label: 'B',
+            repeat: 1,
+            measures: [bar('b1', [chord('G7', 4)]), bar('b2', [chord('C', 4)])],
+        },
+    ]);
+
+    it('a settings change in the last two seconds of the lap still carries on after the loop', () => {
+        const audio = fakeAudioContext(10);
+        const state = fakeState(audio);
+        const host = new BandHost({ state: () => state, silence: () => {} });
+        host.setScore(aThenB);
+        const timeline = compileTimeline(aThenB);
+        const loopA = { from: 0, to: timeline.bars[2].start };
+        host.start(drumsOnly, BPM, 0, loopA);
+        // Laps of A are two bars (four seconds) from 10.1 s: release a second into the second.
+        const lapEnd = 10.1 + 4 * BAR_S;
+        run(host, audio, 10.1, lapEnd - 3);
+        host.setLoop(null);
+        // The bar after the loop is queued two seconds ahead of the lap's end; then the band
+        // changes, inside that window.
+        run(host, audio, lapEnd - 3, lapEnd - 1);
+        host.update({ ...drumsOnly, intensity: 0.9 });
+        run(host, audio, lapEnd - 1, lapEnd + BAR_S / 2);
+        // Half a bar after the lap, the band is in B's first bar, not back at the top.
+        const tick = host.songTick();
+        expect(tick).not.toBeNull();
+        expect(tick!).toBeGreaterThanOrEqual(timeline.bars[2].start);
+        expect(tick!).toBeLessThan(timeline.bars[3].start);
+        host.stop();
+    });
+
+    it('on a counted chart, a settings change after a last-bar release still plays the section once more', () => {
+        // The counted twin: released in the last bar of the last section, the section plays
+        // once more and ends. A settings change after that must not cut the extra time short.
+        const audio = fakeAudioContext(10);
+        const state = fakeState(audio);
+        const onEnd = vi.fn();
+        const host = new BandHost({ state: () => state, silence: () => {}, onEnd });
+        const score = { ...song([{ ...twoBars.sections[0] }]), choruses: 1 };
+        host.setScore(score);
+        const timeline = compileTimeline(score);
+        host.start(drumsOnly, BPM, 0, { from: 0, to: timeline.ticks });
+        // Into the second lap's last bar (laps are two bars, from 10.1 s), then release.
+        run(host, audio, 10.1, 10.1 + 3.25 * BAR_S);
+        host.setLoop(null);
+        run(host, audio, 10.1 + 3.25 * BAR_S, 10.1 + 3.5 * BAR_S);
+        host.update({ ...drumsOnly, intensity: 0.9 });
+        const end = 10.1 + 6 * BAR_S;
+        run(host, audio, 10.1 + 3.5 * BAR_S, end);
+        expect(onEnd).not.toHaveBeenCalled();
+        audio.currentTime = end;
+        pump(host);
+        expect(onEnd).toHaveBeenCalledTimes(1);
     });
 });
 
