@@ -9,6 +9,10 @@ import { directionLabel } from '../lib/score-labels';
 type WrittenSection = SemanticScore['sections'][number];
 type WrittenBar = WrittenSection['measures'][number];
 
+/** How long a press on a section letter must last to arm the practice loop instead of opening
+ * the section menu. */
+const SECTION_HOLD_MS = 500;
+
 /**
  * The visible chord symbol in the chart's current notation (#1276). `chord.display`
  * (`FormattedChordNames`) is precomputed for all three notations by
@@ -104,6 +108,8 @@ export function ChartSheet({
     // the click that follows a fired long-press doesn't also fire the plain-tap
     // handler below (the section menu, #1422).
     const sectionLoopPress = useRef<number | null>(null);
+    // When the pending press went down, on the input events' own clock (`event.timeStamp`).
+    const sectionPressStart = useRef(0);
     const suppressSectionTap = useRef(false);
     // A plain tap opens this small menu (#1422) instead of the long-press/'L' loop
     // toggle above, which it leaves untouched. One menu for the whole sheet, not
@@ -175,7 +181,7 @@ export function ChartSheet({
                             aria-keyshortcuts="L"
                             aria-haspopup="menu"
                             aria-expanded={sectionMenu?.id === block.id}
-                            onPointerDown={() => {
+                            onPointerDown={(event) => {
                                 // A long-press whose click never arrived (a
                                 // touch released off-target) must not leave
                                 // the flag set and swallow the NEXT tap, which
@@ -184,16 +190,32 @@ export function ChartSheet({
                                 if (sectionLoopPress.current !== null) {
                                     window.clearTimeout(sectionLoopPress.current);
                                 }
+                                sectionPressStart.current = event.timeStamp;
                                 sectionLoopPress.current = window.setTimeout(() => {
                                     sectionLoopPress.current = null;
                                     suppressSectionTap.current = true;
                                     onToggleLoop(block.id);
-                                }, 500);
+                                }, SECTION_HOLD_MS);
                             }}
-                            onPointerUp={() => {
-                                if (sectionLoopPress.current !== null) {
-                                    window.clearTimeout(sectionLoopPress.current);
-                                    sectionLoopPress.current = null;
+                            onPointerUp={(event) => {
+                                if (sectionLoopPress.current === null) {
+                                    return;
+                                }
+                                window.clearTimeout(sectionLoopPress.current);
+                                sectionLoopPress.current = null;
+                                // The timer can lose to the release: when the
+                                // main thread is busy across its due time,
+                                // both engines run the queued pointerup
+                                // before the overdue timer, so a real hold
+                                // read as a tap and opened the menu (#1496).
+                                // The events' own timestamps say how long the
+                                // press lasted, however late they are handled.
+                                if (
+                                    event.timeStamp - sectionPressStart.current >=
+                                    SECTION_HOLD_MS
+                                ) {
+                                    suppressSectionTap.current = true;
+                                    onToggleLoop(block.id);
                                 }
                             }}
                             onPointerLeave={() => {

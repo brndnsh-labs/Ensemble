@@ -692,15 +692,19 @@ test('real runtime, local saves, reload recovery and offline playback', async ({
     expect(errors).toEqual([]);
 });
 
-test('responsive chart and editor fit laptop, phone and tablet', async ({ page }) => {
-    await seedStarters(page);
-    await songLink(page, 'Blue pocket', 'Blues').click();
-    for (const [width, height] of [
-        [1300, 940],
-        [402, 874],
-        [874, 402],
-        [820, 1180],
-    ]) {
+// One test per screen (#1496). The four screens in one test ran 45-47s on a loaded WebKit runner
+// against the suite's 45s budget: each opens and closes the Sounds dialog, plays and stops three
+// times and takes two screenshots, and headless WebKit renders the first frames after a dialog
+// opens at up to a second each, which Playwright's stable-element wait has to sit through.
+for (const [width, height] of [
+    [1300, 940],
+    [402, 874],
+    [874, 402],
+    [820, 1180],
+]) {
+    test(`responsive chart and editor fit ${width}x${height}`, async ({ page }) => {
+        await seedStarters(page);
+        await songLink(page, 'Blue pocket', 'Blues').click();
         await page.setViewportSize({ width, height });
         await expect(
             page.getByRole('button', { name: 'Start playback', exact: true }),
@@ -743,9 +747,8 @@ test('responsive chart and editor fit laptop, phone and tablet', async ({ page }
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
             true,
         );
-        await page.getByRole('button', { name: 'Chart', exact: true }).click();
-    }
-});
+    });
+}
 
 test('two tabs cannot overwrite a newer save; a conflicting take can become a copy', async ({
     page,
