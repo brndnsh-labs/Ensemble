@@ -98,8 +98,13 @@ table, Save, read and delete routes; and the same per-owner document cap.
   `kind: 'collection'`, and any other `kind` is refused. The manifest names a live collection
   row's `kind`; a chart row and a tombstone carry none.
 - **One id space per owner across kinds.** The outbox walks songs and collections merged in id
-  order under one cursor, and a document never changes kind: the server refuses that update as a
-  conflict with no remote version, and a collection may not take a song's id locally.
+  order under one cursor, and a document never changes kind. The server answers ANY Save whose
+  id it holds as the other kind — a create, a stale update or an exact-revision one — as a
+  conflict with `remote: null`, so no reply carries a body of the other kind. Should one ever
+  arrive anyway, the client parks that Save as the same `remote: null` conflict rather than
+  rejecting the reply, so one bad id cannot stall the outbox for every document behind it.
+  Locally neither kind may take the other's id: a Save of either is refused, and a download
+  observation of either kind for an id held as the other writes nothing.
 - **A collection never owns its songs.** It is filtered when READ — an id that no longer resolves
   is left out of the view — and never rewritten: deleting a song never touches a collection, and a
   list pruned against a library download still in progress would upload the loss.

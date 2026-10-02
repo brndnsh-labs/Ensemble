@@ -281,7 +281,7 @@ table is `src/db/save.ts` (`commitSave`, one `withTransaction`); the route is
 | Create or update over a tombstone; update of an id the owner never had | `409 … kind: 'conflict', remote: null` |
 | Any decoder refusal — including an envelope `ownerId` that is not the session's account | `400 { error: 'malformed_request' }` |
 | Owner at a storage cap (#1234) — create at `MAX_DOCUMENTS_PER_OWNER`, or a write crossing `MAX_BYTES_PER_OWNER` | `409 { error: 'quota_exceeded' }` — nothing written |
-| Update naming the exact revision of a document of the OTHER kind (a collection over a chart's id, or the reverse, #1474) | `409 … kind: 'conflict', remote: null` — a document never changes kind |
+| Any Save — create, stale or exact-revision update — whose id the owner holds as the OTHER kind (a collection at a chart's id, or the reverse, #1474) | `409 … kind: 'conflict', revision: <current>, remote: null` — a document never changes kind, and no reply carries a body of the other kind |
 
 **Two document kinds, one table (#1474).** The `document` slot holds a chart or a collection
 (`prototypes/v2/lib/collections.ts`: `{ kind: 'collection', schemaVersion: 1, id, name, revision,
@@ -290,9 +290,10 @@ request, stored body and reply is byte-for-byte what it was before collections e
 shared decoder (`syncDocument` in `lib/sync/protocol.ts`) dispatches on `kind` and refuses any
 other value. A collection is stored, read, deleted and tombstoned through exactly the routes
 below, its ids share the owner's one id space, and it counts toward `MAX_DOCUMENTS_PER_OWNER`
-like any other row (`test/http/documents-collections.test.ts`). `commitSave` refuses an update
-that would change a stored document's kind (`documentKindOf`), answering it as a conflict with no
-remote, because there is no version of THIS document there to resolve against.
+like any other row (`test/http/documents-collections.test.ts`). `commitSave` decides kind
+(`documentKindOf`) BEFORE any revision branch: any Save whose id holds the other kind is a
+conflict with no remote, because there is no version of THIS document there to resolve against —
+so neither a create nor a stale update can hand a client a body of the wrong kind.
 
 Design points worth knowing before changing it:
 

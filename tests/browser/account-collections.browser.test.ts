@@ -237,18 +237,35 @@ describe('an account collection through the outbox (#1474)', () => {
         expect(await book.prepare(scope, 'set-a')).toBe('conflict');
     });
 
-    it('refuses a conflict reply whose remote is a different kind, writing nothing', async () => {
-        await book.saveCollection(scope, collection('set-a'), null);
+    it('parks a Save whose conflict remote is the other kind, and the pass goes on (review R1)', async () => {
+        // Both directions, each with a later document behind it in id order: a reply naming the
+        // other kind must not stall the outbox for everything after that id.
+        await book.saveCollection(scope, collection('a-set'), null);
+        await book.save(scope, accountChart('B', 'b-song'), null);
+        await book.save(scope, accountChart('Z', 'z-song'), null);
         const server = cloud({
             conflict: new Map([
-                ['set-a', { revision: 'cloud-chart', document: accountChart('X', 'set-a') }],
+                ['a-set', { revision: 'cloud-chart', document: accountChart('X', 'a-set') }],
+                ['b-song', { revision: 'cloud-set', document: collection('b-song') }],
             ]),
         });
-        await expect(runOutboxPass(book, scope, server.transport)).rejects.toThrow(
-            'does not match',
-        );
-        const [head] = await book.pendingCollection(scope, 'set-a');
-        expect(head.status).toBe('queued');
+        const result = await runOutboxPass(book, scope, server.transport);
+        expect(result.kind).toBe('complete');
+        expect(result.counts).toMatchObject({ conflict: 2, committed: 1 });
+
+        // Parked as a document this kind no longer has there: no body of the other kind is kept.
+        const [collectionHead] = await book.pendingCollection(scope, 'a-set');
+        expect(collectionHead.status).toBe('conflict');
+        expect(collectionHead.remote).toBeNull();
+        const [songHead] = await book.pending(scope, 'b-song');
+        expect(songHead.status).toBe('conflict');
+        expect(songHead.remote).toBeNull();
+        // The song behind both of them uploaded in the same pass.
+        expect((await book.read(scope, 'z-song'))?.remoteRevision).toBe('cloud-z-song-1');
+        // And the next pass spends no request on either parked head.
+        const next = cloud();
+        await runOutboxPass(book, scope, next.transport);
+        expect(next.calls).toEqual([]);
     });
 
     it('a refused head (#1298) retires with the next Save, as a song’s does', async () => {
@@ -273,6 +290,54 @@ describe('an account collection through the outbox (#1474)', () => {
         await book.saveCollection(scope, collection('set-a'), null);
         await expect(book.pending(scope, 'set-a')).rejects.toThrow();
         expect(await book.queued(scope, 'set-a')).toHaveLength(1);
+    });
+
+    it('keeps one id space the other way: a song cannot take a collection’s id (review R1)', async () => {
+        await book.saveCollection(scope, collection('set-a'), null);
+        await expect(book.save(scope, accountChart('A', 'set-a'), null)).rejects.toThrow(
+            'already belongs to a collection',
+        );
+        expect(await book.read(scope, 'set-a')).toBeNull();
+        expect(await book.queued(scope, 'set-a')).toHaveLength(1);
+    });
+
+    it('a download never writes one kind beside the other at the same id (review R1)', async () => {
+        await book.saveCollection(scope, collection('set-a'), null);
+        await book.save(scope, accountChart('A', 'song-a'), null);
+        // A chart body for an id held as a collection: nothing written, no candidate.
+        expect(
+            await book.reconcile(scope, {
+                kind: 'version',
+                documentId: 'set-a',
+                revision: 'r-chart',
+                document: accountChart('X', 'set-a'),
+            }),
+        ).toBe('superseded');
+        expect(await book.read(scope, 'set-a')).toBeNull();
+        expect(await book.remoteCandidate(scope, 'set-a')).toBeNull();
+        // A collection body for an id held as a song: nothing written.
+        expect(
+            await book.reconcileCollection(scope, {
+                kind: 'version',
+                documentId: 'song-a',
+                revision: 'r-set',
+                document: collection('song-a'),
+            }),
+        ).toBe('superseded');
+        expect(await book.readCollection(scope, 'song-a')).toBeNull();
+        // Tombstones of the wrong kind remove nothing of the right one.
+        expect(
+            await book.reconcile(scope, { kind: 'deleted', documentId: 'set-a', revision: 'r' }),
+        ).toBe('unchanged');
+        expect(
+            await book.reconcileCollection(scope, {
+                kind: 'deleted',
+                documentId: 'song-a',
+                revision: 'r',
+            }),
+        ).toBe('unchanged');
+        expect(await book.readCollection(scope, 'set-a')).not.toBeNull();
+        expect(await book.read(scope, 'song-a')).not.toBeNull();
     });
 
     it('compare-and-swaps on the local revision', async () => {

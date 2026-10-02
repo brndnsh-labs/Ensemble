@@ -1103,6 +1103,17 @@ export class AccountSongbook {
         // server-side `conflict` enforces remotely.
         const operationId = crypto.randomUUID();
         return this.database.run('readwrite', scope, (tx) => {
+            // One id space per owner across kinds (#1474 review R1): a song never takes a
+            // collection's id, the mirror of `saveCollection`'s check. Requested first, so its
+            // callback runs first and its refusal aborts before the song read below acts.
+            tx.read(
+                tx.table('collections').getKey([scope.ownerId, document.id]),
+                (collection: IDBValidKey | undefined) => {
+                    if (collection !== undefined) {
+                        throw new Error('This id already belongs to a collection.');
+                    }
+                },
+            );
             tx.read(
                 tx.table('songs').get([scope.ownerId, document.id]),
                 (previous: SavedSong | undefined) => {
@@ -1539,16 +1550,20 @@ export class AccountSongbook {
                     if (response.kind === 'conflict') {
                         // `reply()` accepts a remote of either kind; only one of the operation's
                         // own kind may be preserved beside it. Another kind under this id is not
-                        // a version of this document at all, and a server that sent one is
-                        // broken — refused like any other reply that does not match its request.
-                        if (
+                        // a version of this document at all — the account holds the id as the
+                        // other kind — so it is parked exactly as a missing document is, with NO
+                        // remote (#1474 review R1). Throwing here instead would leave the head
+                        // queued, re-sent and rejected on every pass, and since a storage-side
+                        // throw ends the drain, every document after this id would never upload.
+                        // The current server never sends one (`commitSave` answers a cross-kind
+                        // write with `remote: null`); this is the defence for one that did.
+                        const remote =
                             response.remote !== null &&
                             documentKind(response.remote.document) !== kind
-                        ) {
-                            throw new Error('Remote conflict version does not match this song.');
-                        }
+                                ? null
+                                : response.remote;
                         operation.status = 'conflict';
-                        operation.remote = response.remote;
+                        operation.remote = remote;
                         tx.table('operations').put(operation);
                         return tx.finish('conflict');
                     }
@@ -2347,9 +2362,23 @@ export class AccountSongbook {
             const key = candidateKey(scope.ownerId, documentId);
             const candidate = (): RemoteCandidate =>
                 Object.assign({ key, ownerId: scope.ownerId }, observed);
+            // One id space per owner across kinds (#1474 review R1): an id this device holds as a
+            // COLLECTION is not a chart's to write, so a chart observation for it writes nothing —
+            // not a song beside the collection, not a candidate. Requested first, so it is known
+            // before the song read's callback runs.
+            let heldAsCollection = false;
+            tx.read(
+                tx.table('collections').getKey([scope.ownerId, documentId]),
+                (collection: IDBValidKey | undefined) => {
+                    heldAsCollection = collection !== undefined;
+                },
+            );
             tx.read(
                 tx.table('songs').get([scope.ownerId, documentId]),
                 (stored: SavedSong | undefined) => {
+                    if (heldAsCollection) {
+                        return tx.finish(observed.kind === 'deleted' ? 'unchanged' : 'superseded');
+                    }
                     const song = stored ? savedSong(stored, scope, documentId) : null;
                     liveDrafts(tx, scope, documentId, song, (drafts: number) => {
                         operations(tx, scope, documentId, (queue) => {
@@ -2482,9 +2511,21 @@ export class AccountSongbook {
             throw new Error('Unknown remote observation kind.');
         }
         return this.database.run('readwrite', scope, (tx) => {
+            // The mirror of `reconcile`'s check (#1474 review R1): an id this device holds as a
+            // SONG is not a collection's to write, so nothing is written beside it.
+            let heldAsSong = false;
+            tx.read(
+                tx.table('songs').getKey([scope.ownerId, documentId]),
+                (song: IDBValidKey | undefined) => {
+                    heldAsSong = song !== undefined;
+                },
+            );
             tx.read(
                 tx.table('collections').get([scope.ownerId, documentId]),
                 (row: SavedCollection | undefined) => {
+                    if (heldAsSong) {
+                        return tx.finish(document === null ? 'unchanged' : 'superseded');
+                    }
                     const collection = storedCollection(row, scope, documentId);
                     queueOf(tx, scope, documentId, collectionSnapshot, (queue) => {
                         const held = queue.length > 0;

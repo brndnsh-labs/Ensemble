@@ -197,6 +197,28 @@ describe('collections through the document routes (#1474)', () => {
         );
     });
 
+    it.each([
+        ['a collection created at a chart’s id', 'chart', 'collection', null],
+        ['a chart created at a collection’s id', 'collection', 'chart', null],
+        ['a stale collection update at a chart’s id', 'chart', 'collection', 'rev-stale'],
+        ['a stale chart update at a collection’s id', 'collection', 'chart', 'rev-stale'],
+    ] as const)(
+        'never hands back the other kind as a remote: %s (review R1)',
+        async (_label, stored, sent, expected) => {
+            ctx = await setUp();
+            const make = (kind: 'chart' | 'collection') =>
+                kind === 'chart' ? makeChartDocument('shared') : collection('shared');
+            await save(ctx, 'shared', 'op-1', null, make(stored));
+            const reply = await save(ctx, 'shared', 'op-2', expected, make(sent));
+            // The same answer in every branch: the id is not this kind's, so there is no version of
+            // THIS document to resolve against — never a body of the other kind.
+            expect(reply.status).toBe(409);
+            expect(reply.json).toMatchObject({ kind: 'conflict', revision: 'rev-1', remote: null });
+            const body = JSON.parse(readDocument(ctx.testDb.db, ctx.accountId, 'shared')!.body);
+            expect(body.kind === 'collection' ? 'collection' : 'chart').toBe(stored);
+        },
+    );
+
     it('refuses a malformed collection exactly as it refuses a malformed chart', async () => {
         ctx = await setUp();
         const duplicate = { ...collection('set-1'), songIds: ['a', 'a'] };
