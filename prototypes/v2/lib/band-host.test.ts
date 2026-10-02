@@ -607,6 +607,112 @@ describe('BandHost counted choruses', () => {
 });
 
 /**
+ * A looping song's laps (#1492): the host carries each lap's memory into the next across the
+ * wrap. The comp remembers where the lead's last note ends as a song tick, which the wrap
+ * moves into the new lap's ticks, so trading with the soloist, lap k of the loop comps as
+ * chorus k of the same chart counted does — the top of the lap included.
+ */
+describe('BandHost looping laps', () => {
+    const BPM = 120;
+    /** 4/4 at 120: two seconds a bar. */
+    const BAR_S = 2;
+    const blues = song([
+        {
+            id: 'a',
+            label: 'A',
+            repeat: 1,
+            measures: [
+                'C7',
+                'F7',
+                'C7',
+                'C7',
+                'F7',
+                'F7',
+                'C7',
+                'A7',
+                'Dm7',
+                'G7',
+                ['C7', 'A7'],
+                ['Dm7', 'G7'],
+            ].map((symbols, i) =>
+                bar(
+                    `b${i}`,
+                    typeof symbols === 'string'
+                        ? [chord(symbols, 4)]
+                        : symbols.map((s) => chord(s, 2)),
+                ),
+            ),
+        },
+    ]);
+
+    it('comps lap k of a traded loop as chorus k of the chart counted, from the top of the lap', () => {
+        const length = 12;
+        const counted = compileTimeline({ ...blues, choruses: 5 });
+        /** Ticks to a millionth: swing's arithmetic far into a long timeline rounds differently. */
+        const fine = (n: number) => Math.round(n * 1e6) / 1e6;
+        /**
+         * The comp's notes in the chorus or lap from bar `from`, moved to start at tick 0 — all
+         * but a chord ringing past its end, which only the counted pass voices under the next
+         * chorus's lead.
+         */
+        const comp = (events: BandEvent[], timeline: Timeline, from: number) => {
+            const start = timeline.bars[from].start;
+            const last = timeline.bars[from + length - 1];
+            const end = last.start + last.meter.barTicks;
+            return events
+                .filter(
+                    (e) =>
+                        e.lane === 'comp' &&
+                        e.bar >= from &&
+                        e.bar < from + length &&
+                        e.tick + e.dur <= end + 1e-6,
+                )
+                .map((e) =>
+                    e.lane === 'comp'
+                        ? [e.bar - from, fine(e.tick - start), fine(e.dur), e.midi, e.velocity]
+                        : [],
+                );
+        };
+        const failures: string[] = [];
+        for (const style of ['jazz', 'blues', 'neosoul'] as const) {
+            for (const seed of ['a', 'b']) {
+                const settings = {
+                    ...DEFAULT_SETTINGS,
+                    style,
+                    seed,
+                    lanes: { drums: true, bass: true, comp: true, lead: true },
+                    trade: { with: 'lead', bars: 4, choruses: null } as const,
+                };
+                const audio = fakeAudioContext(10);
+                const state = fakeState(audio);
+                const host = new BandHost({ state: () => state, silence: () => {} });
+                host.setScore(blues);
+                const segments = watchSegments(host) as () => (Queued & { pass: number })[];
+                host.start(settings, BPM, 0, null);
+                run(host, audio, 10.1, 10.1 + 2.5 * length * BAR_S);
+                host.stop();
+                const once = performPass(counted, settings, { pass: 0, looping: false });
+                const laps = segments();
+                expect(laps.map((s) => s.pass).slice(0, 3)).toEqual([0, 1, 2]);
+                const looped = compileTimeline(blues);
+                for (const lap of laps.slice(0, 3)) {
+                    const heard = comp(lap.events, looped, 0);
+                    // The lap was performed, its last bar too.
+                    expect(heard.some((note) => note[0] === length - 1)).toBe(true);
+                    if (
+                        JSON.stringify(heard) !==
+                        JSON.stringify(comp(once.events, counted, lap.pass * length))
+                    ) {
+                        failures.push(`${style}/${seed} lap ${lap.pass}`);
+                    }
+                }
+            }
+        }
+        expect(failures).toEqual([]);
+    });
+});
+
+/**
  * Releasing a practice loop: the lap under way finishes, then the song carries on from the bar
  * after the loop. A settings change after the release regenerates what is still to come, and
  * must regenerate it from the same place (#1484). The lap under way is the one at the

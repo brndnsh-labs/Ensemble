@@ -15,7 +15,7 @@ import { chorusBars, firstSpanAfter, type Timeline } from './form/timeline.js';
 import { COMP_INSTRUMENTS } from './players/comp/instruments.js';
 import { LEAD_INSTRUMENTS } from './players/lead/instruments.js';
 import { feelFor, STYLES } from './styles/index.js';
-import type { BarContext } from './styles/types.js';
+import type { BarContext, DrumIdiom, PitchedIdiom } from './styles/types.js';
 import { nearestMidi } from './theory/pitch.js';
 
 /**
@@ -23,8 +23,10 @@ import { nearestMidi } from './theory/pitch.js';
  * bass note sounded — the pitch a fermata's held bass is found near (`holdFermatas`). A lane
  * owns its own memory, but the fermata is written over the whole pass after the lanes play, so
  * its reference is carried here for a pass that resumes on (or starts at) a fermata bar.
+ * `at` is the song tick the memory stands at — the barline before the next bar to play — so a
+ * pass that begins somewhere else (a loop's wrap back to its top) knows the performance jumped.
  */
-export type PassMemory = Record<Lane, unknown> & { lastBass?: number };
+export type PassMemory = Record<Lane, unknown> & { lastBass?: number; at?: number };
 
 export interface PassOptions {
     /**
@@ -118,6 +120,25 @@ export function performPass(
               lead: lead?.init() ?? null,
           };
     const { bars } = timeline;
+    // A loop's next lap continues from the memory the lap before left at its end, but in the
+    // new lap's own ticks: what a lane remembers by song tick (the comp: where the lead's last
+    // note ends) is moved by the jump back, so the top of a lap hears the lead as the top of
+    // the same chorus counted does (#1492). A resume, or a counted chorus, starts where its
+    // memory stands, and moves nothing.
+    const jump = options.memory?.at === undefined ? 0 : bars[window.from].start - options.memory.at;
+    if (jump !== 0) {
+        const idioms: [Lane, PitchedIdiom | DrumIdiom | undefined][] = [
+            ['drums', style.drums],
+            ['bass', style.bass],
+            ['lead', lead],
+            ['comp', comp],
+        ];
+        for (const [lane, idiom] of idioms) {
+            if (idiom?.rebase) {
+                memory[lane] = idiom.rebase(memory[lane], jump);
+            }
+        }
+    }
     // The held ending (`arrange/ending.ts`): a pass that ends resolves a final turnaround to
     // the tonic. Only the ending bar is played on it; every bar before it hears the chart.
     const ending = options.looping ? null : heldEnding(timeline, window.to - 1, style.ending);
@@ -131,7 +152,7 @@ export function performPass(
         const pass = options.pass + bar.visit.chorus;
         // And its place in the form: seeds are keyed on it, so chorus k plays what lap k plays.
         const place = i - chorusBars(timeline, i).first;
-        snapshots[i] = { ...memory };
+        snapshots[i] = { ...memory, at: bar.start };
         const nextIndex = i + 1 < window.to ? i + 1 : options.looping ? window.wrapTo : -1;
         // The bar after the window is planned by the pass that plays it. "Is the next bar an
         // arrival/ending" a wrap resolves the same way; who plays it comes from `wrapPlan`.
@@ -249,11 +270,12 @@ export function performPass(
         snapshots[i].lastBass = lastBass;
     }
     memory.lastBass = bassLine.at(-1)?.midi ?? lastBass;
+    const lastPlayed = bars[through - 1];
+    memory.at = lastPlayed.start + lastPlayed.meter.barTicks;
     // Where the last strike's hold may reach. A chunk that looked past its end and stopped
     // short of the performance's end: a rest or tacet bar it saw, else where the look ended
     // (the cap). Otherwise the end of the pass — a looping pass's next lap presses anew at its
     // top, and a whole pass ends there (#1488).
-    const lastPlayed = bars[through - 1];
     const horizon =
         through > until && through < window.to
             ? bars[through].start
