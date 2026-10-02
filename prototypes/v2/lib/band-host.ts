@@ -6,6 +6,9 @@
  *     pass of the song, the rest of the song after "play from here", or one lap of a
  *     practice loop. Each segment knows the audio time its first bar starts, so a tempo
  *     change only re-anchors the clock; nothing is regenerated.
+ *   - A chart that counts its choruses (`SemanticScore.choruses`, #1475) does not loop: its
+ *     timeline already holds every chorus, and the band plays it once, with its ending, a
+ *     chorus per segment, then stops (`HostOptions.onEnd`). A practice loop still loops.
  *   - A change to the band (style, intensity, lanes, swing…) regenerates from the next
  *     barline, resuming from the engine's memory snapshot at that bar.
  *   - A 25 ms timer schedules everything that starts within the next 150 ms.
@@ -60,9 +63,19 @@ const BASS_MUTE = 0.85;
 const PALM_MIN_S = 0.08;
 const PALM_MAX_S = 0.13;
 
-interface Segment {
+/** What one segment plays: `performPass`'s options, less the memory it resumes from. */
+interface SegmentPlan {
     pass: number;
     window: PassWindow;
+    /** One past the last bar played: the window's end, or the end of a counted chorus. */
+    until: number;
+    /** Whether the performance goes round again after the window (a loop, an uncounted song). */
+    looping: boolean;
+}
+
+interface Segment extends SegmentPlan {
+    /** Nothing follows: the band stops when this segment ends (a counted chart's last chorus). */
+    ends: boolean;
     /** Song-tick range the window covers. */
     from: number;
     to: number;
@@ -87,6 +100,11 @@ export interface HostOptions {
     state: () => EnsembleState;
     /** Cut every sounding note (a restart must not ring over itself). */
     silence: () => void;
+    /**
+     * A counted chart's performance has played its last bar (#1475). The host has already
+     * stopped by itself, at that barline; the runtime brings the transport to stopped.
+     */
+    onEnd?: () => void;
 }
 
 export interface Loop {
@@ -252,6 +270,10 @@ export class BandHost {
     private readonly options: HostOptions;
     private timeline: Timeline | null = null;
     private scoreKey = '';
+    /** The chart counts its choruses: the band plays them once and stops, never looping. */
+    private counted = false;
+    /** A released loop on a counted chart's last section plays it once more, then ends. */
+    private lastLap = false;
     private settings: BandSettings | null = null;
     private bpm = 120;
     private segments: Segment[] = [];
@@ -291,6 +313,7 @@ export class BandHost {
         }
         this.scoreKey = key;
         this.timeline = compileTimeline(score);
+        this.counted = score.choruses !== undefined;
         if (this.playing && this.settings) {
             // The form changed under the band: restart the song cleanly.
             this.start(this.settings, this.bpm, 0, this.loop);
@@ -325,10 +348,12 @@ export class BandHost {
         this.loop = loop;
         this.nextPass = 0;
         this.resumeBar = null;
-        const window = loop ? this.loopWindow(loop) : this.songWindow(this.barAt(fromTick));
+        this.lastLap = false;
+        const fromBar = Math.min(this.barAt(fromTick), this.timeline.bars.length - 1);
+        const first = loop ? this.lapPlan(loop) : this.songPlan(fromBar, fromBar);
         let segmentStart = audio.currentTime + 0.1;
         if (countIn) {
-            const plan = countInPlan(this.timeline, bpm, window.from);
+            const plan = countInPlan(this.timeline, bpm, first.window.from);
             const countInStart = segmentStart;
             segmentStart = countInStart + plan.seconds;
             const state = this.options.state();
@@ -337,7 +362,7 @@ export class BandHost {
             );
             this.countIn = { start: countInStart, end: segmentStart, times: plan.times, clicks };
         }
-        this.append(window, segmentStart, undefined);
+        this.append(first, segmentStart, undefined);
         this.timer = setInterval(() => this.pump(), TIMER_MS);
         this.pump();
     }
@@ -365,10 +390,20 @@ export class BandHost {
         const index = this.segments.indexOf(current);
         // Everything after the current segment is regenerated lazily with the new settings.
         this.segments.length = index + 1;
+        const cutoff = this.regenerate(current, settings, horizon);
+        this.change = { segment: current, tick: cutoff ?? current.to };
+    }
+
+    /**
+     * Regenerate `current` from the first barline after `horizon` (what is already scheduled
+     * stays), with `settings` and the segment's own `looping`. Returns that barline's tick, or
+     * null when the segment has no barline left to change at.
+     */
+    private regenerate(current: Segment, settings: BandSettings, horizon: number): number | null {
+        const timeline = this.timeline!;
         const cutoffBar = this.barAt(this.tickAt(current, horizon), true);
-        if (cutoffBar >= current.window.to) {
-            this.change = { segment: current, tick: current.to };
-            return;
+        if (cutoffBar >= current.until) {
+            return null;
         }
         // Resume from the engine's own memory at that barline, so the new bars follow on
         // from the bars actually played (voicing, bass register, a pushed chord). `origin`
@@ -378,16 +413,16 @@ export class BandHost {
         // not the fresh start a bare `from` would read as (`planBars`'s `PassWindow.origin`).
         const tail = performPass(timeline, settings, {
             pass: current.pass,
-            looping: true,
+            looping: current.looping,
             memory: current.snapshots[cutoffBar],
             window: {
                 ...current.window,
                 from: cutoffBar,
                 origin: current.window.origin ?? current.window.from,
             },
+            until: current.until,
         });
         const cutoff = timeline.bars[cutoffBar].start;
-        this.change = { segment: current, tick: cutoff };
         current.events = current.events.filter((e) => e.tick < cutoff).concat(tail.events);
         current.cursor = current.events.findIndex(
             (e) => this.timeOf(current, e.tick) + e.offsetMs / 1000 > horizon,
@@ -397,10 +432,11 @@ export class BandHost {
         }
         current.chordSizes = chordSizes(current.events);
         current.legato = legatoLeads(current.events);
-        for (let bar = cutoffBar; bar < current.window.to; bar++) {
+        for (let bar = cutoffBar; bar < current.until; bar++) {
             current.snapshots[bar] = tail.snapshots[bar];
         }
         current.memoryAfter = tail.memory;
+        return cutoff;
     }
 
     /** Re-anchor the clock at the current position; the music keeps its place in the bar. */
@@ -444,8 +480,24 @@ export class BandHost {
         const current = this.current(audio.currentTime);
         if (current) {
             this.segments.length = this.segments.indexOf(current) + 1;
-            this.resumeBar =
-                current.window.to < this.timeline!.bars.length ? current.window.to : null;
+            this.resumeBar = current.until < this.timeline!.bars.length ? current.until : null;
+            if (this.counted && this.resumeBar === null) {
+                // A counted chart's last section has nothing after it to carry on into: the
+                // performance ends with it. The lap under way was played as a loop (a fill
+                // back to its top); from its next barline it plays the ending instead, as the
+                // last bars of any counted performance do. With no barline left in it, the
+                // section plays once more, as written, and ends.
+                current.looping = false;
+                if (
+                    this.regenerate(current, this.settings, audio.currentTime + LOOKAHEAD_S) !==
+                    null
+                ) {
+                    current.ends = true;
+                } else {
+                    current.looping = true;
+                    this.lastLap = true;
+                }
+            }
         }
     }
 
@@ -537,13 +589,31 @@ export class BandHost {
         return beat;
     }
 
-    /** The whole song, once through with an ending, for export. */
+    /**
+     * The whole song, once through with an ending, for export. A counted chart's every chorus
+     * (its timeline holds them all), generated a chorus at a time exactly as it plays live, so
+     * the export is the performance that was heard.
+     */
     render(settings: BandSettings): { events: BandEvent[]; timeline: Timeline } {
-        if (!this.timeline) {
+        const timeline = this.timeline;
+        if (!timeline) {
             throw new Error('No chart loaded.');
         }
-        const { events } = performPass(this.timeline, settings, { pass: 0, looping: false });
-        return { events, timeline: this.timeline };
+        if (!this.counted) {
+            const { events } = performPass(timeline, settings, { pass: 0, looping: false });
+            return { events, timeline };
+        }
+        const events: BandEvent[] = [];
+        let memory: PassMemory | undefined;
+        for (let plan = this.songPlan(0, 0); ; plan = this.songPlan(plan.until, 0)) {
+            const result = performPass(timeline, settings, { ...plan, memory });
+            events.push(...result.events);
+            memory = result.memory;
+            if (plan.until >= timeline.bars.length) {
+                break;
+            }
+        }
+        return { events, timeline };
     }
 
     // ------------------------------------------------------------ internals
@@ -574,34 +644,83 @@ export class BandHost {
         return index < 0 ? bars.length : index;
     }
 
-    private songWindow(fromBar: number): PassWindow {
+    /**
+     * The song from `fromBar`. Uncounted, the rest of this pass, after which it goes round
+     * again. Counted (#1475), the rest of `fromBar`'s chorus of a performance that began at
+     * `origin` and ends after the last chorus: a performance of up to 64 choruses is
+     * generated a chorus at a time, two seconds ahead like any segment, never all at once on
+     * Play (and a settings change regenerates the rest of one chorus, not of the song).
+     * Every chorus is pass 0: its chorus number is its time through (`PassOptions.pass`).
+     */
+    private songPlan(fromBar: number, origin: number): SegmentPlan {
+        const bars = this.timeline!.bars;
+        const from = Math.min(fromBar, bars.length - 1);
+        if (!this.counted) {
+            return {
+                pass: this.nextPass++,
+                window: { from, to: bars.length, wrapTo: 0 },
+                until: bars.length,
+                looping: true,
+            };
+        }
+        let until = from + 1;
+        while (until < bars.length && bars[until].visit.chorus === bars[from].visit.chorus) {
+            until++;
+        }
         return {
-            from: Math.min(fromBar, this.timeline!.bars.length - 1),
-            to: this.timeline!.bars.length,
-            wrapTo: 0,
+            pass: 0,
+            window: { from, to: bars.length, wrapTo: 0, origin },
+            until,
+            looping: false,
         };
     }
 
-    private loopWindow(loop: Loop): PassWindow {
+    /** One lap of a practice loop: it loops, counted chart or not. */
+    private lapPlan(loop: Loop): SegmentPlan {
         const from = this.barAt(loop.from);
         const to = Math.max(from + 1, this.barAt(loop.to, true));
-        return { from, to, wrapTo: from };
+        return {
+            pass: this.nextPass++,
+            window: { from, to, wrapTo: from },
+            until: to,
+            looping: true,
+        };
     }
 
-    private append(window: PassWindow, start: number, memory: PassMemory | undefined): void {
+    /** What plays after `last`: the loop's next lap, or the song's next pass or chorus. */
+    private followOn(last: Segment): SegmentPlan {
+        if (this.loop) {
+            return this.lapPlan(this.loop);
+        }
+        if (this.lastLap) {
+            this.lastLap = false;
+            return {
+                pass: this.nextPass++,
+                window: last.window,
+                until: last.until,
+                looping: false,
+            };
+        }
+        const resume = this.resumeBar;
+        this.resumeBar = null;
+        if (!this.counted) {
+            return this.songPlan(resume ?? 0, resume ?? 0);
+        }
+        // Out of a practice loop, the performance carries on from the bar after it as if it
+        // had played from the top (origin 0): the bar the loop leads into is an arrival.
+        return resume !== null
+            ? this.songPlan(resume, 0)
+            : this.songPlan(last.until, last.window.origin ?? last.window.from);
+    }
+
+    private append(plan: SegmentPlan, start: number, memory: PassMemory | undefined): void {
         const timeline = this.timeline!;
-        const pass = this.nextPass++;
-        const result = performPass(timeline, this.settings!, {
-            pass,
-            looping: true,
-            memory,
-            window,
-        });
-        const from = timeline.bars[window.from].start;
-        const last = timeline.bars[window.to - 1];
+        const result = performPass(timeline, this.settings!, { ...plan, memory });
+        const from = timeline.bars[plan.window.from].start;
+        const last = timeline.bars[plan.until - 1];
         this.segments.push({
-            pass,
-            window,
+            ...plan,
+            ends: !plan.looping && plan.until >= timeline.bars.length,
             from,
             to: last.start + last.meter.barTicks,
             start,
@@ -655,14 +774,18 @@ export class BandHost {
         }
         const now = audio.currentTime;
         const horizon = now + LOOKAHEAD_S;
-        // Keep a segment queued ahead of the playhead.
         const last = this.segments[this.segments.length - 1];
-        if (last && this.endTime(last) < now + PREPARE_S) {
-            const window = this.loop
-                ? this.loopWindow(this.loop)
-                : this.songWindow(this.resumeBar ?? 0);
-            this.resumeBar = null;
-            this.append(window, this.endTime(last), last.memoryAfter);
+        if (last?.ends && now >= this.endTime(last)) {
+            // The performance is over: its last bar has ended, and every note in it was
+            // scheduled before that barline. Stop here, so the transport reads stopped when
+            // the band falls silent — not a lookahead early, nor a lap late.
+            this.halt();
+            this.options.onEnd?.();
+            return;
+        }
+        // Keep a segment queued ahead of the playhead.
+        if (last && !last.ends && this.endTime(last) < now + PREPARE_S) {
+            this.append(this.followOn(last), this.endTime(last), last.memoryAfter);
         }
         // Drop segments that finished.
         while (this.segments.length > 1 && this.endTime(this.segments[0]) < now - 1) {
@@ -708,7 +831,7 @@ export class BandHost {
         if (!state.playback.metronome || !audio || !timeline) {
             return;
         }
-        for (let b = segment.window.from; b < segment.window.to; b++) {
+        for (let b = segment.window.from; b < segment.until; b++) {
             const bar = timeline.bars[b];
             bar.meter.pulses.forEach((offset, i) => {
                 const tick = bar.start + offset;

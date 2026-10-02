@@ -133,6 +133,53 @@ describe('bandChart', () => {
         expect(view.slots.map((s) => s.bar)).toEqual([0, 0, 1, 2, 2, 3, 4]);
     });
 
+    it('loops one time through a section of a counted chart, from the first chorus that plays it (#1475)', () => {
+        const counted: SemanticScore = {
+            ...song([
+                {
+                    id: 'a',
+                    label: 'A',
+                    repeat: 2,
+                    measures: [bar('m1', [chord('C', 4)]), bar('m2', [chord('G7', 4)])],
+                },
+                {
+                    id: 'b',
+                    label: 'B',
+                    repeat: 1,
+                    measures: [
+                        {
+                            ...bar('m3', [chord('F', 4)]),
+                            end: [
+                                { kind: 'coda', label: 'to-coda' },
+                                {
+                                    kind: 'last-chorus',
+                                    destination: { kind: 'coda', via: 'to-coda', target: 'coda' },
+                                },
+                            ],
+                        },
+                    ],
+                },
+                {
+                    id: 'coda',
+                    label: 'Coda',
+                    repeat: 1,
+                    measures: [
+                        { ...bar('c1', [chord('C', 4)]), start: [{ kind: 'coda', label: 'coda' }] },
+                    ],
+                },
+            ]),
+            choruses: 3,
+        };
+        const view = bandChart(counted, compileTimeline(counted));
+        // Three choruses of A twice and B (5 bars each), then the coda: 16 bars.
+        expect(view.slots).toHaveLength(16);
+        // A's window is its two passes in the first chorus only, not a span across all three.
+        expect(sectionSteps(view, 'a')).toEqual({ start: 0, end: 64 });
+        expect(sectionSteps(view, 'b')).toEqual({ start: 64, end: 80 });
+        // The coda is played by the last chorus alone, so that is where its loop is.
+        expect(sectionSteps(view, 'coda')).toEqual({ start: 240, end: 256 });
+    });
+
     it('a one-bar written repeat (`||: F7 :|| x4`) gives each of its 4 passes its own performed bar', () => {
         const oneBarRepeat = song([
             {

@@ -1,7 +1,16 @@
+import type { ScoreEvent, SemanticScore } from '../../public/songbook/score-types.js';
 import { PPQ } from '../core/types.js';
-import { FIXTURES, score } from '../test/scores.js';
+import { COUNTED_FIXTURES, FIXTURES, score } from '../test/scores.js';
 import { buildMeter } from './meter.js';
-import { chordAt, compileTimeline, FERMATA_STRETCH, secondsAt } from './timeline.js';
+import {
+    chordAt,
+    compileTimeline,
+    FERMATA_STRETCH,
+    firstSpanAfter,
+    secondsAt,
+    spanIndexAt,
+    type Timeline,
+} from './timeline.js';
 
 const BAR = PPQ * 4;
 
@@ -177,5 +186,116 @@ describe('timeline', () => {
                 expect(covered, `${name} bar ${bar.index}`).toBe(bar.meter.barTicks);
             }
         }
+    });
+});
+
+/**
+ * The tick lookups are binary searches over spans sorted by start (#1475: a counted chart's
+ * timeline holds every chorus, and a scan from the top made every lookup cost the performance
+ * so far). Pinned against the plain scans they replaced, written out here, at every place a
+ * search can go wrong: each span's edges and their neighbours, midpoints, bar starts, before
+ * the first span and at and past the end — on every fixture, counted ones, and two charts
+ * whose rounded durations overrun a barline (the overlap the walk back exists for).
+ */
+describe('tick lookups', () => {
+    const scanIndex = (t: Timeline, tick: number) =>
+        t.spans.findIndex((s) => s.start <= tick && tick < s.end);
+    const scanAfter = (t: Timeline, tick: number) => {
+        const i = t.spans.findIndex((s) => s.start > tick);
+        return i < 0 ? t.spans.length : i;
+    };
+    const chord = (symbol: string, n: number, d: number): ScoreEvent => ({
+        kind: 'chord',
+        symbol,
+        duration: [n, d],
+    });
+    const hold = (n: number, d: number): ScoreEvent => ({ kind: 'hold', duration: [n, d] });
+    const twoBars = (first: ScoreEvent[]): SemanticScore => ({
+        notation: 'name',
+        key: 'C',
+        isMinor: false,
+        meter: '4/4',
+        grouping: null,
+        sections: [
+            {
+                id: 'a',
+                label: 'A',
+                repeat: 1,
+                measures: [
+                    { id: 'm1', content: { kind: 'events', events: first } },
+                    { id: 'm2', content: { kind: 'events', events: [chord('G7', 4, 1)] } },
+                ],
+            },
+        ],
+    });
+    // Seven sevenths of a quarter round to 69 ticks each: the bar's last span ends at 1923,
+    // past the next bar's first span at 1920.
+    const overrun = twoBars([
+        chord('C', 3, 1),
+        ...Array.from({ length: 7 }, (_, i) => chord(i % 2 ? 'F' : 'Dm', 1, 7)),
+    ]);
+    // The same overrun on the very first span: a chord held over 27 sevenths, ending at 1932.
+    const overrunFirst = twoBars([
+        chord('C', 1, 7),
+        ...Array.from({ length: 27 }, () => hold(1, 7)),
+    ]);
+
+    it('the overrun charts really overlap at the barline', () => {
+        expect(
+            compileTimeline(overrun)
+                .spans.slice(7, 9)
+                .map((s) => [s.start, s.end]),
+        ).toEqual([
+            [1854, 1923],
+            [1920, 3840],
+        ]);
+        expect(
+            compileTimeline(overrunFirst)
+                .spans.slice(0, 2)
+                .map((s) => [s.start, s.end]),
+        ).toEqual([
+            [0, 1932],
+            [1920, 3840],
+        ]);
+    });
+
+    const charts: [string, SemanticScore][] = [
+        ...Object.entries(FIXTURES),
+        ...Object.entries(FIXTURES).map(
+            ([name, s]) => [`${name} x3`, { ...s, choruses: 3 }] as [string, SemanticScore],
+        ),
+        ...Object.entries(COUNTED_FIXTURES),
+        ['overrun', overrun],
+        ['overrun x2', { ...overrun, choruses: 2 }],
+        ['overrunFirst', overrunFirst],
+    ];
+    it.each(charts)('%s: the searches answer what the scans answer', (_name, chart) => {
+        const t = compileTimeline(chart);
+        const ticks = new Set<number>([-1, -0.5, 0, t.ticks - 1, t.ticks, t.ticks + 1, 1e9]);
+        for (const s of t.spans) {
+            for (const edge of [s.start, s.end]) {
+                for (const d of [-1, -0.5, 0, 0.5, 1]) {
+                    ticks.add(edge + d);
+                }
+            }
+            ticks.add((s.start + s.end) / 2);
+        }
+        for (const bar of t.bars) {
+            ticks.add(bar.start);
+        }
+        const failures: string[] = [];
+        for (const tick of ticks) {
+            const index = scanIndex(t, tick);
+            if (spanIndexAt(t, tick) !== index) {
+                failures.push(`spanIndexAt ${tick}`);
+            }
+            if (firstSpanAfter(t, tick) !== scanAfter(t, tick)) {
+                failures.push(`firstSpanAfter ${tick}`);
+            }
+            if (chordAt(t, tick) !== (t.spans[index]?.chord ?? null)) {
+                failures.push(`chordAt ${tick}`);
+            }
+        }
+        expect(failures.slice(0, 10)).toEqual([]);
     });
 });

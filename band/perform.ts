@@ -10,7 +10,7 @@ import { type BarPlan, fullWindow, type PassWindow, planBars } from './arrange/p
 import { rng } from './core/random.js';
 import type { BandEvent, BandSettings, DrumHit, Lane, PitchedNote } from './core/types.js';
 import { applyFeel } from './feel/feel.js';
-import type { Timeline } from './form/timeline.js';
+import { chorusBars, firstSpanAfter, type Timeline } from './form/timeline.js';
 import { COMP_INSTRUMENTS } from './players/comp/instruments.js';
 import { LEAD_INSTRUMENTS } from './players/lead/instruments.js';
 import { feelFor, STYLES } from './styles/index.js';
@@ -26,7 +26,11 @@ import { nearestMidi } from './theory/pitch.js';
 export type PassMemory = Record<Lane, unknown> & { lastBass?: number };
 
 export interface PassOptions {
-    /** 0 for the first time through the song (or the first lap of a loop), 1 for the next… */
+    /**
+     * 0 for the first time through the song (or the first lap of a loop), 1 for the next… A
+     * counted chart's timeline holds all its choruses, and each bar's chorus is added to this
+     * (`planBars`'s `passAt`), so one pass over it plays every chorus as its own time through.
+     */
     pass: number;
     /** Whether the performance continues after this pass (fills lead on; no ending). */
     looping: boolean;
@@ -34,6 +38,20 @@ export interface PassOptions {
     memory?: PassMemory;
     /** The bars to play, in order, and where they lead. Defaults to the whole song. */
     window?: PassWindow;
+    /**
+     * Return only the window's bars before this one; the window still says where the
+     * performance goes and where it ends. A counted chart's live performance is generated a
+     * chorus at a time (`BandHost`), each chorus resuming from the memory the one before left,
+     * as a settings change resumes a pass at a barline. The bars past `until` are played and
+     * dropped — one, and on while the comp has neither struck again nor reached a rest (an N.C.
+     * or a bar it sits out), but never past the end of the next chorus — so what the whole pass
+     * does across that barline (a held organ chord, a comp voice yielding to the lead) is done
+     * here too: the chunks join into the whole pass, event for event. (The organ re-presses
+     * at each chorus top, so the look never needs the cap; a comp that never struck again
+     * would have its hold end there.) `memory` is then the memory before bar `until`.
+     * Defaults to the window's end.
+     */
+    until?: number;
 }
 
 export interface PassResult {
@@ -56,9 +74,26 @@ export function performPass(
     const lead = style.lead?.idiom;
     const leadProfile = LEAD_INSTRUMENTS[settings.lead];
     const window = options.window ?? fullWindow(timeline);
+    const until = Math.min(options.until ?? window.to, window.to);
+    // The bars actually played: past a chunk's end, a look across its barline (above) — at
+    // least one bar, and on until the comp strikes again or rests, since a sustaining comp
+    // holds its last chord to its next strike, which can be bars away. Capped at the end of
+    // the next chorus, so a chunk costs at most two choruses' bars: chunks are generated on
+    // the main thread inside the scheduler's 150 ms lookahead. On a real comp it never binds
+    // (a sustaining comp re-presses at each chorus top); it bounds the cost all the same.
+    let through = Math.min(until + 1, window.to);
+    const lookLimit =
+        until < window.to ? Math.min(chorusBars(timeline, until).end, window.to) : window.to;
     // Trading with the drummer needs a drummer who can solo in this style.
     const drumSolos = Boolean(style.drums.solos);
-    const plans = planBars(timeline, settings, { ...options, window, drumSolos });
+    // Planned only as far as the look can reach, and the bar it leads into: a chunk of a long
+    // counted performance costs its own bars, not the whole timeline's.
+    const plans = planBars(timeline, settings, {
+        ...options,
+        window,
+        planned: lookLimit + 1,
+        drumSolos,
+    });
     // Where the pass wraps, the next bar belongs to the next pass, whose lanes can differ (the
     // fours may open with the drummer alone): what it plays is taken from that pass's plan.
     // That next pass is always a fresh lap (a loop always restarts at the top), never a
@@ -84,9 +119,13 @@ export function performPass(
     const events: BandEvent[] = [];
     const snapshots: PassMemory[] = [];
 
-    for (let i = window.from; i < window.to; i++) {
+    for (let i = window.from; i < through; i++) {
         const bar = bars[i];
         const plan = plans[i];
+        // The band's pass at this bar: a counted chart's chorus is its time through the song.
+        const pass = options.pass + bar.visit.chorus;
+        // And its place in the form: seeds are keyed on it, so chorus k plays what lap k plays.
+        const place = i - chorusBars(timeline, i).first;
         snapshots[i] = { ...memory };
         const nextIndex = i + 1 < window.to ? i + 1 : options.looping ? window.wrapTo : -1;
         // The bar after the window is planned by the pass that plays it. "Is the next bar an
@@ -110,7 +149,7 @@ export function performPass(
             heard,
             instrument,
             lead: leadProfile,
-            pass: options.pass,
+            pass,
             looping: options.looping,
             rng: (purpose, scope = 'bar') =>
                 scope === 'song'
@@ -124,7 +163,7 @@ export function performPass(
                             bar.visit.sectionIndex,
                             purpose,
                         )
-                      : rng(settings.seed, style.id, lane, options.pass, bar.index, purpose),
+                      : rng(settings.seed, style.id, lane, pass, place, purpose),
         });
         if (plan.lanes.drums) {
             const out = style.drums.play(context('drums'), memory.drums);
@@ -149,10 +188,22 @@ export function performPass(
             memory.comp = out.memory;
             events.push(...out.events);
         }
+        const looking = i === through - 1 && i >= until && through < lookLimit;
+        if (
+            looking &&
+            plan.lanes.comp &&
+            !bar.spans.some((s) => !s.chord) &&
+            !events.some((e) => e.lane === 'comp' && !e.muted && e.bar >= until)
+        ) {
+            through++;
+        }
     }
 
+    // The bar after the last one played is planned only so it knows where it leads; nothing
+    // below may write into it.
+    const played = through < window.to ? plans.slice(0, through) : plans;
     const yielded = instrument.family === 'keyboard' ? yieldToLead(events) : events;
-    const fermatas = holdFermatas(yielded, timeline, plans, options.memory?.lastBass);
+    const fermatas = holdFermatas(yielded, timeline, played, options.memory?.lastBass);
     // Each snapshot (and the memory the next pass continues from) takes the last bass note
     // sounded before its barline, after the fermatas have been held — what the full pass's
     // `holdFermatas` hears from a later fermata, whatever bar a resume starts at.
@@ -161,20 +212,36 @@ export function performPass(
         .sort((a, b) => a.tick - b.tick);
     let lastBass = options.memory?.lastBass;
     let next = 0;
-    for (let i = window.from; i < window.to; i++) {
+    for (let i = window.from; i < through; i++) {
         while (next < bassLine.length && bassLine[next].tick < bars[i].start) {
             lastBass = bassLine[next++].midi;
         }
         snapshots[i].lastBass = lastBass;
     }
     memory.lastBass = bassLine.at(-1)?.midi ?? lastBass;
+    // A chunk that looked past its end and stopped short of the performance's end: its last
+    // strike's hold ends at a rest or tacet bar it saw, else where the look ended (the cap).
+    const horizon = through > until && through < window.to ? bars[through].start : undefined;
     const held =
-        instrument.legato && !comp.percussive ? sustain(fermatas, timeline, plans) : fermatas;
+        instrument.legato && !comp.percussive
+            ? sustain(fermatas, timeline, played, horizon)
+            : fermatas;
     const felt = applyFeel(held, timeline, feelFor(style, instrument.family), {
         ...settings,
         strumMs: instrument.strumMs,
     });
     felt.sort((a, b) => a.tick - b.tick || laneOrder(a) - laneOrder(b));
+    const lastSnapshot = snapshots[until];
+    if (through > until) {
+        // The look across the barline is dropped: the next chunk plays that bar itself, from
+        // the memory before it.
+        snapshots.length = until;
+        return {
+            events: felt.filter((e) => e.bar < until),
+            memory: lastSnapshot,
+            snapshots,
+        };
+    }
     return { events: felt, memory, snapshots };
 }
 
@@ -238,7 +305,12 @@ function yieldToLead(events: BandEvent[]): BandEvent[] {
  * barlines too — the idioms play one bar at a time, so this is done once over the pass. It
  * lets go at an N.C., which is a rest for the whole band.
  */
-function sustain(events: BandEvent[], timeline: Timeline, plans: BarPlan[]): BandEvent[] {
+function sustain(
+    events: BandEvent[],
+    timeline: Timeline,
+    plans: BarPlan[],
+    horizon?: number,
+): BandEvent[] {
     const strikes = [
         ...new Set(events.filter((e) => e.lane === 'comp' && !e.muted).map((e) => e.tick)),
     ].sort((a, b) => a - b);
@@ -246,11 +318,25 @@ function sustain(events: BandEvent[], timeline: Timeline, plans: BarPlan[]): Ban
     const tacet = timeline.bars.filter((bar) => plans[bar.index]?.lanes.comp === false);
     const until = new Map<number, number>();
     strikes.forEach((tick, i) => {
-        const next = strikes[i + 1];
+        // The last strike holds to nothing in a whole pass (the performance ends). In a chunk
+        // that looked past its end (`horizon`), the next strike lies beyond what was played:
+        // the hold reaches the rest or tacet bar the look stopped at, or the look's end.
+        const next = strikes[i + 1] ?? horizon;
         if (next === undefined) {
             return;
         }
-        const rest = timeline.spans.find((s) => !s.chord && s.start > tick && s.start < next);
+        // The first N.C. starting after the strike and before `next` (spans are in order).
+        let rest: (typeof timeline.spans)[number] | undefined;
+        for (
+            let j = firstSpanAfter(timeline, tick);
+            j < timeline.spans.length && timeline.spans[j].start < next;
+            j++
+        ) {
+            if (!timeline.spans[j].chord) {
+                rest = timeline.spans[j];
+                break;
+            }
+        }
         const out = tacet.find((bar) => bar.start > tick && bar.start < next);
         until.set(tick, Math.min(rest ? rest.start : next, out ? out.start : next));
     });

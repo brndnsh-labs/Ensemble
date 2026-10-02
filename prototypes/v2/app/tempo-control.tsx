@@ -13,6 +13,12 @@ export function TempoControl({
     const [text, setText] = useState(String(value));
     const committed = useRef(value);
     useEffect(() => {
+        // Only a tempo that changed from outside resets the text. On mount the text already
+        // holds `value`, and this effect runs a task after the commit: setting it again then
+        // overwrote whatever was typed in between (#1485, a song opened then typed into at once).
+        if (committed.current === value) {
+            return;
+        }
         committed.current = value;
         setText(String(value));
     }, [value]);

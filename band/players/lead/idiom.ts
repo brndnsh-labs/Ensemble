@@ -8,7 +8,7 @@ import type { LeadRole } from '../../arrange/cycle.js';
 import { energyTier } from '../../arrange/plan.js';
 import type { Rng } from '../../core/random.js';
 import type { PitchedNote } from '../../core/types.js';
-import { type Bar, chordAt } from '../../form/timeline.js';
+import { type Bar, chordAt, chorusBars, spanIndexAt } from '../../form/timeline.js';
 import type { BarContext, PitchedIdiom } from '../../styles/types.js';
 import { type ChordFacts, chordPcs } from '../../theory/chord.js';
 import { mod12 } from '../../theory/pitch.js';
@@ -107,10 +107,20 @@ export interface LeadMemory {
     /** The last solo phrase, whole: a looping book may play it again. */
     phrase: PhraseMemory | null;
     /**
-     * The latest solo phrase at each slot of the form (by first bar): a looped hook comes back
-     * at the same place in the chord loop, as a sample does.
+     * The latest solo phrase at each slot of the form (by its first bar's place in the chorus,
+     * `placeOf`): a looped hook comes back at the same place in the chord loop, as a sample
+     * does — on a loop's next lap, or a counted chart's next chorus.
      */
     phrases: Record<number, PhraseMemory>;
+}
+
+/**
+ * Bar `index`'s place in the form: its bar within its chorus. A counted chart's timeline holds
+ * every chorus (#1475); keyed by place, its chorus k recalls and seeds what lap k of a loop
+ * does. An uncounted chart's one chorus is the timeline, so this is the bar index.
+ */
+function placeOf(ctx: BarContext, index: number): number {
+    return index - chorusBars(ctx.timeline, index).first;
 }
 
 interface PhraseMemory {
@@ -321,7 +331,7 @@ function soloPlan(
 ): SlotPlan {
     const { bars } = ctx.timeline;
     const first = bars[slotStart];
-    const rng = ctx.rng(`solo:${ctx.pass}:${slotStart}`, 'song');
+    const rng = ctx.rng(`solo:${ctx.pass}:${placeOf(ctx, slotStart)}`, 'song');
     const tier = energyTier(ctx.plan.energy);
     const trade = role.kind === 'trade';
     // A trade's turn sets its length; a solo phrase is the form's.
@@ -337,7 +347,7 @@ function soloPlan(
     // A looping book plays its last phrase again, whole — the hook comes round.
     // The same place in the form from an earlier chorus first (a sample comes round with the
     // chords), else the phrase just played.
-    const atThisSlot = memory.phrases[slotStart];
+    const atThisSlot = memory.phrases[placeOf(ctx, slotStart)];
     const previousPhrase =
         atThisSlot && atThisSlot.kinds.length === length ? atThisSlot : memory.phrase;
     if (
@@ -364,10 +374,12 @@ function soloPlan(
         };
     }
     // The solo's opening statement may leave two bars of room after it; nothing else does.
+    // It opens at the top of its chorus (a counted chart's solo starts a chorus in), or
+    // straight after an intro.
     const opensSolo =
         role.kind === 'solo' &&
         role.chorus === 1 &&
-        (slotStart === 0 || /^intro/i.test(bars[slotStart - 1].visit.label));
+        (placeOf(ctx, slotStart) === 0 || /^intro/i.test(bars[slotStart - 1].visit.label));
     // Now and then (the book's `space`) a phrase takes a roomier shape than its density — but
     // the two-bar breath stays the opening statement's, and a phrase after an empty bar comes
     // straight in.
@@ -475,7 +487,7 @@ function onsetsFor(ctx: BarContext, slotStart: number, plan: SlotPlan): SlotOnse
             if (!chord) {
                 continue; // N.C.: the whole band rests
             }
-            const span = spans.findIndex((s) => s.start <= tick && tick < s.end);
+            const span = spanIndexAt(ctx.timeline, tick);
             onsets.push({
                 tick,
                 dur: steps * STEP,
@@ -500,13 +512,16 @@ function onsetsFor(ctx: BarContext, slotStart: number, plan: SlotPlan): SlotOnse
     // a target of it. Struck earlier, it stops at the change rather than rub against it.
     for (const onset of onsets) {
         const end = onset.tick + onset.dur;
-        const into = spans.findIndex(
-            (s, i) =>
-                i > onset.span &&
-                s.start > onset.tick &&
-                s.start < end &&
-                s.chord?.symbol !== onset.chord.symbol,
-        );
+        // The first later span, starting inside the note, with another chord (spans are in
+        // order of their starts, so the search ends at the note's end).
+        let into = -1;
+        for (let i = onset.span + 1; i < spans.length && spans[i].start < end; i++) {
+            const s = spans[i];
+            if (s.start > onset.tick && s.chord?.symbol !== onset.chord.symbol) {
+                into = i;
+                break;
+            }
+        }
         if (into < 0) {
             continue;
         }
@@ -532,13 +547,20 @@ function onsetsFor(ctx: BarContext, slotStart: number, plan: SlotPlan): SlotOnse
     return onsets;
 }
 
+/** The bar `tick` falls in (the first bar for a tick before it): a binary search. */
 function barOf(ctx: BarContext, tick: number): number {
     const bars = ctx.timeline.bars;
-    let i = 0;
-    while (i + 1 < bars.length && bars[i + 1].start <= tick) {
-        i++;
+    let lo = 0;
+    let hi = bars.length - 1;
+    while (lo < hi) {
+        const mid = (lo + hi + 1) >> 1;
+        if (bars[mid].start <= tick) {
+            lo = mid;
+        } else {
+            hi = mid - 1;
+        }
     }
-    return i;
+    return lo;
 }
 
 function nearestOf(pcs: readonly number[], m: number, avoid: number | null = null): number {
@@ -659,7 +681,7 @@ function lineRng(ctx: BarContext, role: LeadRole, slotStart: number): Rng {
     const first = ctx.timeline.bars[slotStart];
     return role.kind === 'head'
         ? ctx.rng(`${headKey(first)}:${first.phrase.index}:line`, 'song')
-        : ctx.rng(`solo:${ctx.pass}:${slotStart}:line`, 'song');
+        : ctx.rng(`solo:${ctx.pass}:${placeOf(ctx, slotStart)}:line`, 'song');
 }
 
 /** A head phrase, voiced — the restatement of an opening needs the opening's own notes. */
@@ -835,7 +857,7 @@ function planSlot(
     const rng =
         role.kind === 'head'
             ? ctx.rng(`${headKey(first)}:${first.phrase.index}:articulation`, 'song')
-            : ctx.rng(`solo:${ctx.pass}:${slotStart}:articulation`, 'song');
+            : ctx.rng(`solo:${ctx.pass}:${placeOf(ctx, slotStart)}:articulation`, 'song');
     const targets = targetsOf(onsets);
     const top = Math.max(...pitches);
     const notes = onsets.map((o, i): Planned => {
@@ -920,7 +942,7 @@ function planSlot(
             : memory.phrase;
     const phrases =
         role.kind !== 'head' && phrase
-            ? { ...memory.phrases, [slotStart]: phrase }
+            ? { ...memory.phrases, [placeOf(ctx, slotStart)]: phrase }
             : memory.phrases;
     return { notes, motif, trailing, phrase, phrases };
 }

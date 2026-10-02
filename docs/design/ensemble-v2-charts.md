@@ -187,7 +187,12 @@ one in the chart, one whose departure the written route goes back behind (inside
 passage, a first ending or a repeated section: which pass is the last time?), one whose arrival
 is behind its departure, and, for now, any chart that also has a D.C./D.S. jump: the departure
 is then passed both before and after the jump.
-Stopping the band after the last chorus and the chorus-count control are #1475.
+The band plays a counted chart once and stops (#1475): every chorus, the last-chorus coda on
+the final one, then the transport returns to stopped at the end of the last bar, its notes
+ringing out as they do at the end of an export. A section practice loop ignores the count and
+loops its section as written in the first chorus that plays it. `.mid` and audio export render
+the whole counted performance. The Edit panel's **Choruses** select sets the count: Loop (the
+default, which removes the field) or 1–16; a chart that already counts more keeps its number.
 
 iReal coda signs with no D.C./D.S. text (#1476) import as a last-chorus coda, after iReal Pro's
 own rule (https://irealpro.com/how-the-coda-symbol-works-in-ireal-pro/). Its worked example,

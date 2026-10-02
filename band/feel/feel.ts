@@ -15,7 +15,7 @@
  */
 import { hashKey, rng } from '../core/random.js';
 import { type BandEvent, PPQ } from '../core/types.js';
-import type { Timeline } from '../form/timeline.js';
+import { chorusBars, type Timeline } from '../form/timeline.js';
 import type { Feel } from '../styles/types.js';
 
 /** Largest tier-3 placement offset at humanize 100, in ms. */
@@ -132,12 +132,16 @@ export function applyFeel(
                   : feel.lean[event.lane];
         const offsetMs =
             event.offsetMs + lean + place * MAX_CHARACTER_MS * human + (rank ?? 0) * strumMs;
+        // Keyed by the bar's place in its chorus, with no chorus in the key: a counted chart's
+        // chorus k is felt as lap k, so every chorus repeats the same jitter at the same place —
+        // as a loop's laps already do. Deliberate: it is the player's touch on that spot of the
+        // form, settled, not noise drawn afresh each time round.
         const jitter = rng(
             hashKey(settings.seed),
             'vel',
             event.lane,
             voice,
-            event.bar,
+            event.bar - chorusBars(timeline, event.bar).first,
             position,
         ).bipolar();
         const velocity = Math.round(

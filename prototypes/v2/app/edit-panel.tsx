@@ -6,6 +6,9 @@ import type { ChartDocument } from '../lib/runtime';
 import { MeasureEditor, type MeasureEditorHandle } from './measure-editor';
 import { SectionSettings } from './section-settings';
 
+/** The Choruses control's counts (#1475). The chart format allows up to 64 (`score-codec.ts`). */
+const CHORUS_COUNTS = Array.from({ length: 16 }, (_, i) => i + 1);
+
 interface EditPanelProps {
     /** Owned by the shell, whose reveal effect focuses and scrolls to this panel. */
     panelRef: RefObject<HTMLElement | null>;
@@ -23,6 +26,8 @@ interface EditPanelProps {
     onSongMeter: (meter: string) => void;
     /** The song's own major/minor (`score.isMinor`, #1375), never a section or bar override. */
     onSongMode: (isMinor: boolean) => void;
+    /** How many choruses the band plays, then stops (#1475); `undefined` is Loop. */
+    onChoruses: (choruses: number | undefined) => void;
     onSelectMeasure: (id: string) => void;
     onPendingChange: (pending: boolean) => void;
     onApply: (score: SemanticScore) => void;
@@ -52,6 +57,7 @@ export function EditPanel({
     onTitle,
     onSongMeter,
     onSongMode,
+    onChoruses,
     onSelectMeasure,
     onPendingChange,
     onApply,
@@ -122,6 +128,34 @@ export function EditPanel({
                     <p className="preview-note">
                         Chord names stay as written, and so does the key: for A minor, pick A, then
                         Minor. A section or bar with its own mode keeps it.
+                    </p>
+                    <label className="panel-label" htmlFor="song-choruses">
+                        Choruses
+                    </label>
+                    <select
+                        id="song-choruses"
+                        disabled={busy}
+                        value={current.chart.score.choruses ?? 'loop'}
+                        onChange={(e) =>
+                            onChoruses(
+                                e.target.value === 'loop' ? undefined : Number(e.target.value),
+                            )
+                        }
+                    >
+                        <option value="loop">Loop</option>
+                        {[
+                            // A chart from elsewhere may count more than the menu offers; it
+                            // still shows its own count, as Song meter shows an unlisted meter.
+                            ...new Set([...CHORUS_COUNTS, current.chart.score.choruses ?? 1]),
+                        ].map((count) => (
+                            <option key={count} value={count}>
+                                {count}
+                            </option>
+                        ))}
+                    </select>
+                    <p className="preview-note">
+                        Loop plays the form until you stop. A number plays it that many times, takes
+                        a last-chorus coda on the final one, then stops.
                     </p>
                     <MeasureEditor
                         key={current.id}

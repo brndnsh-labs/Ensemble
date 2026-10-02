@@ -1,7 +1,14 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { type CollectionDocument, newCollection } from '../../prototypes/v2/lib/collections.js';
+import {
+    BuiltInCollectionError,
+    type CollectionDocument,
+    newCollection,
+    newStarred,
+    STARRED_COLLECTION_ID,
+} from '../../prototypes/v2/lib/collections.js';
 import {
     deleteCollection as deleteGuestCollection,
+    editCollection as editGuestCollection,
     getCollection as getGuestCollection,
     listCollections as listGuestCollections,
     list as listGuestSongs,
@@ -732,5 +739,30 @@ describe('guest collections (#1474) live beside the songbook, never inside it', 
         const after = await dump(GUEST);
         expect(after.version).toBe(1);
         expect(after.stores).toEqual(before.stores);
+    });
+
+    it('refuses to delete, rename or un-mark a guest Starred (#1477 review R2)', async () => {
+        const starred = await editGuestCollection(STARRED_COLLECTION_ID, () => newStarred(['one']));
+        expect(starred?.builtIn).toBe('starred');
+        await expect(deleteGuestCollection(STARRED_COLLECTION_ID)).rejects.toBeInstanceOf(
+            BuiltInCollectionError,
+        );
+        await expect(
+            editGuestCollection(STARRED_COLLECTION_ID, (current) =>
+                current ? { ...current, name: 'Favourites' } : null,
+            ),
+        ).rejects.toBeInstanceOf(BuiltInCollectionError);
+        await expect(
+            saveGuestCollection({ ...starred!, name: 'Favourites' }, starred!.revision),
+        ).rejects.toBeInstanceOf(BuiltInCollectionError);
+        // Still there, unchanged, and still an ordinary collection to star into.
+        expect((await getGuestCollection(STARRED_COLLECTION_ID))?.name).toBe('Starred');
+        expect(
+            (
+                await editGuestCollection(STARRED_COLLECTION_ID, (current) =>
+                    current ? { ...current, songIds: ['one', 'two'] } : null,
+                )
+            )?.songIds,
+        ).toEqual(['one', 'two']);
     });
 });

@@ -12,8 +12,8 @@ import {
     allSongsSortPreference,
     countInPreference,
     forgetOpened,
-    forgetStar,
     hasDeclinedV1Import,
+    legacyStarredIds,
     openedAtMap,
     recordOpened,
     rememberAllSongsSort,
@@ -21,8 +21,6 @@ import {
     rememberV1Import,
     rememberV1ImportDecline,
     rememberV1SessionMark,
-    setStarred,
-    starredIds,
     v1ImportLedger,
     v1SessionMark,
 } from './session';
@@ -240,28 +238,19 @@ describe('per-song opened-at (#1440)', () => {
     });
 });
 
-describe('starred songs (#1440)', () => {
+describe('the legacy device-local stars (#1440, read-only since #1477)', () => {
     it('is empty on a fresh device', () => {
-        expect(starredIds().size).toBe(0);
+        expect(legacyStarredIds().size).toBe(0);
     });
 
-    it('stars and unstars a song', () => {
-        setStarred('song-1', true);
-        expect(starredIds()).toEqual(new Set(['song-1']));
-        setStarred('song-1', false);
-        expect(starredIds()).toEqual(new Set());
-    });
-
-    it('forgetStar unstars without touching other stars', () => {
-        setStarred('song-1', true);
-        setStarred('song-2', true);
-        forgetStar('song-1');
-        expect(starredIds()).toEqual(new Set(['song-2']));
+    it('reads the ids #1440 wrote, skipping anything that is not a string', () => {
+        store.set('ensemble-v2-preview:starred', JSON.stringify(['song-1', 7, 'song-2']));
+        expect(legacyStarredIds()).toEqual(new Set(['song-1', 'song-2']));
     });
 
     it('drops an unreadable ledger to "nothing starred" rather than throwing', () => {
         store.set('ensemble-v2-preview:starred', 'not json');
-        expect(starredIds().size).toBe(0);
+        expect(legacyStarredIds().size).toBe(0);
     });
 });
 

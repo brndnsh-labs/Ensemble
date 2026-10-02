@@ -1,11 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { REMOTE_UPDATE_MESSAGES } from '../lib/account/messages';
 import type { RemoteCandidateKind } from '../lib/account/sync-loop';
+import { starredOf } from '../lib/collections';
 import { arrangementOf, composerOf, genreOf } from '../lib/documents';
 import type { ChartDocument } from '../lib/runtime';
 import type { AllSongsSort } from '../lib/session';
+import type { CollectionEntry } from './use-collections';
 
-type LibraryView = 'all' | 'starred' | 'recent';
+/** A user collection's view is its id, prefixed so it can never collide with the three below. */
+type LibraryView = 'all' | 'starred' | 'recent' | `collection:${string}`;
+/** The sort select's value: a remembered order, or (inside a collection) the collection's own. */
+type SortChoice = AllSongsSort | 'collection';
 
 const LETTERS = [...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'];
 
@@ -41,8 +46,26 @@ interface AllSongsProps {
      */
     failure: string | null;
     accountLibrary: boolean;
-    /** Per-device star set (#1440) — same source `onToggleStar` writes through. */
+    /**
+     * The star set — the built-in Starred collection's songs since #1477, the same source
+     * `onToggleStar` writes through.
+     */
     starred: ReadonlySet<string>;
+    /**
+     * Every collection in this songbook (#1477), Starred among them, or null while they are read.
+     * Starred keeps its own filter above; the user collections are the Collections group.
+     */
+    collections: readonly CollectionEntry[] | null;
+    onNewCollection: () => void;
+    onRenameCollection: (collectionId: string, name: string) => void;
+    onDeleteCollection: (collectionId: string) => void;
+    /**
+     * The collection THIS TAB's own delete just removed (#1477 review R5), or null — the
+     * `lastRemovedId` rule for collections: only that removal moves focus (to the All songs
+     * filter, since the dialog's own return target, the collection's Delete… button, is gone).
+     * A collection vanishing through a sync never steals focus.
+     */
+    removedCollectionId: string | null;
     /** Per-device opened-at map (#1440), id to ISO timestamp. */
     openedAt: ReadonlyMap<string, string>;
     remoteCandidates: readonly { id: string; kind: RemoteCandidateKind }[];
@@ -69,15 +92,20 @@ interface AllSongsProps {
 /**
  * The All songs page (#1440) — the songbook's answer for a library too large for the home page's
  * 8-row Recently-opened card: search, Starred/Recently-opened filters, a genre dropdown scoped to
- * genres actually present, five sort orders and an A–Z jump index for two of them.
+ * genres actually present, five sort orders and an A–Z jump index for two of them — and, since
+ * #1477, the Collections filter group.
  *
  * A plain list, deliberately: #1442 measured React render/commit at ~1% of a large-library load's
  * JS time (`checks/large-library.perf.spec.ts`), so a 2,000-row `<table>` is not where the cost
  * is — reading and validating the library already paid that before this page ever mounts. No
  * virtualization, no windowing.
  *
- * The Collections filter group is #1443's — this deliberately renders nothing in its place; only
- * a comment marks where it lands, so as not to fake a feature that isn't built yet.
+ * **Collections (#1477).** Starred is a collection, and keeps its place right under All songs; the
+ * user's own collections follow under a "Collections" heading, with "New collection" last.
+ * Choosing Starred or a collection shows its songs in the COLLECTION'S order — the sort select
+ * gains a "Collection order" choice, picked on entering the view and never remembered as the
+ * device's sort — and a user collection offers Rename and Delete… above its rows. Starred offers
+ * neither: it is built in.
  */
 export function AllSongs({
     songs: library,
@@ -94,15 +122,25 @@ export function AllSongs({
     onToggleStar,
     onOpenRowMenu,
     lastRemovedId,
+    collections,
+    onNewCollection,
+    onRenameCollection,
+    onDeleteCollection,
+    removedCollectionId,
 }: AllSongsProps) {
-    const [view, setView] = useState<LibraryView>('all');
+    const [view, setViewState] = useState<LibraryView>('all');
     const [genre, setGenre] = useState('');
     const [search, setSearch] = useState('');
-    const [sort, setSort] = useState<AllSongsSort>(initialSort ?? 'title');
+    const [remembered, setRemembered] = useState<AllSongsSort>(initialSort ?? 'title');
+    /** Inside Starred or a collection: show the collection's own order rather than `remembered`. */
+    const [inOrder, setInOrder] = useState(true);
     const loaded = library !== null;
     const songs = useMemo(() => library ?? [], [library]);
     const rows = useRef(new Map<string, HTMLTableRowElement>());
     const heading = useRef<HTMLHeadingElement>(null);
+    const allFilter = useRef<HTMLButtonElement>(null);
+    /** The collection whose disappearance just sent the view back to All songs (R5). */
+    const fellBackFrom = useRef<string | null>(null);
     // Same courtesy `StandardsBrowser` gives the standards browse view: opening this moves focus
     // to its own heading. Restoring focus on the way OUT is the shell's job instead (#1440 review
     // P3, `app/ensemble.tsx`'s `allSongsEntryRef`) — see `StandardsBrowser`'s own note on why a
@@ -110,6 +148,57 @@ export function AllSongs({
     useEffect(() => {
         heading.current?.focus();
     }, []);
+
+    const starredEntry = useMemo(() => starredOf(collections ?? []), [collections]);
+    const userCollections = useMemo(
+        () => (collections ?? []).filter((entry) => !entry.document.builtIn),
+        [collections],
+    );
+    const activeCollection = view.startsWith('collection:')
+        ? (userCollections.find((entry) => `collection:${entry.document.id}` === view) ?? null)
+        : null;
+    // A collection deleted (here, or by another device's sync) while it is the view falls back to
+    // All songs rather than showing an empty list under a name that no longer exists.
+    useEffect(() => {
+        if (collections !== null && view.startsWith('collection:') && activeCollection === null) {
+            fellBackFrom.current = view.slice('collection:'.length);
+            setViewState('all');
+        }
+    }, [collections, view, activeCollection]);
+    // This tab's own delete of the collection that WAS the view (#1477 review R5): focus goes to
+    // the All songs filter — its Delete… button, where the dialog would return focus, is gone.
+    // A frame later, so the confirm dialog has closed: a modal makes everything outside it inert.
+    useEffect(() => {
+        if (removedCollectionId === null || fellBackFrom.current !== removedCollectionId) {
+            return;
+        }
+        fellBackFrom.current = null;
+        const frame = requestAnimationFrame(() => allFilter.current?.focus());
+        return () => cancelAnimationFrame(frame);
+    }, [removedCollectionId]);
+    /** The order the current view's collection keeps, id to position — null outside one. */
+    const collectionOrder = useMemo(() => {
+        const ids =
+            view === 'starred'
+                ? [...(starredEntry?.document.songIds ?? starred)]
+                : (activeCollection?.document.songIds ?? null);
+        return ids ? new Map(ids.map((id, index) => [id, index])) : null;
+    }, [view, starredEntry, starred, activeCollection]);
+    const collectionCounts = useMemo(() => {
+        const present = new Set(songs.map((song) => song.id));
+        return new Map(
+            userCollections.map((entry) => [
+                entry.document.id,
+                entry.document.songIds.filter((id) => present.has(id)).length,
+            ]),
+        );
+    }, [songs, userCollections]);
+
+    function setView(next: LibraryView) {
+        setViewState(next);
+        setInOrder(true);
+    }
+    const sort: SortChoice = collectionOrder !== null && inOrder ? 'collection' : remembered;
 
     const remoteCandidateKinds = useMemo(
         () => new Map(remoteCandidates.map((row) => [row.id, row.kind])),
@@ -130,8 +219,13 @@ export function AllSongs({
         [songs, openedAt],
     );
 
-    function setSortAndRemember(next: AllSongsSort) {
-        setSort(next);
+    function setSortAndRemember(next: SortChoice) {
+        if (next === 'collection') {
+            setInOrder(true);
+            return;
+        }
+        setInOrder(false);
+        setRemembered(next);
         onSortChange(next);
     }
 
@@ -142,6 +236,9 @@ export function AllSongs({
                 return false;
             }
             if (view === 'recent' && !openedAt.has(song.id)) {
+                return false;
+            }
+            if (activeCollection !== null && !collectionOrder?.has(song.id)) {
                 return false;
             }
             if (genre && genreOf(song) !== genre) {
@@ -156,12 +253,17 @@ export function AllSongs({
             }
             return true;
         });
-    }, [songs, view, starred, openedAt, genre, search]);
+    }, [songs, view, starred, openedAt, genre, search, activeCollection, collectionOrder]);
 
     const sorted = useMemo(() => {
         const next = [...filtered];
         next.sort((a, b) => {
             switch (sort) {
+                case 'collection':
+                    return (
+                        (collectionOrder?.get(a.id) ?? Number.MAX_SAFE_INTEGER) -
+                        (collectionOrder?.get(b.id) ?? Number.MAX_SAFE_INTEGER)
+                    );
                 case 'title':
                 case 'composer': {
                     const keyA = sortKeyFor(a, sort);
@@ -197,7 +299,7 @@ export function AllSongs({
             }
         });
         return next;
-    }, [filtered, sort, openedAt]);
+    }, [filtered, sort, openedAt, collectionOrder]);
 
     // After a row delete, focus goes to the next row, or the heading if the list is now empty
     // (#1440 review P3), rather than falling to `<body>` — a `<dialog>` closing over a row that
@@ -238,7 +340,11 @@ export function AllSongs({
     const showAzIndex = sort === 'title' || sort === 'composer';
 
     function jumpTo(letter: string) {
-        const target = sorted.find((song) => leadingLetter(sortKeyFor(song, sort)) >= letter);
+        if (sort !== 'title' && sort !== 'composer') {
+            return;
+        }
+        const key = sort;
+        const target = sorted.find((song) => leadingLetter(sortKeyFor(song, key)) >= letter);
         const row = rows.current.get(target?.id ?? '');
         // Focus the row's own song link, not just scroll to it (#1440 review P3): a jump that
         // only scrolls hands nothing to keyboard/screen-reader use, and leaves focus wherever the
@@ -291,8 +397,11 @@ export function AllSongs({
                     <span className="sr">Sort by</span>
                     <select
                         value={sort}
-                        onChange={(event) => setSortAndRemember(event.target.value as AllSongsSort)}
+                        onChange={(event) => setSortAndRemember(event.target.value as SortChoice)}
                     >
+                        {collectionOrder !== null && (
+                            <option value="collection">Collection order</option>
+                        )}
                         <option value="title">Title</option>
                         <option value="recentOpened">Recently opened</option>
                         <option value="recentAdded">Recently added</option>
@@ -304,6 +413,7 @@ export function AllSongs({
             <div className="all-songs-layout">
                 <nav className="filter-rail" aria-label="Filter your songs">
                     <button
+                        ref={allFilter}
                         className="filter-item"
                         aria-pressed={view === 'all'}
                         onClick={() => setView('all')}
@@ -326,10 +436,66 @@ export function AllSongs({
                         Recently opened{' '}
                         <span className="filter-count">{loaded ? recentCount : '…'}</span>
                     </button>
-                    {/* Collections group arrives with #1443's synced "Starred" collection and
-                        whole-playlist imports. Nothing renders here until that story lands. */}
+                    <h2 className="filter-heading" id="collections-heading">
+                        Collections
+                    </h2>
+                    <div
+                        className="filter-group"
+                        role="group"
+                        aria-labelledby="collections-heading"
+                        data-testid="collection-filters"
+                    >
+                        {userCollections.map((entry) => (
+                            <button
+                                key={entry.document.id}
+                                className="filter-item"
+                                aria-pressed={view === `collection:${entry.document.id}`}
+                                data-testid="collection-filter"
+                                onClick={() => setView(`collection:${entry.document.id}`)}
+                            >
+                                <span className="filter-name">{entry.document.name}</span>{' '}
+                                <span className="filter-count">
+                                    {loaded ? (collectionCounts.get(entry.document.id) ?? 0) : '…'}
+                                </span>
+                            </button>
+                        ))}
+                        <button
+                            className="filter-item filter-new"
+                            data-testid="new-collection"
+                            disabled={busy || collections === null}
+                            onClick={onNewCollection}
+                        >
+                            + New collection
+                        </button>
+                    </div>
                 </nav>
                 <div className="all-songs-content">
+                    {activeCollection !== null && (
+                        <div className="collection-bar" data-testid="collection-bar">
+                            <h2>{activeCollection.document.name}</h2>
+                            <button
+                                className="btn"
+                                data-testid="collection-rename"
+                                disabled={busy}
+                                onClick={() =>
+                                    onRenameCollection(
+                                        activeCollection.document.id,
+                                        activeCollection.document.name,
+                                    )
+                                }
+                            >
+                                Rename
+                            </button>
+                            <button
+                                className="btn danger"
+                                data-testid="collection-delete"
+                                disabled={busy}
+                                onClick={() => onDeleteCollection(activeCollection.document.id)}
+                            >
+                                Delete…
+                            </button>
+                        </div>
+                    )}
                     {!loaded ? (
                         failure ? (
                             <p
@@ -349,7 +515,14 @@ export function AllSongs({
                             </p>
                         )
                     ) : sorted.length === 0 ? (
-                        <p className="all-songs-empty">No songs match.</p>
+                        <p className="all-songs-empty">
+                            {activeCollection !== null &&
+                            !search.trim() &&
+                            !genre &&
+                            collectionCounts.get(activeCollection.document.id) === 0
+                                ? 'No songs in this collection yet — add one from a song’s ⋯ menu.'
+                                : 'No songs match.'}
+                        </p>
                     ) : (
                         <table className="song-table all-songs-table">
                             <thead>

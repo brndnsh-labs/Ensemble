@@ -9,14 +9,17 @@ import {
     AccountChangedError,
     type AccountScope,
     type ChartDocument,
+    type CollectionDocument,
     type Draft,
     MAX_PENDING_SAVES,
+    type SavedCollection,
     type SavedSong,
     type SaveRefusalReason,
 } from '../sync/protocol';
 import {
     AccountSongbook,
     type AdoptedRemoteVersion,
+    type CollectionListing,
     type KeepBothResolution,
     MAX_LIST_LIMIT,
     MAX_REMOTE_CANDIDATES,
@@ -173,8 +176,25 @@ export interface SyncSnapshot {
     candidates: readonly RemoteUpdate[];
     /** `offline.documents` for `status.ts`. Unobserved until a download pages the manifest. */
     documents: Progress;
-    /** Bumped whenever a pass changed this account's stored library, so a list can re-read. */
+    /**
+     * Collection Saves still in this account's outbox here (#1477), across every collection — the
+     * one cloud fact about collections, because a collection is never on the stand and so never
+     * the watched document the observation describes. The chip counts it beside the chart's own
+     * queue, and it is zero when nothing is attached.
+     */
+    collectionSaves: number;
+    /**
+     * Bumped whenever a pass changed this account's stored SONGS, so a list can re-read. Never for
+     * a collection alone (#1477 review R1): that re-read validates every song in the library, and
+     * a star uploading must not cost a 2,000-song songbook that.
+     */
     libraryVersion: number;
+    /**
+     * Bumped whenever this account's stored COLLECTIONS moved under a reader — a collection Save
+     * committed, a conflict merged, a download adopted or removed one (#1477 review R1). What the
+     * collections' own reader (`app/use-collections.ts`) re-reads on.
+     */
+    collectionsVersion: number;
 }
 
 /**
@@ -304,6 +324,12 @@ export const SIGN_OUT_MESSAGES = {
  * between — and it is by design not refused. The sentence says "export it" because that IS the
  * supported way to carry music between accounts on one device.
  */
+/** What a collection delete says (#1477). The songs in it are never touched by one. */
+export const COLLECTION_MESSAGES = {
+    deleted: 'Collection deleted. Its songs are still in your songbook.',
+    uploading: 'This collection is still uploading to your account. Try again once it has synced.',
+} as const;
+
 export const OWNER_MESSAGES = {
     mismatch:
         'This chart belongs to a different account on this device — export it, or sign back in as that account.',
@@ -511,6 +537,8 @@ function sameSnapshot(a: SyncSnapshot, b: SyncSnapshot): boolean {
         a.documents.required === b.documents.required &&
         a.documents.verified === b.documents.verified &&
         a.libraryVersion === b.libraryVersion &&
+        a.collectionsVersion === b.collectionsVersion &&
+        a.collectionSaves === b.collectionSaves &&
         sameObservation(a.observation, b.observation)
     );
 }
@@ -600,6 +628,14 @@ export interface SignOutPreflight {
      * and the step has to say so rather than offering a retry that will not run.
      */
     refusedSaves: number;
+    /**
+     * Collection Saves still in the outbox (#1477) — a star, a song added to a set list, a rename.
+     * Counted apart from `unsentSaves` because they are not songs: there is no file to export for
+     * one, so the step can only say what signing out discards and offer the sync that sends it.
+     */
+    unsentCollections: number;
+    /** How many of `unsentCollections` sit behind a permanently refused head (`refusedSaves`'s rule). */
+    refusedCollections: number;
     /**
      * Unsaved experiments this device kept for account songs, read from the account database's
      * `drafts` store — which since #1299 is where an account chart's unsaved text actually is.
@@ -772,11 +808,40 @@ export interface SyncLoop {
     /** Every song this account has opened here, id to timestamp (#1440). */
     openedAtMap(): Promise<Map<string, string>>;
     /**
-     * Star or unstar one song on this device (#1440). Fenced on `owner` like `recordOpened`.
+     * Every collection this account holds here, each with the songs in it that resolve (#1477) —
+     * `AccountSongbook.listCollections`, scoped exactly like `listLibrary`.
      */
-    setStarred(documentId: string, starred: boolean, owner: string | null): Promise<void>;
-    /** Every song this account has starred here (#1440). */
-    starredIds(): Promise<Set<string>>;
+    listCollections(owner?: string | null): Promise<CollectionListing[]>;
+    /**
+     * One collection Save, read-modify-written in one transaction (`AccountSongbook.editCollection`)
+     * — a star, "Add to collection…", a new collection, a rename. Commits and queues; it does not
+     * send, the caller runs a pass, as after a song Save. Fenced on `owner` like `save`: a star
+     * filed in another account's Starred is one person's library edited by another.
+     * `CollectionCapError` when it would create a document past the account's cap.
+     */
+    editCollection(
+        documentId: string,
+        edit: (current: CollectionDocument | null) => CollectionDocument | null,
+        owner: string | null,
+    ): Promise<SavedCollection | null>;
+    /**
+     * Delete one collection (#1477) — never its songs. Local-only exactly when that is the whole
+     * truth (`AccountSongbook.deleteCollection`'s `'removed'`); a collection the account holds goes
+     * through the same explicit online delete a song does (`deleteFromCloud`), and one with a Save
+     * in flight is refused until the outbox settles it.
+     */
+    deleteCollection(documentId: string, owner: string | null): Promise<CloudDeleteResult>;
+    /**
+     * Would `deleteCollection` go ahead right now? Null when it would, else the sentence it would
+     * refuse with — asked BEFORE a delete removes any song (#1477 review R4), so "still
+     * uploading" or a built-in stops it with nothing gone. Writes nothing.
+     */
+    collectionDeleteRefusal(documentId: string, owner: string | null): Promise<string | null>;
+    /**
+     * Copy this device's #1440 `star:` rows into Starred, once (`AccountSongbook.migrateStars`).
+     * Runs a pass when it queued a Save. Fenced on `owner` like every write.
+     */
+    migrateStars(owner: string | null): Promise<void>;
     /**
      * Delete one document from the cloud (#1270): an explicit ONLINE operation with a frozen,
      * retry-safe operation id, never a side effect of removing a local copy. Sends immediately
@@ -906,6 +971,8 @@ export function createSyncLoop(
         candidates: NO_UPDATES,
         documents: UNOBSERVED,
         libraryVersion: 0,
+        collectionsVersion: 0,
+        collectionSaves: 0,
     };
     let scope: AccountScope | null = null;
     let watched: string | null = null;
@@ -1088,7 +1155,7 @@ export function createSyncLoop(
         const current = scope;
         const documentId = watched;
         if (!current) {
-            publish({ observation: null, candidates: NO_UPDATES });
+            publish({ observation: null, candidates: NO_UPDATES, collectionSaves: 0 });
             return;
         }
         // Read in its own try, and BEFORE the early return below: the songbook shows its rows with
@@ -1120,8 +1187,21 @@ export function createSyncLoop(
             // Unreadable is not "none": leaving the last published list alone is the conservative
             // direction, since dropping it would quietly retract a marker nothing has resolved.
         }
+        // The collection half of the outbox (#1477), read in its own try for the same reason the
+        // candidates are: a collection is never the watched document, so this is the only place
+        // its unsent Saves are counted, and its failure must not silence the chart's chip.
+        let collectionSaves = state.collectionSaves;
+        try {
+            const outbox = await songbook.collectionOutbox(current);
+            if (mine !== epoch || token !== observation) {
+                return;
+            }
+            collectionSaves = outbox.unsent;
+        } catch {
+            // Unreadable is not "none" here either: the last count stands.
+        }
         if (documentId === null) {
-            publish({ observation: null, candidates });
+            publish({ observation: null, candidates, collectionSaves });
             return;
         }
         try {
@@ -1156,12 +1236,13 @@ export function createSyncLoop(
                     refused: refusal?.reason ?? null,
                 },
                 candidates,
+                collectionSaves,
             });
         } catch {
             // An unreadable record is not evidence about the cloud. Leave the last observation
             // alone rather than publish a fabricated one — but the candidate list above was read
             // successfully, and it is a fact about a different store's rows.
-            publish({ candidates });
+            publish({ candidates, collectionSaves });
         }
     }
 
@@ -1201,8 +1282,12 @@ export function createSyncLoop(
         current: AccountScope,
         transport: SaveTransport,
         refusedDocument: () => Promise<string | null>,
-    ): Promise<boolean> {
+    ): Promise<{ songs: boolean; collections: boolean }> {
+        // Two facts, never one (#1477 review R1): a song moving re-reads the whole library, a
+        // collection moving re-reads only the collections.
         let changed = false;
+        let collectionsChanged = false;
+        const outcome = () => ({ songs: changed, collections: collectionsChanged });
         for (let sweep = 0; sweep < MAX_PENDING_SAVES; sweep += 1) {
             let committed = 0;
             let cursor: string | undefined;
@@ -1211,14 +1296,18 @@ export function createSyncLoop(
                     ...(cursor === undefined ? {} : { afterDocumentId: cursor }),
                 });
                 committed += result.counts.committed;
-                changed ||= result.counts.committed > 0 || result.counts.conflict > 0;
+                changed ||=
+                    result.counts.committed > result.collections.committed ||
+                    result.counts.conflict > result.collections.conflict;
+                collectionsChanged ||=
+                    result.collections.committed > 0 || result.collections.conflict > 0;
                 if (result.kind !== 'more' || result.resumeAfterDocumentId === null) {
                     // A transport failure ends the drain outright: another sweep would only
                     // fail again on the same song, and the reason is already captured.
                     if (result.kind === 'retry' || result.kind === 'aborted') {
                         const refused = result.kind === 'retry' ? await refusedDocument() : null;
                         if (refused === null) {
-                            return changed;
+                            return outcome();
                         }
                         // Strictly past the refused song, so the page ceiling still bounds this.
                         cursor = refused;
@@ -1228,11 +1317,28 @@ export function createSyncLoop(
                 }
                 cursor = result.resumeAfterDocumentId;
             }
-            if (committed === 0) {
-                return changed;
+            // A collection Save that met a newer version is resolved here, without asking
+            // (#1477): merged onto the remote revision and re-queued, so the NEXT sweep sends it.
+            // Asked after every sweep — also clearing a conflict parked by an older build — and a
+            // merge is a reason to sweep again exactly as a commit is. A merge that conflicts
+            // again (the other device moved again) merges again, still bounded by the sweeps.
+            // Its own error boundary, like the collections page the outbox walks: a collection row
+            // this build cannot read must not turn every pass into a "couldn't reach your
+            // account" for the songs that did upload. A moved fence still ends the pass.
+            let merged = 0;
+            try {
+                merged = await songbook.mergeCollectionConflicts(current);
+            } catch (error) {
+                if (error instanceof AccountChangedError) {
+                    throw error;
+                }
+            }
+            collectionsChanged ||= merged > 0;
+            if (committed === 0 && merged === 0) {
+                return outcome();
             }
         }
-        return changed;
+        return outcome();
     }
 
     /**
@@ -1260,6 +1366,7 @@ export function createSyncLoop(
         const backedOff = Date.now() < backoffUntil;
         publish({ running: true, sending: !backedOff });
         let changed = false;
+        let collectionsChanged = false;
         // A pass that does nothing but wait must keep SAYING it is waiting: clearing the sentence
         // here would leave the musician with a queued Save and no explanation for it.
         let failure: SyncFailure | null = backedOff
@@ -1271,7 +1378,7 @@ export function createSyncLoop(
         try {
             if (!backedOff) {
                 try {
-                    changed = await drain(current, transport, async () => {
+                    const drained = await drain(current, transport, async () => {
                         const captured = lastRefusal();
                         if (
                             captured?.error.kind !== 'code' ||
@@ -1295,6 +1402,8 @@ export function createSyncLoop(
                         newlyRefused ||= marked === 'refused';
                         return captured.documentId;
                     });
+                    changed = drained.songs;
+                    collectionsChanged = drained.collections;
                 } catch (error) {
                     if (error instanceof AccountChangedError) {
                         return;
@@ -1357,11 +1466,17 @@ export function createSyncLoop(
                     // writes nothing at all, so there is no stored library change for a re-read to
                     // find. Folding it in would bump `libraryVersion` — and re-render the songbook
                     // — every time a Save raced a download of the previous revision.
-                    changed ||=
-                        result.advanced.length > 0 ||
-                        result.removed.length > 0 ||
-                        result.candidates.length > 0 ||
-                        result.retainedDeleted.length > 0;
+                    //
+                    // A collection the download moved is the collections' re-read, not the
+                    // library's (#1477 review R1): `result.collections` is their share of these.
+                    const collectionIds = new Set(result.collections);
+                    changed ||= [
+                        ...result.advanced,
+                        ...result.removed,
+                        ...result.candidates,
+                        ...result.retainedDeleted,
+                    ].some((documentId) => !collectionIds.has(documentId));
+                    collectionsChanged ||= collectionIds.size > 0;
                     if (result.backoffUntil !== undefined) {
                         // Never shortened: the outbox half may already have met a 429 with a
                         // longer `Retry-After` than this one carries.
@@ -1385,6 +1500,7 @@ export function createSyncLoop(
             publish({
                 failure,
                 ...(changed ? { libraryVersion: state.libraryVersion + 1 } : {}),
+                ...(collectionsChanged ? { collectionsVersion: state.collectionsVersion + 1 } : {}),
             });
             await observe();
         } finally {
@@ -1431,6 +1547,7 @@ export function createSyncLoop(
                     // rows, and `observe()` below fills this one in from the account just attached.
                     candidates: NO_UPDATES,
                     documents: UNOBSERVED,
+                    collectionSaves: 0,
                 });
                 await observe();
             })();
@@ -1459,6 +1576,7 @@ export function createSyncLoop(
                 observation: null,
                 candidates: NO_UPDATES,
                 documents: UNOBSERVED,
+                collectionSaves: 0,
             });
         },
         setActiveDocument(documentId) {
@@ -1553,11 +1671,58 @@ export function createSyncLoop(
         async openedAtMap() {
             return songbook.openedAtMap(await settledScope());
         },
-        async setStarred(documentId, starred, owner) {
-            await songbook.setStarred(await ownedScope(owner), documentId, starred);
+        async listCollections(owner = null) {
+            return songbook.listCollections(await heldScope(owner));
         },
-        async starredIds() {
-            return songbook.starredIds(await settledScope());
+        async editCollection(documentId, edit, owner) {
+            const current = await ownedScope(owner);
+            const saved = await songbook.editCollection(current, documentId, edit);
+            // The chip's collection count moves, and `collectionsVersion` with it — so a write the
+            // collections' reader did not make itself (adopting a guest's collections) is still
+            // re-read. `libraryVersion` deliberately does not: it means "the SONGS changed,
+            // re-read the list", and a star is not worth re-reading a 2,000-song library for.
+            if (saved !== null) {
+                publish({ collectionsVersion: state.collectionsVersion + 1 });
+                await observe();
+            }
+            return saved;
+        },
+        async deleteCollection(documentId, owner) {
+            const current = await ownedScope(owner);
+            const local = await songbook.deleteCollection(current, documentId);
+            if (local === 'removed' || local === 'missing') {
+                if (local === 'removed') {
+                    publish({ collectionsVersion: state.collectionsVersion + 1 });
+                    await observe();
+                }
+                return { kind: 'deleted', retained: false, message: COLLECTION_MESSAGES.deleted };
+            }
+            if (local === 'queued') {
+                return { kind: 'refused', retry: true, message: COLLECTION_MESSAGES.uploading };
+            }
+            const result = await loop.deleteFromCloud(documentId, owner);
+            return result.kind === 'deleted'
+                ? { ...result, message: COLLECTION_MESSAGES.deleted }
+                : result;
+        },
+        async collectionDeleteRefusal(documentId, owner) {
+            const current = await ownedScope(owner);
+            try {
+                const local = await songbook.deleteCollection(current, documentId, {
+                    dryRun: true,
+                });
+                return local === 'queued' ? COLLECTION_MESSAGES.uploading : null;
+            } catch (error) {
+                return error instanceof Error ? error.message : String(error);
+            }
+        },
+        async migrateStars(owner) {
+            const outcome = await songbook.migrateStars(await ownedScope(owner));
+            if (outcome === 'migrated') {
+                publish({ collectionsVersion: state.collectionsVersion + 1 });
+                await observe();
+                void loop.run().catch(() => {});
+            }
         },
         async deleteFromCloud(documentId, owner) {
             const current = await settledScope();
@@ -1760,7 +1925,18 @@ export function createSyncLoop(
                     atRisk.push(song.documentId);
                 }
             }
-            return { documentIds, atRisk, unsentSaves, refusedSaves, drafts };
+            // Collections too (#1477): a queued star or set-list change is committed work the
+            // account has not got, and a sign-out that said nothing about it would drop it.
+            const collections = await songbook.collectionOutbox(current);
+            return {
+                documentIds,
+                atRisk,
+                unsentSaves,
+                refusedSaves,
+                unsentCollections: collections.unsent,
+                refusedCollections: collections.refused,
+                drafts,
+            };
         },
         async heldOwner() {
             if (attaching) {

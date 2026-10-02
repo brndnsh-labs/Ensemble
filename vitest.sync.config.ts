@@ -30,6 +30,7 @@ export default defineConfig({
             'tests/browser/account-library-prefs.browser.test.ts',
             'tests/browser/account-home.browser.test.ts',
             'tests/browser/account-collections.browser.test.ts',
+            'tests/browser/account-starred.browser.test.ts',
         ],
         browser: {
             enabled: true,
