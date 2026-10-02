@@ -6,6 +6,7 @@
 import { type EnergyTier, energyTier } from '../arrange/plan.js';
 import type { Rng } from '../core/random.js';
 import type { PitchedNote } from '../core/types.js';
+import { chorusBars } from '../form/timeline.js';
 import {
     approach,
     BASS,
@@ -51,7 +52,9 @@ function jazzTrade(ctx: BarContext, bar: number, length: number, tier: EnergyTie
     const total = barSteps(ctx.bar);
     const slotStart = ctx.bar.index - bar;
     // One motif for the whole four: it is the solo's idea.
-    const motif = ctx.rng(`trade:${ctx.pass}:${slotStart}`, 'song').pick(TRADE_MOTIFS);
+    // Keyed by the turn's place in the chorus, so a counted chorus trades as its lap does.
+    const place = slotStart - chorusBars(ctx.timeline, slotStart).first;
+    const motif = ctx.rng(`trade:${ctx.pass}:${place}`, 'song').pick(TRADE_MOTIFS);
     const lines = {
         snare: [] as string[],
         tomHigh: [] as string[],

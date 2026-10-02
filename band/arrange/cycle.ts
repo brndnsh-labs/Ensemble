@@ -16,10 +16,15 @@
  *
  * A counted chart's choruses (`SectionVisit.chorus`, #1475) are its times through the song: the
  * plan hands `leadRole` the pass plus the bar's chorus, so the head, solos and trades follow
- * the choruses of one performance exactly as they follow the laps of a looping one.
+ * the choruses of one performance exactly as they follow the laps of a looping one — except
+ * the last. A counted performance of two or more choruses ends on the out-head: the melody
+ * restated, the way a tune is played out (a coda or tag hangs off the head, never off a solo).
+ * So its last chorus is the head whatever the cycle has reached, and any trade hands back to
+ * the band for it. It keeps the pass it has otherwise (the lift, its seeds): only the lead's
+ * job changes.
  */
 import type { TradeSettings } from '../core/types.js';
-import type { Bar, Timeline } from '../form/timeline.js';
+import { type Bar, inFinalChorus, type Timeline } from '../form/timeline.js';
 
 export type LeadRole =
     | { kind: 'rest' }
@@ -65,8 +70,10 @@ export function leadRole(
     if (isIntro(bar)) {
         return { kind: 'rest' };
     }
+    // The out-head (above): the last chorus reads as the first time through, untraded.
+    const out = inFinalChorus(timeline, index);
     const block = trade?.choruses ? trade.choruses + 1 : null;
-    const p = block ? pass % block : pass;
+    const p = out ? 0 : block ? pass % block : pass;
     if (trade && p > 0) {
         return tradeRole(timeline, index, p, trade);
     }

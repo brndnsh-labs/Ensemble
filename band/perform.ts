@@ -10,7 +10,7 @@ import { type BarPlan, fullWindow, type PassWindow, planBars } from './arrange/p
 import { rng } from './core/random.js';
 import type { BandEvent, BandSettings, DrumHit, Lane, PitchedNote } from './core/types.js';
 import { applyFeel } from './feel/feel.js';
-import type { Timeline } from './form/timeline.js';
+import { chorusBars, type Timeline } from './form/timeline.js';
 import { COMP_INSTRUMENTS } from './players/comp/instruments.js';
 import { LEAD_INSTRUMENTS } from './players/lead/instruments.js';
 import { feelFor, STYLES } from './styles/index.js';
@@ -39,10 +39,14 @@ export interface PassOptions {
     /** The bars to play, in order, and where they lead. Defaults to the whole song. */
     window?: PassWindow;
     /**
-     * Generate only the window's bars before this one; the window still says where the
+     * Return only the window's bars before this one; the window still says where the
      * performance goes and where it ends. A counted chart's live performance is generated a
      * chorus at a time (`BandHost`), each chorus resuming from the memory the one before left,
-     * as a settings change resumes a pass at a barline. Defaults to the window's end.
+     * as a settings change resumes a pass at a barline. The bars past `until` are played (one,
+     * and on until the comp strikes again) and dropped, so what the whole pass does across that
+     * barline (a held organ chord, a comp voice yielding to the lead) is done here too: the
+     * chunks join into the whole pass, event for event. `memory` is then the memory before bar
+     * `until`. Defaults to the window's end.
      */
     until?: number;
 }
@@ -68,9 +72,13 @@ export function performPass(
     const leadProfile = LEAD_INSTRUMENTS[settings.lead];
     const window = options.window ?? fullWindow(timeline);
     const until = Math.min(options.until ?? window.to, window.to);
+    // The bars actually played: past a chunk's end, a look across its barline (above) — at
+    // least one bar, and on until the comp strikes again (or rests), since a sustaining comp
+    // holds its last chord to its next strike, which can be bars away.
+    let through = Math.min(until + 1, window.to);
     // Trading with the drummer needs a drummer who can solo in this style.
     const drumSolos = Boolean(style.drums.solos);
-    const plans = planBars(timeline, settings, { ...options, window, until, drumSolos });
+    const plans = planBars(timeline, settings, { ...options, window, drumSolos });
     // Where the pass wraps, the next bar belongs to the next pass, whose lanes can differ (the
     // fours may open with the drummer alone): what it plays is taken from that pass's plan.
     // That next pass is always a fresh lap (a loop always restarts at the top), never a
@@ -96,11 +104,13 @@ export function performPass(
     const events: BandEvent[] = [];
     const snapshots: PassMemory[] = [];
 
-    for (let i = window.from; i < until; i++) {
+    for (let i = window.from; i < through; i++) {
         const bar = bars[i];
         const plan = plans[i];
         // The band's pass at this bar: a counted chart's chorus is its time through the song.
         const pass = options.pass + bar.visit.chorus;
+        // And its place in the form: seeds are keyed on it, so chorus k plays what lap k plays.
+        const place = i - chorusBars(timeline, i).first;
         snapshots[i] = { ...memory };
         const nextIndex = i + 1 < window.to ? i + 1 : options.looping ? window.wrapTo : -1;
         // The bar after the window is planned by the pass that plays it. "Is the next bar an
@@ -138,7 +148,7 @@ export function performPass(
                             bar.visit.sectionIndex,
                             purpose,
                         )
-                      : rng(settings.seed, style.id, lane, pass, bar.index, purpose),
+                      : rng(settings.seed, style.id, lane, pass, place, purpose),
         });
         if (plan.lanes.drums) {
             const out = style.drums.play(context('drums'), memory.drums);
@@ -163,11 +173,20 @@ export function performPass(
             memory.comp = out.memory;
             events.push(...out.events);
         }
+        const looking = i === through - 1 && i >= until && through < window.to;
+        if (
+            looking &&
+            plan.lanes.comp &&
+            !bar.spans.some((s) => !s.chord) &&
+            !events.some((e) => e.lane === 'comp' && !e.muted && e.bar >= until)
+        ) {
+            through++;
+        }
     }
 
-    // The bar at `until` is planned only so the last generated bar knows where it leads; it
-    // is not played here, so nothing below may write into it.
-    const played = until < window.to ? plans.slice(0, until) : plans;
+    // The bar after the last one played is planned only so it knows where it leads; nothing
+    // below may write into it.
+    const played = through < window.to ? plans.slice(0, through) : plans;
     const yielded = instrument.family === 'keyboard' ? yieldToLead(events) : events;
     const fermatas = holdFermatas(yielded, timeline, played, options.memory?.lastBass);
     // Each snapshot (and the memory the next pass continues from) takes the last bass note
@@ -178,7 +197,7 @@ export function performPass(
         .sort((a, b) => a.tick - b.tick);
     let lastBass = options.memory?.lastBass;
     let next = 0;
-    for (let i = window.from; i < until; i++) {
+    for (let i = window.from; i < through; i++) {
         while (next < bassLine.length && bassLine[next].tick < bars[i].start) {
             lastBass = bassLine[next++].midi;
         }
@@ -192,6 +211,17 @@ export function performPass(
         strumMs: instrument.strumMs,
     });
     felt.sort((a, b) => a.tick - b.tick || laneOrder(a) - laneOrder(b));
+    const lastSnapshot = snapshots[until];
+    if (through > until) {
+        // The look across the barline is dropped: the next chunk plays that bar itself, from
+        // the memory before it.
+        snapshots.length = until;
+        return {
+            events: felt.filter((e) => e.bar < until),
+            memory: lastSnapshot,
+            snapshots,
+        };
+    }
     return { events: felt, memory, snapshots };
 }
 

@@ -13,6 +13,8 @@ import {
     type BandEvent,
     compileTimeline,
     DEFAULT_SETTINGS,
+    type PassMemory,
+    performPass,
     secondsAt,
     type Timeline,
     toMidi,
@@ -402,6 +404,56 @@ describe('BandHost counted choruses', () => {
         expect(onEnd).toHaveBeenCalledTimes(1);
     });
 
+    it('released on the last section, the lap under way plays the ending, then stops', () => {
+        // One chorus of a1 a2: a loop on A is a loop on the chart's last section.
+        const audio = fakeAudioContext(10);
+        const state = fakeState(audio);
+        const onEnd = vi.fn();
+        const host = new BandHost({ state: () => state, silence: () => {}, onEnd });
+        const score = { ...song([{ ...twoBars.sections[0] }]), choruses: 1 };
+        host.setScore(score);
+        const timeline = compileTimeline(score);
+        const loop = { from: 0, to: timeline.ticks };
+        host.start(drumsOnly, BPM, 0, loop);
+        // Into the second lap's first bar, then release: its second bar can still change.
+        run(host, audio, 10.1, 10.1 + 2.25 * BAR_S);
+        const internals = host as unknown as {
+            segments: {
+                pass: number;
+                looping: boolean;
+                ends: boolean;
+                events: BandEvent[];
+                snapshots: PassMemory[];
+            }[];
+        };
+        const lap = internals.segments.find((s) => s.pass === 1)!;
+        host.setLoop(null);
+        expect(lap.looping).toBe(false);
+        expect(lap.ends).toBe(true);
+        // Its last bar is now what a performance's last bar plays: the ending, not the fill
+        // back to the top that a lap plays.
+        const ending = performPass(timeline, drumsOnly, {
+            pass: 1,
+            looping: false,
+            memory: lap.snapshots[1],
+            window: { from: 1, to: 2, wrapTo: 0, origin: 0 },
+        });
+        const looped = performPass(timeline, drumsOnly, {
+            pass: 1,
+            looping: true,
+            memory: lap.snapshots[1],
+            window: { from: 1, to: 2, wrapTo: 0, origin: 0 },
+        });
+        const lastBar = JSON.stringify(lap.events.filter((e) => e.bar === 1));
+        expect(lastBar).toBe(JSON.stringify(ending.events));
+        expect(lastBar).not.toBe(JSON.stringify(looped.events));
+        run(host, audio, 10.1 + 2.25 * BAR_S, 10.1 + 4 * BAR_S);
+        expect(onEnd).not.toHaveBeenCalled();
+        audio.currentTime = 10.1 + 4 * BAR_S;
+        pump(host);
+        expect(onEnd).toHaveBeenCalledTimes(1);
+    });
+
     it('exports exactly the performance it plays: three choruses and the coda', () => {
         const audio = fakeAudioContext(10);
         const state = fakeState(audio);
@@ -409,12 +461,25 @@ describe('BandHost counted choruses', () => {
         const score = codaSong(3);
         host.setScore(score);
         const segments = watchSegments(host);
-        host.start(drumsOnly, BPM, 0, null);
+        // The whole band, on the organ: a held chord is what a chorus seam could cut short.
+        const band = {
+            ...DEFAULT_SETTINGS,
+            comp: 'organ' as const,
+            lanes: { drums: true, bass: true, comp: true, lead: true },
+        };
+        host.start(band, BPM, 0, null);
         run(host, audio, 10.1, 10.1 + 7 * BAR_S + 0.1);
         expect(host.playing).toBe(false);
 
-        const { events, timeline } = host.render(drumsOnly);
+        const { events, timeline } = host.render(band);
         expect(timeline.bars).toHaveLength(7); // a1 a2 three times, then c1
+        // The export is the performance as one whole pass — the band's own one-shot, made
+        // independently of the host's chorus-at-a-time generation — and it is what played.
+        const whole = performPass(compileTimeline(score), band, { pass: 0, looping: false });
+        expect(JSON.stringify(events)).toBe(JSON.stringify(whole.events));
+        expect(new Set(events.map((e) => e.lane))).toEqual(
+            new Set(['drums', 'bass', 'comp', 'lead']),
+        );
         expect(JSON.stringify(events)).toBe(
             JSON.stringify(segments().flatMap((segment) => segment.events)),
         );

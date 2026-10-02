@@ -195,12 +195,20 @@ expression devices take turns rather than stack; one peak note per cycle.
     (`BarPlan.lead`), so the lead, the drummer and the rhythm section agree on whose turn it
     is.
   - **A counted chart** (`SemanticScore.choruses`, #1475) is one timeline holding every chorus,
-    played once as pass 0. Each bar's chorus is added to the pass (`planBars`'s `passAt`), so
-    the second chorus is the band's second time through: the head, then solos or trades, the
-    pass lift, trading turns counted from each chorus's top, a solo's arc shaped over its own
-    chorus (`chorusBars`). Only the very last bar differs from a loop's lap: it plays the
-    held ending a non-looping pass always has. An uncounted chart's chorus is always 0, so it
-    plays exactly as before.
+    played once as pass 0. Each bar's chorus is added to the pass (`planBars`'s `passAt`), and
+    every seed, a solo's arc, its opening breath and a looping book's recalled phrase are keyed
+    by the bar's place in its chorus (`chorusBars`), so chorus k plays what lap k of a loop
+    plays: the head, then solos or trades, the pass lift, trading turns counted from each
+    chorus's top.
+  - **It ends on the out-head.** With two or more choruses the last is the head whatever the
+    cycle has reached, and a trade hands back to the band for it (`leadRole`'s
+    `inFinalChorus`): the last chorus of a performance is the melody restated, and a coda or
+    tag hangs off the head, never off a solo. It keeps its pass lift and seeds; only the lead's
+    job changes, so the out-head restates the in-head note for note (the head is keyed by
+    section). The solo arc is not compressed to fit the choruses between (a 4-chorus chart
+    plays solos 1 and 2 of the three-chorus arc, then the head). Its last bar plays the held
+    ending a non-looping pass always has. An uncounted chart's chorus is always 0 and it has no
+    last chorus, so it plays exactly as before.
 - **Phrases, and the space between them.** Each four-bar phrase of the timeline is a slot the
   lead plays in or rests in. A phrase is planned whole at its first bar and kept in memory, so
   any barline can resume it. Most slots leave room: a phrase plays two or three bars and
@@ -267,12 +275,18 @@ schedules everything due in the next 150 ms on a 25 ms timer.
 - **The chart pointer** follows `songTick()` to the written event under it (`slotAt`).
 - **A counted chart** (#1475) is not looped: the host performs its timeline once, generating a
   chorus per segment (`PassOptions.until`: the rest of the window still plans the next bar and
-  the ending), each resuming from the memory the one before left. When the last segment's final
-  bar ends, the host stops by itself and calls `onEnd`; the runtime brings the transport to
-  stopped by Stop's own path, except that the last notes ring out (as an export's release tail
-  does) instead of being cut. A practice loop ignores the count; released, the performance
-  carries on from the bar after it to its end. `render()` builds the export the same chorus
-  at a time, so it is exactly the performance that plays.
+  the ending), each resuming from the memory the one before left. A chunk plays on past its
+  end until the comp strikes again (at least one bar) and drops those bars, so what the whole
+  pass does across a chorus seam — an organ chord held to its next strike, a keyboard voice
+  yielding to the lead — happens live too: the chunks join into the one-shot pass, event for
+  event. (A seam is therefore not a loop wrap, which can do neither.) When the last segment's
+  final bar ends, the host stops by itself and calls `onEnd`; the runtime brings the transport
+  to stopped by Stop's own path, except that the last notes ring out (as an export's release
+  tail does) instead of being cut. A practice loop ignores the count; released, the
+  performance carries on from the bar after it to its end — and released on the chart's last
+  section, the lap under way plays the ending from its next barline (or, with no barline left
+  in it, the section plays once more as written) and the band stops. `render()` builds the
+  export the same chorus at a time, so it is exactly the performance that plays.
 
 A pass is generated on the main thread (about 5–7 ms for 32 bars on a desktop), two seconds
 before it is needed.

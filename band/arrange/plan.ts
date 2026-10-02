@@ -86,9 +86,7 @@ export function fullWindow(timeline: Timeline): PassWindow {
 /**
  * Plans for the bars in `window`, indexed by bar index (bars outside it are absent).
  * `next` is resolved in performance order, so a practice loop's last bar leads back to the
- * loop's first bar rather than on to the next section. With `until`, only the bars before it
- * are planned, plus the bar at `until` itself (the next bar the last one leads into); the
- * window, and so the end of the performance, is unchanged.
+ * loop's first bar rather than on to the next section.
  *
  * A counted chart (`SemanticScore.choruses`, #1475) is performed as ONE pass over its
  * unrolled choruses, so "which time through the song" is the pass plus the bar's chorus
@@ -103,15 +101,8 @@ export function planBars(
         pass,
         looping,
         window,
-        until = window.to,
         drumSolos = false,
-    }: {
-        pass: number;
-        looping: boolean;
-        window: PassWindow;
-        until?: number;
-        drumSolos?: boolean;
-    },
+    }: { pass: number; looping: boolean; window: PassWindow; drumSolos?: boolean },
 ): BarPlan[] {
     const { bars } = timeline;
     // Where this pass truly began, for `first`/`before`/`priorFill` below — see `PassWindow`.
@@ -172,7 +163,7 @@ export function planBars(
     // is fuller than the first but the band never runs away from the player.
     const passLift = (index: number) => Math.min(passAt(index, pass), 3) * 0.03;
     const plans: BarPlan[] = [];
-    for (let i = window.from; i < Math.min(until + 1, window.to); i++) {
+    for (let i = window.from; i < window.to; i++) {
         const bar = bars[i];
         const isLast = i === window.to - 1;
         const next = isLast ? (looping ? bars[window.wrapTo] : null) : bars[i + 1];

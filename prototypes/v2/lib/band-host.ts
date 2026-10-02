@@ -272,6 +272,8 @@ export class BandHost {
     private scoreKey = '';
     /** The chart counts its choruses: the band plays them once and stops, never looping. */
     private counted = false;
+    /** A released loop on a counted chart's last section plays it once more, then ends. */
+    private lastLap = false;
     private settings: BandSettings | null = null;
     private bpm = 120;
     private segments: Segment[] = [];
@@ -346,6 +348,7 @@ export class BandHost {
         this.loop = loop;
         this.nextPass = 0;
         this.resumeBar = null;
+        this.lastLap = false;
         const fromBar = Math.min(this.barAt(fromTick), this.timeline.bars.length - 1);
         const first = loop ? this.lapPlan(loop) : this.songPlan(fromBar, fromBar);
         let segmentStart = audio.currentTime + 0.1;
@@ -387,10 +390,20 @@ export class BandHost {
         const index = this.segments.indexOf(current);
         // Everything after the current segment is regenerated lazily with the new settings.
         this.segments.length = index + 1;
+        const cutoff = this.regenerate(current, settings, horizon);
+        this.change = { segment: current, tick: cutoff ?? current.to };
+    }
+
+    /**
+     * Regenerate `current` from the first barline after `horizon` (what is already scheduled
+     * stays), with `settings` and the segment's own `looping`. Returns that barline's tick, or
+     * null when the segment has no barline left to change at.
+     */
+    private regenerate(current: Segment, settings: BandSettings, horizon: number): number | null {
+        const timeline = this.timeline!;
         const cutoffBar = this.barAt(this.tickAt(current, horizon), true);
         if (cutoffBar >= current.until) {
-            this.change = { segment: current, tick: current.to };
-            return;
+            return null;
         }
         // Resume from the engine's own memory at that barline, so the new bars follow on
         // from the bars actually played (voicing, bass register, a pushed chord). `origin`
@@ -410,7 +423,6 @@ export class BandHost {
             until: current.until,
         });
         const cutoff = timeline.bars[cutoffBar].start;
-        this.change = { segment: current, tick: cutoff };
         current.events = current.events.filter((e) => e.tick < cutoff).concat(tail.events);
         current.cursor = current.events.findIndex(
             (e) => this.timeOf(current, e.tick) + e.offsetMs / 1000 > horizon,
@@ -424,6 +436,7 @@ export class BandHost {
             current.snapshots[bar] = tail.snapshots[bar];
         }
         current.memoryAfter = tail.memory;
+        return cutoff;
     }
 
     /** Re-anchor the clock at the current position; the music keeps its place in the bar. */
@@ -468,8 +481,23 @@ export class BandHost {
         if (current) {
             this.segments.length = this.segments.indexOf(current) + 1;
             this.resumeBar = current.until < this.timeline!.bars.length ? current.until : null;
-            // A counted chart has nothing after its last bar to carry on into: it ends there.
-            current.ends = this.counted && this.resumeBar === null;
+            if (this.counted && this.resumeBar === null) {
+                // A counted chart's last section has nothing after it to carry on into: the
+                // performance ends with it. The lap under way was played as a loop (a fill
+                // back to its top); from its next barline it plays the ending instead, as the
+                // last bars of any counted performance do. With no barline left in it, the
+                // section plays once more, as written, and ends.
+                current.looping = false;
+                if (
+                    this.regenerate(current, this.settings, audio.currentTime + LOOKAHEAD_S) !==
+                    null
+                ) {
+                    current.ends = true;
+                } else {
+                    current.looping = true;
+                    this.lastLap = true;
+                }
+            }
         }
     }
 
@@ -663,6 +691,15 @@ export class BandHost {
     private followOn(last: Segment): SegmentPlan {
         if (this.loop) {
             return this.lapPlan(this.loop);
+        }
+        if (this.lastLap) {
+            this.lastLap = false;
+            return {
+                pass: this.nextPass++,
+                window: last.window,
+                until: last.until,
+                looping: false,
+            };
         }
         const resume = this.resumeBar;
         this.resumeBar = null;

@@ -293,12 +293,14 @@ const CHORUSES = new WeakMap<Timeline, { first: number; end: number }[]>();
  * The bars of the chorus bar `index` belongs to: `first` up to (not including) `end`. A counted
  * chart (`SemanticScore.choruses`, #1475) unrolls every chorus into one timeline, and what the
  * band shapes over "the song" — a solo chorus's arc — is one chorus of it, as it is one lap of
- * an uncounted chart, whose single chorus is the whole timeline.
+ * an uncounted chart, whose single chorus is the whole timeline. So a bar's place in the form
+ * is `index - first`: what the band keys its choices on, so chorus k plays what lap k plays.
  */
 export function chorusBars(timeline: Timeline, index: number): { first: number; end: number } {
-    let spans = CHORUSES.get(timeline);
-    if (!spans) {
-        spans = [];
+    let byBar = CHORUSES.get(timeline);
+    if (!byBar) {
+        const spans: { first: number; end: number }[] = [];
+        byBar = [];
         for (const bar of timeline.bars) {
             const last = spans.at(-1);
             if (last && timeline.bars[last.first].visit.chorus === bar.visit.chorus) {
@@ -306,10 +308,20 @@ export function chorusBars(timeline: Timeline, index: number): { first: number; 
             } else {
                 spans.push({ first: bar.index, end: bar.index + 1 });
             }
+            byBar.push(spans[spans.length - 1]);
         }
-        CHORUSES.set(timeline, spans);
+        CHORUSES.set(timeline, byBar);
     }
-    return spans.find((span) => index < span.end) ?? { first: 0, end: timeline.bars.length };
+    return byBar[index] ?? { first: 0, end: timeline.bars.length };
+}
+
+/**
+ * Is bar `index` in the last chorus of a counted performance of two or more choruses? An
+ * uncounted chart's one chorus loops, so it has no last one; nor does a single counted chorus.
+ */
+export function inFinalChorus(timeline: Timeline, index: number): boolean {
+    const last = timeline.bars.at(-1)?.visit.chorus ?? 0;
+    return last > 0 && timeline.bars[index].visit.chorus === last;
 }
 
 /** The chord sounding at a tick (N.C. → null). */

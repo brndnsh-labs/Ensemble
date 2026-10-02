@@ -127,3 +127,34 @@ export const FIXTURES: Record<string, SemanticScore> = {
         { label: 'Holds', bars: 'C | / | N.C. | G7:3 N.C.:1 | C', fermataBars: [4] },
     ]),
 };
+
+const LAST_CHORUS: ScoreDirection = {
+    kind: 'last-chorus',
+    destination: { kind: 'coda', via: 'to-coda', target: 'coda' },
+};
+
+/**
+ * Charts that count their choruses (#1475): one timeline holding every chorus, played once.
+ * Kept apart from `FIXTURES` so every table-driven test over those stays as it was; the suites
+ * that cover a counted performance (the invariants, `arrange/choruses.test.ts`) read these.
+ */
+export const COUNTED_FIXTURES: Record<string, SemanticScore> = {
+    /** Four times round a blues: the head, two solo choruses, the out-head. */
+    bluesFour: { ...FIXTURES.blues, choruses: 4 },
+    /** Three choruses of a blues and a two-bar tag taken on the last ("To Coda, last chorus"). */
+    bluesCoda: {
+        ...score([
+            {
+                label: 'A',
+                bars: 'C7 | F7 | C7 | C7 | F7 | F7 | C7 | A7 | Dm7 | G7 | C7 A7 | Dm7 G7',
+                end: { 11: [{ kind: 'coda', label: 'to-coda' }, LAST_CHORUS] },
+            },
+            {
+                label: 'Coda',
+                bars: 'Dm7 G7 | C7',
+                start: { 0: [{ kind: 'coda', label: 'coda' }] },
+            },
+        ]),
+        choruses: 3,
+    },
+};

@@ -8,7 +8,7 @@ import type { LeadRole } from '../../arrange/cycle.js';
 import { energyTier } from '../../arrange/plan.js';
 import type { Rng } from '../../core/random.js';
 import type { PitchedNote } from '../../core/types.js';
-import { type Bar, chordAt } from '../../form/timeline.js';
+import { type Bar, chordAt, chorusBars } from '../../form/timeline.js';
 import type { BarContext, PitchedIdiom } from '../../styles/types.js';
 import { type ChordFacts, chordPcs } from '../../theory/chord.js';
 import { mod12 } from '../../theory/pitch.js';
@@ -107,10 +107,20 @@ export interface LeadMemory {
     /** The last solo phrase, whole: a looping book may play it again. */
     phrase: PhraseMemory | null;
     /**
-     * The latest solo phrase at each slot of the form (by first bar): a looped hook comes back
-     * at the same place in the chord loop, as a sample does.
+     * The latest solo phrase at each slot of the form (by its first bar's place in the chorus,
+     * `placeOf`): a looped hook comes back at the same place in the chord loop, as a sample
+     * does — on a loop's next lap, or a counted chart's next chorus.
      */
     phrases: Record<number, PhraseMemory>;
+}
+
+/**
+ * Bar `index`'s place in the form: its bar within its chorus. A counted chart's timeline holds
+ * every chorus (#1475); keyed by place, its chorus k recalls and seeds what lap k of a loop
+ * does. An uncounted chart's one chorus is the timeline, so this is the bar index.
+ */
+function placeOf(ctx: BarContext, index: number): number {
+    return index - chorusBars(ctx.timeline, index).first;
 }
 
 interface PhraseMemory {
@@ -321,7 +331,7 @@ function soloPlan(
 ): SlotPlan {
     const { bars } = ctx.timeline;
     const first = bars[slotStart];
-    const rng = ctx.rng(`solo:${ctx.pass}:${slotStart}`, 'song');
+    const rng = ctx.rng(`solo:${ctx.pass}:${placeOf(ctx, slotStart)}`, 'song');
     const tier = energyTier(ctx.plan.energy);
     const trade = role.kind === 'trade';
     // A trade's turn sets its length; a solo phrase is the form's.
@@ -337,7 +347,7 @@ function soloPlan(
     // A looping book plays its last phrase again, whole — the hook comes round.
     // The same place in the form from an earlier chorus first (a sample comes round with the
     // chords), else the phrase just played.
-    const atThisSlot = memory.phrases[slotStart];
+    const atThisSlot = memory.phrases[placeOf(ctx, slotStart)];
     const previousPhrase =
         atThisSlot && atThisSlot.kinds.length === length ? atThisSlot : memory.phrase;
     if (
@@ -364,10 +374,12 @@ function soloPlan(
         };
     }
     // The solo's opening statement may leave two bars of room after it; nothing else does.
+    // It opens at the top of its chorus (a counted chart's solo starts a chorus in), or
+    // straight after an intro.
     const opensSolo =
         role.kind === 'solo' &&
         role.chorus === 1 &&
-        (slotStart === 0 || /^intro/i.test(bars[slotStart - 1].visit.label));
+        (placeOf(ctx, slotStart) === 0 || /^intro/i.test(bars[slotStart - 1].visit.label));
     // Now and then (the book's `space`) a phrase takes a roomier shape than its density — but
     // the two-bar breath stays the opening statement's, and a phrase after an empty bar comes
     // straight in.
@@ -659,7 +671,7 @@ function lineRng(ctx: BarContext, role: LeadRole, slotStart: number): Rng {
     const first = ctx.timeline.bars[slotStart];
     return role.kind === 'head'
         ? ctx.rng(`${headKey(first)}:${first.phrase.index}:line`, 'song')
-        : ctx.rng(`solo:${ctx.pass}:${slotStart}:line`, 'song');
+        : ctx.rng(`solo:${ctx.pass}:${placeOf(ctx, slotStart)}:line`, 'song');
 }
 
 /** A head phrase, voiced — the restatement of an opening needs the opening's own notes. */
@@ -835,7 +847,7 @@ function planSlot(
     const rng =
         role.kind === 'head'
             ? ctx.rng(`${headKey(first)}:${first.phrase.index}:articulation`, 'song')
-            : ctx.rng(`solo:${ctx.pass}:${slotStart}:articulation`, 'song');
+            : ctx.rng(`solo:${ctx.pass}:${placeOf(ctx, slotStart)}:articulation`, 'song');
     const targets = targetsOf(onsets);
     const top = Math.max(...pitches);
     const notes = onsets.map((o, i): Planned => {
@@ -920,7 +932,7 @@ function planSlot(
             : memory.phrase;
     const phrases =
         role.kind !== 'head' && phrase
-            ? { ...memory.phrases, [slotStart]: phrase }
+            ? { ...memory.phrases, [placeOf(ctx, slotStart)]: phrase }
             : memory.phrases;
     return { notes, motif, trailing, phrase, phrases };
 }
