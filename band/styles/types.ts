@@ -21,6 +21,11 @@ import type { LeadProfile } from '../players/lead/instruments.js';
 /** Everything an idiom may know when it plays one bar. All of it is read-only. */
 export interface BarContext {
     timeline: Timeline;
+    /**
+     * The bar being played. On the last bar of a pass that ends (`plan.ending`) it is the held
+     * ending's (`arrange/ending.ts`): a final turnaround arrives already resolved to the tonic,
+     * so every lane's ending, which plays `bar.spans[0].chord`, holds that one chord.
+     */
     bar: Bar;
     plan: BarPlan;
     /** The bar after this one in performance order (wrapping when the song loops). */
@@ -35,6 +40,13 @@ export interface BarContext {
     pass: number;
     /** Whether the performance goes round again after this pass. */
     looping: boolean;
+    /**
+     * The bar this pass ends on as the band plays it, when that differs from the written one: a
+     * turnaround resolved to the tonic (`arrange/ending.ts`). Null when the pass loops or ends
+     * as written. On the ending bar itself `bar` is this bar; a lane that plans ahead of it
+     * (the lead's phrase) reads it here.
+     */
+    ending: Bar | null;
     /**
      * A seeded stream for one decision. Keyed on the musical position, so a decision is
      * stable no matter what was generated before it. `scope: 'section'` keys on the
@@ -103,4 +115,17 @@ export interface Style {
      * the style has no lead yet and the lane stays silent.
      */
     lead?: { idiom: PitchedIdiom; prefers: LeadInstrument };
+    /**
+     * The tonic chord a held ending plays when the chart's last bar points back to the top (a
+     * ii–V, a V7): the quality the genre ends on, written as a chord-symbol suffix (`6`,
+     * `maj7`, `9`, `''` for the triad) for the chord authority to read, in a major key and in
+     * a minor one. See `arrange/ending.ts`.
+     */
+    ending: EndingQuality;
+}
+
+/** Chord-symbol suffixes for the tonic a held ending resolves to (`Style.ending`). */
+export interface EndingQuality {
+    major: string;
+    minor: string;
 }

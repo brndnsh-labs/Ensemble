@@ -6,6 +6,7 @@
  * hears what the earlier ones played (`heard`), so the comp can answer the lead. That is the whole coordination model: data
  * flowing one way, not a blackboard every lane writes.
  */
+import { heldEnding } from './arrange/ending.js';
 import { type BarPlan, fullWindow, type PassWindow, planBars } from './arrange/plan.js';
 import { rng } from './core/random.js';
 import type { BandEvent, BandSettings, DrumHit, Lane, PitchedNote } from './core/types.js';
@@ -116,6 +117,9 @@ export function performPass(
               lead: lead?.init() ?? null,
           };
     const { bars } = timeline;
+    // The held ending (`arrange/ending.ts`): a pass that ends resolves a final turnaround to
+    // the tonic. Only the ending bar is played on it; every bar before it hears the chart.
+    const ending = options.looping ? null : heldEnding(timeline, window.to - 1, style.ending);
     const events: BandEvent[] = [];
     const snapshots: PassMemory[] = [];
 
@@ -143,7 +147,7 @@ export function performPass(
         const heard: BarContext['heard'] = { drums: [], bass: [], lead: [] };
         const context = (lane: Lane): BarContext => ({
             timeline,
-            bar,
+            bar: plan.ending && ending?.index === i ? ending : bar,
             plan,
             next: nextIndex >= 0 ? { bar: bars[nextIndex], plan: nextPlan } : null,
             heard,
@@ -151,6 +155,7 @@ export function performPass(
             lead: leadProfile,
             pass,
             looping: options.looping,
+            ending,
             rng: (purpose, scope = 'bar') =>
                 scope === 'song'
                     ? rng(settings.seed, style.id, lane, 'song', purpose)

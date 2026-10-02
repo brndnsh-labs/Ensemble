@@ -436,7 +436,11 @@ function withSixths(ctx: BarContext, events: PitchedNote[]): PitchedNote[] {
     }
     const out = [...events];
     for (const [tick, notes] of byTick) {
-        const chord = chordAt(ctx.timeline, tick);
+        // The held ending plays its bar's own chord (`arrange/ending.ts`): a resolved
+        // turnaround is the I, and it takes its 6th like any I.
+        const chord = ctx.plan.ending
+            ? (ctx.bar.spans[0]?.chord ?? null)
+            : chordAt(ctx.timeline, tick);
         const plain =
             chord?.family === 'major' &&
             chord.third === 4 &&
@@ -753,4 +757,7 @@ export const country: Style = {
     // The clean electric: a Telecaster's snap is the country lead, and it bends. (It reads as
     // rockabilly *comping*, above; as the lead it is exactly right.)
     lead: { idiom: countryLead, prefers: 'guitar' },
+    // why: country ends on the plain I triad (the piano adds its own 6th to a I,
+    // `withSixths`), or i in a minor key.
+    ending: { major: '', minor: 'm' },
 };

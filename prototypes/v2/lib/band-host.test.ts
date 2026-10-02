@@ -310,6 +310,37 @@ describe('BandHost counted choruses', () => {
     /** 4/4 at 120: two seconds a bar. */
     const BAR_S = 2;
 
+    it('ends on the tonic where the last chorus ends on a turnaround (#1482)', () => {
+        const audio = fakeAudioContext(10);
+        const state = fakeState(audio);
+        const host = new BandHost({ state: () => state, silence: () => {} });
+        host.setScore({
+            ...song([
+                {
+                    id: 'a',
+                    label: 'A',
+                    repeat: 1,
+                    measures: [
+                        bar('a1', [chord('C', 4)]),
+                        bar('a2', [chord('Dm7', 2), chord('G7', 2)]),
+                    ],
+                },
+            ]),
+            choruses: 2,
+        });
+        const band = {
+            ...DEFAULT_SETTINGS,
+            style: 'jazz' as const,
+            lanes: { drums: true, bass: true, comp: true, lead: true },
+        };
+        const { events, timeline } = host.render(band);
+        const bassIn = (index: number) =>
+            events.flatMap((e) => (e.lane === 'bass' && e.bar === index ? [e.midi % 12] : []));
+        // The first chorus's ii–V leads round to the top; the last one's resolves to C.
+        expect(bassIn(1).some((pc) => pc === 2 || pc === 7)).toBe(true);
+        expect(bassIn(timeline.bars.length - 1)).toEqual([0]);
+    });
+
     it('plays every chorus, the coda only in the last, and stops at the end of its final bar', () => {
         const audio = fakeAudioContext(10);
         const state = fakeState(audio);

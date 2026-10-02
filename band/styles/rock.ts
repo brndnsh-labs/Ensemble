@@ -279,4 +279,6 @@ export const rock: Style = {
     comp: { keyboard: rockKeys, guitar: rockGuitar },
     prefers: 'piano',
     lead: { idiom: rockLead, prefers: 'overdrive' },
+    // why: rock's harmony is the triad: the band ends on the plain I, or i in a minor key.
+    ending: { major: '', minor: 'm' },
 };

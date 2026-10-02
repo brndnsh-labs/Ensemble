@@ -531,4 +531,6 @@ export const reggae: Style = {
     // Tommy McCook. Of the band's leads the sax's reedy, breathy tone is the nearest to the
     // melodica, and warmer than the trumpet, which ska wants for its brightness.
     lead: { idiom: reggaeLead, prefers: 'sax' },
+    // why: the skank plays triads, so the ending holds the I (or i) triad.
+    ending: { major: '', minor: 'm' },
 };

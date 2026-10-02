@@ -687,4 +687,8 @@ export const blues: Style = {
     // filling the space a lead will later take), just not the genre's default voice.
     prefers: 'piano',
     lead: { idiom: bluesLead, prefers: 'guitar' },
+    // why: the blues tonic is a dominant chord, and the band's last chord is the I9 (the
+    // jump-blues final hit: the 9th over the 7th the comp already plays). A minor blues ends
+    // on its im9.
+    ending: { major: '9', minor: 'm9' },
 };

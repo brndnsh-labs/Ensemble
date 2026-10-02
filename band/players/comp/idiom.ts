@@ -151,6 +151,8 @@ export function compIdiom(book: CompBook): PitchedIdiom {
                 }
             };
             if (plan.ending) {
+                // The held ending's chord: a final turnaround is already the tonic here, in the
+                // style's quality (`arrange/ending.ts`), the same chord the bass holds.
                 const chord = bar.spans[0]?.chord;
                 if (chord) {
                     prev = place(chord, prev);

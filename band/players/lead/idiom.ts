@@ -14,7 +14,14 @@ import { type ChordFacts, chordPcs } from '../../theory/chord.js';
 import { mod12 } from '../../theory/pitch.js';
 import { barSteps, dyn, STEP } from '../grid.js';
 import { type Density, soloArc, tradeArc } from './form.js';
-import { type Contour, type LinePalette, type Onset, targetsOf, voiceLine } from './line.js';
+import {
+    type Contour,
+    type LinePalette,
+    nearestRanked,
+    type Onset,
+    targetsOf,
+    voiceLine,
+} from './line.js';
 
 /** What a bar of a phrase does: carries the line, ends it on an arrival, or breathes. */
 type BarKind = 'line' | 'end' | 'rest';
@@ -859,9 +866,24 @@ function planSlot(
             ? ctx.rng(`${headKey(first)}:${first.phrase.index}:articulation`, 'song')
             : ctx.rng(`solo:${ctx.pass}:${placeOf(ctx, slotStart)}:articulation`, 'song');
     const targets = targetsOf(onsets);
-    const top = Math.max(...pitches);
-    const notes = onsets.map((o, i): Planned => {
-        const midi = pitches[i];
+    // The held ending (`arrange/ending.ts`): where the pass resolves its final turnaround to
+    // the tonic, the lead's note in that bar is sung against the tonic. It moves to the
+    // nearest of the tonic's resting tones (`settle`, ranked as any phrase's last note is), so
+    // the line into it stays the one the chart's chord drew — a step or so from where it was
+    // aimed — and the note it lands on is home. Only that bar's notes change; a neighbour's
+    // dynamics still read the pitch the line wrote.
+    const final = ctx.ending;
+    const resolved = onsets.map((o) =>
+        final?.spans[0]?.chord && barOf(ctx, o.tick) === final.index ? final.spans[0].chord : null,
+    );
+    const sung = pitches.map((m, i) => {
+        const chord = resolved[i];
+        return chord ? nearestRanked(book.settle(chord, onsets[i].key), m, ctx.lead.range) : m;
+    });
+    const top = Math.max(...sung);
+    const notes = onsets.map((onset, i): Planned => {
+        const o = resolved[i] ? { ...onset, chord: resolved[i] } : onset;
+        const midi = sung[i];
         const prev = pitches[i - 1];
         const next = pitches[i + 1];
         // A higher note is played a little harder (0.8 of a velocity step per semitone).

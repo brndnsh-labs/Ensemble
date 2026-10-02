@@ -72,6 +72,13 @@ export interface Timeline {
     ticks: number;
     /** Tick ranges that play slower than written (fermatas), as seconds-per-tick multipliers. */
     stretches: { start: number; end: number; factor: number }[];
+    /**
+     * Set when the performance ends in a last-chorus coda (#1472): a counted chart whose final
+     * chorus hops to written outro material, so its last bar is the chart's own ending and the
+     * band holds it as written (`arrange/ending.ts`). Absent otherwise, so every other
+     * timeline is shaped exactly as before.
+     */
+    coda?: true;
 }
 
 function durationTicks([n, d]: Readonly<ScoreDuration>): number {
@@ -253,7 +260,26 @@ export function compileTimeline(score: SemanticScore): Timeline {
         });
     }
 
-    return { bars, visits, spans, ticks: tick, stretches };
+    // A counted chart with a last-chorus coda always ends in it: only the final chorus takes
+    // the hop, and the score form refuses a D.C./D.S. beside it, so nothing follows the coda.
+    // An uncounted chart never takes it (its one chorus loops), so it has no written ending.
+    const coda =
+        score.choruses !== undefined &&
+        score.sections.some((section) =>
+            section.measures.some((measure) =>
+                [...(measure.start ?? []), ...(measure.end ?? [])].some(
+                    (direction) => direction.kind === 'last-chorus',
+                ),
+            ),
+        );
+    return {
+        bars,
+        visits,
+        spans,
+        ticks: tick,
+        stretches,
+        ...(coda ? { coda: true as const } : {}),
+    };
 }
 
 const MINOR_FAMILIES = new Set(['minor', 'half-diminished', 'diminished']);

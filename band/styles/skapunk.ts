@@ -612,4 +612,6 @@ export const skapunk: Style = {
     // Trumpet: the lead of a ska horn section, the brightest and most cutting horn, the one
     // that carries a hook over distorted guitars at 180 bpm.
     lead: { idiom: skaPunkLead, prefers: 'trumpet' },
+    // why: a ska or punk chorus is triads under the horns; the ending holds the I (or i).
+    ending: { major: '', minor: 'm' },
 };

@@ -565,4 +565,7 @@ export const hiphop: Style = {
     // its plucked attack sits apart from the tines (a sax would blur into them), with a small
     // bend to sound played rather than programmed.
     lead: { idiom: hipHopLead, prefers: 'guitar' },
+    // why: a sampled soul or jazz loop sits on seventh chords; the ending holds the loop's
+    // tonic seventh, major or minor.
+    ending: { major: 'maj7', minor: 'm7' },
 };

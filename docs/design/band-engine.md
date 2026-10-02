@@ -266,6 +266,31 @@ expression devices take turns rather than stack; one peak note per cycle.
     - `compAnswerLift`: answers louder than strikes under the line.
     - `compLineDensity`: thinner under the line, with a floor that keeps the time.
 
+### The held ending (#1482)
+
+A pass that does not loop (an export, the last chorus of a counted chart) ends on one held
+chord: the bass's one note, the comp's one chord and the lead's last long note, all from the
+final bar's first chord. Many tunes' last bar is a turnaround written to send the form round
+again (the blues fixture's `Dm7 G7`), and on the last time through a band doesn't hold it: it
+resolves it. So `arrange/ending.ts` (`heldEnding`) gives the ending bar to the lanes on the
+key's tonic, in the quality the genre ends on (`Style.ending`, a chord-symbol suffix read by
+`theory/chord.ts`): I6 for jazz, Imaj7 for bossa, I9 for the blues and funk, Imaj7 for disco
+and hip hop, Imaj9 for neo-soul, the power chord for metal and the triad for the rest; in a
+minor key the minor equivalents (im6 for jazz and bossa, im9, im7, the minor triad).
+- **What already counts as home.** A first chord whose root and bass are the tonic is held as
+  written, in the colour the chart gave it: rhythm changes' `Bb6`, a blues's `C7`, a minor
+  groove's `Em9`, a Picardy `E` in E minor. A tonic over another bass (`C/E`) is not home: an
+  inversion is a passing sound, and the held ending stands on the root.
+- **Written endings stand.** A fermata on the last bar, a last-chorus coda's last bar
+  (`Timeline.coda`) and an N.C. are the chart's own ending, played as written.
+- **Only the ending bar changes.** The bars before it lead into the chord the chart writes, as
+  they do every chorus, and are byte-identical to an ending that did not resolve. The lead's
+  last note is chosen against the written chord and then moved to the nearest of the tonic's
+  resting tones (`LeadBook.settle`), so the line into it is unchanged.
+- The invariant suite judges a pass that ends against the chord it plays there (`asPlayed`);
+  `arrange/ending.test.ts` holds every style to the tonic on turnaround endings, and to the
+  written chord on the endings above.
+
 ## The live host (`prototypes/v2/lib/band-host.ts`)
 
 The runtime's play, stop and resume paths go through `startBand`/`stopBand`; the old worker

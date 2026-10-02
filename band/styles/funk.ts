@@ -304,4 +304,7 @@ export const funk: Style = {
     comp: { keyboard: funkKeys, guitar: funkGuitar },
     prefers: 'clav',
     lead: { idiom: funkLead, prefers: 'sax' },
+    // why: funk's tonic is the one-chord dominant vamp, the I9; in a minor key the im9 vamp
+    // (the minor groove's Em9). The ending holds the chord the groove lives on.
+    ending: { major: '9', minor: 'm9' },
 };

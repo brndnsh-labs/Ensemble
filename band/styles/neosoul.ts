@@ -848,4 +848,7 @@ export const neosoul: Style = {
     // A clean electric guitar: over a Rhodes it is the genre's instrumental voice, and its
     // slides (bent-in 3rds) and quiet vibrato are the idiom; a horn stays one pick away.
     lead: { idiom: neoLead, prefers: 'guitar' },
+    // why: neo-soul voices its tonic with the 9th on top (the Rhodes maj9 and m9); a plain
+    // seventh would be the one chord in the tune without its colour.
+    ending: { major: 'maj9', minor: 'm9' },
 };
