@@ -125,6 +125,7 @@ describe('semantic score playback: exact authored timing', () => {
                 measureIndex,
                 sectionPass: 0,
                 repeatPasses: [],
+                chorus: 0,
             })),
         };
         validateProgression(written);

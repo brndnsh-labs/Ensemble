@@ -14,10 +14,17 @@ export type ScoreEvent =
       }
     | { kind: 'no-chord' | 'hold'; duration: ScoreDuration; fermata?: boolean };
 
+/** Depart at the `via` coda marker, arrive at the `target` coda marker. */
+export interface ScoreCodaDestination {
+    kind: 'coda';
+    via: string;
+    target: string;
+}
+
 export type ScoreDestination =
     | { kind: 'end' }
     | { kind: 'fine'; label: string }
-    | { kind: 'coda'; via: string; target: string }
+    | ScoreCodaDestination
     | { kind: 'ending'; pass: number };
 
 /** Authored navigation, not an already-unrolled list of performed measures. */
@@ -32,7 +39,14 @@ export type ScoreDirection =
           segno?: string;
           destination: ScoreDestination;
           repeats: 'play' | 'skip';
-      };
+      }
+    /**
+     * "To Coda, last time" (#1472). Only the final chorus of a counted performance
+     * (`SemanticScore.choruses`) hops from `via` to `target`. Every other chorus, and every
+     * chorus of an uncounted one, ends where `target` begins: the bars from there on are
+     * written outro material. Sits on the same boundary as its `via` marker.
+     */
+    | { kind: 'last-chorus'; destination: ScoreCodaDestination };
 
 export interface ScoreContext {
     key?: string;
@@ -75,6 +89,12 @@ export interface SemanticScore {
     meter: string;
     grouping: number[] | null;
     sections: ScoreSection[];
+    /**
+     * Choruses in a performance, 1–64 (#1472): the form is played this many times and a
+     * last-chorus coda is taken on the final one. Absent, one chorus loops forever and a
+     * last-chorus coda is never taken.
+     */
+    choruses?: number;
 }
 
 /** Semantic document; the isolated preview reads both versions. V1 sources are never rewritten. */

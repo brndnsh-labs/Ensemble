@@ -588,3 +588,104 @@ describe('pure legacy conversion proposals', () => {
         expect(proposeLegacyScoreConversion(source)).toMatchObject({ kind: 'blocked', source });
     });
 });
+
+describe('chorus count and last-chorus codas (#1472)', () => {
+    /** One bar with "To Coda, last chorus" on its end barline, and a coda bar after it. */
+    function codaScore(): SemanticScore {
+        const score = scoreFixture();
+        score.sections[0].measures[0].end = [
+            { kind: 'coda', label: 'to-coda' },
+            {
+                kind: 'last-chorus',
+                destination: { kind: 'coda', via: 'to-coda', target: 'coda' },
+            },
+        ];
+        score.sections[0].measures.push({
+            id: 'm2',
+            start: [{ kind: 'coda', label: 'coda' }],
+            content: {
+                kind: 'events',
+                events: [{ kind: 'chord', symbol: 'F6', duration: [4, 1] }],
+            },
+        });
+        return { ...score, choruses: 3 };
+    }
+
+    function lastChorusAt(score: SemanticScore): Record<string, unknown> {
+        return score.sections[0].measures[0].end![1] as unknown as Record<string, unknown>;
+    }
+
+    function issue(candidate: unknown) {
+        const checked = validateSemanticScore(candidate);
+        return checked.kind === 'invalid' ? checked.issues[0] : checked;
+    }
+
+    it('round-trips a chorus count and a last-chorus coda through the document codec', () => {
+        const source = documentFixture();
+        source.chart.score = codaScore();
+        const encoded = encodeChartDocumentV2(source);
+        expect(encoded.kind).toBe('ok');
+        if (encoded.kind !== 'ok') {
+            throw new Error('Fixture must encode');
+        }
+        expect(decodeChartDocumentV2(encoded.json)).toEqual({ kind: 'ok', value: source });
+        expect(validateSemanticScore(codaScore())).toEqual({ kind: 'ok', value: codaScore() });
+    });
+
+    it('accepts a last-chorus coda on a start barline too, and a chart with no count', () => {
+        const score = codaScore();
+        const { choruses: _, ...uncounted } = score;
+        expect(validateSemanticScore(uncounted).kind).toBe('ok');
+        score.sections[0].measures[0].start = score.sections[0].measures[0].end;
+        delete score.sections[0].measures[0].end;
+        expect(validateSemanticScore(score).kind).toBe('ok');
+    });
+
+    it.each([0, 65, 2.5, -1, '3', null])('rejects %p choruses', (choruses) => {
+        expect(issue({ ...codaScore(), choruses })).toMatchObject({
+            path: '$.choruses',
+            message: 'Expected an integer from 1 to 64.',
+        });
+    });
+
+    it('rejects non-finite choruses at the structural walk', () => {
+        expect(issue({ ...codaScore(), choruses: Number.NaN })).toMatchObject({
+            path: '$.choruses',
+        });
+    });
+
+    it('rejects unknown fields on the score, the direction and its destination', () => {
+        expect(issue({ ...codaScore(), chorusCount: 3 })).toMatchObject({
+            path: '$.chorusCount',
+            message: 'Unknown field.',
+        });
+        const direction = codaScore();
+        lastChorusAt(direction).times = 2;
+        expect(issue(direction)).toMatchObject({
+            path: '$.sections[0].measures[0].end[1].times',
+            message: 'Unknown field.',
+        });
+        const destination = codaScore();
+        (lastChorusAt(destination).destination as Record<string, unknown>).pass = 2;
+        expect(issue(destination)).toMatchObject({
+            path: '$.sections[0].measures[0].end[1].destination.pass',
+            message: 'Unknown field.',
+        });
+    });
+
+    it.each([
+        [{ kind: 'end' }, 'A last-chorus direction takes a coda destination.'],
+        [{ kind: 'fine', label: 'to-coda' }, 'A last-chorus direction takes a coda destination.'],
+        [
+            { kind: 'coda', via: 'to-coda', target: 'to-coda' },
+            'Coda departure and arrival must differ.',
+        ],
+        [{ kind: 'coda', via: 'to-coda', target: 'nowhere' }, 'Missing coda destination.'],
+        [{ kind: 'coda', via: 'to-coda' }, 'Missing required field.'],
+        [null, 'A last-chorus direction takes a coda destination.'],
+    ])('rejects a last-chorus destination %j', (destination, message) => {
+        const score = codaScore();
+        lastChorusAt(score).destination = destination;
+        expect(issue(score)).toMatchObject({ message });
+    });
+});

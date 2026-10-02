@@ -43,6 +43,8 @@ export interface SectionVisit {
     label: string;
     /** Which written pass of the section (its `repeat` count), from 0. */
     pass: number;
+    /** Which chorus of a counted performance (`SemanticScore.choruses`), from 0; else 0. */
+    chorus: number;
     firstBar: number;
     barCount: number;
     seamless: boolean;
@@ -136,7 +138,8 @@ export function compileTimeline(score: SemanticScore): Timeline {
 
     for (const written of visitsWritten) {
         const section = score.sections[written.sectionIndex];
-        const key = `${written.sectionIndex}:${written.sectionPass}`;
+        // A new chorus always starts a new visit, even of the section the last one ended in.
+        const key = `${written.chorus}:${written.sectionIndex}:${written.sectionPass}`;
         // A new visit starts at the section's first bar, and wherever a D.C. or D.S. jumps
         // back into it. A written repeat inside the section (a vamp, a two-bar turnaround) is
         // part of the visit it sits in, as is a forward skip (a second ending): giving each
@@ -160,6 +163,7 @@ export function compileTimeline(score: SemanticScore): Timeline {
                 id: section.id,
                 label: section.label,
                 pass: written.sectionPass,
+                chorus: written.chorus,
                 firstBar: bars.length,
                 barCount: 0,
                 seamless: section.seamless === true,

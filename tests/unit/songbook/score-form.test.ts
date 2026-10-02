@@ -69,11 +69,11 @@ describe('semantic score form: written measures to performed visits', () => {
         score.sections.push({ id: 'section-b', label: 'B', repeat: 1, measures: [bar('c')] });
 
         expect(compileScoreForm(score)).toEqual([
-            { sectionIndex: 0, measureIndex: 0, sectionPass: 0, repeatPasses: [] },
-            { sectionIndex: 0, measureIndex: 1, sectionPass: 0, repeatPasses: [] },
-            { sectionIndex: 0, measureIndex: 0, sectionPass: 1, repeatPasses: [] },
-            { sectionIndex: 0, measureIndex: 1, sectionPass: 1, repeatPasses: [] },
-            { sectionIndex: 1, measureIndex: 0, sectionPass: 0, repeatPasses: [] },
+            { sectionIndex: 0, measureIndex: 0, sectionPass: 0, repeatPasses: [], chorus: 0 },
+            { sectionIndex: 0, measureIndex: 1, sectionPass: 0, repeatPasses: [], chorus: 0 },
+            { sectionIndex: 0, measureIndex: 0, sectionPass: 1, repeatPasses: [], chorus: 0 },
+            { sectionIndex: 0, measureIndex: 1, sectionPass: 1, repeatPasses: [], chorus: 0 },
+            { sectionIndex: 1, measureIndex: 0, sectionPass: 0, repeatPasses: [], chorus: 0 },
         ]);
     });
 
@@ -315,6 +315,7 @@ describe('semantic score form: written measures to performed visits', () => {
             measureIndex: 0,
             sectionPass: 0,
             repeatPasses: [],
+            chorus: 0,
         });
     });
 
@@ -524,6 +525,7 @@ describe('semantic score form: written measures to performed visits', () => {
             measureIndex: 0,
             sectionPass: 0,
             repeatPasses: [1],
+            chorus: 0,
         });
         expect(first[1].repeatPasses).toEqual([1]);
         expect(score).toEqual(before);
@@ -724,12 +726,14 @@ describe('semantic score form: rejection is visible, complete and bounded', () =
             measureIndex: 0,
             sectionPass: 0,
             repeatPasses: [1],
+            chorus: 0,
         });
         expect(visits.at(-1)).toEqual({
             sectionIndex: 0,
             measureIndex: 3,
             sectionPass: 63,
             repeatPasses: [64],
+            chorus: 0,
         });
     });
 

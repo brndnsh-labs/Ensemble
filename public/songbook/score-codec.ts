@@ -9,8 +9,16 @@ type RecordValue = Record<string, unknown>;
 const CONTEXT = ['key', 'isMinor', 'meter', 'grouping'];
 // `harmony` is a retired lane (#1436), kept so an old chart's section override round-trips.
 const LANES = ['groove', 'bass', 'chords', 'harmony', 'soloist'];
-const START_DIRECTIONS = ['repeat-start', 'ending-start', 'ending-end', 'segno', 'coda', 'fine'];
-const END_DIRECTIONS = ['repeat-end', 'ending-end', 'segno', 'coda', 'fine', 'jump'];
+const START_DIRECTIONS = [
+    'repeat-start',
+    'ending-start',
+    'ending-end',
+    'segno',
+    'coda',
+    'fine',
+    'last-chorus',
+];
+const END_DIRECTIONS = ['repeat-end', 'ending-end', 'segno', 'coda', 'fine', 'jump', 'last-chorus'];
 // biome-ignore lint/suspicious/noControlCharactersInRegex: reject controls at the untrusted display-text boundary.
 const UNSAFE_TEXT = /[<>\u0000-\u001f\u007f]/;
 
@@ -154,6 +162,28 @@ interface Navigation {
     endingReferences: { pass: number; path: string }[];
 }
 
+/** A coda destination's two marker references, shared by D.C./D.S. al Coda and last-chorus codas. */
+function codaDestination(
+    destination: RecordValue,
+    path: string,
+    owner: string,
+    navigation: Navigation,
+) {
+    object(destination, path, ['kind', 'via', 'target']);
+    for (const field of ['via', 'target']) {
+        navigation.references.push({
+            kind: 'coda',
+            label: identity(destination[field], `${path}.${field}`),
+            path: owner,
+        });
+    }
+    requireValue(
+        destination.via !== destination.target,
+        path,
+        'Coda departure and arrival must differ.',
+    );
+}
+
 function directions(value: unknown, path: string, allowed: string[], navigation: Navigation): void {
     for (const [index, item] of list(value, path, 16).entries()) {
         const at = `${path}[${index}]`;
@@ -224,19 +254,7 @@ function directions(value: unknown, path: string, allowed: string[], navigation:
                     path: at,
                 });
             } else if (destination.kind === 'coda') {
-                object(destination, targetPath, ['kind', 'via', 'target']);
-                for (const field of ['via', 'target']) {
-                    navigation.references.push({
-                        kind: 'coda',
-                        label: identity(destination[field], `${targetPath}.${field}`),
-                        path: at,
-                    });
-                }
-                requireValue(
-                    destination.via !== destination.target,
-                    targetPath,
-                    'Coda departure and arrival must differ.',
-                );
+                codaDestination(destination, targetPath, at, navigation);
             } else if (destination.kind === 'ending') {
                 object(destination, targetPath, ['kind', 'pass']);
                 const pass = integer(destination.pass, `${targetPath}.pass`, 1, 64);
@@ -244,6 +262,15 @@ function directions(value: unknown, path: string, allowed: string[], navigation:
             } else {
                 requireValue(false, targetPath, 'Unknown jump destination.');
             }
+        } else if (kind === 'last-chorus') {
+            const record = object(item, at, ['kind', 'destination']);
+            const destination = record.destination as RecordValue | null;
+            requireValue(
+                destination && typeof destination === 'object' && destination.kind === 'coda',
+                `${at}.destination`,
+                'A last-chorus direction takes a coda destination.',
+            );
+            codaDestination(destination, `${at}.destination`, at, navigation);
         } else {
             const record = object(item, at, ['kind', 'label']);
             const label = identity(record.label, `${at}.label`);
@@ -319,14 +346,15 @@ export function validatePreparedSemanticScore(
     prepared: PreparedCandidate,
 ): CodecDecodeResult<SemanticScore> {
     try {
-        const root = object(prepared, '$', [
-            'notation',
-            'key',
-            'isMinor',
-            'meter',
-            'grouping',
-            'sections',
-        ]);
+        const root = object(
+            prepared,
+            '$',
+            ['notation', 'key', 'isMinor', 'meter', 'grouping', 'sections'],
+            ['choruses'],
+        );
+        if (Object.hasOwn(root, 'choruses')) {
+            integer(root.choruses, '$.choruses', 1, 64);
+        }
         requireValue(
             typeof root.notation === 'string' && ['name', 'roman', 'nns'].includes(root.notation),
             '$.notation',

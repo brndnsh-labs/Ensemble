@@ -1,5 +1,19 @@
-import { validateSemanticScore } from './score-codec.js';
-import type { ScoreDirection, ScoreSection, SemanticScore } from './score-types.js';
+/**
+ * FROZEN REFERENCE — do not edit. A verbatim copy of `public/songbook/score-form.ts` as it stood
+ * before #1472 (main @ cb71da85), with only its two import paths re-pointed. It is the "before"
+ * side of `tests/unit/songbook/score-form-differential.test.ts`, which proves that a chart with no
+ * chorus count and no last-chorus coda compiles to exactly the visits it always did.
+ *
+ * A later form story that changes performed order ON PURPOSE for such charts (e.g. #1473's
+ * al-Nth-ending destinations, which this compiler refuses) should narrow that differential to
+ * the charts it does not mean to change, or retire it — never edit this file to agree.
+ */
+import { validateSemanticScore } from '../../public/songbook/score-codec.js';
+import type {
+    ScoreDirection,
+    ScoreSection,
+    SemanticScore,
+} from '../../public/songbook/score-types.js';
 
 export interface ScoreFormVisit {
     sectionIndex: number;
@@ -7,8 +21,6 @@ export interface ScoreFormVisit {
     sectionPass: number;
     /** Musical pass numbers, outermost repeat first (unlike the zero-based indices). */
     repeatPasses: number[];
-    /** Which chorus of the performance, from 0. Always 0 when the chart counts no choruses. */
-    chorus: number;
 }
 
 type Node =
@@ -231,7 +243,6 @@ function sectionForm(section: ScoreSection): Node[] {
 
 type Jump = Extract<ScoreDirection, { kind: 'jump' }>;
 type Marker = Extract<ScoreDirection, { kind: 'segno' | 'coda' | 'fine' }>;
-type LastChorus = Extract<ScoreDirection, { kind: 'last-chorus' }>;
 interface Boundary {
     sectionIndex: number;
     measureIndex: number;
@@ -241,7 +252,7 @@ interface Boundary {
     directions: (Jump | Marker)[];
 }
 type PerformanceStep =
-    | { kind: 'measure'; visit: Omit<ScoreFormVisit, 'chorus'> }
+    | { kind: 'measure'; visit: ScoreFormVisit }
     | { kind: 'boundary'; boundary: Boundary };
 interface Tape {
     steps: PerformanceStep[];
@@ -269,31 +280,23 @@ function navigation(score: SemanticScore, forms: Node[][]) {
     const boundaries = new Map<string, Boundary>();
     const markers = new Map<string, Boundary>();
     const commands: { jump: Jump; boundary: Boundary }[] = [];
-    const lastChoruses: { direction: LastChorus; boundary: Boundary }[] = [];
     let position = 0;
     score.sections.forEach((section, sectionIndex) => {
         section.measures.forEach((measure, measureIndex) => {
             for (const edge of ['start', 'end'] as const) {
-                const at = {
-                    sectionIndex,
-                    measureIndex,
-                    edge,
-                    position: position + (edge === 'end' ? 1 : 0),
-                };
-                for (const direction of measure[edge] ?? []) {
-                    if (direction.kind === 'last-chorus') {
-                        lastChoruses.push({ direction, boundary: { ...at, directions: [] } });
-                    }
-                }
-                // A last-chorus coda is not a tape marker: it names markers that already are.
                 const directions = (measure[edge] ?? []).filter(
-                    (direction): direction is Jump | Marker =>
-                        !FORM_DIRECTIONS.has(direction.kind) && direction.kind !== 'last-chorus',
+                    (direction): direction is Jump | Marker => !FORM_DIRECTIONS.has(direction.kind),
                 );
                 if (!directions.length) {
                     continue;
                 }
-                const boundary: Boundary = { ...at, directions };
+                const boundary: Boundary = {
+                    sectionIndex,
+                    measureIndex,
+                    edge,
+                    position: position + (edge === 'end' ? 1 : 0),
+                    directions,
+                };
                 boundaries.set(boundaryKey(sectionIndex, measureIndex, edge), boundary);
                 for (const direction of directions) {
                     if (direction.kind === 'jump') {
@@ -353,67 +356,7 @@ function navigation(score: SemanticScore, forms: Node[][]) {
             }
         }
     }
-    return {
-        boundaries,
-        commands,
-        lastChorus: lastChorusCoda(score, markers, commands, lastChoruses),
-    };
-}
-
-/**
- * Check a last-chorus coda (#1472) whether or not the chart counts its choruses, and return its
- * destination with the boundary it departs from.
- */
-function lastChorusCoda(
-    score: SemanticScore,
-    markers: Map<string, Boundary>,
-    commands: { jump: Jump; boundary: Boundary }[],
-    found: { direction: LastChorus; boundary: Boundary }[],
-) {
-    const [lastChorus, extra] = found;
-    if (extra) {
-        failAt(
-            score,
-            extra.boundary,
-            'A chart takes one last-chorus coda; which departure ends the performance is ambiguous.',
-        );
-    }
-    if (!lastChorus) {
-        return undefined;
-    }
-    if (commands.length) {
-        // Conservative until a real chart needs both: with a D.C./D.S. in the chorus, the
-        // departure is passed before and after the jump, and "the last time" could be either.
-        failAt(
-            score,
-            lastChorus.boundary,
-            'A last-chorus coda cannot share a chart with a D.C./D.S. jump yet; which pass through its departure is the last time is ambiguous.',
-        );
-    }
-    const destination = lastChorus.direction.destination;
-    const departure = markers.get(destination.via)!;
-    if (
-        departure.sectionIndex !== lastChorus.boundary.sectionIndex ||
-        departure.measureIndex !== lastChorus.boundary.measureIndex ||
-        departure.edge !== lastChorus.boundary.edge
-    ) {
-        failAt(
-            score,
-            lastChorus.boundary,
-            'Place the last-chorus coda on the same bar boundary as its departure coda sign.',
-        );
-    }
-    // Unlike a D.S. al Coda, the arrival may share the departure's barline: the coda written
-    // straight after the form is an outro the last chorus plays on into. The performed-route
-    // check in compileScoreForm still refuses a hop that would land behind its departure.
-    if (markers.get(destination.target)!.position < departure.position) {
-        failAt(
-            score,
-            departure,
-            'The coda arrival must follow its departure; a backward coda would create a navigation cycle.',
-        );
-    }
-    return { destination, departure };
+    return { boundaries, commands };
 }
 
 /** A bounded repeat tape retains exact boundaries, rather than attaching markers to visits. */
@@ -496,7 +439,7 @@ export function compileScoreForm(candidate: unknown): ScoreFormVisit[] {
     }
     const score = checked.value;
     const forms = score.sections.map(sectionForm);
-    const { boundaries, commands, lastChorus } = navigation(score, forms);
+    const { boundaries, commands } = navigation(score, forms);
     const play = performanceTape(score, forms, boundaries, 'play');
     const skip = commands.some(({ jump }) => jump.repeats === 'skip')
         ? performanceTape(score, forms, boundaries, 'skip')
@@ -537,122 +480,84 @@ export function compileScoreForm(candidate: unknown): ScoreFormVisit[] {
             }
         }
     }
-    if (lastChorus) {
-        // The departure must be passed once a chorus, or "the last time" through it is ambiguous.
-        // The play tape holds every written bar, so both markers are on it.
-        const departures = play.markers.get(lastChorus.destination.via)!;
-        if (departures.length > 1) {
-            failAt(
-                score,
-                lastChorus.departure,
-                'The last-chorus coda departs inside a repeated passage; which pass is the last time is ambiguous. Place its coda sign after the complete repeat in a section that plays once.',
-            );
-        }
-        if (play.markers.get(lastChorus.destination.target)![0] <= departures[0]) {
-            failAt(
-                score,
-                lastChorus.departure,
-                'The coda arrival must follow its departure in the performed repeat route; this navigation would jump backward.',
-            );
-        }
-    }
+    const used = new Set<Jump>();
     const visits: ScoreFormVisit[] = [];
-    const choruses = score.choruses ?? 1;
-    for (let chorus = 0; chorus < choruses; chorus++) {
-        // Only the final chorus of a COUNTED performance takes a last-chorus coda. An uncounted
-        // one loops its single chorus forever, so it never reaches a last time.
-        performChorus(chorus, score.choruses !== undefined && chorus === choruses - 1);
-    }
-    return visits;
+    let tape = play;
+    let cursor = 0;
+    let active: { jump: Jump; boundary: Boundary } | undefined;
 
-    /** One pass of the form. A D.C./D.S. is taken afresh in every chorus. */
-    function performChorus(chorus: number, final: boolean): void {
-        const used = new Set<Jump>();
-        let tape = play;
-        let cursor = 0;
-        let active: { jump: Jump; boundary: Boundary } | undefined;
-
-        function target(label: string, boundary: Boundary): number {
-            const index = tape.markers.get(label)?.[0];
-            if (index === undefined) {
-                failAt(
-                    score,
-                    boundary,
-                    'The navigation destination is unreachable under the selected repeat policy.',
-                );
-            }
-            return index;
-        }
-        while (cursor < tape.steps.length) {
-            const step = tape.steps[cursor++];
-            if (step.kind === 'measure') {
-                if (visits.length >= MAX_MEASURES) {
-                    expansionLimit();
-                }
-                visits.push({ ...step.visit, repeatPasses: [...step.visit.repeatPasses], chorus });
-                continue;
-            }
-            const { boundary } = step;
-            const codaAt = (label: string) =>
-                boundary.directions.some(
-                    (direction) => direction.kind === 'coda' && direction.label === label,
-                );
-            if (lastChorus && codaAt(lastChorus.destination[final ? 'via' : 'target'])) {
-                if (!final) {
-                    // Written outro material: only the last chorus plays from here on.
-                    return;
-                }
-                // lastChorusCoda() refuses any jump beside it, so this is still the play tape.
-                cursor = tape.markers.get(lastChorus.destination.target)![0];
-                continue;
-            }
-            const destination = active?.jump.destination;
-            if (
-                destination?.kind === 'fine' &&
-                boundary.directions.some(
-                    (direction) =>
-                        direction.kind === 'fine' && direction.label === destination.label,
-                )
-            ) {
-                return;
-            }
-            if (destination?.kind === 'coda' && codaAt(destination.via)) {
-                const arrival = target(destination.target, active!.boundary);
-                if (arrival < cursor) {
-                    failAt(
-                        score,
-                        active!.boundary,
-                        'The coda arrival must follow its departure in the performed repeat route; this navigation would jump backward.',
-                    );
-                }
-                cursor = arrival;
-                active = undefined;
-                continue;
-            }
-            const jump = boundary.directions.find(
-                (direction): direction is Jump => direction.kind === 'jump',
+    function target(label: string, boundary: Boundary): number {
+        const index = tape.markers.get(label)?.[0];
+        if (index === undefined) {
+            failAt(
+                score,
+                boundary,
+                'The navigation destination is unreachable under the selected repeat policy.',
             );
-            if (!jump || used.has(jump)) {
-                continue;
+        }
+        return index;
+    }
+    while (cursor < tape.steps.length) {
+        const step = tape.steps[cursor++];
+        if (step.kind === 'measure') {
+            if (visits.length >= MAX_MEASURES) {
+                expansionLimit();
             }
-            if (active && active.jump.destination.kind !== 'end') {
+            visits.push({ ...step.visit, repeatPasses: [...step.visit.repeatPasses] });
+            continue;
+        }
+        const { boundary } = step;
+        const destination = active?.jump.destination;
+        if (
+            destination?.kind === 'fine' &&
+            boundary.directions.some(
+                (direction) => direction.kind === 'fine' && direction.label === destination.label,
+            )
+        ) {
+            return visits;
+        }
+        if (
+            destination?.kind === 'coda' &&
+            boundary.directions.some(
+                (direction) => direction.kind === 'coda' && direction.label === destination.via,
+            )
+        ) {
+            const arrival = target(destination.target, active!.boundary);
+            if (arrival < cursor) {
                 failAt(
                     score,
-                    boundary,
-                    'A second jump is reached before the active Fine or coda; the navigation destination is ambiguous.',
+                    active!.boundary,
+                    'The coda arrival must follow its departure in the performed repeat route; this navigation would jump backward.',
                 );
             }
-            used.add(jump);
-            active = { jump, boundary };
-            tape = jump.repeats === 'skip' ? skip : play;
-            cursor = jump.from === 'start' ? 0 : target(jump.segno!, boundary);
+            cursor = arrival;
+            active = undefined;
+            continue;
+        }
+        const jump = boundary.directions.find(
+            (direction): direction is Jump => direction.kind === 'jump',
+        );
+        if (!jump || used.has(jump)) {
+            continue;
         }
         if (active && active.jump.destination.kind !== 'end') {
             failAt(
                 score,
-                active.boundary,
-                'The requested Fine or coda departure is unreachable after the jump.',
+                boundary,
+                'A second jump is reached before the active Fine or coda; the navigation destination is ambiguous.',
             );
         }
+        used.add(jump);
+        active = { jump, boundary };
+        tape = jump.repeats === 'skip' ? skip : play;
+        cursor = jump.from === 'start' ? 0 : target(jump.segno!, boundary);
     }
+    if (active && active.jump.destination.kind !== 'end') {
+        failAt(
+            score,
+            active.boundary,
+            'The requested Fine or coda departure is unreachable after the jump.',
+        );
+    }
+    return visits;
 }
