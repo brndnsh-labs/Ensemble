@@ -86,7 +86,15 @@ export function fullWindow(timeline: Timeline): PassWindow {
 /**
  * Plans for the bars in `window`, indexed by bar index (bars outside it are absent).
  * `next` is resolved in performance order, so a practice loop's last bar leads back to the
- * loop's first bar rather than on to the next section.
+ * loop's first bar rather than on to the next section. `planned` stops planning there (a chunk
+ * of a long counted performance needs only its own bars and the ones it looks across); the
+ * window, and so where the performance goes and ends, is unchanged.
+ *
+ * A counted chart (`SemanticScore.choruses`, #1475) is performed as ONE pass over its
+ * unrolled choruses, so "which time through the song" is the pass plus the bar's chorus
+ * (`passAt`): its second chorus plans exactly as an uncounted chart's second time round the
+ * loop does — the solos after the head, the pass lift, the trading cycle. An uncounted chart's
+ * chorus is always 0, so there the pass is the pass.
  */
 export function planBars(
     timeline: Timeline,
@@ -95,12 +103,21 @@ export function planBars(
         pass,
         looping,
         window,
+        planned = window.to,
         drumSolos = false,
-    }: { pass: number; looping: boolean; window: PassWindow; drumSolos?: boolean },
+    }: {
+        pass: number;
+        looping: boolean;
+        window: PassWindow;
+        planned?: number;
+        drumSolos?: boolean;
+    },
 ): BarPlan[] {
     const { bars } = timeline;
     // Where this pass truly began, for `first`/`before`/`priorFill` below — see `PassWindow`.
     const origin = window.origin ?? window.from;
+    // The band's pass at bar `index` of lap `onPass` — see above.
+    const passAt = (index: number, onPass: number) => onPass + bars[index].visit.chorus;
     // The player trades over the whole song (a pass resumed at a barline still is one); a
     // practice loop keeps its band. Trading with the soloist needs it on; trading with the
     // drummer needs the drums on and a drummer who can solo in this style.
@@ -114,7 +131,7 @@ export function planBars(
             : null;
     // Whether the drummer has bar `index` of `pass` to himself: his turn in a trade.
     const drummerAlone = (index: number, onPass: number) => {
-        const role = leadRole(timeline, index, onPass, trade);
+        const role = leadRole(timeline, index, passAt(index, onPass), trade);
         return (
             role.kind === 'trade' &&
             role.with === 'drums' &&
@@ -131,7 +148,7 @@ export function planBars(
     const fillAt = (index: number, onPass: number): Fill => {
         const bar = bars[index];
         const isLast = index === window.to - 1;
-        const role = leadRole(timeline, index, onPass, trade);
+        const role = leadRole(timeline, index, passAt(index, onPass), trade);
         if ((!looping && isLast) || (role.kind === 'trade' && role.with === 'drums')) {
             // Trading with the drummer, his turn is a solo, not a fill; the true end of a
             // non-looping song plays a held ending instead.
@@ -139,7 +156,11 @@ export function planBars(
         }
         const next = isLast ? (looping ? bars[window.wrapTo] : null) : bars[index + 1];
         const visitEnd = bar.barInVisit === bar.visit.barCount - 1;
-        if ((visitEnd || (isLast && looping)) && !(next && bar.visit.seamless && !isLast)) {
+        // A counted chart's chorus ends into its next chorus the way a looping song's last
+        // bar wraps to the top: a section fill, even out of a seamless section.
+        const wraps =
+            (isLast && looping) || (!isLast && bars[index + 1].visit.chorus !== bar.visit.chorus);
+        if ((visitEnd || wraps) && !(next && bar.visit.seamless && !isLast && !wraps)) {
             return 'section';
         }
         if (bar.phrase.bar === bar.phrase.length - 1 && bar.phrase.index % 2 === 1) {
@@ -149,9 +170,9 @@ export function planBars(
     };
     // A song that loops earns a little more each time round — capped, so the fourth chorus
     // is fuller than the first but the band never runs away from the player.
-    const passLift = Math.min(pass, 3) * 0.03;
+    const passLift = (index: number) => Math.min(passAt(index, pass), 3) * 0.03;
     const plans: BarPlan[] = [];
-    for (let i = window.from; i < window.to; i++) {
+    for (let i = window.from; i < Math.min(planned, window.to); i++) {
         const bar = bars[i];
         const isLast = i === window.to - 1;
         const next = isLast ? (looping ? bars[window.wrapTo] : null) : bars[i + 1];
@@ -166,19 +187,22 @@ export function planBars(
         if (visitEnd && next && sectionEnergy(next) > section + 0.05) {
             energy += 0.06;
         }
-        energy = clamp01(energy + passLift);
+        energy = clamp01(energy + passLift(i));
 
         const lanes = {} as Record<Lane, boolean>;
         for (const lane of ['drums', 'bass', 'comp', 'lead'] as const) {
             lanes[lane] = settings.lanes[lane] && bar.visit.lanes[lane] !== false;
         }
-        const lead = leadRole(timeline, i, pass, trade);
+        const lead = leadRole(timeline, i, passAt(i, pass), trade);
         const drumsTurn = lanes.drums && drummerAlone(i, pass);
         if (lead.kind === 'trade' && lead.turn === 'you') {
             // Your turn is yours: the soloist lays out.
             lanes.lead = false;
         }
-        if (wanted?.with === 'drums' && leadRole(timeline, i, pass, wanted).kind !== 'head') {
+        if (
+            wanted?.with === 'drums' &&
+            leadRole(timeline, i, passAt(i, pass), wanted).kind !== 'head'
+        ) {
             // Asking to trade with the drummer makes you the soloist for every pass but a
             // returned head, even where the trade can't happen (a practice loop, the drums
             // off, a drummer who doesn't solo): the band's soloist never plays over you, but
@@ -201,6 +225,9 @@ export function planBars(
         // under way, so its own first bar still arrives with a crash if the form says so. A
         // genuinely fresh start (play-from-here, a practice loop's own first lap) has nothing
         // before it and keeps the old suppression — its origin defaults to its own `from`.
+        // `pass` here is the lap, not the band's pass (`passAt`): what matters is whether
+        // anything was played before this bar, and a counted chart's later chorus has nothing
+        // before it when the musician starts there.
         const first = i === origin && pass === 0;
         // The drummer's own turn opens with the kick under his statement, not a crash: the
         // crash is the band coming back in.

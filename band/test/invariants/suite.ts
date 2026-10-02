@@ -28,7 +28,7 @@ import { feelFor, STYLE_IDS, STYLES } from '../../styles/index.js';
 import type { Feel } from '../../styles/types.js';
 import { type ChordFacts, chordPcs, fifthOf } from '../../theory/chord.js';
 import { mod12 } from '../../theory/pitch.js';
-import { FIXTURES } from '../scores.js';
+import { COUNTED_FIXTURES, FIXTURES } from '../scores.js';
 
 const SEEDS = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
 const BASS_REGISTER = [23, 57] as const;
@@ -120,6 +120,59 @@ export function invariantSuite(shard: number): void {
     const styles = STYLE_IDS.filter((_, i) => i % SHARDS === shard);
     defineStyles(styles);
     defineLeads(styles.filter((id) => STYLES[id].lead));
+    defineCounted(styles);
+}
+
+/**
+ * A counted chart (#1475), played once through all its choruses as the live band and the
+ * export play it: the head, the solos and trades of the later choruses, the seams between
+ * them, the out-head, a last-chorus coda and the ending — every rule, on every comp.
+ */
+function defineCounted(styles: StyleId[]): void {
+    describe.each(styles)('%s counted choruses', (styleId) => {
+        const style = STYLES[styleId];
+        for (const [name, score] of Object.entries(COUNTED_FIXTURES)) {
+            const timeline = compileTimeline(score);
+            it(`${name}: every chorus keeps the rules`, () => {
+                const problems: string[] = [];
+                const trades: (TradeSettings | null)[] = [
+                    null,
+                    ...(style.lead ? [{ with: 'lead', bars: 4, choruses: null } as const] : []),
+                    ...(style.drums.solos
+                        ? [{ with: 'drums', bars: 4, choruses: null } as const]
+                        : []),
+                ];
+                for (const seed of SEEDS.slice(0, 2)) {
+                    for (const comp of INSTRUMENTS) {
+                        for (const trade of trades) {
+                            const settings: BandSettings = {
+                                ...DEFAULT_SETTINGS,
+                                style: styleId,
+                                comp,
+                                seed,
+                                lanes: { drums: true, bass: true, comp: true, lead: !!style.lead },
+                                lead: style.lead?.prefers ?? DEFAULT_SETTINGS.lead,
+                                trade,
+                            };
+                            const { events } = performPass(timeline, settings, {
+                                pass: 0,
+                                looping: false,
+                            });
+                            checkPass(
+                                timeline,
+                                events,
+                                feelFor(style, COMP_INSTRUMENTS[comp].family).lean,
+                                settings,
+                                `${seed}/${comp}/${trade ? `${trade.with} ${trade.bars}` : 'no trade'}`,
+                                problems,
+                            );
+                        }
+                    }
+                }
+                expect(problems.slice(0, 10), `${styleId}/${name}`).toEqual([]);
+            });
+        }
+    });
 }
 
 function defineStyles(styles: StyleId[]): void {
