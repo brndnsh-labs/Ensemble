@@ -142,6 +142,30 @@ test('a device whose songs are already in the account is offered its collections
             'Add this device’s collections to your account?',
         );
         await expect(second.getByTestId('adopt-guest-collections-pending')).toBeVisible();
+
+        // "Not now" is an ANSWER (#1477 review C2): recorded like the song offer's, so the
+        // offer does not reopen on every load — a plain close used to remember nothing.
+        await second.getByTestId('adopt-guest-decline').click();
+        await expect(second.locator('dialog[aria-labelledby="adopt-guest-title"]')).toBeHidden();
+        await expect
+            .poll(() =>
+                second.evaluate(
+                    () =>
+                        Object.keys(localStorage).filter((key) =>
+                            key.startsWith('ensemble-v2-account-adopt-decided:'),
+                        ).length,
+                ),
+            )
+            .toBe(1);
+        await second.reload();
+        await expect(second.getByTestId('library-loading')).toHaveCount(0);
+        await expect(second.locator('dialog[aria-labelledby="adopt-guest-title"]')).toBeHidden();
+        // The account page's own button still asks, whatever was answered.
+        await second.getByTestId('account-open').click();
+        await second.getByTestId('account-page-adopt-guest').click();
+        await expect(second.locator('#adopt-guest-title')).toHaveText(
+            'Add this device’s collections to your account?',
+        );
         await second.getByTestId('adopt-guest-collections').click();
         await expect(second.locator('#adopt-guest-title')).toHaveText(
             'Added 1 collection to this device’s account songbook',

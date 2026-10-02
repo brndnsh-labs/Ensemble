@@ -622,8 +622,8 @@ export async function migrateGuestStars(legacy: ReadonlySet<string>): Promise<bo
 
 /**
  * Delete one guest collection (#1474). Never its songs (#1443 decision 3): nothing here touches
- * the songbook database. Refusing to delete a built-in collection is the caller's rule
- * (`useCollections`' `remove`, #1477), and the UI offers no way to ask.
+ * the songbook database. A built-in collection is refused here, by storage, with
+ * `BuiltInCollectionError` (#1477 review R2); the UI offers no way to ask either.
  */
 export async function deleteCollection(id: string): Promise<void> {
     const db = await openCollections();

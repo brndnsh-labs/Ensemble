@@ -282,3 +282,56 @@ test('“also delete” decides at confirm time, not from the count the dialog o
         page.locator('.all-songs-table .song-name', { hasText: 'Minor swing sketch' }),
     ).toHaveCount(1);
 });
+
+/**
+ * #1477 review C3: the confirm-time read may only NARROW what the dialog showed. A song that
+ * arrived in the collection while the dialog was open (a sync, another tab) was never shown to
+ * the musician as one the delete would take, so it is never deleted with it.
+ */
+test('“also delete” never deletes a song that arrived after the dialog opened', async ({
+    page,
+}) => {
+    await seedStarters(page);
+    await openAllSongs(page);
+    await addToNew(page, 'Minor swing sketch', 'Friday gig');
+    await collectionFilter(page, 'Friday gig').click();
+    await page.getByTestId('collection-delete').click();
+    await expect(page.locator('.collection-delete-also')).toHaveText(
+        'Also delete the 1 song that is in no other collection',
+    );
+
+    // While the dialog is open, another tab adds Blue pocket to this same collection.
+    await page.evaluate(async () => {
+        const db = await new Promise<IDBDatabase>((resolve, reject) => {
+            const request = indexedDB.open('ensemble-v2-preview-collections', 1);
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+        await new Promise<void>((resolve, reject) => {
+            const tx = db.transaction('collections', 'readwrite');
+            const store = tx.objectStore('collections');
+            const all = store.getAll();
+            all.onsuccess = () => {
+                const gig = all.result.find((row) => row.name === 'Friday gig');
+                store.put({
+                    ...gig,
+                    revision: gig.revision + 1,
+                    updatedAt: new Date().toISOString(),
+                    songIds: [...gig.songIds, 'starter-blues'],
+                });
+            };
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+        });
+        db.close();
+    });
+
+    await page.getByTestId('delete-collection-also-songs').check();
+    await page.getByTestId('delete-collection-confirm').click();
+    await expect(page.getByTestId('shell-message')).toContainText(
+        'Collection deleted, with 1 song',
+    );
+    // Only the song the dialog named went; the one that arrived meanwhile is still here.
+    await expect(page.getByRole('heading', { name: /All songs/ })).toContainText('· 2');
+    await expect(rows(page)).toHaveText(['After hours', 'Blue pocket']);
+});

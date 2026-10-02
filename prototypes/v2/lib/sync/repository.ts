@@ -1068,8 +1068,10 @@ export class AccountSongbook {
      *   exists anywhere, and they go together, in one transaction.
      *
      * Deleting a collection never deletes its songs (#1443 decision 3); nothing here reads them.
-     * Refusing to delete a built-in collection is the caller's rule (`useCollections`' `remove`,
-     * #1477), not storage's.
+     * A built-in collection is refused HERE, by storage, with `BuiltInCollectionError` (#1477
+     * review R2) — the UI offers no way to ask either, but a tombstone on Starred's fixed id would
+     * split Starred across devices, so the rule cannot live only in a caller. A dry run
+     * (`options.dryRun`) refuses it the same way.
      */
     async deleteCollection(
         scope: AccountScope,
@@ -1362,6 +1364,9 @@ export class AccountSongbook {
                         tx.finish(merged);
                     }
                 };
+                /** Every id this sweep resolves, and the Starreds already merged INTO (C1). */
+                const conflicted = new Set(ids);
+                const mergedInto = new Set<string>();
                 const mergeEach = (starred: Map<string, SavedCollection>) => {
                     for (const documentId of ids) {
                         identifier(documentId);
@@ -1374,15 +1379,42 @@ export class AccountSongbook {
                                     if (!record || head?.status !== 'conflict') {
                                         return settled();
                                     }
+                                    const remote = head.remote;
+                                    const gone = !(
+                                        remote && isCollectionCandidate(remote.document)
+                                    );
+                                    // A gone Starred merges INTO another Starred — but only one
+                                    // this transaction leaves alone (#1477 review C1). A target
+                                    // that is itself conflicted in this sweep has its queue
+                                    // retired and its record rewritten below; chaining onto it
+                                    // from a snapshot read earlier would chain onto a retired
+                                    // Save, a `base` no receipt will ever resolve, and wedge the
+                                    // outbox for good. So that merge waits, untouched, for the
+                                    // next sweep — which the target's own merge here guarantees
+                                    // (`merged > 0`) — and reads both afresh then. One merge INTO
+                                    // a target per transaction, for the same reason.
+                                    const siblings =
+                                        gone && record.document.builtIn === 'starred'
+                                            ? [...starred.values()].filter(
+                                                  (entry) => entry.documentId !== documentId,
+                                              )
+                                            : [];
+                                    const into = siblings.find(
+                                        (entry) =>
+                                            !conflicted.has(entry.documentId) &&
+                                            !mergedInto.has(entry.documentId),
+                                    );
+                                    if (siblings.length > 0 && !into) {
+                                        return settled();
+                                    }
                                     for (const operation of queue) {
                                         tx.table('operations').delete([
                                             scope.ownerId,
                                             operation.operationId,
                                         ]);
                                     }
-                                    const remote = head.remote;
                                     const now = new Date().toISOString();
-                                    if (remote && isCollectionCandidate(remote.document)) {
+                                    if (!gone && remote) {
                                         const theirs = collectionSnapshot(remote.document);
                                         const document = collectionSnapshot({
                                             ...record.document,
@@ -1408,16 +1440,11 @@ export class AccountSongbook {
                                                 remoteRevision: remote.revision,
                                             });
                                         }
-                                    } else if (
-                                        record.document.builtIn === 'starred' &&
-                                        [...starred.keys()].some((id) => id !== documentId)
-                                    ) {
+                                    } else if (into) {
                                         // The account has no Starred at this id, but this device
                                         // holds another one: its stars go THERE, one Save, and this
                                         // record leaves — never a second Starred beside the first.
-                                        const into = [...starred.values()].find(
-                                            (entry) => entry.documentId !== documentId,
-                                        )!;
+                                        mergedInto.add(into.documentId);
                                         tx.table('collections').delete([scope.ownerId, documentId]);
                                         tx.table('meta').delete(
                                             deletionKey(scope.ownerId, documentId),

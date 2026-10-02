@@ -137,7 +137,8 @@ table, Save, read and delete routes; and the same per-owner document cap.
   tombstoned fixed id would answer every device's create with `remote: null`, and each would
   re-create Starred under its own fresh id. Should that ever happen anyway, the merge moves a
   `'gone'` Starred's songs INTO another Starred this device holds rather than minting a second
-  one; it cannot unite two devices that never saw each other's, which is why the guard is the
+  one (never into one the same merge is also resolving — that waits a sweep, so no Save is ever
+  chained onto one the merge retired); it cannot unite two devices that never saw each other's, which is why the guard is the
   guarantee. The device-local stars that came before (#1440) are COPIED in
   once and never deleted: a guest's only while no Starred exists, an account's once per device
   behind a `stars-migrated:<owner>` meta marker written in the same transaction as the Save.

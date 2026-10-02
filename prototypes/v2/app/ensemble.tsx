@@ -1919,8 +1919,12 @@ export default function Ensemble() {
         void computeAdoptCandidates(owner)
             .then(async (offer) => {
                 // No song to add, but guest collections the account's copies lack (#1477 review
-                // R3) — a guest whose songs an older build already adopted — is an offer too: the
-                // dialog then asks about the collections alone.
+                // R3), is an offer too: the dialog then asks about the collections alone. Only a
+                // device that has never answered on this owner reaches it (the gate above): one
+                // signing into an account that already holds its songs under the same ids — a
+                // second device with the same seeded or imported songs — or one whose songs were
+                // adopted without this device being asked. A device that answered before uses
+                // the account page's button, which asks no matter what.
                 const collections =
                     offer.candidates.length === 0
                         ? await pendingGuestCollections(owner).catch(() => 0)
@@ -3022,8 +3026,11 @@ export default function Ensemble() {
         void run(async () => {
             setCollectionDeleteFailure(null);
             let deletedSongs = 0;
-            // Decided NOW (#1477 review R4), never from what the dialog counted when it opened:
-            // a song another collection gained meanwhile is no longer "in no other collection".
+            // Re-decided NOW (#1477 review R4), and only ever NARROWED (C3): a song another
+            // collection gained meanwhile is no longer "in no other collection" and stays, while a
+            // song that arrived in this collection meanwhile was never shown to the musician, so
+            // it is never deleted either — the confirm-time read may only take songs OFF the list
+            // the dialog showed.
             let onlyHere: string[] = [];
             if (alsoDeleteSongs) {
                 // And the collection's own delete is asked first: one still uploading must stop
@@ -3033,14 +3040,38 @@ export default function Ensemble() {
                     setCollectionDeleteFailure(refusal);
                     return;
                 }
-                onlyHere = songsOnlyIn(target.collectionId, await collections.fresh());
+                onlyHere = songsOnlyIn(target.collectionId, await collections.fresh()).filter(
+                    (songId) => target.onlyHere.includes(songId),
+                );
                 for (const songId of onlyHere) {
                     if (signedIn) {
+                        const done = deletedSongs;
                         const result = await commitCloudDelete(songId, owner, {
-                            setFailure: setCollectionDeleteFailure,
+                            // Stopped part-way (#1477 review C4): the sentence says how far it
+                            // got, and the dialog's counts move to what is actually left.
+                            setFailure: (message) =>
+                                setCollectionDeleteFailure(
+                                    done === 0
+                                        ? message
+                                        : `${message} ${done} of ${onlyHere.length} songs were deleted; the collection and the rest are kept.`,
+                                ),
                             dialogOpen: () => !!collectionDeleteDialogRef.current?.open,
                         });
                         if (result === null) {
+                            const gone = new Set(onlyHere.slice(0, done));
+                            if (done > 0) {
+                                setCollectionDeleteTarget((current) =>
+                                    current?.collectionId === target.collectionId
+                                        ? {
+                                              ...current,
+                                              songCount: current.songCount - done,
+                                              onlyHere: current.onlyHere.filter(
+                                                  (id) => !gone.has(id),
+                                              ),
+                                          }
+                                        : current,
+                                );
+                            }
                             await refreshSongs();
                             return;
                         }

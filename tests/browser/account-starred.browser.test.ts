@@ -1,7 +1,7 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AccountApi, ApiResult } from '../../prototypes/v2/lib/account/api.js';
 import { createAccountSession } from '../../prototypes/v2/lib/account/session.js';
-import { createSyncLoop } from '../../prototypes/v2/lib/account/sync-loop.js';
+import { COLLECTION_MESSAGES, createSyncLoop } from '../../prototypes/v2/lib/account/sync-loop.js';
 import {
     BuiltInCollectionError,
     type CollectionDocument,
@@ -369,6 +369,8 @@ describe('a conflicted collection Save resolves by merge, without asking (#1477)
  */
 function fakeCloud() {
     const documents = new Map<string, { revision: string; document: unknown }>();
+    /** Ids deleted in the account (another device's delete), with their tombstone revision. */
+    const tombstones = new Map<string, string>();
     let counter = 0;
     const ok = <T>(value: T): ApiResult<T> => ({ ok: true, value, status: 200 });
     const api: AccountApi = {
@@ -388,7 +390,18 @@ function fakeCloud() {
                             ? { kind: 'collection' }
                             : {}),
                     }));
-                return ok({ documents: rows, nextAfterDocumentId: null }) as ApiResult<T>;
+                const dead = [...tombstones.entries()].map(([documentId, revision]) => ({
+                    documentId,
+                    revision,
+                    deleted: true,
+                    bytes: 0,
+                }));
+                return ok({
+                    documents: [...rows, ...dead].sort((a, b) =>
+                        a.documentId < b.documentId ? -1 : 1,
+                    ),
+                    nextAfterDocumentId: null,
+                }) as ApiResult<T>;
             }
             const id = decodeURIComponent(path.slice('/api/documents/'.length));
             const held = documents.get(id);
@@ -423,7 +436,13 @@ function fakeCloud() {
             return ok({ ...envelope, kind: 'committed', revision }) as ApiResult<T>;
         },
     } as AccountApi;
-    return { api, documents };
+    /** Delete a document the way another device's cloud delete would. */
+    const tombstone = (documentId: string) => {
+        documents.delete(documentId);
+        counter += 1;
+        tombstones.set(documentId, `cloud-${counter}`);
+    };
+    return { api, documents, tombstone };
 }
 
 describe('two devices star different songs offline (#1477 acceptance)', () => {
@@ -534,6 +553,79 @@ describe('a collection moving never re-reads the song library (#1477 review R1)'
     });
 });
 
+describe('a SONG another device moved still re-reads the library (#1477 review C5a)', () => {
+    it('a downloaded song, a retained tombstone and a removal each bump libraryVersion', async () => {
+        const cloud = fakeCloud();
+        const phone = connection(freshName());
+        const laptop = connection(freshName());
+        await phone.switchAccount(OWNER);
+        const laptopScope = (await laptop.switchAccount(OWNER))!;
+        const phoneLoop = createSyncLoop(cloud.api, createAccountSession(cloud.api), phone);
+        const laptopLoop = createSyncLoop(cloud.api, createAccountSession(cloud.api), laptop);
+        await phoneLoop.attach(OWNER);
+        await laptopLoop.attach(OWNER);
+        await laptopLoop.run();
+        const library = () => laptopLoop.getSnapshot().libraryVersion;
+
+        // Another device saves a song: this one downloads it (an advance).
+        await phoneLoop.save(accountChart('Theirs', 'song-x'), null, null);
+        await phoneLoop.run();
+        const beforeDownload = library();
+        await laptopLoop.run();
+        expect(await laptop.read(laptopScope, 'song-x')).not.toBeNull();
+        expect(library()).toBeGreaterThan(beforeDownload);
+
+        // Another device deletes it while it is on this device's stand: retained.
+        cloud.tombstone('song-x');
+        laptopLoop.setActiveDocument('song-x');
+        const beforeRetained = library();
+        await laptopLoop.run();
+        expect(await laptop.read(laptopScope, 'song-x')).not.toBeNull();
+        expect(library()).toBeGreaterThan(beforeRetained);
+
+        // Off the stand, the same tombstone removes it.
+        laptopLoop.setActiveDocument(null);
+        const beforeRemoved = library();
+        await laptopLoop.run();
+        expect(await laptop.read(laptopScope, 'song-x')).toBeNull();
+        expect(library()).toBeGreaterThan(beforeRemoved);
+    });
+});
+
+describe('a collection still uploading stops a delete before any song goes (#1477 review C5b)', () => {
+    it('collectionDeleteRefusal answers "still uploading" and writes nothing', async () => {
+        const api = refusingApi();
+        const loop = createSyncLoop(api, createAccountSession(api), book);
+        await loop.attach(OWNER);
+        await book.editCollection(scope, 'set-a', () => ({
+            ...newCollection('Gig', ['song-1']),
+            id: 'set-a',
+        }));
+        await runOutboxPass(book, scope, committing());
+        // A Save of it is still queued: deleting it in the cloud now would resurrect it.
+        await book.editCollection(scope, 'set-a', (current) =>
+            current ? withSong(current, 'song-2', true) : null,
+        );
+        expect(await loop.collectionDeleteRefusal('set-a', OWNER)).toBe(
+            COLLECTION_MESSAGES.uploading,
+        );
+        // The dry run touched nothing: the record and its queued Save are exactly as they were.
+        expect((await book.readCollection(scope, 'set-a'))?.document.songIds).toEqual([
+            'song-1',
+            'song-2',
+        ]);
+        expect(await book.pendingCollection(scope, 'set-a')).toHaveLength(1);
+        // Once it has uploaded, the delete may go ahead.
+        await runOutboxPass(book, scope, committing());
+        expect(await loop.collectionDeleteRefusal('set-a', OWNER)).toBeNull();
+        // And Starred is refused outright, whatever its queue holds.
+        await book.editCollection(scope, STARRED_COLLECTION_ID, () => newStarred(['a']));
+        expect(await loop.collectionDeleteRefusal(STARRED_COLLECTION_ID, OWNER)).toMatch(
+            /can’t be deleted/,
+        );
+    });
+});
+
 describe('Starred is guarded in storage, not only in the UI (#1477 review R2)', () => {
     async function syncedStarred(songIds: string[]): Promise<void> {
         await book.editCollection(scope, STARRED_COLLECTION_ID, () => newStarred(songIds));
@@ -588,6 +680,93 @@ describe('Starred is guarded in storage, not only in the UI (#1477 review R2)', 
             ),
         ).not.toBeNull();
     });
+
+    /**
+     * #1477 review C1: the target Starred is ITSELF conflicted (with a remote version) in the same
+     * sweep as the gone one. Visit order is the queued operations' id order, so both orders are
+     * forced here by naming those operation ids. Before the fix, merging the gone one into a
+     * target whose queue this same transaction retired chained a Save onto a retired one, and
+     * every later pass threw "The preceding Save has no confirmed receipt." — no song uploaded
+     * again.
+     */
+    for (const order of ['target first', 'gone Starred first'] as const) {
+        it(`a gone Starred never chains onto a Save the same merge retired (${order})`, async () => {
+            let n = 0;
+            const commit: SaveTransport = async (request) => {
+                n += 1;
+                return {
+                    ownerId: request.ownerId,
+                    documentId: request.documentId,
+                    operationId: request.operationId,
+                    digest: request.digest,
+                    kind: 'committed',
+                    revision: `cloud-${n}`,
+                };
+            };
+            await book.editCollection(scope, STARRED_COLLECTION_ID, () => newStarred(['a']));
+            await book.editCollection(scope, 'starred-b', () => ({
+                ...newStarred(['z']),
+                id: 'starred-b',
+            }));
+            await runOutboxPass(book, scope, commit);
+            // One more Save queued on each, under operation ids that fix the visit order.
+            const [targetOp, goneOp] =
+                order === 'target first'
+                    ? ['op-1-target', 'op-2-gone']
+                    : ['op-2-target', 'op-1-gone'];
+            const uuid = vi.spyOn(crypto, 'randomUUID');
+            uuid.mockReturnValueOnce(targetOp as ReturnType<typeof crypto.randomUUID>);
+            await book.editCollection(scope, STARRED_COLLECTION_ID, (current) =>
+                current ? withSong(current, 'a2', true) : null,
+            );
+            uuid.mockReturnValueOnce(goneOp as ReturnType<typeof crypto.randomUUID>);
+            await book.editCollection(scope, 'starred-b', (current) =>
+                current ? withSong(current, 'z2', true) : null,
+            );
+            uuid.mockRestore();
+            expect(
+                (await book.pendingCollection(scope, STARRED_COLLECTION_ID))[0].operationId,
+            ).toBe(targetOp);
+
+            // The fixed id conflicts WITH a remote version; `starred-b` is gone from the account.
+            const theirs = newStarred(['r']);
+            const mixed: SaveTransport = async (request) => ({
+                ownerId: request.ownerId,
+                documentId: request.documentId,
+                operationId: request.operationId,
+                digest: request.digest,
+                kind: 'conflict',
+                revision: request.documentId === 'starred-b' ? 'cloud-gone' : 'cloud-remote',
+                remote:
+                    request.documentId === 'starred-b'
+                        ? null
+                        : { revision: 'cloud-remote', document: theirs },
+            });
+            await runOutboxPass(book, scope, mixed);
+
+            // What the sync loop does: merge, sweep, until nothing moves.
+            for (let sweep = 0; sweep < 4; sweep++) {
+                await book.mergeCollectionConflicts(scope);
+                const result = await runOutboxPass(book, scope, commit);
+                expect(result.kind).toBe('complete');
+            }
+
+            // One Starred, holding every star from both lists and the remote's, nothing queued.
+            const collections = await book.listCollections(scope);
+            expect(collections.map((entry) => entry.documentId)).toEqual([STARRED_COLLECTION_ID]);
+            expect(new Set(collections[0].document.songIds)).toEqual(
+                new Set(['a', 'a2', 'r', 'z', 'z2']),
+            );
+            expect(collections[0].remoteRevision).toMatch(/^cloud-\d+$/);
+            expect(await book.collectionOutbox(scope)).toEqual({ unsent: 0, refused: 0 });
+
+            // And the outbox is not wedged: a song Saved now uploads on the next pass.
+            await book.save(scope, accountChart('After', 'song-after'), null);
+            const result = await runOutboxPass(book, scope, commit);
+            expect(result.kind).toBe('complete');
+            expect((await book.read(scope, 'song-after'))?.remoteRevision).toMatch(/^cloud-\d+$/);
+        });
+    }
 
     it('a Starred the account no longer has merges INTO the Starred this device holds', async () => {
         await syncedStarred(['a']);

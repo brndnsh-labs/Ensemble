@@ -227,6 +227,23 @@ export function AdoptGuestDialog({
         });
     }
 
+    /**
+     * The way out of the `'empty'` and `'full'` phases. With a collections offer on screen it is
+     * "Not now", which RECORDS the answer like the song offer's (#1477 review C2): a plain close
+     * remembers nothing, and the sign-in offer would reopen on every page load. The account
+     * page's own button still opens the dialog afterwards — it consults no answer.
+     */
+    const dismiss = (collections: number) =>
+        collections > 0 ? (
+            <button className="btn" data-testid="adopt-guest-decline" onClick={decline}>
+                Not now
+            </button>
+        ) : (
+            <button className="btn" data-testid="adopt-guest-close" onClick={onClose}>
+                Close
+            </button>
+        );
+
     /** The guest-collections half of the `'empty'` and `'full'` phases (#1477 review R3). */
     const collectionsOffer = (count: number) =>
         count > 0 && (
@@ -287,11 +304,7 @@ export function AdoptGuestDialog({
                             : 'Every song on this device is already in your account.'}
                     </p>
                     {collectionsOffer(phase.collections)}
-                    <div className="dialog-actions">
-                        <button className="btn" data-testid="adopt-guest-close" onClick={onClose}>
-                            Close
-                        </button>
-                    </div>
+                    <div className="dialog-actions">{dismiss(phase.collections)}</div>
                 </>
             )}
             {phase.kind === 'full' && (
@@ -303,11 +316,7 @@ export function AdoptGuestDialog({
                         make room.
                     </p>
                     {collectionsOffer(phase.collections)}
-                    <div className="dialog-actions">
-                        <button className="btn" data-testid="adopt-guest-close" onClick={onClose}>
-                            Close
-                        </button>
-                    </div>
+                    <div className="dialog-actions">{dismiss(phase.collections)}</div>
                 </>
             )}
             {phase.kind === 'ask' && (
