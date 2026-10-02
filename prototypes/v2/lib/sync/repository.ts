@@ -494,18 +494,67 @@ function queueCollectionSave(
     } satisfies SaveOperation<CollectionDocument>);
 }
 
+/**
+ * Every queued Save of this owner's COLLECTIONS, read inside the caller's transaction (#1478): the
+ * collection ids from the `collections` store's keys, then each id's own queue through the
+ * operations index — never the whole outbox. After a whole-playlist import the outbox can hold over
+ * a thousand queued SONG Saves, and the readers of this (the chip's count after every observation,
+ * the conflict merge after every sweep) want a handful of collection rows. A queued collection
+ * Save always has its record (`enqueueCollection` writes both), so reading by record loses none.
+ * The rows are concatenated in collection-id order, each id's in index order.
+ */
+function collectionOperations<T>(
+    tx: Transaction<T>,
+    scope: AccountScope,
+    consume: (rows: SaveOperation<SyncDocument>[]) => void,
+) {
+    const owned = IDBKeyRange.bound([scope.ownerId], [scope.ownerId, []], false, true);
+    tx.read(tx.table('collections').getAllKeys(owned), (keys: IDBValidKey[]) => {
+        const queues: SaveOperation<SyncDocument>[][] = new Array(keys.length);
+        let pending = keys.length;
+        if (pending === 0) {
+            return consume([]);
+        }
+        keys.forEach((key, index) => {
+            const documentId = (key as [string, string])[1];
+            tx.read(
+                tx.table('operations').index('song').getAll([scope.ownerId, documentId]),
+                (rows: SaveOperation<SyncDocument>[]) => {
+                    queues[index] = rows.filter(
+                        (row) => row && isCollectionCandidate(row.snapshot),
+                    );
+                    pending -= 1;
+                    if (pending === 0) {
+                        consume(queues.flat());
+                    }
+                },
+            );
+        });
+    });
+}
+
 /** How many documents of either kind this owner holds here, read inside the caller's transaction. */
 function documentCount<T>(
     tx: Transaction<T>,
     scope: AccountScope,
-    consume: (count: number) => void,
+    consume: (count: number, collections: number) => void,
 ) {
     const owned = IDBKeyRange.bound([scope.ownerId], [scope.ownerId, []], false, true);
     tx.read(tx.table('songs').count(owned), (songs: number) => {
         tx.read(tx.table('collections').count(owned), (collections: number) =>
-            consume(songs + collections),
+            consume(songs + collections, collections),
         );
     });
+}
+
+/**
+ * How many documents an import may assume the ACCOUNT holds (#1478 review R1): what this device
+ * holds, or — when the caller knows the account's manifest lists more charts than are here — those
+ * charts plus this device's collections, whichever is larger. This device's rows alone undercount
+ * an account another device filled, and a create past the server's cap ends every outbox pass.
+ */
+export function heldByAccount(local: number, collections: number, remoteCharts?: number): number {
+    return remoteCharts === undefined ? local : Math.max(local, remoteCharts + collections);
 }
 
 /**
@@ -539,7 +588,7 @@ export function capRefusal(
     }
     const format = (value: number) => value.toLocaleString('en-US');
     const room = Math.max(0, cap - held);
-    return `Your account holds up to ${format(cap)} songs and collections, and it has ${format(held)}. This import adds ${format(documents)}, ${format(held + documents - cap)} more than fit${room > 0 ? ` (there is room for ${format(room)})` : ''}. Nothing has been imported.`;
+    return `Your account can hold ${format(cap)} songs and collections, and this device counts ${format(held)} in it. This import adds ${format(documents)}, ${format(held + documents - cap)} more than fit${room > 0 ? ` (there is room for ${format(room)})` : ''}. Nothing has been imported.`;
 }
 
 /**
@@ -1247,6 +1296,16 @@ export class AccountSongbook {
         });
     }
 
+    /** `documentCount`, split: every document here, and how many of them are collections. */
+    async documentCounts(scope: AccountScope): Promise<{ documents: number; collections: number }> {
+        scope = copyScope(scope);
+        return this.database.run('readonly', scope, (tx) => {
+            documentCount(tx, scope, (documents, collections) =>
+                tx.finish({ documents, collections }),
+            );
+        });
+    }
+
     /**
      * A whole iReal playlist, imported as ONE transaction (#1478): every song as its own queued
      * create, then the collection that holds them — created, or extended when it already exists.
@@ -1277,8 +1336,18 @@ export class AccountSongbook {
             documentId: string;
             edit: (current: CollectionDocument | null) => CollectionDocument | null;
         },
-        pace?: { shouldYield: () => boolean; yieldNow: () => Promise<void> },
+        options: {
+            pace?: { shouldYield: () => boolean; yieldNow: () => Promise<void> };
+            /**
+             * The live charts the account's manifest listed at this device's last verified download
+             * (#1478 review R1). The cap is counted against `heldByAccount`, never this device's
+             * rows alone. The sync loop supplies it, and refuses before this when the library is
+             * not verified at all.
+             */
+            remoteCharts?: number;
+        } = {},
     ): Promise<{ songs: number; collection: SavedCollection | null }> {
+        const { pace, remoteCharts } = options;
         scope = copyScope(scope);
         identifier(collection.documentId);
         const songs: ChartDocument[] = [];
@@ -1296,7 +1365,8 @@ export class AccountSongbook {
         const operationIds = songs.map(() => crypto.randomUUID());
         const collectionOperationId = crypto.randomUUID();
         return this.database.run('readwrite', scope, (tx) => {
-            documentCount(tx, scope, (held) => {
+            documentCount(tx, scope, (local, collections) => {
+                const held = heldByAccount(local, collections, remoteCharts);
                 tx.read(
                     tx.table('songs').getKey([scope.ownerId, collection.documentId]),
                     (song: IDBValidKey | undefined) => {
@@ -1514,16 +1584,17 @@ export class AccountSongbook {
      *   original id's record and queue go, exactly as Keep both's `'gone'` route keeps a song's
      *   local line (#1267). The musician's collection is kept; it is never merged into nothing.
      *
-     * One transaction for every conflicted collection this owner has. Read from the WHOLE outbox
-     * of this owner (`operations`, a few rows normally) rather than from every collection's queue,
-     * and decided again per id from its own queue, so a head another tab resolved meanwhile is
-     * left alone. Returns how many collections it re-queued; the loop sweeps again when non-zero.
+     * One transaction for every conflicted collection this owner has. Read from the collections'
+     * own queues (`collectionOperations`, never the whole outbox — #1478 review R3), and decided
+     * again per id from its own queue, so a head another tab resolved meanwhile is left alone. Returns how many collections it re-queued; the loop sweeps again when non-zero.
      */
     async mergeCollectionConflicts(scope: AccountScope): Promise<number> {
         scope = copyScope(scope);
         const owned = IDBKeyRange.bound([scope.ownerId], [scope.ownerId, []], false, true);
         return this.database.run('readwrite', scope, (tx) => {
-            tx.read(tx.table('operations').getAll(owned), (rows: SaveOperation<SyncDocument>[]) => {
+            // The collections' own queues only (#1478 review R3): this runs after every outbox
+            // sweep, and the whole outbox can be a playlist import's thousand queued songs.
+            collectionOperations(tx, scope, (rows) => {
                 const ids = [
                     ...new Set(
                         rows
@@ -1728,39 +1799,23 @@ export class AccountSongbook {
      */
     async collectionOutbox(scope: AccountScope): Promise<{ unsent: number; refused: number }> {
         scope = copyScope(scope);
-        const owned = IDBKeyRange.bound([scope.ownerId], [scope.ownerId, []], false, true);
         return this.database.run('readonly', scope, (tx) => {
-            // Only the collections' own queues are read (#1478): after a whole-playlist import the
-            // outbox can hold well over a thousand queued SONG Saves, and this runs on every
-            // observation — reading every operation's snapshot to find a handful of collection
-            // Saves would read the whole import each time.
-            tx.read(tx.table('collections').getAllKeys(owned), (keys: IDBValidKey[]) => {
+            // Only the collections' own queues are read (#1478): this runs on every observation.
+            collectionOperations(tx, scope, (rows) => {
+                const queues = new Map<string, SaveOperation<SyncDocument>[]>();
+                for (const row of rows) {
+                    queues.set(row.documentId, [...(queues.get(row.documentId) ?? []), row]);
+                }
                 let unsent = 0;
                 let refused = 0;
-                let pending = keys.length;
-                if (pending === 0) {
-                    return tx.finish({ unsent, refused });
+                for (const queue of queues.values()) {
+                    unsent += queue.length;
+                    const head = [...queue].sort((a, b) => a.localRevision - b.localRevision)[0];
+                    if (head?.status === 'refused') {
+                        refused += queue.length;
+                    }
                 }
-                for (const key of keys) {
-                    const documentId = (key as [string, string])[1];
-                    tx.read(
-                        tx.table('operations').index('song').getAll([scope.ownerId, documentId]),
-                        (rows: SaveOperation<SyncDocument>[]) => {
-                            const queue = rows.filter(
-                                (row) => row && isCollectionCandidate(row.snapshot),
-                            );
-                            unsent += queue.length;
-                            const head = queue.sort((a, b) => a.localRevision - b.localRevision)[0];
-                            if (head?.status === 'refused') {
-                                refused += queue.length;
-                            }
-                            pending -= 1;
-                            if (pending === 0) {
-                                tx.finish({ unsent, refused });
-                            }
-                        },
-                    );
-                }
+                tx.finish({ unsent, refused });
             });
         });
     }

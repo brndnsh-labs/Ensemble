@@ -40,8 +40,16 @@ export interface PlaylistImportContext {
     collections: readonly ExistingCollection[] | null;
     /** Ask the shell to read the whole songbook — only once a playlist needs the check. */
     onWantLibrary: () => void;
-    /** Signed in: how many documents the account holds here. Null for a guest — no cap. */
-    documentCount: (() => Promise<number>) | null;
+    /**
+     * Signed in: how many documents the account holds, by this device's verified copy of it — or
+     * why that cannot be told yet (`libraryCheck`, #1478 review R1). Null for a guest — no cap.
+     */
+    accountRoom: (() => Promise<{ held: number } | { refusal: string }>) | null;
+    /**
+     * Changes whenever the account library download moves (`SyncSnapshot.documents`), so a summary
+     * opened mid-download re-asks `accountRoom` as it completes. Null for a guest.
+     */
+    libraryProgress: string | null;
     /** Write the import; `onProgress` gets a sentence to show while it runs. */
     onImport: (plan: PlaylistImport, onProgress: (text: string) => void) => Promise<void>;
 }
@@ -69,7 +77,11 @@ export function ImportDialog({
     const [selected, setSelected] = useState(0);
     const [tempo, setTempo] = useState(String(base.chart.performance.bpm));
     const [error, setError] = useState('');
-    const [busy, setBusy] = useState(false);
+    /** Reading or checking an export: cancellable — Cancel and Escape stay live (review R5). */
+    const [reading, setReading] = useState(false);
+    /** Writing to a songbook: the one step that is never interrupted from here. */
+    const [writing, setWriting] = useState(false);
+    const busy = reading || writing;
     /** A sentence while a long step runs (reading, checking, importing), else null. */
     const [progress, setProgress] = useState<string | null>(null);
     // #1478 — the whole-playlist path, offered beside the single-song picker.
@@ -77,15 +89,24 @@ export function ImportDialog({
     const [mode, setMode] = useState<'all' | 'one'>('all');
     const [includeDuplicates, setIncludeDuplicates] = useState(false);
     const [name, setName] = useState('');
-    const [held, setHeld] = useState<number | null>(null);
-    const [heldError, setHeldError] = useState('');
+    const [room, setRoom] = useState<{ held: number } | { refusal: string } | null>(null);
+    const [roomError, setRoomError] = useState('');
 
     useEffect(() => {
         const element = dialog.current!;
+        // The control that opened this dialog. The shell UNMOUNTS the dialog to close it, and a
+        // dialog closed after it has left the document hands focus back to nothing, so it is
+        // returned here — when that control is still on the page (an import that opened another
+        // page takes focus there instead).
+        const opener =
+            document.activeElement instanceof HTMLElement ? document.activeElement : null;
         element.showModal();
         return () => {
             request.current++;
             element.close();
+            if (opener?.isConnected) {
+                opener.focus();
+            }
         };
     }, []);
 
@@ -95,8 +116,8 @@ export function ImportDialog({
         setPlan(null);
         setMode('all');
         setIncludeDuplicates(false);
-        setHeld(null);
-        setHeldError('');
+        setRoom(null);
+        setRoomError('');
         setError('');
         setSelected(0);
     }
@@ -124,7 +145,7 @@ export function ImportDialog({
                 setNative(candidate);
                 return;
             }
-            setBusy(true);
+            setReading(true);
             setProgress('Reading the export…');
             const pace = framePace();
             const parsed = await parseIRealImportInSteps(text, {
@@ -166,15 +187,15 @@ export function ImportDialog({
             }
         } finally {
             if (current()) {
-                setBusy(false);
+                setReading(false);
                 setProgress(null);
             }
         }
     }
 
     // The account's room, read once a playlist is ready — the cap is stated before anything is
-    // written. The store re-checks it inside the transaction that writes.
-    const { documentCount } = playlist;
+    // written — and again as the library download moves. The store re-checks it as it writes.
+    const { accountRoom, libraryProgress } = playlist;
     // Asked once per playlist, through the LATEST callback: the shell's is a fresh function on
     // every render, and asking again on each one would re-request a read that failed in a loop.
     const wantLibrary = useRef(playlist.onWantLibrary);
@@ -184,20 +205,22 @@ export function ImportDialog({
             wantLibrary.current();
         }
     }, [plan]);
+    // biome-ignore lint/correctness/useExhaustiveDependencies: `libraryProgress` is a re-run trigger.
     useEffect(() => {
-        if (!plan || !documentCount) {
+        if (!plan || !accountRoom) {
             return;
         }
         let alive = true;
-        documentCount().then(
+        accountRoom().then(
             (value) => {
                 if (alive) {
-                    setHeld(value);
+                    setRoom(value);
+                    setRoomError('');
                 }
             },
             (reason: unknown) => {
                 if (alive) {
-                    setHeldError(
+                    setRoomError(
                         reason instanceof Error
                             ? reason.message
                             : 'Your account library could not be read.',
@@ -208,7 +231,7 @@ export function ImportDialog({
         return () => {
             alive = false;
         };
-    }, [plan, documentCount]);
+    }, [plan, accountRoom, libraryProgress]);
 
     const resolved = useMemo((): { value: PlaylistImport } | { error: string } | null => {
         if (!plan || !playlist.library || !playlist.collections) {
@@ -232,7 +255,11 @@ export function ImportDialog({
     }, [plan, playlist.library, playlist.collections, includeDuplicates, name, tempo]);
     const summary = resolved && 'value' in resolved ? resolved.value : null;
     const capMessage =
-        summary && documentCount && held !== null ? capRefusal(summary.documents, held) : null;
+        summary && accountRoom && room
+            ? 'refusal' in room
+                ? room.refusal
+                : capRefusal(summary.documents, room.held)
+            : null;
     const whole = !!plan && mode === 'all';
 
     const song = whole ? undefined : result?.songs[selected];
@@ -266,11 +293,11 @@ export function ImportDialog({
         !!summary &&
         !nothingNew &&
         !capMessage &&
-        !heldError &&
-        (documentCount === null || held !== null);
+        !roomError &&
+        (accountRoom === null || room !== null);
 
     async function add() {
-        setBusy(true);
+        setWriting(true);
         setError('');
         try {
             const candidate =
@@ -287,7 +314,7 @@ export function ImportDialog({
                     : 'Import failed. Your current chart is unchanged.',
             );
         } finally {
-            setBusy(false);
+            setWriting(false);
         }
     }
 
@@ -295,7 +322,7 @@ export function ImportDialog({
         if (!summary || !canImportAll) {
             return;
         }
-        setBusy(true);
+        setWriting(true);
         setError('');
         setProgress(`Importing ${songs(summary.songs.length)}…`);
         try {
@@ -308,7 +335,7 @@ export function ImportDialog({
                     : 'The import failed. Nothing was imported.',
             );
         } finally {
-            setBusy(false);
+            setWriting(false);
             setProgress(null);
         }
     }
@@ -320,7 +347,9 @@ export function ImportDialog({
             aria-label="Review import"
             onCancel={(event) => {
                 event.preventDefault();
-                if (!busy) {
+                // Reading is cancellable (closing stops the parse — `request` moves on unmount and
+                // every step checks it); only a write in progress holds the dialog open.
+                if (!writing) {
                     onClose();
                 }
             }}
@@ -341,7 +370,7 @@ export function ImportDialog({
                             return;
                         }
                         const token = ++request.current;
-                        setBusy(true);
+                        setReading(true);
                         reset();
                         setSource('');
                         void (async () => {
@@ -363,7 +392,7 @@ export function ImportDialog({
                                 }
                             } finally {
                                 if (token === request.current) {
-                                    setBusy(false);
+                                    setReading(false);
                                 }
                             }
                         })();
@@ -514,6 +543,27 @@ export function ImportDialog({
                                         />
                                         Import duplicates anyway
                                     </label>
+                                    <details data-testid="playlist-duplicate-list">
+                                        <summary>Which songs</summary>
+                                        <ul className="import-diagnostics">
+                                            {summary.duplicates.map((entry) => (
+                                                <li key={entry.index}>
+                                                    <strong>{entry.title}</strong>
+                                                    {entry.composer ? ` (${entry.composer})` : ''}
+                                                    {entry.matched.inSongbook
+                                                        ? ' matches “'
+                                                        : ' repeats “'}
+                                                    {entry.matched.title}”
+                                                    {entry.matched.composer
+                                                        ? ` (${entry.matched.composer})`
+                                                        : ' (no composer)'}
+                                                    {entry.matched.inSongbook
+                                                        ? ', already in your songbook.'
+                                                        : ', earlier in this playlist.'}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </details>
                                 </div>
                             )}
                             {summary.refused.length > 0 && (
@@ -532,17 +582,19 @@ export function ImportDialog({
                                     </ul>
                                 </details>
                             )}
-                            {documentCount && (
+                            {accountRoom && (
                                 <p
                                     data-testid="playlist-cap"
-                                    role={capMessage || heldError ? 'alert' : undefined}
+                                    role={capMessage || roomError ? 'alert' : undefined}
                                 >
-                                    {heldError
-                                        ? heldError
-                                        : held === null
+                                    {roomError
+                                        ? roomError
+                                        : room === null
                                           ? 'Checking how much room your account has…'
                                           : (capMessage ??
-                                            `Your account holds up to ${count(MAX_REMOTE_CANDIDATES)} songs and collections. It would have ${count(held + summary.documents)} after this import.`)}
+                                            ('held' in room
+                                                ? `Your account can hold ${count(MAX_REMOTE_CANDIDATES)} songs and collections. Counting what this device has downloaded from it, it would hold ${count(room.held + summary.documents)} after this import.`
+                                                : ''))}
                                 </p>
                             )}
                         </>
@@ -675,7 +727,7 @@ export function ImportDialog({
                         {busy ? 'Working…' : 'Add to songbook'}
                     </button>
                 )}
-                <button className="btn" disabled={busy} onClick={onClose}>
+                <button className="btn" disabled={writing} onClick={onClose}>
                     Cancel
                 </button>
                 {source && (

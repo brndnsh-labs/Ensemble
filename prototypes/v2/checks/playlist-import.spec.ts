@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import { expect, seedStarters, test } from './fixtures';
 
 /**
@@ -33,6 +33,38 @@ const FRIDAY = playlist('Friday set', [
 
 const rows = (page: Page) => page.locator('.all-songs-table .song-name');
 
+/** Nothing on the page, nor inside the modal dialog, may scroll sideways (iPhone 13 width too). */
+async function noSidewaysScroll(page: Page, dialog: Locator): Promise<void> {
+    expect(
+        await page.evaluate(
+            () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+        ),
+    ).toBe(true);
+    expect(await dialog.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(
+        true,
+    );
+}
+
+/** How many songs the guest songbook holds, read straight from its store. */
+function guestSongCount(page: Page): Promise<number> {
+    return page.evaluate(
+        () =>
+            new Promise<number>((resolve, reject) => {
+                const request = indexedDB.open('ensemble-v2-preview', 1);
+                request.onerror = () => reject(request.error);
+                request.onsuccess = () => {
+                    const db = request.result;
+                    const counted = db.transaction('documents').objectStore('documents').count();
+                    counted.onsuccess = () => {
+                        db.close();
+                        resolve(counted.result);
+                    };
+                    counted.onerror = () => reject(counted.error);
+                };
+            }),
+    );
+}
+
 async function reviewLink(page: Page, source: string) {
     await page.getByRole('button', { name: 'Import chart', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: 'Review import' });
@@ -62,15 +94,24 @@ test('a playlist imports as a collection named after it, holding its playable so
     await expect(
         dialog.getByRole('checkbox', { name: 'Import duplicates anyway' }),
     ).not.toBeChecked();
+    // Each skipped duplicate names the song it matched (#1478 review R6).
+    const duplicates = dialog.getByTestId('playlist-duplicate-list');
+    await duplicates.locator('summary').click();
+    await expect(duplicates).toContainText(
+        'Blue pocket matches “Blue pocket” (no composer), already in your songbook.',
+    );
     const refused = dialog.getByTestId('playlist-refused');
     await expect(refused).toContainText('1 song can’t be imported yet');
     await refused.locator('summary').click();
     await expect(refused).toContainText('Broken study');
     // A guest songbook has no cap to state.
     await expect(dialog.getByTestId('playlist-cap')).toHaveCount(0);
+    await noSidewaysScroll(page, dialog);
 
     await dialog.getByTestId('playlist-import').click();
     await expect(dialog).not.toBeVisible();
+    // Focus lands on the page the import opened, not on the closed dialog's opener.
+    await expect(page.getByRole('heading', { name: /All songs/ })).toBeFocused();
 
     // The All songs page opens on the new collection, in the playlist's order: the duplicate is
     // the starter the songbook already held, in its playlist position; the refused song is absent.
@@ -126,6 +167,104 @@ test('duplicates import anyway with the checkbox, and a re-import adds to the sa
     await again.getByRole('button', { name: 'Cancel', exact: true }).click();
     await page.getByTestId('all-songs-link').click();
     await expect(page.getByTestId('collection-filter')).toHaveText(['Friday set 3']);
+});
+
+test('reading a long playlist can be cancelled, and cancelling writes nothing (review R5)', async ({
+    page,
+}) => {
+    await seedStarters(page);
+    // 2,000 tunes of 16 bars: seconds of reading and checking, sliced, with progress shown.
+    const long = playlist(
+        'Long',
+        Array.from({ length: 2_000 }, (_, index): [string, string, string] => [
+            `Long tune ${index + 1}`,
+            'Ensemble',
+            `T44[${'C   |F7   |'.repeat(7)}C   |G7   Z`,
+        ]),
+    );
+    const dialog = await reviewLink(page, long);
+    const progress = dialog.getByTestId('import-progress');
+    await expect(progress).toBeVisible();
+    const cancel = dialog.getByRole('button', { name: 'Cancel', exact: true });
+    await expect(cancel).toBeEnabled();
+    await cancel.click();
+    await expect(dialog).not.toBeVisible();
+    await expect(page.getByRole('button', { name: 'Import chart', exact: true })).toBeFocused();
+    expect(await guestSongCount(page)).toBe(3);
+
+    // Escape cancels a read too, and the dialog opens fresh afterwards.
+    const again = await reviewLink(page, long);
+    await expect(again.getByTestId('import-progress')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(again).not.toBeVisible();
+    await page.getByRole('button', { name: 'Import chart', exact: true }).click();
+    await expect(page.getByTestId('playlist-summary')).toHaveCount(0);
+    await expect(page.getByTestId('import-progress')).toHaveCount(0);
+    expect(await guestSongCount(page)).toBe(3);
+});
+
+test('a retry after the collection failed to save never imports the songs twice (review R8)', async ({
+    page,
+}) => {
+    await seedStarters(page);
+    const dialog = await reviewLink(page, FRIDAY);
+    await expect(dialog.getByTestId('playlist-counts')).toHaveText(
+        '2 songs to import, as the new collection “Friday set”.',
+    );
+    // Make the guest collection store impossible to open at the version the app asks for: the songs land
+    // (a database of their own) and the collection write fails.
+    await page.evaluate(
+        () =>
+            new Promise<void>((resolve, reject) => {
+                const request = indexedDB.open('ensemble-v2-preview-collections', 2);
+                request.onerror = () => reject(request.error);
+                request.onsuccess = () => {
+                    request.result.close();
+                    resolve();
+                };
+            }),
+    );
+    // Every full read of the guest songbook from here on answers late, so the race this guards
+    // is not left to timing: an error shown before the re-read lands is a stale summary.
+    await page.evaluate(() => {
+        const getAll = IDBObjectStore.prototype.getAll;
+        IDBObjectStore.prototype.getAll = function (
+            this: IDBObjectStore,
+            ...args: Parameters<IDBObjectStore['getAll']>
+        ) {
+            const request = getAll.apply(this, args);
+            if (this.name === 'documents') {
+                Object.defineProperty(request, 'onsuccess', {
+                    set(handler: (event: Event) => void) {
+                        request.addEventListener('success', (event) =>
+                            setTimeout(() => handler.call(request, event), 1_000),
+                        );
+                    },
+                });
+            }
+            return request;
+        };
+    });
+    await dialog.getByTestId('playlist-import').click();
+    await expect(
+        dialog.getByRole('alert').filter({ hasText: 'The songs were imported' }),
+    ).toBeVisible();
+    expect(await guestSongCount(page)).toBe(5);
+    // Storage comes back, and the musician retries AT ONCE: the summary must already know the two
+    // songs are in the songbook, so the retry makes the collection and imports nothing again.
+    await page.evaluate(
+        () =>
+            new Promise<void>((resolve) => {
+                const request = indexedDB.deleteDatabase('ensemble-v2-preview-collections');
+                request.onsuccess = () => resolve();
+                request.onerror = () => resolve();
+                request.onblocked = () => resolve();
+            }),
+    );
+    await dialog.getByTestId('playlist-import').click();
+    await expect(dialog).not.toBeVisible();
+    expect(await guestSongCount(page)).toBe(5);
+    await expect(rows(page)).toHaveText(['Second line', 'Blue pocket', 'Night walk']);
 });
 
 test('one song can still be picked from a playlist', async ({ page }) => {

@@ -151,6 +151,11 @@ export interface ResolveOptions {
     newId?: () => string;
 }
 
+/** A playlist song that matched one already in the songbook, or an earlier one in the playlist. */
+export interface DuplicateEntry extends PlaylistEntry {
+    matched: { title: string; composer: string; inSongbook: boolean };
+}
+
 export interface PlaylistImport {
     /** The documents to write, in playlist order, each under a fresh id and the chosen tempo. */
     songs: ChartDocumentV2[];
@@ -159,9 +164,10 @@ export interface PlaylistImport {
     /**
      * The playlist's duplicates — whether or not they are imported: skipped (and named in the
      * collection by the copy already held) unless `includeDuplicates`, imported as new copies when
-     * it is set.
+     * it is set. Each names what it matched (review R6), so two different tunes that share a title
+     * and an empty composer are visible rather than collapsed silently.
      */
-    duplicates: PlaylistEntry[];
+    duplicates: DuplicateEntry[];
     /** Of `duplicates`, how many match a song already in the songbook (the rest repeat in the playlist). */
     duplicatesInSongbook: number;
     /** Whether `duplicates` are being imported anyway. */
@@ -191,33 +197,43 @@ export function resolvePlaylistImport(plan: PlaylistPlan, options: ResolveOption
         throw new Error('Choose a tempo from 40 to 240 BPM.');
     }
     const newId = options.newId ?? (() => crypto.randomUUID());
-    const held = new Map<string, string>();
+    type Match = { id: string; title: string; composer: string };
+    const held = new Map<string, Match>();
     for (const document of options.library) {
-        const key = songKey(document.title, composerOf(document));
+        const composer = composerOf(document);
+        const key = songKey(document.title, composer);
         if (!held.has(key)) {
-            held.set(key, document.id);
+            held.set(key, { id: document.id, title: document.title, composer });
         }
     }
     const songs: ChartDocumentV2[] = [];
     const songIds: string[] = [];
-    const duplicates: PlaylistEntry[] = [];
+    const duplicates: DuplicateEntry[] = [];
     const refused: PlaylistEntry[] = [];
     let duplicatesInSongbook = 0;
-    const imported = new Map<string, string>();
+    const imported = new Map<string, Match>();
     for (const entry of plan.entries) {
         if (!entry.document) {
             refused.push(entry);
             continue;
         }
         const key = songKey(entry.title, entry.composer);
-        const existing = held.get(key) ?? imported.get(key);
+        const inSongbook = held.get(key);
+        const existing = inSongbook ?? imported.get(key);
         if (existing !== undefined) {
-            duplicates.push(entry);
-            if (held.has(key)) {
+            duplicates.push({
+                ...entry,
+                matched: {
+                    title: existing.title,
+                    composer: existing.composer,
+                    inSongbook: inSongbook !== undefined,
+                },
+            });
+            if (inSongbook) {
                 duplicatesInSongbook += 1;
             }
             if (!options.includeDuplicates) {
-                songIds.push(existing);
+                songIds.push(existing.id);
                 continue;
             }
         }
@@ -232,7 +248,7 @@ export function resolvePlaylistImport(plan: PlaylistPlan, options: ResolveOption
         });
         songIds.push(id);
         if (!imported.has(key)) {
-            imported.set(key, id);
+            imported.set(key, { id, title: entry.title, composer: entry.composer });
         }
     }
     if (songIds.length === 0) {

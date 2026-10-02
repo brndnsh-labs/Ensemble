@@ -6,7 +6,9 @@ import {
     belongsToAnotherAccount,
     createSyncLoop,
     DELETE_MESSAGES,
+    libraryCheck,
     OWNER_MESSAGES,
+    RATE_LIMIT_RESUMES,
     SIGN_OUT_MESSAGES,
     SYNC_MESSAGES,
 } from '../../../prototypes/v2/lib/account/sync-loop.js';
@@ -2536,5 +2538,36 @@ describe('the sync loop adopts a preserved remote version on the musician’s wo
         expect(loop.getSnapshot().owner).toBe(null);
         expect(loop.getSnapshot().libraryVersion).toBe(before);
         expect(loop.getSnapshot().observation).toBe(null);
+    });
+});
+
+describe('what a playlist import may assume about the account (#1478 review R1)', () => {
+    it('counts the verified manifest, refuses part-way, and falls back to this page’s last verified count', () => {
+        expect(libraryCheck({ required: 40, verified: 40 }, null)).toEqual({
+            kind: 'verified',
+            remoteCharts: 40,
+        });
+        const partWay = libraryCheck({ required: 1_461, verified: 400 }, 1_461);
+        expect(partWay.kind).toBe('unverified');
+        // Part-way outranks an earlier verified count: the account now holds more than that.
+        expect(partWay).toMatchObject({
+            message: expect.stringContaining('(400 of 1,461 songs)'),
+        });
+        expect(libraryCheck({ required: null, verified: null }, 12)).toEqual({
+            kind: 'verified',
+            remoteCharts: 12,
+        });
+        expect(libraryCheck({ required: null, verified: null }, null)).toMatchObject({
+            kind: 'unverified',
+            message: expect.stringContaining('hasn’t checked your account library yet'),
+        });
+    });
+});
+
+describe('the rate-limit sentence (#1478 review R2)', () => {
+    it('says what actually resumes the upload, and promises no timer', () => {
+        expect(SYNC_MESSAGES.rateLimited).toContain(RATE_LIMIT_RESUMES);
+        expect(SYNC_MESSAGES.rateLimited).not.toMatch(/shortly|try again/i);
+        expect(SYNC_MESSAGES.rateLimited.startsWith('Saved on this device')).toBe(true);
     });
 });

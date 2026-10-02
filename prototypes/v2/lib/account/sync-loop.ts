@@ -20,6 +20,7 @@ import {
     AccountSongbook,
     type AdoptedRemoteVersion,
     type CollectionListing,
+    heldByAccount,
     type KeepBothResolution,
     MAX_LIST_LIMIT,
     MAX_REMOTE_CANDIDATES,
@@ -205,13 +206,69 @@ export interface SyncSnapshot {
 }
 
 /**
+ * Why a whole-playlist import into the account cannot be decided yet (#1478 review R1), or null.
+ *
+ * The import counts room and looks for duplicates against what THIS device holds. A device still
+ * downloading the account holds a fraction of it: importing a playlist another device already
+ * imported would find no duplicates, pass a cap it is nowhere near on this device, and send creates
+ * the server takes until it answers `quota_exceeded` — half a duplicate playlist in the account, and
+ * every later pass stopped at the refused create. So the import waits for a verified library:
+ *
+ * - `current` is this page's latest download (`SyncSnapshot.documents`). Fully verified — every
+ *   chart the manifest lists is held here at its revision — is the answer.
+ * - Part-way (`verified < required`) is refused, with the count: the account holds more than this
+ *   device does, whatever an earlier pass saw.
+ * - Unobserved (no manifest read this pass — offline, a failed page, nothing run yet) falls back to
+ *   `lastVerified`, the charts a COMPLETE download in this page load listed: a device that verified
+ *   its library and then went offline may import, counting what it verified plus everything queued
+ *   here; the server stays the authority for anything another device added since. With neither,
+ *   it is refused.
+ */
+export function libraryCheck(
+    current: Progress,
+    lastVerified: number | null,
+): { kind: 'verified'; remoteCharts: number } | { kind: 'unverified'; message: string } {
+    const { required, verified } = current;
+    if (required !== null && verified !== null) {
+        if (verified >= required) {
+            return { kind: 'verified', remoteCharts: required };
+        }
+        return {
+            kind: 'unverified',
+            message: `This device is still downloading your account library (${verified.toLocaleString('en-US')} of ${required.toLocaleString('en-US')} songs), so it can’t yet check for songs you already have or count the room left. Nothing has been imported.`,
+        };
+    }
+    if (lastVerified !== null) {
+        return { kind: 'verified', remoteCharts: lastVerified };
+    }
+    return {
+        kind: 'unverified',
+        message:
+            'This device hasn’t checked your account library yet, so it can’t look for songs you already have or count the room left. Try again once it is online and synced. Nothing has been imported.',
+    };
+}
+
+/** An account import refused because the library is not verified yet (`libraryCheck`). */
+export class LibraryUnverifiedError extends Error {}
+
+/**
+ * What happens next after the server asks this device to wait (a 429), in ONE place (#1478 review
+ * R2). The loop has no timer (see the header comment): the back-off only ends a pass, and the next
+ * pass runs on the next trigger — coming back to the tab, coming back online, or a Save. So that is
+ * what this says. Were the loop ever to resume by itself after a back-off, this sentence is the
+ * only thing that changes.
+ */
+export const RATE_LIMIT_RESUMES =
+    'Uploading continues when you come back to Ensemble or save a song.';
+
+/**
  * Every failure sentence leads with the local truth. A musician whose Save was refused by the
  * server has not lost anything, and the first thing they need to know is that — the reason comes
  * second, and the server's own vocabulary (`quota_exceeded`, `rate_limited`) never appears.
  */
 export const SYNC_MESSAGES = {
     offline: 'Saved on this device · we’ll upload it when you’re back online.',
-    rateLimited: 'Saved on this device · the server asked us to wait. We’ll try again shortly.',
+    rateLimited: `Saved on this device · the server asked us to wait. ${RATE_LIMIT_RESUMES}`,
     quota: 'Saved on this device · your account library is full. Delete a song in the cloud to make room.',
     tooLarge: 'Saved on this device · this chart is too large to upload.',
     /**
@@ -833,17 +890,20 @@ export interface SyncLoop {
         owner: string | null,
     ): Promise<SavedCollection | null>;
     /**
-     * How many documents of either kind this account holds here (#1478) — what a whole-playlist
-     * import states against the account cap before it writes. Scoped like `listLibrary`.
+     * How many documents a whole-playlist import may assume this ACCOUNT holds (#1478, review R1)
+     * — `heldByAccount` over this device's rows and the verified manifest — or why it cannot be
+     * decided yet (`libraryCheck`). What the import states against the cap before it writes.
+     * Scoped like `listLibrary`.
      */
-    documentCount(owner?: string | null): Promise<number>;
+    importRoom(owner?: string | null): Promise<{ held: number } | { refusal: string }>;
     /**
      * A whole iReal playlist, committed and queued as ONE transaction
      * (`AccountSongbook.importPlaylist`): its songs, then the collection holding them. Fenced on
      * `owner` like `save` — these are nobody's songs until committed, so a caller passes the
      * session's owner. ONE `libraryVersion` and one `collectionsVersion` bump for the whole import,
      * never one per song, and it does not send: the caller runs a pass. `ImportCapError` when the
-     * account has no room, with nothing written.
+     * account has no room, and `LibraryUnverifiedError` when this device cannot tell yet
+     * (`libraryCheck`) — both with nothing written.
      */
     importPlaylist(
         songs: readonly ChartDocument[],
@@ -1017,6 +1077,12 @@ export function createSyncLoop(
     let rerun = false;
     /** Epoch-ms floor the server asked for after a 429. No timer waits it out; the next event does. */
     let backoffUntil = 0;
+    /**
+     * The live charts the last COMPLETE library download in this page load listed for the attached
+     * account (#1478 review R1), or null — `libraryCheck`'s fallback while a later pass could not
+     * read the manifest (offline). Cleared with the owner.
+     */
+    let lastVerified: number | null = null;
 
     function publish(next: Partial<SyncSnapshot>): void {
         const candidate = { ...state, ...next };
@@ -1531,6 +1597,13 @@ export function createSyncLoop(
                         backoffUntil = Math.max(backoffUntil, result.backoffUntil);
                     }
                     publish({ documents: result.documents });
+                    if (
+                        result.documents.required !== null &&
+                        result.documents.verified !== null &&
+                        result.documents.verified >= result.documents.required
+                    ) {
+                        lastVerified = result.documents.required;
+                    }
                     failure = failure ?? failureFromDownload(result);
                 } catch (error) {
                     if (error instanceof AccountChangedError) {
@@ -1587,6 +1660,7 @@ export function createSyncLoop(
                 }
                 scope = next;
                 backoffUntil = 0;
+                lastVerified = null;
                 publish({
                     owner: ownerId,
                     failure: null,
@@ -1614,6 +1688,7 @@ export function createSyncLoop(
             epoch += 1;
             scope = null;
             backoffUntil = 0;
+            lastVerified = null;
             // `failure` is deliberately NOT cleared. The commonest reason this runs at all is a
             // session that just expired, and the sentence explaining that a Save is still owed is
             // the one thing a musician needs at that moment. `attach()` clears it on the way back
@@ -1737,12 +1812,29 @@ export function createSyncLoop(
             }
             return saved;
         },
-        async documentCount(owner = null) {
-            return songbook.documentCount(await heldScope(owner));
+        async importRoom(owner = null) {
+            const current = await heldScope(owner);
+            const check = libraryCheck(state.documents, lastVerified);
+            if (check.kind === 'unverified') {
+                return { refusal: check.message };
+            }
+            const counts = await songbook.documentCounts(current);
+            return {
+                held: heldByAccount(counts.documents, counts.collections, check.remoteCharts),
+            };
         },
         async importPlaylist(songs, collection, owner, pace) {
             const current = await ownedScope(owner);
-            const result = await songbook.importPlaylist(current, songs, collection, pace);
+            // Before anything is written (#1478 review R1): room and duplicates are only as good
+            // as this device's copy of the account.
+            const check = libraryCheck(state.documents, lastVerified);
+            if (check.kind === 'unverified') {
+                throw new LibraryUnverifiedError(check.message);
+            }
+            const result = await songbook.importPlaylist(current, songs, collection, {
+                pace,
+                remoteCharts: check.remoteCharts,
+            });
             publish({
                 libraryVersion: state.libraryVersion + 1,
                 ...(result.collection !== null

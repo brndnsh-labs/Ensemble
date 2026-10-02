@@ -952,10 +952,11 @@ export default function Ensemble() {
     }));
     // The session's owner, when signed in — the account a home slice has to have been read for.
     const sessionOwner = account.session.status === 'signedIn' ? account.session.owner : null;
-    // #1478 — how many documents the signed-in account holds here, for the import's cap line.
-    // Stable per owner, so the dialog reads it once per playlist rather than on every render.
-    const accountDocumentCount = useCallback(
-        () => accountSync.documentCount(sessionOwner),
+    // #1478 — how much room the signed-in account has, by this device's VERIFIED copy of it, for
+    // the import's cap line (review R1: or why that can't be told yet). Stable per owner, so the
+    // dialog reads it once per playlist and again only as the library download moves.
+    const accountImportRoom = useCallback(
+        () => accountSync.importRoom(sessionOwner),
         [sessionOwner],
     );
     // The live songbook's home slice (#1441), or null while it has not been read. Signed in, a
@@ -2995,8 +2996,12 @@ export default function Ensemble() {
             } catch (failure) {
                 // The guest's songs and collections are two databases, so the songs are already
                 // saved. Said plainly, with the way back: a rerun finds them as duplicates and
-                // makes the collection from the copies already here.
+                // makes the collection from the copies already here — so the songbook the dialog
+                // checks duplicates against is re-read and AWAITED before the error re-enables
+                // its button (review R8): a quick retry against the old list would import every
+                // song a second time.
                 await refreshSongs();
+                await reloadGuestLibrary();
                 throw new Error(
                     `The songs were imported, but the collection could not be saved: ${failure instanceof Error ? failure.message : String(failure)} Import the playlist again to make it; its songs will be recognized as already in your songbook.`,
                 );
@@ -5078,7 +5083,10 @@ export default function Ensemble() {
                         library: songbookLoading ? null : liveSongs,
                         collections: collections.collections,
                         onWantLibrary: wantLiveLibrary,
-                        documentCount: signedIn ? accountDocumentCount : null,
+                        accountRoom: signedIn ? accountImportRoom : null,
+                        libraryProgress: signedIn
+                            ? `${sync.documents.verified}/${sync.documents.required}`
+                            : null,
                         onImport: importPlaylist,
                     }}
                 />

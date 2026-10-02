@@ -163,7 +163,17 @@ table, Save, read and delete routes; and the same per-owner document cap.
   drain reads as one; `collectionOutbox` reads only collection queues for the same reason. At the
   server's 120 Saves a minute a 1,350-song import takes at least twelve minutes of passes, and a
   pass that meets a 429 waits for the next trigger (Save, `online`, visibility) — there is still no
-  timer.
+  timer, and the rate-limit sentence says exactly that (`RATE_LIMIT_RESUMES`, the one string to
+  change if the loop ever resumes by itself).
+- **An account import waits for a verified library (#1478 review R1).** Room and duplicates are
+  counted against this device's copy of the account, so a device part-way through downloading it
+  is refused before anything is written ("still downloading your account library (X of Y)"):
+  otherwise a playlist another device already imported finds no duplicates, passes a cap this
+  device is nowhere near, and the server takes creates until `quota_exceeded`. The room counted is
+  `heldByAccount` — this device's rows, or the verified manifest's charts plus its collections,
+  whichever is larger. Offline, a library verified earlier in the same page load still counts
+  (the server stays the authority for anything added since); a device that has never verified
+  the library in this page load is refused.
 - **Guest collections are adopted with guest songs** (`adoptGuestCollections`): song ids remapped to
   the ids those songs are adopted under, the guest Starred merged into the account's. When every
   guest song is already in the account, the offer still opens if a guest collection holds songs

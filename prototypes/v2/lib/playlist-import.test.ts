@@ -215,6 +215,52 @@ describe('resolving it against the songbook (#1478)', () => {
         expect(() => write.edit(grown)).toThrow(/can hold 2,000 songs/);
     });
 
+    it('fills a collection to exactly its cap, and refuses one song past it (review R7)', async () => {
+        const result = resolvePlaylistImport(await plan(SOURCE), {
+            library: [],
+            collections: [],
+            includeDuplicates: false,
+            name: 'Gig set',
+            bpm: 120,
+            newId: counter(),
+        });
+        const write = collectionWrite({ ...result, songIds: ['in-a', 'in-b'] }, () => 'target');
+        const holding = (count: number): CollectionDocument => ({
+            ...newCollection('Gig set', []),
+            id: 'target',
+            songIds: Array.from({ length: count }, (_, i) => `held-${i}`),
+        });
+        // 1,998 + 2 = 2,000: lands, in order.
+        const full = write.edit(holding(MAX_COLLECTION_SONGS - 2));
+        expect(full?.songIds).toHaveLength(MAX_COLLECTION_SONGS);
+        expect(full?.songIds.slice(-2)).toEqual(['in-a', 'in-b']);
+        // 1,999 + 2 = 2,001: refused.
+        expect(() => write.edit(holding(MAX_COLLECTION_SONGS - 1))).toThrow(/can hold 2,000 songs/);
+    });
+
+    it('names what each skipped duplicate matched (review R6)', async () => {
+        const source = playlist(
+            [
+                song('Untitled', '', 'T44[C   |G7   Z'),
+                song('Untitled', '', 'T44[F   |C7   Z'),
+                song('Blue Monk', 'Thelonious Monk'),
+            ],
+            'Same names',
+        );
+        const result = resolvePlaylistImport(await plan(source), {
+            library: [held('blue monk', 'thelonious monk', 'held-monk')],
+            collections: [],
+            includeDuplicates: false,
+            name: 'Same names',
+            bpm: 120,
+            newId: counter(),
+        });
+        expect(result.duplicates.map((entry) => [entry.title, entry.matched])).toEqual([
+            ['Untitled', { title: 'Untitled', composer: '', inSongbook: false }],
+            ['Blue Monk', { title: 'blue monk', composer: 'thelonious monk', inSongbook: true }],
+        ]);
+    });
+
     it('never treats the built-in Starred as the collection a playlist named "Starred" joins', async () => {
         const result = resolvePlaylistImport(await plan(SOURCE), {
             library: [],

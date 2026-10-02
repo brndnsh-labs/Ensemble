@@ -1,7 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { AccountApi, ApiResult } from '../../prototypes/v2/lib/account/api.js';
 import { createAccountSession } from '../../prototypes/v2/lib/account/session.js';
-import { createSyncLoop } from '../../prototypes/v2/lib/account/sync-loop.js';
+import {
+    createSyncLoop,
+    LibraryUnverifiedError,
+} from '../../prototypes/v2/lib/account/sync-loop.js';
 import {
     type CollectionDocument,
     mergeSongIds,
@@ -176,6 +179,76 @@ async function sweep(
     throw new Error('The sweep did not end.');
 }
 
+/**
+ * `receiptCloud` behind the account API the sync loop talks to: the session, a one-page manifest of
+ * what the cloud holds, each document's body, and Save. `missing` answers a body download 404 (a
+ * device that cannot finish downloading), `offline` fails every request as a dead network does.
+ */
+function cloudApi(
+    cloud: ReturnType<typeof receiptCloud>,
+    options: { missing?: () => boolean; offline?: () => boolean } = {},
+): AccountApi {
+    const network = { ok: false as const, error: { kind: 'network' as const } };
+    return {
+        async get<T>(path: string): Promise<ApiResult<T>> {
+            if (options.offline?.()) {
+                return network;
+            }
+            if (path.startsWith('/api/auth/session')) {
+                return { ok: true, status: 200, value: { accountId: OWNER } as T };
+            }
+            if (path.startsWith('/api/documents?')) {
+                const documents = [...cloud.documents.entries()]
+                    .sort(([a], [b]) => (a < b ? -1 : 1))
+                    .map(([documentId, { revision, document }]) => ({
+                        documentId,
+                        revision,
+                        deleted: false,
+                        bytes: JSON.stringify(document).length,
+                        ...((document as { kind?: string }).kind === 'collection'
+                            ? { kind: 'collection' }
+                            : {}),
+                    }));
+                return {
+                    ok: true,
+                    status: 200,
+                    value: { documents, nextAfterDocumentId: null } as T,
+                };
+            }
+            const id = decodeURIComponent(path.slice('/api/documents/'.length));
+            const held = cloud.documents.get(id);
+            if (!held || options.missing?.()) {
+                return { ok: false, error: { kind: 'code', code: 'not_found', status: 404 } };
+            }
+            return { ok: true, status: 200, value: { documentId: id, ...held } as T };
+        },
+        async post<T>(path: string, body: string): Promise<ApiResult<T>> {
+            if (options.offline?.()) {
+                return network;
+            }
+            if (path !== '/api/documents/save') {
+                throw new Error(`Unexpected POST ${path}`);
+            }
+            const request = JSON.parse(body);
+            const value = await cloud.transport({
+                ownerId: request.ownerId,
+                documentId: request.documentId,
+                operationId: request.operationId,
+                digest: await digest(body),
+                body,
+            } as PreparedSave);
+            return { ok: true, status: 200, value: value as T };
+        },
+    } as AccountApi;
+}
+
+/** Another device's songs, already in the account: `count` charts at cloud revisions. */
+function seedCloud(cloud: ReturnType<typeof receiptCloud>, count: number, prefix = 'remote') {
+    for (const song of playlistSongs(count, prefix)) {
+        cloud.documents.set(song.id, { revision: `seeded-${song.id}`, document: song });
+    }
+}
+
 describe('a whole-playlist import into an account (#1478)', () => {
     it('queues 1,350 songs and the collection in one transaction, in playlist order', async () => {
         const songs = playlistSongs(SONGS);
@@ -234,48 +307,11 @@ describe('a whole-playlist import into an account (#1478)', () => {
 
     it('bumps libraryVersion once for the import and once per pass, never per song', async () => {
         const cloud = receiptCloud();
-        const api = {
-            async get<T>(path: string): Promise<ApiResult<T>> {
-                if (path.startsWith('/api/auth/session')) {
-                    return { ok: true, status: 200, value: { accountId: OWNER } as T };
-                }
-                if (path.startsWith('/api/documents?')) {
-                    const documents = [...cloud.documents.entries()]
-                        .sort(([a], [b]) => (a < b ? -1 : 1))
-                        .map(([documentId, { revision, document }]) => ({
-                            documentId,
-                            revision,
-                            deleted: false,
-                            bytes: JSON.stringify(document).length,
-                            ...((document as { kind?: string }).kind === 'collection'
-                                ? { kind: 'collection' }
-                                : {}),
-                        }));
-                    return {
-                        ok: true,
-                        status: 200,
-                        value: { documents, nextAfterDocumentId: null } as T,
-                    };
-                }
-                throw new Error(`Unexpected GET ${path}`);
-            },
-            async post<T>(path: string, body: string): Promise<ApiResult<T>> {
-                const request = JSON.parse(body);
-                const value = await cloud.transport({
-                    ownerId: request.ownerId,
-                    documentId: request.documentId,
-                    operationId: request.operationId,
-                    digest: await digest(body),
-                    body,
-                } as PreparedSave);
-                if (path !== '/api/documents/save') {
-                    throw new Error(`Unexpected POST ${path}`);
-                }
-                return { ok: true, status: 200, value: value as T };
-            },
-        } as AccountApi;
+        const api = cloudApi(cloud);
         const loop = createSyncLoop(api, createAccountSession(api), book);
         await loop.attach(OWNER);
+        // A pass first: the import waits for a verified library (review R1).
+        await loop.run();
         const before = loop.getSnapshot();
         const songs = playlistSongs(200);
         const ids = songs.map((song) => song.id);
@@ -324,7 +360,9 @@ describe('the account cap, checked as the import writes (#1478)', () => {
             ),
         );
         await expect(refusal).rejects.toBeInstanceOf(ImportCapError);
-        await expect(refusal).rejects.toThrow(/up to 2,000 songs and collections.*has 1,990/);
+        await expect(refusal).rejects.toThrow(
+            /can hold 2,000 songs and collections, and this device counts 1,990/,
+        );
         expect(await book.documentCount(scope)).toBe(MAX_REMOTE_CANDIDATES - 10);
         expect(await book.songsWaiting(scope)).toBe(waiting);
         expect(await book.read(scope, over[0].id)).toBeNull();
@@ -369,4 +407,181 @@ describe('the account cap, checked as the import writes (#1478)', () => {
         expect(await book.readCollection(scope, 'playlist')).toBeNull();
         expect(await book.songsWaiting(scope)).toBe(1);
     });
+});
+
+/**
+ * #1478 review R1: room and duplicates are only as good as this device's copy of the account. A
+ * device part-way through downloading the library holds a fraction of it — importing there would
+ * find no duplicates, pass a cap it is nowhere near locally, and half-import into the cloud — so
+ * the import waits for a verified library, and counts the account's manifest when it has one.
+ */
+describe('an account import waits for a verified library (#1478 review R1)', () => {
+    it('refuses on a device that has not checked the library, or is still downloading it, and writes nothing', async () => {
+        const cloud = receiptCloud();
+        seedCloud(cloud, 5);
+        let missing = true;
+        const api = cloudApi(cloud, { missing: () => missing });
+        const loop = createSyncLoop(api, createAccountSession(api), book);
+        await loop.attach(OWNER);
+        const songs = playlistSongs(3);
+        const write = into(
+            'playlist',
+            'Three',
+            songs.map((song) => song.id),
+        );
+
+        // Attached, nothing downloaded yet.
+        expect(await loop.importRoom(OWNER)).toEqual({
+            refusal: expect.stringContaining('hasn’t checked your account library yet'),
+        });
+        await expect(loop.importPlaylist(songs, write, OWNER)).rejects.toBeInstanceOf(
+            LibraryUnverifiedError,
+        );
+
+        // The manifest is read, but no body arrives: 0 of the account's 5 songs are here.
+        await loop.run();
+        expect(loop.getSnapshot().documents).toEqual({ required: 5, verified: 0 });
+        expect(await loop.importRoom(OWNER)).toEqual({
+            refusal: expect.stringContaining(
+                'still downloading your account library (0 of 5 songs)',
+            ),
+        });
+        await expect(loop.importPlaylist(songs, write, OWNER)).rejects.toThrow(
+            /still downloading your account library \(0 of 5 songs\).*Nothing has been imported/,
+        );
+        expect(await book.documentCount(scope)).toBe(0);
+        expect(await book.songsWaiting(scope)).toBe(0);
+        expect(await book.readCollection(scope, 'playlist')).toBeNull();
+
+        // Once the library is downloaded, the same import lands.
+        missing = false;
+        await loop.run();
+        expect(loop.getSnapshot().documents).toEqual({ required: 5, verified: 5 });
+        expect(await loop.importRoom(OWNER)).toEqual({ held: 5 });
+        await loop.importPlaylist(songs, write, OWNER);
+        expect(await book.documentCount(scope)).toBe(9);
+    }, 120_000);
+
+    it('a verified device lands an import at exactly the cap and refuses one past it', async () => {
+        const cloud = receiptCloud();
+        const api = cloudApi(cloud);
+        const loop = createSyncLoop(api, createAccountSession(api), book);
+        await loop.attach(OWNER);
+        // 1,989 songs and a collection, uploaded and verified: ten documents of room.
+        const held = playlistSongs(MAX_REMOTE_CANDIDATES - 11, 'held');
+        await book.importPlaylist(
+            scope,
+            held,
+            into(
+                'held-collection',
+                'Held',
+                held.slice(0, 2).map((song) => song.id),
+            ),
+        );
+        await loop.run();
+        expect(cloud.documents.size).toBe(MAX_REMOTE_CANDIDATES - 10);
+        expect(loop.getSnapshot().documents).toEqual({
+            required: MAX_REMOTE_CANDIDATES - 11,
+            verified: MAX_REMOTE_CANDIDATES - 11,
+        });
+        expect(await loop.importRoom(OWNER)).toEqual({ held: MAX_REMOTE_CANDIDATES - 10 });
+
+        // Ten songs and a new collection: eleven, one past the cap.
+        const over = playlistSongs(10, 'over');
+        await expect(
+            loop.importPlaylist(
+                over,
+                into(
+                    'over',
+                    'Over',
+                    over.map((song) => song.id),
+                ),
+                OWNER,
+            ),
+        ).rejects.toBeInstanceOf(ImportCapError);
+        expect(await book.documentCount(scope)).toBe(MAX_REMOTE_CANDIDATES - 10);
+        // Nine songs and a new collection: exactly the room.
+        const fits = playlistSongs(9, 'fits');
+        await loop.importPlaylist(
+            fits,
+            into(
+                'fits',
+                'Fits',
+                fits.map((song) => song.id),
+            ),
+            OWNER,
+        );
+        expect(await book.documentCount(scope)).toBe(MAX_REMOTE_CANDIDATES);
+    }, 300_000);
+
+    it('counts the charts the account manifest lists, not only this device’s rows', async () => {
+        // Three songs and a collection here; the caller knows the account lists 1,993 charts.
+        await book.importPlaylist(scope, playlistSongs(3, 'local'), into('local', 'Local', []));
+        const five = playlistSongs(5, 'five');
+        // 1,993 + 1 (this device's collection) + 5 songs + 1 new collection = 2,000: lands.
+        await book.importPlaylist(
+            scope,
+            five,
+            into(
+                'five',
+                'Five',
+                five.map((song) => song.id),
+            ),
+            { remoteCharts: 1_993 },
+        );
+        // Now 2 collections here: 1,995 + 2 + 3 songs + 1 new collection = 2,001: refused,
+        // though this device holds only 10 documents.
+        const more = playlistSongs(3, 'more');
+        await expect(
+            book.importPlaylist(
+                scope,
+                more,
+                into(
+                    'more',
+                    'More',
+                    more.map((song) => song.id),
+                ),
+                { remoteCharts: 1_995 },
+            ),
+        ).rejects.toBeInstanceOf(ImportCapError);
+        expect(await book.documentCount(scope)).toBe(10);
+    });
+
+    it('offline, a library verified earlier in this page still allows an import; a never-verified one does not', async () => {
+        const cloud = receiptCloud();
+        let offline = false;
+        const api = cloudApi(cloud, { offline: () => offline });
+        const loop = createSyncLoop(api, createAccountSession(api), book);
+        await loop.attach(OWNER);
+        await loop.run();
+        expect(loop.getSnapshot().documents).toEqual({ required: 0, verified: 0 });
+
+        // The network goes: the next pass reads no manifest, so the download fact is unknown —
+        // but this page verified the library, and the import counts that plus what is queued here.
+        offline = true;
+        await loop.run();
+        expect(loop.getSnapshot().documents).toEqual({ required: null, verified: null });
+        expect(await loop.importRoom(OWNER)).toEqual({ held: 0 });
+        const songs = playlistSongs(2);
+        await loop.importPlaylist(
+            songs,
+            into(
+                'playlist',
+                'Two',
+                songs.map((song) => song.id),
+            ),
+            OWNER,
+        );
+        expect(await book.songsWaiting(scope)).toBe(2);
+
+        // A second device that never reached the account in this page load is refused.
+        const other = connection(freshName());
+        await other.switchAccount(OWNER);
+        const otherLoop = createSyncLoop(api, createAccountSession(api), other);
+        await otherLoop.attach(OWNER);
+        await otherLoop.run();
+        expect(await otherLoop.importRoom(OWNER)).toEqual({
+            refusal: expect.stringContaining('hasn’t checked your account library yet'),
+        });
+    }, 120_000);
 });

@@ -69,7 +69,7 @@ test('a playlist imports into the account as a collection, states the cap first,
     );
     // The cap, stated before anything is written: three songs and one collection.
     await expect(dialog.getByTestId('playlist-cap')).toHaveText(
-        'Your account holds up to 2,000 songs and collections. It would have 4 after this import.',
+        'Your account can hold 2,000 songs and collections. Counting what this device has downloaded from it, it would hold 4 after this import.',
     );
     await dialog.getByTestId('playlist-import').click();
     await expect(dialog).not.toBeVisible();

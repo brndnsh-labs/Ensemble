@@ -1035,16 +1035,27 @@ describe('bounded source-preserving iReal import', () => {
     });
 
     it('bounds total written measures across multiple valid songs', () => {
-        // 4,000 bars a song (each under the per-song bound): 16 fit the import-wide cap and 17
-        // pass it — the whole import is refused, never truncated to the songs that fit.
-        const chart = open(`T44[${'C|'.repeat(3999)}CZ`);
-        const songs = (count: number) =>
-            Array.from({ length: count }, (_, index) => `<a href="${chart}">${index}</a>`).join('');
-        const fits = parseIRealImport(songs(16));
+        // 4,096 bars a song (the per-song bound): sixteen is exactly the import-wide cap of
+        // 65,536 and lands; one more one-bar song passes it, and the whole import is refused —
+        // never truncated to the songs that fit (#1478 review R7: the boundary itself, pinned).
+        expect(MAX_IMPORT_MEASURES).toBe(65_536);
+        const full = open(`T44[${'C|'.repeat(4095)}CZ`);
+        const one = open('T44[C Z');
+        const songs = (extra: boolean) =>
+            [...Array.from({ length: 16 }, () => full), ...(extra ? [one] : [])]
+                .map((link, index) => `<a href="${link}">${index}</a>`)
+                .join('');
+        const fits = parseIRealImport(songs(false));
         expect(fits.diagnostics).toEqual([]);
         expect(fits.songs).toHaveLength(16);
-        expect(16 * 4000).toBeLessThanOrEqual(MAX_IMPORT_MEASURES);
-        const source = songs(17);
+        expect(
+            fits.songs.reduce(
+                (n, song) =>
+                    n + (song.score?.sections.reduce((m, s) => m + s.measures.length, 0) ?? 0),
+                0,
+            ),
+        ).toBe(65_536);
+        const source = songs(true);
         const parsed = parseIRealImport(source);
         expect(parsed.source).toBe(source);
         expect(parsed.songs).toEqual([]);
