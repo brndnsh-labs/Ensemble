@@ -541,4 +541,7 @@ export const disco: Style = {
     // The alto sax: the disco break is a horn's (the guitar is already chucking the comp, and
     // a second guitar would fight it for the same register and attack).
     lead: { idiom: discoLead, prefers: 'sax' },
+    // why: disco's tonic colours are the major 7th and the minor 7th (the Philly strings, the
+    // Chic guitar); the ending holds the tonic in that colour.
+    ending: { major: 'maj7', minor: 'm7' },
 };

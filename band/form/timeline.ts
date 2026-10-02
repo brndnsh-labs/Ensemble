@@ -72,6 +72,13 @@ export interface Timeline {
     ticks: number;
     /** Tick ranges that play slower than written (fermatas), as seconds-per-tick multipliers. */
     stretches: { start: number; end: number; factor: number }[];
+    /**
+     * Set when the performance ends in a written coda: its last bar was reached through a coda
+     * hop — a D.C./D.S. al Coda's, or a counted chart's last-chorus coda (#1472) — so it is the
+     * chart's own ending and the band holds it as written (`arrange/ending.ts`). Absent
+     * otherwise, so every other timeline is shaped exactly as before.
+     */
+    coda?: true;
 }
 
 function durationTicks([n, d]: Readonly<ScoreDuration>): number {
@@ -253,7 +260,63 @@ export function compileTimeline(score: SemanticScore): Timeline {
         });
     }
 
-    return { bars, visits, spans, ticks: tick, stretches };
+    const coda = endsInCoda(score, visitsWritten.at(-1));
+    return {
+        bars,
+        visits,
+        spans,
+        ticks: tick,
+        stretches,
+        ...(coda ? { coda: true as const } : {}),
+    };
+}
+
+/**
+ * Does the performance end in a coda? Every coda hop (a jump "al Coda", or a last-chorus coda)
+ * lands on a written coda marker that follows its departure (the score form refuses a backward
+ * one) and plays on from there. So the performance ends in a coda when its last bar is written
+ * at or after a coda arrival: the measure a `start` marker sits on, or the one after an `end`
+ * marker. An uncounted chart never takes its last-chorus coda, so its last bar comes before
+ * that arrival and it does not end in one.
+ */
+function endsInCoda(
+    score: SemanticScore,
+    last: { sectionIndex: number; measureIndex: number } | undefined,
+): boolean {
+    if (!last) {
+        return false;
+    }
+    const arrivals = new Set<string>();
+    const markers: { label: string; at: number }[] = [];
+    let position = 0;
+    let lastAt = -1;
+    score.sections.forEach((section, s) => {
+        section.measures.forEach((measure, m) => {
+            if (s === last.sectionIndex && m === last.measureIndex) {
+                lastAt = position;
+            }
+            for (const [edge, directions] of [
+                ['start', measure.start],
+                ['end', measure.end],
+            ] as const) {
+                for (const direction of directions ?? []) {
+                    if (direction.kind === 'coda') {
+                        markers.push({
+                            label: direction.label,
+                            at: position + (edge === 'end' ? 1 : 0),
+                        });
+                    } else if (
+                        (direction.kind === 'last-chorus' || direction.kind === 'jump') &&
+                        direction.destination.kind === 'coda'
+                    ) {
+                        arrivals.add(direction.destination.target);
+                    }
+                }
+            }
+            position++;
+        });
+    });
+    return markers.some(({ label, at }) => arrivals.has(label) && lastAt >= at);
 }
 
 const MINOR_FAMILIES = new Set(['minor', 'half-diminished', 'diminished']);

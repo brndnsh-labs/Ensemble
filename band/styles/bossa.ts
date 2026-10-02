@@ -369,4 +369,7 @@ export const bossa: Style = {
     // The sax, not the nylon: the bossa lead voice is Getz's horn, and a nylon melody over the
     // nylon comp would be two of the same guitar in the same register.
     lead: { idiom: bossaLead, prefers: 'sax' },
+    // why: the bossa tonic is the major 7th, the nylon guitar's final Imaj7. In minor, the
+    // minor 6th a bossa cadences on (this style's own fixture closes its A on `Dm6`).
+    ending: { major: 'maj7', minor: 'm6' },
 };

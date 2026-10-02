@@ -266,6 +266,50 @@ expression devices take turns rather than stack; one peak note per cycle.
     - `compAnswerLift`: answers louder than strikes under the line.
     - `compLineDensity`: thinner under the line, with a floor that keeps the time.
 
+### The held ending (#1482)
+
+A pass that does not loop (an export, the last chorus of a counted chart) ends on one held
+chord: the bass's one note, the comp's one chord and the lead's last long note, all from the
+final bar's first chord. Many tunes' last bar is a turnaround written to send the form round
+again (the blues fixture's `Dm7 G7`), and on the last time through a band doesn't hold it: it
+resolves it. So `arrange/ending.ts` (`heldEnding`) gives the ending bar to the lanes on the
+key's tonic, in the quality the genre ends on (`Style.ending`, a chord-symbol suffix read by
+`theory/chord.ts`): I6 for jazz, Imaj7 for bossa, I9 for the blues and funk, Imaj7 for disco
+and hip hop, Imaj9 for neo-soul, the power chord for metal and the triad for the rest; in a
+minor key the minor equivalents (im6 for jazz and bossa, im9, im7, the minor triad).
+- **What already counts as home.** A first chord that rests on the tonic, root and bass, in a
+  stable family (major, minor, dominant, power) is held as written, in the colour the chart
+  gave it: rhythm changes' `Bb6`, a blues's `C7`, a minor groove's `Em9`, a Picardy `E` in E
+  minor. A tonic dominant that resolves down a fifth to the chord after it (an F tune's `C7`)
+  is a V, not a tonic. A tonic over another bass (`C/E`) is not home: an inversion is a passing
+  sound, and the held ending stands on the root. Nor is a tonic that is still moving: `Csus4`,
+  `Co7`, `Cø`, `C+`.
+- **A bar that gets home itself.** When a later chord of the last bar rests on the tonic (`G7
+  C`, `Csus4 Cmaj7`), the band holds that written chord, in its own colour, not the style's.
+- **Written endings stand: how a chart asks to end off the tonic.** A fermata on the last bar,
+  an N.C. on its downbeat, and the last bar of a written coda (`Timeline.coda`: reached through
+  a D.C./D.S. al Coda's hop or a counted chart's last-chorus coda) are the chart's own ending,
+  played as written. A section merely labelled Tag or Ending is not: a jazz tag is the
+  turnaround repeated before the band resolves it. An N.C. later in the last bar (`G7:2
+  N.C.:2`) is a written stop: the bar still resolves, and the held ending, resolved or not,
+  sounds up to the rest and no further.
+- **The key has to be the chart's.** A chart typed without setting its key reads as C major, so
+  the band resolves only into a key the chart is in: one it opens on (a stable chord on the
+  tonic as its first chord, which a dominant I–IV vamp like `E9 | A9` is), or one it rests on
+  somewhere else (a chord resting on its tonic, in a bar in that key). An F tune, an F blues or
+  an A minor tune left on C keeps its written last chord.
+- **Only the ending bar's harmony changes.** The bar before it hears the resolved bar as its
+  next, so its approach notes walk into the tonic (a walking bass's line toward its next
+  chord, a lead-in); its chords, the comp (which never anticipates an ending) and the drums are
+  unchanged, and every bar before it is byte-identical. The lead's last note is chosen against
+  the written chord and then moved to the nearest of the tonic's resting tones
+  (`LeadBook.settle`, rank-weighted as any phrase's last note is), so the line into it is
+  unchanged. A lead phrase planned while the pass looped (a practice loop released on the last
+  section) is replanned for the ending: its slot is keyed by the resolved chord.
+- The invariant suite judges a pass that ends against the chord it plays there (`asPlayed`);
+  `arrange/ending.test.ts` holds every style to the tonic on turnaround endings, and to the
+  written chord on the endings above.
+
 ## The live host (`prototypes/v2/lib/band-host.ts`)
 
 The runtime's play, stop and resume paths go through `startBand`/`stopBand`; the old worker

@@ -8,6 +8,7 @@
  */
 
 import { CYCLE } from '../../arrange/cycle.js';
+import { heldEnding } from '../../arrange/ending.js';
 import {
     type BandEvent,
     type BandSettings,
@@ -112,6 +113,30 @@ function isPowerChord(midis: number[], chord: ChordFacts | null | undefined): bo
     );
 }
 
+/**
+ * The timeline as a pass played it: a pass that ends holds its last bar as the held ending
+ * (`arrange/ending.ts`), so a turnaround resolved to the tonic is judged against the tonic the
+ * band plays there, and every other bar against the chart. A looping pass is the chart.
+ */
+function asPlayed(timeline: Timeline, style: StyleId, looping: boolean): Timeline {
+    const last = timeline.bars.length - 1;
+    const ending = looping ? null : heldEnding(timeline, last, STYLES[style].ending);
+    if (!ending) {
+        return timeline;
+    }
+    const { attack: _, ...span } = ending.spans[0];
+    return {
+        ...timeline,
+        bars: timeline.bars.map((bar) => (bar.index === last ? ending : bar)),
+        spans: [
+            ...timeline.spans
+                .filter((s) => s.start < ending.start)
+                .map((s) => (s.end > ending.start ? { ...s, end: ending.start } : s)),
+            span,
+        ],
+    };
+}
+
 /** How many shard files split the styles between them. */
 const SHARDS = 4;
 
@@ -133,6 +158,7 @@ function defineCounted(styles: StyleId[]): void {
         const style = STYLES[styleId];
         for (const [name, score] of Object.entries(COUNTED_FIXTURES)) {
             const timeline = compileTimeline(score);
+            const judged = asPlayed(timeline, styleId, false);
             it(`${name}: every chorus keeps the rules`, () => {
                 const problems: string[] = [];
                 const trades: (TradeSettings | null)[] = [
@@ -159,7 +185,7 @@ function defineCounted(styles: StyleId[]): void {
                                 looping: false,
                             });
                             checkPass(
-                                timeline,
+                                judged,
                                 events,
                                 feelFor(style, COMP_INSTRUMENTS[comp].family).lean,
                                 settings,
@@ -190,6 +216,7 @@ function defineStyles(styles: StyleId[]): void {
                     const label = `${name} on ${comp}${noBass ? ' without bass' : ''}`;
                     it(`${label}${looping ? ' (looping)' : ' (ending)'}`, () => {
                         const problems: string[] = [];
+                        const judged = asPlayed(timeline, styleId, looping);
                         for (const seed of SEEDS) {
                             const settings: BandSettings = {
                                 ...DEFAULT_SETTINGS,
@@ -212,7 +239,7 @@ function defineStyles(styles: StyleId[]): void {
                                 problems.push(`${seed}: not deterministic`);
                             }
                             checkPass(
-                                timeline,
+                                judged,
                                 first.events,
                                 feelFor(style, COMP_INSTRUMENTS[comp].family).lean,
                                 settings,
@@ -226,7 +253,7 @@ function defineStyles(styles: StyleId[]): void {
                                 memory: first.memory,
                             });
                             checkPass(
-                                timeline,
+                                judged,
                                 second.events,
                                 feelFor(style, COMP_INSTRUMENTS[comp].family).lean,
                                 settings,

@@ -574,4 +574,8 @@ export const metal: Style = {
     // Overdrive: the lead guitar is the genre's voice — sustain for the held notes, gain for
     // the runs, and strings to bend.
     lead: { idiom: metalLead, prefers: 'overdrive' },
+    // why: metal states every chord by root and fifth (its comp plays power chords on both
+    // instrument families), so the final chord is the tonic's power chord in either mode, and
+    // the lead settles on its root or fifth rather than a third the band leaves out.
+    ending: { major: '5', minor: '5' },
 };

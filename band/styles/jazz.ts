@@ -580,4 +580,8 @@ export const jazz: Style = {
     comp: { keyboard: jazzKeys, guitar: jazzGuitar },
     prefers: 'piano',
     lead: { idiom: jazzLead, prefers: 'sax' },
+    // why: a swing band ends on the tonic 6th: it rings under a melody resting on the root
+    // without the major 7th's half-step rub. In minor, the minor 6th (dorian's) that closes a
+    // minor standard.
+    ending: { major: '6', minor: 'm6' },
 };

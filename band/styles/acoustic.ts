@@ -919,4 +919,6 @@ export const acoustic: Style = {
     // first, and the nylon is the only acoustic we have. The electric reads as a band, a horn as
     // another genre.
     lead: { idiom: acousticLead, prefers: 'nylon' },
+    // why: an acoustic strum ends on the open tonic triad (or its minor), left ringing.
+    ending: { major: '', minor: 'm' },
 };

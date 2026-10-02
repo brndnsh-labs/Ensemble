@@ -6,6 +6,7 @@
  * hears what the earlier ones played (`heard`), so the comp can answer the lead. That is the whole coordination model: data
  * flowing one way, not a blackboard every lane writes.
  */
+import { heldEnding } from './arrange/ending.js';
 import { type BarPlan, fullWindow, type PassWindow, planBars } from './arrange/plan.js';
 import { rng } from './core/random.js';
 import type { BandEvent, BandSettings, DrumHit, Lane, PitchedNote } from './core/types.js';
@@ -116,6 +117,9 @@ export function performPass(
               lead: lead?.init() ?? null,
           };
     const { bars } = timeline;
+    // The held ending (`arrange/ending.ts`): a pass that ends resolves a final turnaround to
+    // the tonic. Only the ending bar is played on it; every bar before it hears the chart.
+    const ending = options.looping ? null : heldEnding(timeline, window.to - 1, style.ending);
     const events: BandEvent[] = [];
     const snapshots: PassMemory[] = [];
 
@@ -141,16 +145,29 @@ export function performPass(
                 ? { ...wrapped, lanes: wrapPlan.lanes, lead: wrapPlan.lead }
                 : wrapped;
         const heard: BarContext['heard'] = { drums: [], bass: [], lead: [] };
+        const barFirst = events.length;
         const context = (lane: Lane): BarContext => ({
             timeline,
-            bar,
+            bar: plan.ending && ending?.index === i ? ending : bar,
             plan,
-            next: nextIndex >= 0 ? { bar: bars[nextIndex], plan: nextPlan } : null,
+            // The bar before the held ending hears the chord the band is about to hold, so its
+            // approach notes walk into the tonic rather than into a turnaround nobody plays.
+            next:
+                nextIndex >= 0
+                    ? {
+                          bar:
+                              nextPlan.ending && ending?.index === nextIndex
+                                  ? ending
+                                  : bars[nextIndex],
+                          plan: nextPlan,
+                      }
+                    : null,
             heard,
             instrument,
             lead: leadProfile,
             pass,
             looping: options.looping,
+            ending,
             rng: (purpose, scope = 'bar') =>
                 scope === 'song'
                     ? rng(settings.seed, style.id, lane, 'song', purpose)
@@ -187,6 +204,18 @@ export function performPass(
             const out = comp.play(context('comp'), memory.comp);
             memory.comp = out.memory;
             events.push(...out.events);
+        }
+        if (plan.ending) {
+            // A written stop in the last bar (`G7:2 N.C.:2`): the held ending sounds up to it
+            // and no further, resolved or not. The lanes hold their last chord for the bar.
+            const played = ending?.index === i ? ending : bar;
+            const rest = played.spans.find((span, k) => k > 0 && !span.chord);
+            for (let k = barFirst; rest && k < events.length; k++) {
+                const e = events[k];
+                if (e.lane !== 'drums' && e.tick < rest.start && e.tick + e.dur > rest.start) {
+                    events[k] = { ...e, dur: rest.start - e.tick };
+                }
+            }
         }
         const looking = i === through - 1 && i >= until && through < lookLimit;
         if (

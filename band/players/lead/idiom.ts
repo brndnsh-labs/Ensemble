@@ -14,7 +14,14 @@ import { type ChordFacts, chordPcs } from '../../theory/chord.js';
 import { mod12 } from '../../theory/pitch.js';
 import { barSteps, dyn, STEP } from '../grid.js';
 import { type Density, soloArc, tradeArc } from './form.js';
-import { type Contour, type LinePalette, type Onset, targetsOf, voiceLine } from './line.js';
+import {
+    type Contour,
+    type LinePalette,
+    nearestRanked,
+    type Onset,
+    targetsOf,
+    voiceLine,
+} from './line.js';
 
 /** What a bar of a phrase does: carries the line, ends it on an arrival, or breathes. */
 type BarKind = 'line' | 'end' | 'rest';
@@ -859,9 +866,24 @@ function planSlot(
             ? ctx.rng(`${headKey(first)}:${first.phrase.index}:articulation`, 'song')
             : ctx.rng(`solo:${ctx.pass}:${placeOf(ctx, slotStart)}:articulation`, 'song');
     const targets = targetsOf(onsets);
-    const top = Math.max(...pitches);
-    const notes = onsets.map((o, i): Planned => {
-        const midi = pitches[i];
+    // The held ending (`arrange/ending.ts`): where the pass resolves its final turnaround to
+    // the tonic, the lead's note in that bar is sung against the tonic. It moves to the
+    // nearest of the tonic's resting tones (`settle`, ranked as any phrase's last note is), so
+    // the line into it stays the one the chart's chord drew — a step or so from where it was
+    // aimed — and the note it lands on is home. Only that bar's notes change; a neighbour's
+    // dynamics still read the pitch the line wrote.
+    const final = ctx.ending;
+    const resolved = onsets.map((o) =>
+        final?.spans[0]?.chord && barOf(ctx, o.tick) === final.index ? final.spans[0].chord : null,
+    );
+    const sung = pitches.map((m, i) => {
+        const chord = resolved[i];
+        return chord ? nearestRanked(book.settle(chord, onsets[i].key), m, ctx.lead.range) : m;
+    });
+    const top = Math.max(...sung);
+    const notes = onsets.map((onset, i): Planned => {
+        const o = resolved[i] ? { ...onset, chord: resolved[i] } : onset;
+        const midi = sung[i];
         const prev = pitches[i - 1];
         const next = pitches[i + 1];
         // A higher note is played a little harder (0.8 of a velocity step per semitone).
@@ -966,10 +988,15 @@ export function leadIdiom(book: LeadBook): PitchedIdiom {
             const slotStart = role.kind === 'trade' ? role.from : bar.index - bar.phrase.bar;
             // A trade's turn is keyed by its shape too, so changing the trade mid-turn replans
             // it rather than keeping a plan made for another length (or for a solo chorus).
+            // And a pass that ends on a resolved tonic keys its slots by that chord: a phrase
+            // planned while the pass looped (a practice loop released on the last section, its
+            // lap regenerated from a barline as the ending) or under another style's ending is
+            // replanned against the chord the band now holds, not kept against the written one.
+            const resolved = ctx.ending?.spans[0]?.chord?.symbol;
             const slot =
-                role.kind === 'trade'
+                (role.kind === 'trade'
                     ? `${ctx.pass}:t${role.from}:${role.bars}:${role.turn}:${role.with}`
-                    : `${ctx.pass}:${slotStart}`;
+                    : `${ctx.pass}:${slotStart}`) + (resolved ? `:end:${resolved}` : '');
             let next = memory;
             if (memory.slot !== slot) {
                 // The arrangement decided the slot's job; every bar of a slot has the same one.

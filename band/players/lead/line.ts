@@ -107,7 +107,7 @@ function candidates(pcs: readonly number[], [lo, hi]: readonly [number, number])
  * (1.25 per place) is a little more than a semitone: a better-ranked tone wins unless the
  * next one is more than a step nearer the contour.
  */
-function nearestRanked(
+export function nearestRanked(
     pcs: readonly number[],
     ideal: number,
     range: readonly [number, number],
