@@ -1,4 +1,4 @@
-import type { AccountScope } from './protocol';
+import { AccountChangedError, type AccountScope } from './protocol';
 import { copyScope } from './records';
 import type { AccountSongbook } from './repository';
 import { type SaveTransport, sendNext } from './send';
@@ -53,7 +53,17 @@ async function outboxPage(
         ...(afterDocumentId === undefined ? {} : { afterDocumentId }),
     };
     const songs = await songbook.list(scope, options);
-    const collections = await songbook.collectionPage(scope, options);
+    // The collections half has an error boundary of its own (#1477): one collection row this
+    // build cannot read must not stop every SONG from uploading, which is what a rejected page
+    // did. The pass then walks songs alone — every collection waits, none is lost, and the read
+    // is tried again on the next pass. A moved fence is not such a failure: it still ends the
+    // pass, as it does everywhere.
+    const collections = await songbook.collectionPage(scope, options).catch((error: unknown) => {
+        if (error instanceof AccountChangedError) {
+            throw error;
+        }
+        return { collections: [], nextAfterDocumentId: null };
+    });
     const merged = [...songs.songs, ...collections.collections]
         .map((record) => ({ documentId: record.documentId }))
         .sort((a, b) => (a.documentId < b.documentId ? -1 : a.documentId > b.documentId ? 1 : 0));

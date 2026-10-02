@@ -4,6 +4,7 @@ import { type RefObject, useEffect, useRef, useState } from 'react';
 import {
     type AdoptCandidate,
     type AdoptFailure,
+    adoptGuestCollections,
     adoptGuestSongs,
     computeAdoptCandidates,
     rememberAdoptionDecision,
@@ -62,7 +63,13 @@ type Phase =
     | { kind: 'full'; omitted: number }
     | { kind: 'ask'; candidates: AdoptCandidate[]; omitted: number; room: number }
     | { kind: 'copying'; copied: number; total: number }
-    | { kind: 'done'; adopted: number; failures: AdoptFailure[] }
+    | {
+          kind: 'done';
+          adopted: number;
+          failures: AdoptFailure[];
+          /** Guest collections that could not be brought along (#1477), apart from songs. */
+          collectionFailures: number;
+      }
     | { kind: 'error'; message: string };
 
 export function AdoptGuestDialog({
@@ -148,10 +155,26 @@ export function AdoptGuestDialog({
                 setPhase({ kind: 'copying', copied, total });
             }
         });
+        // The guest's collections come along with its songs (#1477), remapped to the ids those
+        // songs were just adopted under — but only for the WHOLE-songbook offer. A scoped offer
+        // (#1359) is about the songs one v1 import brought over, not about this device's lists.
+        let collectionFailures = 0;
+        if (!scoped && ownerId !== null) {
+            try {
+                collectionFailures = (await adoptGuestCollections(ownerId)).failures.length;
+            } catch {
+                collectionFailures = 1;
+            }
+        }
         if (!openRef.current) {
             return;
         }
-        setPhase({ kind: 'done', adopted: result.adopted, failures: result.failures });
+        setPhase({
+            kind: 'done',
+            adopted: result.adopted,
+            failures: result.failures,
+            collectionFailures,
+        });
     }
 
     const busy = phase.kind === 'copying';
@@ -290,6 +313,14 @@ export function AdoptGuestDialog({
                                 ? 'One song could not be added.'
                                 : `${phase.failures.length} songs could not be added.`}{' '}
                             Try again from your account page.
+                        </p>
+                    )}
+                    {phase.collectionFailures > 0 && (
+                        <p className="status-detail" data-testid="adopt-guest-collection-failures">
+                            {phase.collectionFailures === 1
+                                ? 'One collection could not be added.'
+                                : `${phase.collectionFailures} collections could not be added.`}{' '}
+                            They are still on this device.
                         </p>
                     )}
                     <div className="dialog-actions">

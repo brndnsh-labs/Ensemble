@@ -297,6 +297,16 @@ export function SyncStatus(props: SyncStatusProps) {
                     ? ` (${view.cloud.pendingCount})`
                     : ''}
             </span>
+            {sync.collectionSaves > 0 && (
+                // #1477 — collection Saves (a star, a set-list change) are never the watched
+                // document the cloud fact above describes, so they are counted here, beside it,
+                // rather than left out of every reading of what has not uploaded yet.
+                <span className="sync-fact" data-testid="sync-collections">
+                    {sync.collectionSaves === 1
+                        ? 'Collections · 1 change waiting to upload'
+                        : `Collections · ${sync.collectionSaves} changes waiting to upload`}
+                </span>
+            )}
             <span className="sync-fact" data-testid="sync-offline">
                 {OFFLINE_LABELS[view.offline.status]}
                 {songs === null && soundFiles === null

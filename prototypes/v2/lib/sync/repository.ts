@@ -1,4 +1,12 @@
-import { resolvedSongIds } from '../collections';
+import {
+    isCollectionCandidate,
+    MAX_COLLECTION_SONGS,
+    mergeSongIds,
+    newStarred,
+    resolvedSongIds,
+    STARRED_COLLECTION_ID,
+    starredOf,
+} from '../collections';
 import {
     HOME_FILL_SPARE,
     type HomeRead,
@@ -49,6 +57,7 @@ import {
     snapshot,
     starKey,
     starPrefix,
+    starsMigratedKey,
     syncDocument,
 } from './protocol';
 import {
@@ -457,6 +466,60 @@ function enqueueCollection(
 }
 
 /**
+ * One fresh queued Save for a collection record already written in the caller's transaction —
+ * `enqueueCollection`'s operation half, for `mergeCollectionConflicts`, which has just retired the
+ * id's whole queue and so names its base directly: the remote revision it merged onto, or null for
+ * a create under a fresh id. The operation id is minted here, as every other Save's is.
+ */
+function queueCollectionSave(
+    tx: Pick<Transaction<never>, 'table'>,
+    scope: AccountScope,
+    document: CollectionDocument,
+    base: { revision: string | null },
+): void {
+    if (base.revision !== null) {
+        remoteRevision(base.revision);
+    }
+    tx.table('operations').add({
+        ownerId: scope.ownerId,
+        documentId: document.id,
+        operationId: crypto.randomUUID(),
+        localRevision: document.revision,
+        snapshot: document,
+        base,
+        wireBody: null,
+        status: 'queued',
+    } satisfies SaveOperation<CollectionDocument>);
+}
+
+/** How many documents of either kind this owner holds here, read inside the caller's transaction. */
+function documentCount<T>(
+    tx: Transaction<T>,
+    scope: AccountScope,
+    consume: (count: number) => void,
+) {
+    const owned = IDBKeyRange.bound([scope.ownerId], [scope.ownerId, []], false, true);
+    tx.read(tx.table('songs').count(owned), (songs: number) => {
+        tx.read(tx.table('collections').count(owned), (collections: number) =>
+            consume(songs + collections),
+        );
+    });
+}
+
+/**
+ * A collection create refused on this device because the account is already at its document cap
+ * (#1477). Its sentence is the one a song Save at the cap is answered with (`SYNC_MESSAGES.quota`'s
+ * remedy), minus "Saved on this device" — nothing was.
+ */
+export class CollectionCapError extends Error {
+    constructor() {
+        super(
+            `Your account library is full (${MAX_REMOTE_CANDIDATES} songs and collections). Delete a song in the cloud to make room.`,
+        );
+    }
+}
+
+/**
  * The saved record under one id, of whichever kind holds it (#1474): the song when there is one,
  * else the collection, else null. Two reads inside the caller's transaction; a song wins because
  * every chart path that was here before collections asked `songs` alone and must see what it did.
@@ -679,6 +742,9 @@ export class AccountSongbook {
             // that is being removed in this same transaction, so leaving it would point the next
             // sign-in at a chart this device no longer holds.
             tx.table('meta').delete(lastOpenedKey(ownerId));
+            // The star copy's marker (#1477), one key per owner: it describes the `star:` rows just
+            // removed, and a later sign-in as this owner starts with none to copy.
+            tx.table('meta').delete(starsMigratedKey(ownerId));
             tx.finish(undefined);
         });
     }
@@ -998,7 +1064,8 @@ export class AccountSongbook {
      *   exists anywhere, and they go together, in one transaction.
      *
      * Deleting a collection never deletes its songs (#1443 decision 3); nothing here reads them.
-     * Refusing to delete a built-in collection is the caller's rule (#1477), not storage's.
+     * Refusing to delete a built-in collection is the caller's rule (`useCollections`' `remove`,
+     * #1477), not storage's.
      */
     async deleteCollection(scope: AccountScope, documentId: string): Promise<CollectionDeletion> {
         scope = copyScope(scope);
@@ -1011,10 +1078,16 @@ export class AccountSongbook {
                     if (!collection) {
                         return tx.finish('missing');
                     }
-                    if (collection.remoteRevision !== null) {
-                        return tx.finish('cloud');
-                    }
                     queueOf(tx, scope, documentId, collectionSnapshot, (queue) => {
+                        if (collection.remoteRevision !== null) {
+                            // A confirmed collection with a Save still queued is `'queued'`, not
+                            // `'cloud'` (#1477 review P2-1): deleted in the cloud now, the record
+                            // would be RETAINED for that Save, which would then meet the tombstone
+                            // as a `remote: null` conflict — and `mergeCollectionConflicts` moves
+                            // such a list to a fresh id, re-creating the collection the musician
+                            // just deleted on every device. The outbox settles the Save first.
+                            return tx.finish(queue.length > 0 ? 'queued' : 'cloud');
+                        }
                         if (queue.some((operation) => operation.wireBody !== null)) {
                             return tx.finish('queued');
                         }
@@ -1026,6 +1099,340 @@ export class AccountSongbook {
                     });
                 },
             );
+        });
+    }
+
+    /**
+     * Read-modify-write one collection as ONE explicit Save (#1477): `edit` gets the saved document
+     * (null when this owner has none by that id) and returns the next one, or null to queue
+     * nothing. Everything `saveCollection` does — the cross-kind refusal, the queue rules, the
+     * immutable queued operation — happens in the same transaction as the read, so a star toggled
+     * twice in quick succession is two Saves in order, never a compare-and-swap the second one
+     * loses to the first.
+     *
+     * A CREATE is refused locally when this device already holds `MAX_REMOTE_CANDIDATES` documents
+     * of either kind (#1477 "Starred at the cap"): the server would answer `quota_exceeded`, which
+     * ends every outbox pass, so a create that can only be refused is never queued. The count is
+     * what this device holds, so it can miss a cap another device filled; the server stays the
+     * authority, and its refusal is then surfaced like a song Save's.
+     */
+    async editCollection(
+        scope: AccountScope,
+        documentId: string,
+        edit: (current: CollectionDocument | null) => CollectionDocument | null,
+    ): Promise<SavedCollection | null> {
+        scope = copyScope(scope);
+        identifier(documentId);
+        const operationId = crypto.randomUUID();
+        return this.database.run('readwrite', scope, (tx) => {
+            tx.read(
+                tx.table('songs').getKey([scope.ownerId, documentId]),
+                (song: IDBValidKey | undefined) => {
+                    if (song !== undefined) {
+                        throw new Error('This id already belongs to a song.');
+                    }
+                    tx.read(
+                        tx.table('collections').get([scope.ownerId, documentId]),
+                        (row: SavedCollection | undefined) => {
+                            const previous = storedCollection(row, scope, documentId);
+                            const proposed = edit(previous?.document ?? null);
+                            if (proposed === null) {
+                                return tx.finish(null);
+                            }
+                            const document = collectionSnapshot(proposed);
+                            if (document.id !== documentId) {
+                                throw new Error('A collection edit cannot change its id.');
+                            }
+                            const enqueue = () =>
+                                queueOf(tx, scope, documentId, collectionSnapshot, (queue) => {
+                                    tx.finish(
+                                        enqueueCollection(
+                                            tx,
+                                            scope,
+                                            document,
+                                            previous,
+                                            previous?.document.revision ?? null,
+                                            operationId,
+                                            queue,
+                                        ),
+                                    );
+                                });
+                            if (previous) {
+                                return enqueue();
+                            }
+                            documentCount(tx, scope, (count) => {
+                                if (count >= MAX_REMOTE_CANDIDATES) {
+                                    throw new CollectionCapError();
+                                }
+                                enqueue();
+                            });
+                        },
+                    );
+                },
+            );
+        });
+    }
+
+    /**
+     * Copy this device's `star:` rows (#1440) into the account's built-in Starred collection, once
+     * per device (#1477). For an account that is the union of what THIS device has: the stars are
+     * added after whatever Starred already holds (a download from another device, or a star made
+     * here since), in the order the rows sort.
+     *
+     * - **A copy.** The `star:` rows are never removed here, so the migration is reversible; they
+     *   become inert. Sign-out still clears them with the rest of the account (`clearAccount`).
+     * - **Once.** A `stars-migrated:` marker (`starsMigratedKey`) is written in the SAME transaction
+     *   as the Save, so a song unstarred after the copy is never starred again by a later run, and
+     *   two tabs migrating at once queue one Save between them.
+     * - **Never an empty Starred.** No rows, no Save — the marker alone is written.
+     * - **Not at the cap.** A create that `editCollection` would refuse writes nothing at all, not
+     *   even the marker, so the copy is tried again on a later load.
+     *
+     * `'migrated'` when it queued a Save, `'nothing'` when there was nothing to copy, `'done'` when
+     * this device had already migrated, `'full'` when the account has no room for a Starred yet.
+     */
+    async migrateStars(scope: AccountScope): Promise<'migrated' | 'nothing' | 'done' | 'full'> {
+        scope = copyScope(scope);
+        const operationId = crypto.randomUUID();
+        const marker = starsMigratedKey(scope.ownerId);
+        return this.database.run('readwrite', scope, (tx) => {
+            tx.read(tx.table('meta').get(marker), (done: unknown) => {
+                if (done !== undefined) {
+                    return tx.finish('done');
+                }
+                const mark = () =>
+                    tx.table('meta').put({
+                        key: marker,
+                        ownerId: scope.ownerId,
+                        migratedAt: new Date().toISOString(),
+                    });
+                const prefix = starPrefix(scope.ownerId);
+                const range = IDBKeyRange.bound(prefix, `${prefix}￿`, false, true);
+                tx.read(tx.table('meta').getAll(range), (rows: Star[]) => {
+                    const stars: string[] = [];
+                    for (const row of rows) {
+                        try {
+                            stars.push(savedStar(row, scope, row.documentId).documentId);
+                        } catch {
+                            // `starredIds`' posture: one corrupt row costs only its own star.
+                        }
+                    }
+                    if (stars.length === 0) {
+                        mark();
+                        return tx.finish('nothing');
+                    }
+                    const owned = IDBKeyRange.bound(
+                        [scope.ownerId],
+                        [scope.ownerId, []],
+                        false,
+                        true,
+                    );
+                    tx.read(
+                        tx.table('collections').getAll(owned, MAX_REMOTE_CANDIDATES + 1),
+                        (rows: SavedCollection[]) => {
+                            const saved = rows.map((row) => {
+                                identifier(row?.documentId);
+                                return savedCollection(row, scope, row.documentId);
+                            });
+                            const previous = starredOf(saved);
+                            const target = previous?.documentId ?? STARRED_COLLECTION_ID;
+                            const document = previous
+                                ? {
+                                      ...previous.document,
+                                      songIds: mergeSongIds(previous.document.songIds, stars),
+                                  }
+                                : newStarred(stars.slice(0, MAX_COLLECTION_SONGS));
+                            if (
+                                previous &&
+                                document.songIds.length === previous.document.songIds.length
+                            ) {
+                                // Every star is already in Starred: nothing to queue.
+                                mark();
+                                return tx.finish('nothing');
+                            }
+                            const enqueue = () =>
+                                queueOf(tx, scope, target, collectionSnapshot, (queue) => {
+                                    enqueueCollection(
+                                        tx,
+                                        scope,
+                                        collectionSnapshot(document),
+                                        previous,
+                                        previous?.document.revision ?? null,
+                                        operationId,
+                                        queue,
+                                    );
+                                    mark();
+                                    tx.finish('migrated');
+                                });
+                            if (previous) {
+                                return enqueue();
+                            }
+                            tx.read(
+                                tx.table('songs').getKey([scope.ownerId, target]),
+                                (song: IDBValidKey | undefined) => {
+                                    if (song !== undefined) {
+                                        throw new Error('This id already belongs to a song.');
+                                    }
+                                    documentCount(tx, scope, (count) => {
+                                        if (count >= MAX_REMOTE_CANDIDATES) {
+                                            return tx.finish('full');
+                                        }
+                                        enqueue();
+                                    });
+                                },
+                            );
+                        },
+                    );
+                });
+            });
+        });
+    }
+
+    /**
+     * Resolve every collection whose outbox head is a conflict, without asking (#1477, decided on
+     * #1443) — the way out a parked collection Save otherwise lacks: new Saves would chain behind
+     * it until "Too many pending Saves", a cloud delete would conflict and a download would report
+     * it superseded, forever.
+     *
+     * A collection is never on the stand and has no drafts, so nothing here needs a musician:
+     *
+     * - **The other side holds a version** (`remote` is a collection): MERGE — `mergeSongIds`, this
+     *   device's list first then the remote-only ids — and re-save it ON the remote revision. Every
+     *   queued Save for the id retires (they are all superseded by the merge: their bytes are this
+     *   record's own history) and one fresh operation is queued with `base: { revision }` the
+     *   remote one, so the next send is an ordinary update the server can take. The record keeps
+     *   its own name and built-in mark; it is labelled with the remote revision it now builds on.
+     * - **The other side has nothing** (`remote: null` — tombstoned by a delete on another device,
+     *   or the id is held there as a song): the list moves to a FRESH id as a new collection, the
+     *   original id's record and queue go, exactly as Keep both's `'gone'` route keeps a song's
+     *   local line (#1267). The musician's collection is kept; it is never merged into nothing.
+     *
+     * One transaction for every conflicted collection this owner has. Read from the WHOLE outbox
+     * of this owner (`operations`, a few rows normally) rather than from every collection's queue,
+     * and decided again per id from its own queue, so a head another tab resolved meanwhile is
+     * left alone. Returns how many collections it re-queued; the loop sweeps again when non-zero.
+     */
+    async mergeCollectionConflicts(scope: AccountScope): Promise<number> {
+        scope = copyScope(scope);
+        const owned = IDBKeyRange.bound([scope.ownerId], [scope.ownerId, []], false, true);
+        return this.database.run('readwrite', scope, (tx) => {
+            tx.read(tx.table('operations').getAll(owned), (rows: SaveOperation<SyncDocument>[]) => {
+                const ids = [
+                    ...new Set(
+                        rows
+                            .filter(
+                                (row) =>
+                                    row?.status === 'conflict' &&
+                                    isCollectionCandidate(row.snapshot),
+                            )
+                            .map((row) => row.documentId),
+                    ),
+                ];
+                let merged = 0;
+                let pending = ids.length;
+                if (pending === 0) {
+                    return tx.finish(0);
+                }
+                const settled = () => {
+                    pending -= 1;
+                    if (pending === 0) {
+                        tx.finish(merged);
+                    }
+                };
+                for (const documentId of ids) {
+                    identifier(documentId);
+                    tx.read(
+                        tx.table('collections').get([scope.ownerId, documentId]),
+                        (row: SavedCollection | undefined) => {
+                            const record = storedCollection(row, scope, documentId);
+                            queueOf(tx, scope, documentId, collectionSnapshot, (queue) => {
+                                const head = queue[0];
+                                if (!record || head?.status !== 'conflict') {
+                                    return settled();
+                                }
+                                for (const operation of queue) {
+                                    tx.table('operations').delete([
+                                        scope.ownerId,
+                                        operation.operationId,
+                                    ]);
+                                }
+                                const remote = head.remote;
+                                const now = new Date().toISOString();
+                                if (remote && isCollectionCandidate(remote.document)) {
+                                    const theirs = collectionSnapshot(remote.document);
+                                    const document = collectionSnapshot({
+                                        ...record.document,
+                                        songIds: mergeSongIds(
+                                            record.document.songIds,
+                                            theirs.songIds,
+                                        ),
+                                        revision: record.document.revision + 1,
+                                        updatedAt: now,
+                                    });
+                                    tx.table('collections').put({
+                                        ...record,
+                                        document,
+                                        remoteRevision: remote.revision,
+                                    } satisfies SavedCollection);
+                                    queueCollectionSave(tx, scope, document, {
+                                        revision: remote.revision,
+                                    });
+                                } else {
+                                    const fresh = collectionSnapshot({
+                                        ...record.document,
+                                        id: crypto.randomUUID(),
+                                        revision: 0,
+                                        createdAt: now,
+                                        updatedAt: now,
+                                    });
+                                    tx.table('collections').delete([scope.ownerId, documentId]);
+                                    tx.table('meta').delete(deletionKey(scope.ownerId, documentId));
+                                    tx.table('collections').put({
+                                        ownerId: scope.ownerId,
+                                        documentId: fresh.id,
+                                        document: fresh,
+                                        remoteRevision: null,
+                                    } satisfies SavedCollection);
+                                    queueCollectionSave(tx, scope, fresh, { revision: null });
+                                }
+                                merged += 1;
+                                settled();
+                            });
+                        },
+                    );
+                }
+            });
+        });
+    }
+
+    /**
+     * This owner's queued collection Saves (#1477), across every collection: what the sign-out
+     * preflight and the sync chip count beside songs, so a collection change is never dropped by a
+     * sign-out that said nothing about it. `refused` is the subset stranded behind a refused head
+     * (a refused head's whole queue, `signOutPreflight`'s rule for songs).
+     */
+    async collectionOutbox(scope: AccountScope): Promise<{ unsent: number; refused: number }> {
+        scope = copyScope(scope);
+        const owned = IDBKeyRange.bound([scope.ownerId], [scope.ownerId, []], false, true);
+        return this.database.run('readonly', scope, (tx) => {
+            tx.read(tx.table('operations').getAll(owned), (rows: SaveOperation<SyncDocument>[]) => {
+                const queues = new Map<string, SaveOperation<SyncDocument>[]>();
+                for (const row of rows) {
+                    if (row && isCollectionCandidate(row.snapshot)) {
+                        queues.set(row.documentId, [...(queues.get(row.documentId) ?? []), row]);
+                    }
+                }
+                let unsent = 0;
+                let refused = 0;
+                for (const queue of queues.values()) {
+                    unsent += queue.length;
+                    const head = [...queue].sort((a, b) => a.localRevision - b.localRevision)[0];
+                    if (head?.status === 'refused') {
+                        refused += queue.length;
+                    }
+                }
+                tx.finish({ unsent, refused });
+            });
         });
     }
 
@@ -1375,7 +1782,12 @@ export class AccountSongbook {
         });
     }
 
-    /** Star or unstar one song on this device (#1440). Presence in the store is the whole fact. */
+    /**
+     * Star or unstar one song on this device — #1440's per-device `star:` row, presence being the
+     * whole fact. LEGACY since #1477: stars are the built-in Starred collection now, and nothing in
+     * the app writes these rows any more; `migrateStars` copies them once and leaves them. Kept as
+     * the one writer of the old shape, which the migration's own tests seed through.
+     */
     async setStarred(scope: AccountScope, documentId: string, starred: boolean): Promise<void> {
         scope = copyScope(scope);
         identifier(documentId);
@@ -1390,7 +1802,7 @@ export class AccountSongbook {
         });
     }
 
-    /** Every song this account has starred on this device (#1440). */
+    /** Every song this account starred on this device under #1440's `star:` rows (legacy, #1477). */
     async starredIds(scope: AccountScope): Promise<Set<string>> {
         scope = copyScope(scope);
         return this.database.run('readonly', scope, (tx) => {

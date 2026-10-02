@@ -38,6 +38,15 @@
  * every guest song is offered.
  */
 
+import {
+    type CollectionDocument,
+    MAX_COLLECTION_SONGS,
+    mergeSongIds,
+    newCollection,
+    newStarred,
+    STARRED_COLLECTION_ID,
+    starredOf,
+} from '../collections';
 import { withFollowFeel } from '../documents';
 import * as repository from '../repository';
 import type { ChartDocument } from '../runtime';
@@ -143,7 +152,7 @@ export async function computeAdoptCandidates(
         if (onlyGuestIds && !onlyGuestIds.has(guest.id)) {
             continue;
         }
-        const accountDocumentId = `guest-${await stableId('adopt-doc', ownerId, guest.id)}`;
+        const accountDocumentId = await adoptedSongId(ownerId, guest.id);
         if (known.has(accountDocumentId)) {
             continue;
         }
@@ -203,6 +212,88 @@ export async function adoptGuestSongs(
         void accountSync.run();
     }
     return { adopted, failures };
+}
+
+/** The account document id a guest song is adopted under — `computeAdoptCandidates`' own rule. */
+function adoptedSongId(ownerId: string, guestId: string): Promise<string> {
+    return stableId('adopt-doc', ownerId, guestId).then((hash) => `guest-${hash}`);
+}
+
+/**
+ * Bring this device's guest COLLECTIONS into the account with its songs (#1477) — #1474 left them
+ * behind in their own database (`ensemble-v2-preview-collections`). Run after `adoptGuestSongs`,
+ * from the same whole-songbook offer; like it, this never touches the guest store.
+ *
+ * Every song id is REMAPPED to the id its song is adopted under (`adoptedSongId`, the same
+ * deterministic rule), so the collection resolves to the account's copies. Only songs the guest
+ * songbook still holds are carried: a dangling guest id would only be a dead reference here. A
+ * song the account had no room for maps to an id that does not resolve yet — filtered when read
+ * (`resolvedSongIds`), and found the day that song is adopted after all.
+ *
+ * - The guest's **Starred** merges into the account's Starred (`mergeSongIds`: the account's order
+ *   first), creating it only when there is something to add.
+ * - Any other collection lands under a deterministic id of its own, so a rerun after an
+ *   interruption merges into the copy it already made rather than making a second one.
+ *
+ * Each collection is ONE Save (`editCollection`), so the queue grows by at most one per collection
+ * and a rerun that changes nothing queues nothing. A collection the account has no room for is a
+ * failure entry rather than a reason to stop the rest.
+ */
+export async function adoptGuestCollections(ownerId: string): Promise<AdoptResult> {
+    const collections = await repository.listCollections();
+    let adopted = 0;
+    const failures: AdoptFailure[] = [];
+    for (const { document, resolvedSongIds } of collections) {
+        try {
+            const songIds = await Promise.all(
+                resolvedSongIds.map((guestId) => adoptedSongId(ownerId, guestId)),
+            );
+            if (document.builtIn === 'starred') {
+                if (songIds.length === 0) {
+                    continue;
+                }
+                const listing = await accountSync.listCollections(ownerId);
+                const target = starredOf(listing)?.documentId ?? STARRED_COLLECTION_ID;
+                await accountSync.editCollection(
+                    target,
+                    (current) =>
+                        current
+                            ? mergedOrNull(current, songIds)
+                            : newStarred(songIds.slice(0, MAX_COLLECTION_SONGS)),
+                    ownerId,
+                );
+            } else {
+                const id = `guest-${await stableId('adopt-collection', ownerId, document.id)}`;
+                await accountSync.editCollection(
+                    id,
+                    (current) =>
+                        current
+                            ? mergedOrNull(current, songIds)
+                            : {
+                                  ...newCollection(document.name, songIds),
+                                  id,
+                              },
+                    ownerId,
+                );
+            }
+            adopted += 1;
+        } catch (error) {
+            failures.push({
+                guestId: document.id,
+                message: error instanceof Error ? error.message : String(error),
+            });
+        }
+    }
+    if (adopted > 0) {
+        void accountSync.run().catch(() => {});
+    }
+    return { adopted, failures };
+}
+
+/** `current` with `songIds` merged in after its own, or null when that adds nothing. */
+function mergedOrNull(current: CollectionDocument, songIds: string[]): CollectionDocument | null {
+    const merged = mergeSongIds(current.songIds, songIds);
+    return merged.length === current.songIds.length ? null : { ...current, songIds: merged };
 }
 
 const DECIDED_PREFIX = 'ensemble-v2-account-adopt-decided:';

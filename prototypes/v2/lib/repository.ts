@@ -1,5 +1,13 @@
 import type { InstrumentModule } from '@engine/types';
-import { type CollectionDocument, resolvedSongIds, validateCollection } from './collections';
+import {
+    type CollectionDocument,
+    isCollectionSongId,
+    MAX_COLLECTION_SONGS,
+    newStarred,
+    resolvedSongIds,
+    STARRED_COLLECTION_ID,
+    validateCollection,
+} from './collections';
 import { type ChartDocument, validateDocument } from './documents';
 import {
     HOME_FILL_SPARE,
@@ -525,8 +533,87 @@ export async function saveCollection(
 }
 
 /**
+ * Read-modify-write one guest collection in ONE transaction (#1477): `edit` gets the stored
+ * document (null when there is none) and returns the next one, or null to write nothing. The
+ * committed copy takes the next revision and a fresh `updatedAt`, exactly as `saveCollection`'s.
+ *
+ * What a star toggle and "Add to collection…" write through, rather than a read in one
+ * transaction and a `saveCollection` in another: two quick toggles would otherwise race each
+ * other's compare-and-swap, and the second would fail on a conflict nobody else caused. `edit`
+ * runs synchronously inside the transaction; a throw aborts it and rejects with its own sentence.
+ */
+export async function editCollection(
+    id: string,
+    edit: (current: CollectionDocument | null) => CollectionDocument | null,
+): Promise<CollectionDocument | null> {
+    const db = await openCollections();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(COLLECTIONS, 'readwrite');
+        const store = tx.objectStore(COLLECTIONS);
+        const read = store.get(id);
+        let committed: CollectionDocument | null = null;
+        let failure: Error | undefined;
+        read.onsuccess = () => {
+            try {
+                const previous = read.result === undefined ? null : validateCollection(read.result);
+                const next = edit(previous);
+                if (next === null) {
+                    return;
+                }
+                if (next.id !== id) {
+                    throw new Error('A collection edit cannot change its id.');
+                }
+                committed = validateCollection({
+                    ...next,
+                    revision: previous === null ? 0 : previous.revision + 1,
+                    createdAt: previous?.createdAt ?? next.createdAt,
+                    updatedAt: new Date().toISOString(),
+                });
+                store.put(committed);
+            } catch (error) {
+                failure = error instanceof Error ? error : new Error(String(error));
+                tx.abort();
+            }
+        };
+        tx.oncomplete = () => resolve(committed);
+        tx.onerror = () =>
+            reject(failure || new Error('Saving the collection failed. Storage may be full.'));
+        tx.onabort = () => reject(failure || new Error('Saving the collection was interrupted.'));
+    });
+}
+
+/**
+ * Copy the device-local stars (#1440's `ensemble-v2-preview:starred`, read by `lib/session.ts`'s
+ * `legacyStarredIds`) into the built-in Starred collection, once (#1477).
+ *
+ * A COPY: the old key is never written or removed here, so the migration is reversible — an older
+ * build still finds every star it had. Idempotent by construction, because it runs only while this
+ * songbook has no Starred at all: once one exists (made here or by a later star), the old key is
+ * inert, and a song unstarred since is not starred again on the next load. No stars, no Starred —
+ * it is never created empty. One transaction, so two tabs migrating at once write it once.
+ *
+ * `true` when this call created it.
+ */
+export async function migrateGuestStars(legacy: ReadonlySet<string>): Promise<boolean> {
+    if (![...legacy].some(isCollectionSongId)) {
+        return false;
+    }
+    // A guest's Starred only ever lives at its fixed id: nothing re-creates it elsewhere, since a
+    // guest collection has no outbox and so no `'gone'` conflict to resolve.
+    const created = await editCollection(STARRED_COLLECTION_ID, (current) =>
+        current === null
+            ? // Only ids a collection can hold (#1477 review): one id the old key accepted but the
+              // decoder would refuse must not fail the whole copy on every load.
+              newStarred([...legacy].filter(isCollectionSongId).slice(0, MAX_COLLECTION_SONGS))
+            : null,
+    );
+    return created !== null;
+}
+
+/**
  * Delete one guest collection (#1474). Never its songs (#1443 decision 3): nothing here touches
- * the songbook database. Refusing to delete a built-in collection is the caller's rule (#1477).
+ * the songbook database. Refusing to delete a built-in collection is the caller's rule
+ * (`useCollections`' `remove`, #1477), and the UI offers no way to ask.
  */
 export async function deleteCollection(id: string): Promise<void> {
     const db = await openCollections();

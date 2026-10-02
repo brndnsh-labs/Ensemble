@@ -49,6 +49,9 @@ function stubSongbook(overrides: Record<string, unknown> = {}): AccountSongbook 
         queued: async () => [],
         list: async () => ({ songs: [], nextAfterDocumentId: null }),
         collectionPage: async () => ({ collections: [], nextAfterDocumentId: null }),
+        // The conflict merge each sweep asks for, and the collection outbox count (#1477).
+        mergeCollectionConflicts: async () => 0,
+        collectionOutbox: async () => ({ unsent: 0, refused: 0 }),
         remoteCandidates: async () => [],
         reconcile: async () => 'unchanged',
         prepare: async () => 'idle',
@@ -1441,6 +1444,9 @@ describe('signing out moves the fence before it asks the server for anything', (
             atRisk: ['song-1', 'song-2'],
             unsentSaves: 2,
             refusedSaves: 0,
+            // No collection Saves in this store (#1477): counted apart from songs, and zero here.
+            unsentCollections: 0,
+            refusedCollections: 0,
             drafts: 1,
         });
     });
@@ -2069,6 +2075,8 @@ describe('an expired session signs out on this device without a round trip (#135
             atRisk: ['song-1', 'song-2'],
             unsentSaves: 1,
             refusedSaves: 0,
+            unsentCollections: 0,
+            refusedCollections: 0,
             drafts: 1,
         });
         // The export the step offers reads through the held scope too, or it would have no library

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
     type AdoptCandidate,
+    adoptGuestCollections,
     adoptGuestSongs,
     computeAdoptCandidates,
     forgetAdoptionDecision,
@@ -8,6 +9,12 @@ import {
     libraryDownloaded,
     rememberAdoptionDecision,
 } from '../../../prototypes/v2/lib/account/adopt-guest.js';
+import {
+    type CollectionDocument,
+    newCollection,
+    newStarred,
+    STARRED_COLLECTION_ID,
+} from '../../../prototypes/v2/lib/collections.js';
 import { LocalRevisionError } from '../../../prototypes/v2/lib/sync/protocol.js';
 import { MAX_REMOTE_CANDIDATES } from '../../../prototypes/v2/lib/sync/repository.js';
 
@@ -21,18 +28,28 @@ import { MAX_REMOTE_CANDIDATES } from '../../../prototypes/v2/lib/sync/repositor
  * about storage.
  */
 
-const { listLibrary, save, run, list } = vi.hoisted(() => ({
-    listLibrary: vi.fn(),
-    save: vi.fn(),
-    run: vi.fn(),
-    list: vi.fn(),
-}));
+const { listLibrary, save, run, list, listCollections, accountCollections, editCollection } =
+    vi.hoisted(() => ({
+        listLibrary: vi.fn(),
+        save: vi.fn(),
+        run: vi.fn(),
+        list: vi.fn(),
+        listCollections: vi.fn(),
+        accountCollections: vi.fn(),
+        editCollection: vi.fn(),
+    }));
 
 vi.mock('../../../prototypes/v2/lib/account/sync-loop.js', () => ({
-    accountSync: { listLibrary, save, run },
+    accountSync: {
+        listLibrary,
+        save,
+        run,
+        listCollections: accountCollections,
+        editCollection,
+    },
 }));
 
-vi.mock('../../../prototypes/v2/lib/repository.js', () => ({ list }));
+vi.mock('../../../prototypes/v2/lib/repository.js', () => ({ list, listCollections }));
 
 function guestSong(id: string) {
     return {
@@ -409,5 +426,113 @@ describe('forgetAdoptionDecision (#1351 patch R11)', () => {
     it('never throws on unwritable storage; one redundant prompt is the worst case', () => {
         withStorage(new Map(), { throws: true });
         expect(() => forgetAdoptionDecision('owner-1')).not.toThrow();
+    });
+});
+
+describe('adoptGuestCollections (#1477)', () => {
+    beforeEach(() => {
+        // The pass it asks for is fire-and-forget with a `.catch`, as every detached pass is.
+        run.mockResolvedValue(undefined);
+    });
+
+    function guestCollection(id: string, songIds: string[], builtIn = false): CollectionDocument {
+        return builtIn
+            ? { ...newStarred(songIds) }
+            : { ...newCollection(`Set ${id}`, songIds), id };
+    }
+
+    /** Runs each queued edit against what the account holds, the way `editCollection` does. */
+    function editsAgainst(held: Map<string, CollectionDocument>) {
+        const written: CollectionDocument[] = [];
+        editCollection.mockImplementation(
+            async (
+                id: string,
+                edit: (current: CollectionDocument | null) => CollectionDocument | null,
+            ) => {
+                const next = edit(held.get(id) ?? null);
+                if (next) {
+                    written.push(next);
+                }
+                return next;
+            },
+        );
+        return written;
+    }
+
+    it('remaps every song id to the id its song is adopted under, and keeps the order', async () => {
+        // The SAME ids `computeAdoptCandidates` derives for these guest songs: a collection whose
+        // ids were derived any other way would point at nothing once the songs land.
+        list.mockResolvedValue([guestSong('a'), guestSong('b')]);
+        listLibrary.mockResolvedValue([]);
+        const { candidates } = await computeAdoptCandidates('owner-1');
+        const adopted = new Map(candidates.map((c) => [c.guestId, c.accountDocumentId]));
+
+        listCollections.mockResolvedValue([
+            { document: guestCollection('gig', ['b', 'a', 'gone']), resolvedSongIds: ['b', 'a'] },
+        ]);
+        accountCollections.mockResolvedValue([]);
+        const written = editsAgainst(new Map());
+
+        expect(await adoptGuestCollections('owner-1')).toEqual({ adopted: 1, failures: [] });
+
+        expect(written).toHaveLength(1);
+        expect(written[0].name).toBe('Set gig');
+        // Only songs the guest songbook still holds, each under its adopted id, in order.
+        expect(written[0].songIds).toEqual([adopted.get('b'), adopted.get('a')]);
+        // A deterministic collection id, so a rerun merges into its own earlier copy.
+        expect(written[0].id).toMatch(/^guest-[a-f0-9]{64}$/);
+        expect(editCollection).toHaveBeenCalledWith(written[0].id, expect.any(Function), 'owner-1');
+        // One pass for the lot, never one per collection.
+        expect(run).toHaveBeenCalledTimes(1);
+    });
+
+    it('a rerun queues nothing for a collection it already copied', async () => {
+        listCollections.mockResolvedValue([
+            { document: guestCollection('gig', ['a']), resolvedSongIds: ['a'] },
+        ]);
+        accountCollections.mockResolvedValue([]);
+        const first = editsAgainst(new Map());
+        await adoptGuestCollections('owner-1');
+        const held = new Map([[first[0].id, first[0]]]);
+        const second = editsAgainst(held);
+        await adoptGuestCollections('owner-1');
+        expect(second).toEqual([]);
+    });
+
+    it('merges the guest Starred into the account’s, the account’s order first', async () => {
+        listCollections.mockResolvedValue([
+            { document: guestCollection('s', ['a'], true), resolvedSongIds: ['a'] },
+        ]);
+        const accountStarred = newStarred(['theirs']);
+        accountCollections.mockResolvedValue([
+            { document: accountStarred, resolvedSongIds: ['theirs'] },
+        ]);
+        const written = editsAgainst(new Map([[STARRED_COLLECTION_ID, accountStarred]]));
+
+        await adoptGuestCollections('owner-1');
+
+        expect(written).toHaveLength(1);
+        expect(written[0].id).toBe(STARRED_COLLECTION_ID);
+        expect(written[0].songIds[0]).toBe('theirs');
+        expect(written[0].songIds[1]).toMatch(/^guest-[a-f0-9]{64}$/);
+    });
+
+    it('never creates an empty Starred, and reports a collection it could not add', async () => {
+        listCollections.mockResolvedValue([
+            { document: guestCollection('s', ['gone'], true), resolvedSongIds: [] },
+            { document: guestCollection('gig', ['a']), resolvedSongIds: ['a'] },
+        ]);
+        accountCollections.mockResolvedValue([]);
+        editCollection.mockRejectedValue(new Error('Your account library is full.'));
+
+        const result = await adoptGuestCollections('owner-1');
+
+        // The empty Starred was not even attempted; the full account refused the other one.
+        expect(editCollection).toHaveBeenCalledTimes(1);
+        expect(result.adopted).toBe(0);
+        expect(result.failures).toEqual([
+            { guestId: 'gig', message: 'Your account library is full.' },
+        ]);
+        expect(run).not.toHaveBeenCalled();
     });
 });

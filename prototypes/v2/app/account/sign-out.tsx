@@ -89,11 +89,16 @@ export function SignOutDialog({
     onConfirm,
     onClose,
 }: SignOutDialogProps) {
+    const device = mode === 'device';
     const unsent = preflight?.unsentSaves ?? 0;
     const drafts = preflight?.drafts ?? 0;
     const exposed = preflight?.atRisk.length ?? 0;
-    const atRisk = exposed > 0;
-    const device = mode === 'device';
+    // Collection changes still queued (#1477): committed work like an unsent song Save, but with
+    // no file to export, so they never add to `exposed` — only to what the step warns about.
+    const collections = preflight?.unsentCollections ?? 0;
+    const collectionsSendable =
+        !device && collections > 0 && (preflight?.refusedCollections ?? 0) < collections;
+    const atRisk = exposed > 0 || collections > 0;
     // Every unsent Save is one the account has already refused, so there is nothing left for a
     // sync to send. A partial overlap still offers Sync now: it can empty the rest of the queue,
     // and the refused ones were never going anywhere either way.
@@ -152,6 +157,18 @@ export function SignOutDialog({
                                   : 'Signing out discards them. Sync now, or export the song first.'}
                         </p>
                     )}
+                    {collections > 0 && (
+                        <p className="status-detail" data-testid="sign-out-collections">
+                            {collections === 1
+                                ? 'One change to your collections hasn’t reached your account yet.'
+                                : `${collections} changes to your collections haven’t reached your account yet.`}{' '}
+                            {device
+                                ? `Signing out here discards ${collections === 1 ? 'it' : 'them'} — cancel and sign in again to let ${collections === 1 ? 'it' : 'them'} upload.`
+                                : collectionsSendable
+                                  ? `Signing out discards ${collections === 1 ? 'it' : 'them'}. Sync now to send ${collections === 1 ? 'it' : 'them'} first.`
+                                  : `Your account won’t accept ${collections === 1 ? 'it' : 'them'}, and signing out discards ${collections === 1 ? 'it' : 'them'}.`}
+                        </p>
+                    )}
                     {drafts > 0 && (
                         <p className="status-detail" data-testid="sign-out-drafts">
                             {drafts === 1
@@ -180,7 +197,7 @@ export function SignOutDialog({
                 </p>
             )}
             <div className="dialog-actions">
-                {atRisk && (
+                {exposed > 0 && (
                     <button
                         className="btn"
                         data-testid="sign-out-export"
@@ -195,7 +212,7 @@ export function SignOutDialog({
                         {exposed === 1 ? 'Export that song' : `Export those ${exposed} songs`}
                     </button>
                 )}
-                {unsent > 0 && !onlyRefused && (
+                {((unsent > 0 && !onlyRefused) || collectionsSendable) && (
                     <button
                         className="btn"
                         data-testid="sign-out-sync"

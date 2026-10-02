@@ -118,8 +118,27 @@ table, Save, read and delete routes; and the same per-owner document cap.
 - **No drafts, no candidates.** A collection edit IS its Save, and a collection is never "on the
   stand", so the only local work that can hold one is its own queued Save. A download never adopts
   a body over that Save and preserves no candidate beside it: the queued Save meets the newer
-  revision as a conflict carrying the remote version. Resolving such a conflict, Starred, and every
-  UI are #1477's.
+  revision as a conflict carrying the remote version.
+- **A collection conflict resolves by merge, without asking (#1477, decided on #1443).** After every
+  outbox sweep the sync loop asks `mergeCollectionConflicts`: a conflicted collection head retires
+  its whole queue and one fresh Save is queued ON the remote revision, holding the union of the
+  two lists — this device's order first, then the ids only the remote has. A conflict whose remote
+  is `null` (tombstoned, or the id is the other kind there) moves the list to a fresh id instead,
+  the shape Keep both gives a song. No dialog: for Starred the union is always right, and for a
+  user collection it never loses a song. The cost, accepted: a removal made on one device while the
+  other still held the id is undone by the union. A song conflict is untouched by this.
+- **Starred is a built-in collection at one fixed id (`collection-starred`), created lazily.** The
+  first star creates it — never startup, so an account at the document cap is never handed a Save
+  it must refuse (a create this device can see is past the cap is refused locally). Two devices
+  that each star offline both create the fixed id, so they meet as an ordinary conflict and merge,
+  never as two Starred collections. The device-local stars that came before (#1440) are COPIED in
+  once and never deleted: a guest's only while no Starred exists, an account's once per device
+  behind a `stars-migrated:<owner>` meta marker written in the same transaction as the Save.
+- **Collections are counted where songs are.** The sign-out preflight reports unsent collection
+  Saves apart from songs (they have no file to export), and the sync chip counts them across the
+  account, since a collection is never the watched document.
+- **Guest collections are adopted with guest songs** (`adoptGuestCollections`): song ids remapped to
+  the ids those songs are adopted under, the guest Starred merged into the account's.
 
 Client-provided owner IDs are routing hints, never authorization. Every server query uses
 the authenticated owner, including list, receipt lookup, update, delete, export and feedback.

@@ -89,12 +89,13 @@ export function forgetOpened(id: string): void {
 const STARRED = 'ensemble-v2-preview:starred';
 
 /**
- * Starred songs (#1440) — a per-device preference, stored the same way `openedAtMap` is: one
- * small JSON blob rather than a key per song. #1443 migrates this into a synced built-in
- * "Starred" collection; until then it lives here, beside the rest of this file's device-only
- * conveniences.
+ * The device-local stars #1440 kept here — one small JSON blob of song ids — READ ONLY since
+ * #1477. Stars are now the built-in Starred collection (`lib/collections.ts`), and this key is
+ * what the guest's one-time copy reads (`migrateGuestStars` in `lib/repository.ts`). Nothing
+ * writes or removes it any more: it is left exactly as it was, so the copy is reversible and an
+ * older build still finds every star it had.
  */
-export function starredIds(): Set<string> {
+export function legacyStarredIds(): Set<string> {
     const ids = new Set<string>();
     let raw: string | null = null;
     try {
@@ -118,29 +119,6 @@ export function starredIds(): Set<string> {
         // An unreadable ledger only costs "nothing starred"; never block startup on it.
     }
     return ids;
-}
-
-export function setStarred(id: string, starred: boolean): void {
-    const ids = starredIds();
-    const changed = starred ? !ids.has(id) : ids.has(id);
-    if (!changed) {
-        return;
-    }
-    if (starred) {
-        ids.add(id);
-    } else {
-        ids.delete(id);
-    }
-    try {
-        localStorage.setItem(STARRED, JSON.stringify([...ids]));
-    } catch {
-        // Best-effort preference; the toggle still applies for this render.
-    }
-}
-
-/** Drops one song's star, if any — deleting a starred song must not leave a dangling id (#1440). */
-export function forgetStar(id: string): void {
-    setStarred(id, false);
 }
 
 const ALL_SONGS_SORT = 'ensemble-v2-preview:all-songs-sort';
