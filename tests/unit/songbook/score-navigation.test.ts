@@ -709,6 +709,19 @@ describe('semantic navigation: D.C./D.S. al Nth ending (#1473)', () => {
         expect(() => compileScoreForm(score)).toThrow(/jump timing.*ambiguous/i);
     });
 
+    it('is still refused in a section that repeats, which reaches it once a pass', () => {
+        const score = scoreFixture(
+            [...twoEndings()],
+            [bar('bridge'), bar('jump', [], [dc({ kind: 'ending', pass: 2 })])],
+        );
+        expect(performedIds(score)).toEqual(
+            ['a', 'b', 'one', 'a', 'b', 'two', 'bridge', 'jump'].concat(['a', 'b', 'two']),
+        );
+        score.sections[1].repeat = 2;
+        expect(validateSemanticScore(score).kind).toBe('ok');
+        expect(() => compileScoreForm(score)).toThrow(/jump timing.*ambiguous/i);
+    });
+
     it('is refused without a Fine to stop at', () => {
         const score = scoreFixture([
             ...twoEndings('none'),

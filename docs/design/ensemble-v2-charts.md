@@ -202,10 +202,12 @@ Fine before ending N; another jump on the way; and no Fine before the route come
 command. Unlike other jumps, the command may sit inside a final ending, as iReal charts write it
 (a last ending runs to the section's end): only a command the form reaches more than once has
 ambiguous timing. The iReal importer maps "D.C./D.S. al 1st/2nd/3rd End." (iReal's spelling)
-and "... ending"; the jump takes effect at the first closing barline from its text on, since
-"the jump only takes effect at that closing barline". It needs one Fine between the return point
-and the jump and no coda sign; otherwise the text stays the inert annotation it was before, with
-its note.
+and "... ending". Since "the jump only takes effect at that closing barline", the jump sits at
+the closing barline of its text's bar, or of the next bar when that bar is bare (no sign,
+rehearsal mark, staff text or meter change), as charts set the long text one bar early. It is
+applied only as the chart's one jump, with one Fine between the return point and the jump, no
+coda sign, and a route the score form accepts. Otherwise the text is imported exactly as before:
+the inert annotation, with its note.
 
 The current form grammar pairs repeat barlines within each section (an unmatched end repeat
 starts at that section's beginning). An explicit start must close in the same section; repeated

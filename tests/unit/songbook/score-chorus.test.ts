@@ -146,6 +146,10 @@ describe('chorus count (#1472)', () => {
         expect(() => compileScoreForm(uncounted)).toThrow(
             /^This chart expands beyond the playback limit of 16,384 measures\. Reduce repeats\.$/,
         );
+        // One chorus alone is over the limit: fewer choruses cannot help, so it is not offered.
+        expect(() => compileScoreForm({ ...uncounted, choruses: 2 })).toThrow(
+            /^This chart expands beyond the playback limit of 16,384 measures\. Reduce repeats\.$/,
+        );
     });
 
     it('takes a D.C. al 2nd ending in every chorus (#1473)', () => {

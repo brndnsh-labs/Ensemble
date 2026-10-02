@@ -254,10 +254,13 @@ function failAt(score: SemanticScore, boundary: Boundary, message: string): neve
     );
 }
 
-function expansionLimit(score: SemanticScore): never {
-    // A counted chart's choruses multiply its length too. The uncounted message is unchanged.
+/**
+ * `choruses`: fewer choruses would help, because the whole counted performance is over the limit.
+ * Otherwise the message is the one uncounted charts always had.
+ */
+function expansionLimit(choruses = false): never {
     throw new Error(
-        `This chart expands beyond the playback limit of 16,384 measures. Reduce repeats${score.choruses === undefined ? '' : ' or choruses'}.`,
+        `This chart expands beyond the playback limit of 16,384 measures. Reduce repeats${choruses ? ' or choruses' : ''}.`,
     );
 }
 
@@ -613,7 +616,7 @@ function performanceTape(
         for (const node of nodes) {
             if (node.kind === 'bar') {
                 if (measures++ >= MAX_MEASURES) {
-                    expansionLimit(score);
+                    expansionLimit();
                 }
                 emitBoundary(sectionIndex, node.index, 'start');
                 steps.push({
@@ -765,7 +768,7 @@ export function compileScoreForm(candidate: unknown): ScoreFormVisit[] {
 
         function perform(visit: RouteVisit) {
             if (visits.length >= MAX_MEASURES) {
-                expansionLimit(score);
+                expansionLimit(score.choruses !== undefined);
             }
             visits.push({ ...visit, repeatPasses: [...visit.repeatPasses], chorus });
         }
