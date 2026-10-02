@@ -9,7 +9,7 @@ import {
     type TradeSettings,
 } from './core/types.js';
 import { chordAt, compileTimeline } from './form/timeline.js';
-import { performPass } from './perform.js';
+import { type PassMemory, performPass } from './perform.js';
 import { STYLE_IDS, STYLES } from './styles/index.js';
 import { FIXTURES, score } from './test/scores.js';
 import { fifthOf } from './theory/chord.js';
@@ -410,6 +410,82 @@ describe('comp instruments', () => {
             }
         }
         expect(shapes.filter((s) => s.split(' ')[1] !== s.split(' ')[3])).toEqual([]);
+    });
+
+    describe('an organ re-presses a held chord at a phrase top only, and only once it has been held a bar', () => {
+        const HOLDING = STYLE_IDS.filter((id) => !STYLES[id].comp.keyboard.percussive);
+        /** The ticks an organ presses a chord at (one per chord struck). */
+        const presses = (chart: ReturnType<typeof score>, style: (typeof HOLDING)[number]) =>
+            [
+                ...new Set(
+                    performPass(
+                        compileTimeline(chart),
+                        { ...DEFAULT_SETTINGS, style, comp: 'organ', seed: 'r' },
+                        { pass: 0, looping: true },
+                    )
+                        .events.filter((e) => e.lane === 'comp' && !e.muted)
+                        .map((e) => e.tick),
+                ),
+            ].sort((a, b) => a - b);
+        const downbeats = (ticks: number[], bars: number) =>
+            ticks.filter((t) => t % BAR === 0 && t / BAR < bars).map((t) => t / BAR);
+
+        it('a 5-bar phrase is one phrase: pressed on its first bar, not again on its fifth', () => {
+            const chart = score([
+                { label: 'A', bars: 'Dm7 | Dm7 | Dm7 | Dm7 | Dm7' },
+                { label: 'B', bars: 'Dm7 | Dm7 | Dm7' },
+            ]);
+            for (const style of HOLDING) {
+                expect(downbeats(presses(chart, style), 8), style).toEqual([0, 5]);
+            }
+        });
+
+        it('a chord struck on beat 3 is not struck again two beats later at the next phrase', () => {
+            for (const bars of [
+                // A 5-bar phrase: its fifth bar is no phrase top.
+                'C | C | F | C G | G',
+                // An 8-bar section: bar 5 is a phrase top, but the G is only two beats old.
+                'C | C | F | C G | G | F | C | C',
+            ]) {
+                const chart = score([{ label: 'A', bars }]);
+                for (const style of HOLDING) {
+                    expect(downbeats(presses(chart, style), 8), `${style} ${bars}`).not.toContain(
+                        4,
+                    );
+                }
+            }
+        });
+
+        it('a written anticipation held over the barline is not struck again at the phrase', () => {
+            const chart = score([{ label: 'A', bars: 'C | C | C | C:3 G:1 | / | F | C | C' }]);
+            for (const style of HOLDING) {
+                expect(downbeats(presses(chart, style), 8), style).not.toContain(4);
+            }
+        });
+
+        it('a practice loop that starts mid-phrase presses its chord at the top of every lap', () => {
+            // The lap's first bar is no phrase top, but the hand let go at the wrap: the vamp's
+            // chord is pressed again there, not left silent until the next phrase.
+            const vamp = compileTimeline(
+                score([{ label: 'A', bars: 'Dm7 | Dm7 | Dm7 | Dm7 | Dm7 | Dm7 | Dm7 | Dm7' }]),
+            );
+            const window = { from: 2, to: 4, wrapTo: 2 };
+            for (const style of HOLDING) {
+                let memory: PassMemory | undefined;
+                for (let pass = 0; pass < 3; pass++) {
+                    const result = performPass(
+                        vamp,
+                        { ...DEFAULT_SETTINGS, style, comp: 'organ', seed: 'r' },
+                        { pass, looping: true, memory, window },
+                    );
+                    memory = result.memory;
+                    const top = result.events.filter(
+                        (e) => e.lane === 'comp' && !e.muted && e.tick === vamp.bars[2].start,
+                    );
+                    expect(top.length, `${style} lap ${pass}`).toBeGreaterThan(0);
+                }
+            }
+        });
     });
 });
 

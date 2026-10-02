@@ -37,6 +37,12 @@ interface CompMemory {
     chord?: string | null;
     /** The next bar's first chord was already played as an anticipation. */
     pushed: boolean;
+    /** The bar this memory was left by (its index), to tell a bar that follows on from one
+     * that doesn't (a loop's wrap, the bars the comp sat out). */
+    bar?: number;
+    /** A sustaining instrument struck its last chord after that bar's downbeat: it has been
+     * held for less than a bar. */
+    fresh?: boolean;
 }
 
 export interface CompBook {
@@ -159,9 +165,17 @@ export function compIdiom(book: CompBook): PitchedIdiom {
                 }
                 return {
                     events,
-                    memory: { voicing: prev, pushed: false, chord: chord?.symbol ?? null },
+                    memory: {
+                        voicing: prev,
+                        pushed: false,
+                        chord: chord?.symbol ?? null,
+                        bar: bar.index,
+                    },
                 };
             }
+            const legato = ctx.instrument.legato && !book.percussive;
+            // The next bar played is not the one after this: a loop's wrap back to its top.
+            const wraps = !!ctx.next && ctx.next.bar.index !== bar.index + 1;
             const nextFirst = ctx.next?.bar.spans[0];
             let pushed = false;
             const planned: Planned[] = [];
@@ -197,7 +211,13 @@ export function compIdiom(book: CompBook): PitchedIdiom {
                         !ctx.next?.plan.ending &&
                         // Nor into a bar the comp sits out (the drummer's four).
                         ctx.next?.plan.lanes.comp !== false &&
-                        rng.chance(book.push[tier]);
+                        rng.chance(book.push[tier]) &&
+                        // why: nor, on a sustaining instrument, across a loop's wrap. Its
+                        // push would ring an eighth into the next lap and stop (a pass holds
+                        // nothing past its end), and that lap, tied in, would press nothing:
+                        // the top of every lap silent (#1488). It lands on the downbeat.
+                        // (Drawn first, so every other strike's chance is unchanged.)
+                        !(legato && wraps);
                     if (anticipates && nextFirst?.chord) {
                         target = nextFirst.chord;
                         length = total - hit.step + TIE_STEPS;
@@ -249,7 +269,7 @@ export function compIdiom(book: CompBook): PitchedIdiom {
                 }
             });
             planned.sort((a, b) => a.step - b.step);
-            const legato = ctx.instrument.legato && !book.percussive;
+            let fresh = false;
             const leadUntil = answerLead(ctx, book, planned, spans, memory, legato);
             if (legato) {
                 // An organist holds a chord and presses again only when it changes: the comping
@@ -257,21 +277,27 @@ export function compIdiom(book: CompBook): PitchedIdiom {
                 // hit is a stutter, not a groove. So the organ presses on each chord's arrival
                 // (or on a push just before it) and holds; `sustain` in perform.ts carries it
                 // across barlines. An N.C. lets go, so the next chord is pressed anew. And a
-                // chord still held where the form's four-bar phrasing turns over is pressed anew
-                // (#1488): an organist re-articulates a long vamp at each phrase, and so at each
-                // section, at the top of each lap of a loop and of each chorus of a counted
-                // chart (#1475), where the form starts over.
+                // chord still held at the top of a phrase is pressed anew (#1488): an organist
+                // re-articulates a long vamp at each phrase, and so at each section, at the top
+                // of each lap of a loop and of each chorus of a counted chart (#1475), where
+                // the form starts over.
                 // why: one chord tied silently through a 32-bar vamp is not how the organ is
-                // played, and a loop's next lap has nothing else to press it. Every 4 bars
-                // (`phrase.bar % 4`), so a 5- or 6-bar phrase is pressed again on its 5th bar:
-                // the hold never runs past four bars of a vamp. Keyed on the bar's place in
-                // the form, so lap k and chorus k press in the same bars. The chord the hand
-                // already holds is pressed again in the same shape (`again`): lifted and put
-                // back down, not re-voiced.
+                // played, and a loop's next lap has nothing else to press it. At the phrase's
+                // first bar only (phrases are 3–6 bars), so the hold never runs past a phrase.
+                // Only a chord held for a bar or more: one struck after the last bar's downbeat
+                // (`fresh`, a change on beat 3, a written anticipation) is still sounding new,
+                // and pressing it again a beat or two later is a stutter. Keyed on the bar's
+                // place in the form, so lap k and chorus k press in the same bars. The chord
+                // the hand already holds is pressed again in the same shape (`again`): lifted
+                // and put back down, not re-voiced.
                 const kept = planned.filter((h) => h.early);
-                const phraseTop = ctx.bar.phrase.bar % 4 === 0;
+                const phraseTop = ctx.bar.phrase.bar === 0 && !memory.fresh;
+                // The hand let go since the last bar it played — a loop's wrap back to its top,
+                // or bars the comp sat out, where `sustain` ends the hold: whatever it last
+                // struck no longer sounds, so this bar's chord is pressed, changed or not.
+                const resumed = memory.bar !== undefined && memory.bar !== bar.index - 1;
                 const holding = memory.pushed ? null : (memory.chord ?? null);
-                let last = phraseTop ? null : holding;
+                let last = phraseTop || resumed ? null : holding;
                 spans.forEach(({ span, from, to }, index) => {
                     const chord = span.chord;
                     if (!chord) {
@@ -280,7 +306,8 @@ export function compIdiom(book: CompBook): PitchedIdiom {
                     }
                     // A chord held into the bar by a written hold (`/`) is pressed again at a
                     // phrase top too: a vamp written with slashes is the same vamp.
-                    const tiedIn = index === 0 && (memory.pushed || (!span.attack && !phraseTop));
+                    const tiedIn =
+                        index === 0 && !resumed && (memory.pushed || (!span.attack && !phraseTop));
                     const pushed = kept.some(
                         (h) => h.chord === chord && h.step >= from - TIE_STEPS && h.step < from,
                     );
@@ -307,6 +334,7 @@ export function compIdiom(book: CompBook): PitchedIdiom {
                     );
                 }
                 planned.splice(0, planned.length, ...kept.sort((a, b) => a.step - b.step));
+                fresh = (planned.at(-1)?.step ?? 0) > 0;
             }
             let held: ChordFacts | null = null;
             let ahead = false;
@@ -356,6 +384,8 @@ export function compIdiom(book: CompBook): PitchedIdiom {
                     pushed,
                     chord: endsInRest ? null : (struck ?? null),
                     ...(leadUntil !== undefined ? { leadUntil } : {}),
+                    bar: bar.index,
+                    ...(fresh ? { fresh } : {}),
                 },
             };
         },

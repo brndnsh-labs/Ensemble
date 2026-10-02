@@ -47,9 +47,9 @@ export interface PassOptions {
      * dropped — one, and on while the comp has neither struck again nor reached a rest (an N.C.
      * or a bar it sits out), but never past the end of the next chorus — so what the whole pass
      * does across that barline (a held organ chord, a comp voice yielding to the lead) is done
-     * here too: the chunks join into the whole pass, event for event. (The organ re-presses
-     * at each chorus top, so the look never needs the cap; a comp that never struck again
-     * would have its hold end there.) `memory` is then the memory before bar `until`.
+     * here too: the chunks join into the whole pass, event for event. (The organ re-presses a
+     * held chord at each phrase top, so the look never needs the cap; a comp that never struck
+     * again would have its hold end there.) `memory` is then the memory before bar `until`.
      * Defaults to the window's end.
      */
     until?: number;
@@ -81,7 +81,8 @@ export function performPass(
     // holds its last chord to its next strike, which can be bars away. Capped at the end of
     // the next chorus, so a chunk costs at most two choruses' bars: chunks are generated on
     // the main thread inside the scheduler's 150 ms lookahead. On a real comp it never binds
-    // (a sustaining comp re-presses at each chorus top); it bounds the cost all the same.
+    // (a sustaining comp re-presses a held chord at each phrase top); it bounds the cost all
+    // the same.
     let through = Math.min(until + 1, window.to);
     const lookLimit =
         until < window.to ? Math.min(chorusBars(timeline, until).end, window.to) : window.to;

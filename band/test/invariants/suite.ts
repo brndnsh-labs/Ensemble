@@ -150,18 +150,21 @@ export function invariantSuite(shard: number): void {
 }
 
 /**
- * The organ on a one-chord vamp (#1488), looping (laps 0–2, each continuing from the last) and
- * once through with an ending: it sounds in every bar that has a chord. A holding organ holds
- * through every such bar with no gap, and presses the chord again at least every four bars (at
- * each phrase, so at the top of each lap), in the shape it holds. A chopped organ (`percussive`: the reggae bubble)
- * plays its figure in every bar. The counted vamp, a chorus at a time, is pinned with the
- * chunks in `arrange/chorus-seams.test.ts`.
+ * The organ, looping (laps 0–2, each continuing from the last, with what the lap before rang
+ * past its end carried into it) and once through with an ending (#1488): it sounds in every bar
+ * that has a chord. A holding organ holds through every chord with no gap, top of the lap
+ * included; a chopped organ (`percussive`: the reggae bubble) plays its figure in every such
+ * bar. On a one-chord vamp a holding organ presses the chord again at each phrase, so no hold
+ * runs past a phrase. The counted vamp, a chorus at a time, is pinned with the chunks in
+ * `arrange/chorus-seams.test.ts`.
  */
 function defineVamps(styles: StyleId[]): void {
-    describe.each(styles)('%s organ vamp', (styleId) => {
+    describe.each(styles)('%s organ', (styleId) => {
         const holds = !STYLES[styleId].comp.keyboard.percussive;
-        for (const [name, chart] of Object.entries(VAMP_FIXTURES)) {
+        const charts = Object.entries({ ...VAMP_FIXTURES, ...FIXTURES });
+        for (const [name, chart] of charts) {
             const timeline = compileTimeline(chart);
+            const vamp = Object.hasOwn(VAMP_FIXTURES, name);
             it(`${name}: the organ sounds in every bar, every lap`, () => {
                 const problems: string[] = [];
                 for (const seed of SEEDS.slice(0, 2)) {
@@ -171,13 +174,18 @@ function defineVamps(styles: StyleId[]): void {
                         comp: 'organ',
                         seed,
                     };
-                    const passes: [string, BandEvent[]][] = [
+                    const organOf = (events: BandEvent[]) =>
+                        events.filter((e): e is PitchedNote => e.lane === 'comp' && !e.muted);
+                    const passes: [string, PitchedNote[]][] = [
                         [
                             'ending',
-                            performPass(timeline, settings, { pass: 0, looping: false }).events,
+                            organOf(
+                                performPass(timeline, settings, { pass: 0, looping: false }).events,
+                            ),
                         ],
                     ];
                     let memory: PassMemory | undefined;
+                    let overhang: PitchedNote[] = [];
                     for (let lap = 0; lap < 3; lap++) {
                         const result = performPass(timeline, settings, {
                             pass: lap,
@@ -185,20 +193,23 @@ function defineVamps(styles: StyleId[]): void {
                             memory,
                         });
                         memory = result.memory;
-                        passes.push([`lap ${lap}`, result.events]);
+                        const organ = organOf(result.events);
+                        passes.push([`lap ${lap}`, [...overhang, ...organ]]);
+                        // What rings past the lap's end sounds at the top of the next one.
+                        overhang = organ
+                            .filter((n) => n.tick + n.dur > timeline.ticks)
+                            .map((n) => ({ ...n, tick: n.tick - timeline.ticks }));
                     }
-                    for (const [label, events] of passes) {
-                        const organ = events.filter(
-                            (e): e is PitchedNote => e.lane === 'comp' && !e.muted,
-                        );
+                    for (const [label, organ] of passes) {
                         for (const bar of timeline.bars) {
-                            if (!bar.spans.some((s) => s.chord)) {
+                            const end = bar.start + bar.meter.barTicks;
+                            const chords = bar.spans.filter((s) => s.chord);
+                            if (!chords.length) {
                                 continue;
                             }
-                            const end = bar.start + bar.meter.barTicks;
-                            const sounding = organ.filter(
-                                (n) => n.tick < end && n.tick + n.dur > bar.start,
-                            );
+                            const sounding = organ
+                                .filter((n) => n.tick < end && n.tick + n.dur > bar.start)
+                                .sort((a, b) => a.tick - b.tick);
                             if (!sounding.length) {
                                 problems.push(`${seed} ${label}: bar ${bar.index} silent`);
                                 continue;
@@ -206,41 +217,50 @@ function defineVamps(styles: StyleId[]): void {
                             if (!holds) {
                                 continue;
                             }
-                            // Held through: every tick of the bar is under a sounding note.
-                            let covered = bar.start;
-                            for (const n of [...sounding].sort((a, b) => a.tick - b.tick)) {
-                                if (n.tick > covered + 1e-6) {
-                                    break;
+                            // Held through: every tick of every chord is under a sounding note.
+                            for (const span of chords) {
+                                let covered = span.start;
+                                for (const n of sounding) {
+                                    if (n.tick > covered + 1e-6) {
+                                        break;
+                                    }
+                                    covered = Math.max(covered, n.tick + n.dur);
                                 }
-                                covered = Math.max(covered, n.tick + n.dur);
-                            }
-                            if (covered < end - 1e-6) {
-                                problems.push(`${seed} ${label}: bar ${bar.index} gap`);
+                                if (covered < span.end - 1e-6) {
+                                    problems.push(
+                                        `${seed} ${label}: bar ${bar.index} silent from ${covered - bar.start}`,
+                                    );
+                                }
                             }
                         }
                         if (holds) {
-                            const longest = Math.max(...organ.map((n) => n.dur));
-                            const fourBars = 4 * timeline.bars[0].meter.barTicks;
-                            if (longest > fourBars + 1e-6) {
-                                problems.push(`${seed} ${label}: a hold of ${longest} ticks`);
-                            }
-                            // A re-press lifts the held chord and puts the same shape back
-                            // down (the ending's final chord is voiced as an ending).
+                            // At the top of a lap, never the chord struck again an eighth after
+                            // it was pressed (a push across the wrap, then the lap's downbeat).
                             const presses = new Map<number, number[]>();
                             for (const n of organ) {
-                                if (label !== 'ending' || n.bar < timeline.bars.length - 1) {
-                                    presses.set(n.tick, [...(presses.get(n.tick) ?? []), n.midi]);
+                                presses.set(n.tick, [...(presses.get(n.tick) ?? []), n.midi]);
+                            }
+                            const ticks = [...presses.keys()].sort((a, b) => a - b);
+                            const shape = (t: number) =>
+                                presses
+                                    .get(t)!
+                                    .sort((a, b) => a - b)
+                                    .join(',');
+                            for (let k = 1; k < ticks.length; k++) {
+                                if (
+                                    ticks[k - 1] < 0 &&
+                                    ticks[k] - ticks[k - 1] <= 2 * STEP + 1e-6 &&
+                                    shape(ticks[k]) === shape(ticks[k - 1])
+                                ) {
+                                    problems.push(`${seed} ${label}: re-struck at ${ticks[k]}`);
                                 }
                             }
-                            const shapes = new Set(
-                                [...presses.values()].map((midis) =>
-                                    midis.sort((a, b) => a - b).join(','),
-                                ),
-                            );
-                            if (shapes.size > 1) {
-                                problems.push(
-                                    `${seed} ${label}: re-voiced ${[...shapes].join(' / ')}`,
-                                );
+                        }
+                        if (holds && vamp) {
+                            const longest = Math.max(...organ.map((n) => n.dur));
+                            const phrase = Math.max(...timeline.bars.map((b) => b.phrase.length));
+                            if (longest > phrase * timeline.bars[0].meter.barTicks + 1e-6) {
+                                problems.push(`${seed} ${label}: a hold of ${longest} ticks`);
                             }
                         }
                     }

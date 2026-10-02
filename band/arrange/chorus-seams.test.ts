@@ -72,8 +72,8 @@ describe('a counted performance generated a chorus at a time (`PassOptions.until
     // chorus seam (a held organ chord, a comp voice yielding to the lead, a hold that stops at
     // an N.C. or at the drummer's turn) is done in the chunk too: the chunks join into the
     // whole pass, event for event, every lane — the organ on a one-chord vamp included, since
-    // it re-presses at each chorus top (the look's cap, which would end an unstruck hold, never
-    // binds on a real comp: see the cap test below).
+    // it re-presses a held chord at each phrase top, a chorus's first bar among them (the look's
+    // cap, which would end an unstruck hold, never binds on a real comp: see the cap test below).
     describe.each(STYLE_IDS)('%s joins into the whole pass', (style: StyleId) => {
         for (const [name, chart] of Object.entries({
             ...COUNTED_FIXTURES,
@@ -82,7 +82,8 @@ describe('a counted performance generated a chorus at a time (`PassOptions.until
             // An N.C. at the top of each chorus: a hold across the seam stops at the rest.
             restAtTop: REST_AT_TOP,
             holds: HOLDS,
-            // A one-chord vamp: the organ re-presses at each chorus top, so the look stops there.
+            // A one-chord vamp: the organ re-presses at each phrase top (a chorus's first bar
+            // among them), so the look stops there.
             vamp: organVamp(8, 3),
         })) {
             it(name, () => {
@@ -131,8 +132,9 @@ describe('a counted performance generated a chorus at a time (`PassOptions.until
 
     it('looks across a seam at most to the end of the next chorus: a 64-chorus organ vamp', () => {
         // Chunks are generated on the main thread inside a 150 ms lookahead, so each may cost
-        // at most two choruses' bars. On the vamp the organ re-presses at each chorus top, so
-        // the look stops one bar in. Counted in bars played, not in time.
+        // at most two choruses' bars. On the vamp the organ re-presses at each phrase top, the
+        // chorus's first bar among them, so the look stops one bar in. Counted in bars played,
+        // not in time.
         const timeline = compileTimeline(organVamp(32, 64));
         const perChunk = chunkBars(timeline, 32);
         expect(perChunk).toHaveLength(64);
@@ -168,8 +170,9 @@ describe('a counted performance generated a chorus at a time (`PassOptions.until
     });
 
     it('keeps an organ on a one-chord vamp sounding in every chorus, every style', () => {
-        // An organist re-presses at the top of each chorus: the chord is never tied silently
-        // across the whole performance, so every bar of every chorus sounds, as played live.
+        // An organist re-presses a held chord at each phrase, the top of each chorus included:
+        // the chord is never tied silently across the whole performance, so every bar of every
+        // chorus sounds, as played live.
         const timeline = compileTimeline(organVamp(8, 8));
         for (const style of STYLE_IDS) {
             const settings = { ...ORGAN, style };

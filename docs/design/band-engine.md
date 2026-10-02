@@ -117,10 +117,13 @@ physical: its range, its strum speed, whether it sustains.
   (the swing chunk, the funk scratch). A funk chank is staccato. A scratch after an
   anticipation deadens the grip already held, never the old one. An upstroke catches the top
   three strings. The organ holds each chord to the next strike, across barlines, until an N.C.
-  or a bar it sits out; the last chord of a pass holds to the pass's end. A chord still held
-  where the form's four-bar phrasing turns over is pressed again, in the shape the hand holds
-  (#1488): an organist re-articulates a long vamp at each phrase, so the hold never runs past
-  four bars, and the top of every lap of a loop and every chorus is pressed anew.
+  or a bar it sits out; the last chord of a pass holds to the pass's end. A chord held for a
+  bar or more is pressed again at the first bar of each phrase (phrases are 3–6 bars), in the
+  shape the hand holds (#1488): an organist re-articulates a long vamp at each phrase, so the
+  hold never runs past a phrase. A chord struck after the last bar's downbeat (a change on beat
+  3, a written anticipation) is not struck again so soon. Where the hand let go — the top of a
+  loop's lap, the bar after the comp sat out — the chord is pressed whatever the phrase, and
+  the organ never pushes a chord across a loop's wrap: it lands on the lap's downbeat.
 - **Voicing laws for every instrument.** A written b13, #11 or 13 takes the 5th's seat; 7#9
   plays 3-b7-#9; half-diminished always sounds its b5. Close intervals obey low-interval limits
   (a minor 3rd no lower than C3, a major 3rd no lower than Bb2, …).
@@ -335,9 +338,10 @@ schedules everything due in the next 150 ms on a 25 ms timer.
   (an organ chord held to its next strike or to a rest, a keyboard voice yielding to the lead)
   happens live too: the chunks join into the one-shot pass, event for event. (A seam is
   therefore not a loop wrap, which can do neither.) A sustaining comp (the organ) re-presses
-  at each phrase, and so at the top of each chorus of a counted chart, as an organist
-  re-articulates where the form starts over, so the look always finds a strike by the next
-  chorus's first bar. It is still
+  a chord held a bar or more at each phrase, and so at the top of each chorus of a counted
+  chart, as an organist re-articulates where the form starts over, so the look finds a strike
+  by the next chorus's first bar (or, after a chord struck late in the chorus's last bar, by
+  the next change or phrase). It is still
   bounded at the end of the next chorus — chunks are generated on the main thread inside the
   scheduler's 150 ms lookahead, so a chunk may cost at most two choruses' bars — but on a real
   comp that cap never binds: the chunks join into the one-shot pass with no exception (a comp
@@ -387,7 +391,8 @@ Every canonical genre has its own style (`STYLE_FOR_GENRE` in `runtime.ts`).
   determinism, bar and register bounds, velocities, the timing tiers (strum included), no
   pitched onsets under N.C., no same-pitch overlaps, bass arrivals on chord tones, comp chords
   that carry their guide tones, playable guitar grips off the bass's register, and an organ
-  that sounds in every bar of a one-chord vamp (`VAMP_FIXTURES`), lap after lap. It is one
+  that sounds through every chord of every fixture and of a one-chord vamp (`VAMP_FIXTURES`),
+  lap after lap, what a lap rings past its end carried into the next. It is one
   suite (`suite.ts`) split by style over `shard-*.test.ts`, only so the runner spreads it over
   its workers; a new style still joins it the moment it is registered.
 - The critique: one claims file per style (`band/test/claims/<id>.ts`, built with
