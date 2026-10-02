@@ -324,10 +324,58 @@ export function inFinalChorus(timeline: Timeline, index: number): boolean {
     return last > 0 && timeline.bars[index].visit.chorus === last;
 }
 
+/**
+ * Is bar `index` in the chorus before the last of a counted performance of three or more
+ * choruses — the one that leads into the out-head?
+ */
+export function beforeFinalChorus(timeline: Timeline, index: number): boolean {
+    const last = timeline.bars.at(-1)?.visit.chorus ?? 0;
+    return last > 1 && timeline.bars[index].visit.chorus === last - 1;
+}
+
+/**
+ * The index of the first span starting after `tick` (`spans.length` if none). Spans are in
+ * order of their starts, so this is a binary search: a counted chart's timeline holds every
+ * chorus, and a scan from the top would make each lookup cost the whole performance so far.
+ */
+export function firstSpanAfter(timeline: Timeline, tick: number): number {
+    const { spans } = timeline;
+    let lo = 0;
+    let hi = spans.length;
+    while (lo < hi) {
+        const mid = (lo + hi) >> 1;
+        if (spans[mid].start <= tick) {
+            lo = mid + 1;
+        } else {
+            hi = mid;
+        }
+    }
+    return lo;
+}
+
+/**
+ * The index of the first span sounding at `tick`, or -1 — what `spans.findIndex` over
+ * `start <= tick < end` answers, without the scan (`firstSpanAfter`). A bar whose rounded
+ * event lengths overrun it (a seven's odd grouping) can leave one span ending just past the
+ * next one's start; the walk back finds that earlier span first, as the scan did.
+ */
+export function spanIndexAt(timeline: Timeline, tick: number): number {
+    const { spans } = timeline;
+    let first = firstSpanAfter(timeline, tick) - 1;
+    while (first > 0 && spans[first - 1].end > tick) {
+        first--;
+    }
+    for (let i = Math.max(first, 0); i < spans.length && spans[i].start <= tick; i++) {
+        if (tick < spans[i].end) {
+            return i;
+        }
+    }
+    return -1;
+}
+
 /** The chord sounding at a tick (N.C. → null). */
 export function chordAt(timeline: Timeline, tick: number): ChordFacts | null {
-    const span = timeline.spans.find((s) => s.start <= tick && tick < s.end);
-    return span?.chord ?? null;
+    return timeline.spans[spanIndexAt(timeline, tick)]?.chord ?? null;
 }
 
 /** Seconds from tick 0 to `tick` at `bpm`, honouring fermata stretches. */

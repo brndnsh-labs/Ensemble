@@ -204,11 +204,16 @@ expression devices take turns rather than stack; one peak note per cycle.
     cycle has reached, and a trade hands back to the band for it (`leadRole`'s
     `inFinalChorus`): the last chorus of a performance is the melody restated, and a coda or
     tag hangs off the head, never off a solo. It keeps its pass lift and seeds; only the lead's
-    job changes, so the out-head restates the in-head note for note (the head is keyed by
-    section). The solo arc is not compressed to fit the choruses between (a 4-chorus chart
-    plays solos 1 and 2 of the three-chorus arc, then the head). Its last bar plays the held
-    ending a non-looping pass always has. An uncounted chart's chorus is always 0 and it has no
-    last chorus, so it plays exactly as before.
+    job changes, so the out-head restates the in-head note for note up to its closing cadence
+    (the head is keyed by section; in its last phrase the in-head leads on into the next
+    chorus, the out-head resolves). The chorus before it never brings the head back
+    (`beforeFinalChorus`): a head that returns mid-performance is there to set up more
+    blowing, and right before the out-head it would only be the melody twice — so a solo
+    there becomes the arc's third, wind-down chorus and a trade runs on. The solo arc is not
+    otherwise compressed to fit the choruses between (a 4-chorus chart plays solos 1 and 2 of
+    the three-chorus arc, then the head; a 6-chorus one plays two third choruses running). Its
+    last bar plays the held ending a non-looping pass always has. An uncounted chart's chorus
+    is always 0 and it has no last chorus, so it plays exactly as before.
 - **Phrases, and the space between them.** Each four-bar phrase of the timeline is a slot the
   lead plays in or rests in. A phrase is planned whole at its first bar and kept in memory, so
   any barline can resume it. Most slots leave room: a phrase plays two or three bars and
@@ -276,10 +281,15 @@ schedules everything due in the next 150 ms on a 25 ms timer.
 - **A counted chart** (#1475) is not looped: the host performs its timeline once, generating a
   chorus per segment (`PassOptions.until`: the rest of the window still plans the next bar and
   the ending), each resuming from the memory the one before left. A chunk plays on past its
-  end until the comp strikes again (at least one bar) and drops those bars, so what the whole
-  pass does across a chorus seam — an organ chord held to its next strike, a keyboard voice
-  yielding to the lead — happens live too: the chunks join into the one-shot pass, event for
-  event. (A seam is therefore not a loop wrap, which can do neither.) When the last segment's
+  end — at least one bar, and on while the comp has neither struck again nor reached an N.C. or
+  a bar it sits out — and drops those bars, so what the whole pass does across a chorus seam
+  (an organ chord held to its next strike or to a rest, a keyboard voice yielding to the lead)
+  happens live too: the chunks join into the one-shot pass, event for event. (A seam is
+  therefore not a loop wrap, which can do neither.) The look stops at the end of the next
+  chorus, so a chunk costs at most two choruses' bars: chunks are generated on the main thread
+  inside the scheduler's 150 ms lookahead, and on a one-chord vamp the organ never strikes
+  again. That cap is the one place the chunks and the one-shot pass part: a chord held
+  unstruck through a whole chorus past the seam ends at that chorus's end. When the last segment's
   final bar ends, the host stops by itself and calls `onEnd`; the runtime brings the transport
   to stopped by Stop's own path, except that the last notes ring out (as an export's release
   tail does) instead of being cut. A practice loop ignores the count; released, the
@@ -288,8 +298,12 @@ schedules everything due in the next 150 ms on a 25 ms timer.
   in it, the section plays once more as written) and the band stops. `render()` builds the
   export the same chorus at a time, so it is exactly the performance that plays.
 
-A pass is generated on the main thread (about 5–7 ms for 32 bars on a desktop), two seconds
-before it is needed.
+A pass is generated on the main thread, two seconds before it is needed: about 8 ms for 32
+bars with all four lanes (rhythm changes in jazz, measured 2026-10-02 on the dev box), and
+about the same for one chorus of a counted chart however long it is (7–8 ms for a 32-bar
+chorus of a 64-chorus chart; about 10 ms for a one-chord organ vamp, whose look runs a whole
+chorus). Lookups by tick (`chordAt`, `spanIndexAt`) are binary searches, so a bar's cost does
+not grow with how far into the performance it is.
 
 Audio (WAV/stem) export renders `BandHost.render()`'s events offline (`lib/band-export.ts`)
 through `playBandEvent`, the same voice mapping `BandHost` schedules live with, feel offsets

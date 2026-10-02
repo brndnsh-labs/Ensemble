@@ -8,7 +8,7 @@ import type { LeadRole } from '../../arrange/cycle.js';
 import { energyTier } from '../../arrange/plan.js';
 import type { Rng } from '../../core/random.js';
 import type { PitchedNote } from '../../core/types.js';
-import { type Bar, chordAt, chorusBars } from '../../form/timeline.js';
+import { type Bar, chordAt, chorusBars, spanIndexAt } from '../../form/timeline.js';
 import type { BarContext, PitchedIdiom } from '../../styles/types.js';
 import { type ChordFacts, chordPcs } from '../../theory/chord.js';
 import { mod12 } from '../../theory/pitch.js';
@@ -487,7 +487,7 @@ function onsetsFor(ctx: BarContext, slotStart: number, plan: SlotPlan): SlotOnse
             if (!chord) {
                 continue; // N.C.: the whole band rests
             }
-            const span = spans.findIndex((s) => s.start <= tick && tick < s.end);
+            const span = spanIndexAt(ctx.timeline, tick);
             onsets.push({
                 tick,
                 dur: steps * STEP,
@@ -512,13 +512,16 @@ function onsetsFor(ctx: BarContext, slotStart: number, plan: SlotPlan): SlotOnse
     // a target of it. Struck earlier, it stops at the change rather than rub against it.
     for (const onset of onsets) {
         const end = onset.tick + onset.dur;
-        const into = spans.findIndex(
-            (s, i) =>
-                i > onset.span &&
-                s.start > onset.tick &&
-                s.start < end &&
-                s.chord?.symbol !== onset.chord.symbol,
-        );
+        // The first later span, starting inside the note, with another chord (spans are in
+        // order of their starts, so the search ends at the note's end).
+        let into = -1;
+        for (let i = onset.span + 1; i < spans.length && spans[i].start < end; i++) {
+            const s = spans[i];
+            if (s.start > onset.tick && s.chord?.symbol !== onset.chord.symbol) {
+                into = i;
+                break;
+            }
+        }
         if (into < 0) {
             continue;
         }
@@ -544,13 +547,20 @@ function onsetsFor(ctx: BarContext, slotStart: number, plan: SlotPlan): SlotOnse
     return onsets;
 }
 
+/** The bar `tick` falls in (the first bar for a tick before it): a binary search. */
 function barOf(ctx: BarContext, tick: number): number {
     const bars = ctx.timeline.bars;
-    let i = 0;
-    while (i + 1 < bars.length && bars[i + 1].start <= tick) {
-        i++;
+    let lo = 0;
+    let hi = bars.length - 1;
+    while (lo < hi) {
+        const mid = (lo + hi + 1) >> 1;
+        if (bars[mid].start <= tick) {
+            lo = mid;
+        } else {
+            hi = mid - 1;
+        }
     }
-    return i;
+    return lo;
 }
 
 function nearestOf(pcs: readonly number[], m: number, avoid: number | null = null): number {

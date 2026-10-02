@@ -21,10 +21,14 @@
  * restated, the way a tune is played out (a coda or tag hangs off the head, never off a solo).
  * So its last chorus is the head whatever the cycle has reached, and any trade hands back to
  * the band for it. It keeps the pass it has otherwise (the lift, its seeds): only the lead's
- * job changes.
+ * job changes. And the chorus before it never brings the head back: a head that returns
+ * mid-performance is there to set up more blowing, and right before the out-head it would
+ * just be the melody twice. That chorus stays the soloist's — a solo becomes the arc's third,
+ * wind-down chorus, whose last phrase comes down and settles so the head can come in; a trade
+ * keeps trading, its block running on into the out-head.
  */
 import type { TradeSettings } from '../core/types.js';
-import { type Bar, inFinalChorus, type Timeline } from '../form/timeline.js';
+import { type Bar, beforeFinalChorus, inFinalChorus, type Timeline } from '../form/timeline.js';
 
 export type LeadRole =
     | { kind: 'rest' }
@@ -74,6 +78,13 @@ export function leadRole(
     const out = inFinalChorus(timeline, index);
     const block = trade?.choruses ? trade.choruses + 1 : null;
     const p = out ? 0 : block ? pass % block : pass;
+    // No head twice running at the end (above): where the cycle would bring it back in the
+    // chorus before the out-head, the solo winds down instead, or the trade runs on.
+    if (beforeFinalChorus(timeline, index) && pass > 0 && (block ? p === 0 : p % CYCLE === 0)) {
+        return trade
+            ? tradeRole(timeline, index, block ?? pass, trade)
+            : { kind: 'solo', chorus: 3 };
+    }
     if (trade && p > 0) {
         return tradeRole(timeline, index, p, trade);
     }

@@ -404,6 +404,32 @@ describe('BandHost counted choruses', () => {
         expect(onEnd).toHaveBeenCalledTimes(1);
     });
 
+    it('released in the last bar of the last section, it plays once more with the ending, then stops', () => {
+        // No barline is left in the lap to change at: the section plays once more as written,
+        // ending, rather than stopping dead on a fill back to its top.
+        const audio = fakeAudioContext(10);
+        const state = fakeState(audio);
+        const onEnd = vi.fn();
+        const host = new BandHost({ state: () => state, silence: () => {}, onEnd });
+        const score = { ...song([{ ...twoBars.sections[0] }]), choruses: 1 };
+        host.setScore(score);
+        const timeline = compileTimeline(score);
+        const segments = watchSegments(host);
+        host.start(drumsOnly, BPM, 0, { from: 0, to: timeline.ticks });
+        // Into the second lap's last bar (laps are two bars, from 10.1 s), then release.
+        run(host, audio, 10.1, 10.1 + 3.25 * BAR_S);
+        host.setLoop(null);
+        const end = 10.1 + 6 * BAR_S;
+        run(host, audio, 10.1 + 3.25 * BAR_S, end);
+        expect(onEnd).not.toHaveBeenCalled();
+        const last = segments().at(-1) as unknown as { looping: boolean; ends: boolean };
+        expect(last.looping).toBe(false);
+        expect(last.ends).toBe(true);
+        audio.currentTime = end;
+        pump(host);
+        expect(onEnd).toHaveBeenCalledTimes(1);
+    });
+
     it('released on the last section, the lap under way plays the ending, then stops', () => {
         // One chorus of a1 a2: a loop on A is a loop on the chart's last section.
         const audio = fakeAudioContext(10);

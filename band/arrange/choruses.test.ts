@@ -81,6 +81,22 @@ describe('a counted chart plans each chorus as the loop plans that lap', () => {
                                 }
                                 continue;
                             }
+                            if (
+                                chorus === CHORUSES - 2 &&
+                                chorus > 0 &&
+                                leadRole(looped, bar, chorus, trade).kind === 'head'
+                            ) {
+                                // Where the loop brings the head back (for the soloist, or the
+                                // band's soloist returning while you trade with the drummer),
+                                // the chorus before the out-head keeps blowing instead.
+                                if (
+                                    leadRole(counted, chorus * length + bar, chorus, trade).kind ===
+                                    'head'
+                                ) {
+                                    failures.push(`${where} (head before the out-head)`);
+                                }
+                                continue;
+                            }
                             // A trade turn names its first bar by index: in the counted
                             // timeline that is the same bar of a later chorus.
                             const relative =
@@ -120,59 +136,123 @@ describe('a counted chart plans each chorus as the loop plans that lap', () => {
     });
 });
 
-/** The lead's job in each chorus of a counted blues, by the first bar's role. */
-function rolesByChorus(choruses: number, trade: TradeSettings | null): string[] {
+/**
+ * The lead's job in each chorus of a counted blues: H the head, S1–S3 a solo chorus of the
+ * arc, T traded (the roles a chorus's bars take, joined when they differ).
+ */
+function rolesByChorus(choruses: number, trade: TradeSettings | null): string {
     const timeline = compileTimeline({ ...FIXTURES.blues, choruses });
     const length = timeline.bars.length / choruses;
     return Array.from({ length: choruses }, (_, chorus) => {
         const kinds = new Set(
             Array.from({ length }, (_, bar) => {
                 const role = leadRole(timeline, chorus * length + bar, chorus, trade);
-                return role.kind === 'solo' ? `solo${role.chorus}` : role.kind;
+                return role.kind === 'solo'
+                    ? `S${role.chorus}`
+                    : role.kind === 'head'
+                      ? 'H'
+                      : role.kind === 'trade'
+                        ? 'T'
+                        : 'rest';
             }),
         );
         return [...kinds].join('+');
-    });
+    }).join(',');
 }
+
+/** What each chorus is for, N = 1–12, per trade setting. */
+const ROLE_TABLES: [string, TradeSettings | null, string[]][] = [
+    [
+        'no trade',
+        null,
+        [
+            'H',
+            'H,H',
+            'H,S1,H',
+            'H,S1,S2,H',
+            'H,S1,S2,S3,H',
+            'H,S1,S2,S3,S3,H',
+            'H,S1,S2,S3,H,S1,H',
+            'H,S1,S2,S3,H,S1,S2,H',
+            'H,S1,S2,S3,H,S1,S2,S3,H',
+            'H,S1,S2,S3,H,S1,S2,S3,S3,H',
+            'H,S1,S2,S3,H,S1,S2,S3,H,S1,H',
+            'H,S1,S2,S3,H,S1,S2,S3,H,S1,S2,H',
+        ],
+    ],
+    [
+        'trading, the head back every chorus',
+        { with: 'lead', bars: 4, choruses: 1 },
+        [
+            'H',
+            'H,H',
+            'H,T,H',
+            'H,T,T,H',
+            'H,T,H,T,H',
+            'H,T,H,T,T,H',
+            'H,T,H,T,H,T,H',
+            'H,T,H,T,H,T,T,H',
+            'H,T,H,T,H,T,H,T,H',
+            'H,T,H,T,H,T,H,T,T,H',
+            'H,T,H,T,H,T,H,T,H,T,H',
+            'H,T,H,T,H,T,H,T,H,T,T,H',
+        ],
+    ],
+    [
+        'trading, the head back every two',
+        { with: 'lead', bars: 4, choruses: 2 },
+        [
+            'H',
+            'H,H',
+            'H,T,H',
+            'H,T,T,H',
+            'H,T,T,T,H',
+            'H,T,T,H,T,H',
+            'H,T,T,H,T,T,H',
+            'H,T,T,H,T,T,T,H',
+            'H,T,T,H,T,T,H,T,H',
+            'H,T,T,H,T,T,H,T,T,H',
+            'H,T,T,H,T,T,H,T,T,T,H',
+            'H,T,T,H,T,T,H,T,T,H,T,H',
+        ],
+    ],
+    [
+        'trading with the drummer, the head never back',
+        { with: 'drums', bars: 4, choruses: null },
+        Array.from({ length: 12 }, (_, i) =>
+            i === 0 ? 'H' : ['H', ...Array.from({ length: i - 1 }, () => 'T'), 'H'].join(','),
+        ),
+    ],
+];
 
 describe('a counted performance ends on the out-head', () => {
     for (const choruses of [2, 3, 4, 5, 8]) {
         for (const trade of TRADES) {
             it(`${choruses} choruses, ${trade ? `trading ${JSON.stringify(trade)}` : 'no trade'}`, () => {
-                const roles = rolesByChorus(choruses, trade);
-                expect(roles[0]).toBe('head');
-                expect(roles.at(-1)).toBe('head');
-                // Every chorus between is a solo or a trade, never a stray head.
+                const roles = rolesByChorus(choruses, trade).split(',');
+                expect(roles[0]).toBe('H');
+                expect(roles.at(-1)).toBe('H');
+                // Every chorus between is a solo or a trade, or a head the cycle brings back.
                 for (const role of roles.slice(1, -1)) {
-                    if (trade) {
-                        expect(['head', 'trade']).toContain(role);
-                    } else {
-                        expect(role).toMatch(/^(solo[123]|head)$/);
-                    }
+                    expect(role).toMatch(trade ? /^(H|T)$/ : /^(S[123]|H)$/);
                 }
             });
         }
     }
 
-    it('plays the cycle as a loop does, then the head: what each chorus is for', () => {
-        expect(rolesByChorus(1, null)).toEqual(['head']);
-        expect(rolesByChorus(2, null)).toEqual(['head', 'head']);
-        expect(rolesByChorus(3, null)).toEqual(['head', 'solo1', 'head']);
-        expect(rolesByChorus(4, null)).toEqual(['head', 'solo1', 'solo2', 'head']);
-        expect(rolesByChorus(5, null)).toEqual(['head', 'solo1', 'solo2', 'solo3', 'head']);
-        expect(rolesByChorus(8, null)).toEqual([
-            'head',
-            'solo1',
-            'solo2',
-            'solo3',
-            'head',
-            'solo1',
-            'solo2',
-            'head',
-        ]);
-    });
+    for (const [name, trade, table] of ROLE_TABLES) {
+        it(`plays, ${name}, what each chorus is for — never the head twice at the end`, () => {
+            const roles = table.map((_, i) => rolesByChorus(i + 1, trade));
+            expect(roles).toEqual(table);
+            // Two choruses are the head and its restatement by design; from three on, the
+            // chorus before the out-head is never a head as well.
+            for (const row of roles.slice(2)) {
+                expect(row.endsWith('H,H'), row).toBe(false);
+            }
+        });
+    }
 
-    it('restates the in-head note for note, and takes a last-chorus coda under the head', () => {
+    it('restates the in-head up to its closing cadence, and takes a last-chorus coda under the head', () => {
         const timeline = compileTimeline(COUNTED_FIXTURES.bluesCoda);
         const settings: BandSettings = { ...DEFAULT_SETTINGS, style: 'blues', lanes: ALL_LANES };
         const { events } = performPass(timeline, settings, { pass: 0, looping: false });
@@ -181,7 +261,11 @@ describe('a counted performance ends on the out-head', () => {
             events
                 .filter((e) => e.lane === 'lead' && e.bar >= from && e.bar < to)
                 .map((e) => (e.lane === 'lead' ? [e.midi, e.dur] : []));
-        expect(lead(2 * length, 3 * length)).toEqual(lead(0, length));
+        // The same tune (the head is keyed by section) up to its last phrase, where the in-head
+        // leads on into the next chorus and the out-head resolves.
+        const lastPhrase = timeline.bars[length - 1].phrase.length;
+        expect(lead(2 * length, 3 * length - lastPhrase)).toEqual(lead(0, length - lastPhrase));
+        expect(lead(2 * length, 3 * length - lastPhrase).length).toBeGreaterThan(0);
         const codaBars = timeline.bars.filter((b) => b.visit.label === 'Coda');
         expect(codaBars.map((b) => b.visit.chorus)).toEqual([2, 2]);
         expect(codaBars.every((b) => leadRole(timeline, b.index, 2, null).kind === 'head')).toBe(
@@ -217,13 +301,19 @@ function lapOf(
 
 describe("a counted chorus plays its lap's music", () => {
     // Chorus k against lap k for the choruses whose next one is still a lap's: the last two
-    // differ by design (the out-head, and the bar that leads into it). The lead, drums and
-    // bass are compared whole. The comp is not: at a seam a comp chord can ring into the next
-    // chorus's first bar (an organ's hold, a pushed chord a keyboard voices under the lead),
-    // which the whole pass does across a chorus and a loop cannot do across its wrap.
+    // differ by design (the out-head, and the chorus that leads into it). The lead, drums and
+    // bass are compared whole. The comp on its interior bars: at a seam a comp chord can ring
+    // into the next chorus's first bar (an organ's hold, a pushed chord a keyboard voices under
+    // the lead), which the whole pass does across a chorus and a loop cannot do across its
+    // wrap — so the first two bars and the last of each chorus differ, by design. And only
+    // untraded: the comp remembers when the lead last sounded as a song tick, which a loop's
+    // wrap carries into the next lap as if the lead were still playing; across a trade's long
+    // silences that stale tick reaches the interior (the counted chorus reads it correctly).
     const CHORUS_COUNT = 5;
     const COMPARED = 3;
     const LANES: Lane[] = ['lead', 'drums', 'bass'];
+    const interior = (events: BandEvent[], from: number, length: number) =>
+        events.filter((e) => e.lane !== 'comp' || (e.bar >= from + 2 && e.bar < from + length - 1));
     describe.each(STYLE_IDS.filter((id) => STYLES[id].lead))('%s', (style: StyleId) => {
         for (const name of ['blues', 'rhythmChanges', 'bossa'] as const) {
             it(name, () => {
@@ -234,8 +324,12 @@ describe("a counted chorus plays its lap's music", () => {
                 for (const seed of ['a', 'b', 'c', 'd']) {
                     for (const trade of [
                         null,
-                        { with: 'lead', bars: 4, choruses: null },
-                    ] as const) {
+                        { with: 'lead', bars: 4, choruses: null } as const,
+                        // The drummer's fours, where he solos (jazz): his motif is seeded too.
+                        ...(STYLES[style].drums.solos
+                            ? [{ with: 'drums', bars: 4, choruses: null } as const]
+                            : []),
+                    ]) {
                         const settings: BandSettings = {
                             ...DEFAULT_SETTINGS,
                             style,
@@ -253,99 +347,21 @@ describe("a counted chorus plays its lap's music", () => {
                                 memory,
                             });
                             memory = lap.memory;
+                            const from = chorus * length;
+                            const lanes: Lane[] = trade ? LANES : [...LANES, 'comp'];
                             if (
-                                lapOf(once.events, counted, chorus * length, length, LANES) !==
-                                lapOf(lap.events, looped, 0, length, LANES)
+                                lapOf(
+                                    interior(once.events, from, length),
+                                    counted,
+                                    from,
+                                    length,
+                                    lanes,
+                                ) !==
+                                lapOf(interior(lap.events, 0, length), looped, 0, length, lanes)
                             ) {
                                 failures.push(`${seed} ${trade ? 'trading' : ''} chorus ${chorus}`);
                             }
                         }
-                    }
-                }
-                expect(failures).toEqual([]);
-            });
-        }
-    });
-});
-
-/** The counted performance as the live host and the export generate it: a chorus at a time. */
-function chunked(timeline: Timeline, settings: BandSettings): BandEvent[] {
-    const events: BandEvent[] = [];
-    let memory: PassMemory | undefined;
-    let from = 0;
-    while (from < timeline.bars.length) {
-        let until = from + 1;
-        while (
-            until < timeline.bars.length &&
-            timeline.bars[until].visit.chorus === timeline.bars[from].visit.chorus
-        ) {
-            until++;
-        }
-        const result = performPass(timeline, settings, {
-            pass: 0,
-            looping: false,
-            memory,
-            window: { from, to: timeline.bars.length, wrapTo: 0, origin: 0 },
-            until,
-        });
-        events.push(...result.events);
-        memory = result.memory;
-        from = until;
-    }
-    return events;
-}
-
-describe('a counted performance generated a chorus at a time (`PassOptions.until`)', () => {
-    it('plays only the bars before `until`, and hands on the memory before it', () => {
-        const timeline = compileTimeline({ ...FIXTURES.blues, choruses: 3 });
-        const length = timeline.bars.length / 3;
-        const settings = { ...DEFAULT_SETTINGS, style: 'blues' as const, seed: 'chunk' };
-        const window = { from: 0, to: timeline.bars.length, wrapTo: 0, origin: 0 };
-        const first = performPass(timeline, settings, {
-            pass: 0,
-            looping: false,
-            window,
-            until: length,
-        });
-        expect(first.events.every((e) => e.bar < length)).toBe(true);
-        expect(first.events.some((e) => e.bar === length - 1)).toBe(true);
-        expect(first.snapshots).toHaveLength(length);
-        const whole = performPass(timeline, settings, { pass: 0, looping: false, window });
-        expect(first.memory).toEqual(whole.snapshots[length]);
-    });
-
-    // Each chunk plays one bar past its end and drops it, so what the whole pass does across a
-    // chorus seam (a held organ chord, a comp voice yielding to the lead) is done in the chunk
-    // too: the chunks join into the whole pass, event for event, every lane.
-    describe.each(STYLE_IDS)('%s joins into the whole pass', (style: StyleId) => {
-        for (const [name, score] of Object.entries({
-            ...COUNTED_FIXTURES,
-            rhythmChanges: { ...FIXTURES.rhythmChanges, choruses: 2 },
-            awkward: { ...FIXTURES.awkward, choruses: 2 },
-        })) {
-            it(name, () => {
-                const timeline = compileTimeline(score);
-                const failures: string[] = [];
-                for (const comp of [
-                    'piano',
-                    'rhodes',
-                    'organ',
-                    'clav',
-                    'guitar',
-                    'nylon',
-                ] as const) {
-                    const settings: BandSettings = {
-                        ...DEFAULT_SETTINGS,
-                        style,
-                        comp,
-                        lanes: { ...ALL_LANES, lead: !!STYLES[style].lead },
-                        lead: STYLES[style].lead?.prefers ?? DEFAULT_SETTINGS.lead,
-                    };
-                    const whole = performPass(timeline, settings, { pass: 0, looping: false });
-                    if (
-                        JSON.stringify(chunked(timeline, settings)) !== JSON.stringify(whole.events)
-                    ) {
-                        failures.push(comp);
                     }
                 }
                 expect(failures).toEqual([]);
