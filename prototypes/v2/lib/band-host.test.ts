@@ -734,6 +734,136 @@ describe('BandHost releasing a practice loop', () => {
         pump(host);
         expect(onEnd).toHaveBeenCalledTimes(1);
     });
+
+    /**
+     * A loop from the top of `score` to `loopTo`, the whole band, the timer firing every 25 ms
+     * from 10.1 s. `tick(t)` pumps at audio time `t`.
+     */
+    function rig(score: SemanticScore, loopTo: number, onEnd?: () => void) {
+        for (const voice of [playDrumSound, playBassNote, playNote, playSoloNote]) {
+            vi.mocked(voice).mockClear();
+        }
+        const audio = fakeAudioContext(10);
+        const state = fakeState(audio);
+        const host = new BandHost({ state: () => state, silence: () => {}, onEnd });
+        host.setScore(score);
+        host.start(
+            { ...DEFAULT_SETTINGS, lanes: { drums: true, bass: true, comp: true, lead: true } },
+            BPM,
+            0,
+            { from: 0, to: loopTo },
+        );
+        const tick = (t: number) => {
+            audio.currentTime = t;
+            pump(host);
+        };
+        const pumpTo = (from: number, to: number) => {
+            for (let i = 0; from + i * 0.025 < to - 1e-9; i++) {
+                tick(from + i * 0.025);
+            }
+        };
+        const release = (t: number) => {
+            audio.currentTime = t;
+            host.setLoop(null);
+        };
+        return { audio, host, tick, pumpTo, release };
+    }
+
+    it('after a stalled timer, a release near the end of the queue still carries on after the loop', () => {
+        // The timer stalled (a busy main thread, a background tab) two seconds before the
+        // release, so nothing past the lap under way was queued: the queue ends 120 ms after
+        // the release, inside the lookahead.
+        const timeline = compileTimeline(aThenB);
+        const { host, pumpTo, release } = rig(aThenB, timeline.bars[2].start);
+        const lapEnd = 10.1 + 4 * BAR_S;
+        const at = lapEnd - 0.12;
+        pumpTo(10.1, at - 2);
+        release(at);
+        pumpTo(at, lapEnd + BAR_S / 2);
+        const tick = host.songTick();
+        expect(tick).not.toBeNull();
+        expect(tick!).toBeGreaterThanOrEqual(timeline.bars[2].start);
+        expect(tick!).toBeLessThan(timeline.bars[3].start);
+        expect(doubled(voiceCalls())).toEqual([]);
+        host.stop();
+    });
+
+    it('after a stalled timer, a counted last section released in its last bar plays once more, then ends', () => {
+        const score = { ...song([{ ...twoBars.sections[0] }]), choruses: 1 };
+        const onEnd = vi.fn();
+        const { audio, pumpTo, release, tick } = rig(score, compileTimeline(score).ticks, () =>
+            onEnd(audio.currentTime),
+        );
+        const lapEnd = 10.1 + 4 * BAR_S;
+        const at = lapEnd - 0.12;
+        pumpTo(10.1, at - 2);
+        release(at);
+        // The section once more, as written: two bars after the lap under way, and no sooner.
+        pumpTo(at, lapEnd + 2 * BAR_S);
+        expect(onEnd).not.toHaveBeenCalled();
+        tick(lapEnd + 2 * BAR_S);
+        expect(onEnd).toHaveBeenCalledTimes(1);
+        expect(onEnd).toHaveBeenCalledWith(lapEnd + 2 * BAR_S);
+        expect(doubled(voiceCalls())).toEqual([]);
+    });
+
+    it('after a stalled timer, a lap that has started is under way though nothing of it was sent', () => {
+        // The next lap was queued two seconds ahead, then the timer stalled past its barline:
+        // the playhead is in that lap, so the release finishes it, as for any lap playing.
+        const timeline = compileTimeline(aThenB);
+        const { host, tick, pumpTo, release } = rig(aThenB, timeline.bars[2].start);
+        const lapEnd = 10.1 + 4 * BAR_S;
+        pumpTo(10.1, lapEnd - 1.9);
+        release(lapEnd + 0.4);
+        tick(lapEnd + 0.4);
+        // Still the lap (A's first bar), then B once it ends.
+        expect(host.songTick()!).toBeLessThan(timeline.bars[1].start);
+        pumpTo(lapEnd + 0.425, lapEnd + 2 * BAR_S + BAR_S / 2);
+        const at = host.songTick();
+        expect(at).not.toBeNull();
+        expect(at!).toBeGreaterThanOrEqual(timeline.bars[2].start);
+        expect(at!).toBeLessThan(timeline.bars[3].start);
+        host.stop();
+    });
+
+    it('after the timer stalled past the end of the queue, a release still carries on after the loop', () => {
+        // Stalled before the next lap was queued, and released after the queued lap's end:
+        // nothing is playing at the release, and the lap that was is the one it leads on from.
+        const timeline = compileTimeline(aThenB);
+        const { host, pumpTo, release } = rig(aThenB, timeline.bars[2].start);
+        const lapEnd = 10.1 + 4 * BAR_S;
+        pumpTo(10.1, lapEnd - 2.2);
+        release(lapEnd + 0.2);
+        pumpTo(lapEnd + 0.2, lapEnd + BAR_S / 2);
+        const at = host.songTick();
+        expect(at).not.toBeNull();
+        expect(at!).toBeGreaterThanOrEqual(timeline.bars[2].start);
+        expect(at!).toBeLessThan(timeline.bars[3].start);
+        host.stop();
+    });
+
+    it('a note pushed ahead of the next lap, already sent, makes that lap the one under way', () => {
+        // The band pushes the next lap's kick a few ms ahead of the barline. A pump 152 ms
+        // before the lap ends has sent it; a release a millisecond later still sees the lap's
+        // end beyond its own lookahead, but that kick is already with the voices.
+        const timeline = compileTimeline(aThenB);
+        const { host, tick, pumpTo, release } = rig(aThenB, timeline.bars[2].start);
+        const lapEnd = 10.1 + 4 * BAR_S;
+        pumpTo(10.1, 17.9);
+        tick(lapEnd - 0.152);
+        expect(voiceCalls().some((call) => call.time > lapEnd - 0.01 && call.time < lapEnd)).toBe(
+            true,
+        );
+        release(lapEnd - 0.151);
+        pumpTo(lapEnd - 0.13, lapEnd + 2 * BAR_S + BAR_S / 2);
+        expect(doubled(voiceCalls())).toEqual([]);
+        // That lap plays out, then the song carries on into B.
+        const at = host.songTick();
+        expect(at).not.toBeNull();
+        expect(at!).toBeGreaterThanOrEqual(timeline.bars[2].start);
+        expect(at!).toBeLessThan(timeline.bars[3].start);
+        host.stop();
+    });
 });
 
 /** Every note-on's absolute tick in a type-1 file (the band's writer: no running status). */
