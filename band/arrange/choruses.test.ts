@@ -302,17 +302,20 @@ function lapOf(
 describe("a counted chorus plays its lap's music", () => {
     // Chorus k against lap k for the choruses whose next one is still a lap's: the last two
     // differ by design (the out-head, and the chorus that leads into it). The lead, drums and
-    // bass are compared whole, and the comp on every bar but its last, traded or not: the
-    // comp remembers where the lead's last note ends as a song tick, which a loop's wrap moves
-    // into the next lap's own ticks (#1492), so the top of a lap hears the lead as the top of
-    // the chorus does. The last bar differs by design: a chord it pushes rings into the next
-    // chorus's first bar, where the whole pass voices it under that chorus's lead (and swings
-    // its end in that bar), which a loop cannot do across its wrap.
+    // bass are compared whole, and the comp too, traded or not: the comp remembers where the
+    // lead's last note ends as a song tick, which a loop's wrap moves into the next lap's own
+    // ticks (#1492), so the top of a lap hears the lead as the top of the chorus does. Only a
+    // comp chord that rings past the chorus's end differs, by design: the whole pass voices it
+    // under the next chorus's lead (and swings its end in that bar), which a loop cannot do
+    // across its wrap.
     const CHORUS_COUNT = 5;
     const COMPARED = 3;
     const LANES: Lane[] = ['lead', 'drums', 'bass', 'comp'];
-    const interior = (events: BandEvent[], from: number, length: number) =>
-        events.filter((e) => e.lane !== 'comp' || e.bar < from + length - 1);
+    const interior = (events: BandEvent[], timeline: Timeline, from: number, length: number) => {
+        const last = timeline.bars[from + length - 1];
+        const end = last.start + last.meter.barTicks;
+        return events.filter((e) => e.lane !== 'comp' || e.tick + e.dur <= end + 1e-6);
+    };
     describe.each(STYLE_IDS.filter((id) => STYLES[id].lead))('%s', (style: StyleId) => {
         for (const name of ['blues', 'rhythmChanges', 'bossa'] as const) {
             it(name, () => {
@@ -349,13 +352,19 @@ describe("a counted chorus plays its lap's music", () => {
                             const from = chorus * length;
                             if (
                                 lapOf(
-                                    interior(once.events, from, length),
+                                    interior(once.events, counted, from, length),
                                     counted,
                                     from,
                                     length,
                                     LANES,
                                 ) !==
-                                lapOf(interior(lap.events, 0, length), looped, 0, length, LANES)
+                                lapOf(
+                                    interior(lap.events, looped, 0, length),
+                                    looped,
+                                    0,
+                                    length,
+                                    LANES,
+                                )
                             ) {
                                 failures.push(`${seed} ${trade ? 'trading' : ''} chorus ${chorus}`);
                             }

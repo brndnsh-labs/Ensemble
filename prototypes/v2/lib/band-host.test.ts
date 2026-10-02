@@ -650,11 +650,23 @@ describe('BandHost looping laps', () => {
         const counted = compileTimeline({ ...blues, choruses: 5 });
         /** Ticks to a millionth: swing's arithmetic far into a long timeline rounds differently. */
         const fine = (n: number) => Math.round(n * 1e6) / 1e6;
-        /** The comp's notes in bars [from, from + length - 1), moved to start at tick 0. */
+        /**
+         * The comp's notes in the chorus or lap from bar `from`, moved to start at tick 0 — all
+         * but a chord ringing past its end, which only the counted pass voices under the next
+         * chorus's lead.
+         */
         const comp = (events: BandEvent[], timeline: Timeline, from: number) => {
             const start = timeline.bars[from].start;
+            const last = timeline.bars[from + length - 1];
+            const end = last.start + last.meter.barTicks;
             return events
-                .filter((e) => e.lane === 'comp' && e.bar >= from && e.bar < from + length - 1)
+                .filter(
+                    (e) =>
+                        e.lane === 'comp' &&
+                        e.bar >= from &&
+                        e.bar < from + length &&
+                        e.tick + e.dur <= end + 1e-6,
+                )
                 .map((e) =>
                     e.lane === 'comp'
                         ? [e.bar - from, fine(e.tick - start), fine(e.dur), e.midi, e.velocity]
@@ -685,9 +697,8 @@ describe('BandHost looping laps', () => {
                 const looped = compileTimeline(blues);
                 for (const lap of laps.slice(0, 3)) {
                     const heard = comp(lap.events, looped, 0);
-                    // The whole lap was performed (the last bar is the seam: a chord it pushes
-                    // rings into the next chorus, which only the counted pass can voice).
-                    expect(heard.length).toBeGreaterThan(0);
+                    // The lap was performed, its last bar too.
+                    expect(heard.some((note) => note[0] === length - 1)).toBe(true);
                     if (
                         JSON.stringify(heard) !==
                         JSON.stringify(comp(once.events, counted, lap.pass * length))

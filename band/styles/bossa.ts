@@ -202,8 +202,8 @@ const bossaNylon = compIdiom({
  * instruments on the same bottom line muddy the low end of our voices.
  */
 const bossaGuitar: PitchedIdiom = {
-    name: bossaNylon.name,
-    init: bossaNylon.init,
+    // The fingers' idiom whole (its memory, its `rebase` across a loop's wrap), with the thumb.
+    ...bossaNylon,
     play(ctx, memory) {
         const out = bossaNylon.play(ctx, memory);
         // (The ending's last chord needs no thumb: without a bass, its grip has the root.)

@@ -15,7 +15,7 @@ import { chorusBars, firstSpanAfter, type Timeline } from './form/timeline.js';
 import { COMP_INSTRUMENTS } from './players/comp/instruments.js';
 import { LEAD_INSTRUMENTS } from './players/lead/instruments.js';
 import { feelFor, STYLES } from './styles/index.js';
-import type { BarContext } from './styles/types.js';
+import type { BarContext, DrumIdiom, PitchedIdiom } from './styles/types.js';
 import { nearestMidi } from './theory/pitch.js';
 
 /**
@@ -121,13 +121,23 @@ export function performPass(
           };
     const { bars } = timeline;
     // A loop's next lap continues from the memory the lap before left at its end, but in the
-    // new lap's own ticks: what the comp remembers by song tick (where the lead's last note
-    // ends) is moved by the jump back, so the top of a lap hears the lead as the top of the
-    // same chorus counted does (#1492). A resume, or a counted chorus, starts where its memory
-    // stands, and moves nothing.
+    // new lap's own ticks: what a lane remembers by song tick (the comp: where the lead's last
+    // note ends) is moved by the jump back, so the top of a lap hears the lead as the top of
+    // the same chorus counted does (#1492). A resume, or a counted chorus, starts where its
+    // memory stands, and moves nothing.
     const jump = options.memory?.at === undefined ? 0 : bars[window.from].start - options.memory.at;
-    if (jump !== 0 && comp.rebase) {
-        memory.comp = comp.rebase(memory.comp, jump);
+    if (jump !== 0) {
+        const idioms: [Lane, PitchedIdiom | DrumIdiom | undefined][] = [
+            ['drums', style.drums],
+            ['bass', style.bass],
+            ['lead', lead],
+            ['comp', comp],
+        ];
+        for (const [lane, idiom] of idioms) {
+            if (idiom?.rebase) {
+                memory[lane] = idiom.rebase(memory[lane], jump);
+            }
+        }
     }
     // The held ending (`arrange/ending.ts`): a pass that ends resolves a final turnaround to
     // the tonic. Only the ending bar is played on it; every bar before it hears the chart.
