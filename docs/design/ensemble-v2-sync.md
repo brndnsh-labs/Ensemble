@@ -150,6 +150,20 @@ table, Save, read and delete routes; and the same per-owner document cap.
   re-reads and re-validates the whole library, and `collectionsVersion` when collections did (a
   collection Save committed, a merge, a download of a collection), which re-reads only the
   collections. A star uploading must not cost a 2,000-song songbook a full re-read.
+- **A whole-playlist import is ONE transaction (#1478).** `AccountSongbook.importPlaylist` commits
+  every song as its own queued create (base `revision: null`, a fresh operation id each) and the
+  collection that holds them — created, or extended when one of that name exists — in one
+  transaction, after re-checking the account cap inside it (`ImportCapError`, nothing written).
+  So there is no half-imported playlist to resume: a reload or closed tab mid-import aborts the
+  transaction, and a rerun cannot duplicate a song. No pending budget changes either:
+  `MAX_PENDING_SAVES` bounds ONE document's queue, and each imported song's queue is one deep. The
+  drain is the outbox's as it always was — frozen bytes and receipts, pass by pass — and the loop
+  bumps `libraryVersion` once for the import and once per pass, never per song. The chip and the
+  songbook count `songsWaiting` (queued SONGS, from the operations index's keys alone) so a long
+  drain reads as one; `collectionOutbox` reads only collection queues for the same reason. At the
+  server's 120 Saves a minute a 1,350-song import takes at least twelve minutes of passes, and a
+  pass that meets a 429 waits for the next trigger (Save, `online`, visibility) — there is still no
+  timer.
 - **Guest collections are adopted with guest songs** (`adoptGuestCollections`): song ids remapped to
   the ids those songs are adopted under, the guest Starred merged into the account's. When every
   guest song is already in the account, the offer still opens if a guest collection holds songs

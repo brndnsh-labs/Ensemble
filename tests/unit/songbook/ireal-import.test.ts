@@ -1,6 +1,15 @@
 import fixtures from '../../../docs/design/fixtures/ensemble-v2-charts.json';
-import { decodeIRealMusic } from '../../../public/songbook/ireal-decode.js';
-import { parseIRealImport } from '../../../public/songbook/ireal-import.js';
+import {
+    decodeIRealInput,
+    decodeIRealMusic,
+    MAX_IREAL_SONGS,
+    songSourceLink,
+} from '../../../public/songbook/ireal-decode.js';
+import {
+    MAX_IMPORT_MEASURES,
+    parseIRealImport,
+    parseIRealImportInSteps,
+} from '../../../public/songbook/ireal-import.js';
 import { prepareScorePlayback } from '../../../public/songbook/score-playback.js';
 
 function open(body: string, title = 'Original fixture', key = 'C'): string {
@@ -1008,11 +1017,15 @@ describe('bounded source-preserving iReal import', () => {
         for (const source of ['x'.repeat(1_048_577), '🎵'.repeat(262_145)]) {
             expect(parseIRealImport(source).diagnostics[0]?.message).toContain('1 MiB');
         }
-        const tooMany = Array.from(
-            { length: 65 },
-            () => `<a href="${open('T44[C Z')}">song</a>`,
-        ).join('');
-        expect(parseIRealImport(tooMany).diagnostics[0]?.message).toContain('64');
+        // #1478: a playlist imports whole, so the song cap is the account's (2,000), not 64.
+        const links = (length: number) =>
+            Array.from({ length }, () => `<a href="${open('T44[C Z')}">song</a>`).join('');
+        expect(parseIRealImport(links(2_001)).diagnostics[0]?.message).toContain(
+            'at most 2,000 songs',
+        );
+        const atCap = parseIRealImport(links(2_000));
+        expect(atCap.diagnostics).toEqual([]);
+        expect(atCap.songs).toHaveLength(2_000);
         blocked(`T44[${'C|'.repeat(4096)}C Z`);
         blocked(`T44[C${' '.repeat(64)}Z`);
     });
@@ -1022,12 +1035,20 @@ describe('bounded source-preserving iReal import', () => {
     });
 
     it('bounds total written measures across multiple valid songs', () => {
-        const chart = open(`T44[${'C|'.repeat(2050)}CZ`);
-        const source = `<a href="${chart}">one</a><a href="${chart}">two</a>`;
+        // 4,000 bars a song (each under the per-song bound): 16 fit the import-wide cap and 17
+        // pass it — the whole import is refused, never truncated to the songs that fit.
+        const chart = open(`T44[${'C|'.repeat(3999)}CZ`);
+        const songs = (count: number) =>
+            Array.from({ length: count }, (_, index) => `<a href="${chart}">${index}</a>`).join('');
+        const fits = parseIRealImport(songs(16));
+        expect(fits.diagnostics).toEqual([]);
+        expect(fits.songs).toHaveLength(16);
+        expect(16 * 4000).toBeLessThanOrEqual(MAX_IMPORT_MEASURES);
+        const source = songs(17);
         const parsed = parseIRealImport(source);
         expect(parsed.source).toBe(source);
         expect(parsed.songs).toEqual([]);
-        expect(parsed.diagnostics[0]?.message).toContain('4,096 written measures');
+        expect(parsed.diagnostics[0]?.message).toContain('65,536 written measures');
     });
 
     it('returns detached objects and deterministic identities on repeated reads', () => {
@@ -1039,5 +1060,121 @@ describe('bounded source-preserving iReal import', () => {
         first.songs[0].score!.sections[0].measures[0].id = 'Changed';
         expect(second.songs[0].metadata.fields[0]).toBe('Blues fixture');
         expect(second.songs[0].score!.sections[0].measures[0].id).toBe('ireal-1-bar-1');
+    });
+});
+
+/**
+ * #1478 — a whole playlist: its name kept, up to the account's 2,000 songs, parsed in slices that
+ * agree exactly with the one-go parse, and each song's own link rebuildable from its fields.
+ */
+describe('whole-playlist decoding (#1478)', () => {
+    /** One modern (irealb) playlist link of `count` songs, with an optional terminal name. */
+    function playlist(count: number, name?: string): string {
+        const fields = (index: number) => [
+            `Tune ${index + 1}`,
+            `Composer ${index % 7}`,
+            '',
+            'Medium Swing',
+            'C',
+            '',
+            `1r34LbKcu7T44[C   |G7   Z`,
+            '',
+            '0',
+            '0',
+        ];
+        const songs = Array.from({ length: count }, (_, index) =>
+            fields(index).map(encodeURIComponent).join('='),
+        );
+        return `irealb://${songs.join('===')}${name === undefined ? '' : `===${encodeURIComponent(name)}`}`;
+    }
+
+    it('decodes a 1,350-song playlist with its name and every song, in order', () => {
+        const source = playlist(1350, 'Jazz 1350');
+        const decoded = decodeIRealInput(source);
+        expect(decoded.playlistName).toBe('Jazz 1350');
+        expect(decoded.entries).toHaveLength(1350);
+        const parsed = parseIRealImport(source);
+        expect(parsed.diagnostics).toEqual([]);
+        expect(parsed.playlistName).toBe('Jazz 1350');
+        expect(parsed.songs).toHaveLength(1350);
+        expect(parsed.songs[0].title).toBe('Tune 1');
+        expect(parsed.songs[1349].title).toBe('Tune 1350');
+        expect(parsed.songs.every((song) => song.score)).toBe(true);
+    });
+
+    it('has no playlist name when the export carries none', () => {
+        expect(decodeIRealInput(playlist(3)).playlistName).toBeUndefined();
+        expect(parseIRealImport(playlist(3)).playlistName).toBeUndefined();
+    });
+
+    it('drops an unsafe playlist name with a warning, never the songs', () => {
+        const parsed = parseIRealImport(playlist(2, '<b>Gig</b>'));
+        expect(parsed.playlistName).toBeUndefined();
+        expect(parsed.songs).toHaveLength(2);
+        expect(parsed.diagnostics).toEqual([
+            expect.objectContaining({ severity: 'warning', message: expect.any(String) }),
+        ]);
+    });
+
+    it('refuses a playlist of more than 2,000 songs, and accepts exactly 2,000', () => {
+        // The account's document cap (`MAX_DOCUMENTS_PER_OWNER`), written out: the contract.
+        expect(MAX_IREAL_SONGS).toBe(2_000);
+        const over = parseIRealImport(playlist(2_001, 'Too many'));
+        expect(over.songs).toEqual([]);
+        expect(over.diagnostics[0]).toMatchObject({ severity: 'error' });
+        expect(over.diagnostics[0].message).toContain('at most 2,000 songs');
+        const full = parseIRealImport(playlist(2_000, 'Full'));
+        expect(full.diagnostics).toEqual([]);
+        expect(full.songs).toHaveLength(2_000);
+    });
+
+    it('still refuses an export over the 1 MiB byte cap, however few songs it names', () => {
+        const padded = `${playlist(2, 'Gig')}${'x'.repeat(1_048_576)}`;
+        expect(parseIRealImport(padded).diagnostics[0]?.message).toContain('1 MiB');
+    });
+
+    it('parses in slices with exactly the one-go result, reporting progress as it goes', async () => {
+        const source = playlist(120, 'Sliced');
+        let yields = 0;
+        const progress: number[] = [];
+        const sliced = await parseIRealImportInSteps(source, {
+            // Every song is a slice here, so each yields: the result must not depend on where.
+            shouldYield: () => true,
+            yieldNow: async () => {
+                yields += 1;
+            },
+            onProgress: (done) => progress.push(done),
+        });
+        expect(sliced).toEqual(parseIRealImport(source));
+        expect(yields).toBe(120);
+        expect(progress.at(-1)).toBe(120);
+        expect(progress).toEqual([...progress].sort((a, b) => a - b));
+    });
+
+    it('stops when cancelled, and resolves null', async () => {
+        let calls = 0;
+        const sliced = await parseIRealImportInSteps(playlist(50), {
+            shouldYield: () => true,
+            yieldNow: async () => {
+                calls += 1;
+            },
+            cancelled: () => calls >= 3,
+        });
+        expect(sliced).toBeNull();
+        expect(calls).toBe(3);
+    });
+
+    it("rebuilds each song's own link from its fields, which reads back to the same song", () => {
+        const parsed = parseIRealImport(playlist(5, 'Links'));
+        for (const song of parsed.songs) {
+            const again = parseIRealImport(songSourceLink('irealb', song.metadata.fields));
+            expect(again.songs).toHaveLength(1);
+            expect(again.songs[0].metadata.fields).toEqual(song.metadata.fields);
+            // Ids are positional (`ireal-<index>-…`); the music is what must read back the same.
+            const music = (score: typeof song.score) =>
+                score?.sections.flatMap((section) => section.measures.map((bar) => bar.content));
+            expect(music(again.songs[0].score)).toEqual(music(song.score));
+            expect(again.playlistName).toBeUndefined();
+        }
     });
 });

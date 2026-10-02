@@ -184,6 +184,13 @@ export interface SyncSnapshot {
      */
     collectionSaves: number;
     /**
+     * How many SONGS have a Save in this account's outbox here (#1478) — the chart on the stand's
+     * own queue among them. One song's Save is the observation's to describe; this is what the
+     * chip counts when more than that is waiting, as it is for the whole drain of a playlist
+     * import. Zero when nothing is attached.
+     */
+    songsWaiting: number;
+    /**
      * Bumped whenever a pass changed this account's stored SONGS, so a list can re-read. Never for
      * a collection alone (#1477 review R1): that re-read validates every song in the library, and
      * a star uploading must not cost a 2,000-song songbook that.
@@ -539,6 +546,7 @@ function sameSnapshot(a: SyncSnapshot, b: SyncSnapshot): boolean {
         a.libraryVersion === b.libraryVersion &&
         a.collectionsVersion === b.collectionsVersion &&
         a.collectionSaves === b.collectionSaves &&
+        a.songsWaiting === b.songsWaiting &&
         sameObservation(a.observation, b.observation)
     );
 }
@@ -825,6 +833,28 @@ export interface SyncLoop {
         owner: string | null,
     ): Promise<SavedCollection | null>;
     /**
+     * How many documents of either kind this account holds here (#1478) — what a whole-playlist
+     * import states against the account cap before it writes. Scoped like `listLibrary`.
+     */
+    documentCount(owner?: string | null): Promise<number>;
+    /**
+     * A whole iReal playlist, committed and queued as ONE transaction
+     * (`AccountSongbook.importPlaylist`): its songs, then the collection holding them. Fenced on
+     * `owner` like `save` — these are nobody's songs until committed, so a caller passes the
+     * session's owner. ONE `libraryVersion` and one `collectionsVersion` bump for the whole import,
+     * never one per song, and it does not send: the caller runs a pass. `ImportCapError` when the
+     * account has no room, with nothing written.
+     */
+    importPlaylist(
+        songs: readonly ChartDocument[],
+        collection: {
+            documentId: string;
+            edit: (current: CollectionDocument | null) => CollectionDocument | null;
+        },
+        owner: string | null,
+        pace?: { shouldYield: () => boolean; yieldNow: () => Promise<void> },
+    ): Promise<{ songs: number; collection: SavedCollection | null }>;
+    /**
      * Delete one collection (#1477) — never its songs. Local-only exactly when that is the whole
      * truth (`AccountSongbook.deleteCollection`'s `'removed'`); a collection the account holds goes
      * through the same explicit online delete a song does (`deleteFromCloud`), and one with a Save
@@ -973,6 +1003,7 @@ export function createSyncLoop(
         libraryVersion: 0,
         collectionsVersion: 0,
         collectionSaves: 0,
+        songsWaiting: 0,
     };
     let scope: AccountScope | null = null;
     let watched: string | null = null;
@@ -1155,7 +1186,12 @@ export function createSyncLoop(
         const current = scope;
         const documentId = watched;
         if (!current) {
-            publish({ observation: null, candidates: NO_UPDATES, collectionSaves: 0 });
+            publish({
+                observation: null,
+                candidates: NO_UPDATES,
+                collectionSaves: 0,
+                songsWaiting: 0,
+            });
             return;
         }
         // Read in its own try, and BEFORE the early return below: the songbook shows its rows with
@@ -1200,8 +1236,19 @@ export function createSyncLoop(
         } catch {
             // Unreadable is not "none" here either: the last count stands.
         }
+        // The songs half (#1478), the same way: a key walk of the outbox, in its own try.
+        let songsWaiting = state.songsWaiting;
+        try {
+            const waiting = await songbook.songsWaiting(current);
+            if (mine !== epoch || token !== observation) {
+                return;
+            }
+            songsWaiting = waiting;
+        } catch {
+            // Unreadable is not "none": the last count stands.
+        }
         if (documentId === null) {
-            publish({ observation: null, candidates, collectionSaves });
+            publish({ observation: null, candidates, collectionSaves, songsWaiting });
             return;
         }
         try {
@@ -1237,12 +1284,13 @@ export function createSyncLoop(
                 },
                 candidates,
                 collectionSaves,
+                songsWaiting,
             });
         } catch {
             // An unreadable record is not evidence about the cloud. Leave the last observation
             // alone rather than publish a fabricated one — but the candidate list above was read
             // successfully, and it is a fact about a different store's rows.
-            publish({ candidates, collectionSaves });
+            publish({ candidates, collectionSaves, songsWaiting });
         }
     }
 
@@ -1548,6 +1596,7 @@ export function createSyncLoop(
                     candidates: NO_UPDATES,
                     documents: UNOBSERVED,
                     collectionSaves: 0,
+                    songsWaiting: 0,
                 });
                 await observe();
             })();
@@ -1577,6 +1626,7 @@ export function createSyncLoop(
                 candidates: NO_UPDATES,
                 documents: UNOBSERVED,
                 collectionSaves: 0,
+                songsWaiting: 0,
             });
         },
         setActiveDocument(documentId) {
@@ -1686,6 +1736,21 @@ export function createSyncLoop(
                 await observe();
             }
             return saved;
+        },
+        async documentCount(owner = null) {
+            return songbook.documentCount(await heldScope(owner));
+        },
+        async importPlaylist(songs, collection, owner, pace) {
+            const current = await ownedScope(owner);
+            const result = await songbook.importPlaylist(current, songs, collection, pace);
+            publish({
+                libraryVersion: state.libraryVersion + 1,
+                ...(result.collection !== null
+                    ? { collectionsVersion: state.collectionsVersion + 1 }
+                    : {}),
+            });
+            await observe();
+            return result;
         },
         async deleteCollection(documentId, owner) {
             const current = await ownedScope(owner);

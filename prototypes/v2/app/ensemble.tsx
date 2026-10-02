@@ -54,6 +54,7 @@ import {
     v1ImportContext,
     v1ImportOffer,
 } from '../lib/import-v1';
+import { collectionWrite, framePace, type PlaylistImport } from '../lib/playlist-import';
 import * as repository from '../lib/repository';
 import type { ChartDocument } from '../lib/runtime';
 import * as runtime from '../lib/runtime';
@@ -594,6 +595,11 @@ export default function Ensemble() {
     const [standardsOpen, setStandardsOpen] = useState(false);
     // The All songs page (#1440): a third songbook-home view, alongside the standards browser.
     const [allSongsOpen, setAllSongsOpen] = useState(false);
+    /**
+     * The collection the All songs page opens on (#1478) — the one a whole-playlist import just
+     * wrote — or null for All songs itself. Set only by that import; every other way in clears it.
+     */
+    const [allSongsCollection, setAllSongsCollection] = useState<string | null>(null);
     // Which home entry point opened the standards browser (#1441) — "Browse all →" or one
     // shelf's link — so the browser opens on that shelf and focus comes back to that button.
     const [standardsEntry, setStandardsEntry] = useState<StandardsEntry>('all');
@@ -946,6 +952,12 @@ export default function Ensemble() {
     }));
     // The session's owner, when signed in — the account a home slice has to have been read for.
     const sessionOwner = account.session.status === 'signedIn' ? account.session.owner : null;
+    // #1478 — how many documents the signed-in account holds here, for the import's cap line.
+    // Stable per owner, so the dialog reads it once per playlist rather than on every render.
+    const accountDocumentCount = useCallback(
+        () => accountSync.documentCount(sessionOwner),
+        [sessionOwner],
+    );
     // The live songbook's home slice (#1441), or null while it has not been read. Signed in, a
     // slice read for anybody else is not an answer yet.
     const liveHome = signedIn
@@ -2855,7 +2867,8 @@ export default function Ensemble() {
      * a page of 20. When they agree, the page shows the kept list at once and the re-read
      * replaces it (a rename in another tab changes no count).
      */
-    function openAllSongs() {
+    function openAllSongs(collectionId: string | null = null) {
+        setAllSongsCollection(collectionId);
         const which = signedIn ? 'account' : 'guest';
         if (liveSongs === null || !libraryWanted.current[which]) {
             wantLibrary(which);
@@ -2946,6 +2959,59 @@ export default function Ensemble() {
         collections.toggleStar(id, !starred.has(id)).catch((failure: unknown) => {
             setHomeNoticeState(failure instanceof Error ? failure.message : String(failure));
         });
+    }
+    /**
+     * Write a whole iReal playlist into the live songbook (#1478): its songs in ONE transaction,
+     * then the collection holding them — the songbook `storeSave` would write a single import to,
+     * by the same rule. Signed in, the account's one transaction (`accountSync.importPlaylist`)
+     * holds songs AND collection and states the cap again as it writes; a guest's songs and
+     * collection live in two databases (`lib/repository.ts`), so they are two transactions, songs
+     * first. One re-read of the songbook afterwards, never one per song.
+     *
+     * Then, from the songbook, the All songs page opens on the collection; from the stand the
+     * chart stays where it is and the stand says where the songs went.
+     */
+    async function importPlaylist(plan: PlaylistImport, onProgress: (text: string) => void) {
+        if (currentStore.current?.store === 'account' && !signedIn) {
+            // `storeSave`'s own guard: never a silent copy into the guest songbook.
+            throw new Error(
+                'Your session expired — sign in again to import into your account. Nothing was imported.',
+            );
+        }
+        const write = collectionWrite(plan);
+        const pace = framePace();
+        onProgress(`Saving ${plan.songs.length.toLocaleString('en-US')} songs on this device…`);
+        if (signedIn) {
+            if (sessionOwner === null) {
+                throw new Error('Your account is still connecting. Nothing was imported.');
+            }
+            await accountSync.importPlaylist(plan.songs, write, sessionOwner, pace);
+            // One pass to start the upload; the outbox drains the rest pass by pass.
+            void accountSync.run().catch(() => {});
+        } else {
+            await repository.importSongs(plan.songs, pace);
+            try {
+                await repository.editCollection(write.documentId, write.edit);
+            } catch (failure) {
+                // The guest's songs and collections are two databases, so the songs are already
+                // saved. Said plainly, with the way back: a rerun finds them as duplicates and
+                // makes the collection from the copies already here.
+                await refreshSongs();
+                throw new Error(
+                    `The songs were imported, but the collection could not be saved: ${failure instanceof Error ? failure.message : String(failure)} Import the playlist again to make it; its songs will be recognized as already in your songbook.`,
+                );
+            }
+        }
+        track('chart_imported', { format: 'ireal' });
+        await refreshSongs();
+        await collections.reload();
+        const sentence = `Imported ${plan.songs.length.toLocaleString('en-US')} ${plan.songs.length === 1 ? 'song' : 'songs'} into “${plan.collection.name}”.`;
+        if (current) {
+            setMessage(`${sentence} Find them under Collections on All songs.`);
+            return;
+        }
+        openAllSongs(write.documentId);
+        setHomeNoticeState(sentence);
     }
     /** Add the row menu's song to one of the songbook's collections (#1477). */
     function addRowToCollection(collectionId: string) {
@@ -5008,6 +5074,13 @@ export default function Ensemble() {
                         });
                         track('chart_opened', { source: 'import' });
                     }}
+                    playlist={{
+                        library: songbookLoading ? null : liveSongs,
+                        collections: collections.collections,
+                        onWantLibrary: wantLiveLibrary,
+                        documentCount: signedIn ? accountDocumentCount : null,
+                        onImport: importPlaylist,
+                    }}
                 />
             )}
             {/*
@@ -5030,6 +5103,18 @@ export default function Ensemble() {
                 >
                     <span>{homeNotice}</span>
                 </div>
+            )}
+            {/*
+             * #1478 — the upload a whole-playlist import leaves behind, said on the songbook too:
+             * the sync chip lives in Song actions, which needs a chart on the stand, and a 1,350-song
+             * import drains over many passes. The count is the loop's (`songsWaiting`), read from
+             * storage, and the pass's own reason follows when one is holding it up.
+             */}
+            {!current && signedIn && sync.songsWaiting > 1 && (
+                <p className="upload-progress" role="status" data-testid="songs-uploading">
+                    {`Songs · ${sync.songsWaiting.toLocaleString('en-US')} waiting to upload to your account`}
+                    {sync.failure ? ` · ${sync.failure.message}` : ''}
+                </p>
             )}
             {!ready ? (
                 <main className="loading">
@@ -5055,6 +5140,7 @@ export default function Ensemble() {
                     busy={busy}
                     initialSort={allSongsSortPreference()}
                     onSortChange={rememberAllSongsSort}
+                    initialCollectionId={allSongsCollection}
                     onBack={() => setAllSongsOpen(false)}
                     onOpenSong={openSong}
                     onToggleStar={toggleStar}

@@ -297,6 +297,17 @@ export function SyncStatus(props: SyncStatusProps) {
                     ? ` (${view.cloud.pendingCount})`
                     : ''}
             </span>
+            {sync.songsWaiting > (view.cloud.status === 'queued' ? 1 : 0) && (
+                // #1478 — every song with a Save still queued here, the chart on the stand's among
+                // them. One song is the cloud fact above; more than that (a playlist import draining
+                // over several passes) is counted here, so the chip never reads as "all uploaded"
+                // while hundreds of songs are still waiting.
+                <span className="sync-fact" data-testid="sync-songs-waiting">
+                    {sync.songsWaiting === 1
+                        ? 'Songs · 1 waiting to upload'
+                        : `Songs · ${sync.songsWaiting.toLocaleString('en-US')} waiting to upload`}
+                </span>
+            )}
             {sync.collectionSaves > 0 && (
                 // #1477 — collection Saves (a star, a set-list change) are never the watched
                 // document the cloud fact above describes, so they are counted here, beside it,

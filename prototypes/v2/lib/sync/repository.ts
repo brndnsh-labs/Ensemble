@@ -522,6 +522,43 @@ export class CollectionCapError extends Error {
 }
 
 /**
+ * The account cap check a whole-playlist import makes (#1478): null when `documents` more fit
+ * beside the `held` documents this device knows the account holds, else the sentence that refuses
+ * the import — stating the cap and the usage, because the import writes nothing rather than half a
+ * playlist. The count is what this device holds (songs and collections, the server's own unit), so
+ * it can miss documents another device added; the server stays the authority, and refuses a Save
+ * past its cap on upload. A guest songbook has no cap and never asks.
+ */
+export function capRefusal(
+    documents: number,
+    held: number,
+    cap = MAX_REMOTE_CANDIDATES,
+): string | null {
+    if (held + documents <= cap) {
+        return null;
+    }
+    const format = (value: number) => value.toLocaleString('en-US');
+    const room = Math.max(0, cap - held);
+    return `Your account holds up to ${format(cap)} songs and collections, and it has ${format(held)}. This import adds ${format(documents)}, ${format(held + documents - cap)} more than fit${room > 0 ? ` (there is room for ${format(room)})` : ''}. Nothing has been imported.`;
+}
+
+/**
+ * A whole-playlist import refused on this device because the account has no room for it (#1478):
+ * the import writes nothing rather than half a playlist. Its sentence is `capRefusal`'s;
+ * `documents` and `held` are the numbers it was decided on.
+ */
+export class ImportCapError extends Error {
+    readonly documents: number;
+    readonly held: number;
+
+    constructor(documents: number, held: number) {
+        super(capRefusal(documents, held) ?? 'Your account library is full.');
+        this.documents = documents;
+        this.held = held;
+    }
+}
+
+/**
  * The saved record under one id, of whichever kind holds it (#1474): the song when there is one,
  * else the collection, else null. Two reads inside the caller's transaction; a song wins because
  * every chart path that was here before collections asked `songs` alone and must see what it did.
@@ -1199,6 +1236,151 @@ export class AccountSongbook {
     }
 
     /**
+     * How many documents of either kind this owner holds on this device (#1478) — the count a
+     * whole-playlist import states against the account cap before it writes anything, and the
+     * same count `importPlaylist` and a collection create re-check inside their own transaction.
+     */
+    async documentCount(scope: AccountScope): Promise<number> {
+        scope = copyScope(scope);
+        return this.database.run('readonly', scope, (tx) => {
+            documentCount(tx, scope, (count) => tx.finish(count));
+        });
+    }
+
+    /**
+     * A whole iReal playlist, imported as ONE transaction (#1478): every song as its own queued
+     * create, then the collection that holds them — created, or extended when it already exists.
+     * Either all of it is committed and queued, or none of it is: a reload or a closed tab
+     * mid-import aborts the transaction, so there is no half-imported playlist to resume and
+     * nothing a re-run could duplicate. That is all the resuming this design needs — the
+     * DRAIN is the outbox's as it always was: one queued create per song (each song's queue is one
+     * deep, far inside `MAX_PENDING_SAVES`, which bounds ONE document's queue), frozen and sent
+     * pass by pass, each committed by its own receipt.
+     *
+     * - **The cap is checked here**, inside the transaction that writes: the songs, plus one when
+     *   the collection is new, against `MAX_REMOTE_CANDIDATES` less the documents this device
+     *   holds. Past it, `ImportCapError` and nothing is written — a create the server can only
+     *   refuse with `quota_exceeded` would end every outbox pass.
+     * - **Every song is a create**: an id this owner already holds, of either kind, refuses the
+     *   whole import rather than overwriting anything.
+     * - **The collection** is `collection.edit`'s answer for what is stored at its id (null when
+     *   nothing is), one Save through the same queue rules as `editCollection`.
+     *
+     * Every document is validated BEFORE the transaction opens (a validation is synchronous and a
+     * 1,350-song import's worth would stall the page), handing the event loop back through
+     * `pace` between slices when given.
+     */
+    async importPlaylist(
+        scope: AccountScope,
+        candidates: readonly unknown[],
+        collection: {
+            documentId: string;
+            edit: (current: CollectionDocument | null) => CollectionDocument | null;
+        },
+        pace?: { shouldYield: () => boolean; yieldNow: () => Promise<void> },
+    ): Promise<{ songs: number; collection: SavedCollection | null }> {
+        scope = copyScope(scope);
+        identifier(collection.documentId);
+        const songs: ChartDocument[] = [];
+        for (const candidate of candidates) {
+            songs.push(snapshot(candidate));
+            if (pace?.shouldYield()) {
+                await pace.yieldNow();
+            }
+        }
+        const ids = new Set(songs.map((song) => song.id));
+        if (ids.size !== songs.length || ids.has(collection.documentId)) {
+            throw new Error('An import cannot use one id twice.');
+        }
+        // Always fresh, never caller-supplied — `save` says why.
+        const operationIds = songs.map(() => crypto.randomUUID());
+        const collectionOperationId = crypto.randomUUID();
+        return this.database.run('readwrite', scope, (tx) => {
+            documentCount(tx, scope, (held) => {
+                tx.read(
+                    tx.table('songs').getKey([scope.ownerId, collection.documentId]),
+                    (song: IDBValidKey | undefined) => {
+                        if (song !== undefined) {
+                            throw new Error('This id already belongs to a song.');
+                        }
+                    },
+                );
+                tx.read(
+                    tx.table('collections').get([scope.ownerId, collection.documentId]),
+                    (row: SavedCollection | undefined) => {
+                        const previous = storedCollection(row, scope, collection.documentId);
+                        const needed = songs.length + (previous ? 0 : 1);
+                        if (held + needed > MAX_REMOTE_CANDIDATES) {
+                            throw new ImportCapError(needed, held);
+                        }
+                        const now = new Date().toISOString();
+                        for (const [index, candidate] of songs.entries()) {
+                            const key = [scope.ownerId, candidate.id];
+                            tx.read(
+                                tx.table('collections').getKey(key),
+                                (taken: IDBValidKey | undefined) => {
+                                    if (taken !== undefined) {
+                                        throw new Error('This id already belongs to a collection.');
+                                    }
+                                },
+                            );
+                            // Validated above, before the transaction; a create's own revision
+                            // and stamps cannot make a valid document invalid.
+                            const saved: ChartDocument = {
+                                ...candidate,
+                                revision: 0,
+                                createdAt: now,
+                                updatedAt: now,
+                            };
+                            // `add`, never `put`: a song this owner already holds refuses the
+                            // whole import (a ConstraintError aborts the transaction).
+                            tx.table('songs').add({
+                                ownerId: scope.ownerId,
+                                documentId: saved.id,
+                                document: saved,
+                                remoteRevision: null,
+                            } satisfies SavedSong);
+                            tx.table('operations').add({
+                                ownerId: scope.ownerId,
+                                documentId: saved.id,
+                                operationId: operationIds[index],
+                                localRevision: 0,
+                                snapshot: saved,
+                                base: { revision: null },
+                                wireBody: null,
+                                status: 'queued',
+                            } satisfies SaveOperation);
+                        }
+                        const proposed = collection.edit(previous?.document ?? null);
+                        if (proposed === null) {
+                            return tx.finish({ songs: songs.length, collection: null });
+                        }
+                        const document = collectionSnapshot(proposed);
+                        if (document.id !== collection.documentId) {
+                            throw new Error('A collection edit cannot change its id.');
+                        }
+                        assertBuiltInKept(previous?.document ?? null, document);
+                        queueOf(tx, scope, document.id, collectionSnapshot, (queue) => {
+                            tx.finish({
+                                songs: songs.length,
+                                collection: enqueueCollection(
+                                    tx,
+                                    scope,
+                                    document,
+                                    previous,
+                                    previous?.document.revision ?? null,
+                                    collectionOperationId,
+                                    queue,
+                                ),
+                            });
+                        });
+                    },
+                );
+            });
+        });
+    }
+
+    /**
      * Copy this device's `star:` rows (#1440) into the account's built-in Starred collection, once
      * per device (#1477). For an account that is the union of what THIS device has: the stars are
      * added after whatever Starred already holds (a download from another device, or a star made
@@ -1548,23 +1730,72 @@ export class AccountSongbook {
         scope = copyScope(scope);
         const owned = IDBKeyRange.bound([scope.ownerId], [scope.ownerId, []], false, true);
         return this.database.run('readonly', scope, (tx) => {
-            tx.read(tx.table('operations').getAll(owned), (rows: SaveOperation<SyncDocument>[]) => {
-                const queues = new Map<string, SaveOperation<SyncDocument>[]>();
-                for (const row of rows) {
-                    if (row && isCollectionCandidate(row.snapshot)) {
-                        queues.set(row.documentId, [...(queues.get(row.documentId) ?? []), row]);
-                    }
-                }
+            // Only the collections' own queues are read (#1478): after a whole-playlist import the
+            // outbox can hold well over a thousand queued SONG Saves, and this runs on every
+            // observation — reading every operation's snapshot to find a handful of collection
+            // Saves would read the whole import each time.
+            tx.read(tx.table('collections').getAllKeys(owned), (keys: IDBValidKey[]) => {
                 let unsent = 0;
                 let refused = 0;
-                for (const queue of queues.values()) {
-                    unsent += queue.length;
-                    const head = [...queue].sort((a, b) => a.localRevision - b.localRevision)[0];
-                    if (head?.status === 'refused') {
-                        refused += queue.length;
-                    }
+                let pending = keys.length;
+                if (pending === 0) {
+                    return tx.finish({ unsent, refused });
                 }
-                tx.finish({ unsent, refused });
+                for (const key of keys) {
+                    const documentId = (key as [string, string])[1];
+                    tx.read(
+                        tx.table('operations').index('song').getAll([scope.ownerId, documentId]),
+                        (rows: SaveOperation<SyncDocument>[]) => {
+                            const queue = rows.filter(
+                                (row) => row && isCollectionCandidate(row.snapshot),
+                            );
+                            unsent += queue.length;
+                            const head = queue.sort((a, b) => a.localRevision - b.localRevision)[0];
+                            if (head?.status === 'refused') {
+                                refused += queue.length;
+                            }
+                            pending -= 1;
+                            if (pending === 0) {
+                                tx.finish({ unsent, refused });
+                            }
+                        },
+                    );
+                }
+            });
+        });
+    }
+
+    /**
+     * How many SONGS this owner has Saves queued for here (#1478) — what the sync chip says is
+     * "waiting to upload" when that is more than the chart on the stand, as it is for the whole
+     * drain of a playlist import. Counted from the operations index's KEYS alone, never the queued
+     * snapshots, so a thousand queued songs cost a key walk, not a thousand documents read.
+     */
+    async songsWaiting(scope: AccountScope): Promise<number> {
+        scope = copyScope(scope);
+        const owned = IDBKeyRange.bound([scope.ownerId], [scope.ownerId, []], false, true);
+        return this.database.run('readonly', scope, (tx) => {
+            tx.read(tx.table('collections').getAllKeys(owned), (keys: IDBValidKey[]) => {
+                const collections = new Set(keys.map((key) => (key as [string, string])[1]));
+                let songs = 0;
+                let last: string | null = null;
+                tx.read(
+                    tx.table('operations').index('song').openKeyCursor(owned),
+                    (cursor: IDBCursor | null) => {
+                        if (!cursor) {
+                            return tx.finish(songs);
+                        }
+                        // The index sorts by (owner, document), so one document's queue is a run.
+                        const documentId = (cursor.key as [string, string])[1];
+                        if (documentId !== last) {
+                            last = documentId;
+                            if (!collections.has(documentId)) {
+                                songs += 1;
+                            }
+                        }
+                        cursor.continue();
+                    },
+                );
             });
         });
     }

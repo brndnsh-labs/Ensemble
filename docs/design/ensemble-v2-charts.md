@@ -49,6 +49,22 @@ implemented (#1473, below).
 The optional document `importSource` holds inert original text and its format, not runtime state.
 This is additive preview work, not production adoption or complete iReal compatibility.
 
+**A whole playlist imports as a collection (#1478, decided on #1443).** The decoder keeps the
+playlist's own name and reads up to 2,000 songs (the account's document cap); the import-wide
+measure cap is 65,536, sized from Jazz 1460 (34,510 written measures across the 1,220 tunes that
+build a score, measured 2026-10-02). The review dialog offers "Import all N as a collection"
+beside the single-song picker and states, before anything is written: the songs to import;
+duplicates by case- and whitespace-insensitive title + composer, skipped by default with an
+"Import duplicates anyway" checkbox (a skipped duplicate stays in the collection as the copy the
+songbook already holds, in its playlist position); songs the importer refuses, listed with their
+diagnostics and never half-imported; and, signed in, the account cap — past it nothing is
+written. A collection of the same name (not Starred) is added to rather than duplicated. Each
+song keeps ITS OWN link as `importSource` (`songSourceLink`), never the whole playlist: 1,350
+copies of a 650 KB playlist would pass the account's 256 MiB storage cap on their own. The parse
+and the per-song checks run in slices (`parseIRealImportInSteps`, `planPlaylist`): parsing Jazz
+1460 took 1.1-2.3 s and building and checking its documents 2.1-4.3 s in one go on a desktop (Node, Chromium and WebKit),
+several times that on a phone.
+
 With the exact-timing foundation and first measure-aware editor implemented, build faithful
 iReal import and form playback in verifiable slices. Keep quick text entry and the
 music-stand appearance. Full chart compatibility is the destination, not a claim about the
@@ -318,7 +334,7 @@ fixture for this specific export, not general import or by-ear compatibility.
 | Meter/key changes | Native bar editing, sticky contexts and supported-meter playback tested; the song's own meter is set from the Edit panel (#1371), re-dividing equal-length bars and blocking — never rounding — on a bar whose written lengths cannot follow | Real-device and audible acceptance; source import mapping; a section-level key/meter surface. |
 | Unsupported meters or off-grid timing | Block, explain location | Never substitute 4/4 or round durations. |
 | Long charts | No fixed page limit | Synthetic 64/128-bar layouts and explicit input/expansion bounds. |
-| Playlist HTML | Bounded supported-envelope selection/diagnostics implemented | Additional real playlist envelopes; no silent first-song-only import. |
+| Playlist HTML | Bounded supported-envelope selection/diagnostics implemented; a whole playlist (up to 2,000 songs, the account cap) imports as a collection named after it (#1478) | Additional real playlist envelopes; no silent first-song-only import. |
 | Composer, title, style, transpose, tempo | Display metadata plus original source retained; starting tempo explicit | Verify raw transpose/tempo/repetition meanings before applying them automatically. |
 
 Unsupported-at-this-stage means visibly unavailable until implemented, not intentionally

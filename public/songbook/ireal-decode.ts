@@ -1,7 +1,14 @@
 type IRealFormat = 'irealbook' | 'irealb';
 
 const MAX_SOURCE_BYTES = 1_048_576;
-const MAX_SONGS = 64;
+/**
+ * The most songs one import may hold (#1478): the account's whole document cap
+ * (`MAX_DOCUMENTS_PER_OWNER`, 2,000), since a playlist imports whole as a collection. iReal's own
+ * big jazz playlists sit under it (Jazz 1460 is 1,460 tunes in 652 KB), and the 1 MiB source cap
+ * above bounds the work long before this would at real tune sizes.
+ */
+export const MAX_IREAL_SONGS = 2_000;
+const TOO_MANY_SONGS = 'Import at most 2,000 songs at a time.';
 const MUSIC_PREFIX = '1r34LbKcu7';
 const HTML_ENTITIES = new Map([
     ['amp', '&'],
@@ -111,8 +118,8 @@ function linksFromHtml(source: string): string[] {
         }
         if (href && /^ireal(?:book|b):\/\//i.test(href)) {
             links.push(href);
-            if (links.length > MAX_SONGS) {
-                throw new Error('Import at most 64 songs at a time.');
+            if (links.length > MAX_IREAL_SONGS) {
+                throw new Error(TOO_MANY_SONGS);
             }
         }
     }
@@ -151,7 +158,10 @@ export function decodeIRealMusic(value: string): string {
     return decoded.join('');
 }
 
-function entriesFromPayload(payload: string, format: IRealFormat): string[][] {
+function entriesFromPayload(
+    payload: string,
+    format: IRealFormat,
+): { entries: string[][]; playlistName?: string } {
     // Fixed positional widths retain empty metadata. Never split /=+/ or discard blank fields.
     const fields = payload.split('=');
     const width = format === 'irealb' ? 10 : 6;
@@ -162,8 +172,8 @@ function entriesFromPayload(payload: string, format: IRealFormat): string[][] {
             throw new Error('The iReal song header or playlist is incomplete or unsupported.');
         }
         entries.push(fields.slice(index, index + width));
-        if (entries.length > MAX_SONGS) {
-            throw new Error('Import at most 64 songs at a time.');
+        if (entries.length > MAX_IREAL_SONGS) {
+            throw new Error(TOO_MANY_SONGS);
         }
         index += width;
         if (index === fields.length) {
@@ -175,15 +185,26 @@ function entriesFromPayload(payload: string, format: IRealFormat): string[][] {
             }
             index += 2;
         }
-        // Optional terminal playlist title is not another song. All musical entries are returned.
+        // An optional terminal playlist title is not another song (#1478 keeps it: an imported
+        // playlist becomes a collection named after it). All musical entries are returned.
         if (fields.length - index === 1) {
-            break;
+            return fields[index] ? { entries, playlistName: fields[index] } : { entries };
         }
     }
-    return entries;
+    return { entries };
 }
 
-export function decodeIRealInput(input: string): { format: IRealFormat; entries: string[][] } {
+export interface DecodedIReal {
+    format: IRealFormat;
+    entries: string[][];
+    /**
+     * The playlist's own title, raw and unvalidated (the importer checks it as display text), when
+     * the export carries one — the first link's that does, for an HTML export of several links.
+     */
+    playlistName?: string;
+}
+
+export function decodeIRealInput(input: string): DecodedIReal {
     if (
         typeof input !== 'string' ||
         input.length > MAX_SOURCE_BYTES ||
@@ -194,6 +215,7 @@ export function decodeIRealInput(input: string): { format: IRealFormat; entries:
     const text = input.trim();
     const links = /^ireal(?:book|b):\/\//i.test(text) ? [text] : linksFromHtml(text);
     let format: IRealFormat | undefined;
+    let playlistName: string | undefined;
     const entries: string[][] = [];
     for (const link of links) {
         const scheme = /^(irealbook|irealb):\/\//i.exec(link);
@@ -214,13 +236,29 @@ export function decodeIRealInput(input: string): { format: IRealFormat; entries:
         if (/^search\?/i.test(payload)) {
             throw new Error('An iReal search link is not a chart export.');
         }
-        entries.push(...entriesFromPayload(payload, current));
-        if (entries.length > MAX_SONGS) {
-            throw new Error('Import at most 64 songs at a time.');
+        const decoded = entriesFromPayload(payload, current);
+        // A loop, not a spread: `push(...entries)` puts every entry on the call stack at once.
+        for (const entry of decoded.entries) {
+            entries.push(entry);
+        }
+        playlistName ??= decoded.playlistName;
+        if (entries.length > MAX_IREAL_SONGS) {
+            throw new Error(TOO_MANY_SONGS);
         }
     }
     if (!format) {
         throw new Error('No supported iReal chart was found.');
     }
-    return { format, entries };
+    return playlistName === undefined ? { format, entries } : { format, entries, playlistName };
+}
+
+/**
+ * One song's own iReal link, rebuilt from its positional header fields exactly as the export held
+ * them (#1478) — what a song imported from a whole playlist keeps as its `importSource`, so 1,350
+ * documents do not each carry the whole 650 KB playlist (which alone would pass the account's
+ * 256 MiB storage cap). `decodeIRealInput` reads it back to the same fields: a percent-encoded
+ * field cannot contain the `=` separator.
+ */
+export function songSourceLink(format: IRealFormat, fields: readonly string[]): string {
+    return `${format}://${fields.map(encodeURIComponent).join('=')}`;
 }
