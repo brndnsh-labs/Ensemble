@@ -425,7 +425,9 @@ test('the row after the playing row stays fully visible on every bar change, and
 test('data-next skips both chords of a two-chord bar, resolves across the repeat, then moves on', async ({
     page,
 }) => {
-    test.setTimeout(30_000);
+    // The setup alone is ~14s on a CPU-starved WebKit, and eight bars there run at a third of
+    // real time: measured 30s for a run that was on track throughout (#1485).
+    test.setTimeout(45_000);
     await buildLookaheadChart(page);
     await startHere(page, 'A');
     // A3 holds two chords (Dm7, G7); the cue must point past BOTH to A4, never at A3 itself —
@@ -448,39 +450,69 @@ test('data-next skips both chords of a two-chord bar, resolves across the repeat
 test('a one-bar written repeat points at the SAME bar through pass 3, and the FOLLOWING bar on pass 4', async ({
     page,
 }) => {
-    test.setTimeout(20_000);
+    // Two laps of a five-bar form plus the setup; on a CPU-starved WebKit the band's clock runs
+    // at a third of real time, so this is real work rather than a hang (#1485).
+    test.setTimeout(75_000);
     // #1458 patch review P2-1: a written-measure-keyed next-bar walk skips every later pass of a
     // one-bar `||: :||` repeat as "the same bar as before", pointing the cue at whatever follows
     // the WHOLE repeat for its entire 4-pass run rather than only its final pass. R1 is one
-    // written bar performed four times; `activeId` alone can't tell the passes apart (same
-    // written id every time), so this waits on real time instead — one second per bar at 240bpm.
+    // written bar performed four times, so `activeId` can't tell the passes apart. The cue can:
+    // it reads `soon` in each pass's last beat and goes back to `true` on the next downbeat.
+    // So the page records every state the cue takes, and this asserts on that record (#1485):
+    // sampling at fixed offsets from the first R1 read the wrong pass whenever CI WebKit ran
+    // behind the wall clock. The SECOND lap is the one asserted: on a loaded WebKit the stand can
+    // go unpainted while audio comes up, so the first lap's opening passes may never show.
     await buildOneBarRepeatChart(page);
+    await page.evaluate(() => {
+        const w = window as unknown as { cues: string[] };
+        w.cues = [];
+        new MutationObserver(() => {
+            const active = document.querySelector('.bar[data-active="true"]');
+            const next = document.querySelectorAll('.bar[data-next]');
+            const cue = `${active?.getAttribute('data-measure-id') ?? '-'} next ${Array.from(
+                next,
+                (bar) => `${bar.getAttribute('data-measure-id')}:${bar.getAttribute('data-next')}`,
+            ).join(',')}`;
+            if (w.cues.at(-1) !== cue) {
+                w.cues.push(cue);
+            }
+        }).observe(document.querySelector('.sheet')!, {
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['data-active', 'data-next'],
+        });
+    });
+    const cues = () => page.evaluate(() => (window as unknown as { cues: string[] }).cues);
+    // From the first R1 after lap 1's R2 up to lap 2's R2: the whole of lap 2's repeat.
+    const lapTwoRepeat = (recorded: string[]) => {
+        const lapOneEnd = recorded.findIndex((cue) => cue.startsWith('R2 '));
+        const from =
+            lapOneEnd < 0
+                ? -1
+                : recorded.findIndex((cue, i) => i > lapOneEnd && cue.startsWith('R1 '));
+        const to =
+            from < 0 ? -1 : recorded.findIndex((cue, i) => i > from && cue.startsWith('R2 '));
+        return to < 0 ? null : recorded.slice(from, to);
+    };
     await page.getByRole('button', { name: 'Start playback', exact: true }).click();
-    await pollSamples(page, (s) => s.activeId === 'R1'); // past any count-in, into pass 1
-    for (let pass = 1; pass <= 3; pass++) {
-        // Mid-bar, cumulatively: pass 1 at +500ms, pass 2 at +1500ms, pass 3 at +2500ms — each a
-        // full 1000ms bar further on than the last, landing mid-way through that pass.
-        await page.waitForTimeout(pass === 1 ? 500 : 1000);
-        const sample = await sampleChart(page);
-        expect(sample.activeId, `should still be on the repeated bar during pass ${pass}`).toBe(
-            'R1',
-        );
-        expect(sample.nextCount).toBe(1);
-        expect(
-            sample.nextId,
-            `pass ${pass} of 4 should point at the SAME one-bar repeat, not skip past it early`,
-        ).toBe('R1');
-    }
-    await page.waitForTimeout(1000); // now mid-way through pass 4 (+3500ms cumulative)
-    const finalPass = await sampleChart(page);
-    expect(finalPass.activeId, 'should still be on the repeated bar during its final pass').toBe(
-        'R1',
-    );
-    expect(
-        finalPass.nextId,
-        'the final pass should move on to the bar that follows the repeat',
-    ).toBe('R2');
+    await expect
+        .poll(async () => lapTwoRepeat(await cues()) !== null, { timeout: 45_000 })
+        .toBe(true);
     await page.getByRole('button', { name: 'Stop playback', exact: true }).click();
+    const repeat = lapTwoRepeat(await cues());
+    expect(
+        repeat,
+        'passes 1-3 point at the SAME one-bar repeat; only pass 4 moves on to R2',
+    ).toEqual([
+        'R1 next R1:true',
+        'R1 next R1:soon',
+        'R1 next R1:true',
+        'R1 next R1:soon',
+        'R1 next R1:true',
+        'R1 next R1:soon',
+        'R1 next R2:true',
+        'R1 next R2:soon',
+    ]);
 });
 
 test('a repeat’s second pass strengthens the cue only in its OWN last beat, not for the whole bar', async ({
