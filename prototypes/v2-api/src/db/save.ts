@@ -125,6 +125,23 @@ export type SaveOutcome =
      */
     | { kind: 'quota_exceeded'; limit: 'documents' | 'bytes'; usage: number; cap: number };
 
+/**
+ * Which document kind a stored or incoming body is (#1474): the `kind` a collection carries, and
+ * `'chart'` for anything without one — a chart has no `kind` field at all. A body that is not
+ * JSON reads as a chart; the write path only ever stores validated JSON, so that branch is a
+ * fixture's, never a decision about real data.
+ */
+function documentKindOf(body: string): string {
+    try {
+        const parsed: unknown = JSON.parse(body);
+        const kind =
+            parsed && typeof parsed === 'object' ? (parsed as { kind?: unknown }).kind : undefined;
+        return typeof kind === 'string' ? kind : 'chart';
+    } catch {
+        return 'chart';
+    }
+}
+
 /** A minted revision satisfies the client's `remoteRevision` grammar (`[A-Za-z0-9._:-]{1,200}`). */
 export function mintRevision(): string {
     return randomUUID();
@@ -193,6 +210,16 @@ export function commitSave(
                         revision: current.revision,
                         remote: { revision: current.revision, body: current.body },
                     };
+                }
+                // A document never changes KIND (#1474): a chart's id cannot be overwritten by a
+                // collection or the reverse, even naming its exact revision. Ids are unique per
+                // owner across kinds, so this is reachable only by a client bug — and it answers
+                // as a conflict with NO remote version, because there is no version of the
+                // document this request is about here: the id is not this kind's to write. The
+                // client resolves that as it does a missing document (a fresh id), and is never
+                // handed a body of the other kind as if it were "theirs".
+                if (documentKindOf(current.body) !== documentKindOf(body)) {
+                    return { kind: 'conflict', revision: current.revision, remote: null };
                 }
             }
 

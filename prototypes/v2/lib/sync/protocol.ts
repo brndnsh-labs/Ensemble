@@ -1,8 +1,16 @@
 import { validateAnyChartDocument } from '../../../../public/songbook/document-v2.js';
 import type { ChartDocumentV2 } from '../../../../public/songbook/score-types.js';
 import type { ChartDocument as LegacyDocument } from '../../../../public/songbook/types.js';
+import { type CollectionDocument, decodeCollection, isCollectionCandidate } from '../collections';
 
 export type ChartDocument = LegacyDocument | ChartDocumentV2;
+/**
+ * Every document kind the account syncs (#1474): a chart, or a collection (`lib/collections.ts`).
+ * A chart carries no `kind`, so every chart path below is unchanged; only the paths that move
+ * any document — the outbox, the Save request and its reply — dispatch on it.
+ */
+export type SyncDocument = ChartDocument | CollectionDocument;
+export type { CollectionDocument };
 
 export const ACCOUNT_DATABASE = 'ensemble-v2-account-songbook';
 export const MAX_PENDING_SAVES = 64;
@@ -29,9 +37,21 @@ export interface Draft {
     capturedAt: string;
 }
 
-export interface RemoteVersion {
+export interface RemoteVersion<D extends SyncDocument = ChartDocument> {
     revision: string;
-    document: ChartDocument;
+    document: D;
+}
+
+/**
+ * One saved collection in the account's `collections` store (#1474) — the collection half of
+ * `SavedSong`, with the same two revisions: the document's own local commit counter and the
+ * opaque server revision the cloud last confirmed (null until it has).
+ */
+export interface SavedCollection {
+    ownerId: string;
+    documentId: string;
+    document: CollectionDocument;
+    remoteRevision: string | null;
 }
 
 export type UnsupportedReason = 'needs-app-update' | 'invalid';
@@ -279,17 +299,22 @@ export function deleteReply(candidate: unknown, request: PreparedDelete): Delete
  */
 export type SaveRefusalReason = 'too-large' | 'refused';
 
-export interface SaveOperation {
+/**
+ * One queued Save. The `operations` store holds both kinds (#1474) under one `song` index keyed by
+ * document id — ids are unique per owner across kinds, as the server's one `documents` table makes
+ * them — so `D` says which kind a reader has proved it holds. Chart paths read the default.
+ */
+export interface SaveOperation<D extends SyncDocument = ChartDocument> {
     ownerId: string;
     documentId: string;
     operationId: string;
     localRevision: number;
-    snapshot: ChartDocument;
+    snapshot: D;
     base: { revision: string | null } | { operationId: string };
     wireBody: string | null;
     status: 'queued' | 'conflict' | 'refused';
     // null is an explicit missing/deleted remote song; undefined means no conflict.
-    remote?: RemoteVersion | null;
+    remote?: RemoteVersion<D> | null;
     /** Present only when `status === 'refused'` (#1298). Never set for `'queued'`/`'conflict'`. */
     reason?: SaveRefusalReason;
 }
@@ -310,8 +335,12 @@ export interface SaveReceipt {
     revision: string;
 }
 
+/**
+ * `remote` is any kind here: `reply()` validates the reply before it knows which store the
+ * operation belongs to, and `acknowledge` is what proves the remote is the operation's own kind.
+ */
 export type SaveReply = SaveReceipt &
-    ({ kind: 'committed' } | { kind: 'conflict'; remote: RemoteVersion | null });
+    ({ kind: 'committed' } | { kind: 'conflict'; remote: RemoteVersion<SyncDocument> | null });
 
 export class AccountChangedError extends Error {
     constructor() {
@@ -350,6 +379,36 @@ export function snapshot(candidate: unknown): ChartDocument {
     }
     identifier(decoded.value.id);
     return decoded.value;
+}
+
+/** A collection the account will sync: valid, and every id inside it a sync identifier. */
+export function collectionSnapshot(candidate: unknown): CollectionDocument {
+    const decoded = decodeCollection(candidate);
+    if (decoded.kind !== 'ok') {
+        throw new Error('Cannot sync this collection version or content. The source is unchanged.');
+    }
+    identifier(decoded.value.id);
+    // An account collection names account documents, and every one of those is a sync identifier.
+    // A guest id outside that grammar could never resolve here, so it is refused rather than
+    // stored as a dead reference the server would have to hold forever.
+    for (const songId of decoded.value.songIds) {
+        identifier(songId);
+    }
+    return decoded.value;
+}
+
+/**
+ * Either kind, dispatched on `kind` — the one decoder the outbox, the Save request and its reply
+ * share. A candidate with no `kind` is a chart and goes through `snapshot()` exactly as it always
+ * did, so a chart's bytes and verdicts are unchanged by this function existing.
+ */
+export function syncDocument(candidate: unknown): SyncDocument {
+    return isCollectionCandidate(candidate) ? collectionSnapshot(candidate) : snapshot(candidate);
+}
+
+/** Which kind a validated document is. A chart has no `kind` field at all. */
+export function documentKind(document: SyncDocument): 'chart' | 'collection' {
+    return (document as { kind?: unknown }).kind === 'collection' ? 'collection' : 'chart';
 }
 
 export async function digest(body: string): Promise<string> {
@@ -391,7 +450,9 @@ export function reply(candidate: unknown, request: PreparedSave): SaveReply {
     }
     const remote = value.remote as Record<string, unknown>;
     remoteRevision(remote.revision);
-    const document = snapshot(remote.document);
+    // Either kind: whether it is the SAME kind as the queued Save is `acknowledge`'s check, which
+    // holds the stored operation this reply answers.
+    const document = syncDocument(remote.document);
     if (document.id !== request.documentId || remote.revision !== value.revision) {
         throw new Error('Remote conflict version does not match this song.');
     }

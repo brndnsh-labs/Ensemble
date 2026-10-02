@@ -2,7 +2,8 @@ import {
     exceedsUtf8ByteLimit,
     SONGBOOK_MAX_INPUT_BYTES,
 } from '../../../../public/songbook/structural-limits.js';
-import { type ChartDocument, digest, identifier, remoteRevision, snapshot } from './protocol';
+import { isCollectionCandidate } from '../collections';
+import { digest, identifier, remoteRevision, type SyncDocument, syncDocument } from './protocol';
 
 /**
  * Canonical decoder for a received explicit-Save request.
@@ -46,7 +47,8 @@ export interface DecodedSaveRequest {
     expectedRevision: string | null;
     /** SHA-256 of the received bytes, never of a re-serialized substitute. */
     digest: string;
-    document: ChartDocument;
+    /** A chart, or a collection (#1474) — `kind` says which; a chart carries none. */
+    document: SyncDocument;
 }
 
 /**
@@ -177,11 +179,17 @@ export async function decodeSaveRequest(
     // The portable codec owns chart validity, version support, structural limits and the
     // document byte ceiling. It also detaches, so the returned document shares no reference
     // with the parsed body.
-    let document: ChartDocument;
+    // Either kind (#1474), dispatched on `kind` by `syncDocument`: a document with none is a chart
+    // and is decoded by `snapshot()` exactly as before collections existed.
+    let document: SyncDocument;
     try {
-        document = snapshot(record.document);
+        document = syncDocument(record.document);
     } catch {
-        throw new SaveRequestError('Save request document is not a supported chart.');
+        throw new SaveRequestError(
+            isCollectionCandidate(record.document)
+                ? 'Save request document is not a supported collection.'
+                : 'Save request document is not a supported chart.',
+        );
     }
     // The document limit is enforced INDEPENDENTLY of this file's request ceiling, by
     // `prepareCandidate` inside the call above: it measures the document's own UTF-8 bytes
@@ -211,6 +219,8 @@ export async function decodeSaveRequest(
     //   v2 — `validateChartDocumentV2` returns the detached parsed candidate with the
     //        caller's key order intact, so the reconstruction echoes whatever order arrived.
     //        A key-shuffled v2 body is ACCEPTED, and hashes to a different digest.
+    //   collection (#1474) — `decodeCollection` REBUILDS in its own field order, like v1, so a
+    //        key-shuffled collection body is rejected.
     // That is not an integrity hole: every schema object is allowlisted, so no extra content
     // can ride along in either version, and the outbox only ever sends bytes it froze once.
     // But a receipt service keyed on (operationId, digest) must treat the digest as "the bytes

@@ -22,7 +22,8 @@ export async function sendNext(
     } catch {
         // Uncertain delivery retains the frozen request, even if the server committed it.
         // A storage/account failure is not a transport retry: let the caller handle it.
-        await songbook.pending(scope, documentId);
+        // `queued`, not the chart-only `pending`: this step moves collections too (#1474).
+        await songbook.queued(scope, documentId);
         return 'retry';
     }
     return songbook.acknowledge(scope, request, response);

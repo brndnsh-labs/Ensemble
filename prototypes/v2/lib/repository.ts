@@ -1,4 +1,5 @@
 import type { InstrumentModule } from '@engine/types';
+import { type CollectionDocument, resolvedSongIds, validateCollection } from './collections';
 import { type ChartDocument, validateDocument } from './documents';
 import {
     HOME_FILL_SPARE,
@@ -378,4 +379,162 @@ export function clearRecovery(id: string): void {
     for (const key of recoveryKeysFor(id)) {
         localStorage.removeItem(key);
     }
+}
+
+/**
+ * Guest collections (#1474) live in a database of their OWN, not in a new store of the songbook's.
+ *
+ * #1474 drafted a `collections` store added to `ensemble-v2-preview` by a version bump. That
+ * database holds a guest's only copy of every song, and a bump would be its first schema change
+ * since it shipped: every tab still open on the old build would lose its songbook connection
+ * (`onversionchange` closes it, and a reopen at version 1 then fails) until reloaded, and WebKit is
+ * the engine where an open of this very database has already been measured losing its object
+ * stores (`lib/account/held-account.ts`). Nothing a collection needs is worth that: no write ever
+ * spans a song and a collection, so the two never need one transaction — the reason the ACCOUNT
+ * collections do share a database (`lib/sync/database.ts`) is the outbox, which guests have none
+ * of. So the songbook database is not opened at a new version, not upgraded and not written by
+ * anything here; it is only read, for the ids `listCollections` resolves against.
+ */
+const COLLECTIONS_DATABASE = 'ensemble-v2-preview-collections';
+const COLLECTIONS = 'collections';
+let collectionsDatabase: Promise<IDBDatabase> | undefined;
+
+function openCollections(): Promise<IDBDatabase> {
+    if (!collectionsDatabase) {
+        const opening = new Promise<IDBDatabase>((resolve, reject) => {
+            const request = indexedDB.open(COLLECTIONS_DATABASE, 1);
+            request.onupgradeneeded = () =>
+                request.result.createObjectStore(COLLECTIONS, { keyPath: 'id' });
+            request.onerror = () =>
+                reject(new Error('Collection storage is unavailable. Your songs are unaffected.'));
+            request.onblocked = () =>
+                reject(
+                    new Error('Another tab is blocking collection storage. Close it and reload.'),
+                );
+            request.onsuccess = () => {
+                request.result.onversionchange = () => {
+                    request.result.close();
+                    collectionsDatabase = undefined;
+                };
+                resolve(request.result);
+            };
+        });
+        collectionsDatabase = opening;
+        void opening.catch(() => {
+            if (collectionsDatabase === opening) {
+                collectionsDatabase = undefined;
+            }
+        });
+    }
+    return collectionsDatabase;
+}
+
+/** A guest collection as a reader shows it: the stored document, plus the songs that resolve. */
+export interface GuestCollection {
+    /** What a Save builds on. `songIds` is never pruned of songs that no longer resolve. */
+    document: CollectionDocument;
+    /** The collection's songs this songbook holds right now, in the collection's order. */
+    resolvedSongIds: string[];
+}
+
+function songIds(): Promise<Set<string>> {
+    return open().then(
+        (db) =>
+            new Promise<Set<string>>((resolve, reject) => {
+                const request = db.transaction(STORE, 'readonly').objectStore(STORE).getAllKeys();
+                request.onerror = () => reject(new Error('Unable to read your local songbook.'));
+                request.onsuccess = () => resolve(new Set(request.result.map(String)));
+            }),
+    );
+}
+
+/**
+ * Every guest collection, each with the songs in it that resolve (#1474). A song id that does not
+ * resolve — the song was deleted — is left out of `resolvedSongIds` and kept in the document:
+ * deleting a song never rewrites a collection. Like `list()`, a collection that does not validate
+ * fails the read rather than being skipped.
+ */
+export async function listCollections(): Promise<GuestCollection[]> {
+    const [db, songs] = await Promise.all([openCollections(), songIds()]);
+    const rows = await new Promise<unknown[]>((resolve, reject) => {
+        const request = db.transaction(COLLECTIONS, 'readonly').objectStore(COLLECTIONS).getAll();
+        request.onerror = () => reject(new Error('Unable to read your collections.'));
+        request.onsuccess = () => resolve(request.result);
+    });
+    return rows.map((row) => {
+        const document = validateCollection(row);
+        return {
+            document,
+            resolvedSongIds: resolvedSongIds(document, (id) => songs.has(id)),
+        };
+    });
+}
+
+/** One guest collection by id, or null. */
+export async function getCollection(id: string): Promise<CollectionDocument | null> {
+    const db = await openCollections();
+    const raw = await new Promise<unknown>((resolve, reject) => {
+        const request = db.transaction(COLLECTIONS, 'readonly').objectStore(COLLECTIONS).get(id);
+        request.onerror = () => reject(new Error('Unable to read your collections.'));
+        request.onsuccess = () => resolve(request.result);
+    });
+    return raw === undefined ? null : validateCollection(raw);
+}
+
+/**
+ * Save one guest collection — `save()`'s compare-and-swap for a collection: `expected` is the
+ * revision the caller read (null to create), a mismatch is a `ConflictError`, and the committed
+ * document gets the next revision and a fresh `updatedAt`. Local only: a guest collection is never
+ * uploaded without the musician's own gesture, exactly like a guest song.
+ */
+export async function saveCollection(
+    candidate: unknown,
+    expected: number | null,
+): Promise<CollectionDocument> {
+    const document = validateCollection(candidate);
+    const db = await openCollections();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(COLLECTIONS, 'readwrite');
+        const store = tx.objectStore(COLLECTIONS);
+        const read = store.get(document.id);
+        let committed: CollectionDocument;
+        let failure: Error | undefined;
+        read.onsuccess = () => {
+            const previous = read.result as CollectionDocument | undefined;
+            if (
+                (expected === null && previous) ||
+                (expected !== null && previous?.revision !== expected)
+            ) {
+                failure = new ConflictError();
+                tx.abort();
+                return;
+            }
+            committed = validateCollection({
+                ...document,
+                revision: expected === null ? 0 : expected + 1,
+                createdAt: previous?.createdAt ?? document.createdAt,
+                updatedAt: new Date().toISOString(),
+            });
+            store.put(committed);
+        };
+        tx.oncomplete = () => resolve(committed);
+        tx.onerror = () =>
+            reject(failure || new Error('Saving the collection failed. Storage may be full.'));
+        tx.onabort = () => reject(failure || new Error('Saving the collection was interrupted.'));
+    });
+}
+
+/**
+ * Delete one guest collection (#1474). Never its songs (#1443 decision 3): nothing here touches
+ * the songbook database. Refusing to delete a built-in collection is the caller's rule (#1477).
+ */
+export async function deleteCollection(id: string): Promise<void> {
+    const db = await openCollections();
+    await new Promise<void>((resolve, reject) => {
+        const tx = db.transaction(COLLECTIONS, 'readwrite');
+        tx.objectStore(COLLECTIONS).delete(id);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(new Error('Delete failed. Storage may be unavailable.'));
+        tx.onabort = () => reject(new Error('Delete was interrupted.'));
+    });
 }

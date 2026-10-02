@@ -83,6 +83,38 @@ Local IDB changes later need blocked-upgrade, crash, quota and rollback tests.
 | Server receipt | Owner + operation ID + request digest; fixed committed revision/result |
 | Remote deletion | Owner + document ID + revision tombstone; old devices cannot recreate the same ID |
 | Sound cache | Public, content-addressed bytes; readiness computed from actual required files |
+| Collection (#1474) | Same as an account document — `(ownerId, documentId)`, local commit revision, opaque server revision — in the account database's own `collections` store; a guest collection lives in its own `ensemble-v2-preview-collections` database |
+
+### Collections: a second synced document kind (#1474, decided on #1443)
+
+A collection is a named, ordered list of song ids (`prototypes/v2/lib/collections.ts`) and a
+document of its own, not a field on each song: adding 1,339 songs to a playlist is one Save, not
+1,339 song revisions. It travels the Explicit Save protocol below unchanged — the same outbox,
+operations, receipts, frozen request bytes, conflicts and refusals; the same server `documents`
+table, Save, read and delete routes; and the same per-owner document cap.
+
+- **The discriminator is `kind`, and a chart has none.** Every chart ever stored validates, saves
+  and downloads exactly as before; a document is a collection only when it says
+  `kind: 'collection'`, and any other `kind` is refused. The manifest names a live collection
+  row's `kind`; a chart row and a tombstone carry none.
+- **One id space per owner across kinds.** The outbox walks songs and collections merged in id
+  order under one cursor, and a document never changes kind: the server refuses that update as a
+  conflict with no remote version, and a collection may not take a song's id locally.
+- **A collection never owns its songs.** It is filtered when READ — an id that no longer resolves
+  is left out of the view — and never rewritten: deleting a song never touches a collection, and a
+  list pruned against a library download still in progress would upload the loss.
+- **Storage is additive.** The account database went to version 2 only to CREATE the
+  `collections` store; it shares a database with the outbox because a Save and its acknowledgement
+  commit record and queue in one transaction. The guest songbook database is not upgraded at all:
+  guest collections, which have no outbox, live in a separate database, so the store holding a
+  guest's only copy of every song is never reopened at a new version.
+  `tests/browser/account-collections.browser.test.ts` proves every pre-existing row byte-identical
+  after both.
+- **No drafts, no candidates.** A collection edit IS its Save, and a collection is never "on the
+  stand", so the only local work that can hold one is its own queued Save. A download never adopts
+  a body over that Save and preserves no candidate beside it: the queued Save meets the newer
+  revision as a conflict carrying the remote version. Resolving such a conflict, Starred, and every
+  UI are #1477's.
 
 Client-provided owner IDs are routing hints, never authorization. Every server query uses
 the authenticated owner, including list, receipt lookup, update, delete, export and feedback.
