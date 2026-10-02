@@ -7,7 +7,6 @@
 import { type EnergyTier, energyTier } from '../../arrange/plan.js';
 import type { Rng } from '../../core/random.js';
 import type { PitchedNote } from '../../core/types.js';
-import { chorusBars } from '../../form/timeline.js';
 import type { BarContext, PitchedIdiom } from '../../styles/types.js';
 import type { ChordFacts } from '../../theory/chord.js';
 import { at, barSteps, dyn, STEP, spanSteps } from '../grid.js';
@@ -165,8 +164,7 @@ export function compIdiom(book: CompBook): PitchedIdiom {
             }
             const nextFirst = ctx.next?.bar.spans[0];
             let pushed = false;
-            // `early`: the hit plays the next chord ahead of its arrival (an anticipation).
-            const planned: (Hit & { chord: ChordFacts; early?: boolean })[] = [];
+            const planned: Planned[] = [];
             const spans = spanSteps(bar);
             spans.forEach(({ span, from, to }, index) => {
                 const chord = span.chord;
@@ -258,28 +256,43 @@ export function compIdiom(book: CompBook): PitchedIdiom {
                 // rhythm is for a struck instrument, and re-pressing a held organ chord on every
                 // hit is a stutter, not a groove. So the organ presses on each chord's arrival
                 // (or on a push just before it) and holds; `sustain` in perform.ts carries it
-                // across barlines. An N.C. lets go, so the next chord is pressed anew. And the
-                // top of each chorus of a counted chart (#1475) is pressed anew too: an organist
-                // re-articulates where the form starts over, and a chord tied silently across
-                // every chorus of a vamp is not how the instrument is played. (An uncounted
-                // chart's chorus is always 0, so it is unchanged.)
+                // across barlines. An N.C. lets go, so the next chord is pressed anew. And a
+                // chord still held where the form's four-bar phrasing turns over is pressed anew
+                // (#1488): an organist re-articulates a long vamp at each phrase, and so at each
+                // section, at the top of each lap of a loop and of each chorus of a counted
+                // chart (#1475), where the form starts over.
+                // why: one chord tied silently through a 32-bar vamp is not how the organ is
+                // played, and a loop's next lap has nothing else to press it. Every 4 bars
+                // (`phrase.bar % 4`), so a 5- or 6-bar phrase is pressed again on its 5th bar:
+                // the hold never runs past four bars of a vamp. Keyed on the bar's place in
+                // the form, so lap k and chorus k press in the same bars. The chord the hand
+                // already holds is pressed again in the same shape (`again`): lifted and put
+                // back down, not re-voiced.
                 const kept = planned.filter((h) => h.early);
-                const chorusTop =
-                    ctx.bar.visit.chorus > 0 &&
-                    ctx.bar.index === chorusBars(ctx.timeline, ctx.bar.index).first;
-                let last = memory.pushed || chorusTop ? null : (memory.chord ?? null);
+                const phraseTop = ctx.bar.phrase.bar % 4 === 0;
+                const holding = memory.pushed ? null : (memory.chord ?? null);
+                let last = phraseTop ? null : holding;
                 spans.forEach(({ span, from, to }, index) => {
                     const chord = span.chord;
                     if (!chord) {
                         last = null;
                         return;
                     }
-                    const tiedIn = index === 0 && (memory.pushed || !span.attack);
+                    // A chord held into the bar by a written hold (`/`) is pressed again at a
+                    // phrase top too: a vamp written with slashes is the same vamp.
+                    const tiedIn = index === 0 && (memory.pushed || (!span.attack && !phraseTop));
                     const pushed = kept.some(
                         (h) => h.chord === chord && h.step >= from - TIE_STEPS && h.step < from,
                     );
                     if (!tiedIn && !pushed && chord.symbol !== last && !span.fermata) {
-                        kept.push({ step: from, length: to - from, velocity: 80, chord });
+                        const again = index === 0 && chord.symbol === holding;
+                        kept.push({
+                            step: from,
+                            length: to - from,
+                            velocity: 80,
+                            chord,
+                            ...(again ? { again } : {}),
+                        });
                     }
                     last = chord.symbol;
                 });
@@ -310,8 +323,9 @@ export function compIdiom(book: CompBook): PitchedIdiom {
                       : total - hit.step;
                 const length = legato ? room : Math.min(hit.length, room);
                 if (!shape) {
-                    // A pianist re-voices every strike, leading from the last one.
-                    prev = place(hit.chord, prev);
+                    // A pianist re-voices every strike, leading from the last one. An organ
+                    // re-articulating the chord it holds keeps its shape.
+                    prev = hit.again && prev ? prev : place(hit.chord, prev);
                 } else if (!prev || (hit.chord !== held && (!hit.muted || !ahead))) {
                     // A guitarist holds a grip and moves to the next as its chord arrives, so a
                     // scratch on that chord's first sixteenth deadens the new shape. After an
@@ -348,7 +362,11 @@ export function compIdiom(book: CompBook): PitchedIdiom {
     };
 }
 
-type Planned = Hit & { chord: ChordFacts; early?: boolean };
+/**
+ * A planned hit: `early` plays the next chord ahead of its arrival (an anticipation); `again`
+ * presses the chord the organ already holds once more, in its shape (a phrase's re-press).
+ */
+type Planned = Hit & { chord: ChordFacts; early?: boolean; again?: boolean };
 
 /**
  * The comp answers the lead, in place on the bar's planned hits: a strike under a note the

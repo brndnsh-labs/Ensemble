@@ -29,7 +29,7 @@ import { feelFor, STYLE_IDS, STYLES } from '../../styles/index.js';
 import type { Feel } from '../../styles/types.js';
 import { type ChordFacts, chordPcs, fifthOf } from '../../theory/chord.js';
 import { mod12 } from '../../theory/pitch.js';
-import { COUNTED_FIXTURES, FIXTURES } from '../scores.js';
+import { COUNTED_FIXTURES, FIXTURES, VAMP_FIXTURES } from '../scores.js';
 
 const SEEDS = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
 const BASS_REGISTER = [23, 57] as const;
@@ -146,6 +146,109 @@ export function invariantSuite(shard: number): void {
     defineStyles(styles);
     defineLeads(styles.filter((id) => STYLES[id].lead));
     defineCounted(styles);
+    defineVamps(styles);
+}
+
+/**
+ * The organ on a one-chord vamp (#1488), looping (laps 0–2, each continuing from the last) and
+ * once through with an ending: it sounds in every bar that has a chord. A holding organ holds
+ * through every such bar with no gap, and presses the chord again at least every four bars (at
+ * each phrase, so at the top of each lap), in the shape it holds. A chopped organ (`percussive`: the reggae bubble)
+ * plays its figure in every bar. The counted vamp, a chorus at a time, is pinned with the
+ * chunks in `arrange/chorus-seams.test.ts`.
+ */
+function defineVamps(styles: StyleId[]): void {
+    describe.each(styles)('%s organ vamp', (styleId) => {
+        const holds = !STYLES[styleId].comp.keyboard.percussive;
+        for (const [name, chart] of Object.entries(VAMP_FIXTURES)) {
+            const timeline = compileTimeline(chart);
+            it(`${name}: the organ sounds in every bar, every lap`, () => {
+                const problems: string[] = [];
+                for (const seed of SEEDS.slice(0, 2)) {
+                    const settings: BandSettings = {
+                        ...DEFAULT_SETTINGS,
+                        style: styleId,
+                        comp: 'organ',
+                        seed,
+                    };
+                    const passes: [string, BandEvent[]][] = [
+                        [
+                            'ending',
+                            performPass(timeline, settings, { pass: 0, looping: false }).events,
+                        ],
+                    ];
+                    let memory: PassMemory | undefined;
+                    for (let lap = 0; lap < 3; lap++) {
+                        const result = performPass(timeline, settings, {
+                            pass: lap,
+                            looping: true,
+                            memory,
+                        });
+                        memory = result.memory;
+                        passes.push([`lap ${lap}`, result.events]);
+                    }
+                    for (const [label, events] of passes) {
+                        const organ = events.filter(
+                            (e): e is PitchedNote => e.lane === 'comp' && !e.muted,
+                        );
+                        for (const bar of timeline.bars) {
+                            if (!bar.spans.some((s) => s.chord)) {
+                                continue;
+                            }
+                            const end = bar.start + bar.meter.barTicks;
+                            const sounding = organ.filter(
+                                (n) => n.tick < end && n.tick + n.dur > bar.start,
+                            );
+                            if (!sounding.length) {
+                                problems.push(`${seed} ${label}: bar ${bar.index} silent`);
+                                continue;
+                            }
+                            if (!holds) {
+                                continue;
+                            }
+                            // Held through: every tick of the bar is under a sounding note.
+                            let covered = bar.start;
+                            for (const n of [...sounding].sort((a, b) => a.tick - b.tick)) {
+                                if (n.tick > covered + 1e-6) {
+                                    break;
+                                }
+                                covered = Math.max(covered, n.tick + n.dur);
+                            }
+                            if (covered < end - 1e-6) {
+                                problems.push(`${seed} ${label}: bar ${bar.index} gap`);
+                            }
+                        }
+                        if (holds) {
+                            const longest = Math.max(...organ.map((n) => n.dur));
+                            const fourBars = 4 * timeline.bars[0].meter.barTicks;
+                            if (longest > fourBars + 1e-6) {
+                                problems.push(`${seed} ${label}: a hold of ${longest} ticks`);
+                            }
+                            // A re-press lifts the held chord and puts the same shape back
+                            // down (the ending's final chord is voiced as an ending).
+                            const presses = new Map<number, number[]>();
+                            for (const n of organ) {
+                                if (label !== 'ending' || n.bar < timeline.bars.length - 1) {
+                                    presses.set(n.tick, [...(presses.get(n.tick) ?? []), n.midi]);
+                                }
+                            }
+                            const shapes = new Set(
+                                [...presses.values()].map((midis) =>
+                                    midis.sort((a, b) => a - b).join(','),
+                                ),
+                            );
+                            if (shapes.size > 1) {
+                                problems.push(
+                                    `${seed} ${label}: re-voiced ${[...shapes].join(' / ')}`,
+                                );
+                            }
+                        }
+                    }
+                }
+                expect(problems.slice(0, 10), `${styleId}/${name}`).toEqual([]);
+            });
+        }
+    });
 }
 
 /**

@@ -10,7 +10,7 @@ import {
 } from './core/types.js';
 import { chordAt, compileTimeline } from './form/timeline.js';
 import { performPass } from './perform.js';
-import { STYLE_IDS } from './styles/index.js';
+import { STYLE_IDS, STYLES } from './styles/index.js';
 import { FIXTURES, score } from './test/scores.js';
 import { fifthOf } from './theory/chord.js';
 import { nearestMidi } from './theory/pitch.js';
@@ -369,6 +369,47 @@ describe('comp instruments', () => {
                 }
             }
         }
+    });
+
+    it('an organ presses a chord held into a new phrase again, in the shape it holds', () => {
+        // The verse ends F | F and the chorus opens on F (#1488): the organ re-articulates the
+        // held chord at the section's top — lifted and put back down, not re-voiced.
+        const pop = compileTimeline(FIXTURES.popSong);
+        const verseF = pop.bars[10];
+        expect(pop.bars.slice(10, 13).map((b) => b.spans[0].chord?.symbol)).toEqual([
+            'F',
+            'F',
+            'F',
+        ]);
+        const chorusTop = pop.bars[12];
+        expect(chorusTop.phrase.bar).toBe(0);
+        const shapes: string[] = [];
+        for (const style of STYLE_IDS.filter((id) => !STYLES[id].comp.keyboard.percussive)) {
+            for (const seed of ['a', 'b']) {
+                const comp = performPass(
+                    pop,
+                    { ...DEFAULT_SETTINGS, style, comp: 'organ', seed },
+                    { pass: 0, looping: true },
+                ).events.filter((e): e is PitchedNote => e.lane === 'comp' && !e.muted);
+                const at = (tick: number) =>
+                    comp
+                        .filter((e) => e.tick === tick)
+                        .map((e) => e.midi)
+                        .sort((a, b) => a - b)
+                        .join(',');
+                expect(at(chorusTop.start), `${style}/${seed}`).not.toBe('');
+                // The verse's F (pressed on its bar, or pushed just before it) holds right up to
+                // the re-press.
+                const pressed = Math.max(
+                    ...comp.filter((e) => e.tick < chorusTop.start).map((e) => e.tick),
+                );
+                expect(pressed, `${style}/${seed}`).toBeGreaterThan(verseF.start - BAR / 4);
+                const held = comp.filter((e) => e.tick === pressed);
+                expect(Math.min(...held.map((e) => e.tick + e.dur))).toBe(chorusTop.start);
+                shapes.push(`${style}/${seed} ${at(pressed)} -> ${at(chorusTop.start)}`);
+            }
+        }
+        expect(shapes.filter((s) => s.split(' ')[1] !== s.split(' ')[3])).toEqual([]);
     });
 });
 
