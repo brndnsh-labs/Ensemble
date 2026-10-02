@@ -263,6 +263,9 @@ expression devices take turns rather than stack; one peak note per cycle.
     belongs to the new chord.
   - A breath that began before the barline counts its silence there. A bar the lead sits out
     right after playing counts as a breath. A longer rest (the lead resting by form) doesn't.
+  - Where the lead last let go is remembered as a song tick, and a loop's wrap moves it into
+    the next lap's own ticks (`PassMemory.at`, the idiom's `rebase`; #1492): the top of a lap
+    hears the lead as the top of the same chorus counted does, traded or not.
   - A strummed or chopped groove (funk, rock, reggae and the rest) keeps its figure under the
     lead. So does the organ, which holds.
   - With the lead off, nothing changes.

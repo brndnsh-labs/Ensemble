@@ -115,6 +115,13 @@ export function compIdiom(book: CompBook): PitchedIdiom {
         name: book.name,
         percussive: book.percussive,
         init: (): CompMemory => ({ voicing: null, pushed: false }),
+        // Where the lead's last note ends is a song tick: across a loop's wrap it is moved into
+        // the new lap's ticks, so a note that ended just before the wrap ended just before
+        // the lap's top, not far in its future (#1492).
+        rebase: (memory: CompMemory, ticks: number): CompMemory =>
+            memory.leadUntil === undefined
+                ? memory
+                : { ...memory, leadUntil: memory.leadUntil + ticks },
         play(ctx, memory: CompMemory) {
             const { bar, plan } = ctx;
             const shape = !plan.lanes.bass && book.alone ? book.alone : book.grip;

@@ -73,6 +73,12 @@ export interface Idiom<E, M> {
     solos?: boolean;
     init(): M;
     play(ctx: BarContext, memory: M): { events: E[]; memory: M };
+    /**
+     * Move the song ticks this memory holds by `ticks`: the performance jumped (a loop's wrap
+     * back to its top), and a tick remembered from before the jump is read in the new lap's
+     * own ticks. Absent, the memory holds no ticks.
+     */
+    rebase?(memory: M, ticks: number): M;
 }
 
 export type DrumIdiom = Idiom<DrumHit, any>;

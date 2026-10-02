@@ -302,18 +302,17 @@ function lapOf(
 describe("a counted chorus plays its lap's music", () => {
     // Chorus k against lap k for the choruses whose next one is still a lap's: the last two
     // differ by design (the out-head, and the chorus that leads into it). The lead, drums and
-    // bass are compared whole. The comp on its interior bars: at a seam a comp chord can ring
-    // into the next chorus's first bar (an organ's hold, a pushed chord a keyboard voices under
-    // the lead), which the whole pass does across a chorus and a loop cannot do across its
-    // wrap — so the first two bars and the last of each chorus differ, by design. And only
-    // untraded: the comp remembers when the lead last sounded as a song tick, which a loop's
-    // wrap carries into the next lap as if the lead were still playing; across a trade's long
-    // silences that stale tick reaches the interior (the counted chorus reads it correctly).
+    // bass are compared whole, and the comp on every bar but its last, traded or not: the
+    // comp remembers where the lead's last note ends as a song tick, which a loop's wrap moves
+    // into the next lap's own ticks (#1492), so the top of a lap hears the lead as the top of
+    // the chorus does. The last bar differs by design: a chord it pushes rings into the next
+    // chorus's first bar, where the whole pass voices it under that chorus's lead (and swings
+    // its end in that bar), which a loop cannot do across its wrap.
     const CHORUS_COUNT = 5;
     const COMPARED = 3;
-    const LANES: Lane[] = ['lead', 'drums', 'bass'];
+    const LANES: Lane[] = ['lead', 'drums', 'bass', 'comp'];
     const interior = (events: BandEvent[], from: number, length: number) =>
-        events.filter((e) => e.lane !== 'comp' || (e.bar >= from + 2 && e.bar < from + length - 1));
+        events.filter((e) => e.lane !== 'comp' || e.bar < from + length - 1);
     describe.each(STYLE_IDS.filter((id) => STYLES[id].lead))('%s', (style: StyleId) => {
         for (const name of ['blues', 'rhythmChanges', 'bossa'] as const) {
             it(name, () => {
@@ -348,16 +347,15 @@ describe("a counted chorus plays its lap's music", () => {
                             });
                             memory = lap.memory;
                             const from = chorus * length;
-                            const lanes: Lane[] = trade ? LANES : [...LANES, 'comp'];
                             if (
                                 lapOf(
                                     interior(once.events, from, length),
                                     counted,
                                     from,
                                     length,
-                                    lanes,
+                                    LANES,
                                 ) !==
-                                lapOf(interior(lap.events, 0, length), looped, 0, length, lanes)
+                                lapOf(interior(lap.events, 0, length), looped, 0, length, LANES)
                             ) {
                                 failures.push(`${seed} ${trade ? 'trading' : ''} chorus ${chorus}`);
                             }
