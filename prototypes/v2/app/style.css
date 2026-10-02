@@ -2876,6 +2876,13 @@ html[data-theme="stage"] {
    than one badge — a musician who saved offline needs to see local safety and cloud
    confirmation disagree. Rendered only on the music stand, and only for a device with an
    account, so the guest DOM and the songbook page are both unchanged. */
+.upload-progress {
+    margin: 0;
+    padding: 8px 20px;
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.6;
+}
 .sync-status {
     display: flex;
     flex-direction: column;

@@ -65,3 +65,58 @@
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
+.import-progress {
+    color: var(--muted);
+    font-size: 13px;
+}
+.import-choice {
+    display: grid;
+    gap: 10px;
+    margin: 16px 0 0;
+    padding: 0;
+    border: 0;
+}
+.import-choice legend {
+    margin-bottom: 8px;
+    font-weight: 700;
+    overflow-wrap: anywhere;
+}
+.import-choice label {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    padding: 12px 14px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+}
+.import-choice label:has(input:checked) {
+    border-color: var(--ink);
+}
+.import-choice span {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+}
+.import-choice small {
+    color: var(--muted);
+    font-size: 13px;
+}
+.import-duplicates {
+    display: grid;
+    gap: 8px;
+    padding: 12px 14px;
+    background: var(--chip);
+    border-radius: 12px;
+    font-size: 13px;
+}
+.import-duplicates p {
+    margin: 0;
+}
+.import-duplicates label {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+.import-refused {
+    font-size: 13px;
+}

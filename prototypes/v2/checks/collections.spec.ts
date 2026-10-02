@@ -220,6 +220,34 @@ test('a guest’s device-local stars move into Starred on upgrade, and the old k
     // Once: a song unstarred after the copy is not starred again by the next load.
     await page.getByRole('button', { name: 'Unstar Blue pocket' }).click();
     await expect(page.getByRole('button', { name: /^Starred/ })).toHaveText('Starred 1');
+    // The star on screen is optimistic; reloading before its write commits would abort the write
+    // and test nothing about the migration. Wait for the STORED Starred to hold one song.
+    await expect
+        .poll(() =>
+            page.evaluate(
+                () =>
+                    new Promise<number>((resolve, reject) => {
+                        const request = indexedDB.open('ensemble-v2-preview-collections', 1);
+                        request.onerror = () => reject(request.error);
+                        request.onsuccess = () => {
+                            const db = request.result;
+                            const read = db
+                                .transaction('collections')
+                                .objectStore('collections')
+                                .get('collection-starred');
+                            read.onsuccess = () => {
+                                db.close();
+                                resolve(
+                                    (read.result as { songIds?: string[] } | undefined)?.songIds
+                                        ?.length ?? -1,
+                                );
+                            };
+                            read.onerror = () => reject(read.error);
+                        };
+                    }),
+            ),
+        )
+        .toBe(1);
     await page.reload();
     await page.getByTestId('all-songs-link').click();
     await expect(page.getByRole('button', { name: /^Starred/ })).toHaveText('Starred 1');

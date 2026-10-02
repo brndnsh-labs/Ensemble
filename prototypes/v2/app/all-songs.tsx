@@ -72,6 +72,11 @@ interface AllSongsProps {
     busy: boolean;
     /** The device's remembered sort, or null for "no preference recorded yet". */
     initialSort: AllSongsSort | null;
+    /**
+     * A user collection to open the page on (#1478: the one a whole-playlist import just wrote),
+     * or null/absent for All songs. Read when the page mounts, like `initialSort`.
+     */
+    initialCollectionId?: string | null;
     onSortChange: (sort: AllSongsSort) => void;
     onBack: () => void;
     onOpenSong: (id: string) => void;
@@ -116,6 +121,7 @@ export function AllSongs({
     remoteCandidates,
     busy,
     initialSort,
+    initialCollectionId = null,
     onSortChange,
     onBack,
     onOpenSong,
@@ -128,7 +134,9 @@ export function AllSongs({
     onDeleteCollection,
     removedCollectionId,
 }: AllSongsProps) {
-    const [view, setViewState] = useState<LibraryView>('all');
+    const [view, setViewState] = useState<LibraryView>(
+        initialCollectionId === null ? 'all' : `collection:${initialCollectionId}`,
+    );
     const [genre, setGenre] = useState('');
     const [search, setSearch] = useState('');
     const [remembered, setRemembered] = useState<AllSongsSort>(initialSort ?? 'title');

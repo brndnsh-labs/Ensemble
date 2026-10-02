@@ -236,6 +236,50 @@ export async function save(
 }
 
 /**
+ * Write a whole import's songs to the guest songbook in ONE transaction (#1478): every one of them
+ * or none. Each is a create — `add`, never `put` — so an id the songbook already holds refuses the
+ * whole batch rather than overwriting a song. One transaction rather than one per song: a
+ * 1,350-song playlist is one commit, and the shell re-reads the songbook once afterwards.
+ *
+ * Every document is validated BEFORE the transaction opens, handing the event loop back through
+ * `pace` between slices when given — validating a whole playlist in one go would stall the page.
+ * Each lands at revision 0 with this write's `updatedAt`, exactly as `save`'s create does.
+ */
+export async function importSongs(
+    candidates: readonly ChartDocument[],
+    pace?: { shouldYield: () => boolean; yieldNow: () => Promise<void> },
+): Promise<ChartDocument[]> {
+    const documents: ChartDocument[] = [];
+    for (const candidate of candidates) {
+        documents.push(validated(candidate));
+        if (pace?.shouldYield()) {
+            await pace.yieldNow();
+        }
+    }
+    if (new Set(documents.map((document) => document.id)).size !== documents.length) {
+        throw new Error('An import cannot use one id twice.');
+    }
+    const db = await open();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE, 'readwrite');
+        const store = tx.objectStore(STORE);
+        const now = new Date().toISOString();
+        const committed = documents.map((document) => ({
+            ...document,
+            revision: 0,
+            updatedAt: now,
+        }));
+        for (const document of committed) {
+            store.add(document);
+        }
+        tx.oncomplete = () => resolve(committed);
+        tx.onerror = () =>
+            reject(new Error('The import failed. Storage may be full. Nothing was imported.'));
+        tx.onabort = () => reject(new Error('The import was interrupted. Nothing was imported.'));
+    });
+}
+
+/**
  * Delete one song from the guest songbook (#1440) — the local-only counterpart to the account
  * songbook's tombstone route (`app/account/delete-song.tsx`), which this must never stand in for:
  * an account song deletes through that route alone, never a local-only removal.

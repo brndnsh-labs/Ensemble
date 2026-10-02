@@ -38,7 +38,8 @@ const snapshot = () => accountSync.getSnapshot();
 /**
  * Attaches the loop to the signed-in owner, keeps it pointed at the chart on the stand, and
  * registers the only three passive triggers there are: `online`, a `visibilitychange` back to
- * visible, and — from the shell — an explicit Save. No timer, no background sync.
+ * visible, and — from the shell — an explicit Save. No background sync; the loop's one timer is a
+ * resume at the end of a rate-limit back-off (`armResume`, #1478), which this hook does not own.
  */
 export function useAccountLibrary(
     enabled: boolean,
@@ -297,6 +298,17 @@ export function SyncStatus(props: SyncStatusProps) {
                     ? ` (${view.cloud.pendingCount})`
                     : ''}
             </span>
+            {sync.songsWaiting > (view.cloud.status === 'queued' ? 1 : 0) && (
+                // #1478 — every song with a Save still queued here, the chart on the stand's among
+                // them. One song is the cloud fact above; more than that (a playlist import draining
+                // over several passes) is counted here, so the chip never reads as "all uploaded"
+                // while hundreds of songs are still waiting.
+                <span className="sync-fact" data-testid="sync-songs-waiting">
+                    {sync.songsWaiting === 1
+                        ? 'Songs · 1 waiting to upload'
+                        : `Songs · ${sync.songsWaiting.toLocaleString('en-US')} waiting to upload`}
+                </span>
+            )}
             {sync.collectionSaves > 0 && (
                 // #1477 — collection Saves (a star, a set-list change) are never the watched
                 // document the cloud fact above describes, so they are counted here, beside it,

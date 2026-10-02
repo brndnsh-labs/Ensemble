@@ -76,8 +76,49 @@ export const DOWNLOAD_CONCURRENCY = 4;
  * gets a `backoff` outcome rather than a wrong answer.
  */
 export const DOWNLOAD_INTERVAL_MS = 400;
-/** Used only when a 429 arrives with no parseable `Retry-After`. */
+/**
+ * The back-off after a 429 that names no usable wait. In production that is every 429: the
+ * transports do not read `Retry-After` today, so `retryAfterSeconds` is null and this is the wait.
+ */
 export const BACKOFF_FALLBACK_MS = 60_000;
+/** The shortest wait a back-off may ask for (#1478 review C5): never a tight loop. */
+export const BACKOFF_MIN_MS = 1_000;
+/** The longest: the server's budgets are per minute, so no wait longer than a window is right. */
+export const BACKOFF_MAX_MS = 60_000;
+
+/**
+ * How long to wait after a 429 (#1478 review C5): the server's `Retry-After` when it is a finite
+ * number of seconds, clamped to [`BACKOFF_MIN_MS`, `BACKOFF_MAX_MS`]; otherwise — null, NaN, an
+ * infinity — `BACKOFF_FALLBACK_MS`. A NaN reaching a back-off floor would compare false against
+ * every clock reading and let every later pass send inside the window it was told to wait out.
+ */
+export function backoffWait(retryAfterSeconds: number | null): number {
+    if (retryAfterSeconds === null || !Number.isFinite(retryAfterSeconds)) {
+        return BACKOFF_FALLBACK_MS;
+    }
+    return Math.min(BACKOFF_MAX_MS, Math.max(BACKOFF_MIN_MS, retryAfterSeconds * 1_000));
+}
+
+/**
+ * What a COMPLETE manifest says about the account, for a whole-playlist import's room and
+ * duplicate checks (#1478 review C1, C4). Null on a result whose manifest was not fully paged.
+ *
+ * - `charts`/`collections`: every live row of each kind the manifest listed — the account's own
+ *   count, whether or not this device holds the bodies.
+ * - `unverifiable`: live charts SETTLED without a copy at that revision here — preserved beside a
+ *   held record (`candidate`), superseded under the plan, needing an app update (`unsupported`,
+ *   this pass or quarantined earlier), `missing` on download, or a malformed body. No further
+ *   download of THIS plan changes them, so they never mean "still downloading".
+ * - `unsettled`: live charts neither verified nor settled — not attempted before the pass stopped,
+ *   or failed for a reason a retry can fix (network, a rate limit, the server). These are what
+ *   "still downloading" means.
+ */
+export interface LibraryFacts {
+    charts: number;
+    collections: number;
+    unverifiable: number;
+    unsettled: number;
+}
 /** Loop fuse for local paging: 400 pages of `MAX_LIST_LIMIT` is 40,000 local documents. */
 const LOCAL_PAGE_CEILING = 400;
 
@@ -256,6 +297,8 @@ export interface LibraryDownloadResult {
      * failure this fact exists to prevent.
      */
     documents: Progress;
+    /** What the manifest says about the account (#1478 review C1); null unless it was paged. */
+    library: LibraryFacts | null;
 }
 
 export interface LibraryDownloadOptions {
@@ -604,13 +647,13 @@ async function libraryDownloadPass(
     };
     const halt = (retryAfterSeconds: number | null): void => {
         stopped = true;
-        const wait = retryAfterSeconds === null ? BACKOFF_FALLBACK_MS : retryAfterSeconds * 1_000;
-        backoffUntil = Math.max(backoffUntil ?? 0, now() + wait);
+        backoffUntil = Math.max(backoffUntil ?? 0, now() + backoffWait(retryAfterSeconds));
     };
     const report = (
         complete: boolean,
         absent: string[],
         documents: Progress,
+        library: LibraryFacts | null = null,
     ): LibraryDownloadResult => ({
         complete,
         advanced: buckets.advanced,
@@ -626,6 +669,7 @@ async function libraryDownloadPass(
         collections: collectionsChanged,
         ...(backoffUntil === undefined ? {} : { backoffUntil }),
         documents,
+        library,
     });
     const abandoned = (): LibraryDownloadResult =>
         report(false, [], { required: null, verified: null });
@@ -960,11 +1004,52 @@ async function libraryDownloadPass(
     const complete =
         !stopped && resolved === plan.fetch.length && tombstoned === plan.tombstone.length;
     buckets.unchanged.push(...plan.unchanged);
-    return report(complete, plan.absent, {
-        required: plan.documents.required,
+    const verified =
+        plan.documents.mirrored +
+        buckets.advanced.filter((documentId) => !collectionIds.has(documentId)).length;
+    // The live charts settled without a copy at their revision here (#1478 review C1): nothing a
+    // further download of this plan would change. A chart quarantined by an earlier pass is one
+    // the plan left `unchanged` without mirroring it.
+    const live = new Map(
+        rows
+            .filter((row) => !row.deleted && row.kind === undefined)
+            .map((row) => [row.documentId, row.revision]),
+    );
+    const settled = new Set<string>();
+    for (const mirror of local) {
+        if (
+            mirror.kind !== 'collection' &&
+            mirror.quarantinedRevision !== null &&
+            live.get(mirror.documentId) === mirror.quarantinedRevision &&
+            !(mirror.saved && mirror.remoteRevision === mirror.quarantinedRevision)
+        ) {
+            settled.add(mirror.documentId);
+        }
+    }
+    for (const documentId of [
+        ...buckets.candidate,
+        ...buckets.superseded,
+        ...buckets.unsupported,
+        ...missing,
+        ...failures
+            .filter((failure) => failure.reason === 'malformed-body')
+            .map((failure) => failure.documentId),
+    ]) {
+        if (documentId !== null && live.has(documentId)) {
+            settled.add(documentId);
+        }
+    }
+    const required = plan.documents.required;
+    return report(
+        complete,
+        plan.absent,
         // Charts only, like `documents.required` (#1474): an advanced collection is not a song.
-        verified:
-            plan.documents.mirrored +
-            buckets.advanced.filter((documentId) => !collectionIds.has(documentId)).length,
-    });
+        { required, verified },
+        {
+            charts: required,
+            collections: rows.filter((row) => !row.deleted && row.kind === 'collection').length,
+            unverifiable: settled.size,
+            unsettled: Math.max(0, required - verified - settled.size),
+        },
+    );
 }

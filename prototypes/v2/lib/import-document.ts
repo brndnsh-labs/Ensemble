@@ -1,15 +1,24 @@
 import { writtenSettings } from '@engine/songbook/codec';
+import { songSourceLink } from '@engine/songbook/ireal-decode';
 import type { IRealImportResult } from '@engine/songbook/ireal-import';
 import type { ChartDocumentV2 } from '@engine/songbook/score-types';
 import { type ChartDocument, followingFeel, validateDocument } from './documents';
 import { checkPlayable } from './engine-mode';
 
-/** Build a detached candidate only. Reviewing an import never changes the running band. */
+/**
+ * Build a detached candidate only. Reviewing an import never changes the running band.
+ *
+ * `source` is what the document keeps as its original (`importSource.text`): the whole input by
+ * default — one song picked from a file keeps the file it came from — or, for a whole-playlist
+ * import (#1478), `'song'`: that song's own link (`songSourceLink`), so 1,350 documents never each
+ * carry the whole playlist.
+ */
 export function importedDocument(
     result: IRealImportResult,
     index: number,
     base: ChartDocument,
     bpm: number,
+    source: 'input' | 'song' = 'input',
 ): ChartDocumentV2 {
     const song = result.songs[index];
     if (
@@ -38,7 +47,13 @@ export function importedDocument(
             ...(song.composer ? { composer: song.composer } : {}),
             ...(song.style ? { style: song.style } : {}),
         },
-        importSource: { format: result.format, text: result.source },
+        importSource: {
+            format: result.format,
+            text:
+                source === 'song'
+                    ? songSourceLink(result.format, song.metadata.fields)
+                    : result.source,
+        },
         chart: {
             score: song.score,
             performance: { ...setup.performance, bpm },

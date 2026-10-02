@@ -20,9 +20,25 @@ export interface IRealImportSong {
 export interface IRealImportResult {
     source: string;
     format: 'irealbook' | 'irealb' | null;
+    /**
+     * The playlist's own title (#1478), when the export carries one that is bounded plain text —
+     * what a whole-playlist import names its collection. One that is not is dropped with a warning,
+     * never shown, exactly as an unsafe song title is.
+     */
+    playlistName?: string;
     songs: IRealImportSong[];
     diagnostics: IRealImportDiagnostic[];
 }
+
+/**
+ * The most written measures one import may hold, across every song in it (#1478; 4,096 before a
+ * playlist could import whole). Sized from the largest playlist this importer is built for:
+ * iReal's Jazz 1460 measured 34,510 written measures across the 1,220 of its 1,460 tunes that
+ * build a score (2026-10-02), about 28 a tune. 65,536 holds a full 2,000-song import
+ * (`MAX_IREAL_SONGS`) of tunes that size with about 15% to spare, and nearly twice Jazz 1460.
+ * Each tune is also bounded on its own by the score builder; this bounds the whole import's work.
+ */
+export const MAX_IMPORT_MEASURES = 65_536;
 
 // biome-ignore lint/suspicious/noControlCharactersInRegex: display metadata must never contain markup or controls.
 const UNSAFE_TEXT = /[<>\u0000-\u001f\u007f]/;
@@ -94,17 +110,29 @@ function importSong(fields: string[], modern: boolean, index: number): IRealImpo
 }
 
 /**
- * Bounded, synchronous and side-effect-free. Parsing never fetches, executes HTML, persists,
- * adopts playback state, or rounds music until something sounds plausible. The exact input
- * accompanies successes and failures; callers must keep it private and render metadata as text.
- * A score is authored data, not a playback certificate: the ordinary playback validator must
- * still check supported qualities, lane semantics, form traversal and expansion limits.
+ * The import as a sequence of steps: the decode, then one song per step, each yielding the number
+ * of songs read so far and the total. `parseIRealImport` drains it in one go; `parseIRealImportInSteps`
+ * hands the event loop back between slices, so a whole playlist never freezes the page (#1478).
+ * Both build the same `result`, so the two can never disagree about a song.
  */
-export function parseIRealImport(input: string): IRealImportResult {
-    const result: IRealImportResult = { source: input, format: null, songs: [], diagnostics: [] };
+function* importSteps(
+    input: string,
+    result: IRealImportResult,
+): Generator<{ done: number; total: number }, void, void> {
     try {
         const decoded = decodeIRealInput(input);
         result.format = decoded.format;
+        if (decoded.playlistName !== undefined) {
+            try {
+                result.playlistName = displayText(decoded.playlistName, 'playlist name');
+            } catch (error) {
+                result.diagnostics.push({
+                    severity: 'warning',
+                    message: error instanceof Error ? error.message : String(error),
+                });
+            }
+        }
+        const total = decoded.entries.length;
         let totalMeasures = 0;
         for (const [index, fields] of decoded.entries.entries()) {
             const song = importSong(fields, decoded.format === 'irealb', index);
@@ -113,11 +141,14 @@ export function parseIRealImport(input: string): IRealImportResult {
                     (count, section) => count + section.measures.length,
                     0,
                 ) ?? 0;
-            if (totalMeasures > 4096) {
+            if (totalMeasures > MAX_IMPORT_MEASURES) {
                 result.songs = [];
-                throw new Error('Import at most 4,096 written measures across all selected songs.');
+                throw new Error(
+                    `Import at most ${MAX_IMPORT_MEASURES.toLocaleString('en-US')} written measures across all selected songs.`,
+                );
             }
             result.songs.push(song);
+            yield { done: index + 1, total };
         }
     } catch (error) {
         result.diagnostics.push({
@@ -127,6 +158,60 @@ export function parseIRealImport(input: string): IRealImportResult {
                     ? error.message
                     : 'This iReal input could not be decoded safely.',
         });
+    }
+}
+
+function emptyResult(input: string): IRealImportResult {
+    return { source: input, format: null, songs: [], diagnostics: [] };
+}
+
+/**
+ * Bounded, synchronous and side-effect-free. Parsing never fetches, executes HTML, persists,
+ * adopts playback state, or rounds music until something sounds plausible. The exact input
+ * accompanies successes and failures; callers must keep it private and render metadata as text.
+ * A score is authored data, not a playback certificate: the ordinary playback validator must
+ * still check supported qualities, lane semantics, form traversal and expansion limits.
+ */
+export function parseIRealImport(input: string): IRealImportResult {
+    const result = emptyResult(input);
+    for (const _ of importSteps(input, result)) {
+        // Drained in one go: every song is read before this returns.
+    }
+    return result;
+}
+
+export interface ImportStepOptions {
+    /**
+     * Asked after every song: true when this slice has run long enough to hand the event loop back.
+     * The caller owns the clock (a UI passes a frame budget), so this module keeps none.
+     */
+    shouldYield: () => boolean;
+    /** Hands the event loop back; resolves when the import may continue. */
+    yieldNow: () => Promise<void>;
+    /** Songs read so far, after each yield — never before the song it counts was read. */
+    onProgress?: (done: number, total: number) => void;
+    /** Checked after every yield: true stops the import and resolves null. */
+    cancelled?: () => boolean;
+}
+
+/**
+ * `parseIRealImport`, in slices (#1478). Parsing Jazz 1460's 1,460 tunes took 1.1-2.3 s
+ * in one go on a desktop, which is several seconds of a frozen page on a phone. The result is
+ * identical to `parseIRealImport`'s; null only when `cancelled` said so.
+ */
+export async function parseIRealImportInSteps(
+    input: string,
+    options: ImportStepOptions,
+): Promise<IRealImportResult | null> {
+    const result = emptyResult(input);
+    for (const { done, total } of importSteps(input, result)) {
+        if (options.shouldYield()) {
+            options.onProgress?.(done, total);
+            await options.yieldNow();
+            if (options.cancelled?.()) {
+                return null;
+            }
+        }
     }
     return result;
 }

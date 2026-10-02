@@ -150,6 +150,47 @@ table, Save, read and delete routes; and the same per-owner document cap.
   re-reads and re-validates the whole library, and `collectionsVersion` when collections did (a
   collection Save committed, a merge, a download of a collection), which re-reads only the
   collections. A star uploading must not cost a 2,000-song songbook a full re-read.
+- **A whole-playlist import is ONE transaction (#1478).** `AccountSongbook.importPlaylist` commits
+  every song as its own queued create (base `revision: null`, a fresh operation id each) and the
+  collection that holds them — created, or extended when one of that name exists — in one
+  transaction, after re-checking the account cap inside it (`ImportCapError`, nothing written).
+  So there is no half-imported playlist to resume: a reload or closed tab mid-import aborts the
+  transaction, and a rerun cannot duplicate a song. No pending budget changes either:
+  `MAX_PENDING_SAVES` bounds ONE document's queue, and each imported song's queue is one deep. The
+  drain is the outbox's as it always was — frozen bytes and receipts, pass by pass — and the loop
+  bumps `libraryVersion` once for the import and once per pass, never per song. The chip and the
+  songbook count `songsWaiting` (queued SONGS, from the operations index's keys alone) so a long
+  drain reads as one; `collectionOutbox` reads only collection queues for the same reason. At the
+  server's 120 Saves a minute a 1,350-song import takes at least twelve minutes of passes.
+- **A rate-limited upload resumes by itself (DECISION 2026-10-02, Brandon, #1478).** The loop's
+  one time-based trigger, amending [rollout decision 9](ensemble-v2-rollout.md): a pass that ends on
+  a 429 arms ONE timer for the end of the back-off (`armResume` in `lib/account/sync-loop.ts`), only
+  while the page is attached to that owner, visible and has work queued (Saves in the outbox, or a
+  download the limit cut short). Every pass clears it as it starts, so whichever trigger runs first
+  is the only one; detaching (sign-out, another owner) clears it. When it fires it re-checks every
+  condition against storage and otherwise does nothing — no rescheduling; a pass that meets the
+  limit again arms the next window, so an import walks through its windows and stops when the
+  queue is empty. A hidden tab resumes on the ordinary visibility trigger. Why only this: a 429 is
+  the server naming a specific wait, and a playlist import queues a thousand Saves from one gesture,
+  so there is no later musician action to wait for. Every other failure — offline, a server error,
+  a full account, an expired session — still waits for a real trigger. The sentence is
+  `RATE_LIMIT_RESUMES`.
+- **An account import waits for a settled library (#1478 review R1, C1–C4).** Room and duplicates
+  are counted against this device's copy of the account, so a device part-way through downloading
+  it is refused before anything is written ("still downloading your account library (X of Y)"):
+  otherwise a playlist another device already imported finds no duplicates, passes a cap this
+  device is nowhere near, and the server takes creates until `quota_exceeded`. Each download that
+  pages the whole manifest reports `LibraryFacts`: the live charts and collections it lists,
+  the charts settled without a copy here (held beside a draft or the open chart, needing an app
+  update, missing, malformed — `unverifiable`), and the charts not yet fetched for a transient
+  reason (`unsettled`). Only `unsettled` refuses; `unverifiable` charts are counted for room and
+  named to the musician as not checked for duplicates. The room is `heldByAccount`: the larger of
+  this device's rows and the manifest's charts plus the larger of its collections and this
+  device's. The import dialog starts a pass as soon as a playlist is read, so the check is made
+  against that pass. The facts of an EARLIER pass in the same page load are used only when the
+  latest pass read no manifest (offline, a failed page); a device that has settled nothing in this
+  page load is refused. The residual window is honest: another device can add documents between
+  that pass and the write, and the server's cap stays the authority.
 - **Guest collections are adopted with guest songs** (`adoptGuestCollections`): song ids remapped to
   the ids those songs are adopted under, the guest Starred merged into the account's. When every
   guest song is already in the account, the offer still opens if a guest collection holds songs

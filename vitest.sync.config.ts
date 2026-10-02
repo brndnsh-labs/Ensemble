@@ -31,6 +31,7 @@ export default defineConfig({
             'tests/browser/account-home.browser.test.ts',
             'tests/browser/account-collections.browser.test.ts',
             'tests/browser/account-starred.browser.test.ts',
+            'tests/browser/account-playlist-import.browser.test.ts',
         ],
         browser: {
             enabled: true,
