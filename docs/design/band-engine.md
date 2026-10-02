@@ -209,9 +209,10 @@ expression devices take turns rather than stack; one peak note per cycle.
     chorus, the out-head resolves). The chorus before it never brings the head back
     (`beforeFinalChorus`): a head that returns mid-performance is there to set up more
     blowing, and right before the out-head it would only be the melody twice — so a solo
-    there becomes the arc's third, wind-down chorus and a trade runs on. The solo arc is not
-    otherwise compressed to fit the choruses between (a 4-chorus chart plays solos 1 and 2 of
-    the three-chorus arc, then the head; a 6-chorus one plays two third choruses running). Its
+    there becomes the arc's third, wind-down chorus and a trade runs on — and the solos wind
+    down once: were the chorus before that a third chorus too, it holds the build as a second
+    (a 6-chorus chart: head, 1, 2, 2, 3, head). The solo arc is not otherwise compressed to
+    fit the choruses between (a 4-chorus chart plays solos 1 and 2 of the arc, then the head). Its
     last bar plays the held ending a non-looping pass always has. An uncounted chart's chorus
     is always 0 and it has no last chorus, so it plays exactly as before.
 - **Phrases, and the space between them.** Each four-bar phrase of the timeline is a slot the
@@ -285,11 +286,13 @@ schedules everything due in the next 150 ms on a 25 ms timer.
   a bar it sits out — and drops those bars, so what the whole pass does across a chorus seam
   (an organ chord held to its next strike or to a rest, a keyboard voice yielding to the lead)
   happens live too: the chunks join into the one-shot pass, event for event. (A seam is
-  therefore not a loop wrap, which can do neither.) The look stops at the end of the next
-  chorus, so a chunk costs at most two choruses' bars: chunks are generated on the main thread
-  inside the scheduler's 150 ms lookahead, and on a one-chord vamp the organ never strikes
-  again. That cap is the one place the chunks and the one-shot pass part: a chord held
-  unstruck through a whole chorus past the seam ends at that chorus's end. When the last segment's
+  therefore not a loop wrap, which can do neither.) A sustaining comp (the organ) re-presses
+  at the top of each chorus of a counted chart, as an organist re-articulates where the form
+  starts over, so the look always finds a strike by the next chorus's first bar. It is still
+  bounded at the end of the next chorus — chunks are generated on the main thread inside the
+  scheduler's 150 ms lookahead, so a chunk may cost at most two choruses' bars — but on a real
+  comp that cap never binds: the chunks join into the one-shot pass with no exception (a comp
+  that never struck again would have its hold end at the cap). When the last segment's
   final bar ends, the host stops by itself and calls `onEnd`; the runtime brings the transport
   to stopped by Stop's own path, except that the last notes ring out (as an export's release
   tail does) instead of being cut. A practice loop ignores the count; released, the
@@ -301,8 +304,7 @@ schedules everything due in the next 150 ms on a 25 ms timer.
 A pass is generated on the main thread, two seconds before it is needed: about 8 ms for 32
 bars with all four lanes (rhythm changes in jazz, measured 2026-10-02 on the dev box), and
 about the same for one chorus of a counted chart however long it is (7–8 ms for a 32-bar
-chorus of a 64-chorus chart; about 10 ms for a one-chord organ vamp, whose look runs a whole
-chorus). Lookups by tick (`chordAt`, `spanIndexAt`) are binary searches, so a bar's cost does
+chorus of a 64-chorus chart, whose look across the seam is one bar). Lookups by tick (`chordAt`, `spanIndexAt`) are binary searches, so a bar's cost does
 not grow with how far into the performance it is.
 
 Audio (WAV/stem) export renders `BandHost.render()`'s events offline (`lib/band-export.ts`)

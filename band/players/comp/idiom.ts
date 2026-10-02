@@ -7,6 +7,7 @@
 import { type EnergyTier, energyTier } from '../../arrange/plan.js';
 import type { Rng } from '../../core/random.js';
 import type { PitchedNote } from '../../core/types.js';
+import { chorusBars } from '../../form/timeline.js';
 import type { BarContext, PitchedIdiom } from '../../styles/types.js';
 import type { ChordFacts } from '../../theory/chord.js';
 import { at, barSteps, dyn, STEP, spanSteps } from '../grid.js';
@@ -255,9 +256,16 @@ export function compIdiom(book: CompBook): PitchedIdiom {
                 // rhythm is for a struck instrument, and re-pressing a held organ chord on every
                 // hit is a stutter, not a groove. So the organ presses on each chord's arrival
                 // (or on a push just before it) and holds; `sustain` in perform.ts carries it
-                // across barlines. An N.C. lets go, so the next chord is pressed anew.
+                // across barlines. An N.C. lets go, so the next chord is pressed anew. And the
+                // top of each chorus of a counted chart (#1475) is pressed anew too: an organist
+                // re-articulates where the form starts over, and a chord tied silently across
+                // every chorus of a vamp is not how the instrument is played. (An uncounted
+                // chart's chorus is always 0, so it is unchanged.)
                 const kept = planned.filter((h) => h.early);
-                let last = memory.pushed ? null : (memory.chord ?? null);
+                const chorusTop =
+                    ctx.bar.visit.chorus > 0 &&
+                    ctx.bar.index === chorusBars(ctx.timeline, ctx.bar.index).first;
+                let last = memory.pushed || chorusTop ? null : (memory.chord ?? null);
                 spans.forEach(({ span, from, to }, index) => {
                     const chord = span.chord;
                     if (!chord) {

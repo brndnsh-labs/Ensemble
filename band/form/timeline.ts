@@ -325,12 +325,13 @@ export function inFinalChorus(timeline: Timeline, index: number): boolean {
 }
 
 /**
- * Is bar `index` in the chorus before the last of a counted performance of three or more
- * choruses — the one that leads into the out-head?
+ * Is bar `index` in the chorus `ahead` choruses before the last of a counted performance (1:
+ * the one that leads into the out-head)? Never, for an uncounted chart, or for the first
+ * chorus (which is always the head).
  */
-export function beforeFinalChorus(timeline: Timeline, index: number): boolean {
+export function beforeFinalChorus(timeline: Timeline, index: number, ahead = 1): boolean {
     const last = timeline.bars.at(-1)?.visit.chorus ?? 0;
-    return last > 1 && timeline.bars[index].visit.chorus === last - 1;
+    return last > ahead && timeline.bars[index].visit.chorus === last - ahead;
 }
 
 /**
@@ -355,9 +356,13 @@ export function firstSpanAfter(timeline: Timeline, tick: number): number {
 
 /**
  * The index of the first span sounding at `tick`, or -1 — what `spans.findIndex` over
- * `start <= tick < end` answers, without the scan (`firstSpanAfter`). A bar whose rounded
- * event lengths overrun it (a seven's odd grouping) can leave one span ending just past the
- * next one's start; the walk back finds that earlier span first, as the scan did.
+ * `start <= tick < end` answers, without the scan (`firstSpanAfter`). What the searches rely
+ * on: spans are sorted by start, and two spans overlap, if at all, by a few ticks at a
+ * barline. That happens when a bar's durations are not whole ticks (a 1/7 of a quarter rounds
+ * to 69 ticks, and seven of them overrun the bar): the last span then ends just past the next
+ * bar's first span's start (the timeline absorbs the rounding there). The walk back finds that
+ * earlier span first, as the scan did — on every chart in the corpus the search returns what
+ * the scan returned (pinned by the property test in `timeline.test.ts`).
  */
 export function spanIndexAt(timeline: Timeline, tick: number): number {
     const { spans } = timeline;

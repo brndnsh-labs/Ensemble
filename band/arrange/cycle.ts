@@ -25,7 +25,9 @@
  * mid-performance is there to set up more blowing, and right before the out-head it would
  * just be the melody twice. That chorus stays the soloist's — a solo becomes the arc's third,
  * wind-down chorus, whose last phrase comes down and settles so the head can come in; a trade
- * keeps trading, its block running on into the out-head.
+ * keeps trading, its block running on into the out-head. And it winds down once: where the
+ * chorus before that would itself be the third, wind-down chorus, it holds the build as the
+ * second instead (…, S2, S2, S3, H), so the solos peak and come down just once into the head.
  */
 import type { TradeSettings } from '../core/types.js';
 import { type Bar, beforeFinalChorus, inFinalChorus, type Timeline } from '../form/timeline.js';
@@ -84,6 +86,10 @@ export function leadRole(
         return trade
             ? tradeRole(timeline, index, block ?? pass, trade)
             : { kind: 'solo', chorus: 3 };
+    }
+    // …and winds down once: the chorus before it, were it the wind-down too, builds instead.
+    if (!trade && beforeFinalChorus(timeline, index, 2) && pass > 0 && pass % CYCLE === CYCLE - 1) {
+        return { kind: 'solo', chorus: 2 };
     }
     if (trade && p > 0) {
         return tradeRole(timeline, index, p, trade);

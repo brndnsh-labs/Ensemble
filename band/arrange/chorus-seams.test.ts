@@ -16,6 +16,11 @@ import { STYLE_IDS, STYLES } from '../styles/index.js';
 import { COUNTED_FIXTURES, FIXTURES, score } from '../test/scores.js';
 
 const ALL_LANES = { drums: true, bass: true, comp: true, lead: true };
+const REST_AT_TOP = { ...score([{ label: 'A', bars: 'N.C. | C7 | F7 | G7:3 C7:1' }]), choruses: 3 };
+const HOLDS = {
+    ...score([{ label: 'A', bars: 'C | / | N.C. | G7:3 N.C.:1 | C', fermataBars: [4] }]),
+    choruses: 3,
+};
 
 /** The counted performance as the live host and the export generate it: a chorus at a time. */
 function chunked(timeline: Timeline, settings: BandSettings): BandEvent[] {
@@ -66,24 +71,19 @@ describe('a counted performance generated a chorus at a time (`PassOptions.until
     // Each chunk plays past its end and drops those bars, so what the whole pass does across a
     // chorus seam (a held organ chord, a comp voice yielding to the lead, a hold that stops at
     // an N.C. or at the drummer's turn) is done in the chunk too: the chunks join into the
-    // whole pass, event for event, every lane — short of a chord held unstruck through a whole
-    // chorus past the seam, which the look's cap ends there (the vamp test below).
+    // whole pass, event for event, every lane — the organ on a one-chord vamp included, since
+    // it re-presses at each chorus top (the look's cap, which would end an unstruck hold, never
+    // binds on a real comp: see the cap test below).
     describe.each(STYLE_IDS)('%s joins into the whole pass', (style: StyleId) => {
         for (const [name, chart] of Object.entries({
             ...COUNTED_FIXTURES,
             rhythmChanges: { ...FIXTURES.rhythmChanges, choruses: 2 },
             awkward: { ...FIXTURES.awkward, choruses: 2 },
             // An N.C. at the top of each chorus: a hold across the seam stops at the rest.
-            restAtTop: {
-                ...score([{ label: 'A', bars: 'N.C. | C7 | F7 | G7:3 C7:1' }]),
-                choruses: 3,
-            },
-            holds: {
-                ...score([
-                    { label: 'A', bars: 'C | / | N.C. | G7:3 N.C.:1 | C', fermataBars: [4] },
-                ]),
-                choruses: 3,
-            },
+            restAtTop: REST_AT_TOP,
+            holds: HOLDS,
+            // A one-chord vamp: the organ re-presses at each chorus top, so the look stops there.
+            vamp: organVamp(8, 3),
         })) {
             it(name, () => {
                 const timeline = compileTimeline(chart);
@@ -130,43 +130,147 @@ describe('a counted performance generated a chorus at a time (`PassOptions.until
     });
 
     it('looks across a seam at most to the end of the next chorus: a 64-chorus organ vamp', () => {
-        // An organ on one chord never strikes again, so the look would run to the end of the
-        // performance; chunks are generated on the main thread inside a 150 ms lookahead, so
-        // each costs at most two choruses' bars. Counted in bars played, not in time.
-        const vamp = {
-            ...score([{ label: 'A', bars: Array(32).fill('Dm7').join(' | ') }]),
-            choruses: 64,
-        };
-        const timeline = compileTimeline(vamp);
-        const settings: BandSettings = {
-            ...DEFAULT_SETTINGS,
-            style: 'rock',
-            comp: 'organ',
-            lanes: { drums: true, bass: true, comp: true, lead: false },
-        };
-        const drums = STYLES.rock.drums;
-        const played = vi.spyOn(drums, 'play');
-        const perChunk: number[] = [];
-        let memory: PassMemory | undefined;
-        try {
-            for (let from = 0; from < timeline.bars.length; from += 32) {
-                played.mockClear();
-                const result = performPass(timeline, settings, {
-                    pass: 0,
-                    looping: false,
-                    memory,
-                    window: { from, to: timeline.bars.length, wrapTo: 0, origin: 0 },
-                    until: from + 32,
-                });
-                memory = result.memory;
-                perChunk.push(played.mock.calls.length);
-            }
-        } finally {
-            played.mockRestore();
-        }
+        // Chunks are generated on the main thread inside a 150 ms lookahead, so each may cost
+        // at most two choruses' bars. On the vamp the organ re-presses at each chorus top, so
+        // the look stops one bar in. Counted in bars played, not in time.
+        const timeline = compileTimeline(organVamp(32, 64));
+        const perChunk = chunkBars(timeline, 32);
         expect(perChunk).toHaveLength(64);
         expect(Math.max(...perChunk)).toBeLessThanOrEqual(64);
-        // The hold still reaches across the seam, to where the look ended.
-        expect(perChunk[0]).toBe(64);
+        expect(perChunk.slice(0, -1).every((bars) => bars === 33)).toBe(true);
+    });
+
+    it('stops a look that finds no strike at the end of the next chorus, and the hold there', () => {
+        // A comp that never strikes again past the seam (silenced here from bar `until` on):
+        // the look runs a whole chorus and stops, and the last chord's hold ends where the look
+        // ended — the cap the look is bounded by.
+        const timeline = compileTimeline(organVamp(8, 4));
+        const book = STYLES.rock.comp.keyboard;
+        const play = book.play.bind(book);
+        const silent = vi
+            .spyOn(book, 'play')
+            .mockImplementation((ctx, memory) =>
+                ctx.bar.index >= 8 ? { events: [], memory } : play(ctx, memory),
+            );
+        try {
+            expect(chunkBars(timeline, 8, 1)).toEqual([16]);
+            const { events } = performPass(timeline, ORGAN, {
+                pass: 0,
+                looping: false,
+                window: { from: 0, to: timeline.bars.length, wrapTo: 0, origin: 0 },
+                until: 8,
+            });
+            const last = events.filter((e) => e.lane === 'comp').at(-1)!;
+            expect(last.lane === 'comp' && last.tick + last.dur).toBe(timeline.bars[16].start);
+        } finally {
+            silent.mockRestore();
+        }
+    });
+
+    it('keeps an organ on a one-chord vamp sounding in every chorus, every style', () => {
+        // An organist re-presses at the top of each chorus: the chord is never tied silently
+        // across the whole performance, so every bar of every chorus sounds, as played live.
+        const timeline = compileTimeline(organVamp(8, 8));
+        for (const style of STYLE_IDS) {
+            const settings = { ...ORGAN, style };
+            const sounding = Array(8).fill(0);
+            const bars = new Set<number>();
+            for (const e of chunked(timeline, settings)) {
+                if (e.lane !== 'comp' || e.muted) {
+                    continue;
+                }
+                for (const bar of timeline.bars) {
+                    if (bar.start < e.tick + e.dur && e.tick < bar.start + bar.meter.barTicks) {
+                        bars.add(bar.index);
+                    }
+                }
+            }
+            for (const bar of bars) {
+                sounding[timeline.bars[bar].visit.chorus]++;
+            }
+            expect(sounding, style).toEqual(Array(8).fill(8));
+        }
+    });
+
+    it('never extends a hold across the start of an N.C. bar', () => {
+        // `sustain` holds an organ chord to its next strike, but lets go at a rest. A written
+        // length may run over a mid-bar N.C. (as it always has); a hold that `sustain` extends
+        // past the bar the note was struck in must stop at the start of an N.C. bar.
+        const charts = [
+            ...Object.values(FIXTURES),
+            ...Object.values(COUNTED_FIXTURES),
+            { ...FIXTURES.awkward, choruses: 2 },
+            REST_AT_TOP,
+            HOLDS,
+        ];
+        const failures: string[] = [];
+        for (const chart of charts) {
+            const timeline = compileTimeline(chart);
+            const rests = timeline.bars
+                .filter(
+                    (bar) =>
+                        bar.spans[0] && !bar.spans[0].chord && bar.spans[0].start === bar.start,
+                )
+                .map((bar) => bar.start);
+            for (const style of STYLE_IDS) {
+                const settings = { ...ORGAN, style };
+                for (const events of [
+                    performPass(timeline, settings, { pass: 0, looping: false }).events,
+                    chunked(timeline, settings),
+                ]) {
+                    for (const e of events) {
+                        if (e.lane !== 'comp' || e.muted) {
+                            continue;
+                        }
+                        const barEnd =
+                            timeline.bars[e.bar].start + timeline.bars[e.bar].meter.barTicks;
+                        const end = e.tick + e.dur;
+                        const crossed = rests.find((at) => at > e.tick && at < end - 1e-6);
+                        if (end > barEnd + 1e-6 && crossed !== undefined) {
+                            failures.push(
+                                `${style} ${e.tick}+${e.dur} over the N.C. at ${crossed}`,
+                            );
+                        }
+                    }
+                }
+            }
+        }
+        expect(failures.slice(0, 5)).toEqual([]);
     });
 });
+
+/** A one-chord vamp of `length` bars, counted. */
+function organVamp(length: number, choruses: number) {
+    return { ...score([{ label: 'A', bars: Array(length).fill('Dm7').join(' | ') }]), choruses };
+}
+
+const ORGAN: BandSettings = {
+    ...DEFAULT_SETTINGS,
+    style: 'rock',
+    comp: 'organ',
+    lanes: { drums: true, bass: true, comp: true, lead: false },
+};
+
+/** Bars played (the drummer's, one per bar) by each chunk of `length` bars, up to `count`. */
+function chunkBars(timeline: Timeline, length: number, count = Number.POSITIVE_INFINITY): number[] {
+    const played = vi.spyOn(STYLES.rock.drums, 'play');
+    const perChunk: number[] = [];
+    let memory: PassMemory | undefined;
+    try {
+        for (let from = 0; from < timeline.bars.length && perChunk.length < count; from += length) {
+            played.mockClear();
+            const result = performPass(timeline, ORGAN, {
+                pass: 0,
+                looping: false,
+                memory,
+                window: { from, to: timeline.bars.length, wrapTo: 0, origin: 0 },
+                until: from + length,
+            });
+            memory = result.memory;
+            perChunk.push(played.mock.calls.length);
+        }
+    } finally {
+        played.mockRestore();
+    }
+    return perChunk;
+}
