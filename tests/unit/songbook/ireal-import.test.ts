@@ -577,12 +577,122 @@ describe('bounded source-preserving iReal import', () => {
         expect(content.annotations).toBeUndefined();
     });
 
-    it('refuses a chart where unrelated playback text ("Break") would otherwise silence a real orphaned coda', () => {
+    it('refuses a chart where unrelated playback text ("Break") would otherwise silence a real orphaned sign', () => {
         // P1 regression (#1447 review): a broad playback-keyword match must never relax the
         // unpaired-marker check — only text that genuinely REFERENCES a Fine/Coda/Segno marker
-        // or a numbered ending may do that. Real charts hitting this: Aisha, Horace-Scope,
-        // Liberia, Mc Jolt.
-        blocked('T44[C   |F   Q|G7 <Break>  |C   Z[QD7   |G7   Z');
+        // or a numbered ending may do that. Real charts hitting this: Horace-Scope and Mc Jolt
+        // (their departure is inside a repeat). A lone segno is never mapped, so it is still
+        // refused beside the text.
+        blocked('T44[SC   |F   |G7 <Break>  |C   Z');
+    });
+
+    it('does not let unrelated playback text ("Break") turn a coda pair into inert text (#1476)', () => {
+        // The #1447 regression above, with the coda pair #1476 maps (Aisha, Liberia): "Break"
+        // must not relax the pair into ignored signs, so it is still read as a last-chorus coda.
+        const measures = score('T44[C   |F   Q|G7 <Break>  |C   Z[QD7   |G7   Z').sections[0]
+            .measures;
+        expect(measures[1].end).toContainEqual(expect.objectContaining({ kind: 'last-chorus' }));
+    });
+
+    describe('coda signs with no jump text (#1476)', () => {
+        const UNPAIRED = 'Bar 1: Unpaired navigation symbols need an explicit supported jump.';
+        // Head C F G7 C, the departure at the end of bar 2; a two-bar coda D7 G7 from bar 5.
+        const tag = 'T44[C   |F   Q|G7   |C   Z[QD7   |G7   Z';
+
+        it('maps a departure at the end of a bar and a later coda at the start of one to a last-chorus coda', () => {
+            const parsed = parseIRealImport(open(tag));
+            const song = parsed.songs[0];
+            const result = song.score!;
+            // No chorus count on import: the musician sets one in the Edit panel.
+            expect(result.choruses).toBeUndefined();
+            const measures = result.sections[0].measures;
+            expect(measures[1].end).toEqual([
+                { kind: 'coda', label: 'coda-1' },
+                {
+                    kind: 'last-chorus',
+                    destination: { kind: 'coda', via: 'coda-1', target: 'coda-2' },
+                },
+            ]);
+            expect(measures[4].start).toEqual([{ kind: 'coda', label: 'coda-2' }]);
+            expect(song.diagnostics.map(({ message }) => message)).toEqual([
+                'The coda at bar 5 is played once, at the end: with a chorus count set, the last chorus jumps to it from the end of bar 2. Until then the form loops without it.',
+                'The stored key is used. iReal style is preserved as text, not applied as an Ensemble genre.',
+            ]);
+            const order = (choruses?: number) =>
+                prepareScorePlayback({ ...result, ...(choruses ? { choruses } : {}) }).visits.map(
+                    ({ chorus, measureIndex }) => `${chorus}:${measureIndex + 1}`,
+                );
+            // Uncounted, the coda is never reached; counted, only the last chorus takes it.
+            expect(order()).toEqual(['0:1', '0:2', '0:3', '0:4']);
+            expect(order(2)).toEqual(['0:1', '0:2', '0:3', '0:4', '1:1', '1:2', '1:5', '1:6']);
+        });
+
+        it.each([
+            // iReal's other form: only the coda section is marked. A last-chorus coda departs
+            // from a written sign, and this chart has none to depart from.
+            ['a lone coda sign at the start of a bar', 'T44[C   |F   Z[QD7   |G7   Z'],
+            ['a lone departure sign', 'T44[C   |F   Q|G7   Z'],
+            ['both signs at the start of a bar', 'T44[QC   |F   Z[QD7   |G7   Z'],
+            ['both signs at the end of a bar', 'T44[C   Q|F   Z[D7   Q|G7   Z'],
+            ['a coda target before its departure', 'T44[QC   |F   Q|G7   Z'],
+            ['three coda signs', 'T44[C   Q|F   Q|G7   Z[QD7   |G7   Z'],
+            ['a Fine beside the pair', 'T44[C   <Fine>|F   Q|G7   Z[QD7   |G7   Z'],
+            ['a segno beside the pair', 'T44[SC   |F   Q|G7   Z[QD7   |G7   Z'],
+            ['a Fine for a departure', 'T44[C   |F   <Fine>|G7   Z[QD7   |G7   Z'],
+            // The score form refuses a last-chorus departure inside a repeat (which pass is the
+            // last time?), so the import is read again as before and refused as before.
+            ['a departure inside a repeat', 'T44{C   |F   Q}[G7   Z[QD7   |G7   Z'],
+            // Passed once, but the last chorus would leave the repeat on pass 1 (#1476 review).
+            [
+                'a departure inside a first ending',
+                'T44{C   |F   |N1G7   Q}|N2G7   |C   Z[QD7   |G7   Z',
+            ],
+            [
+                'a departure inside a one-bar first ending',
+                'T44{C   |N1F   Q}|N2G7   ][QD7   |G7   Z',
+            ],
+        ])('still refuses %s, as before #1476', (_, body) => {
+            const song = parseIRealImport(open(body)).songs[0];
+            expect(song.score).toBeUndefined();
+            expect(song.diagnostics).toEqual([
+                expect.objectContaining({ severity: 'error', message: UNPAIRED }),
+            ]);
+        });
+
+        it('names the blocker a mapped pair leaves, not the signs it no longer has to refuse', () => {
+            // Eight Jazz 1460 charts ("Very Early") carry the pair and multi-chord bars in a meter
+            // the importer doesn't time yet (#1453): the refusal is now that bar, which is what's
+            // in the way.
+            const song = parseIRealImport(open('T34[C   |F   Q|D G7 |C   Z[QD7   Z')).songs[0];
+            expect(song.score).toBeUndefined();
+            expect(song.diagnostics).toEqual([
+                expect.objectContaining({
+                    severity: 'error',
+                    message:
+                        'Bar 3: Multi-chord cell timing in this meter needs a verified import mapping.',
+                }),
+            ]);
+        });
+
+        it('leaves a coda pair beside coda prose as the ignored signs it was (I Got Rhythm)', () => {
+            // "Original takes Coda every time" says when the coda is taken, and not on the last
+            // chorus only: the signs stay inert, each named, never a guessed last-chorus coda.
+            const parsed = parseIRealImport(
+                open('T44[C   |F   Q|G7 <Original takes Coda every time>|C   Z[QD7   |G7   Z'),
+            );
+            const song = parsed.songs[0];
+            const measures = song.score!.sections[0].measures;
+            expect(measures.flatMap((measure) => measure.end ?? [])).not.toContainEqual(
+                expect.objectContaining({ kind: 'last-chorus' }),
+            );
+            const messages = song.diagnostics.map(({ message }) => message);
+            expect(messages).toContain(
+                'The coda sign in bar 2 has no supported jump and is ignored.',
+            );
+            expect(messages).toContain(
+                'The coda sign in bar 5 has no supported jump and is ignored.',
+            );
+        });
     });
 
     it('caps the notes list so a pathological chart cannot produce an unbounded number of warnings', () => {

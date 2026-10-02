@@ -770,15 +770,54 @@ function alEndingClose(
 }
 
 /**
- * Map the chart's D.C./D.S. text to jumps. An al-ending is applied only when `applyAlEnding` and
- * alEndingClose allow; otherwise it stays the inert text readBars read it as. Returns whether
- * one was applied.
+ * A chart's coda signs with no D.C./D.S. text at all, read as iReal Pro reads them (#1476). Its
+ * worked example, 500 Miles High, has a coda sign in the form and the Coda section below it: "Set
+ * the player to repeat 5 times and the main form repeats 5 times, then jumps to the Coda on the
+ * final pass"; "The player jumps to the Coda only on the last repeat"
+ * (https://irealpro.com/how-the-coda-symbol-works-in-ireal-pro/). That is a last-chorus coda
+ * (#1472). Only that shape is mapped: exactly two signs, nothing else orphaned, placed as the
+ * page's convention has them: 'put the "jump from" Coda symbol at the end of a measure, and the
+ * "jump to" Coda symbol at the beginning of the first measure of the Coda section'. The page
+ * also lets a chart "mark only the Coda section at the end, as in Alley Cat"; a last-chorus coda
+ * departs from a written sign, so that form would need a departure sign the chart doesn't have,
+ * and stays refused. Returns their bars and labels, or undefined for any other shape.
+ */
+function unpairedCoda(
+    orphaned: Marker[],
+): { via: number; target: number; labels: { via: string; target: string } } | undefined {
+    // Markers are in reading order, so a start-of-bar sign after an end-of-bar one is in a
+    // later bar.
+    const [via, target] = orphaned;
+    if (
+        orphaned.length !== 2 ||
+        // Defensive only: the codec refuses a coda destination naming a Fine, and the import
+        // falls back to the same refusal, so dropping these two checks changes no outcome.
+        via.direction.kind !== 'coda' ||
+        target.direction.kind !== 'coda' ||
+        via.edge !== 'end' ||
+        target.edge !== 'start'
+    ) {
+        return undefined;
+    }
+    return {
+        via: via.index,
+        target: target.index,
+        labels: { via: via.direction.label, target: target.direction.label },
+    };
+}
+
+/**
+ * Map the chart's D.C./D.S. text to jumps. An al-ending is applied only when `applyConventions`
+ * and alEndingClose allow; otherwise it stays the inert text readBars read it as. With
+ * `applyConventions`, coda signs with no jump text at all become a last-chorus coda when
+ * `unpairedCoda` allows (#1476); otherwise they are refused as before. Returns whether either
+ * was applied.
  */
 function mapNavigation(
     bars: WrittenBar[],
     notes: string[],
     tolerateUnpairedMarkers: boolean,
-    applyAlEnding: boolean,
+    applyConventions: boolean,
 ): boolean {
     const markers: Marker[] = bars.flatMap((bar, index) => [
         ...bar.start.map((direction) => ({ direction, index, edge: 'start' })),
@@ -793,7 +832,7 @@ function mapNavigation(
             continue;
         }
         const close =
-            applyAlEnding && written.length === 1
+            applyConventions && written.length === 1
                 ? alEndingClose(bars, markers, index, jump)
                 : undefined;
         if (close === undefined) {
@@ -877,6 +916,21 @@ function mapNavigation(
             ['coda', 'fine', 'segno'].includes(direction.kind),
         );
         if (orphaned.length) {
+            // Tolerated means the chart has navigation prose or an al-ending left as text
+            // ("Original takes Coda every time"), which may say when the coda is taken: that
+            // stays the honest note below, never a guessed last-chorus coda.
+            const coda = applyConventions && !tolerateUnpairedMarkers && unpairedCoda(orphaned);
+            if (coda) {
+                // On the departure sign's own barline, as the score form requires.
+                bars[coda.via].end.push({
+                    kind: 'last-chorus',
+                    destination: { kind: 'coda', ...coda.labels },
+                });
+                notes.push(
+                    `The coda at bar ${coda.target + 1} is played once, at the end: with a chorus count set, the last chorus jumps to it from the end of bar ${coda.via + 1}. Until then the form loops without it.`,
+                );
+                return true;
+            }
             if (!tolerateUnpairedMarkers) {
                 fail(0, 'Unpaired navigation symbols need an explicit supported jump.');
             }
@@ -903,19 +957,24 @@ export function scoreFromIRealBody(
         throw new Error('The stored key signature is unsupported.');
     }
     // An al-ending the shared score form refuses (another repeat on its route, say) is read
-    // again as the inert text it was before #1473, rather than refusing the whole import.
+    // again as the inert text it was before #1473, rather than refusing the whole import. A
+    // last-chorus coda it refuses (a departure inside a repeat, say) is read again as the
+    // unpaired signs they were before #1476, refused with the same message as before.
     return (
         buildScore(body, key, index, modern, true) ?? buildScore(body, key, index, modern, false)!
     );
 }
 
-/** Null when an applied al-ending (#1473) leaves a score the score form refuses. */
+/**
+ * Null when an applied convention, an al-ending (#1473) or a last-chorus coda (#1476), leaves a
+ * score the score form refuses.
+ */
 function buildScore(
     body: string,
     key: string,
     index: number,
     modern: boolean,
-    applyAlEnding: boolean,
+    applyConventions: boolean,
 ): { score: SemanticScore; notes: string[] } | null {
     const notes: string[] = [];
     const signals: ParseSignals = {
@@ -929,7 +988,7 @@ function buildScore(
     // mapNavigation cannot apply) is imported as inert annotation only, so a Fine/Coda/Segno
     // marker it would otherwise have paired with is expected to be unpaired here; mapNavigation
     // notes each one by name rather than hard-failing.
-    const applied = mapNavigation(bars, notes, signals.unmappedNavigation, applyAlEnding);
+    const applied = mapNavigation(bars, notes, signals.unmappedNavigation, applyConventions);
     const id = (bar: number) => `ireal-${index + 1}-bar-${bar + 1}`;
     const measures: ScoreMeasure[] = [];
     let pendingTwo = false;
