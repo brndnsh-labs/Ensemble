@@ -291,6 +291,53 @@ test('tempo allows sequential typing, Enter, blur, Escape and single step commit
     await expect(tempo).toHaveValue('240');
 });
 
+// #1485 — opening a song remounts the tempo field (`key={current.id}`), and its sync effect used
+// to set the text to the song's tempo once more on mount. That effect runs a task after the
+// commit, so a tempo typed in between was overwritten by it: on a loaded CI runner a
+// `fill('240')` right after an import read back `100`. This types in the commit's own microtask,
+// the earliest moment the field exists, which lands inside that window every time.
+test('a tempo typed the moment a song opens is not overwritten by the field mounting (#1485)', async ({
+    page,
+}) => {
+    await seedStarters(page);
+    await songLink(page, 'Blue pocket', 'Blues').click();
+    const document = await exportCurrent(page);
+    document.title = 'Blue pocket (imported)';
+    await page.evaluate(() => {
+        const opened = window.document.getElementById('tempo');
+        const typed = window as unknown as { typed?: string };
+        const watch = new MutationObserver(() => {
+            const field = window.document.getElementById('tempo') as HTMLInputElement | null;
+            if (!field || field === opened || field.disabled) {
+                return;
+            }
+            watch.disconnect();
+            // A keystroke as React sees one: the prototype setter skips React's value tracker.
+            Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(
+                field,
+                '137',
+            );
+            field.dispatchEvent(new Event('input', { bubbles: true }));
+            typed.typed = field.value;
+        });
+        watch.observe(window.document, { subtree: true, childList: true, attributes: true });
+    });
+    await page.getByLabel('Import Ensemble document').setInputFiles({
+        name: 'imported.ensemble',
+        mimeType: 'application/json',
+        buffer: Buffer.from(JSON.stringify(document)),
+    });
+    await expect
+        .poll(() => page.evaluate(() => (window as unknown as { typed?: string }).typed))
+        .toBe('137');
+    const tempo = page.getByLabel('Tempo', { exact: true });
+    // Long enough for the mount's effects to have run, so a regression has had its chance.
+    await page.waitForTimeout(500);
+    await expect(tempo).toHaveValue('137');
+    await tempo.press('Enter');
+    expect((await exportCurrent(page)).chart.performance.bpm).toBe(137);
+});
+
 test('Continue remembers opened songs and recovered setup without changing saved timestamps', async ({
     page,
 }) => {
