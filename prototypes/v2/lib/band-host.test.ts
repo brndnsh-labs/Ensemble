@@ -8,7 +8,7 @@
  * fake `AudioContext` has none of the nodes the real voices need.
  *
  * Also the counted chart (#1475): N choruses played once, then the host stops by itself; and
- * releasing a practice loop (#1484).
+ * releasing a practice loop (#1484, #1489).
  */
 import {
     type BandEvent,
@@ -20,6 +20,10 @@ import {
     type Timeline,
     toMidi,
 } from '@band/index';
+import { playBassNote } from '@engine/engine/synth-bass';
+import { playNote } from '@engine/engine/synth-chords';
+import { playDrumSound } from '@engine/engine/synth-drums';
+import { playSoloNote } from '@engine/engine/synth-soloist';
 import type {
     ScoreDirection,
     ScoreEvent,
@@ -522,7 +526,8 @@ describe('BandHost counted choruses', () => {
 /**
  * Releasing a practice loop: the lap under way finishes, then the song carries on from the bar
  * after the loop. A settings change after the release regenerates what is still to come, and
- * must regenerate it from the same place (#1484).
+ * must regenerate it from the same place (#1484). The lap under way is the one at the
+ * scheduler's horizon, so a release inside the lookahead never sounds a downbeat twice (#1489).
  */
 describe('BandHost releasing a practice loop', () => {
     const BPM = 120;
@@ -591,6 +596,273 @@ describe('BandHost releasing a practice loop', () => {
         audio.currentTime = end;
         pump(host);
         expect(onEnd).toHaveBeenCalledTimes(1);
+    });
+
+    /** Every note handed to the (mocked) voices: its lane and pitch (or drum), and its time. */
+    function voiceCalls(): { note: string; time: number }[] {
+        const calls = [
+            ...vi
+                .mocked(playDrumSound)
+                .mock.calls.map(([, piece, time]) => ({ note: `drums ${piece}`, time })),
+            ...vi
+                .mocked(playBassNote)
+                .mock.calls.map(([, freq, time]) => ({ note: `bass ${freq}`, time })),
+            ...vi
+                .mocked(playNote)
+                .mock.calls.map(([, freq, time]) => ({ note: `comp ${freq}`, time })),
+            ...vi
+                .mocked(playSoloNote)
+                .mock.calls.map(([, freq, time]) => ({ note: `lead ${freq}`, time })),
+        ];
+        return calls.sort((x, y) => x.time - y.time);
+    }
+
+    /**
+     * The same drum or pitch struck twice within 20 ms: one note handed to the voices twice.
+     * The band humanises each bar's timing on its own, so a doubled downbeat is not two calls
+     * at exactly the same time but a few milliseconds apart.
+     */
+    function doubled(calls: { note: string; time: number }[]): string[] {
+        return calls.flatMap((call, i) =>
+            calls
+                .slice(i + 1)
+                .filter((later) => later.note === call.note && later.time - call.time < 0.02)
+                .map((later) => `${call.note} at ${call.time} and ${later.time}`),
+        );
+    }
+
+    /**
+     * Loop A with the whole band, pumping every 25 ms as the host's own timer does; release the
+     * loop `early` seconds before the second lap ends, then play on `after` seconds past it.
+     */
+    function releaseBefore(early: number, after: number) {
+        const band = {
+            ...DEFAULT_SETTINGS,
+            lanes: { drums: true, bass: true, comp: true, lead: true },
+        };
+        for (const voice of [playDrumSound, playBassNote, playNote, playSoloNote]) {
+            vi.mocked(voice).mockClear();
+        }
+        const audio = fakeAudioContext(10);
+        const state = fakeState(audio);
+        const host = new BandHost({ state: () => state, silence: () => {} });
+        host.setScore(aThenB);
+        const timeline = compileTimeline(aThenB);
+        host.start(band, BPM, 0, { from: 0, to: timeline.bars[2].start });
+        const lapEnd = 10.1 + 4 * BAR_S;
+        const pumpTo = (from: number, to: number) => {
+            for (let i = 0; from + i * 0.025 < to - 1e-9; i++) {
+                audio.currentTime = from + i * 0.025;
+                pump(host);
+            }
+        };
+        pumpTo(10.1, lapEnd - early);
+        const before = voiceCalls();
+        audio.currentTime = lapEnd - early;
+        host.setLoop(null);
+        pumpTo(lapEnd - early, lapEnd + after);
+        return { host, timeline, lapEnd, before, calls: voiceCalls() };
+    }
+
+    it('released just inside the lookahead, no note is handed to the voices twice (#1489)', () => {
+        // The scheduler hands the voices everything that starts within the next 150 ms, so
+        // 100 ms before the lap's end the next lap's downbeat has already gone to them.
+        const { host, timeline, lapEnd, before, calls } = releaseBefore(0.1, 2 * BAR_S + BAR_S / 2);
+        const onBarline = (call: { time: number }) => Math.abs(call.time - lapEnd) < 0.03;
+        expect(before.some(onBarline)).toBe(true);
+        expect(doubled(calls)).toEqual([]);
+        // The bass plays one note at a time: one note on the lap's barline, not two.
+        expect(
+            calls.filter((call) => call.note.startsWith('bass') && onBarline(call)),
+        ).toHaveLength(1);
+        // The lap whose downbeat was sounding plays out, and then the song carries on past
+        // the loop: B's first bar, half a bar after that lap.
+        const tick = host.songTick();
+        expect(tick).not.toBeNull();
+        expect(tick!).toBeGreaterThanOrEqual(timeline.bars[2].start);
+        expect(tick!).toBeLessThan(timeline.bars[3].start);
+        host.stop();
+    });
+
+    it('released a second before the lap ends, the bar after the loop takes the barline', () => {
+        // Outside the lookahead nothing of the next lap has been scheduled, so the lap under
+        // way is the last and the song's next bar takes the barline. Nothing is doubled here
+        // either: the band itself never strikes one note twice within 20 ms.
+        const { host, timeline, lapEnd, before, calls } = releaseBefore(1, BAR_S / 2);
+        expect(before.some((call) => call.time > lapEnd - 0.05)).toBe(false);
+        expect(doubled(calls)).toEqual([]);
+        const tick = host.songTick();
+        expect(tick).not.toBeNull();
+        expect(tick!).toBeGreaterThanOrEqual(timeline.bars[2].start);
+        expect(tick!).toBeLessThan(timeline.bars[3].start);
+        host.stop();
+    });
+
+    it("on a counted chart's last section, released just inside the lookahead, the lap under way ends it", () => {
+        // The next lap's downbeat is already with the voices: that lap is the one under way,
+        // so it plays the ending and the performance stops after it, nothing struck twice.
+        for (const voice of [playDrumSound, playBassNote, playNote, playSoloNote]) {
+            vi.mocked(voice).mockClear();
+        }
+        const audio = fakeAudioContext(10);
+        const state = fakeState(audio);
+        const onEnd = vi.fn();
+        const host = new BandHost({ state: () => state, silence: () => {}, onEnd });
+        const score = { ...song([{ ...twoBars.sections[0] }]), choruses: 1 };
+        host.setScore(score);
+        const timeline = compileTimeline(score);
+        host.start(
+            { ...DEFAULT_SETTINGS, lanes: { drums: true, bass: true, comp: true, lead: true } },
+            BPM,
+            0,
+            { from: 0, to: timeline.ticks },
+        );
+        const lapEnd = 10.1 + 4 * BAR_S;
+        const pumpTo = (from: number, to: number) => {
+            for (let i = 0; from + i * 0.025 < to - 1e-9; i++) {
+                audio.currentTime = from + i * 0.025;
+                pump(host);
+            }
+        };
+        pumpTo(10.1, lapEnd - 0.1);
+        audio.currentTime = lapEnd - 0.1;
+        host.setLoop(null);
+        pumpTo(lapEnd - 0.1, lapEnd + 2 * BAR_S);
+        expect(doubled(voiceCalls())).toEqual([]);
+        expect(onEnd).not.toHaveBeenCalled();
+        audio.currentTime = lapEnd + 2 * BAR_S;
+        pump(host);
+        expect(onEnd).toHaveBeenCalledTimes(1);
+    });
+
+    /**
+     * A loop from the top of `score` to `loopTo`, the whole band, the timer firing every 25 ms
+     * from 10.1 s. `tick(t)` pumps at audio time `t`.
+     */
+    function rig(score: SemanticScore, loopTo: number, onEnd?: () => void) {
+        for (const voice of [playDrumSound, playBassNote, playNote, playSoloNote]) {
+            vi.mocked(voice).mockClear();
+        }
+        const audio = fakeAudioContext(10);
+        const state = fakeState(audio);
+        const host = new BandHost({ state: () => state, silence: () => {}, onEnd });
+        host.setScore(score);
+        host.start(
+            { ...DEFAULT_SETTINGS, lanes: { drums: true, bass: true, comp: true, lead: true } },
+            BPM,
+            0,
+            { from: 0, to: loopTo },
+        );
+        const tick = (t: number) => {
+            audio.currentTime = t;
+            pump(host);
+        };
+        const pumpTo = (from: number, to: number) => {
+            for (let i = 0; from + i * 0.025 < to - 1e-9; i++) {
+                tick(from + i * 0.025);
+            }
+        };
+        const release = (t: number) => {
+            audio.currentTime = t;
+            host.setLoop(null);
+        };
+        return { audio, host, tick, pumpTo, release };
+    }
+
+    it('after a stalled timer, a release near the end of the queue still carries on after the loop', () => {
+        // The timer stalled (a busy main thread, a background tab) two seconds before the
+        // release, so nothing past the lap under way was queued: the queue ends 120 ms after
+        // the release, inside the lookahead.
+        const timeline = compileTimeline(aThenB);
+        const { host, pumpTo, release } = rig(aThenB, timeline.bars[2].start);
+        const lapEnd = 10.1 + 4 * BAR_S;
+        const at = lapEnd - 0.12;
+        pumpTo(10.1, at - 2);
+        release(at);
+        pumpTo(at, lapEnd + BAR_S / 2);
+        const tick = host.songTick();
+        expect(tick).not.toBeNull();
+        expect(tick!).toBeGreaterThanOrEqual(timeline.bars[2].start);
+        expect(tick!).toBeLessThan(timeline.bars[3].start);
+        expect(doubled(voiceCalls())).toEqual([]);
+        host.stop();
+    });
+
+    it('after a stalled timer, a counted last section released in its last bar plays once more, then ends', () => {
+        const score = { ...song([{ ...twoBars.sections[0] }]), choruses: 1 };
+        const onEnd = vi.fn();
+        const { audio, pumpTo, release, tick } = rig(score, compileTimeline(score).ticks, () =>
+            onEnd(audio.currentTime),
+        );
+        const lapEnd = 10.1 + 4 * BAR_S;
+        const at = lapEnd - 0.12;
+        pumpTo(10.1, at - 2);
+        release(at);
+        // The section once more, as written: two bars after the lap under way, and no sooner.
+        pumpTo(at, lapEnd + 2 * BAR_S);
+        expect(onEnd).not.toHaveBeenCalled();
+        tick(lapEnd + 2 * BAR_S);
+        expect(onEnd).toHaveBeenCalledTimes(1);
+        expect(onEnd).toHaveBeenCalledWith(lapEnd + 2 * BAR_S);
+        expect(doubled(voiceCalls())).toEqual([]);
+    });
+
+    it('after a stalled timer, a lap that has started is under way though nothing of it was sent', () => {
+        // The next lap was queued two seconds ahead, then the timer stalled past its barline:
+        // the playhead is in that lap, so the release finishes it, as for any lap playing.
+        const timeline = compileTimeline(aThenB);
+        const { host, tick, pumpTo, release } = rig(aThenB, timeline.bars[2].start);
+        const lapEnd = 10.1 + 4 * BAR_S;
+        pumpTo(10.1, lapEnd - 1.9);
+        release(lapEnd + 0.4);
+        tick(lapEnd + 0.4);
+        // Still the lap (A's first bar), then B once it ends.
+        expect(host.songTick()!).toBeLessThan(timeline.bars[1].start);
+        pumpTo(lapEnd + 0.425, lapEnd + 2 * BAR_S + BAR_S / 2);
+        const at = host.songTick();
+        expect(at).not.toBeNull();
+        expect(at!).toBeGreaterThanOrEqual(timeline.bars[2].start);
+        expect(at!).toBeLessThan(timeline.bars[3].start);
+        host.stop();
+    });
+
+    it('after the timer stalled past the end of the queue, a release still carries on after the loop', () => {
+        // Stalled before the next lap was queued, and released after the queued lap's end:
+        // nothing is playing at the release, and the lap that was is the one it leads on from.
+        const timeline = compileTimeline(aThenB);
+        const { host, pumpTo, release } = rig(aThenB, timeline.bars[2].start);
+        const lapEnd = 10.1 + 4 * BAR_S;
+        pumpTo(10.1, lapEnd - 2.2);
+        release(lapEnd + 0.2);
+        pumpTo(lapEnd + 0.2, lapEnd + BAR_S / 2);
+        const at = host.songTick();
+        expect(at).not.toBeNull();
+        expect(at!).toBeGreaterThanOrEqual(timeline.bars[2].start);
+        expect(at!).toBeLessThan(timeline.bars[3].start);
+        host.stop();
+    });
+
+    it('a note pushed ahead of the next lap, already sent, makes that lap the one under way', () => {
+        // The band pushes the next lap's kick a few ms ahead of the barline. A pump 152 ms
+        // before the lap ends has sent it; a release a millisecond later still sees the lap's
+        // end beyond its own lookahead, but that kick is already with the voices.
+        const timeline = compileTimeline(aThenB);
+        const { host, tick, pumpTo, release } = rig(aThenB, timeline.bars[2].start);
+        const lapEnd = 10.1 + 4 * BAR_S;
+        pumpTo(10.1, 17.9);
+        tick(lapEnd - 0.152);
+        expect(voiceCalls().some((call) => call.time > lapEnd - 0.01 && call.time < lapEnd)).toBe(
+            true,
+        );
+        release(lapEnd - 0.151);
+        pumpTo(lapEnd - 0.13, lapEnd + 2 * BAR_S + BAR_S / 2);
+        expect(doubled(voiceCalls())).toEqual([]);
+        // That lap plays out, then the song carries on into B.
+        const at = host.songTick();
+        expect(at).not.toBeNull();
+        expect(at!).toBeGreaterThanOrEqual(timeline.bars[2].start);
+        expect(at!).toBeLessThan(timeline.bars[3].start);
+        host.stop();
     });
 });
 

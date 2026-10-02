@@ -478,8 +478,12 @@ export class BandHost {
             this.start(this.settings, this.bpm, loop.from, loop);
             return;
         }
-        // Leaving a loop: finish the lap that is playing, then carry on through the song.
-        const current = this.current(audio.currentTime);
+        // Leaving a loop: finish the lap under way, then carry on through the song. A lap the
+        // voices have already been sent anything from is under way, even before its barline:
+        // dropping it would leave that downbeat to sound a second time under the song's next
+        // bar (#1489).
+        const horizon = audio.currentTime + LOOKAHEAD_S;
+        const current = this.underWay(audio.currentTime);
         if (current) {
             this.segments.length = this.segments.indexOf(current) + 1;
             if (current.until < this.timeline!.bars.length) {
@@ -491,10 +495,7 @@ export class BandHost {
                 // last bars of any counted performance do. With no barline left in it, the
                 // section plays once more, as written, and ends.
                 current.looping = false;
-                if (
-                    this.regenerate(current, this.settings, audio.currentTime + LOOKAHEAD_S) !==
-                    null
-                ) {
+                if (this.regenerate(current, this.settings, horizon) !== null) {
                     current.ends = true;
                 } else {
                     current.looping = true;
@@ -751,6 +752,24 @@ export class BandHost {
     /** The segment playing at `time` (or the first one still to come). */
     private current(time: number): Segment | undefined {
         return this.segments.find((s) => this.endTime(s) > time);
+    }
+
+    /**
+     * The segment under way at `now`: the last one that has started, or that the voices have
+     * been sent anything from (`pump` has moved its cursor or clicked a pulse in it), whichever
+     * is later. Before the first one starts (a count-in) it is the first. Judged by what was
+     * actually sent, not by a horizon: the last pump ran up to a timer tick earlier, a pushed
+     * note sounds before its barline, and after a stalled timer the queue can end before `now`
+     * plus the lookahead, or before `now` itself.
+     */
+    private underWay(now: number): Segment | undefined {
+        let found = this.segments[0];
+        for (const segment of this.segments) {
+            if (segment.start <= now || segment.cursor > 0 || segment.clicked >= 0) {
+                found = segment;
+            }
+        }
+        return found;
     }
 
     /** Inverse of `timeOf` (bisection: fermata stretches make it piecewise). */
