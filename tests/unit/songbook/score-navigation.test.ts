@@ -244,6 +244,7 @@ describe('semantic navigation: global D.C./D.S. itineraries', () => {
             measureIndex: 0,
             sectionPass: 0,
             repeatPasses: [],
+            chorus: 0,
         });
         expect(visits[1].repeatPasses).toEqual([]);
     });

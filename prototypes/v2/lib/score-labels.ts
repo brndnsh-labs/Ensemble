@@ -22,6 +22,8 @@ export function directionLabel(direction: ScoreDirection): string {
                         : '';
             return `${jump}${ending}`;
         }
+        case 'last-chorus':
+            return 'To Coda, last chorus';
         case 'repeat-start':
             return '𝄆';
         case 'repeat-end':

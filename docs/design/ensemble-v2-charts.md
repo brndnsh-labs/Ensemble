@@ -170,6 +170,24 @@ that global order; unsupported/ambiguous jump forms still fail explicitly. A cod
 success proves authored-data validity and references, not that the form can be performed.
 Never use an unfolded chord list as the only retained chart.
 
+Choruses and "last time" (#1472; decision on #1450, option (a)). A score may carry
+`choruses`, an integer from 1 to 64. `compileScoreForm` unrolls that many passes of the form,
+and every visit carries a 0-based `chorus` (the band timeline's section visits carry it too).
+Absent means one chorus that the band loops forever, which is the behavior every chart had
+before; a before/after differential test against the frozen pre-#1472 compiler pins that.
+D.C./D.S. jumps are taken afresh in every chorus. A `last-chorus` direction,
+`{ kind: 'last-chorus', destination: { kind: 'coda', via, target } }`, is "To Coda, last
+chorus": only the final chorus of a counted performance hops from `via` to `target` and plays
+on to the end. Every other chorus, and every chorus of an uncounted chart, ends where `target`
+begins, so the bars from there on are written outro material. Its arrival may share its
+departure's barline (an outro written straight after the form). The compiler refuses, rather
+than guesses, a last-chorus coda that is not on the same boundary as its `via` sign, a second
+one in the chart, one whose departure is inside a repeated passage or repeated section (which
+pass is the last time?), one whose arrival is behind its departure, and, for now, any chart
+that also has a D.C./D.S. jump: the departure is then passed both before and after the jump.
+Stopping the band after the last chorus and the chorus-count control are #1475; how iReal's
+unpaired coda signs map onto this is #1476.
+
 The current form grammar pairs repeat barlines within each section (an unmatched end repeat
 starts at that section's beginning). An explicit start must close in the same section; repeated
 regions cannot cross or share an ambiguous start. Nesting is capped at 16. Ending pass sets
