@@ -327,6 +327,74 @@ describe('bounded source-preserving iReal import', () => {
         expect(bars[1].end).toEqual([{ kind: 'repeat-end', times: 3 }]);
     });
 
+    describe('repeat-count spellings (#1486)', () => {
+        function imported(text: string) {
+            const parsed = parseIRealImport(open(`T44{C   |F   <${text}>}`));
+            const song = parsed.songs[0];
+            expect(song.diagnostics.filter((entry) => entry.severity === 'error')).toEqual([]);
+            return { song, closing: song.score!.sections[0].measures[1] };
+        }
+        const note = (text: string) =>
+            `A staff-text instruction ("${text}") is preserved as text only; it is not applied to the performed order.`;
+
+        // iReal's editor writes "Nx" (ireal-musicxml's converter maps "3x".."8x"); the Jazz 1460
+        // playlist also writes "x3" (Harlequin), "3X" (Up With The Lark) and "Repeat 3x" (Speak
+        // Like A Child); #1486 names "3 x", "Play 3x" and "3 times".
+        it.each([
+            ['3x', 3],
+            ['3X', 3],
+            ['x3', 3],
+            ['X4', 4],
+            ['3 x', 3],
+            ['Repeat 3x', 3],
+            ['repeat 5X', 5],
+            ['Play 3x', 3],
+            ['PLAY 4 x', 4],
+            ['3 times', 3],
+            ['4 Times', 4],
+            ['64x', 64],
+        ])(
+            'reads "%s" as a repeat played %i times, with no leftover text or note',
+            (text, times) => {
+                const { song, closing } = imported(text);
+                expect(closing.end).toEqual([{ kind: 'repeat-end', times }]);
+                expect(closing.annotations).toBeUndefined();
+                expect(song.diagnostics.map(({ message }) => message)).not.toContain(note(text));
+            },
+        );
+
+        it.each([
+            '3X (for solos only)', // Joshua, Jazz 1460
+            'Solos x4', // Horace-Scope, Jazz 1460
+            'x 3',
+            'Repeat x3',
+            '3 times then fade',
+        ])('keeps the near-count "%s" as text, plays the repeat twice, and says so', (text) => {
+            const { song, closing } = imported(text);
+            expect(closing.end).toEqual([{ kind: 'repeat-end', times: 2 }]);
+            expect(closing.annotations).toEqual([expect.objectContaining({ text })]);
+            expect(song.diagnostics.map(({ message }) => message)).toContain(note(text));
+        });
+
+        it.each([
+            '1st x slow', // ordinal prose, not a count (cf. Brilliant Corners, Jazz 1460)
+            '(4xs)', // Butterfly, Jazz 1460
+            'half x feel throughout', // Butterfly, Jazz 1460
+            'Bb7x',
+        ])('leaves "%s", which is not a count, as plain text with no note', (text) => {
+            const { song, closing } = imported(text);
+            expect(closing.end).toEqual([{ kind: 'repeat-end', times: 2 }]);
+            expect(closing.annotations).toEqual([expect.objectContaining({ text })]);
+            expect(song.diagnostics.map(({ message }) => message)).not.toContain(note(text));
+        });
+
+        it('refuses a newly read count outside 2-64 or away from a closing repeat, as for "3x"', () => {
+            blocked('T44{C   |F   <Repeat 1x>}');
+            blocked('T44{C   |F   <x65>}');
+            blocked('T44{C   |F   <3 times>|G   }');
+        });
+    });
+
     it('preserves slash bass, alternate chords, fermata, N.C. and held events as distinct notation', () => {
         // Written as a PREFIX ("fC/E…"), per the Jazz 1460 playlist's own usage — see
         // ireal-score.ts's 'f' branch for the infojunkie/ireal-musicxml + pianosnake/ireal-reader

@@ -478,4 +478,38 @@ describe('the Jazz 1460 playlist fixtures (#1447)', () => {
             ],
         });
     });
+
+    describe('repeat counts written other than "3x" (#1486)', () => {
+        // Before #1486 each of these imported with its count left as inert text (one with a
+        // note, two silently), so the repeat played twice. A main-vs-branch run over the whole
+        // Jazz 1460 playlist changed exactly these three charts; the other 1457 were
+        // byte-identical (diagnostics included).
+        it.each([
+            // Bars 37-38, "{C-7/F | F13 <x3> }": the two-bar vamp before the solos, three times.
+            ['harlequin', 'x3', 38, [37, 38], 44],
+            // Bars 23-24, "{A-9 | E9sus <Repeat 3x> }": the A section's closing vamp.
+            ['speak-like-a-child', 'Repeat 3x', 24, [23, 24], 54],
+            // Bars 1-4, the intro "{C^7/G | C6/G | G9sus | G7 <3X> }".
+            ['up-with-the-lark', '3X', 4, [1, 2, 3, 4], 72],
+        ])(
+            'imports %s, reading its "%s" as three passes',
+            (slug, text, closingBar, bars, performed) => {
+                const { document, song } = importFixture(slug);
+                const measures = document.chart.score.sections[0].measures;
+                expect(measures[closingBar - 1].end).toEqual([{ kind: 'repeat-end', times: 3 }]);
+                expect(measures[closingBar - 1].annotations).toBeUndefined();
+                expect(song.diagnostics.map(({ message }) => message).join('\n')).not.toContain(
+                    text,
+                );
+                const visits = compileScoreForm(document.chart.score).map(
+                    ({ measureIndex }) => measureIndex + 1,
+                );
+                for (const bar of bars) {
+                    expect(visits.filter((visit) => visit === bar)).toHaveLength(3);
+                }
+                expect(visits).toHaveLength(performed);
+                expectCanonicalRoundTrip(document);
+            },
+        );
+    });
 });
