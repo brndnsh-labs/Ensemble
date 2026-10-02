@@ -441,17 +441,6 @@ describe('semantic navigation: authored validation, ambiguity and bounds', () =>
         expect(() => compileScoreForm(score)).toThrow(/jump timing.*ambiguous/i);
     });
 
-    it('rejects al-ending rather than guessing its owning repeat or stopping Fine', () => {
-        const score = scoreFixture([
-            bar('a', [{ kind: 'repeat-start' }]),
-            bar('b', [{ kind: 'ending-start', passes: [1] }], [{ kind: 'repeat-end', times: 2 }]),
-            bar('c', [{ kind: 'ending-start', passes: [2] }], [{ kind: 'ending-end' }]),
-            bar('jump', [], [dc({ kind: 'ending', pass: 2 })]),
-        ]);
-        expect(validateSemanticScore(score).kind).toBe('ok');
-        expect(() => compileScoreForm(score)).toThrow(/al ending.*not supported.*owning repeat/i);
-    });
-
     it.each(['same', 'later'] as const)(
         'rejects a D.S. sign on the %s boundary as its command',
         (location) => {
@@ -618,5 +607,262 @@ describe('semantic navigation: authored validation, ambiguity and bounds', () =>
             ],
         );
         expect(() => compileScoreForm(score)).toThrow(/nesting.*16/i);
+    });
+});
+
+/** A repeat with two endings; the 2nd closes explicitly so the bars after it stand alone. */
+function twoEndings(fineOn: 'first' | 'second' | 'none' = 'second'): ScoreMeasure[] {
+    const fine: ScoreDirection[] = [{ kind: 'fine', label: 'stop' }];
+    return [
+        bar('a', [{ kind: 'repeat-start' }]),
+        bar('b'),
+        bar(
+            'one',
+            [{ kind: 'ending-start', passes: [1] }],
+            [{ kind: 'repeat-end', times: 2 }, ...(fineOn === 'first' ? fine : [])],
+        ),
+        bar(
+            'two',
+            [{ kind: 'ending-start', passes: [2] }],
+            [{ kind: 'ending-end' }, ...(fineOn === 'second' ? fine : [])],
+        ),
+    ];
+}
+
+/** A two-bar repeat with no endings. */
+function vamp(id: string): ScoreMeasure[] {
+    return [
+        bar(`${id}-1`, [{ kind: 'repeat-start' }]),
+        bar(`${id}-2`, [], [{ kind: 'repeat-end', times: 2 }]),
+    ];
+}
+
+describe('semantic navigation: D.C./D.S. al Nth ending (#1473)', () => {
+    // iReal Pro, https://www.irealpro.com/learn/repeats-endings-and-jumps/: "D.C. al 2nd ending
+    // returns to the top, skips the first ending, and takes the second." "It also needs a Fine
+    // to mark where to stop." Each also works as D.S.
+    it('plays the repeat once on return, straight into ending 2, then stops at the Fine', () => {
+        const score = scoreFixture([
+            ...twoEndings(),
+            bar('bridge'),
+            bar('jump', [], [dc({ kind: 'ending', pass: 2 })]),
+        ]);
+        expect(validateSemanticScore(score).kind).toBe('ok');
+        // First time: both passes. After the D.C.: the body once, ending 2, the Fine.
+        expect(performedIds(score)).toEqual(
+            ['a', 'b', 'one', 'a', 'b', 'two', 'bridge', 'jump'].concat(['a', 'b', 'two']),
+        );
+        // The return is the repeat's pass 2, the pass whose ending it takes.
+        expect(compileScoreForm(score).slice(-3)).toEqual([
+            { sectionIndex: 0, measureIndex: 0, sectionPass: 0, repeatPasses: [2], chorus: 0 },
+            { sectionIndex: 0, measureIndex: 1, sectionPass: 0, repeatPasses: [2], chorus: 0 },
+            { sectionIndex: 0, measureIndex: 3, sectionPass: 0, repeatPasses: [2], chorus: 0 },
+        ]);
+    });
+
+    it('performs D.S. al 2nd ending from the segno, leaving the introduction out', () => {
+        const score = scoreFixture(
+            [bar('intro'), bar('vamp', [], [{ kind: 'segno', label: 'sign' }])],
+            [...twoEndings(), bar('bridge', [], [ds({ kind: 'ending', pass: 2 })])],
+        );
+        expect(performedIds(score)).toEqual(
+            ['intro', 'vamp', 'a', 'b', 'one', 'a', 'b', 'two', 'bridge'].concat(['a', 'b', 'two']),
+        );
+    });
+
+    it('takes ending 1 and then leaves the repeat, skipping its later endings, on to the Fine', () => {
+        const score = scoreFixture([
+            ...twoEndings('none'),
+            bar('tail', [], [{ kind: 'fine', label: 'stop' }]),
+            bar('jump', [], [dc({ kind: 'ending', pass: 1 })]),
+        ]);
+        expect(performedIds(score)).toEqual(
+            ['a', 'b', 'one', 'a', 'b', 'two', 'tail', 'jump'].concat(['a', 'b', 'one', 'tail']),
+        );
+    });
+
+    it('may sit inside the final ending it names, which the form reaches once (Cherokee)', () => {
+        // A last ending runs to the section's end, so iReal's "D.C. al 2nd ending" sits inside it.
+        const score = scoreFixture([
+            bar('a', [{ kind: 'repeat-start' }]),
+            bar('one', [{ kind: 'ending-start', passes: [1] }], [{ kind: 'repeat-end', times: 2 }]),
+            bar('two', [{ kind: 'ending-start', passes: [2] }], [{ kind: 'fine', label: 'stop' }]),
+            bar('bridge'),
+            bar('jump', [], [dc({ kind: 'ending', pass: 2 })]),
+        ]);
+        expect(performedIds(score)).toEqual(
+            ['a', 'one', 'a', 'two', 'bridge', 'jump'].concat(['a', 'two']),
+        );
+    });
+
+    it('is still refused inside a repeated passage, where the form reaches it twice', () => {
+        const score = scoreFixture([
+            bar('a', [], [{ kind: 'fine', label: 'stop' }]),
+            bar('b', [{ kind: 'repeat-start' }]),
+            bar(
+                'one',
+                [{ kind: 'ending-start', passes: [1, 2] }],
+                [dc({ kind: 'ending', pass: 3 }), { kind: 'repeat-end', times: 3 }],
+            ),
+            bar('three', [{ kind: 'ending-start', passes: [3] }]),
+        ]);
+        expect(() => compileScoreForm(score)).toThrow(/jump timing.*ambiguous/i);
+    });
+
+    it('is still refused in a section that repeats, which reaches it once a pass', () => {
+        const score = scoreFixture(
+            [...twoEndings()],
+            [bar('bridge'), bar('jump', [], [dc({ kind: 'ending', pass: 2 })])],
+        );
+        expect(performedIds(score)).toEqual(
+            ['a', 'b', 'one', 'a', 'b', 'two', 'bridge', 'jump'].concat(['a', 'b', 'two']),
+        );
+        score.sections[1].repeat = 2;
+        expect(validateSemanticScore(score).kind).toBe('ok');
+        expect(() => compileScoreForm(score)).toThrow(/jump timing.*ambiguous/i);
+    });
+
+    it('is refused without a Fine to stop at', () => {
+        const score = scoreFixture([
+            ...twoEndings('none'),
+            bar('jump', [], [dc({ kind: 'ending', pass: 2 })]),
+        ]);
+        expect(validateSemanticScore(score).kind).toBe('ok');
+        expect(() => compileScoreForm(score)).toThrow(
+            /al ending 2 needs a Fine after ending 2, before the jump\. The chart is preserved\./,
+        );
+    });
+
+    it('is refused when the only Fine lies in an ending the return skips', () => {
+        const score = scoreFixture([
+            ...twoEndings('first'),
+            bar('jump', [], [dc({ kind: 'ending', pass: 2 })]),
+        ]);
+        expect(() => compileScoreForm(score)).toThrow(/needs a Fine after ending 2/);
+    });
+
+    it('is refused when the Fine comes before ending N on the way back', () => {
+        const score = scoreFixture([
+            bar('head', [], [{ kind: 'fine', label: 'stop' }]),
+            ...twoEndings('none'),
+            bar('jump', [], [dc({ kind: 'ending', pass: 2 })]),
+        ]);
+        expect(() => compileScoreForm(score)).toThrow(/Fine comes before ending 2/);
+    });
+
+    it('is refused when no repeat after the return point has ending N', () => {
+        // The 2nd ending is behind the segno, so the D.S. can never reach it.
+        const score = scoreFixture([
+            ...twoEndings(),
+            bar('later', [{ kind: 'segno', label: 'sign' }]),
+            bar('jump', [], [ds({ kind: 'ending', pass: 2 })]),
+        ]);
+        expect(validateSemanticScore(score).kind).toBe('ok');
+        expect(() => compileScoreForm(score)).toThrow(
+            /al ending 2 needs a repeat with an ending 2 after its return point\. The chart is preserved\./,
+        );
+        // An ending number written nowhere in the chart is already invalid authored data.
+        const nowhere = scoreFixture([
+            ...twoEndings(),
+            bar('jump', [], [dc({ kind: 'ending', pass: 3 })]),
+        ]);
+        expect(validateSemanticScore(nowhere).kind).toBe('invalid');
+        expect(() => compileScoreForm(nowhere)).toThrow(/The chart is invalid/);
+    });
+
+    it('is refused when two repeats after the return point have an ending N', () => {
+        const again = twoEndings('none').map((measure) => ({ ...measure, id: `${measure.id}-2` }));
+        const score = scoreFixture([
+            ...twoEndings(),
+            ...again,
+            bar('jump', [], [dc({ kind: 'ending', pass: 2 })]),
+        ]);
+        expect(() => compileScoreForm(score)).toThrow(
+            /More than one repeat .* has an ending 2; which one the jump takes is ambiguous/,
+        );
+    });
+
+    it.each<[string, () => SemanticScore]>([
+        [
+            'before the repeat it takes',
+            () =>
+                scoreFixture([
+                    ...vamp('vamp'),
+                    ...twoEndings(),
+                    bar('jump', [], [dc({ kind: 'ending', pass: 2 })]),
+                ]),
+        ],
+        [
+            'between ending N and the Fine',
+            () =>
+                scoreFixture([
+                    ...twoEndings('none'),
+                    ...vamp('vamp'),
+                    bar('tail', [], [{ kind: 'fine', label: 'stop' }]),
+                    bar('jump', [], [dc({ kind: 'ending', pass: 2 })]),
+                ]),
+        ],
+        [
+            'nested inside the repeat it takes',
+            () =>
+                scoreFixture([
+                    bar('a', [{ kind: 'repeat-start' }]),
+                    ...vamp('inner'),
+                    ...twoEndings().slice(2),
+                    bar('jump', [], [dc({ kind: 'ending', pass: 2 })]),
+                ]),
+        ],
+        [
+            'around the return point (a segno inside a repeat)',
+            () =>
+                scoreFixture([
+                    bar('v1', [{ kind: 'repeat-start' }]),
+                    bar(
+                        'v2',
+                        [{ kind: 'segno', label: 'sign' }],
+                        [{ kind: 'repeat-end', times: 2 }],
+                    ),
+                    ...twoEndings(),
+                    bar('jump', [], [ds({ kind: 'ending', pass: 2 }, 'play')]),
+                ]),
+        ],
+        [
+            'a repeated section on the way',
+            () => {
+                const score = scoreFixture(
+                    [bar('head')],
+                    [...twoEndings(), bar('jump', [], [dc({ kind: 'ending', pass: 2 })])],
+                );
+                score.sections[0].repeat = 2;
+                return score;
+            },
+        ],
+    ])('is refused with another repeat in the replayed passage: %s', (_, chart) => {
+        expect(() => compileScoreForm(chart())).toThrow(
+            /Another repeat lies in the passage replayed after the D\.C\.\/D\.S\. al ending 2; whether it repeats again is not documented\. The chart is preserved\./,
+        );
+    });
+
+    it('plays a repeat after the Fine normally on the way to the jump, never on the return', () => {
+        const score = scoreFixture([
+            ...twoEndings(),
+            ...vamp('bridge'),
+            bar('jump', [], [dc({ kind: 'ending', pass: 2 })]),
+        ]);
+        expect(performedIds(score)).toEqual(
+            ['a', 'b', 'one', 'a', 'b', 'two'].concat(
+                ['bridge-1', 'bridge-2', 'bridge-1', 'bridge-2', 'jump'],
+                ['a', 'b', 'two'],
+            ),
+        );
+    });
+
+    it('is refused when another jump comes before its Fine', () => {
+        const score = scoreFixture([
+            bar('head', [], [dc()]),
+            ...twoEndings(),
+            bar('jump', [], [dc({ kind: 'ending', pass: 2 })]),
+        ]);
+        expect(() => compileScoreForm(score)).toThrow(/second jump.*ambiguous/i);
     });
 });
