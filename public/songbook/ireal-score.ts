@@ -770,16 +770,17 @@ function alEndingClose(
 }
 
 /**
- * A chart's coda signs with no D.C./D.S. text at all, read as iReal Pro reads them (#1476): "the
- * repeats play in full and the Coda is added once as a tag at the end"; "the main form repeats 5
- * times, then jumps to the Coda on the final pass"
+ * A chart's coda signs with no D.C./D.S. text at all, read as iReal Pro reads them (#1476). Its
+ * worked example, 500 Miles High, has a coda sign in the form and the Coda section below it: "Set
+ * the player to repeat 5 times and the main form repeats 5 times, then jumps to the Coda on the
+ * final pass"; "The player jumps to the Coda only on the last repeat"
  * (https://irealpro.com/how-the-coda-symbol-works-in-ireal-pro/). That is a last-chorus coda
- * (#1472). Only the shape that page draws is mapped: exactly two signs, nothing else orphaned, the
- * departure "at the end of a measure" and the target "at the beginning of the first measure of
- * the Coda section", later in the chart. The page also lets a chart leave the departure out and
- * mark only the coda section; a last-chorus coda departs from a written sign, so that form would
- * need a departure sign the chart doesn't have, and stays refused. Returns their bars and labels,
- * or undefined for any other shape.
+ * (#1472). Only that shape is mapped: exactly two signs, nothing else orphaned, placed as the
+ * page's convention has them: 'put the "jump from" Coda symbol at the end of a measure, and the
+ * "jump to" Coda symbol at the beginning of the first measure of the Coda section'. The page
+ * also lets a chart "mark only the Coda section at the end, as in Alley Cat"; a last-chorus coda
+ * departs from a written sign, so that form would need a departure sign the chart doesn't have,
+ * and stays refused. Returns their bars and labels, or undefined for any other shape.
  */
 function unpairedCoda(
     orphaned: Marker[],
@@ -789,6 +790,8 @@ function unpairedCoda(
     const [via, target] = orphaned;
     if (
         orphaned.length !== 2 ||
+        // Defensive only: the codec refuses a coda destination naming a Fine, and the import
+        // falls back to the same refusal, so dropping these two checks changes no outcome.
         via.direction.kind !== 'coda' ||
         target.direction.kind !== 'coda' ||
         via.edge !== 'end' ||

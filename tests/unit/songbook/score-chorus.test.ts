@@ -223,6 +223,31 @@ describe('last-chorus coda (#1472)', () => {
         ]);
     });
 
+    it('departs from a final ending, which the route only moves on from', () => {
+        // An open last ending (Aisha, Cheetah): passed once, and nothing behind it follows.
+        const score = scoreFixture(
+            [
+                bar('a', [{ kind: 'repeat-start' }]),
+                bar(
+                    'first',
+                    [{ kind: 'ending-start', passes: [1] }],
+                    [{ kind: 'repeat-end', times: 2 }],
+                ),
+                bar(
+                    'second',
+                    [{ kind: 'ending-start', passes: [2] }],
+                    [{ kind: 'coda', label: 'to-coda' }, lastChorus],
+                ),
+                bar('turn'),
+            ],
+            [bar('c', [{ kind: 'coda', label: 'coda' }])],
+        );
+        expect(byChorus({ ...score, choruses: 2 })).toEqual([
+            ['a', 'first', 'a', 'second', 'turn'],
+            ['a', 'first', 'a', 'second', 'c'],
+        ]);
+    });
+
     it('is refused beside a D.C./D.S. jump, whose last time through the departure is ambiguous', () => {
         const score = codaChart(2);
         score.sections[0].measures[0].start = [{ kind: 'segno', label: 'sign' }];
@@ -309,6 +334,63 @@ describe('last-chorus coda (#1472)', () => {
                 score.sections[1].repeat = 2;
                 return score;
             })(),
+        ],
+        [
+            // Passed twice, though no bar behind the start of its own bar is played again.
+            'at the start of a repeat',
+            scoreFixture(
+                [
+                    bar('a', [
+                        { kind: 'repeat-start' },
+                        { kind: 'coda', label: 'to-coda' },
+                        lastChorus,
+                    ]),
+                    bar('b', [], [{ kind: 'repeat-end', times: 2 }]),
+                ],
+                [bar('c', [{ kind: 'coda', label: 'coda' }])],
+            ),
+        ],
+        [
+            // Passed once, on pass 1 only: the route then goes back for pass 2 and its ending,
+            // which the last chorus would never play (#1476 review).
+            'inside a first ending',
+            scoreFixture(
+                [
+                    bar('a', [{ kind: 'repeat-start' }]),
+                    bar('b'),
+                    bar(
+                        'first',
+                        [{ kind: 'ending-start', passes: [1] }],
+                        [
+                            { kind: 'coda', label: 'to-coda' },
+                            lastChorus,
+                            { kind: 'repeat-end', times: 2 },
+                        ],
+                    ),
+                    bar('second', [{ kind: 'ending-start', passes: [2] }]),
+                    bar('out'),
+                ],
+                [bar('c', [{ kind: 'coda', label: 'coda' }])],
+            ),
+        ],
+        [
+            'inside a first ending, beside a repeat with no bars of its own after it',
+            scoreFixture(
+                [
+                    bar('a', [{ kind: 'repeat-start' }]),
+                    bar(
+                        'first',
+                        [{ kind: 'ending-start', passes: [1] }],
+                        [
+                            { kind: 'coda', label: 'to-coda' },
+                            lastChorus,
+                            { kind: 'repeat-end', times: 2 },
+                        ],
+                    ),
+                    bar('second', [{ kind: 'ending-start', passes: [2] }]),
+                ],
+                [bar('c', [{ kind: 'coda', label: 'coda' }])],
+            ),
         ],
     ])('is refused %s, where which pass is the last time is ambiguous', (_, score) => {
         expect(() => compileScoreForm({ ...score, choruses: 2 })).toThrow(

@@ -735,7 +735,22 @@ export function compileScoreForm(candidate: unknown): ScoreFormVisit[] {
         // The departure must be passed once a chorus, or "the last time" through it is ambiguous.
         // The play tape holds every written bar, so both markers are on it.
         const departures = play.markers.get(lastChorus.destination.via)!;
-        if (departures.length > 1) {
+        // Passed once is not enough: a departure in a first ending is passed on pass 1 only,
+        // and the written route then goes back behind it for the next pass (#1476 review).
+        const firstBar = score.sections.map((_, index) =>
+            score.sections
+                .slice(0, index)
+                .reduce((count, section) => count + section.measures.length, 0),
+        );
+        const goesBack = play.steps
+            .slice(departures[0] + 1)
+            .some(
+                (step) =>
+                    step.kind === 'measure' &&
+                    firstBar[step.visit.sectionIndex] + step.visit.measureIndex <
+                        lastChorus.departure.position,
+            );
+        if (departures.length > 1 || goesBack) {
             failAt(
                 score,
                 lastChorus.departure,

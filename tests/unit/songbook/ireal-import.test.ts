@@ -642,6 +642,15 @@ describe('bounded source-preserving iReal import', () => {
             // The score form refuses a last-chorus departure inside a repeat (which pass is the
             // last time?), so the import is read again as before and refused as before.
             ['a departure inside a repeat', 'T44{C   |F   Q}[G7   Z[QD7   |G7   Z'],
+            // Passed once, but the last chorus would leave the repeat on pass 1 (#1476 review).
+            [
+                'a departure inside a first ending',
+                'T44{C   |F   |N1G7   Q}|N2G7   |C   Z[QD7   |G7   Z',
+            ],
+            [
+                'a departure inside a one-bar first ending',
+                'T44{C   |N1F   Q}|N2G7   ][QD7   |G7   Z',
+            ],
         ])('still refuses %s, as before #1476', (_, body) => {
             const song = parseIRealImport(open(body)).songs[0];
             expect(song.score).toBeUndefined();
@@ -651,8 +660,9 @@ describe('bounded source-preserving iReal import', () => {
         });
 
         it('names the blocker a mapped pair leaves, not the signs it no longer has to refuse', () => {
-            // Eight Jazz 1460 waltzes ("Very Early") carry the pair and 3/4 multi-chord bars,
-            // which stay held back (#1453): the refusal is now that bar, which is what's in the way.
+            // Eight Jazz 1460 charts ("Very Early") carry the pair and multi-chord bars in a meter
+            // the importer doesn't time yet (#1453): the refusal is now that bar, which is what's
+            // in the way.
             const song = parseIRealImport(open('T34[C   |F   Q|D G7 |C   Z[QD7   Z')).songs[0];
             expect(song.score).toBeUndefined();
             expect(song.diagnostics).toEqual([

@@ -269,10 +269,11 @@ describe('the Jazz 1460 playlist fixtures (#1447)', () => {
     });
 
     // #1476: coda signs with no D.C./D.S. text, as iReal Pro reads them
-    // (https://irealpro.com/how-the-coda-symbol-works-in-ireal-pro/): "the repeats play in full
-    // and the Coda is added once as a tag at the end"; "the main form repeats 5 times, then jumps
-    // to the Coda on the final pass". Imported as a last-chorus coda (#1472) with no chorus count,
-    // so the form loops without the coda until the musician sets one.
+    // (https://irealpro.com/how-the-coda-symbol-works-in-ireal-pro/), whose worked example is
+    // 500 Miles High: "Set the player to repeat 5 times and the main form repeats 5 times, then
+    // jumps to the Coda on the final pass"; "The player jumps to the Coda only on the last
+    // repeat". Imported as a last-chorus coda (#1472) with no chorus count, so the form loops
+    // without the coda until the musician sets one.
     describe('coda signs with no jump text, as a last-chorus coda (#1476)', () => {
         /** [chorus, written bar number] for each performed bar. */
         function performed(document: ChartDocumentV2, choruses?: number) {
@@ -286,6 +287,33 @@ describe('the Jazz 1460 playlist fixtures (#1447)', () => {
             Array.from({ length: to - from + 1 }, (_, i) => [chorus, from + i]);
         const codaNote = (target: number, via: number) =>
             `The coda at bar ${target} is played once, at the end: with a chorus count set, the last chorus jumps to it from the end of bar ${via}. Until then the form loops without it.`;
+
+        it("imports 500 Miles High, iReal's own worked example, as that page plays it", () => {
+            // The page: "the Coda symbol sits in the form right before the C-7 chord, with the
+            // Coda section marked at the bottom". The written chart, 22 bars in one section:
+            //   bars  1-14  Em7 | % | Gm7 | % | Bbmaj7 | % | Bm7b5 | E7#9 | Am7 | % | F#m7b5 | % |
+            //               Fm7 | %, the departure sign at the end of bar 14
+            //   bars 15-18  Cm7 | % | B7#9 | %, the rest of the form
+            //   bars 19-22  the Coda section, a repeat: {Cm7 | % | Abmaj7 | %}
+            // Every pass but the last plays the 18-bar form; "the main form repeats 5 times, then
+            // jumps to the Coda on the final pass", so the last plays 1-14, then the coda with
+            // its repeat. Two choruses: 18 + 14 + 8 = 40 bars.
+            const { document, song } = importFixture('500-miles-high');
+            expect(document.chart.score.choruses).toBeUndefined();
+            expect(performedBarCount(document)).toBe(18);
+            expect(performed(document)).toEqual(bars(0, 1, 18));
+            expect(performed(document, 2)).toEqual([
+                ...bars(0, 1, 18),
+                ...bars(1, 1, 14),
+                ...bars(1, 19, 22),
+                ...bars(1, 19, 22),
+            ]);
+            expectCanonicalRoundTrip(document);
+            expect(song.diagnostics.map(({ message }) => message)).toEqual([
+                codaNote(19, 14),
+                expect.stringContaining('Stored key is used without transposition'),
+            ]);
+        });
 
         it('imports Blue In Green as its published 10-bar form, its 4-bar coda on the last chorus only', () => {
             // The written chart, 14 bars in one section, no intro:
