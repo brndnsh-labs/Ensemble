@@ -478,8 +478,13 @@ export class BandHost {
             this.start(this.settings, this.bpm, loop.from, loop);
             return;
         }
-        // Leaving a loop: finish the lap that is playing, then carry on through the song.
-        const current = this.current(audio.currentTime);
+        // Leaving a loop: finish the lap that is playing, then carry on through the song. The
+        // lap is the one playing at the scheduler's horizon, as `update()` judges it, not at
+        // this moment: inside the lookahead the next lap's downbeat has already gone to the
+        // voices, so that lap is the one under way. Dropping it would leave its downbeat to
+        // sound a second time under the song's next bar (#1489).
+        const horizon = audio.currentTime + LOOKAHEAD_S;
+        const current = this.current(horizon);
         if (current) {
             this.segments.length = this.segments.indexOf(current) + 1;
             if (current.until < this.timeline!.bars.length) {
@@ -491,10 +496,7 @@ export class BandHost {
                 // last bars of any counted performance do. With no barline left in it, the
                 // section plays once more, as written, and ends.
                 current.looping = false;
-                if (
-                    this.regenerate(current, this.settings, audio.currentTime + LOOKAHEAD_S) !==
-                    null
-                ) {
+                if (this.regenerate(current, this.settings, horizon) !== null) {
                     current.ends = true;
                 } else {
                     current.looping = true;
