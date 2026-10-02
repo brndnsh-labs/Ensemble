@@ -47,9 +47,9 @@ export interface PassOptions {
      * dropped — one, and on while the comp has neither struck again nor reached a rest (an N.C.
      * or a bar it sits out), but never past the end of the next chorus — so what the whole pass
      * does across that barline (a held organ chord, a comp voice yielding to the lead) is done
-     * here too: the chunks join into the whole pass, event for event. (The organ re-presses
-     * at each chorus top, so the look never needs the cap; a comp that never struck again
-     * would have its hold end there.) `memory` is then the memory before bar `until`.
+     * here too: the chunks join into the whole pass, event for event. (The organ re-presses a
+     * held chord at each phrase top, so the look never needs the cap; a comp that never struck
+     * again would have its hold end there.) `memory` is then the memory before bar `until`.
      * Defaults to the window's end.
      */
     until?: number;
@@ -81,7 +81,8 @@ export function performPass(
     // holds its last chord to its next strike, which can be bars away. Capped at the end of
     // the next chorus, so a chunk costs at most two choruses' bars: chunks are generated on
     // the main thread inside the scheduler's 150 ms lookahead. On a real comp it never binds
-    // (a sustaining comp re-presses at each chorus top); it bounds the cost all the same.
+    // (a sustaining comp re-presses a held chord at each phrase top); it bounds the cost all
+    // the same.
     let through = Math.min(until + 1, window.to);
     const lookLimit =
         until < window.to ? Math.min(chorusBars(timeline, until).end, window.to) : window.to;
@@ -248,9 +249,15 @@ export function performPass(
         snapshots[i].lastBass = lastBass;
     }
     memory.lastBass = bassLine.at(-1)?.midi ?? lastBass;
-    // A chunk that looked past its end and stopped short of the performance's end: its last
-    // strike's hold ends at a rest or tacet bar it saw, else where the look ended (the cap).
-    const horizon = through > until && through < window.to ? bars[through].start : undefined;
+    // Where the last strike's hold may reach. A chunk that looked past its end and stopped
+    // short of the performance's end: a rest or tacet bar it saw, else where the look ended
+    // (the cap). Otherwise the end of the pass — a looping pass's next lap presses anew at its
+    // top, and a whole pass ends there (#1488).
+    const lastPlayed = bars[through - 1];
+    const horizon =
+        through > until && through < window.to
+            ? bars[through].start
+            : lastPlayed.start + lastPlayed.meter.barTicks;
     const held =
         instrument.legato && !comp.percussive
             ? sustain(fermatas, timeline, played, horizon)
@@ -332,13 +339,13 @@ function yieldToLead(events: BandEvent[]): BandEvent[] {
 /**
  * A sustaining instrument (the organ) holds every chord until the next one is struck, across
  * barlines too — the idioms play one bar at a time, so this is done once over the pass. It
- * lets go at an N.C., which is a rest for the whole band.
+ * lets go at an N.C., which is a rest for the whole band, and at a bar the comp sits out.
  */
 function sustain(
     events: BandEvent[],
     timeline: Timeline,
     plans: BarPlan[],
-    horizon?: number,
+    horizon: number,
 ): BandEvent[] {
     const strikes = [
         ...new Set(events.filter((e) => e.lane === 'comp' && !e.muted).map((e) => e.tick)),
@@ -347,13 +354,12 @@ function sustain(
     const tacet = timeline.bars.filter((bar) => plans[bar.index]?.lanes.comp === false);
     const until = new Map<number, number>();
     strikes.forEach((tick, i) => {
-        // The last strike holds to nothing in a whole pass (the performance ends). In a chunk
-        // that looked past its end (`horizon`), the next strike lies beyond what was played:
-        // the hold reaches the rest or tacet bar the look stopped at, or the look's end.
+        // The last strike has no next one in what was played: it holds to `horizon` — the end
+        // of the pass, or, in a chunk that looked past its end, the rest or tacet bar the look
+        // stopped at, or the look's end. (A last strike that let go at the end of its bar
+        // left a one-chord vamp silent from its second bar on, and a loop silent after the
+        // chord its last change struck: #1488.)
         const next = strikes[i + 1] ?? horizon;
-        if (next === undefined) {
-            return;
-        }
         // The first N.C. starting after the strike and before `next` (spans are in order).
         let rest: (typeof timeline.spans)[number] | undefined;
         for (

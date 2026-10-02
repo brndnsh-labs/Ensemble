@@ -128,6 +128,16 @@ export const FIXTURES: Record<string, SemanticScore> = {
     ]),
 };
 
+/**
+ * One-chord vamps (#1488): the chord written out in every bar (the 8 bars the organ fell silent
+ * on), and held with slashes over a 10-bar section (a 6-bar last phrase). Kept apart from
+ * `FIXTURES` so every table-driven test over those stays as it was.
+ */
+export const VAMP_FIXTURES: Record<string, SemanticScore> = {
+    written: score([{ label: 'A', bars: Array(8).fill('Dm7').join(' | ') }]),
+    slashes: score([{ label: 'A', bars: ['Dm7', ...Array(9).fill('/')].join(' | ') }]),
+};
+
 const LAST_CHORUS: ScoreDirection = {
     kind: 'last-chorus',
     destination: { kind: 'coda', via: 'to-coda', target: 'coda' },
