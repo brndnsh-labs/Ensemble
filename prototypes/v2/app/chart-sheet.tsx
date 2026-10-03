@@ -14,6 +14,31 @@ type WrittenBar = WrittenSection['measures'][number];
 const SECTION_HOLD_MS = 500;
 
 /**
+ * The counts the footer's form-length menu offers (#1511): a short list of the Edit panel's
+ * 1–16 (`CHORUS_COUNTS` in `edit-panel.tsx`), plus the chart's own count when it is not listed.
+ */
+const STAND_CHORUS_COUNTS = [1, 2, 3, 4, 6, 8, 12, 16];
+/** The popover's width (`.popover` in `style.css`), for placing it inside the viewport. */
+const POPOVER_WIDTH = 260;
+/** Room kept between the popover and the viewport's edges. */
+const VIEWPORT_MARGIN = 8;
+
+/** What the footer says the band does with the form: the count, or the loop when there is none. */
+function formLengthText(choruses: number | undefined): string {
+    if (choruses === undefined) {
+        return 'repeats continuously';
+    }
+    return choruses === 1 ? 'plays once, then ends' : `plays ${choruses} times, then ends`;
+}
+
+function chorusChoice(choruses: number | undefined): string {
+    if (choruses === undefined) {
+        return 'Repeats continuously';
+    }
+    return choruses === 1 ? 'Plays once' : `Plays ${choruses} times`;
+}
+
+/**
  * The visible chord symbol in the chart's current notation (#1276). `chord.display`
  * (`FormattedChordNames`) is precomputed for all three notations by
  * `chords-engine.validateProgression()` regardless of which one is selected — the
@@ -80,6 +105,10 @@ interface ChartSheetProps {
     onEditSection: (block: ChartBlock) => void;
     onEditBar: (measure: ChartMeasure) => void;
     onAudition: (globalIndex: number) => void;
+    /** How many times the band plays the form, then stops (#1511, the footer's menu);
+     * `undefined` repeats it continuously. On a text chart the shell makes the measure copy
+     * first, as "Try the bar editor · keep original" does. */
+    onChoruses: (choruses: number | undefined) => void;
 }
 
 export function ChartSheet({
@@ -102,6 +131,7 @@ export function ChartSheet({
     onEditSection,
     onEditBar,
     onAudition,
+    onChoruses,
 }: ChartSheetProps) {
     // Long-press bookkeeping for the section-letter loop gesture: the pending
     // timer so pointerup/leave/cancel can cancel it, and a suppression flag so
@@ -166,6 +196,110 @@ export function ChartSheet({
         setSectionMenu(null);
         sectionMenuTrigger.current?.focus();
     }
+
+    // The footer's form-length menu (#1511): how many times the band plays the form. Opened
+    // above or below the footer button, whichever has more room, and never wider than the
+    // viewport; only that computed placement is inline, as the section menu's is.
+    const choruses = current.schemaVersion === 2 ? current.chart.score.choruses : undefined;
+    const [formMenu, setFormMenu] = useState<{
+        top?: number;
+        bottom?: number;
+        left: number;
+        maxHeight: number;
+    } | null>(null);
+    const formMenuRef = useRef<HTMLDivElement>(null);
+    const formMenuTrigger = useRef<HTMLButtonElement>(null);
+    // The menu closes with the footer: playback hides it, and so does a busy shell.
+    const formMenuOpen = formMenu !== null && !playbackActive && !busy;
+    useEffect(() => {
+        if (playbackActive || busy) {
+            setFormMenu(null);
+        }
+    }, [playbackActive, busy]);
+
+    useEffect(() => {
+        if (!formMenuOpen) {
+            return;
+        }
+        const items = () =>
+            Array.from(
+                formMenuRef.current?.querySelectorAll<HTMLElement>('[role="menuitemradio"]') ?? [],
+            );
+        (
+            items().find((item) => item.getAttribute('aria-checked') === 'true') ?? items()[0]
+        )?.focus();
+        function closeOnOutsidePress(event: PointerEvent) {
+            const target = event.target as Node;
+            // The button's own click toggles the menu; closing here first would reopen it.
+            if (
+                !formMenuRef.current?.contains(target) &&
+                !formMenuTrigger.current?.contains(target)
+            ) {
+                setFormMenu(null);
+            }
+        }
+        function onKey(event: KeyboardEvent) {
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                setFormMenu(null);
+                formMenuTrigger.current?.focus();
+                return;
+            }
+            const all = items();
+            const at = all.indexOf(document.activeElement as HTMLElement);
+            const moves: Record<string, number> = {
+                ArrowDown: at + 1,
+                ArrowUp: at - 1,
+                Home: 0,
+                End: all.length - 1,
+            };
+            if (at >= 0 && Object.hasOwn(moves, event.key)) {
+                event.preventDefault();
+                all[(moves[event.key] + all.length) % all.length]?.focus();
+            }
+        }
+        document.addEventListener('pointerdown', closeOnOutsidePress);
+        document.addEventListener('keydown', onKey);
+        return () => {
+            document.removeEventListener('pointerdown', closeOnOutsidePress);
+            document.removeEventListener('keydown', onKey);
+        };
+    }, [formMenuOpen]);
+
+    function toggleFormMenu(event: ReactMouseEvent<HTMLButtonElement>) {
+        if (formMenu) {
+            setFormMenu(null);
+            return;
+        }
+        const rect = event.currentTarget.getBoundingClientRect();
+        const left = Math.max(
+            VIEWPORT_MARGIN,
+            Math.min(
+                rect.right - POPOVER_WIDTH,
+                window.innerWidth - POPOVER_WIDTH - VIEWPORT_MARGIN,
+            ),
+        );
+        const below = window.innerHeight - rect.bottom - 6 - VIEWPORT_MARGIN;
+        const above = rect.top - 6 - VIEWPORT_MARGIN;
+        setFormMenu(
+            below >= above
+                ? { top: rect.bottom + 6, left, maxHeight: below }
+                : { bottom: window.innerHeight - rect.top + 6, left, maxHeight: above },
+        );
+    }
+    function pickChoruses(next: number | undefined) {
+        setFormMenu(null);
+        formMenuTrigger.current?.focus();
+        if (next !== choruses) {
+            onChoruses(next);
+        }
+    }
+    const chorusChoices: Array<number | undefined> = [
+        undefined,
+        ...[...new Set([...STAND_CHORUS_COUNTS, ...(choruses ? [choruses] : [])])].sort(
+            (a, b) => a - b,
+        ),
+    ];
     const notation = arrangementOf(current).notation;
     let barNumber = 0;
     return (
@@ -528,8 +662,56 @@ export function ChartSheet({
             ))}
             <div className="chart-bottom" hidden={playbackActive}>
                 <span>Tap a chord to hear it while stopped.</span>
-                <span>{totalBars} bars · repeats continuously</span>
+                <button
+                    ref={formMenuTrigger}
+                    type="button"
+                    className="form-length"
+                    aria-haspopup="menu"
+                    aria-expanded={formMenuOpen}
+                    disabled={busy}
+                    onClick={toggleFormMenu}
+                >
+                    {totalBars} bars · {formLengthText(choruses)}
+                </button>
             </div>
+            {formMenuOpen && (
+                <div
+                    ref={formMenuRef}
+                    className="popover form-length-menu"
+                    style={{
+                        top: formMenu.top,
+                        bottom: formMenu.bottom,
+                        left: formMenu.left,
+                        maxHeight: formMenu.maxHeight,
+                    }}
+                >
+                    {current.schemaVersion === 1 && (
+                        <p className="form-length-note" id="form-length-note">
+                            Counting choruses turns this chart into bars; the original is kept.
+                        </p>
+                    )}
+                    <div
+                        role="menu"
+                        aria-label="How many times the form plays"
+                        aria-describedby={
+                            current.schemaVersion === 1 ? 'form-length-note' : undefined
+                        }
+                    >
+                        {chorusChoices.map((count) => (
+                            <button
+                                key={count ?? 'loop'}
+                                type="button"
+                                role="menuitemradio"
+                                aria-checked={count === choruses}
+                                className={`option${count === choruses ? ' active' : ''}`}
+                                onClick={() => pickChoruses(count)}
+                            >
+                                {chorusChoice(count)}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
             {sectionMenu && (
                 <div
                     ref={sectionMenuRef}

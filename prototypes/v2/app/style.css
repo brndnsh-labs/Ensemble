@@ -962,6 +962,40 @@ html [hidden] {
     color: var(--muted);
     font-size: 11px;
     gap: 12px;
+    /* Two facts side by side; on a phone the form-length button takes the next line (#1511). */
+    flex-wrap: wrap;
+}
+/* The footer's "N bars · repeats continuously" is the form-length control (#1511): it reads
+   as the sentence it was, with a quiet outline and caret so it also reads as tappable. */
+.chart-bottom .form-length {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 32px;
+    padding: 4px 11px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    color: var(--ink);
+    font: inherit;
+    text-align: left;
+    white-space: normal;
+}
+.chart-bottom .form-length::after {
+    content: "▾";
+    color: var(--muted);
+}
+.chart-bottom .form-length:hover:not(:disabled) {
+    border-color: var(--muted);
+}
+.form-length-menu {
+    overflow: auto;
+    padding: 9px;
+}
+.form-length-note {
+    font-size: 11px;
+    line-height: 1.5;
+    color: var(--muted);
+    padding: 6px 9px 8px;
 }
 .chart-bottom em {
     font-family: Georgia, serif;

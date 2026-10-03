@@ -39,7 +39,10 @@ The approved HTML study is in Brandon's Downloads/ensemble-v2 folder. It is a vi
 not a production file format or runtime. Home exposes quick jam, recent songs, songbook and
 new/import. The chart is a music stand during playback. Tempo, genre, instrument mutes and
 transport are primary controls; key is one obvious action away. Loop/start belongs at the
-relevant section. Detailed band, sound, practice and device controls get deliberate homes.
+relevant section. How many times the form plays belongs at the end of the form (#1511): the
+chart footer's "N bars · repeats continuously" is a button that sets it, the same setting as the
+Edit panel's Choruses, and on a text chart a pick first makes the measure copy "Try the bar
+editor · keep original" makes, leaving the original as it was. Detailed band, sound, practice and device controls get deliberate homes.
 
 Test laptop at approximately 1300x940, phone portrait/landscape, and tablet. Preserve whole
 measures and readable chord symbols. Compare two versus four bars per phone row and scrolling
