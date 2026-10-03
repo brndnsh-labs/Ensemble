@@ -2411,7 +2411,7 @@ export default function Ensemble() {
      * round trip to a store that is going to say no. The text stays in memory, which is where the
      * banner and `exportSong` can still reach it.
      */
-    function draft(next: ChartDocument, baseline = saved) {
+    function draft(next: ChartDocument, baseline = saved, shared = sharedDraft) {
         setCurrent(next);
         // A shared draft — a standard or a #chart=/v1 link (`landDraftOnStand`) — belongs to no
         // songbook yet and has no `saved` baseline to recover FROM if the tab closes; "Keep a
@@ -2419,7 +2419,7 @@ export default function Ensemble() {
         // the moment that happens. Writing recovery storage for it here would key a slot under
         // the shared id (a catalog id for a standard) that nothing but a Save — which this isn't
         // — ever clears, so "Preserved drafts" would grow by one per edited-but-unsaved visit.
-        if (sharedDraft) {
+        if (shared) {
             return;
         }
         if (baseline && same(next, baseline)) {
@@ -4481,24 +4481,57 @@ export default function Ensemble() {
         setV1Data(null);
         setV1Result(null);
     }
+    /**
+     * "Try the bar editor · keep original": saves a measure copy of the text chart on the stand
+     * and opens it, leaving the original as it was. Null when the stand holds no text chart.
+     * Throws, before anything is created, when the chart cannot be converted or played.
+     */
+    async function openMeasureCopy() {
+        const original = updateChart();
+        if (original.schemaVersion !== 1) {
+            return null;
+        }
+        const converted = convertedCopy(original);
+        // Capability preflight before creating a copy or changing the active song.
+        checkPlayable(converted.chart.score);
+        // The stand's owner (#1311): a converted copy is the open chart's music, so it is as
+        // much that account's as a `Save a copy` is.
+        const created = await storeSave(converted, null, {
+            owner: standOwner(),
+            stand: false,
+        });
+        await refreshSongs();
+        return { created, ...(await open(created)) };
+    }
     function upgradeEditor() {
         void run(async () => {
-            const original = updateChart();
-            if (original.schemaVersion !== 1) {
+            const opened = await openMeasureCopy();
+            if (!opened) {
                 return;
             }
-            const converted = convertedCopy(original);
-            // Capability preflight before creating a copy or changing the active song.
-            checkPlayable(converted.chart.score);
-            // The stand's owner (#1311): a converted copy is the open chart's music, so it is as
-            // much that account's as a `Save a copy` is.
-            const created = await storeSave(converted, null, {
-                owner: standOwner(),
-                stand: false,
-            });
-            await refreshSongs();
-            await open(created);
-            revealEditor(arrangementOf(created).sections[0].id);
+            revealEditor(arrangementOf(opened.created).sections[0].id);
+            setMessage('Editable copy created · your original song is unchanged');
+        });
+    }
+    /**
+     * How many times the band plays the form (#1475), from the Edit panel or the chart footer
+     * (#1511): one unsaved edit. A text chart has no count, so the footer's pick first makes the
+     * same measure copy "Try the bar editor · keep original" makes, then counts the copy.
+     */
+    function changeChoruses(choruses: number | undefined) {
+        if (current?.schemaVersion !== 1) {
+            change(() => runtime.setChoruses(choruses), true);
+            return;
+        }
+        void run(async () => {
+            const opened = await openMeasureCopy();
+            if (!opened) {
+                return;
+            }
+            runtime.setChoruses(choruses);
+            // `open()` just bound the copy, so its baseline and its not-a-shared-draft state are
+            // passed in: this render's `saved` and `sharedDraft` still describe the original.
+            draft(runtime.captureDocument(opened.current), opened.saved, false);
             setMessage('Editable copy created · your original song is unchanged');
         });
     }
@@ -5484,6 +5517,7 @@ export default function Ensemble() {
                                     revealEditor(measure.sectionId);
                                 }}
                                 onAudition={(index) => runtime.audition(index)}
+                                onChoruses={changeChoruses}
                             />
                         </div>
                         <EditPanel
@@ -5499,9 +5533,7 @@ export default function Ensemble() {
                             onTitle={(title) => draft({ ...current, title })}
                             onSongMeter={changeSongMeter}
                             onSongMode={(isMinor) => change(() => runtime.setMode(isMinor), true)}
-                            onChoruses={(choruses) =>
-                                change(() => runtime.setChoruses(choruses), true)
-                            }
+                            onChoruses={changeChoruses}
                             onSelectMeasure={setMeasureId}
                             onPendingChange={(pending) => {
                                 pendingText.current = pending;
