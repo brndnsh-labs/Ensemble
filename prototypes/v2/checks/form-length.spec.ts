@@ -128,6 +128,32 @@ test('the footer sets how many times a measure chart plays, and the band stops a
     await page.keyboard.press('Escape');
     await expect(menu).toHaveCount(0);
     await expect(footer).toBeFocused();
+    // The menu's keys are its own: with a practice loop armed, arrowing through the menu and
+    // Escaping out of it closes the menu and leaves the loop alone (the chart reads a bare
+    // Escape as "clear the loop").
+    const sectionA = page.getByRole('button', {
+        name: 'Section A · hold to practice-loop',
+        exact: true,
+    });
+    await sectionA.focus();
+    await page.keyboard.press('l');
+    await expect(sectionA).toHaveAttribute('aria-pressed', 'true');
+    await footer.click();
+    await page.keyboard.press('ArrowDown');
+    await expect(
+        menu.getByRole('menuitemradio', { name: 'Plays once', exact: true }),
+    ).toBeFocused();
+    await page.keyboard.press('End');
+    await expect(
+        menu.getByRole('menuitemradio', { name: 'Plays 16 times', exact: true }),
+    ).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(menu).toHaveCount(0);
+    await expect(footer).toBeFocused();
+    await expect(sectionA).toHaveAttribute('aria-pressed', 'true');
+    await sectionA.focus();
+    await page.keyboard.press('l');
+    await expect(sectionA).toHaveAttribute('aria-pressed', 'false');
     // The popover stays inside the viewport and the page never scrolls sideways.
     await footer.click();
     const box = await page.locator('.form-length-menu').boundingBox();
@@ -228,6 +254,20 @@ test('on a shared text chart, a count makes the measure copy and counts it (#151
         [2, 'Shared song — editable copy'],
     ]);
     expect(stored[0].schemaVersion === 2 && 'choruses' in stored[0].chart.score).toBe(false);
+    // That unsaved count is retained like any edit to a library song: one recovery slot, the
+    // copy's, so closing the tab before Save does not lose it.
+    const copyId = stored[0].id;
+    const recoveryKeys = () =>
+        page.evaluate(() =>
+            Object.keys(localStorage).filter((key) =>
+                key.startsWith('ensemble-v2-preview:recovery:'),
+            ),
+        );
+    await expect.poll(recoveryKeys).toHaveLength(1);
+    expect((await recoveryKeys())[0].endsWith(`:${copyId}`)).toBe(true);
+    await page.reload();
+    await songLink(page, 'Shared song — editable copy').first().click();
+    await expect(footer).toHaveText('4 bars · plays 2 times, then ends');
     const save = page.getByRole('button', { name: 'Save', exact: true });
     await save.click();
     await expect(save).toBeDisabled();

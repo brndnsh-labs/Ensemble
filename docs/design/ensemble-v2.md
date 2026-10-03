@@ -42,7 +42,8 @@ transport are primary controls; key is one obvious action away. Loop/start belon
 relevant section. How many times the form plays belongs at the end of the form (#1511): the
 chart footer's "N bars · repeats continuously" is a button that sets it, the same setting as the
 Edit panel's Choruses, and on a text chart a pick first makes the measure copy "Try the bar
-editor · keep original" makes, leaving the original as it was. Detailed band, sound, practice and device controls get deliberate homes.
+editor · keep original" makes, leaving the original as it was. Detailed band, sound, practice
+and device controls get deliberate homes.
 
 Test laptop at approximately 1300x940, phone portrait/landscape, and tablet. Preserve whole
 measures and readable chord symbols. Compare two versus four bars per phone row and scrolling

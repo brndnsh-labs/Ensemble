@@ -1,6 +1,12 @@
 import type { SemanticScore } from '@engine/songbook/score-types';
 import type { ChartNotation } from '@engine/songbook/types';
-import { type MouseEvent as ReactMouseEvent, useEffect, useRef, useState } from 'react';
+import {
+    type KeyboardEvent as ReactKeyboardEvent,
+    type MouseEvent as ReactMouseEvent,
+    useEffect,
+    useRef,
+    useState,
+} from 'react';
 import { arrangementOf } from '../lib/documents';
 import type { ChartBlock, ChartChord, ChartMeasure } from '../lib/lead-sheet';
 import type { ChartDocument } from '../lib/runtime';
@@ -238,33 +244,49 @@ export function ChartSheet({
                 setFormMenu(null);
             }
         }
-        function onKey(event: KeyboardEvent) {
+        // Escape with focus somewhere outside the menu; inside it, `onFormMenuKey` answers and
+        // stops the event before it reaches the document.
+        function closeOnEscape(event: KeyboardEvent) {
             if (event.key === 'Escape') {
                 event.preventDefault();
                 setFormMenu(null);
                 formMenuTrigger.current?.focus();
-                return;
-            }
-            const all = items();
-            const at = all.indexOf(document.activeElement as HTMLElement);
-            const moves: Record<string, number> = {
-                ArrowDown: at + 1,
-                ArrowUp: at - 1,
-                Home: 0,
-                End: all.length - 1,
-            };
-            if (at >= 0 && Object.hasOwn(moves, event.key)) {
-                event.preventDefault();
-                all[(moves[event.key] + all.length) % all.length]?.focus();
             }
         }
         document.addEventListener('pointerdown', closeOnOutsidePress);
-        document.addEventListener('keydown', onKey);
+        document.addEventListener('keydown', closeOnEscape);
         return () => {
             document.removeEventListener('pointerdown', closeOnOutsidePress);
-            document.removeEventListener('keydown', onKey);
+            document.removeEventListener('keydown', closeOnEscape);
         };
     }, [formMenuOpen]);
+
+    /**
+     * The menu's own keys. They stop here, because the chart around the sheet reads Escape as
+     * "clear the practice loop" and an arrow as browsing away from Following.
+     */
+    function onFormMenuKey(event: ReactKeyboardEvent<HTMLDivElement>) {
+        const all = Array.from(
+            event.currentTarget.querySelectorAll<HTMLElement>('[role="menuitemradio"]'),
+        );
+        const at = all.indexOf(document.activeElement as HTMLElement);
+        const moves: Record<string, number> = {
+            ArrowDown: at + 1,
+            ArrowUp: at - 1,
+            Home: 0,
+            End: all.length - 1,
+        };
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            event.stopPropagation();
+            setFormMenu(null);
+            formMenuTrigger.current?.focus();
+        } else if (Object.hasOwn(moves, event.key)) {
+            event.preventDefault();
+            event.stopPropagation();
+            all[(moves[event.key] + all.length) % all.length]?.focus();
+        }
+    }
 
     function toggleFormMenu(event: ReactMouseEvent<HTMLButtonElement>) {
         if (formMenu) {
@@ -693,6 +715,7 @@ export function ChartSheet({
                     <div
                         role="menu"
                         aria-label="How many times the form plays"
+                        onKeyDown={onFormMenuKey}
                         aria-describedby={
                             current.schemaVersion === 1 ? 'form-length-note' : undefined
                         }
