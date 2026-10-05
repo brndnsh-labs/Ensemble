@@ -343,13 +343,22 @@ function stopBand(ringOut = false): void {
 }
 
 /**
- * The chart slot sounding this instant, or -1 when none is: stopped, counting in, or between two
- * queued segments. A pure read off `songTick()`, for the stand to call every animation frame
- * (#1240): publishing it through state on a poll made the chart a sample of a sample, and a
- * chord shorter than the two periods together could go unpainted.
+ * The song tick sounding this instant, or null while stopped, counting in, or between two queued
+ * segments. Read it ONCE per paint and hand that one value to `playheadSlot` and `inLastBeat`
+ * (#1506): the audio clock runs on its own thread and can cross a barline between two reads in
+ * the same task, and a stand that asked each question separately once painted the bar just left
+ * with the new bar's cue.
  */
-export function playheadSlot(): number {
-    const tick = band?.songTick();
+export function songTick(): number | null {
+    return band?.songTick() ?? null;
+}
+
+/**
+ * The chart slot `songTick()`'s `tick` falls in, or -1 when none does. For the stand to call
+ * every animation frame (#1240): publishing it through state on a poll made the chart a sample of
+ * a sample, and a chord shorter than the two periods together could go unpainted.
+ */
+export function playheadSlot(tick: number | null): number {
     if (tick == null) {
         return -1;
     }
@@ -1488,14 +1497,14 @@ export function bandChartView(): BandChart | null {
  * for a measure-less (v1) chart too, so this works for v1 exactly like a schemaVersion-2 chart
  * (P2-2: the old `!bandView` gate wrongly denied v1 charts this cue and the jump-ahead both).
  *
- * Pure engine read off `songTick()` directly, not the chart's `active` slot: React only commits
+ * Pure engine read off `songTick()`'s `tick`, not the chart's `active` slot: React only commits
  * `active` on its next render, so a caller that read `active`'s bar from the DOM (the Following
  * look-ahead's, #1458) could still see the bar just left after `songTick()` had already crossed
  * into the next one — firing "last beat" a bar early, at the new bar's downbeat. Reading the bar
  * straight from the timeline via `tick` has no such lag: it always names whichever bar `tick` is
- * ACTUALLY in, this instant. False while stopped or counting in.
+ * ACTUALLY in. The caller passes the same `tick` it gave `playheadSlot` (#1506). False while
+ * stopped or counting in.
  */
-export function inLastBeat(): boolean {
-    const tick = band?.songTick();
+export function inLastBeat(tick: number | null): boolean {
     return tick != null && (band?.inLastPulse(tick) ?? false);
 }

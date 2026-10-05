@@ -555,9 +555,10 @@ export default function Ensemble() {
     const [loopedSectionId, setLoopedSectionId] = useState<string | null>(null);
     // #1458 — is playback in the ACTIVE bar's last FELT pulse right now? Strengthens the next-bar
     // cue and gates the Following look-ahead's jump-ahead scroll. Edge-triggered off the same
-    // 60ms poll below (`runtime.inLastBeat()`, a pure engine read off the live song tick — never
-    // the chart's own `active` state, which the poll that publishes it can still be a tick behind)
-    // rather than a new interval — it only flips twice a bar, nowhere near "per frame".
+    // 60ms poll below (`runtime.inLastBeat()`, a pure engine read off the song tick the active slot
+    // is read from, #1506 — never the chart's own `active` state, which the poll that publishes
+    // it can still be a tick behind) rather than a new interval — it only flips twice a bar,
+    // nowhere near "per frame".
     const [nextSoon, setNextSoon] = useState(false);
     const { stage, toggleTheme } = useStageTheme();
     const [following, setFollowing] = useState(true);
@@ -1146,7 +1147,11 @@ export default function Ensemble() {
             window.cancelAnimationFrame(frame);
             window.clearTimeout(idle);
             const playingNow = runtime.state().playback.isPlaying;
-            const slot = playingNow ? runtime.playheadSlot() : -1;
+            // ONE read of the band's clock for the whole paint (#1506): the audio clock can cross
+            // a barline between two reads in this one task, and the active bar and the cue below
+            // read separately once showed the bar just left with the new bar's cue.
+            const tick = playingNow ? runtime.songTick() : null;
+            const slot = runtime.playheadSlot(tick);
             setPlaying(playingNow);
             // No slot while counting in or between two queued segments: the pointer holds.
             setActive((previous) => (!playingNow ? null : slot >= 0 ? slot : previous));
@@ -1156,7 +1161,7 @@ export default function Ensemble() {
             // node: React hasn't necessarily committed `active`'s new value yet on the very frame
             // playback crosses a barline, so reading the OLD bar's DOM attributes here would still
             // see the bar just left after the engine had already moved on.
-            setNextSoon(runtime.inLastBeat());
+            setNextSoon(runtime.inLastBeat(tick));
             if (playingNow) {
                 frame = window.requestAnimationFrame(follow);
             }
