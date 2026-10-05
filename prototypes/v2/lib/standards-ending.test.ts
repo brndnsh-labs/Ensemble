@@ -1,11 +1,13 @@
 /**
  * The held ending on every chart the app ships (#1516): the standards catalog and a new song's
  * starting chart, as authored and as a musician might type them without setting the key (it
- * defaults to C major, `blankSong`). A pass that ends resolves only into a key the chart rests
- * in, so the ending's root is the chart's own: a chord its last bar writes, the chord it opens
- * on, or the tonic of the key it is really in — never a defaulted C it does not rest on.
+ * defaults to C major, `blankSong`). The ending's root is the chart's own (#1521): as authored,
+ * a band that plays the last bar as written ends on a chord that bar writes, and a band that
+ * resolves it ends on the tonic of the key the chart is really in; typed without its key, it
+ * ends on the same root it does as authored, the known exceptions pinned.
  */
-import { compileTimeline, DEFAULT_SETTINGS, performPass } from '@band/index';
+import { heldEnding } from '@band/arrange/ending';
+import { compileTimeline, DEFAULT_SETTINGS, performPass, STYLES } from '@band/index';
 import type { SemanticScore } from '@engine/songbook/score-types';
 import { describe, expect, it } from 'vitest';
 import { buildStandardDocument, STANDARDS } from './standards';
@@ -38,9 +40,8 @@ const PC: Record<string, number> = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }
 const keyPc = (name: string) =>
     (PC[name[0]] + (name.includes('#') ? 1 : 0) - (name.includes('b') ? 1 : 0) + 12) % 12;
 
-/** The pitch class the bass holds in a pass's last bar: the ending's root. */
-function endingRoot(score: SemanticScore): { held: number; allowed: Set<number> } {
-    const timeline = compileTimeline(score);
+/** The pitch class the bass holds at the end of a jazz pass's last bar: the ending's root. */
+function heldRoot(timeline: ReturnType<typeof compileTimeline>): number {
     const { events } = performPass(
         timeline,
         { ...DEFAULT_SETTINGS, style: 'jazz', seed: 'a' },
@@ -48,13 +49,27 @@ function endingRoot(score: SemanticScore): { held: number; allowed: Set<number> 
     );
     const last = timeline.bars.at(-1)!;
     const bass = events.filter((e) => e.lane === 'bass' && e.bar === last.index);
-    const held = bass.at(-1)!.lane === 'bass' ? (bass.at(-1) as { midi: number }).midi % 12 : -1;
-    const opening = timeline.spans.find((span) => span.chord)!.chord!;
-    const allowed = new Set([
-        ...last.spans.flatMap((span) => (span.chord ? [span.chord.bass, span.chord.root] : [])),
-        opening.root,
-    ]);
-    return { held, allowed };
+    return bass.at(-1)!.lane === 'bass' ? (bass.at(-1) as { midi: number }).midi % 12 : -1;
+}
+
+/**
+ * Does a jazz pass end on the chart's own root, given the tonic of the key it is really in?
+ * When the band resolves the bar (the chord it holds is not one the bar writes) that root must
+ * be the real tonic; only a bar played as written — held on its first chord, or split to hold a
+ * chord it writes later (`G7 C`, `D7 G`) — may end on another root the bar writes.
+ */
+function endsHome(score: SemanticScore, tonic: number): boolean {
+    const timeline = compileTimeline(score);
+    const held = heldRoot(timeline);
+    const last = timeline.bars.at(-1)!;
+    const written = last.spans.flatMap((span) => (span.chord ? [span.chord] : []));
+    const ending = heldEnding(timeline, last.index, STYLES.jazz.ending);
+    const chord = ending?.spans.filter((span) => span.chord).at(-1)?.chord;
+    const resolved = !!chord && !written.some((w) => w.symbol === chord.symbol);
+    if (resolved) {
+        return held === tonic;
+    }
+    return written.some((w) => w.root === held || w.bass === held);
 }
 
 describe('the held ending on every shipped chart (#1516)', () => {
@@ -67,32 +82,42 @@ describe('the held ending on every shipped chart (#1516)', () => {
         ]),
     ];
 
-    it('ends on its own tonic, as authored', () => {
-        const wrong: string[] = [];
-        for (const [title, score, key] of charts) {
-            const { held, allowed } = endingRoot(score);
-            if (!allowed.has(held) && held !== keyPc(key)) {
-                wrong.push(`${title}: ${held}`);
-            }
-        }
+    it("ends on its own tonic, as authored (the jazz pass's bass root)", () => {
+        const wrong = charts
+            .filter(([, score, key]) => !endsHome(score, keyPc(key)))
+            .map(([title]) => title);
         expect(wrong).toEqual([]);
     });
 
-    it('typed without its key (read as C major), never ends on a C it does not rest on', () => {
-        const wrong: string[] = [];
-        for (const [title, score, key] of charts) {
-            const { held, allowed } = endingRoot({ ...score, key: 'C', isMinor: false });
-            // C is the ending only where the chart is really in C, or writes it there.
-            if (!allowed.has(held) && !(held === 0 && keyPc(key) === 0)) {
-                wrong.push(title);
-            }
-        }
-        // Open in #1521 (whether to weigh the whole chart, or record whether the key was set):
-        // each holds a C chord two bars that no local rule can tell from a tonic — the 8-bar
-        // blues's IV7 (`C7 | C7 | G7`), Stella's ii (`Cm7 | Cm7 | Ab7`), rhythm changes'
-        // bridge (`C7 | C7 | F7`). So a defaulted C reads as backed, and rhythm changes' last
-        // bar, a turnaround off its opening chord (`Bbmaj7 F7`), resolves into it. Pinned so a
-        // fix (or a new case) shows up here.
-        expect(wrong).toEqual(['8-Bar Blues', 'Rhythm Changes', 'Stella by Starlight']);
+    it("typed without its key (read as C major), the jazz pass's bass ends on its authored root", () => {
+        // Forcing the key to C must not move the ending: the root the band holds is the one it
+        // holds with the chart's own key.
+        const wrong = charts
+            .filter(
+                ([, score]) =>
+                    heldRoot(compileTimeline({ ...score, key: 'C', isMinor: false })) !==
+                    heldRoot(compileTimeline(score)),
+            )
+            .map(([title]) => title);
+        // Open in #1521's options B and C (record whether the key was set, or weigh the whole
+        // chart); no rule reading one chord at a time tells these from a chart in C:
+        // - All The Things You Are rests on `Cmaj7` (its A section's `Dm7 G7 | Cmaj7 | Cmaj7`),
+        //   which states C as home, and resolves into it;
+        // - Stella rests on `Cm7 | Cm7 | Ab7`, a minor tonic on C, and resolves into C minor;
+        // - Canon and Andalusian end on a V triad (`A`, `E`), which is not read as a V7 pointing
+        //   home (a triad a fifth above is as often a I–IV the other way round), so the
+        //   unbacked bar is played as written;
+        // - Funk (i-IV) ends on its dorian IV7 (`A7`), which points nowhere by a fifth;
+        // - Alternative Loop ends on its borrowed iv, `Cm`: on the defaulted tonic, it reads as
+        //   home.
+        // Pinned so a fix (or a new case) shows up here.
+        expect(wrong).toEqual([
+            'All The Things You Are',
+            'Stella by Starlight',
+            'Canon',
+            'Andalusian',
+            'Funk (i-IV)',
+            'Alternative Loop',
+        ]);
     });
 });
