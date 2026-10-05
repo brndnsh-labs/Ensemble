@@ -29,7 +29,7 @@ import { feelFor, STYLE_IDS, STYLES } from '../../styles/index.js';
 import type { Feel } from '../../styles/types.js';
 import { type ChordFacts, chordPcs, fifthOf } from '../../theory/chord.js';
 import { mod12 } from '../../theory/pitch.js';
-import { COUNTED_FIXTURES, FIXTURES, VAMP_FIXTURES } from '../scores.js';
+import { COUNTED_FIXTURES, FIXTURES, METER_ENDINGS, VAMP_FIXTURES } from '../scores.js';
 
 const SEEDS = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
 const BASS_REGISTER = [23, 57] as const;
@@ -147,6 +147,59 @@ export function invariantSuite(shard: number): void {
     defineLeads(styles.filter((id) => STYLES[id].lead));
     defineCounted(styles);
     defineVamps(styles);
+    defineEndings(styles);
+}
+
+/**
+ * The held ending in every meter (#1503): a pass that ends keeps every rule in its last bar
+ * whatever the meter, and nothing rings past the end of the performance. A held note is the
+ * bar's length, not four beats: a 3/4, 6/8 or 7/8 ending that holds 16 sixteenths sustains
+ * past the band's last barline.
+ */
+function defineEndings(styles: StyleId[]): void {
+    describe.each(styles)('%s ending in every meter', (styleId) => {
+        const style = STYLES[styleId];
+        for (const [meter, score] of Object.entries(METER_ENDINGS)) {
+            const timeline = compileTimeline(score);
+            const judged = asPlayed(timeline, styleId, false);
+            it(`${meter}: the held ending ends with the bar`, () => {
+                const problems: string[] = [];
+                for (const seed of SEEDS.slice(0, 2)) {
+                    for (const comp of INSTRUMENTS) {
+                        const settings: BandSettings = {
+                            ...DEFAULT_SETTINGS,
+                            style: styleId,
+                            comp,
+                            seed,
+                            lanes: { drums: true, bass: true, comp: true, lead: !!style.lead },
+                            lead: style.lead?.prefers ?? DEFAULT_SETTINGS.lead,
+                        };
+                        const { events } = performPass(timeline, settings, {
+                            pass: 0,
+                            looping: false,
+                        });
+                        const where = `${seed}/${comp}`;
+                        checkPass(
+                            judged,
+                            events,
+                            feelFor(style, COMP_INSTRUMENTS[comp].family).lean,
+                            settings,
+                            where,
+                            problems,
+                        );
+                        for (const e of events) {
+                            if (e.lane !== 'drums' && e.tick + e.dur > timeline.ticks + 1) {
+                                problems.push(
+                                    `${where} bar ${e.bar} ${e.lane}@${e.tick}: rings ${e.tick + e.dur - timeline.ticks} ticks past the end`,
+                                );
+                            }
+                        }
+                    }
+                }
+                expect(problems.slice(0, 10), `${styleId}/${meter}`).toEqual([]);
+            });
+        }
+    });
 }
 
 /**

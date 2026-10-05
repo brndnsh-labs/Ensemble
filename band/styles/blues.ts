@@ -20,7 +20,7 @@ import {
 import { type GripShape, grip } from '../players/comp/fretboard.js';
 import { compIdiom, type Hit, strums } from '../players/comp/idiom.js';
 import { drumIdiom, tomRun } from '../players/drums/kit.js';
-import { at, dyn, isCommonTime, pulses, STEP, spanSteps } from '../players/grid.js';
+import { at, barSteps, dyn, isCommonTime, pulses, STEP, spanSteps } from '../players/grid.js';
 import { leadIdiom } from '../players/lead/idiom.js';
 import { bluesPool, bluesTargets, restingTones } from '../players/lead/palette.js';
 import { type ChordFacts, fifthOf } from '../theory/chord.js';
@@ -250,7 +250,8 @@ const shuffleBass: PitchedIdiom = {
             const chord = bar.spans[0]?.chord;
             if (chord) {
                 const root = nearestMidi(chord.bass, last ?? BASS.home, BASS.lo, BASS.hi);
-                events.push(bassNote(bar, 0, root, 16, dyn(100, plan.energy)));
+                // why: the held note is the bar, in any meter (#1503).
+                events.push(bassNote(bar, 0, root, barSteps(bar), dyn(100, plan.energy)));
             }
             return { events, memory: { last } };
         }

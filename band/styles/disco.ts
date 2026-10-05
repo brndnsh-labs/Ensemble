@@ -200,7 +200,8 @@ const discoBass: PitchedIdiom = {
             const chord = bar.spans[0]?.chord;
             if (chord) {
                 const root = pumpRoot(ctx, chord.bass);
-                events.push(bassNote(bar, 0, root, 16, dyn(106, plan.energy)));
+                // why: the held note is the bar, in any meter (#1503).
+                events.push(bassNote(bar, 0, root, barSteps(bar), dyn(106, plan.energy)));
                 last = root;
             }
             return { events, memory: { last } };
