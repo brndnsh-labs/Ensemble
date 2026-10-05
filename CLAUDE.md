@@ -156,7 +156,7 @@ The music stand: songbook home, chart sheet, transport, edit panel and sounds pa
 
 ### Data / Config split
 
-- UI metadata (menus, categories): `public/data/instrument-styles.ts`
+- Per-lane style keyspaces (what a saved chart's legacy `style` fields may hold, validated by the songbook codec): `public/data/instrument-styles.ts`
 - Musical behavior: the band engine's styles, `band/styles/` (one file per genre)
 - Styles live beside the components in `prototypes/v2/app/` (`style.css` plus per-surface `.css` files). `public/` holds no CSS.
 

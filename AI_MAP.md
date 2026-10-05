@@ -157,7 +157,7 @@ The ground-up replacement for the generative engine, the default since 2026-09-2
 | Path | Responsibility | Key Data |
 | :--- | :--- | :--- |
 | `public/data/smart-genres.ts` | High-level genre configurations + the genre-naming authority (canon name ↔ feel ↔ groove strategy key). | `SMART_GENRES`, `canonToFeel`, `feelToCanon`, `GROOVE_STRATEGY_BY_GENRE`, `isLatinGrooveFamily` |
-| `public/data/instrument-styles.ts` | UI menu definitions and shared player availability. | `CHORD_STYLES`, `BASS_STYLES`, `getChordPlayerChoices` |
+| `public/data/instrument-styles.ts` | Per-lane style keyspaces the songbook codec validates an old chart's legacy `style` fields against. | `isKnownChordStyle`, `isKnownBassStyle`, `isKnownSoloistStyle`, `isKnownHarmonyStyle` |
 | `public/data/sound-packs.ts` | Catalog of installable sample packs, read by v2's `lib/sounds.ts`. | `SOUND_PACKS`, `packsForInstrument` |
 | `public/data/genre-sound-map.ts` | Genre → instrument sound defaults consumed by Auto-follow mode (#675). | `GENRE_SOUND_MAP`, `autoVoiceForGenre` |
 

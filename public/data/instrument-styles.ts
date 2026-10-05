@@ -1,3 +1,12 @@
+/*
+ * The per-lane style keyspaces a saved chart may name. v1's per-instrument style pickers are
+ * gone and no `prototypes/v2` file imports this module, but it is NOT dead (#1437 kept it): the
+ * songbook codec (`songbook/codec.ts`) validates an old chart's legacy `band.*.style` fields
+ * against `isKnownChordStyle`/`isKnownBassStyle`/`isKnownSoloistStyle`/`isKnownHarmonyStyle`,
+ * so v2 reaches it through every chart it opens. Deleting it, or a list entry, changes which
+ * stored charts decode. Only each entry's `id` is read today; `name`/`category` are v1 picker
+ * labels nothing renders.
+ */
 import { SMART_GENRES } from './smart-genres.js';
 
 export interface StyleEntry {
@@ -44,7 +53,7 @@ export const BASS_STYLES: StyleEntry[] = [
 
 // #628: the one soloist voice per canonical genre (the 13). The manual soloist
 // picker is gone, and so is the v1 manual's generated style table (#1358), so this list
-// now serves share-URL hydration validation (state-hydration.ts).
+// now serves the songbook codec's legacy `soloist.style` validation (`isKnownSoloistStyle`).
 // Ids match the voices the 13 genres actually resolve to via smart-genres.ts
 // `.soloist`; the retired `shred`/`minimal` phantom profiles are gone.
 export const SOLOIST_STYLES: StyleEntry[] = [
