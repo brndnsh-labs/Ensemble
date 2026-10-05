@@ -36,7 +36,7 @@ import type {
 } from '@engine/songbook/score-types';
 import type { EnsembleState } from '@engine/types';
 import { describe, expect, it, vi } from 'vitest';
-import { BandHost, countInPlan } from './band-host';
+import { BandHost, countInPlan, type Loop } from './band-host';
 
 vi.mock('@engine/engine/synth-drums', () => ({ playDrumSound: vi.fn() }));
 vi.mock('@engine/engine/synth-bass', () => ({ playBassNote: vi.fn() }));
@@ -776,7 +776,7 @@ const wholeBand = {
  */
 function rig(
     score: SemanticScore,
-    loopTo: number | null,
+    loopTo: number | Loop | null,
     onEnd?: () => void,
     settings: BandSettings = wholeBand,
 ) {
@@ -787,7 +787,7 @@ function rig(
     const state = fakeState(audio);
     const host = new BandHost({ state: () => state, silence: () => {}, onEnd });
     host.setScore(score);
-    host.start(settings, 120, 0, loopTo === null ? null : { from: 0, to: loopTo });
+    host.start(settings, 120, 0, typeof loopTo === 'number' ? { from: 0, to: loopTo } : loopTo);
     const tick = (t: number) => {
         audio.currentTime = t;
         pump(host);
@@ -1377,6 +1377,14 @@ describe('BandHost releasing a loop into another chord', () => {
     };
     /** The chord (its symbol) a lap's last bar pushed over its end, or null (#1507). */
     const pushOf = (lap: Lap) => (lap.memoryAfter.comp as { pushed: string | null }).pushed;
+    /** The last bass note a lap plays in bar `index`. */
+    const lastBass = (lap: Lap, index: number) =>
+        lap.events.flatMap((e) => (e.lane === 'bass' && e.bar === index ? [e.midi] : [])).at(-1);
+    /** Is `midi` a half or whole step from pitch class `pc`: an approach to it? */
+    const stepsTo = (midi: number | undefined, pc: number) => {
+        const d = midi === undefined ? 0 : (((midi - pc) % 12) + 12) % 12;
+        return d === 1 || d === 2 || d === 10 || d === 11;
+    };
 
     /** The comp's notes handed to its voice, struck (not scratched): when, until when, and pitch. */
     function compNotes(): { time: number; end: number; midi: number }[] {
@@ -1391,26 +1399,30 @@ describe('BandHost releasing a loop into another chord', () => {
     }
 
     /**
-     * Loop A on `score` with `settings`, released at audio time `at` (or never, with null), and
-     * played on to 38.1 s: two bars past the end of the third lap, the latest a release here
-     * can lead from. Laps are four bars (eight seconds) from 10.1 s.
+     * A loop on `score` with `settings` — on bars `[from, to)`, A by default — released at audio
+     * time `at` (or never, with null), and played on to `end`: by default 38.1 s, two bars past
+     * the end of A's third lap, the latest a release here can lead from. Laps start at 10.1 s.
      */
     function releasedAt(
         score: SemanticScore,
         settings: BandSettings,
         at: number | null,
-        onEnd?: (time: number) => void,
+        {
+            onEnd,
+            loop = [0, 4],
+            end = 10.1 + 14 * BAR_S,
+        }: { onEnd?: (time: number) => void; loop?: [number, number]; end?: number } = {},
     ) {
         let now = () => 0;
+        const { bars } = compileTimeline(score);
         const { audio, host, pumpTo, release } = rig(
             score,
-            compileTimeline(score).bars[4].start,
+            { from: bars[loop[0]].start, to: bars[loop[1]].start },
             () => onEnd?.(now()),
             settings,
         );
         now = () => audio.currentTime;
         const segments = watchSegments(host) as () => Lap[];
-        const end = 10.1 + 14 * BAR_S;
         if (at === null) {
             pumpTo(10.1, end);
         } else {
@@ -1434,6 +1446,7 @@ describe('BandHost releasing a loop into another chord', () => {
         const styles = new Set<string>();
         let aimedAtTop = 0;
         let aimedOn = 0;
+        const walks = { held: { C: 0, F: 0 }, released: { C: 0, F: 0 } };
         for (const style of STYLE_IDS) {
             for (const comp of ['piano', 'guitar', 'organ'] as const) {
                 for (const seed of ['a', 'b', 'c', 'd']) {
@@ -1455,6 +1468,13 @@ describe('BandHost releasing a loop into another chord', () => {
                         if (twin && pushOf(twin) === 'C') {
                             aimedAtTop++;
                         }
+                        // And its bass steps into the C; released, into the F.
+                        if (twin) {
+                            walks.held.C += stepsTo(lastBass(twin, 3), 0) ? 1 : 0;
+                            walks.held.F += stepsTo(lastBass(twin, 3), 5) ? 1 : 0;
+                        }
+                        walks.released.C += stepsTo(lastBass(leads, 3), 0) ? 1 : 0;
+                        walks.released.F += stepsTo(lastBass(leads, 3), 5) ? 1 : 0;
                         const pushed = pushOf(leads);
                         if (pushed === 'F') {
                             aimedOn++;
@@ -1505,6 +1525,10 @@ describe('BandHost releasing a loop into another chord', () => {
         expect(aimedOn).toBeGreaterThanOrEqual(40);
         expect(styles.size).toBeGreaterThanOrEqual(6);
         expect(problems).toEqual([]);
+        // The bass's last note, a step from the next root, turns from the C to the F. (Some of
+        // G7's own tones are a step from both, so a measure over every take, by a clear margin.)
+        expect(walks.released.F - walks.held.F).toBeGreaterThanOrEqual(50);
+        expect(walks.held.C - walks.released.C).toBeGreaterThanOrEqual(100);
     });
 
     it('released into a section the comp sits out, the lap pushes nothing into it', () => {
@@ -1556,9 +1580,9 @@ describe('BandHost releasing a loop into another chord', () => {
                 const where = `${style}/${seed}`;
                 const ended: number[] = [];
                 const settings = { ...DEFAULT_SETTINGS, style, comp: 'piano' as const, seed };
-                const { segments, calls } = releasedAt(counted, settings, lapEnd - 6.5, (time) =>
-                    ended.push(time),
-                );
+                const { segments, calls } = releasedAt(counted, settings, lapEnd - 6.5, {
+                    onEnd: (time) => ended.push(time),
+                });
                 const leads = segments.find((s) => s.released !== undefined);
                 if (leads && pushOf(leads) === 'F') {
                     aimedOn++;
@@ -1581,6 +1605,127 @@ describe('BandHost releasing a loop into another chord', () => {
             }
         }
         expect(aimedOn).toBeGreaterThanOrEqual(5);
+        expect(problems).toEqual([]);
+    });
+
+    /** `C | Am | Dm | G7` twice, played once: the second time ends on a G7 held as the tonic. */
+    const twice: SemanticScore = {
+        ...chart,
+        sections: [
+            chart.sections[0],
+            {
+                ...chart.sections[0],
+                id: 'B',
+                label: 'B',
+                measures: chart.sections[0].measures.map((m, i) => ({ ...m, id: `B${i}` })),
+            },
+        ],
+        choruses: 1,
+    };
+
+    it('on a counted chart, a lap released into the held ending pushes nothing over it, and its bass heads for the chord held', () => {
+        // The loop is B's first three bars; the bar after it is the performance's last, a G7 the
+        // band resolves and holds as the tonic (`arrange/ending.ts`). The final chord lands on
+        // its downbeat, never early, so the lap pushes nothing into it, and its bass heads for
+        // the C held, as it does into the C at its own top, not for the G7 as written. Laps
+        // are three bars (six seconds) from 10.1 s: released early in the second.
+        const problems: string[] = [];
+        let pushedAtTop = 0;
+        let heldToG = 0;
+        let releasedToG = 0;
+        for (const style of STYLE_IDS) {
+            for (const comp of ['piano', 'guitar'] as const) {
+                for (const seed of ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']) {
+                    const where = `${style}/${comp}/${seed}`;
+                    const settings = { ...DEFAULT_SETTINGS, style, comp, seed };
+                    const options = { loop: [4, 7] as [number, number], end: 28 };
+                    const held = releasedAt(twice, settings, null, options);
+                    const { segments, notes } = releasedAt(twice, settings, 16.4, options);
+                    const leads = segments.find((s) => s.released !== undefined)!;
+                    const twin = held.segments.find((s) => Math.abs(s.start - leads.start) < 1e-9)!;
+                    const seam = leads.start + 3 * BAR_S;
+                    if (pushOf(twin) !== null) {
+                        pushedAtTop++;
+                    }
+                    if (pushOf(leads) !== null) {
+                        problems.push(`${where}: the lap pushes ${pushOf(leads)} into the ending`);
+                    }
+                    if (notes.some((n) => n.time < seam - 0.01 && n.end > seam + 0.06)) {
+                        problems.push(`${where}: a chord rings over the ending's downbeat`);
+                    }
+                    if (!notes.some((n) => Math.abs(n.time - seam) < 0.05)) {
+                        problems.push(`${where}: the final chord is not struck on its downbeat`);
+                    }
+                    heldToG += stepsTo(lastBass(twin, 6), 7) ? 1 : 0;
+                    releasedToG += stepsTo(lastBass(leads, 6), 7) ? 1 : 0;
+                }
+            }
+        }
+        // Not vacuous: unreleased, the lap pushes the C at its top in some takes.
+        expect(pushedAtTop).toBeGreaterThanOrEqual(5);
+        expect(problems).toEqual([]);
+        // The bass steps toward G (the written G7) no more often than when it wraps to the C.
+        expect(releasedToG).toBeLessThanOrEqual(heldToG + 10);
+    });
+
+    it('on a counted chart traded with the drummer, the lap leads into the bar as the chorus it carries on in plays it', () => {
+        // Three choruses of A and B, the soloist's place traded with the drummer in turns of
+        // four bars or eight. A looped in the head (chorus 0) or under a traded chorus (chorus
+        // 1), then released in its first lap or its second: the lap leads into that chorus's B,
+        // whatever lap it was. Where the bass plays that bar, the lap's walk steps into its F;
+        // where the drummer has it alone, the lap pushes nothing into it.
+        const three = { ...chart, choruses: 3 };
+        const problems: string[] = [];
+        let alone = 0;
+        let walkedGroups = 0;
+        for (const bars of [4, 8] as const) {
+            for (const [from, at] of [0, 8].flatMap((f) => [10.4, 18.4].map((t) => [f, t]))) {
+                let walked = 0;
+                let toF = 0;
+                const group = `turns of ${bars}, chorus ${from / 8}, released at ${at}`;
+                for (const comp of ['piano', 'guitar'] as const) {
+                    for (let s = 0; s < 16; s++) {
+                        const where = `${group}, ${comp}/${s}`;
+                        const settings = {
+                            ...DEFAULT_SETTINGS,
+                            style: 'jazz' as const,
+                            comp,
+                            seed: `s${s}`,
+                            trade: { with: 'drums' as const, bars, choruses: null },
+                        };
+                        const { segments } = releasedAt(three, settings, at, {
+                            loop: [from, from + 4],
+                            end: 32,
+                        });
+                        const leads = segments.find((seg) => seg.released !== undefined)!;
+                        const next = segments.find(
+                            (seg) => seg !== leads && seg.window.from === from + 4,
+                        )!;
+                        const band = next.events.some(
+                            (e) => (e.lane === 'bass' || e.lane === 'comp') && e.bar === from + 4,
+                        );
+                        if (!band) {
+                            alone++;
+                            if (pushOf(leads) !== null) {
+                                problems.push(`${where}: pushes into the drummer's turn`);
+                            }
+                            continue;
+                        }
+                        walked++;
+                        toF += stepsTo(lastBass(leads, from + 3), 5) ? 1 : 0;
+                    }
+                }
+                if (walked) {
+                    walkedGroups++;
+                    if (toF < walked * 0.75) {
+                        problems.push(`${group}: the bass steps to F in ${toF} of ${walked}`);
+                    }
+                }
+            }
+        }
+        // Not vacuous: one of them leads into the drummer's turn, the others into the band.
+        expect(alone).toBeGreaterThanOrEqual(16);
+        expect(walkedGroups).toBeGreaterThanOrEqual(3);
         expect(problems).toEqual([]);
     });
 
