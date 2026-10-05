@@ -384,26 +384,43 @@ export class BandHost {
         if (!this.playing || !audio || !timeline) {
             return;
         }
-        const horizon = audio.currentTime + LOOKAHEAD_S;
-        const current = this.current(horizon);
-        if (!current) {
+        const now = audio.currentTime;
+        const horizon = now + LOOKAHEAD_S;
+        const atHorizon = this.current(horizon);
+        if (!atHorizon) {
             return;
         }
-        const index = this.segments.indexOf(current);
+        // The segment at the horizon, or a later one the voices have already been sent anything
+        // from (`underWay`): a note pushed ahead of the next segment's barline is sent while
+        // that barline is still beyond the horizon. Dropping that segment would leave the note
+        // to sound again under the one rebuilt in its place (#1499).
+        const sent = this.underWay(now)!;
+        const current =
+            this.segments.indexOf(sent) > this.segments.indexOf(atHorizon) ? sent : atHorizon;
         // Everything after the current segment is regenerated lazily with the new settings.
-        this.segments.length = index + 1;
+        this.segments.length = this.segments.indexOf(current) + 1;
         const cutoff = this.regenerate(current, settings, horizon);
         this.change = { segment: current, tick: cutoff ?? current.to };
     }
 
     /**
-     * Regenerate `current` from the first barline after `horizon` (what is already scheduled
-     * stays), with `settings` and the segment's own `looping`. Returns that barline's tick, or
-     * null when the segment has no barline left to change at.
+     * Regenerate `current` from the first barline after `horizon` and after every note already
+     * sent to the voices, with `settings` and the segment's own `looping`. What comes before
+     * that barline stays, sent or still to be sent. Returns the barline's tick, or null when
+     * the segment has no barline left to change at.
      */
     private regenerate(current: Segment, settings: BandSettings, horizon: number): number | null {
         const timeline = this.timeline!;
-        const cutoffBar = this.barAt(this.tickAt(current, horizon), true);
+        let cutoffBar = this.barAt(this.tickAt(current, horizon), true);
+        if (current.cursor > 0) {
+            // A note pushed ahead of a barline is sent while the barline is still beyond the
+            // horizon. Its bar plays on as it was: regenerated, its own twin of that note would
+            // sound again. Events are in tick order, so the last one sent is the latest.
+            cutoffBar = Math.max(
+                cutoffBar,
+                this.barAt(current.events[current.cursor - 1].tick) + 1,
+            );
+        }
         if (cutoffBar >= current.until) {
             return null;
         }
@@ -425,13 +442,10 @@ export class BandHost {
             until: current.until,
         });
         const cutoff = timeline.bars[cutoffBar].start;
+        // Every note sent is before the cutoff, so the cursor stays where the last pump left
+        // it. Moved on to the horizon, it would skip the kept notes between the last pump's
+        // horizon and this one, up to a timer tick of them never sent (#1499).
         current.events = current.events.filter((e) => e.tick < cutoff).concat(tail.events);
-        current.cursor = current.events.findIndex(
-            (e) => this.timeOf(current, e.tick) + e.offsetMs / 1000 > horizon,
-        );
-        if (current.cursor < 0) {
-            current.cursor = current.events.length;
-        }
         current.chordSizes = chordSizes(current.events);
         current.legato = legatoLeads(current.events);
         for (let bar = cutoffBar; bar < current.until; bar++) {

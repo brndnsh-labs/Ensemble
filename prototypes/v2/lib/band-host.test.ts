@@ -7,8 +7,8 @@
  * The synth voices are mocked out: this suite is about scheduling and timing, not sound, and a
  * fake `AudioContext` has none of the nodes the real voices need.
  *
- * Also the counted chart (#1475): N choruses played once, then the host stops by itself; and
- * releasing a practice loop (#1484, #1489).
+ * Also the counted chart (#1475): N choruses played once, then the host stops by itself;
+ * releasing a practice loop (#1484, #1489); and a settings change near a barline (#1499).
  */
 import {
     type BandEvent,
@@ -712,6 +712,89 @@ describe('BandHost looping laps', () => {
     });
 });
 
+/** A (two bars) then B (two bars): a loop on A has a song to carry on into. */
+const aThenB = song([
+    {
+        id: 'a',
+        label: 'A',
+        repeat: 1,
+        measures: [bar('a1', [chord('C', 4)]), bar('a2', [chord('F', 4)])],
+    },
+    {
+        id: 'b',
+        label: 'B',
+        repeat: 1,
+        measures: [bar('b1', [chord('G7', 4)]), bar('b2', [chord('C', 4)])],
+    },
+]);
+
+/** Every note handed to the (mocked) voices: its lane and pitch (or drum), and its time. */
+function voiceCalls(): { note: string; time: number }[] {
+    const calls = [
+        ...vi
+            .mocked(playDrumSound)
+            .mock.calls.map(([, piece, time]) => ({ note: `drums ${piece}`, time })),
+        ...vi
+            .mocked(playBassNote)
+            .mock.calls.map(([, freq, time]) => ({ note: `bass ${freq}`, time })),
+        ...vi.mocked(playNote).mock.calls.map(([, freq, time]) => ({ note: `comp ${freq}`, time })),
+        ...vi
+            .mocked(playSoloNote)
+            .mock.calls.map(([, freq, time]) => ({ note: `lead ${freq}`, time })),
+    ];
+    return calls.sort((x, y) => x.time - y.time);
+}
+
+/**
+ * The same drum or pitch struck twice within 20 ms: one note handed to the voices twice.
+ * The band humanises each bar's timing on its own, so a doubled downbeat is not two calls
+ * at exactly the same time but a few milliseconds apart.
+ */
+function doubled(calls: { note: string; time: number }[]): string[] {
+    return calls.flatMap((call, i) =>
+        calls
+            .slice(i + 1)
+            .filter((later) => later.note === call.note && later.time - call.time < 0.02)
+            .map((later) => `${call.note} at ${call.time} and ${later.time}`),
+    );
+}
+
+/** The whole band, every lane playing. */
+const wholeBand = {
+    ...DEFAULT_SETTINGS,
+    lanes: { drums: true, bass: true, comp: true, lead: true },
+};
+
+/**
+ * `score` at 120 bpm (two seconds a bar), looped from the top to `loopTo` (or the song, with
+ * null), the whole band, the timer firing every 25 ms from 10.1 s. `tick(t)` pumps at audio
+ * time `t`.
+ */
+function rig(score: SemanticScore, loopTo: number | null, onEnd?: () => void) {
+    for (const voice of [playDrumSound, playBassNote, playNote, playSoloNote]) {
+        vi.mocked(voice).mockClear();
+    }
+    const audio = fakeAudioContext(10);
+    const state = fakeState(audio);
+    const host = new BandHost({ state: () => state, silence: () => {}, onEnd });
+    host.setScore(score);
+    host.start(wholeBand, 120, 0, loopTo === null ? null : { from: 0, to: loopTo });
+    const tick = (t: number) => {
+        audio.currentTime = t;
+        pump(host);
+    };
+    const pumpTo = (from: number, to: number) => {
+        for (let i = 0; from + i * 0.025 < to - 1e-9; i++) {
+            tick(from + i * 0.025);
+        }
+    };
+    const release = (t: number) => {
+        audio.currentTime = t;
+        host.setLoop(null);
+    };
+    return { audio, host, tick, pumpTo, release };
+}
+
 /**
  * Releasing a practice loop: the lap under way finishes, then the song carries on from the bar
  * after the loop. A settings change after the release regenerates what is still to come, and
@@ -722,22 +805,6 @@ describe('BandHost releasing a practice loop', () => {
     const BPM = 120;
     /** 4/4 at 120: two seconds a bar. */
     const BAR_S = 2;
-    /** A (two bars) then B (two bars): a loop on A has a song to carry on into. */
-    const aThenB = song([
-        {
-            id: 'a',
-            label: 'A',
-            repeat: 1,
-            measures: [bar('a1', [chord('C', 4)]), bar('a2', [chord('F', 4)])],
-        },
-        {
-            id: 'b',
-            label: 'B',
-            repeat: 1,
-            measures: [bar('b1', [chord('G7', 4)]), bar('b2', [chord('C', 4)])],
-        },
-    ]);
-
     it('a settings change in the last two seconds of the lap still carries on after the loop', () => {
         const audio = fakeAudioContext(10);
         const state = fakeState(audio);
@@ -786,39 +853,6 @@ describe('BandHost releasing a practice loop', () => {
         pump(host);
         expect(onEnd).toHaveBeenCalledTimes(1);
     });
-
-    /** Every note handed to the (mocked) voices: its lane and pitch (or drum), and its time. */
-    function voiceCalls(): { note: string; time: number }[] {
-        const calls = [
-            ...vi
-                .mocked(playDrumSound)
-                .mock.calls.map(([, piece, time]) => ({ note: `drums ${piece}`, time })),
-            ...vi
-                .mocked(playBassNote)
-                .mock.calls.map(([, freq, time]) => ({ note: `bass ${freq}`, time })),
-            ...vi
-                .mocked(playNote)
-                .mock.calls.map(([, freq, time]) => ({ note: `comp ${freq}`, time })),
-            ...vi
-                .mocked(playSoloNote)
-                .mock.calls.map(([, freq, time]) => ({ note: `lead ${freq}`, time })),
-        ];
-        return calls.sort((x, y) => x.time - y.time);
-    }
-
-    /**
-     * The same drum or pitch struck twice within 20 ms: one note handed to the voices twice.
-     * The band humanises each bar's timing on its own, so a doubled downbeat is not two calls
-     * at exactly the same time but a few milliseconds apart.
-     */
-    function doubled(calls: { note: string; time: number }[]): string[] {
-        return calls.flatMap((call, i) =>
-            calls
-                .slice(i + 1)
-                .filter((later) => later.note === call.note && later.time - call.time < 0.02)
-                .map((later) => `${call.note} at ${call.time} and ${later.time}`),
-        );
-    }
 
     /**
      * Loop A with the whole band, pumping every 25 ms as the host's own timer does; release the
@@ -924,40 +958,6 @@ describe('BandHost releasing a practice loop', () => {
         expect(onEnd).toHaveBeenCalledTimes(1);
     });
 
-    /**
-     * A loop from the top of `score` to `loopTo`, the whole band, the timer firing every 25 ms
-     * from 10.1 s. `tick(t)` pumps at audio time `t`.
-     */
-    function rig(score: SemanticScore, loopTo: number, onEnd?: () => void) {
-        for (const voice of [playDrumSound, playBassNote, playNote, playSoloNote]) {
-            vi.mocked(voice).mockClear();
-        }
-        const audio = fakeAudioContext(10);
-        const state = fakeState(audio);
-        const host = new BandHost({ state: () => state, silence: () => {}, onEnd });
-        host.setScore(score);
-        host.start(
-            { ...DEFAULT_SETTINGS, lanes: { drums: true, bass: true, comp: true, lead: true } },
-            BPM,
-            0,
-            { from: 0, to: loopTo },
-        );
-        const tick = (t: number) => {
-            audio.currentTime = t;
-            pump(host);
-        };
-        const pumpTo = (from: number, to: number) => {
-            for (let i = 0; from + i * 0.025 < to - 1e-9; i++) {
-                tick(from + i * 0.025);
-            }
-        };
-        const release = (t: number) => {
-            audio.currentTime = t;
-            host.setLoop(null);
-        };
-        return { audio, host, tick, pumpTo, release };
-    }
-
     it('after a stalled timer, a release near the end of the queue still carries on after the loop', () => {
         // The timer stalled (a busy main thread, a background tab) two seconds before the
         // release, so nothing past the lap under way was queued: the queue ends 120 ms after
@@ -1052,6 +1052,98 @@ describe('BandHost releasing a practice loop', () => {
         expect(at!).toBeGreaterThanOrEqual(timeline.bars[2].start);
         expect(at!).toBeLessThan(timeline.bars[3].start);
         host.stop();
+    });
+});
+
+/**
+ * A settings change takes the new music from a barline, and leaves what comes before it alone:
+ * every note before that barline sounds once, as it would have without the change, however the
+ * change falls against the timer and the segments' barlines (#1499).
+ */
+describe('BandHost a settings change near a barline', () => {
+    /** 4/4 at 120: two seconds a bar. */
+    const BAR_S = 2;
+    const changed = { ...wholeBand, intensity: 0.9 };
+
+    it('a change a timer tick after a pump still sends every note before its barline', () => {
+        // The timer last fired 24 ms before the change, so it sent the notes up to 126 ms
+        // ahead; the change looks 150 ms ahead. The notes in between have not gone to the
+        // voices yet, and must still go: a change in each timer tick of the song's first two
+        // bars.
+        const { pumpTo } = rig(aThenB, null);
+        pumpTo(10.1, 10.1 + 3 * BAR_S);
+        const unchanged = voiceCalls();
+        const missing: string[] = [];
+        let inBetween = 0;
+        for (let i = 0; i < (2 * BAR_S) / 0.025; i++) {
+            const at = 10.1 + i * 0.025 + 0.024;
+            const { audio, host, pumpTo } = rig(aThenB, null);
+            pumpTo(10.1, at);
+            audio.currentTime = at;
+            host.update(changed);
+            const barline = 10.1 + Math.ceil((at + 0.15 - 10.1) / BAR_S) * BAR_S;
+            pumpTo(at + 0.001, barline);
+            // The band pushes a downbeat a few ms ahead of its barline: leave those out.
+            const before = (call: { time: number }) => call.time < barline - 0.05;
+            const heard = new Set(
+                voiceCalls()
+                    .filter(before)
+                    .map((call) => JSON.stringify(call)),
+            );
+            for (const call of unchanged.filter(before)) {
+                if (!heard.has(JSON.stringify(call))) {
+                    missing.push(`${call.note} at ${call.time} (change at ${at})`);
+                }
+            }
+            inBetween += unchanged.filter(
+                (call) => call.time > at - 0.024 + 0.15 && call.time <= at + 0.15,
+            ).length;
+            host.stop();
+        }
+        // The window the last pump had not reached held notes, and none of them was lost.
+        expect(inBetween).toBeGreaterThan(0);
+        expect(missing).toEqual([]);
+    });
+
+    it('a bar whose pushed downbeat is already sent plays on as it was; the change follows it', () => {
+        // The band pushes a downbeat a few ms ahead of its barline, so a pump 150 ms before the
+        // barline (or 152 ms, a millisecond before the change) has sent it, while the change
+        // still sees the barline beyond its own lookahead. On the next lap's barline, too: that
+        // lap is under way, and is not dropped and rebuilt under its own downbeat.
+        const timeline = compileTimeline(aThenB);
+        const loopTo = timeline.bars[2].start;
+        const lapEnd = 10.1 + 4 * BAR_S;
+        const { pumpTo } = rig(aThenB, loopTo);
+        pumpTo(10.1, lapEnd + 2 * BAR_S);
+        const unchanged = voiceCalls();
+        const inBar = (calls: { note: string; time: number }[], from: number) =>
+            calls.filter((call) => call.time >= from - 0.05 && call.time < from + BAR_S - 0.05);
+        for (const barline of [10.1 + BAR_S, lapEnd]) {
+            for (const [pumpAt, changeAt] of [
+                [barline - 0.15, barline - 0.15],
+                [barline - 0.152, barline - 0.151],
+            ]) {
+                const { audio, host, tick, pumpTo } = rig(aThenB, loopTo);
+                pumpTo(10.1, pumpAt);
+                tick(pumpAt);
+                const onBarline = (call: { time: number }) => Math.abs(call.time - barline) < 0.03;
+                expect(voiceCalls().some(onBarline)).toBe(true);
+                audio.currentTime = changeAt;
+                host.update(changed);
+                pumpTo(pumpAt + 0.025, barline + 2 * BAR_S);
+                const calls = voiceCalls();
+                expect(doubled(calls)).toEqual([]);
+                // The bass plays one note at a time: one note on the barline, not two.
+                expect(
+                    calls.filter((call) => call.note.startsWith('bass') && onBarline(call)),
+                ).toHaveLength(1);
+                expect(inBar(calls, barline)).toEqual(inBar(unchanged, barline));
+                expect(inBar(calls, barline + BAR_S)).not.toEqual(
+                    inBar(unchanged, barline + BAR_S),
+                );
+                host.stop();
+            }
+        }
     });
 });
 
