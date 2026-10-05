@@ -7,6 +7,7 @@
 import { type EnergyTier, energyTier } from '../../arrange/plan.js';
 import type { Rng } from '../../core/random.js';
 import type { PitchedNote } from '../../core/types.js';
+import type { Bar } from '../../form/timeline.js';
 import type { BarContext, PitchedIdiom } from '../../styles/types.js';
 import type { ChordFacts } from '../../theory/chord.js';
 import { at, barSteps, dyn, endingSpans, STEP, spanSteps } from '../grid.js';
@@ -35,8 +36,13 @@ interface CompMemory {
     leadUntil?: number;
     /** The chord the hand last struck (its symbol), for an instrument that holds it. */
     chord?: string | null;
-    /** The next bar's first chord was already played as an anticipation. */
-    pushed: boolean;
+    /**
+     * The chord (its symbol) the bar's last strike anticipated, tied over the barline into the
+     * next bar's first eighth; null when it pushed nothing. Kept as the chord, not a flag, so
+     * a bar that turns out to play another chord (a practice loop released into the bar after
+     * it, where the push was aimed at the loop's top) is not mistaken for tied in (#1507).
+     */
+    pushed: string | null;
     /** The bar this memory was left by (its index), to tell a bar that follows on from one
      * that doesn't (a loop's wrap, the bars the comp sat out). */
     bar?: number;
@@ -114,7 +120,7 @@ export function compIdiom(book: CompBook): PitchedIdiom {
     return {
         name: book.name,
         percussive: book.percussive,
-        init: (): CompMemory => ({ voicing: null, pushed: false }),
+        init: (): CompMemory => ({ voicing: null, pushed: null }),
         // Where the lead's last note ends is a song tick: across a loop's wrap it is moved into
         // the new lap's ticks, so a note that ended just before the wrap ended just before
         // the lap's top, not far in its future (#1492).
@@ -181,14 +187,16 @@ export function compIdiom(book: CompBook): PitchedIdiom {
                 });
                 return {
                     events,
-                    memory: { voicing: prev, pushed: false, chord: held, bar: bar.index },
+                    memory: { voicing: prev, pushed: null, chord: held, bar: bar.index },
                 };
             }
             const legato = ctx.instrument.legato && !book.percussive;
             // The next bar played is not the one after this: a loop's wrap back to its top.
             const wraps = !!ctx.next && ctx.next.bar.index !== bar.index + 1;
             const nextFirst = ctx.next?.bar.spans[0];
-            let pushed = false;
+            let pushed: string | null = null;
+            // The bar before struck this bar's first chord early: it rings in, tied.
+            const pushedIn = tiedFromPush(memory, bar);
             const planned: Planned[] = [];
             const spans = spanSteps(bar);
             spans.forEach(({ span, from, to }, index) => {
@@ -203,7 +211,7 @@ export function compIdiom(book: CompBook): PitchedIdiom {
                 }
                 // The previous bar already played this chord early and tied it over its
                 // first eighth.
-                if (memory.pushed && index === 0) {
+                if (pushedIn && index === 0) {
                     hits = hits.filter((h) => h.step >= TIE_STEPS);
                 }
                 const isLastSpan = to >= total;
@@ -232,7 +240,7 @@ export function compIdiom(book: CompBook): PitchedIdiom {
                     if (anticipates && nextFirst?.chord) {
                         target = nextFirst.chord;
                         length = total - hit.step + TIE_STEPS;
-                        pushed = true;
+                        pushed = nextFirst.chord.symbol;
                     }
                     planned.push({ ...hit, length, chord: target, early: target !== chord });
                 }
@@ -256,7 +264,7 @@ export function compIdiom(book: CompBook): PitchedIdiom {
             // skip beats, but never a chord.
             spans.forEach(({ span, from, to }, index) => {
                 const chord = span.chord;
-                const tiedIn = index === 0 && (memory.pushed || !span.attack);
+                const tiedIn = index === 0 && (pushedIn || !span.attack);
                 if (!chord || tiedIn || span.fermata) {
                     return;
                 }
@@ -332,7 +340,7 @@ export function compIdiom(book: CompBook): PitchedIdiom {
                     // A chord held into the bar by a written hold (`/`) is pressed again at a
                     // phrase top too: a vamp written with slashes is the same vamp.
                     const tiedIn =
-                        index === 0 && !resumed && (memory.pushed || (!span.attack && !phraseTop));
+                        index === 0 && !resumed && (pushedIn || (!span.attack && !phraseTop));
                     const pushed = kept.some(
                         (h) => h.chord === chord && h.step >= from - TIE_STEPS && h.step < from,
                     );
@@ -415,6 +423,16 @@ export function compIdiom(book: CompBook): PitchedIdiom {
             };
         },
     };
+}
+
+/**
+ * Is the bar's first chord tied in from an anticipation — struck at the end of the bar before
+ * and ringing over the barline — so that its downbeat is not struck again? Only when the
+ * chord pushed is the chord the bar opens on (#1507): a practice loop released into the bar
+ * after it carries a push aimed at the loop's top, and that chord is not this bar's.
+ */
+export function tiedFromPush(memory: { pushed?: string | null }, bar: Bar): boolean {
+    return !!memory.pushed && memory.pushed === bar.spans[0]?.chord?.symbol;
 }
 
 /**

@@ -19,7 +19,7 @@ import {
     pickApproach,
 } from '../players/bass/line.js';
 import { type GripShape, grip } from '../players/comp/fretboard.js';
-import { compIdiom, type Hit, strums } from '../players/comp/idiom.js';
+import { compIdiom, type Hit, strums, tiedFromPush } from '../players/comp/idiom.js';
 import { drumIdiom, tomRun } from '../players/drums/kit.js';
 import { at, dyn, isCommonTime, pulses, STEP, spanSteps } from '../players/grid.js';
 import { leadIdiom } from '../players/lead/idiom.js';
@@ -524,7 +524,8 @@ const shuffleGuitar = compIdiom({
 interface HandMemory {
     voicing: number[] | null;
     chord?: string | null;
-    pushed: boolean;
+    /** The chord the last strike anticipated (`compIdiom`'s `pushed`), or null. */
+    pushed: string | null;
 }
 
 /** The boogie's arrival chord: a full root-position grip whose bottom string is the boogie's. */
@@ -559,6 +560,8 @@ function boogie(ctx: BarContext, memory: HandMemory, tier: EnergyTier) {
         bar: bar.index,
         stroke: up ? ('up' as const) : ('down' as const),
     });
+    // The previous bar anticipated this bar's first chord: it rings over the barline (#1507).
+    const pushedIn = tiedFromPush(memory, bar);
     spanSteps(bar).forEach(({ span, from, to }, index) => {
         const chord = span.chord;
         if (!chord) {
@@ -567,7 +570,7 @@ function boogie(ctx: BarContext, memory: HandMemory, tier: EnergyTier) {
         }
         // The previous bar anticipated this chord (or it is held over from it): the hand is
         // already on it, ringing over the barline, so the arrival is not struck again.
-        const tiedIn = index === 0 && (memory.pushed || !span.attack);
+        const tiedIn = index === 0 && (pushedIn || !span.attack);
         const shape = grip(chord, 'close', BOOGIE_GRIP, voicing);
         const low = shape[0];
         const root = low !== undefined && low <= 52 ? low : nearestMidi(chord.bass, 45, 40, 52);
@@ -593,7 +596,7 @@ function boogie(ctx: BarContext, memory: HandMemory, tier: EnergyTier) {
                 events.push(
                     ...shape.map((m) => note(step, m, 1.8, tier === 'low' ? 76 : 92, false)),
                 );
-            } else if (!(step === 0 && memory.pushed)) {
+            } else if (!(step === 0 && pushedIn)) {
                 events.push(...dyad.map((m) => note(step, m, 1.8, vel, false)));
             }
             // The same dyad again on the swung "and", an upstroke (none after an off-beat
@@ -606,7 +609,7 @@ function boogie(ctx: BarContext, memory: HandMemory, tier: EnergyTier) {
         voicing = shape;
         held = chord.symbol;
     });
-    return { events, memory: { voicing, pushed: false, chord: held } satisfies HandMemory };
+    return { events, memory: { voicing, pushed: null, chord: held } satisfies HandMemory };
 }
 
 const bluesGuitar: PitchedIdiom = {

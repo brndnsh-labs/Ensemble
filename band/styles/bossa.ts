@@ -18,7 +18,7 @@ import {
     place,
     sectionPlace,
 } from '../players/bass/line.js';
-import { compIdiom, type Hit } from '../players/comp/idiom.js';
+import { compIdiom, type Hit, tiedFromPush } from '../players/comp/idiom.js';
 import { drumIdiom, type Lines, snareFigure } from '../players/drums/kit.js';
 import { at, barSteps, dyn, isCommonTime, pulses, STEP, spanSteps } from '../players/grid.js';
 import { leadIdiom } from '../players/lead/idiom.js';
@@ -222,7 +222,7 @@ const bossaGuitar: PitchedIdiom = {
                     continue;
                 }
                 // An anticipated grip (root on its bottom string) still rings over the One.
-                if (step === 0 && (memory as { pushed?: boolean }).pushed) {
+                if (step === 0 && tiedFromPush(memory as { pushed?: string | null }, ctx.bar)) {
                     continue;
                 }
                 // Where the fingers pluck, the grip already has the bass on its bottom string.

@@ -15,7 +15,9 @@ import {
     compileTimeline,
     DEFAULT_SETTINGS,
     type PassMemory,
+    type PassWindow,
     performPass,
+    STYLE_IDS,
     secondsAt,
     type Timeline,
     toMidi,
@@ -1233,6 +1235,129 @@ describe('BandHost a settings change near a barline', () => {
             }
             host.stop();
         }
+    });
+});
+
+/**
+ * A practice loop released into a bar with another chord (#1507). The lap's last bar may push
+ * the loop's top chord across the wrap, tied into the next lap's first eighth; released, the
+ * song carries on under a different chord, and that bar's downbeat must be struck, not treated
+ * as tied in to a chord it does not play.
+ */
+describe('BandHost releasing a loop into another chord', () => {
+    const BPM = 120;
+    /** 4/4 at 120: two seconds a bar. */
+    const BAR_S = 2;
+    /** A loop on A (`C | Am | Dm | G7`, its G7 pushing the C at its top), released into B's F. */
+    const chart = song(
+        [
+            ['A', ['C', 'Am', 'Dm', 'G7']],
+            ['B', ['F', 'F', 'G7', 'C']],
+        ].map(([label, symbols]) => ({
+            id: label as string,
+            label: label as string,
+            repeat: 1,
+            measures: (symbols as string[]).map((s, i) => bar(`${label}${i}`, [chord(s, 4)])),
+        })),
+    );
+
+    it('the comp strikes the downbeat of the bar after the loop, in every style whose lap pushed into the wrap', () => {
+        const timeline = compileTimeline(chart);
+        const after = timeline.bars[4];
+        const problems: string[] = [];
+        const pushedBy = new Set<string>();
+        let struck = 0;
+        for (const style of STYLE_IDS) {
+            // The organ never pushes across a loop's wrap (#1488): a struck keyboard and a guitar.
+            for (const comp of ['piano', 'guitar'] as const) {
+                for (const seed of ['a', 'b', 'c', 'd', 'e', 'f']) {
+                    const audio = fakeAudioContext(10);
+                    const state = fakeState(audio);
+                    const host = new BandHost({ state: () => state, silence: () => {} });
+                    host.setScore(chart);
+                    const segments = watchSegments(host);
+                    host.start({ ...DEFAULT_SETTINGS, style, comp, seed }, BPM, 0, {
+                        from: 0,
+                        to: after.start,
+                    });
+                    // Laps are four bars (eight seconds) from 10.1 s: release in the second.
+                    run(host, audio, 10.1, 10.1 + 6 * BAR_S);
+                    host.setLoop(null);
+                    run(host, audio, 10.1 + 6 * BAR_S, 10.1 + 10 * BAR_S);
+                    host.stop();
+                    const queued = segments();
+                    const into = queued.findIndex((s) => s.window.from === after.index);
+                    expect(into, `${style}/${comp}/${seed}: the song carries on`).toBeGreaterThan(
+                        0,
+                    );
+                    // The lap's last bar rang a chord over the wrap: a push toward the loop's top.
+                    const pushed = queued[into - 1].events.some(
+                        (e) =>
+                            e.lane === 'comp' &&
+                            !e.muted &&
+                            e.bar === after.index - 1 &&
+                            e.tick + e.dur > after.start,
+                    );
+                    if (!pushed) {
+                        continue;
+                    }
+                    pushedBy.add(style);
+                    // What the bar plays arrived at with nothing tied into it: the same pass,
+                    // from the same memory, less the push that was aimed at the loop's top.
+                    const song = queued[into] as Queued & {
+                        pass: number;
+                        until: number;
+                        looping: boolean;
+                        window: PassWindow;
+                        memoryBefore: PassMemory;
+                    };
+                    const memory = song.memoryBefore;
+                    const unpushed = performPass(
+                        timeline,
+                        { ...DEFAULT_SETTINGS, style, comp, seed },
+                        {
+                            pass: song.pass,
+                            looping: song.looping,
+                            window: song.window,
+                            until: song.until,
+                            memory: {
+                                ...memory,
+                                comp: { ...(memory.comp as object), pushed: null },
+                            },
+                        },
+                    );
+                    const where = `${style}/${comp}/${seed}`;
+                    const firstBar = (events: BandEvent[]) =>
+                        JSON.stringify(
+                            events.filter((e) => e.lane === 'comp' && e.bar === after.index),
+                        );
+                    if (firstBar(song.events) !== firstBar(unpushed.events)) {
+                        problems.push(`${where}: the bar plays as if the C were tied into it`);
+                    }
+                    // So where the figure strikes the downbeat, F is struck there, with its A —
+                    // the chord the bar plays, not the C the push was aimed at.
+                    const downbeat = (events: BandEvent[]) =>
+                        events.some(
+                            (e) =>
+                                e.lane === 'comp' &&
+                                !e.muted &&
+                                e.tick === after.start &&
+                                e.midi % 12 === 9,
+                        );
+                    if (downbeat(unpushed.events)) {
+                        struck++;
+                        if (!downbeat(song.events)) {
+                            problems.push(`${where}: no F on the downbeat`);
+                        }
+                    }
+                }
+            }
+        }
+        // Not vacuous: most of the styles push across the wrap in some take, and in plenty of
+        // those the bar's own figure strikes its downbeat.
+        expect(pushedBy.size).toBeGreaterThanOrEqual(5);
+        expect(struck).toBeGreaterThanOrEqual(10);
+        expect(problems).toEqual([]);
     });
 });
 
