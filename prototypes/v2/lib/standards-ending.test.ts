@@ -1,10 +1,10 @@
 /**
  * The held ending on every chart the app ships (#1516): the standards catalog and a new song's
  * starting chart, as authored and as a musician might type them without setting the key (it
- * defaults to C major, `blankSong`). The ending's root is the chart's own (#1521): a band that
- * plays the last bar as written ends on a chord that bar writes, and a band that resolves it
- * ends on the tonic of the key the chart is really in — never on a defaulted C, nor on any
- * other root that is not the tune's home.
+ * defaults to C major, `blankSong`). The ending's root is the chart's own (#1521): as authored,
+ * a band that plays the last bar as written ends on a chord that bar writes, and a band that
+ * resolves it ends on the tonic of the key the chart is really in; typed without its key, it
+ * ends on the same root it does as authored, the known exceptions pinned.
  */
 import { heldEnding } from '@band/arrange/ending';
 import { compileTimeline, DEFAULT_SETTINGS, performPass, STYLES } from '@band/index';
@@ -40,15 +40,8 @@ const PC: Record<string, number> = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }
 const keyPc = (name: string) =>
     (PC[name[0]] + (name.includes('#') ? 1 : 0) - (name.includes('b') ? 1 : 0) + 12) % 12;
 
-/**
- * Does a jazz pass end on the chart's own root, given the tonic of the key it is really in?
- * The root is the pitch class the bass holds in the last bar. When the band resolves the bar
- * (the chord it holds is not one the bar writes) that root must be the real tonic; only a bar
- * played as written — held on its first chord, or split to hold a chord it writes later
- * (`G7 C`, `D7 G`) — may end on another root the bar writes.
- */
-function endsHome(score: SemanticScore, tonic: number): boolean {
-    const timeline = compileTimeline(score);
+/** The pitch class the bass holds at the end of a jazz pass's last bar: the ending's root. */
+function heldRoot(timeline: ReturnType<typeof compileTimeline>): number {
     const { events } = performPass(
         timeline,
         { ...DEFAULT_SETTINGS, style: 'jazz', seed: 'a' },
@@ -56,7 +49,19 @@ function endsHome(score: SemanticScore, tonic: number): boolean {
     );
     const last = timeline.bars.at(-1)!;
     const bass = events.filter((e) => e.lane === 'bass' && e.bar === last.index);
-    const held = bass.at(-1)!.lane === 'bass' ? (bass.at(-1) as { midi: number }).midi % 12 : -1;
+    return bass.at(-1)!.lane === 'bass' ? (bass.at(-1) as { midi: number }).midi % 12 : -1;
+}
+
+/**
+ * Does a jazz pass end on the chart's own root, given the tonic of the key it is really in?
+ * When the band resolves the bar (the chord it holds is not one the bar writes) that root must
+ * be the real tonic; only a bar played as written — held on its first chord, or split to hold a
+ * chord it writes later (`G7 C`, `D7 G`) — may end on another root the bar writes.
+ */
+function endsHome(score: SemanticScore, tonic: number): boolean {
+    const timeline = compileTimeline(score);
+    const held = heldRoot(timeline);
+    const last = timeline.bars.at(-1)!;
     const written = last.spans.flatMap((span) => (span.chord ? [span.chord] : []));
     const ending = heldEnding(timeline, last.index, STYLES.jazz.ending);
     const chord = ending?.spans.filter((span) => span.chord).at(-1)?.chord;
@@ -84,22 +89,35 @@ describe('the held ending on every shipped chart (#1516)', () => {
         expect(wrong).toEqual([]);
     });
 
-    it('typed without its key (read as C major), ends on its own tonic', () => {
-        // The key reads C; the tonic the band must resolve to is still the authored one.
+    it('typed without its key (read as C major), ends on the root it ends on as authored', () => {
+        // Forcing the key to C must not move the ending: the root the band holds is the one it
+        // holds with the chart's own key.
         const wrong = charts
             .filter(
-                ([, score, key]) => !endsHome({ ...score, key: 'C', isMinor: false }, keyPc(key)),
+                ([, score]) =>
+                    heldRoot(compileTimeline({ ...score, key: 'C', isMinor: false })) !==
+                    heldRoot(compileTimeline(score)),
             )
             .map(([title]) => title);
         // Open in #1521's options B and C (record whether the key was set, or weigh the whole
-        // chart). Each rests on a C chord that no rule reading one chord at a time can tell
-        // from a tonic, so a defaulted C reads as home and the band resolves into it:
-        // - All The Things You Are's A section modulates to C (`Dm7 G7 | Cmaj7 | Cmaj7`), and
-        //   its last `C7b9` points back to an `Fm7` opening — exactly how a C tune that opens on
-        //   its vi ends, so the opening cannot be preferred over the key;
-        // - Stella's C section holds `Cm7 | Cm7 | Ab7` (a ii it never resolves as one), and its
-        //   last bar, `Bbmaj7` on the downbeat, is approached two bars earlier, not in the bar.
+        // chart); no rule reading one chord at a time tells these from a chart in C:
+        // - All The Things You Are rests on `Cmaj7` (its A section's `Dm7 G7 | Cmaj7 | Cmaj7`),
+        //   which states C as home, and resolves into it;
+        // - Stella rests on `Cm7 | Cm7 | Ab7`, a minor tonic on C, and resolves into C minor;
+        // - Canon and Andalusian end on a V triad (`A`, `E`), which is not read as a V7 pointing
+        //   home (a triad a fifth above is as often a I–IV the other way round), so the
+        //   unbacked bar is played as written;
+        // - Funk (i-IV) ends on its dorian IV7 (`A7`), which points nowhere by a fifth;
+        // - Alternative Loop ends on its borrowed iv, `Cm`: on the defaulted tonic, it reads as
+        //   home.
         // Pinned so a fix (or a new case) shows up here.
-        expect(wrong).toEqual(['All The Things You Are', 'Stella by Starlight']);
+        expect(wrong).toEqual([
+            'All The Things You Are',
+            'Stella by Starlight',
+            'Canon',
+            'Andalusian',
+            'Funk (i-IV)',
+            'Alternative Loop',
+        ]);
     });
 });

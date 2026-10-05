@@ -259,9 +259,11 @@ describe('a final turnaround resolves to the tonic', () => {
                 0,
             ],
             // A triad or a 6th says major, not which major (#1521): a blues that states its I
-            // once as a plain `C`, or voices it `C6` in bar 11's turnaround, is still a blues.
-            // Only a major 7th on the tonic says it is not a dominant; a tonic of triads and
-            // 6ths alone ends major.
+            // once as a plain `C`, or voices it `C6` in bar 11's turnaround, is still a blues,
+            // since it rests on its I7 far longer. Only a major 7th on the tonic rules the
+            // dominant out; otherwise the dominant has to out-rest the triads and 6ths, so a pop
+            // song with one passing `C7` stays major (a tie stays major too), and a tonic of
+            // triads and 6ths alone ends major.
             [
                 'a blues with a plain I',
                 score([
@@ -288,6 +290,29 @@ describe('a final turnaround resolves to the tonic', () => {
                 'a tonic of triads and 6ths',
                 score([{ label: 'A', bars: 'C6 | Am7 | Dm7 G7 | C | F | G7' }]),
                 'major',
+                0,
+            ],
+            [
+                'a passing I7, a tie',
+                score([{ label: 'A', bars: 'C | C7 | Am | F | G7' }]),
+                'major',
+                0,
+            ],
+            [
+                'a 16-bar song with one I7',
+                score([
+                    {
+                        label: 'A',
+                        bars: 'C | Am | F | G | C | Am | F | G | C7 | Am | F | G | C | Am | F | G',
+                    },
+                ]),
+                'major',
+                0,
+            ],
+            [
+                'a dominant vamp with a turnaround',
+                score([{ label: 'A', bars: 'C9 | C9 | C9 | Dm7 G7' }]),
+                'dominant',
                 0,
             ],
         ];
@@ -690,13 +715,15 @@ describe('an ending already home, or written, is played as written', () => {
     });
 
     it('a key the chart never rests on is not one to end in', () => {
-        // Typed without setting the key, a chart reads as C major. An F tune ending on its
-        // ii–V (C7 is its V, resolving to F, not a tonic) and an A minor tune ending on E7 hold
-        // their written chord: nothing in either rests on C.
-        // An F blues keyed C: its C7s all fall to F7, and it opens on F7, not on C.
+        // Typed without setting the key, a chart reads as C major. Nothing in these rests on C,
+        // and none ends on a V7 of a resting opening: a Bb tune that opens on its V7 (`F7 →
+        // Bbmaj7` moves) and ends on a ii–V of that V7, and a G tune opening on its V7. Each
+        // holds its written chord. A ii–V is not an arrival: the `C7` after its `Gm7` is not
+        // held as a resolution (`arrivalAt` wants a V7 before the I).
+        // An F blues keyed C, ended at its bar 4: a C7 heading to Gm7 rests there, as written.
         for (const bars of [
-            'F | Gm7 C7 | F | Gm7 C7',
-            'Am | Dm7 | Bm7b5 | E7',
+            'F7 | Bbmaj7 | Am7 D7 | Gm7 C7',
+            'D7 | G | D7 | A7',
             'F7 | Bb7 | F7 | C7 | Gm7 C7',
         ]) {
             const timeline = compileTimeline(score([{ label: 'A', bars }]));
@@ -710,10 +737,26 @@ describe('an ending already home, or written, is played as written', () => {
                     pass: 0,
                     looping: false,
                 });
+                // The F blues runs on to its bar 5, `Gm7 C7`: that C7 is the V7 of the F7 it
+                // opens on, and it ends on F (#1521; it used to resolve into C).
                 expect(
                     lastBar(timeline, events).bass.map((n) => mod12(n.midi)),
                     `${style} ${bars}`,
-                ).toEqual([written.bass]);
+                ).toEqual([timeline.bars.length === 4 ? written.bass : 5]);
+            }
+        }
+        // An F tune ending on its ii–V and an A minor tune ending on E7 used to hold their
+        // written last chord, the ii and the V7 (#1521): each V7 points back to the chart's
+        // resting opening, so the band ends there, in its family.
+        for (const [bars, root, family] of [
+            ['F | Gm7 C7 | F | Gm7 C7', 5, 'major'],
+            ['Am | Dm7 | Bm7b5 | E7', 9, 'minor'],
+        ] as const) {
+            const timeline = compileTimeline(score([{ label: 'A', bars }]));
+            for (const style of STYLE_IDS) {
+                const chord = heldEnding(timeline, 3, STYLES[style].ending)?.spans[0].chord;
+                expect(chord?.root, `${style} ${bars}`).toBe(root);
+                expect(chord?.intervals, `${style} ${bars}`).toEqual(EXPECTED[style][family]);
             }
         }
         // Past the opening, a C7 that goes anywhere but F (here to G7) is a tonic, and backs C.
@@ -787,18 +830,20 @@ describe('an ending already home, or written, is played as written', () => {
 
     it('a ii–V on the tonic of a major key does not back it (#1516)', () => {
         // Autumn Leaves (G minor) opens on `Cm7 F7`; rhythm changes passes through it. With the
-        // key left at C, neither is in C: their last bars are played as written.
-        for (const [bars, written] of [
-            ['Cm7 | F7 | Bbmaj7 | Ebmaj7 | Am7b5 | D7 | Gm6 | Gm6', 7],
-            ['Bbmaj7 Gm7 | Cm7 F7 | Dm7 G7 | Cm7 F7', 0],
+        // key left at C, neither is in C. Autumn Leaves's last bar is played as written; rhythm
+        // changes' last `Cm7 F7` is not a home on C either (#1521: held as one, the band sat on
+        // the Cm7 and dropped the F7), and its F7 sends it back to its Bbmaj7, where it ends.
+        for (const [bars, root, resolved] of [
+            ['Cm7 | F7 | Bbmaj7 | Ebmaj7 | Am7b5 | D7 | Gm6 | Gm6', 7, false],
+            ['Bbmaj7 Gm7 | Cm7 F7 | Dm7 G7 | Cm7 F7', 10, true],
         ] as const) {
             const timeline = compileTimeline(score([{ label: 'A', bars }]));
             const last = timeline.bars.length - 1;
             for (const style of STYLE_IDS) {
-                expect(
-                    heldEnding(timeline, last, STYLES[style].ending),
-                    `${style} ${bars}`,
-                ).toBeNull();
+                const ending = heldEnding(timeline, last, STYLES[style].ending);
+                expect(ending?.spans[0].chord?.root ?? null, `${style} ${bars}`).toBe(
+                    resolved ? root : null,
+                );
                 const { events } = performPass(timeline, settingsFor(style, 'a'), {
                     pass: 0,
                     looping: false,
@@ -806,7 +851,7 @@ describe('an ending already home, or written, is played as written', () => {
                 expect(
                     lastBar(timeline, events).bass.map((n) => mod12(n.midi)),
                     `${style} ${bars}`,
-                ).toEqual([written]);
+                ).toEqual([root]);
             }
         }
         // A minor key's dorian i7–IV7 is its tonic: `Em7 | A7` in E minor ends on Em.
@@ -999,18 +1044,83 @@ describe('a chart typed without its key, read one chord at a time (#1521)', () =
         }
     });
 
-    it('a final V7 of the opening chord resolves to it, when only a dominant 7th backs the key', () => {
+    it('a final V7 of the opening chord resolves to it, when the opening is where the tune rests', () => {
         // Left on C, an 8-bar blues in G holds its IV7 two bars (`C7 | C7`), rhythm changes its
-        // bridge's `C7 | C7`: a C7 that never settles is no C home. The last `D7` and `F7` send
-        // the form back to its opening G7 and Bbmaj7, and the band ends there, in the opening's
-        // family: the blues on its dominant colour, rhythm changes on its major one. A G tune
-        // that never touches C ends on G rather than holding its last `D7`.
+        // bridge's `C7 | C7`, and a blues in F its V7: a C7 is no C home. The last V7 sends the
+        // form back to its opening, which rests longer than any C7, and the band ends there, in
+        // the opening's family: the blues on their dominant colour, rhythm changes on its major
+        // one, a minor tune typed without its key on its minor one. A G tune that never touches
+        // C ends on G rather than holding its last `D7`.
         const charts: [string, SemanticScore, number, TonicFamily][] = [
             [
                 '8-bar blues',
                 score([{ label: 'A', bars: 'G7 | D7 | C7 | C7 | G7 | D7 | G7 | D7' }]),
                 7,
                 'dominant',
+            ],
+            [
+                '8-bar blues, I I IV IV',
+                score([{ label: 'A', bars: 'G7 | G7 | C7 | C7 | G7 | D7 | G7 | D7' }]),
+                7,
+                'dominant',
+            ],
+            [
+                '8-bar blues, quick change',
+                score([{ label: 'A', bars: 'G7 | C7 | G7 | E7 | A7 | D7 | G7 C7 | G7 D7' }]),
+                7,
+                'dominant',
+            ],
+            [
+                '12-bar blues in F',
+                score([
+                    {
+                        label: 'A',
+                        bars: 'F7 | Bb7 | F7 | F7 | Bb7 | Bb7 | F7 | F7 | C7 | Bb7 | F7 | C7',
+                    },
+                ]),
+                5,
+                'dominant',
+            ],
+            [
+                '8-bar blues in F',
+                score([{ label: 'A', bars: 'F7 | C7 | Bb7 | Bb7 | F7 | C7 | F7 | C7' }]),
+                5,
+                'dominant',
+            ],
+            [
+                // Its last `Cm7 F7` is a ii–V, not a home on C (`isHome`).
+                'jazz blues in Bb',
+                score([
+                    {
+                        label: 'A',
+                        bars: 'Bb7 | Eb7 | Bb7 | Bb7 | Eb7 | Eb7 | Bb7 | G7 | Cm7 | F7 | Bb6 G7 | Cm7 F7',
+                    },
+                ]),
+                10,
+                'dominant',
+            ],
+            [
+                'minor blues in A',
+                score([
+                    {
+                        label: 'A',
+                        bars: 'Am7 | Am7 | Am7 | Am7 | Dm7 | Dm7 | Am7 | Am7 | F7 | E7 | Am7 | E7',
+                    },
+                ]),
+                9,
+                'minor',
+            ],
+            [
+                // Its `C7` (the bVI7) rests a bar, but the tune rests on Em7 far longer.
+                'minor blues in E',
+                score([
+                    {
+                        label: 'A',
+                        bars: 'Em7 | Am7 | Em7 | Em7 | Am7 | Am7 | Em7 | Em7 | C7 | B7 | Em7 | B7',
+                    },
+                ]),
+                4,
+                'minor',
             ],
             [
                 'rhythm changes',
@@ -1045,18 +1155,21 @@ describe('a chart typed without its key, read one chord at a time (#1521)', () =
     });
 
     it('a key the chart states as home keeps its tonic over the opening chord', () => {
-        // The opening wins only over a key that nothing but a dominant 7th backs. A C tune that
-        // opens on its V triad and states C as a triad (#1516's `G D7` turnaround), a tune in Ab
-        // that opens on its vi (All The Things You Are's shape, its last `C7b9` the V of `Fm7`),
-        // and a C tune opening on its IV whose last `C7` is the key's own V7 of IV all resolve
-        // to the key's tonic. `G | C | D | D7` is the same evidence as the first — a C triad
-        // that rests, a G opening, a last V7 of G — so it ends on C too: whether it is a G tune
-        // left on C is for the whole chart or a key known to be set to say (#1521, B and C).
+        // A triad, a power chord or a maj7 on the key's tonic states it as home, and is never
+        // outweighed: a C tune that opens on its V triad (#1516's `G D7` turnaround), a rock tune
+        // stating C as `C5`, a tune in Ab that opens on its vi (All The Things You Are's shape,
+        // its last `C7b9` the V of `Fm7`), and a C tune opening on its IV whose last `C7` is the
+        // key's own V7 of IV. A set key whose tonic is only a C7 keeps it when the opening rests
+        // no longer than that C7: a circle of dominants (`D7 | G7 | C7 | A7`), once or twice, in
+        // C and in D.
         for (const [bars, key, tonic] of [
             ['G | Am | Dm7 | C | G | Am | Dm7 | D7', 'C', 0],
-            ['G | C | D | D7', 'C', 0],
+            ['G | F | C5 | D7', 'C', 0],
             ['Fm7 | Bbm7 | Eb7 | Abmaj7 | Dbmaj7 | Dm7 G7 | Cmaj7 | Gm7b5 C7b9', 'Ab', 8],
             ['F | G7 | C | C7', 'C', 0],
+            ['D7 | G7 | C7 | A7', 'C', 0],
+            ['D7 | G7 | C7 | A7 | D7 | G7 | C7 | A7', 'C', 0],
+            ['E7 | A7 | D7 | B7', 'D', 2],
         ] as const) {
             const timeline = compileTimeline(score([{ label: 'A', bars }], { key }));
             const last = timeline.bars.length - 1;
@@ -1067,6 +1180,29 @@ describe('a chart typed without its key, read one chord at a time (#1521)', () =
                 ).toBe(tonic);
                 expect(heldBass(timeline, style), `${style} ${bars}`).toBe(tonic);
             }
+        }
+    });
+
+    it("a last V7 on a root the tune rests on is that home turning round, not the opening's V", () => {
+        // A D tune that opens on its IV and ends `D D7`, left on C: the D7 is its I picking up a
+        // 7th to go round to the G at the top, not the V of G. The tune rests on D longer than
+        // on G, so the band does not end on G; nothing backs C, so the bar is played as written.
+        const timeline = compileTimeline(
+            score([{ label: 'A', bars: 'G | D | A7 | D | G | D | A7 | D D7' }]),
+        );
+        for (const style of STYLE_IDS) {
+            expect(heldEnding(timeline, 7, STYLES[style].ending), style).toBeNull();
+            expect(heldBass(timeline, style), style).toBe(2);
+        }
+    });
+
+    it('known miss (#1521, options B and C): `G | C | D | D7` left on C ends on C', () => {
+        // The same evidence as a C tune that opens on its V (`G | Am | Dm7 | C | … | D7`, above):
+        // a C triad that rests, a G opening, a last V7 of G. Whether it is a G tune left on C is
+        // for the whole chart, or a key known to be set, to say. Pinned so a fix shows up here.
+        const timeline = compileTimeline(score([{ label: 'A', bars: 'G | C | D | D7' }]));
+        for (const style of STYLE_IDS) {
+            expect(heldBass(timeline, style), style).toBe(0);
         }
     });
 });
