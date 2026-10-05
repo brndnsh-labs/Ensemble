@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test';
 import { backToSongbook, newSongOnTheStand, saveAs } from './account-helpers';
-import { appUrl, expect, seedStarters, test } from './fixtures';
+import { appUrl, expect, seedStarters, songLink, test } from './fixtures';
 import { seedGuestSongs } from './large-library';
 
 /**
@@ -378,6 +378,56 @@ test('Rename opens the song (recovering its draft) instead of renaming in place 
     await expect(page.getByTestId('stand-toast')).toContainText(
         'opened it here so renaming won’t lose them',
     );
+});
+
+/**
+ * #1512: the title Rename carries forward is retained like any other edit, even when the chart
+ * last on the stand was a shared link's unsaved draft. `draft()` skips the recovery write for a
+ * shared draft, and it used to read that flag from the render that made `renameRow`'s closure,
+ * which still described the link after `open()` had moved the stand on to the saved song.
+ */
+test('a Rename that opens the song retains its new title after a shared link was on the stand', async ({
+    page,
+}) => {
+    await seedStarters(page);
+    await page.locator('.song-link', { hasText: 'Blue pocket' }).click();
+    await page.getByRole('button', { name: 'Edit chart' }).click();
+    await page.getByLabel('Song title').fill('Blue pocket edited');
+    const titlesRetained = () =>
+        page.evaluate(() =>
+            Object.keys(localStorage)
+                .filter(
+                    (key) =>
+                        key.startsWith('ensemble-v2-preview:recovery:') &&
+                        key.endsWith(':starter-blues'),
+                )
+                .map((key) => JSON.parse(localStorage.getItem(key) ?? '{}').document?.title),
+        );
+    await expect.poll(titlesRetained).toEqual(['Blue pocket edited']);
+
+    // A v1 `?prog=` link lands as an unsaved shared draft; leaving it keeps the songbook's
+    // songs, and the draft above, as they were.
+    await page.goto(appUrl(`?prog=${encodeURIComponent('C7 | F7 | C7 | G7')}&key=C&bpm=120`));
+    await expect(page.getByRole('heading', { name: 'Shared song' })).toBeVisible();
+    await backToSongbook(page);
+
+    const row = page.locator('.song-table .song-row', { hasText: 'Blue pocket' });
+    await row.getByRole('button', { name: 'More actions for Blue pocket' }).click();
+    await page.getByTestId('row-menu-rename').click();
+    await page.getByTestId('row-menu-rename-input').fill('Renamed after a shared link');
+    await page.getByTestId('row-menu-rename-save').click();
+    await expect(page.getByLabel('Song title')).toHaveValue('Renamed after a shared link');
+
+    // This page load's own slot holds the new title, beside the earlier load's draft.
+    await expect
+        .poll(async () => (await titlesRetained()).sort())
+        .toEqual(['Blue pocket edited', 'Renamed after a shared link']);
+    // So closing the tab before Save loses nothing: the song reopens with the new title.
+    await page.reload();
+    await songLink(page, 'Blue pocket').first().click();
+    await expect(
+        page.getByRole('heading', { name: 'Renamed after a shared link', exact: true }),
+    ).toBeVisible();
 });
 
 test('a live draft is discarded, not orphaned, when its song is deleted', async ({ page }) => {

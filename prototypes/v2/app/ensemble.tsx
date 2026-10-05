@@ -587,7 +587,11 @@ export default function Ensemble() {
         ReturnType<typeof repository.recoveriesFor>
     >([]);
     // A chart opened from a `#chart=` share link: unsaved by definition (no `saved`
-    // baseline), until "Keep a copy" commits it as a normal library document.
+    // baseline), until "Keep a copy" commits it as a normal library document. A ref AND a state
+    // mirror, written only by `markSharedDraft`, for `currentStore`'s reason (#1512): `draft()`
+    // runs in the same tick as an `open()` that has just cleared the flag, and must read it as it
+    // is NOW, not as the render that made the closure saw it.
+    const sharedDraftNow = useRef(false);
     const [sharedDraft, setSharedDraft] = useState(false);
     // The standards browse surface (#1439): a second songbook-home view, shown instead of the
     // library list while no chart is on the stand. Opening a standard clears it the same way
@@ -1189,7 +1193,7 @@ export default function Ensemble() {
         setCurrent(runtime.withLoadedSounds(withFeel));
         currentStore.current = null;
         setStandStore(null);
-        setSharedDraft(true);
+        markSharedDraft(true);
         pendingText.current = false;
         setBuffers(new Map());
         setPendingMeasures(false);
@@ -2225,6 +2229,11 @@ export default function Ensemble() {
         currentStore.current = next;
         setStandStore(next);
     }
+    /** The ONE writer of the shared-draft flag (#1512): the ref and its state mirror together. */
+    function markSharedDraft(shared: boolean) {
+        sharedDraftNow.current = shared;
+        setSharedDraft(shared);
+    }
     /**
      * The songbook this device writes to right now, bound to the account the SESSION names
      * (#1311 patch review R1).
@@ -2411,15 +2420,17 @@ export default function Ensemble() {
      * round trip to a store that is going to say no. The text stays in memory, which is where the
      * banner and `exportSong` can still reach it.
      */
-    function draft(next: ChartDocument, baseline = saved, shared = sharedDraft) {
+    function draft(next: ChartDocument, baseline = saved) {
         setCurrent(next);
         // A shared draft — a standard or a #chart=/v1 link (`landDraftOnStand`) — belongs to no
         // songbook yet and has no `saved` baseline to recover FROM if the tab closes; "Keep a
-        // copy"/Save is what turns it into a library entry, and `open()` clears `sharedDraft`
-        // the moment that happens. Writing recovery storage for it here would key a slot under
+        // copy"/Save is what turns it into a library entry, and `open()` clears the flag the
+        // moment that happens. Writing recovery storage for it here would key a slot under
         // the shared id (a catalog id for a standard) that nothing but a Save — which this isn't
         // — ever clears, so "Preserved drafts" would grow by one per edited-but-unsaved visit.
-        if (shared) {
+        // Read from the ref (#1512): a caller that has just awaited `open()` holds a closure
+        // whose `sharedDraft` still describes the chart that was on the stand before it.
+        if (sharedDraftNow.current) {
             return;
         }
         if (baseline && same(next, baseline)) {
@@ -2702,7 +2713,7 @@ export default function Ensemble() {
         // on the stand (#1311). From the SESSION, not `sync.owner` — see `liveStand` for why the
         // loop's snapshot is null in exactly the window this has to be right in.
         bindStand(liveStand());
-        setSharedDraft(false);
+        markSharedDraft(false);
         clearBuffers();
         rememberOpened(next.id);
         setRecoveryHealthy(!unreadable && !volatileDrafts.current.has(document.id));
@@ -4529,9 +4540,9 @@ export default function Ensemble() {
                 return;
             }
             runtime.setChoruses(choruses);
-            // `open()` just bound the copy, so its baseline and its not-a-shared-draft state are
-            // passed in: this render's `saved` and `sharedDraft` still describe the original.
-            draft(runtime.captureDocument(opened.current), opened.saved, false);
+            // `open()` just bound the copy, so its baseline is passed in: this render's `saved`
+            // still describes the original.
+            draft(runtime.captureDocument(opened.current), opened.saved);
             setMessage('Editable copy created · your original song is unchanged');
         });
     }
