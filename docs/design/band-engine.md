@@ -398,7 +398,10 @@ schedules everything due in the next 150 ms on a 25 ms timer.
   tail does) instead of being cut. A practice loop ignores the count; released, the
   performance carries on from the bar after it to its end — and released on the chart's last
   section, the lap under way plays the ending from its next barline (or, with no barline left
-  in it, the section plays once more as written) and the band stops. `render()` builds the
+  in it, the section plays once more as written) and the band stops. A chord the lap's last
+  bar pushed toward the loop's top is tied into the bar after it only if that bar opens on the
+  same chord: the comp remembers which chord it pushed (`CompMemory.pushed`,
+  `tiedFromPush`), and otherwise strikes the bar as written (#1507). `render()` builds the
   export the same chorus at a time, so it is exactly the performance that plays.
 
 A pass is generated on the main thread, two seconds before it is needed: about 8 ms for 32
