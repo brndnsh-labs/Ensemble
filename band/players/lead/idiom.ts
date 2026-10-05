@@ -834,9 +834,9 @@ function voiceSolo(
  * phrase's last note is: B→C, F→E), held to the bar's end or its written stop. A last note
  * that is already that tone and rings up to the change holds on through it (a sus4 → I
  * resolving under it). Only a lead that sings in the bar lands; one resting there stays out.
- * In place on `notes`.
+ * In place on `notes`; `lineVelocity` is the line's planned level.
  */
-function landOnHeld(ctx: BarContext, book: LeadBook, notes: Planned[]): void {
+function landOnHeld(ctx: BarContext, book: LeadBook, notes: Planned[], lineVelocity: number): void {
     const final = ctx.ending;
     const held = final?.spans.filter((span) => span.chord).at(-1);
     if (!final || !held?.chord || held.start <= final.start) {
@@ -855,11 +855,15 @@ function landOnHeld(ctx: BarContext, book: LeadBook, notes: Planned[]): void {
         return;
     }
     last.dur = Math.min(last.dur, held.start - last.tick);
+    // why: the landing is an arrival with the band, never a passing note. The last note over
+    // the V may be ghosted (a valley in a run plays 10 softer) or a low one; the landing takes
+    // its level but no less than the line's own (`lineVelocity`, as the notes read it).
+    const floor = dyn(Math.min(118, Math.max(40, Math.round(lineVelocity))), ctx.plan.energy);
     notes.splice(notes.indexOf(last) + 1, 0, {
         tick: held.start,
         dur: length,
         midi,
-        velocity: last.velocity,
+        velocity: Math.max(last.velocity, floor),
         bar: final.index,
         ...(length >= STEP * book.vibrato ? { vibrato: true } : {}),
     });
@@ -980,7 +984,7 @@ function planSlot(
         }
         return note;
     });
-    landOnHeld(ctx, book, notes);
+    landOnHeld(ctx, book, notes, plan.velocity);
     // What the next phrase may develop: this one's opening bar.
     const opening = onsets
         .map((o, i) => (o.bar === 0 ? pitches[i] : null))

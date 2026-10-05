@@ -572,6 +572,23 @@ describe('an ending already home, or written, is played as written', () => {
                                     chordPcs(home.chord!).includes(mod12(sung.midi)),
                                 `${where}: the lead's last note, ${sung.midi}, rests on ${symbol}`,
                             ).toBe(true);
+                            // A landing is an arrival, never ghosted: no further under the line
+                            // (the middle of its last eight notes) than a ghost's 10 drop.
+                            if (sung.tick === home.start) {
+                                const line = events
+                                    .filter(
+                                        (e): e is PitchedNote =>
+                                            e.lane === 'lead' && e.tick < home.start,
+                                    )
+                                    .slice(-8)
+                                    .map((n) => n.velocity)
+                                    .sort((a, b) => a - b);
+                                const middle = line[line.length >> 1] ?? sung.velocity;
+                                expect(
+                                    sung.velocity,
+                                    `${where}: the landing's velocity`,
+                                ).toBeGreaterThanOrEqual(middle - 10);
+                            }
                         }
                     }
                 }
