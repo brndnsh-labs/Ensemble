@@ -245,8 +245,15 @@ const subBass: PitchedIdiom = {
         if (plan.ending) {
             const chord = bar.spans[0]?.chord;
             if (chord) {
+                // why: the held note is the bar, in any meter (#1503).
                 events.push(
-                    bassNote(bar, 0, subRoot(ctx, bassPc(chord)), 16, dyn(110, plan.energy)),
+                    bassNote(
+                        bar,
+                        0,
+                        subRoot(ctx, bassPc(chord)),
+                        barSteps(bar),
+                        dyn(110, plan.energy),
+                    ),
                 );
                 last = subRoot(ctx, bassPc(chord));
             }

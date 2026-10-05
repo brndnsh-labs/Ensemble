@@ -138,6 +138,19 @@ export const VAMP_FIXTURES: Record<string, SemanticScore> = {
     slashes: score([{ label: 'A', bars: ['Dm7', ...Array(9).fill('/')].join(' | ') }]),
 };
 
+/**
+ * A held ending in every meter the suite plays (#1503): each chart closes on its V7, which the
+ * band resolves and holds, so the pass ends on the held ending in that meter. (`FIXTURES`'
+ * odd meters sit mid-chart; their last bar is 4/4.) Kept apart from `FIXTURES` so every
+ * table-driven test over those stays as it was.
+ */
+export const METER_ENDINGS: Record<string, SemanticScore> = {
+    '4/4': score([{ label: 'A', bars: 'C | Am7 | Dm7 | G7' }]),
+    '3/4': score([{ label: 'A', bars: 'C | Am7 | Dm7 | G7', meter: '3/4' }]),
+    '6/8': score([{ label: 'A', bars: 'C | Am7 | Dm7 | G7', meter: '6/8' }]),
+    '7/8': score([{ label: 'A', bars: 'C | Am7 | Dm7 | G7', meter: '7/8', grouping: [2, 2, 3] }]),
+};
+
 const LAST_CHORUS: ScoreDirection = {
     kind: 'last-chorus',
     destination: { kind: 'coda', via: 'to-coda', target: 'coda' },

@@ -20,7 +20,7 @@ import {
 } from '../players/bass/line.js';
 import { compIdiom, type Hit, strums } from '../players/comp/idiom.js';
 import { drumIdiom, snareFigure, tomRun } from '../players/drums/kit.js';
-import { dyn, isCommonTime, pulses, spanSteps } from '../players/grid.js';
+import { barSteps, dyn, isCommonTime, pulses, spanSteps } from '../players/grid.js';
 import { leadIdiom } from '../players/lead/idiom.js';
 import { fifthFirst, pentatonicPool, rootFirst } from '../players/lead/palette.js';
 import { mod12 } from '../theory/pitch.js';
@@ -99,7 +99,14 @@ const rockBass: PitchedIdiom = {
             const chord = bar.spans[0]?.chord;
             if (chord) {
                 events.push(
-                    bassNote(bar, 0, place(bassPc(chord), last), 16, dyn(100, plan.energy)),
+                    // why: the held note is the bar, in any meter (#1503).
+                    bassNote(
+                        bar,
+                        0,
+                        place(bassPc(chord), last),
+                        barSteps(bar),
+                        dyn(100, plan.energy),
+                    ),
                 );
             }
             return { events, memory: { last } };

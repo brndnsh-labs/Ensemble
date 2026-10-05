@@ -316,6 +316,9 @@ minor key the minor equivalents (im6 for jazz and bossa, im9, im7, the minor tri
   (`LeadBook.settle`, rank-weighted as any phrase's last note is), so the line into it is
   unchanged. A lead phrase planned while the pass looped (a practice loop released on the last
   section) is replanned for the ending: its slot is keyed by the resolved chord.
+- **The held chord lasts the bar, in any meter**, and nothing rings past the band's last
+  barline: a bass that held four beats overran a 3/4, 6/8 or 7/8 ending (#1503). The invariant
+  suite ends a chart in every meter it plays (`METER_ENDINGS`) to hold it.
 - The invariant suite judges a pass that ends against the chord it plays there (`asPlayed`);
   `arrange/ending.test.ts` holds every style to the tonic on turnaround endings, and to the
   written chord on the endings above.

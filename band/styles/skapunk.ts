@@ -305,7 +305,8 @@ const skaPunkBass: PitchedIdiom = {
             const chord = bar.spans[0]?.chord;
             if (chord) {
                 const root = arrive(chord);
-                events.push(bassNote(bar, 0, root, 16, dyn(104, plan.energy)));
+                // why: the held note is the bar, in any meter (#1503).
+                events.push(bassNote(bar, 0, root, barSteps(bar), dyn(104, plan.energy)));
                 last = root;
             }
             return { events, memory: { last, land: null } };

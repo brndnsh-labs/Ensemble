@@ -203,7 +203,14 @@ const reggaeBass: PitchedIdiom = {
             const chord = bar.spans[0]?.chord;
             if (chord) {
                 events.push(
-                    bassNote(bar, 0, place(bassPc(chord), last), 16, dyn(104, plan.energy)),
+                    // why: the held note is the bar, in any meter (#1503).
+                    bassNote(
+                        bar,
+                        0,
+                        place(bassPc(chord), last),
+                        barSteps(bar),
+                        dyn(104, plan.energy),
+                    ),
                 );
             }
             return { events, memory: { last } };
