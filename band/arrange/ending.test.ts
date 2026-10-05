@@ -222,6 +222,42 @@ describe('a final turnaround resolves to the tonic', () => {
                 'dominant',
                 4,
             ],
+            // Chords on the tonic that pass through it don't decide its family: a ii–V heading
+            // for Bb (`Cm7 F7`), the V of the iv (`A` → `Dm` in A minor), a borrowed iv-ish
+            // `Cm` as long as the C it follows (the key's mode breaks the tie), a V7 of IV
+            // (`C7` → `Fmaj7`), alone at the opening or among Cmaj7s.
+            [
+                'ii–V through the tonic',
+                score([{ label: 'A', bars: 'Cmaj7 | Cm7 F7 | Bbmaj7 | Dm7 G7' }]),
+                'major',
+                0,
+            ],
+            [
+                'V of iv in a minor key',
+                score([{ label: 'A', bars: 'Am | A | Dm | E7' }], { key: 'A', isMinor: true }),
+                'minor',
+                9,
+            ],
+            [
+                'a borrowed minor tonic',
+                score([{ label: 'A', bars: 'C | F | Cm | G7' }]),
+                'major',
+                0,
+            ],
+            [
+                'a V7 of IV among Cmaj7s',
+                score([
+                    { label: 'A', bars: 'Cmaj7 | Am7 | Dm7 G7 | C7 | Gm7 C7 | Fmaj7 | Dm7 | G7' },
+                ]),
+                'major',
+                0,
+            ],
+            [
+                'a V7 of IV opening',
+                score([{ label: 'A', bars: 'C7 | Fmaj7 | Dm7 | G7' }]),
+                'major',
+                0,
+            ],
         ];
         for (const style of STYLE_IDS) {
             for (const [name, chart, family, tonic] of tables) {
@@ -416,8 +452,11 @@ describe('an ending already home, or written, is played as written', () => {
         // `G7 C` and `Csus4 Cmaj7` resolve on their own: the band ends on what the chart
         // writes there, not on the style's default tonic — and, as a band reading the bar
         // plays it, strikes the V (or the sus) on 1 and holds the I from 3 (#1502).
+        let leads = 0;
         for (const [bars, first, symbol, line] of [
             ['C | F | Dm7 | G7 C', 'G7', 'C', [7, 0]],
+            // The I arriving on beat 4 instead: the lead's plan is keyed by where it arrives.
+            ['C | F | Dm7 | G7:3 C:1', 'G7', 'C', [7, 0]],
             // The resolution is above the same root: the bass holds its C through it.
             ['C | F | G7 | Csus4 Cmaj7', 'Csus4', 'Cmaj7', [0]],
             ['Am | Dm7 | E7 | E7 Am6', 'E7', 'Am6', [4, 9]],
@@ -461,7 +500,10 @@ describe('an ending already home, or written, is played as written', () => {
                         // moves) up to the change.
                         expect(played.bass.at(-1)!.tick + played.bass.at(-1)!.dur, where).toBe(end);
                         if (notes.length > 1) {
-                            expect(played.bass[0].dur, where).toBe(home.start - bar.start);
+                            // (Funk's ending hits last a half note at most.)
+                            expect(played.bass[0].dur, where).toBe(
+                                Math.min(home.start - bar.start, style === 'funk' ? 960 : Infinity),
+                            );
                         }
                         const chords = played.comp.filter((n) => !n.muted);
                         const at1 = chords.filter((n) => n.tick === bar.start);
@@ -498,20 +540,45 @@ describe('an ending already home, or written, is played as written', () => {
                                 `${where}: ${symbol}'s 3rd`,
                             ).toBe(true);
                         }
-                        // The drummer catches the arrival with the band.
+                        // The drummer catches the arrival with the band: one crash, where the I
+                        // lands, and a kick under the V.
+                        const kit = events.filter((e) => e.lane === 'drums' && e.bar === bar.index);
                         expect(
-                            events.some(
+                            kit
+                                .filter((e) => e.lane === 'drums' && e.piece === 'crash')
+                                .map((e) => e.tick),
+                            `${where}: one crash, on 3`,
+                        ).toEqual([home.start]);
+                        expect(
+                            kit.some(
                                 (e) =>
                                     e.lane === 'drums' &&
-                                    e.piece === 'crash' &&
-                                    e.tick === home.start,
+                                    e.piece === 'kick' &&
+                                    e.tick === bar.start,
                             ),
-                            `${where}: a crash on 3`,
+                            `${where}: a kick under the V`,
                         ).toBe(true);
+                        // The lead resolves with the band: its last note is struck where the I
+                        // arrives (or rings into it), on a tone of the I, held to the end.
+                        const sung = played.lead.at(-1);
+                        if (sung) {
+                            leads++;
+                            expect(
+                                sung.tick + sung.dur,
+                                `${where}: the lead ends with the bar`,
+                            ).toBe(end);
+                            expect(
+                                sung.tick + sung.dur > home.start &&
+                                    chordPcs(home.chord!).includes(mod12(sung.midi)),
+                                `${where}: the lead's last note, ${sung.midi}, rests on ${symbol}`,
+                            ).toBe(true);
+                        }
                     }
                 }
             }
         }
+        // The lead's check is not vacuous: every style with a lead sang into most endings.
+        expect(leads).toBeGreaterThan(40);
     });
 
     it('a last bar of one chord, resolved or home, is struck once on its downbeat', () => {

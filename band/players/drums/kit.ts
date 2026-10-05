@@ -108,18 +108,20 @@ export function drumIdiom(book: DrumBook): DrumIdiom {
                     bar: bar.index,
                 });
             if (plan.ending) {
-                hit('crash', 0, 118);
-                hit('kick', 0, 110);
                 // A bar that gets home itself (`| G7 C |`): the band strikes the V on 1 and the
-                // I on 3, and the drummer catches the arrival with them, or the last chord lands
-                // with no kit under it (#1502).
+                // I on 3 (#1502). why: the crash is the ending's one arrival, so it goes where
+                // the I lands, with the kick; the V on 1 is a hit the drummer catches with the
+                // kick alone. Two crashes two beats apart would announce the end twice, the
+                // first time under the chord that isn't it. Any other ending crashes on 1.
                 const held = endingSpans(ctx)
                     .filter(({ span }) => span.chord)
                     .at(-1);
-                if (held && held.from > 0) {
-                    hit('crash', held.from, 118);
-                    hit('kick', held.from, 110);
+                const arrival = held && held.from > 0 ? held.from : 0;
+                if (arrival > 0) {
+                    hit('kick', 0, 110);
                 }
+                hit('crash', arrival, 118);
+                hit('kick', arrival, 110);
                 return { events, memory: null };
             }
             const tier = energyTier(plan.energy);

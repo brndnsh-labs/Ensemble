@@ -825,6 +825,46 @@ function voiceSolo(
     return { onsets, pitches, plan };
 }
 
+/**
+ * In a last bar that gets home itself (`| G7 C |`, `ctx.ending`), the line is sung as written
+ * over the V, and a note struck before a change stops at it: a line that ends there leaves the
+ * melody on the V's leading tone, 7th or 13th, silent under the band's held I. why: the soloist
+ * resolves with the band — the note over the V is kept, and the line lands where the I
+ * arrives, on the tonic's resting tone nearest its last note (`settle`, ranked as any
+ * phrase's last note is: B→C, F→E), held to the bar's end or its written stop. A last note
+ * that is already that tone and rings up to the change holds on through it (a sus4 → I
+ * resolving under it). Only a lead that sings in the bar lands; one resting there stays out.
+ * In place on `notes`.
+ */
+function landOnHeld(ctx: BarContext, book: LeadBook, notes: Planned[]): void {
+    const final = ctx.ending;
+    const held = final?.spans.filter((span) => span.chord).at(-1);
+    if (!final || !held?.chord || held.start <= final.start) {
+        return;
+    }
+    const inBar = notes.filter((n) => n.bar === final.index);
+    const last = inBar.at(-1);
+    if (!last || inBar.some((n) => n.tick >= held.start)) {
+        return;
+    }
+    const midi = nearestRanked(book.settle(held.chord, final.key), last.midi, ctx.lead.range);
+    const length = held.end - held.start;
+    if (midi === last.midi && last.tick + last.dur >= held.start - 1) {
+        last.dur = held.end - last.tick;
+        last.vibrato = last.vibrato || last.dur >= STEP * book.vibrato;
+        return;
+    }
+    last.dur = Math.min(last.dur, held.start - last.tick);
+    notes.splice(notes.indexOf(last) + 1, 0, {
+        tick: held.start,
+        dur: length,
+        midi,
+        velocity: last.velocity,
+        bar: final.index,
+        ...(length >= STEP * book.vibrato ? { vibrato: true } : {}),
+    });
+}
+
 function planSlot(
     ctx: BarContext,
     book: LeadBook,
@@ -940,6 +980,7 @@ function planSlot(
         }
         return note;
     });
+    landOnHeld(ctx, book, notes);
     // What the next phrase may develop: this one's opening bar.
     const opening = onsets
         .map((o, i) => (o.bar === 0 ? pitches[i] : null))
@@ -997,7 +1038,12 @@ export function leadIdiom(book: LeadBook): PitchedIdiom {
             // planned while the pass looped (a practice loop released on the last section, its
             // lap regenerated from a barline as the ending) or under another style's ending is
             // replanned against the chord the band now holds, not kept against the written one.
-            const resolved = ctx.ending?.spans.filter((span) => span.chord).at(-1)?.chord?.symbol;
+            // Keyed by where the held chord arrives too: `G7 C` and `G7:3 C:1` hold the same C
+            // from different beats, and a plan landing on one is not the other's.
+            const held = ctx.ending?.spans.filter((span) => span.chord).at(-1);
+            const resolved = held?.chord
+                ? `${held.chord.symbol}@${held.start - ctx.ending!.start}`
+                : null;
             const slot =
                 (role.kind === 'trade'
                     ? `${ctx.pass}:t${role.from}:${role.bars}:${role.turn}:${role.with}`
