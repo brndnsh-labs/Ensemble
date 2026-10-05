@@ -31,19 +31,37 @@ const STABLE: ReadonlySet<ChordFamily> = new Set(['major', 'minor', 'dominant', 
  * first of the chart where the form goes round to the top (what a last bar points back to).
  */
 function chordAfter(timeline: Timeline, tick: number): ChordFacts | null {
+    return spanAfter(timeline, tick)?.chord ?? null;
+}
+
+/** The span holding `chordAfter`'s chord: where the form goes next, round to the top if need be. */
+function spanAfter(timeline: Timeline, tick: number) {
     const { spans } = timeline;
     for (let j = firstSpanAfter(timeline, tick); j < spans.length; j++) {
         if (spans[j].chord) {
-            return spans[j].chord;
+            return spans[j];
         }
     }
-    return spans.find((span) => span.chord)?.chord ?? null;
+    return spans.find((span) => span.chord) ?? null;
+}
+
+/**
+ * Is a dominant moving on, given the chord after it? It is when it resolves down a fifth
+ * (`C7` → `F` is a V, the F tune's), and when it turns minor on its own root (#1521): `C7` →
+ * `Cm7` is a II7 becoming the ii of a ii–V (`C7 | Cm7 F7 | Bb`, the A-Train's bars 3–6), not a
+ * C that rests. A blues's `C7` → `C7` or → `A7` stays.
+ */
+function dominantMoves(chord: ChordFacts, next: ChordFacts | null): boolean {
+    return (
+        !!next &&
+        (next.root === mod12(chord.root + 5) ||
+            (next.root === chord.root && next.family === 'minor'))
+    );
 }
 
 /**
  * Does the chord at `tick` rest on the key's tonic: rooted on it, in a stable family, and not
- * a dominant resolving down a fifth to the chord after it (`C7` → `F` is a V, the F tune's;
- * a blues's `C7` → `C7` or → `A7` is its tonic)?
+ * a dominant moving on to the chord after it (`dominantMoves`)?
  */
 function restsOnTonic(
     timeline: Timeline,
@@ -54,8 +72,7 @@ function restsOnTonic(
     if (chord.root !== key.tonic || !STABLE.has(chord.family)) {
         return false;
     }
-    const next = chord.family === 'dominant' ? chordAfter(timeline, tick) : null;
-    return !next || next.root !== mod12(chord.root + 5);
+    return chord.family !== 'dominant' || !dominantMoves(chord, chordAfter(timeline, tick));
 }
 
 /**
@@ -261,7 +278,8 @@ function arrivalAt(timeline: Timeline, bar: Bar): number {
  *   at rest (`resting`), off the key's tonic (an opening on the tonic is the key itself, and
  *   the key's path resolves it). A minor opening counts: a minor tune typed without its key
  *   (`Am | Dm7 | Bm7b5 | E7`, a minor blues) ends on its i, not on its V7. A power chord does
- *   not: it has no third to say which mode to end in;
+ *   not: it has no third to say which mode to end in. Nor does a dominant that opens a chain
+ *   of dominants falling by fifths (`dominantChain`: `A7 | D7 | G7 | E7`);
  * - nothing but a dominant 7th rests on the key's tonic (`tonicWeights`): a triad, a 6th, a
  *   maj7, a minor chord or a power chord on C is how a tune states C as its home (`G | Am | Dm7
  *   | C | … | G D7` stays a C tune that opens on its V; All The Things You Are left on C rests
@@ -292,7 +310,8 @@ function openingHome(timeline: Timeline, bar: Bar): ChordFacts | null {
         home.family === 'power' ||
         !resting(timeline, home, opening.start, false) ||
         last.root !== mod12(home.root + 7) ||
-        home.root === key.tonic
+        home.root === key.tonic ||
+        dominantChain(timeline, home, opening.start)
     ) {
         return null;
     }
@@ -305,6 +324,22 @@ function openingHome(timeline: Timeline, bar: Bar): ChordFacts | null {
     const turn = tonicWeights(timeline, key, last.root);
     const turnRests = turn.major + turn.neutral + turn.minor + turn.power;
     return rests > tonic.stays && rests > turnRests ? home : null;
+}
+
+/**
+ * Does the dominant at `tick` open a chain of dominants falling by fifths (#1521): `A7 → D7 →
+ * G`, each falling a fifth onto the next? `actsAsTonic` lets a dominant that falls onto another
+ * dominant stay home, as a blues's I7 → IV7 does — but a blues's IV7 goes back to its I7 or
+ * elsewhere, while a chain's next dominant falls a fifth again: `A7 | D7 | G7 | E7` is a G
+ * tune's V of V, V and I, and its A7 is no home to end on.
+ */
+function dominantChain(timeline: Timeline, chord: ChordFacts, tick: number): boolean {
+    const next = spanAfter(timeline, tick);
+    if (chord.family !== 'dominant' || next?.chord?.family !== 'dominant') {
+        return false;
+    }
+    const onward = chordAfter(timeline, next.start);
+    return next.chord.root === mod12(chord.root + 5) && onward?.root === mod12(next.chord.root + 5);
 }
 
 /**
@@ -367,9 +402,10 @@ function tonicWeights(timeline: Timeline, key: KeyContext, root: number) {
             weights[chord.seventh === 11 ? 'major' : 'neutral'] += length;
         } else if (chord.family === 'dominant') {
             weights.dominant += length;
-            // A dominant that does not fall a fifth stays where it is: a `C7` falling to `F7`
-            // is a blues's I7–IV7 or an F blues's V7–I7, and says nothing about which.
-            if (next?.root !== mod12(root + 5)) {
+            // A dominant that does not move on (`dominantMoves`) stays where it is: a `C7`
+            // falling to `F7` is a blues's I7–IV7 or an F blues's V7–I7, and says nothing about
+            // which; a `C7` turning to `Cm7` is a ii–V on its way.
+            if (!dominantMoves(chord, next)) {
                 weights.stays += length;
             }
         } else if (chord.family === 'minor') {

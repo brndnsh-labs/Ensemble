@@ -359,13 +359,15 @@ in a minor key the minor equivalents (im6 for jazz and bossa, im9, im7, the mino
   ends on the opening chord, in its own family, if the chart says that is home one chord at a
   time:
   - the key is major (a minor key was set: the default is C major), and the opening is a
-    stable chord with a third, at rest, in root position, off the key's tonic;
+    stable chord with a third, at rest, in root position, off the key's tonic, and not the
+    head of a chain of dominants falling by fifths (`A7 | D7 | G7 | E7` is a G tune's V of
+    V, not an A home);
   - nothing but a dominant 7th rests on the key's tonic. A triad, a 6th, a maj7, a minor or a
     power chord on C states C as home and keeps it (`G | Am | Dm7 | C | … | G D7` stays a C
     tune that opens on its V; `G | F | C5 | D7` stays in C);
-  - the opening rests longer than C7 rests on C (a C7 falling a fifth is moving, as
-    `keyBacked` reads it): every blues gives its I more time than its IV, while a circle of
-    dominants set in C (`D7 | G7 | C7 | A7`) keeps C;
+  - the opening rests longer than C7 rests on C (a C7 falling a fifth, or turning into a
+    `Cm7` on its way to a ii–V, is moving, as `keyBacked` reads it): every blues gives its I
+    more time than its IV, while a circle of dominants set in C (`D7 | G7 | C7 | A7`) keeps C;
   - and the opening rests longer than the last V7's own root does as a resting chord: a D
     tune that opens on its IV and ends `D D7` is D turning round, not the V of G.
 

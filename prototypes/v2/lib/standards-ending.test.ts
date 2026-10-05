@@ -82,14 +82,14 @@ describe('the held ending on every shipped chart (#1516)', () => {
         ]),
     ];
 
-    it('ends on its own tonic, as authored', () => {
+    it("ends on its own tonic, as authored (the jazz pass's bass root)", () => {
         const wrong = charts
             .filter(([, score, key]) => !endsHome(score, keyPc(key)))
             .map(([title]) => title);
         expect(wrong).toEqual([]);
     });
 
-    it('typed without its key (read as C major), ends on the root it ends on as authored', () => {
+    it("typed without its key (read as C major), the jazz pass's bass ends on its authored root", () => {
         // Forcing the key to C must not move the ending: the root the band holds is the one it
         // holds with the chart's own key.
         const wrong = charts

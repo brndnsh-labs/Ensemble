@@ -1071,6 +1071,25 @@ describe('a chart typed without its key, read one chord at a time (#1521)', () =
                 'dominant',
             ],
             [
+                // Its I7 falls onto its IV7, which goes back to the I7: a blues, not a chain.
+                '12-bar quick-change blues in G',
+                score([
+                    {
+                        label: 'A',
+                        bars: 'G7 | C7 | G7 | G7 | C7 | C7 | G7 | E7 | A7 | D7 | G7 E7 | A7 D7',
+                    },
+                ]),
+                7,
+                'dominant',
+            ],
+            [
+                // The A-Train shape in Bb: its `C7 | C7 | Cm7` is a II7 on its way, no C home.
+                'a Bb tune with a II7',
+                score([{ label: 'A', bars: 'Bb6 | Bb6 | C7 | C7 | Cm7 | F7 | Bb6 | Cm7 F7' }]),
+                10,
+                'major',
+            ],
+            [
                 '12-bar blues in F',
                 score([
                     {
@@ -1187,12 +1206,51 @@ describe('a chart typed without its key, read one chord at a time (#1521)', () =
         // A D tune that opens on its IV and ends `D D7`, left on C: the D7 is its I picking up a
         // 7th to go round to the G at the top, not the V of G. The tune rests on D longer than
         // on G, so the band does not end on G; nothing backs C, so the bar is played as written.
-        const timeline = compileTimeline(
-            score([{ label: 'A', bars: 'G | D | A7 | D | G | D | A7 | D D7' }]),
-        );
-        for (const style of STYLE_IDS) {
-            expect(heldEnding(timeline, 7, STYLES[style].ending), style).toBeNull();
-            expect(heldBass(timeline, style), style).toBe(2);
+        // `G | A7 | D | D7` rests on G and on D a bar each: a tie keeps the written ending.
+        for (const bars of ['G | D | A7 | D | G | D | A7 | D D7', 'G | A7 | D | D7']) {
+            const timeline = compileTimeline(score([{ label: 'A', bars }]));
+            const last = timeline.bars.length - 1;
+            for (const style of STYLE_IDS) {
+                expect(heldEnding(timeline, last, STYLES[style].ending), style).toBeNull();
+                expect(heldBass(timeline, style), style).toBe(2);
+            }
+        }
+    });
+
+    it('an opening that is not home is not taken: a chain, a power chord, a set minor key', () => {
+        // Each ends on a V7 of its opening chord, with nothing resting on C, and each is played
+        // as written, as main played it:
+        // - a G tune opening on its V of V, `A7 → D7 → G` (`dominantChain`): its A7 falls onto a
+        //   D7 that falls again, so it is a chain of dominants, not a blues's I7 → IV7;
+        // - a power-chord riff (`E5 | A5 | E5 | B7`): no third to say which E to end on;
+        // - a key set to A minor (a new chart's key is C major, so a minor key was set): `Dm |
+        //   Bb | C | A7` is its iv, bII, bIII and the I7 of A phrygian dominant, and ends on A7;
+        // - a Bb tune opening on its IV, left on C: its `C7 → Cm7` is a II7 turning into the ii
+        //   of a ii–V (`dominantMoves`), not a C that rests, so nothing backs C and the bar is
+        //   played as written, on its `Cm7`.
+        for (const [bars, key, minor, written] of [
+            ['A7 | D7 | G7 | E7', 'C', false, 4],
+            ['A7 | D7 | G | E7', 'C', false, 4],
+            ['E5 | A5 | E5 | B7', 'C', false, 11],
+            ['Dm | Bb | C | A7', 'A', true, 9],
+            [
+                'Ebmaj7 | Ebm7 Ab7 | Bbmaj7 | Bbmaj7 | Gm7 C7 | Cm7 F7 | Bbmaj7 | Cm7 F7',
+                'C',
+                false,
+                0,
+            ],
+        ] as const) {
+            const timeline = compileTimeline(
+                score([{ label: 'A', bars }], { key, isMinor: minor }),
+            );
+            const last = timeline.bars.length - 1;
+            for (const style of STYLE_IDS) {
+                expect(
+                    heldEnding(timeline, last, STYLES[style].ending),
+                    `${style} ${bars}`,
+                ).toBeNull();
+                expect(heldBass(timeline, style), `${style} ${bars}`).toBe(written);
+            }
         }
     });
 
