@@ -196,6 +196,25 @@ function defineEndings(styles: StyleId[]): void {
                                 );
                             }
                         }
+                        // And the bass's held note lasts to it, in every meter: five beats in
+                        // 5/4, not four. (Funk's ending is a short hit, a half note at most:
+                        // `endingBass`'s cap.)
+                        const last = timeline.bars[timeline.bars.length - 1];
+                        const due =
+                            last.start +
+                            (styleId === 'funk'
+                                ? Math.min(last.meter.barTicks, 8 * STEP)
+                                : last.meter.barTicks);
+                        const held = events
+                            .filter(
+                                (e): e is PitchedNote => e.lane === 'bass' && e.bar === last.index,
+                            )
+                            .at(-1);
+                        if (!held || Math.abs(held.tick + held.dur - due) > 1) {
+                            problems.push(
+                                `${where}: the held bass ends at ${held ? held.tick + held.dur : 'nothing'}, not ${due}`,
+                            );
+                        }
                     }
                 }
                 expect(problems.slice(0, 10), `${styleId}/${meter}`).toEqual([]);

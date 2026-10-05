@@ -149,6 +149,9 @@ export const METER_ENDINGS: Record<string, SemanticScore> = {
     '3/4': score([{ label: 'A', bars: 'C | Am7 | Dm7 | G7', meter: '3/4' }]),
     '6/8': score([{ label: 'A', bars: 'C | Am7 | Dm7 | G7', meter: '6/8' }]),
     '7/8': score([{ label: 'A', bars: 'C | Am7 | Dm7 | G7', meter: '7/8', grouping: [2, 2, 3] }]),
+    // A bar shorter than funk's half-note hit, and one longer than four beats.
+    '2/4': score([{ label: 'A', bars: 'C | Am7 | Dm7 | G7', meter: '2/4' }]),
+    '5/4': score([{ label: 'A', bars: 'C | Am7 | Dm7 | G7', meter: '5/4' }]),
 };
 
 const LAST_CHORUS: ScoreDirection = {
