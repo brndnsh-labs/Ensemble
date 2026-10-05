@@ -335,12 +335,20 @@ in a minor key the minor equivalents (im6 for jazz and bossa, im9, im7, the mino
   an A minor tune left on C keeps its written last chord. In a major key a minor chord on the
   tonic falling a fifth to a dominant is the ii of a ii–V, not a resting tonic (`isTwoFive`,
   #1516): `Cm7 F7` is how Autumn Leaves, rhythm changes, Stella and Cherokee pass through C, so
-  left on C they keep their written last chord (a minor key's dorian `Em7 A7` is its tonic). And
-  a tune whose last bar opens on the chord it opens on, by root and both resting
-  (`endsWhereItOpens`), is home whatever its key says: `G | C | D | G` left on C ends on G. Not
-  every case is decidable bar by bar: left on C, the 8-bar blues's IV7 (`C7 | C7`) and Stella's
-  held ii (`Cm7 | Cm7 | Ab7`) still read as resting on C (#1516's open question: weigh the whole
-  chart, or record whether the key was set).
+  left on C they keep their written last chord (a minor key's dorian `Em7 A7` is its tonic).
+- **Bookends.** A tune whose last bar comes to rest on the chord it opens on, by root, both
+  resting (`bookendAt`), is home there whatever its key says: `G | C | D | G` left on C ends on
+  G. The bar has to end there: one that moves off the opening chord (`F G7`, `G D7`) is a
+  turnaround and resolves, and one that reaches it later (`D7 G`) strikes the D7 and holds the G,
+  as `G7 C` does. Bookends outrank a key that was set, too: `G | C | F | G` in C ends on its G,
+  and `Dm | Am | E7 | Dm` in A minor on its Dm, as written. That is deliberate — a tune that
+  opens and closes on one chord has said where home is, and ending on its written last chord is
+  never wrong-sounding — and also unavoidable today: a set key can't be told from the default
+  (#1521).
+- **Not every defaulted key is decidable bar by bar.** Left on C, the 8-bar blues's IV7 (`C7 |
+  C7`), Stella's held ii (`Cm7 | Cm7 | Ab7`) and rhythm changes' bridge (`C7 | C7 | F7`) still
+  read as resting on C, so they resolve into C (#1521: weigh the whole chart, or record whether
+  the key was set).
 - **Only the ending bar's harmony changes.** The bar before it hears the resolved bar as its
   next, so its approach notes walk into the tonic (a walking bass's line toward its next
   chord, a lead-in); its chords, the comp (which never anticipates an ending) and the drums are

@@ -703,6 +703,39 @@ describe('an ending already home, or written, is played as written', () => {
         expect(heldEnding(onV, 3, STYLES.jazz.ending)?.spans[0].chord?.root).toBe(0);
     });
 
+    it('a last bar that moves off the opening chord is a turnaround, and resolves (#1516)', () => {
+        // Each opens on its IV or V and ends on a turnaround from that chord (`F G7`, `G D7`):
+        // the bar leaves home, so the band resolves it to the key's tonic, in C.
+        for (const bars of [
+            'F | G | Em | Am | F | G7 | C | F G7',
+            'G | Am | Dm7 | C | G | Am | Dm7 | G D7',
+        ]) {
+            const timeline = compileTimeline(score([{ label: 'A', bars }]));
+            const last = timeline.bars.length - 1;
+            for (const style of STYLE_IDS) {
+                const ending = heldEnding(timeline, last, STYLES[style].ending);
+                expect(
+                    ending?.spans.map((span) => span.chord?.root),
+                    `${style} ${bars}`,
+                ).toEqual([0]);
+                const { events } = performPass(timeline, settingsFor(style, 'a'), {
+                    pass: 0,
+                    looping: false,
+                });
+                expect(
+                    lastBar(timeline, events).bass.map((n) => mod12(n.midi)),
+                    `${style} ${bars}`,
+                ).toEqual([0]);
+            }
+        }
+        // One that reaches the opening chord later in the bar gets home itself: `D7 G` strikes
+        // the D7 and holds the G, as `G7 C` does.
+        const later = compileTimeline(score([{ label: 'A', bars: 'G | C | D | D7 G' }]));
+        expect(
+            heldEnding(later, 3, STYLES.jazz.ending)?.spans.map((span) => span.chord?.symbol),
+        ).toEqual(['D7', 'G']);
+    });
+
     it('a ii–V on the tonic of a major key does not back it (#1516)', () => {
         // Autumn Leaves (G minor) opens on `Cm7 F7`; rhythm changes passes through it. With the
         // key left at C, neither is in C: their last bars are played as written.

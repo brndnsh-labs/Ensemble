@@ -87,10 +87,12 @@ describe('the held ending on every shipped chart (#1516)', () => {
                 wrong.push(title);
             }
         }
-        // Still undecided (#1516): each holds a C chord two bars that no local rule can tell
-        // from a tonic — the 8-bar blues's IV7 (`C7 | C7 | G7`), Stella's ii (`Cm7 | Cm7 |
-        // Ab7`). Telling them apart needs the chart weighed as a whole, or a record of whether
-        // the key was set. Pinned so a fix (or a new case) shows up here.
-        expect(wrong).toEqual(['8-Bar Blues', 'Stella by Starlight']);
+        // Open in #1521 (whether to weigh the whole chart, or record whether the key was set):
+        // each holds a C chord two bars that no local rule can tell from a tonic — the 8-bar
+        // blues's IV7 (`C7 | C7 | G7`), Stella's ii (`Cm7 | Cm7 | Ab7`), rhythm changes'
+        // bridge (`C7 | C7 | F7`). So a defaulted C reads as backed, and rhythm changes' last
+        // bar, a turnaround off its opening chord (`Bbmaj7 F7`), resolves into it. Pinned so a
+        // fix (or a new case) shows up here.
+        expect(wrong).toEqual(['8-Bar Blues', 'Rhythm Changes', 'Stella by Starlight']);
     });
 });

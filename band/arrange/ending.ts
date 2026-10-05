@@ -140,28 +140,46 @@ function keyBacked(timeline: Timeline, key: KeyContext): boolean {
 }
 
 /**
- * Does the last bar open on the chord the chart opens on, both of them resting (#1516)? A tune
- * that starts and ends on its I is home there whatever its key says: `G | C | D | G` and
- * `F | Bb | C | F` typed without a key (read as C) end on G and F, not on C. Matched by root,
- * in any stable family and in root position (a G minor groove's `Gm11` and its last `G7#9`),
- * and only when both act as a tonic (`actsAsTonic`): a tune that opens on its V (`G7 | C`) does
- * not end at home on that V.
+ * Where the last bar comes to rest on the chord the chart opens on (#1516): the index of the
+ * span from which it stays on that chord's root to the bar's end, or -1. A tune that starts and
+ * ends on its I is home there whatever its key says: `G | C | D | G` and `F | Bb | C | F` typed
+ * without a key (read as C) end on G and F, not on C. Matched by root, in any stable family and
+ * in root position (a G minor groove's `Gm11` and its last `G7#9`), and only when both act as a
+ * tonic (`actsAsTonic`): a tune that opens on its V (`G7 | C`) does not end at home on that V.
+ * The bar has to END there: one that opens on the opening chord and moves off it (`F G7`,
+ * `G D7`) is a turnaround, and resolves; one that reaches it later (`D7 G`) gets home itself.
  */
-function endsWhereItOpens(timeline: Timeline, bar: Bar): boolean {
-    const last = bar.spans[0];
+function bookendAt(timeline: Timeline, bar: Bar): number {
     const opening = timeline.spans.find((span) => span.chord);
-    if (!last?.chord || !opening?.chord || opening.start === last.start) {
-        return false;
+    if (!opening?.chord || opening.start >= bar.start) {
+        return -1;
     }
+    const root = opening.chord.root;
     const resting = (chord: ChordFacts, start: number) =>
         STABLE.has(chord.family) &&
         chord.bass === chord.root &&
         actsAsTonic(chord, chordAfter(timeline, start), bar.key.minor);
-    return (
-        last.chord.root === opening.chord.root &&
-        resting(last.chord, last.start) &&
-        resting(opening.chord, opening.start)
-    );
+    if (!resting(opening.chord, opening.start)) {
+        return -1;
+    }
+    // The last chord of the bar (before a written stop) is on the opening's root, and so is
+    // every chord from the first of them.
+    let from = -1;
+    for (let k = bar.spans.length - 1; k >= 0; k--) {
+        const { chord } = bar.spans[k];
+        if (!chord) {
+            if (from >= 0) {
+                break;
+            }
+            continue;
+        }
+        if (chord.root !== root) {
+            break;
+        }
+        from = k;
+    }
+    const arrival = from >= 0 ? bar.spans[from] : null;
+    return arrival?.chord && resting(arrival.chord, arrival.start) ? from : -1;
 }
 
 /**
@@ -280,7 +298,7 @@ function endingSuffix(quality: EndingQuality, key: KeyContext, family: TonicFami
  *   blues, `Em9` closing a minor groove, a Picardy `E` in E minor, in the colour the chart
  *   chose for it. A tonic over another bass (`C/E`) is not home — an inversion is a passing
  *   sound, and a held ending stands on its root — and nor is `Csus4`;
- * - its first chord is the one the chart opens on, both resting (`endsWhereItOpens`): the
+ * - it rests from its downbeat to its end on the chord the chart opens on (`bookendAt`): the
  *   tune is home whatever its key says (a `G | C | D | G` typed without a key);
  * - the chart never rests on the key's tonic anywhere (`keyBacked`): the key is not backed.
  * A bar that reaches home later (`G7 C`, `Csus4 C`) strikes what comes before it as written and
@@ -297,13 +315,22 @@ export function heldEnding(timeline: Timeline, index: number, quality: EndingQua
     const home = bar.spans.findIndex(
         (span) => !!span.chord && isHome(timeline, span.chord, span.start, bar.key),
     );
-    if (home === 0 || endsWhereItOpens(timeline, bar)) {
+    if (home === 0) {
         return null;
     }
     if (home > 0) {
         // The bar resolves itself: a band reading `| G7 C |` strikes the G7 on 1 and holds the
         // C from 3, the tonic the chart writes, in its colour.
         return heldOn(bar, bar.spans[home].chord!, home);
+    }
+    // Bookends outrank the key, even a key that was set (#1516; a set key can't be told from
+    // the default yet, #1521): a tune that opens and ends on its own chord ends there.
+    const bookend = bookendAt(timeline, bar);
+    if (bookend === 0) {
+        return null;
+    }
+    if (bookend > 0) {
+        return heldOn(bar, bar.spans[bookend].chord!, bookend);
     }
     if (!keyBacked(timeline, bar.key)) {
         return null;
