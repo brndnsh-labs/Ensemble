@@ -1058,7 +1058,8 @@ describe('BandHost releasing a practice loop', () => {
 /**
  * A settings change takes the new music from a barline, and leaves what comes before it alone:
  * every note before that barline sounds once, as it would have without the change, however the
- * change falls against the timer and the segments' barlines (#1499).
+ * change falls against the timer and the segments' barlines (#1499). A pass or lap queued
+ * ahead and rebuilt for the change is still the one that would have followed (#1500).
  */
 describe('BandHost a settings change near a barline', () => {
     /** 4/4 at 120: two seconds a bar. */
@@ -1143,6 +1144,38 @@ describe('BandHost a settings change near a barline', () => {
                 );
                 host.stop();
             }
+        }
+    });
+
+    it('a pass queued ahead and rebuilt for a change keeps its number', () => {
+        // The next lap or pass is queued two seconds before the one playing ends; a change a
+        // second before the end drops it and builds it again. Its pass number is its time
+        // through, which picks its variation: the passes heard still count 0, 1, 2, 3.
+        const timeline = compileTimeline(aThenB);
+        const loopA = timeline.bars[2].start;
+        for (const [loopTo, segmentS, release] of [
+            [loopA, 2 * BAR_S, false],
+            [null, 4 * BAR_S, false],
+            // Released in its second lap, the loop carries on into B's two bars, then the song.
+            [loopA, 2 * BAR_S, true],
+        ] as const) {
+            const { audio, host, pumpTo, release: releaseAt } = rig(aThenB, loopTo);
+            const segments = watchSegments(host) as () => (Queued & {
+                pass: number;
+                cursor: number;
+            })[];
+            const end = 10.1 + 2 * segmentS;
+            pumpTo(10.1, end - 1);
+            if (release) {
+                releaseAt(end - 1);
+            }
+            audio.currentTime = end - 1;
+            host.update(changed);
+            pumpTo(end - 1, end + 4 * BAR_S + 0.5);
+            const heard = segments().filter((segment) => segment.cursor > 0);
+            expect(heard.length).toBeGreaterThanOrEqual(4);
+            expect(heard.map((segment) => segment.pass)).toEqual(heard.map((_, i) => i));
+            host.stop();
         }
     });
 });

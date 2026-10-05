@@ -285,7 +285,6 @@ export class BandHost {
     private segments: Segment[] = [];
     private loop: Loop | null = null;
     private timer: ReturnType<typeof setInterval> | null = null;
-    private nextPass = 0;
     /** The barline where the last settings change is first heard, while it is still to come. */
     private change: { segment: Segment; tick: number } | null = null;
     /** The one-bar count-in scheduled by `start()`, while it is still sounding. */
@@ -350,9 +349,8 @@ export class BandHost {
         this.settings = settings;
         this.bpm = bpm;
         this.loop = loop;
-        this.nextPass = 0;
         const fromBar = Math.min(this.barAt(fromTick), this.timeline.bars.length - 1);
-        const first = loop ? this.lapPlan(loop) : this.songPlan(fromBar, fromBar);
+        const first = loop ? this.lapPlan(loop, 0) : this.songPlan(fromBar, fromBar);
         let segmentStart = audio.currentTime + 0.1;
         if (countIn) {
             const plan = countInPlan(this.timeline, bpm, first.window.from);
@@ -663,19 +661,19 @@ export class BandHost {
     }
 
     /**
-     * The song from `fromBar`. Uncounted, the rest of this pass, after which it goes round
-     * again. Counted (#1475), the rest of `fromBar`'s chorus of a performance that began at
+     * The song from `fromBar`. Uncounted, the rest of pass `pass` (the first, unless it follows
+     * another), after which it goes round again. Counted (#1475), the rest of `fromBar`'s chorus of a performance that began at
      * `origin` and ends after the last chorus: a performance of up to 64 choruses is
      * generated a chorus at a time, two seconds ahead like any segment, never all at once on
      * Play (and a settings change regenerates the rest of one chorus, not of the song).
      * Every chorus is pass 0: its chorus number is its time through (`PassOptions.pass`).
      */
-    private songPlan(fromBar: number, origin: number): SegmentPlan {
+    private songPlan(fromBar: number, origin: number, pass = 0): SegmentPlan {
         const bars = this.timeline!.bars;
         const from = Math.min(fromBar, bars.length - 1);
         if (!this.counted) {
             return {
-                pass: this.nextPass++,
+                pass,
                 window: { from, to: bars.length, wrapTo: 0 },
                 until: bars.length,
                 looping: true,
@@ -693,26 +691,31 @@ export class BandHost {
         };
     }
 
-    /** One lap of a practice loop: it loops, counted chart or not. */
-    private lapPlan(loop: Loop): SegmentPlan {
+    /** Lap `pass` of a practice loop: it loops, counted chart or not. */
+    private lapPlan(loop: Loop, pass: number): SegmentPlan {
         const from = this.barAt(loop.from);
         const to = Math.max(from + 1, this.barAt(loop.to, true));
         return {
-            pass: this.nextPass++,
+            pass,
             window: { from, to, wrapTo: from },
             until: to,
             looping: true,
         };
     }
 
-    /** What plays after `last`: the loop's next lap, or the song's next pass or chorus. */
+    /**
+     * What plays after `last`: the loop's next lap, or the song's next pass or chorus. A lap or
+     * an uncounted pass is the one after `last`'s, so a follow-on that `update()` drops and
+     * builds again is the same pass, not the one after it (#1500).
+     */
     private followOn(last: Segment): SegmentPlan {
+        const pass = last.pass + 1;
         if (this.loop) {
-            return this.lapPlan(this.loop);
+            return this.lapPlan(this.loop, pass);
         }
         if (last.released === 'again') {
             return {
-                pass: this.nextPass++,
+                pass,
                 window: last.window,
                 until: last.until,
                 looping: false,
@@ -720,7 +723,7 @@ export class BandHost {
         }
         const resume = last.released ?? null;
         if (!this.counted) {
-            return this.songPlan(resume ?? 0, resume ?? 0);
+            return this.songPlan(resume ?? 0, resume ?? 0, pass);
         }
         // Out of a practice loop, the performance carries on from the bar after it as if it
         // had played from the top (origin 0): the bar the loop leads into is an arrival.
