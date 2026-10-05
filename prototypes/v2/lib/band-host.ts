@@ -84,6 +84,11 @@ interface Segment extends SegmentPlan {
      * follow-on and builds it again (#1484).
      */
     released?: number | 'again';
+    /**
+     * A released lap's: the segment that follows it (`followOn`), which its last bar leads
+     * into in place of another lap, however often it is rebuilt (#1517).
+     */
+    leadsInto?: SegmentPlan;
     /** Song-tick range the window covers. */
     from: number;
     to: number;
@@ -438,6 +443,7 @@ export class BandHost {
                 origin: current.window.origin ?? current.window.from,
             },
             until: current.until,
+            leadsInto: current.leadsInto,
         });
         const cutoff = timeline.bars[cutoffBar].start;
         // Every note sent is before the cutoff, so the cursor stays where the last pump left
@@ -500,6 +506,13 @@ export class BandHost {
             this.segments.length = this.segments.indexOf(current) + 1;
             if (current.until < this.timeline!.bars.length) {
                 current.released = current.until;
+                // The lap was played toward its own top: its last bar pushes the loop's first
+                // chord across the wrap, and its bass walks up to it. From the first barline it
+                // can still change at (`regenerate`), it leads into what actually follows it —
+                // the segment `followOn` builds, as that pass plays its first bar (#1517). With
+                // none left, it ends as it was played.
+                current.leadsInto = this.followOn(current);
+                this.regenerate(current, this.settings, horizon);
             } else if (this.counted) {
                 // A counted chart's last section has nothing after it to carry on into: the
                 // performance ends with it. The lap under way was played as a loop (a fill

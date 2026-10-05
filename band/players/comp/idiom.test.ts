@@ -39,7 +39,7 @@ function organ(bars: string, index: number, steps: number[]) {
         timeline,
         bar,
         plan: plans[index],
-        next: { bar: next, plan: plans[next.index] },
+        next: { bar: next, plan: plans[next.index], wraps: next.index !== index + 1 },
         heard: { drums: [], bass: [], lead: [] },
         instrument: COMP_INSTRUMENTS.organ,
         lead: LEAD_INSTRUMENTS[settings.lead],
