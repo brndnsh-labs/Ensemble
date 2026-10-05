@@ -74,7 +74,6 @@ export const STATE_OWNERSHIP_MANIFEST = {
         workerLogging: 'runtime-derived',
         suspendTimeout: 'runtime-derived',
         currentKey: 'runtime-derived',
-        conductorVelocity: 'runtime-derived',
         masterVolume: 'preferences',
         countIn: 'preferences',
         visualFlash: 'preferences',

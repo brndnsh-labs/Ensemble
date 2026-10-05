@@ -1113,8 +1113,6 @@ export interface GlobalContext {
     readonly suspendTimeout: ReturnType<typeof setTimeout> | null;
     /** The current musical key being tracked by playback. */
     readonly currentKey: string | null;
-    /** Dynamic velocity modifier (0.0-1.0) applied by Conductor. */
-    readonly conductorVelocity: number;
     /** Master output volume. */
     readonly masterVolume: number;
     /** Whether the metronome count-in is enabled. */

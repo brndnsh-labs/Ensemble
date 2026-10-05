@@ -75,7 +75,7 @@ const BASS_ACCENT_EXPONENT = 0.9;
  * velocity from a future producer bug should distort, not blow up the bus.
  *
  * Raised from 2.0 by #941 for exactly one reason: the bass lane's macro term
- * grew from the band-wide `conductorVelocity` (≤1.15) to `bassMacroGain` (≤1.5)
+ * grew from the old conductor's band-wide velocity (≤1.15) to `bassMacroGain` (≤1.5)
  * when it became the lane's SOLE intensity term. This is a defensive bound
  * tracking a changed reachable maximum, NOT a decision to make the bass louder —
  * mid-intensity level is unchanged (see `bassMacroGain`), and the realistic

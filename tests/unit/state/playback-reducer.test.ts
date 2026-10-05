@@ -142,7 +142,6 @@ describe('Playback Reducer', () => {
                 workerLogging: true,
                 viz: { v: 1 },
                 suspendTimeout: 123,
-                conductorVelocity: 0.5,
                 lyricalBias: 0.2,
                 masterLimiter: { l: 1 },
                 masterVolume: 0.7,

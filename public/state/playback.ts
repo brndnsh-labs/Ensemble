@@ -47,7 +47,6 @@ export const playback = deepSignal<GlobalContext>({
     workerLogging: false,
     suspendTimeout: null,
     currentKey: null,
-    conductorVelocity: 1.0,
     masterVolume: 0.4,
     countIn: true,
     visualFlash: false,

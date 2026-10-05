@@ -46,7 +46,6 @@ export function resetAllStateForTest(): void {
     p.qualityColors = true;
     p.sessionTimer = 5;
     p.applyPresetSettings = false;
-    p.conductorVelocity = 1.0;
     p.songMode = true;
     p.masterVolume = 0.4;
 
