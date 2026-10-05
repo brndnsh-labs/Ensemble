@@ -12,10 +12,10 @@
  */
 import { type EnergyTier, energyTier } from '../arrange/plan.js';
 import type { PitchedNote } from '../core/types.js';
-import { BASS, bassNote, kickSteps, type LineMemory } from '../players/bass/line.js';
+import { BASS, bassNote, endingBass, kickSteps, type LineMemory } from '../players/bass/line.js';
 import { compIdiom, type Hit, pendulum } from '../players/comp/idiom.js';
 import { drumIdiom, type Lines, snareFigure, tomRun } from '../players/drums/kit.js';
-import { barSteps, dyn, isCommonTime, pulses, STEP, spanSteps } from '../players/grid.js';
+import { dyn, isCommonTime, pulses, STEP, spanSteps } from '../players/grid.js';
 import { leadIdiom } from '../players/lead/idiom.js';
 import { chordScale, fifthFirst, rootFirst } from '../players/lead/palette.js';
 import { type ChordFacts, chordPcs } from '../theory/chord.js';
@@ -233,11 +233,9 @@ const metalBass: PitchedIdiom = {
         const events: PitchedNote[] = [];
         let last = memory.last;
         if (plan.ending) {
-            const chord = bar.spans[0]?.chord;
-            if (chord) {
-                last = lowRoot(chord.bass);
-                events.push(bassNote(bar, 0, last, barSteps(bar), dyn(108, plan.energy)));
-            }
+            const held = endingBass(ctx, (c) => lowRoot(c.bass), last, dyn(108, plan.energy));
+            events.push(...held.events);
+            last = held.last;
             return { events, memory: { last } };
         }
         const kicks = kickSteps(ctx);

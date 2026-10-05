@@ -19,6 +19,7 @@ import {
     BASS,
     bassNote,
     bassPc,
+    endingBass,
     type LineMemory,
     nextChord,
     place,
@@ -199,13 +200,14 @@ const acousticBass: PitchedIdiom = {
         const events: PitchedNote[] = [];
         let { last, land } = memory;
         if (plan.ending) {
-            const chord = bar.spans[0]?.chord;
-            if (chord) {
-                // A passing tone into the last chord lands where it pointed, a step away.
-                const root =
-                    land !== null && mod12(land) === chord.bass ? land : place(bassPc(chord), last);
-                events.push(bassNote(bar, 0, root, total, dyn(96, plan.energy)));
-            }
+            // A passing tone into the last chord lands where it pointed, a step away.
+            const held = endingBass(
+                ctx,
+                (c, p) => (land !== null && mod12(land) === c.bass ? land : place(bassPc(c), p)),
+                last,
+                dyn(96, plan.energy),
+            );
+            events.push(...held.events);
             return { events, memory: { last, land: null } satisfies AcousticBassMemory };
         }
         const common = isCommonTime(bar);

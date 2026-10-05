@@ -11,6 +11,7 @@ import {
     BASS_SLOT_HI,
     bassNote,
     bassPc,
+    endingBass,
     kickSteps,
     type LineMemory,
     nextChord,
@@ -113,10 +114,15 @@ const funkBass: PitchedIdiom = {
         const events: PitchedNote[] = [];
         let last = memory.last;
         if (plan.ending) {
-            const chord = bar.spans[0]?.chord;
-            if (chord) {
-                events.push(bassNote(bar, 0, place(bassPc(chord), last), 8, dyn(108, plan.energy)));
-            }
+            // A half note at most: the funk ending is a short hit, not a held note.
+            const held = endingBass(
+                ctx,
+                (c, p) => place(bassPc(c), p),
+                last,
+                dyn(108, plan.energy),
+                8,
+            );
+            events.push(...held.events);
             return { events, memory: { last } };
         }
         const total = Math.round(bar.meter.barTicks / 120);
@@ -305,6 +311,9 @@ export const funk: Style = {
     prefers: 'clav',
     lead: { idiom: funkLead, prefers: 'sax' },
     // why: funk's tonic is the one-chord dominant vamp, the I9; in a minor key the im9 vamp
-    // (the minor groove's Em9). The ending holds the chord the groove lives on.
-    ending: { major: '9', minor: 'm9' },
+    // (the minor groove's Em9). The ending holds the chord the groove lives on. On a tune whose
+    // own tonic is not a dominant (`Cmaj7`, `C6`) the I9's b7 would make the last chord a V7
+    // of IV (#1502): it ends on the 6/9 instead, the horn section's final hit, which keeps the
+    // 9th and has no 7th to argue with the tune's.
+    ending: { major: '69', minor: 'm9', dominant: '9' },
 };

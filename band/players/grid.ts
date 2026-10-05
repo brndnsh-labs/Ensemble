@@ -5,6 +5,7 @@
  */
 import { PPQ } from '../core/types.js';
 import type { Bar } from '../form/timeline.js';
+import type { BarContext } from '../styles/types.js';
 
 export const STEP = PPQ / 4;
 
@@ -45,6 +46,17 @@ export function spanSteps(bar: Bar) {
         from: Math.round((span.start - bar.start) / STEP),
         to: Math.round((span.end - bar.start) / STEP),
     }));
+}
+
+/**
+ * The chords a held ending strikes (`plan.ending`), with their step ranges. A bar the band
+ * resolves (`ctx.ending`, `arrange/ending.ts`) is played as that bar says: the resolved tonic
+ * alone, or a bar that gets home itself, `| G7 C |`'s V on 1 and its I from 3 (#1502). A last
+ * bar played as written (already home on its downbeat, a coda's) holds its first chord.
+ */
+export function endingSpans(ctx: BarContext) {
+    const spans = spanSteps(ctx.bar);
+    return ctx.ending?.index === ctx.bar.index ? spans : spans.slice(0, 1);
 }
 
 /**

@@ -283,10 +283,25 @@ chord: the bass's one note, the comp's one chord and the lead's last long note, 
 final bar's first chord. Many tunes' last bar is a turnaround written to send the form round
 again (the blues fixture's `Dm7 G7`), and on the last time through a band doesn't hold it: it
 resolves it. So `arrange/ending.ts` (`heldEnding`) gives the ending bar to the lanes on the
-key's tonic, in the quality the genre ends on (`Style.ending`, a chord-symbol suffix read by
-`theory/chord.ts`): I6 for jazz, Imaj7 for bossa, I9 for the blues and funk, Imaj7 for disco
-and hip hop, Imaj9 for neo-soul, the power chord for metal and the triad for the rest; in a
-minor key the minor equivalents (im6 for jazz and bossa, im9, im7, the minor triad).
+key's tonic, in the colour the genre ends on (`Style.ending`, a chord-symbol suffix read by
+`theory/chord.ts`): I6 for jazz, Imaj7 for bossa, I9 for the blues, I6/9 for funk, Imaj7 for
+disco and hip hop, Imaj9 for neo-soul, the power chord for metal and the triad for the rest;
+in a minor key the minor equivalents (im6 for jazz and bossa, im9, im7, the minor triad).
+- **The family is the chart's, the colour the style's (#1502).** The ending takes its family
+  from the chart's own tonic (`tonicFamily`), so a colour never changes what the tonic is.
+  Every chord on the tonic counts for its family by how long it lasts, unless it only passes
+  through: a dominant falling a fifth to anything but a dominant is a V (`C7` → `Fmaj7`), a
+  minor chord falling a fifth to a dominant is a ii (`Cm7` → `F7`), a major chord falling a
+  fifth to a minor one is a V (`A` → `Dm` in A minor); I → IV, i → iv and a blues's I7 → IV7
+  stay home. The longer of minor and major wins, a tie goes to the key's mode, and the
+  dominant family is taken only when nothing major rests on the tonic (a blues, a dominant
+  vamp; a tune that states `Cmaj7` is not a blues because a `C7` passes). On a dominant tonic (a blues's
+  `C7`, a dominant vamp's `E9`) a style whose colour carries a 7th plays its `dominant` colour,
+  keeping the chart's b7: I9 for funk, the blues, bossa, disco and neo-soul, I7 for hip hop
+  (jazz's 6th and the triads carry no 7th to contradict it). On a major tonic funk ends on the
+  6/9, since its I9's b7 would turn the last chord into a V7 of IV; the blues keeps its I9, its
+  own sound on any tune. A minor tonic ends minor even where the key reads major (a C minor
+  tune typed without its key).
 - **What already counts as home.** A first chord that rests on the tonic, root and bass, in a
   stable family (major, minor, dominant, power) is held as written, in the colour the chart
   gave it: rhythm changes' `Bb6`, a blues's `C7`, a minor groove's `Em9`, a Picardy `E` in E
@@ -295,7 +310,17 @@ minor key the minor equivalents (im6 for jazz and bossa, im9, im7, the minor tri
   sound, and the held ending stands on the root. Nor is a tonic that is still moving: `Csus4`,
   `Co7`, `Cø`, `C+`.
 - **A bar that gets home itself.** When a later chord of the last bar rests on the tonic (`G7
-  C`, `Csus4 Cmaj7`), the band holds that written chord, in its own colour, not the style's.
+  C`, `Csus4 Cmaj7`), the band holds that written chord, in its own colour, not the style's,
+  and plays the bar as a band reading it does (#1502): the chords before it struck where they
+  are written (the G7 on 1), the tonic struck where the chart puts it and held from there (the
+  C from 3), bass and comp together. The drummer kicks the V and saves the ending's one crash
+  for the arrival. A bass under a resolution on its own root (`Csus4 Cmaj7`) holds the note
+  through it (funk's short hits strike it again). The lead sings its line over the V as
+  written and lands with the band (`landOnHeld`): on the tonic's resting tone nearest its last
+  note, struck where the I arrives (or held into it when it is already that tone), to the end
+  of the bar. The lanes read
+  the chords to strike from `endingSpans`; a last bar played as written (home on its downbeat,
+  a coda's) still holds its first chord.
 - **Written endings stand: how a chart asks to end off the tonic.** A fermata on the last bar,
   an N.C. on its downbeat, and the last bar of a written coda (`Timeline.coda`: reached through
   a D.C./D.S. al Coda's hop or a counted chart's last-chorus coda) are the chart's own ending,
@@ -307,7 +332,23 @@ minor key the minor equivalents (im6 for jazz and bossa, im9, im7, the minor tri
   the band resolves only into a key the chart is in: one it opens on (a stable chord on the
   tonic as its first chord, which a dominant I–IV vamp like `E9 | A9` is), or one it rests on
   somewhere else (a chord resting on its tonic, in a bar in that key). An F tune, an F blues or
-  an A minor tune left on C keeps its written last chord.
+  an A minor tune left on C keeps its written last chord. In a major key a minor chord on the
+  tonic falling a fifth to a dominant is the ii of a ii–V, not a resting tonic (`isTwoFive`,
+  #1516): `Cm7 F7` is how Autumn Leaves, rhythm changes, Stella and Cherokee pass through C, so
+  left on C they keep their written last chord (a minor key's dorian `Em7 A7` is its tonic).
+- **Bookends.** A tune whose last bar comes to rest on the chord it opens on, by root, both
+  resting (`bookendAt`), is home there whatever its key says: `G | C | D | G` left on C ends on
+  G. The bar has to end there: one that moves off the opening chord (`F G7`, `G D7`) is a
+  turnaround and resolves, and one that reaches it later (`D7 G`) strikes the D7 and holds the G,
+  as `G7 C` does. Bookends outrank a key that was set, too: `G | C | F | G` in C ends on its G,
+  and `Dm | Am | E7 | Dm` in A minor on its Dm, as written. That is deliberate — a tune that
+  opens and closes on one chord has said where home is, and ending on its written last chord is
+  never wrong-sounding — and also unavoidable today: a set key can't be told from the default
+  (#1521).
+- **Not every defaulted key is decidable bar by bar.** Left on C, the 8-bar blues's IV7 (`C7 |
+  C7`), Stella's held ii (`Cm7 | Cm7 | Ab7`) and rhythm changes' bridge (`C7 | C7 | F7`) still
+  read as resting on C, so they resolve into C (#1521: weigh the whole chart, or record whether
+  the key was set).
 - **Only the ending bar's harmony changes.** The bar before it hears the resolved bar as its
   next, so its approach notes walk into the tonic (a walking bass's line toward its next
   chord, a lead-in); its chords, the comp (which never anticipates an ending) and the drums are

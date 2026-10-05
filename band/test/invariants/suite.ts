@@ -124,7 +124,9 @@ function asPlayed(timeline: Timeline, style: StyleId, looping: boolean): Timelin
     if (!ending) {
         return timeline;
     }
-    const { attack: _, ...span } = ending.spans[0];
+    // Every span the ending bar plays: the held chord, and what a bar that gets home itself
+    // strikes before it (`| G7 C |`'s V, #1502).
+    const played = ending.spans.map(({ attack: _, ...span }) => span);
     return {
         ...timeline,
         bars: timeline.bars.map((bar) => (bar.index === last ? ending : bar)),
@@ -132,7 +134,7 @@ function asPlayed(timeline: Timeline, style: StyleId, looping: boolean): Timelin
             ...timeline.spans
                 .filter((s) => s.start < ending.start)
                 .map((s) => (s.end > ending.start ? { ...s, end: ending.start } : s)),
-            span,
+            ...played,
         ],
     };
 }
@@ -193,6 +195,25 @@ function defineEndings(styles: StyleId[]): void {
                                     `${where} bar ${e.bar} ${e.lane}@${e.tick}: rings ${e.tick + e.dur - timeline.ticks} ticks past the end`,
                                 );
                             }
+                        }
+                        // And the bass's held note lasts to it, in every meter: five beats in
+                        // 5/4, not four. (Funk's ending is a short hit, a half note at most:
+                        // `endingBass`'s cap.)
+                        const last = timeline.bars[timeline.bars.length - 1];
+                        const due =
+                            last.start +
+                            (styleId === 'funk'
+                                ? Math.min(last.meter.barTicks, 8 * STEP)
+                                : last.meter.barTicks);
+                        const held = events
+                            .filter(
+                                (e): e is PitchedNote => e.lane === 'bass' && e.bar === last.index,
+                            )
+                            .at(-1);
+                        if (!held || Math.abs(held.tick + held.dur - due) > 1) {
+                            problems.push(
+                                `${where}: the held bass ends at ${held ? held.tick + held.dur : 'nothing'}, not ${due}`,
+                            );
                         }
                     }
                 }

@@ -10,6 +10,7 @@ import {
     BASS_SLOT_HI,
     bassNote,
     bassPc,
+    endingBass,
     kickSteps,
     type LineMemory,
     nextChord,
@@ -20,7 +21,7 @@ import {
 } from '../players/bass/line.js';
 import { compIdiom, type Hit, strums } from '../players/comp/idiom.js';
 import { drumIdiom, snareFigure, tomRun } from '../players/drums/kit.js';
-import { barSteps, dyn, isCommonTime, pulses, spanSteps } from '../players/grid.js';
+import { dyn, isCommonTime, pulses, spanSteps } from '../players/grid.js';
 import { leadIdiom } from '../players/lead/idiom.js';
 import { fifthFirst, pentatonicPool, rootFirst } from '../players/lead/palette.js';
 import { mod12 } from '../theory/pitch.js';
@@ -96,19 +97,13 @@ const rockBass: PitchedIdiom = {
         const events: PitchedNote[] = [];
         let last = memory.last;
         if (plan.ending) {
-            const chord = bar.spans[0]?.chord;
-            if (chord) {
-                events.push(
-                    // why: the held note is the bar, in any meter (#1503).
-                    bassNote(
-                        bar,
-                        0,
-                        place(bassPc(chord), last),
-                        barSteps(bar),
-                        dyn(100, plan.energy),
-                    ),
-                );
-            }
+            const held = endingBass(
+                ctx,
+                (c, p) => place(bassPc(c), p),
+                last,
+                dyn(100, plan.energy),
+            );
+            events.push(...held.events);
             return { events, memory: { last } };
         }
         spans.forEach(({ span, from, to }, i) => {

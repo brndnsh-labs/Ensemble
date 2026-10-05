@@ -79,38 +79,209 @@ function keyAt(timeline: Timeline, tick: number): KeyContext | undefined {
     return bars[lo]?.key;
 }
 
+/** The keys a bar-by-bar scan compares against: is the bar sounding at `tick` in `key`? */
+function inKey(timeline: Timeline, key: KeyContext) {
+    return (tick: number) => {
+        const here = keyAt(timeline, tick);
+        return here?.tonic === key.tonic && here.minor === key.minor;
+    };
+}
+
+/**
+ * Is a minor chord on the tonic of a major key the ii of a ii–V (`Cm7` → `F7`, heading for Bb)?
+ * In a major key a minor chord on the tonic that falls a fifth to a dominant is not resting on
+ * it: Autumn Leaves (G minor) opens on `Cm7 F7`, rhythm changes, Stella and Cherokee pass
+ * through it (#1516). A minor key's dorian i7–IV7 (`Em7 A7`) is its tonic.
+ */
+function isTwoFive(chord: ChordFacts, next: ChordFacts | null, key: KeyContext): boolean {
+    return (
+        !key.minor &&
+        chord.family === 'minor' &&
+        next?.family === 'dominant' &&
+        next.root === mod12(chord.root + 5)
+    );
+}
+
 /**
  * Does the chart itself rest on this key's tonic somewhere, in a bar in this key? A chart typed
- * without setting its key reads as C major, so an F tune whose last bar is `Gm7 C7` would
- * otherwise "resolve" to C, and an A minor tune ending on `E7` to C6. A key the chart never sits
- * on is not one to end in, so its written chord stands.
+ * without setting its key reads as C major (`blankSong`), so an F tune whose last bar is `Gm7
+ * C7` would otherwise "resolve" to C, and an A minor tune ending on `E7` to C6. A key the chart
+ * never sits on is not one to end in, so its written chord stands.
  * - A chart that OPENS on a stable chord on the tonic is in that key outright, whatever follows
  *   it: a dominant I–IV vamp (`E9 | A9`, `C7 | F7`) falls a fifth from every I, and is still in
  *   I. (An F blues keyed C opens on F7, an F tune on F, an A minor tune on Am: none backs C.)
  * - Anywhere else a chord counts when it rests on the tonic (`restsOnTonic`): a tonic dominant
  *   that falls a fifth to the next chord (`C7` → `F`) is a V there, not a tonic.
+ * - Neither counts as a ii of a ii–V in a major key (`isTwoFive`, #1516): `Cm7 F7` is how a
+ *   G minor or a Bb tune passes through C, so a defaulted C must not be read off it.
  * Computed afresh on each call (once per pass): a pure scan that usually stops at the first
  * chord, so the engine keeps no memo between passes.
  */
 function keyBacked(timeline: Timeline, key: KeyContext): boolean {
     const { spans } = timeline;
-    const sameKey = (tick: number) => {
-        const here = keyAt(timeline, tick);
-        return here?.tonic === key.tonic && here.minor === key.minor;
-    };
+    const sameKey = inKey(timeline, key);
     const opening = spans.find((span) => span.chord);
     if (
         opening?.chord &&
         sameKey(opening.start) &&
         opening.chord.root === key.tonic &&
-        STABLE.has(opening.chord.family)
+        STABLE.has(opening.chord.family) &&
+        !isTwoFive(opening.chord, chordAfter(timeline, opening.start), key)
     ) {
         return true;
     }
     return spans.some(
         ({ chord, start }) =>
-            !!chord && sameKey(start) && restsOnTonic(timeline, chord, start, key),
+            !!chord &&
+            sameKey(start) &&
+            restsOnTonic(timeline, chord, start, key) &&
+            !isTwoFive(chord, chordAfter(timeline, start), key),
     );
+}
+
+/**
+ * Where the last bar comes to rest on the chord the chart opens on (#1516): the index of the
+ * span from which it stays on that chord's root to the bar's end, or -1. A tune that starts and
+ * ends on its I is home there whatever its key says: `G | C | D | G` and `F | Bb | C | F` typed
+ * without a key (read as C) end on G and F, not on C. Matched by root, in any stable family and
+ * in root position (a G minor groove's `Gm11` and its last `G7#9`), and only when both act as a
+ * tonic (`actsAsTonic`): a tune that opens on its V (`G7 | C`) does not end at home on that V.
+ * The bar has to END there: one that opens on the opening chord and moves off it (`F G7`,
+ * `G D7`) is a turnaround, and resolves; one that reaches it later (`D7 G`) gets home itself.
+ */
+function bookendAt(timeline: Timeline, bar: Bar): number {
+    const opening = timeline.spans.find((span) => span.chord);
+    if (!opening?.chord || opening.start >= bar.start) {
+        return -1;
+    }
+    const root = opening.chord.root;
+    const resting = (chord: ChordFacts, start: number) =>
+        STABLE.has(chord.family) &&
+        chord.bass === chord.root &&
+        actsAsTonic(chord, chordAfter(timeline, start), bar.key.minor);
+    if (!resting(opening.chord, opening.start)) {
+        return -1;
+    }
+    // The last chord of the bar (before a written stop) is on the opening's root, and so is
+    // every chord from the first of them.
+    let from = -1;
+    for (let k = bar.spans.length - 1; k >= 0; k--) {
+        const { chord } = bar.spans[k];
+        if (!chord) {
+            if (from >= 0) {
+                break;
+            }
+            continue;
+        }
+        if (chord.root !== root) {
+            break;
+        }
+        from = k;
+    }
+    const arrival = from >= 0 ? bar.spans[from] : null;
+    return arrival?.chord && resting(arrival.chord, arrival.start) ? from : -1;
+}
+
+/**
+ * Is a chord on the tonic acting as the tonic, given the chord after it and the key's mode?
+ * Only a fall of a fifth can make it something else, and then by what it falls to (#1502):
+ * - a dominant falling to anything but another dominant is a V (`C7` → `Fmaj7`); to a dominant
+ *   it is the I7 of a dominant I–IV vamp (`C7` → `F7`, a blues), and stays home;
+ * - a minor chord falling to a dominant is a ii in a major key (`Cm7` → `F7`, the ii–V of Bb),
+ *   but a minor key's dorian i7–IV7 vamp (`Em7` → `A7`); i → iv (`Cm7` → `Fm7`) is a tonic;
+ * - a major chord falling to a minor one is that chord's V in a minor key (`A` → `Dm` in A
+ *   minor), but a major key's I → iv (`C` → `Fm`); I → IV (`C` → `F`, `C` → `F7`) is a tonic.
+ */
+function actsAsTonic(chord: ChordFacts, next: ChordFacts | null, minorKey: boolean): boolean {
+    if (!next || next.root !== mod12(chord.root + 5)) {
+        return true;
+    }
+    switch (chord.family) {
+        case 'dominant':
+            return next.family === 'dominant';
+        case 'minor':
+            return minorKey || next.family !== 'dominant';
+        case 'major':
+            return !minorKey || next.family !== 'minor';
+        default:
+            return true;
+    }
+}
+
+/** The family a held ending takes from the chart's own tonic (`tonicFamily`), or the key's. */
+type TonicFamily = 'major' | 'minor' | 'dominant' | null;
+
+/**
+ * The family of the chart's own tonic in this key (#1502): what it rests on, weighed by how
+ * long it rests there. Every stable chord on the tonic in a bar in this key that acts as the
+ * tonic (`actsAsTonic`) counts for its family, by its length; a passing one does not (the ii–V
+ * `Cm7 F7` of a C-major tune heading for Bb, a secondary dominant, the V7 of IV).
+ * - Minor wins when it rests longer than major and dominant together, and the other way round;
+ *   a tie (or nothing resting on the tonic at all) goes to the key's mode, so a passing
+ *   borrowed chord (`C | F | Cm | G7`) doesn't turn a major tune minor.
+ * - Of the two major families the dominant is taken only when the chart never rests on a
+ *   non-dominant major tonic: a blues, a dominant vamp. A tune that states `Cmaj7` anywhere is
+ *   not a blues because a `C7` passes through it.
+ * Null when the key's mode decides (a power chord, or nothing to weigh).
+ */
+function tonicFamily(timeline: Timeline, key: KeyContext): TonicFamily {
+    const sameKey = inKey(timeline, key);
+    let major = 0;
+    let dominant = 0;
+    let minor = 0;
+    for (const { chord, start, end } of timeline.spans) {
+        if (
+            !chord ||
+            chord.root !== key.tonic ||
+            !sameKey(start) ||
+            !actsAsTonic(chord, chordAfter(timeline, start), key.minor)
+        ) {
+            continue;
+        }
+        const length = end - start;
+        if (chord.family === 'major') {
+            major += length;
+        } else if (chord.family === 'dominant') {
+            dominant += length;
+        } else if (chord.family === 'minor') {
+            minor += length;
+        }
+    }
+    const majors = major + dominant;
+    const minorWins = minor > majors || (minor === majors && key.minor);
+    if (minorWins && minor > 0) {
+        return 'minor';
+    }
+    if (!minorWins && majors > 0) {
+        return major > 0 ? 'major' : 'dominant';
+    }
+    return null;
+}
+
+/**
+ * The suffix a held ending plays on the tonic: the family is the chart's (`tonicFamily`), the
+ * colour the style's (#1502). A style's colour must not change what the tonic is: funk's I9 on
+ * a tune whose tonic is `Cmaj7` adds a b7 the tune never had, and turns the last chord into a
+ * V7 of IV.
+ * - A dominant tonic in a major key (a blues's `C7`, a dominant vamp's `E9`) takes the style's
+ *   `dominant` colour, which keeps the b7 the chart wrote. Without one the style's colour has
+ *   no 7th to contradict it (a triad, a 6th), and its major quality stands.
+ * - A minor tonic takes the minor quality, a major one the major quality, whatever the key
+ *   says: a C minor tune typed without its key ends on Cm6, not on C6.
+ * - Otherwise (nothing to weigh, a power chord, or a dominant in a minor key: the Hendrix
+ *   `E7#9` tonic is a minor key's sound) the key's mode decides, as it always did.
+ */
+function endingSuffix(quality: EndingQuality, key: KeyContext, family: TonicFamily): string {
+    if (family === 'dominant' && !key.minor) {
+        return quality.dominant ?? quality.major;
+    }
+    if (family === 'minor') {
+        return quality.minor;
+    }
+    if (family === 'major') {
+        return quality.major;
+    }
+    return key.minor ? quality.minor : quality.major;
 }
 
 /**
@@ -127,8 +298,11 @@ function keyBacked(timeline: Timeline, key: KeyContext): boolean {
  *   blues, `Em9` closing a minor groove, a Picardy `E` in E minor, in the colour the chart
  *   chose for it. A tonic over another bass (`C/E`) is not home — an inversion is a passing
  *   sound, and a held ending stands on its root — and nor is `Csus4`;
+ * - it rests from its downbeat to its end on the chord the chart opens on (`bookendAt`): the
+ *   tune is home whatever its key says (a `G | C | D | G` typed without a key);
  * - the chart never rests on the key's tonic anywhere (`keyBacked`): the key is not backed.
- * A bar that reaches home later (`G7 C`, `Csus4 C`) holds that written chord, as written.
+ * A bar that reaches home later (`G7 C`, `Csus4 C`) strikes what comes before it as written and
+ * holds that written chord from where the chart puts it (#1502).
  */
 export function heldEnding(timeline: Timeline, index: number, quality: EndingQuality): Bar | null {
     const bar = timeline.bars[index];
@@ -145,33 +319,50 @@ export function heldEnding(timeline: Timeline, index: number, quality: EndingQua
         return null;
     }
     if (home > 0) {
-        // The bar resolves itself: the band holds the tonic the chart writes, in its colour.
-        return heldOn(bar, bar.spans[home].chord!);
+        // The bar resolves itself: a band reading `| G7 C |` strikes the G7 on 1 and holds the
+        // C from 3, the tonic the chart writes, in its colour.
+        return heldOn(bar, bar.spans[home].chord!, home);
+    }
+    // Bookends outrank the key, even a key that was set (#1516; a set key can't be told from
+    // the default yet, #1521): a tune that opens and ends on its own chord ends there.
+    const bookend = bookendAt(timeline, bar);
+    if (bookend === 0) {
+        return null;
+    }
+    if (bookend > 0) {
+        return heldOn(bar, bar.spans[bookend].chord!, bookend);
     }
     if (!keyBacked(timeline, bar.key)) {
         return null;
     }
-    // A roman numeral names the key's tonic in either mode; the suffix is the genre's quality.
-    const suffix = bar.key.minor ? quality.minor : quality.major;
+    // A roman numeral names the key's tonic in either mode; the suffix is the genre's colour
+    // on the chart's own tonic family.
+    const suffix = endingSuffix(quality, bar.key, tonicFamily(timeline, bar.key));
     const chord = parseChord(`I${suffix}`, bar.key);
     if (!chord) {
         throw new Error(`Unknown ending quality: ${suffix}`);
     }
-    return heldOn(bar, chord);
+    return heldOn(bar, chord, 0);
 }
 
 /**
- * `bar` played as one chord, struck on its downbeat (the resolution is an arrival) and held to
- * the bar's first written rest, if it has one: the chart's stop stays where it is written.
+ * `bar` played to one held chord: the spans before `from` as written (a `G7 C` bar's G7,
+ * struck on 1), then `chord` struck where span `from` starts (the downbeat for a resolved
+ * turnaround: the resolution is an arrival) and held to the bar's first written rest after it,
+ * if it has one: the chart's stop stays where it is written, and the bar is silent from there.
+ * The held chord is always the bar's last chord, so a lane finds it there.
  */
-function heldOn(bar: Bar, chord: ChordFacts): Bar {
-    const rest = bar.spans.findIndex((span) => !span.chord);
-    const end = rest > 0 ? bar.spans[rest].start : bar.start + bar.meter.barTicks;
+function heldOn(bar: Bar, chord: ChordFacts, from: number): Bar {
+    const rest = bar.spans.findIndex((span, k) => k > from && !span.chord);
+    const start = from > 0 ? bar.spans[from].start : bar.start;
+    const barEnd = bar.start + bar.meter.barTicks;
+    const end = rest > 0 ? bar.spans[rest].start : barEnd;
     return {
         ...bar,
         spans: [
-            { start: bar.start, end, chord, fermata: false, tied: false, attack: true },
-            ...(rest > 0 ? bar.spans.slice(rest) : []),
+            ...bar.spans.slice(0, from),
+            { start, end, chord, fermata: false, tied: false, attack: true },
+            ...(rest > 0 ? [{ ...bar.spans[rest], end: barEnd }] : []),
         ],
     };
 }
