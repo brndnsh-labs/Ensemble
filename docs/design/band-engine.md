@@ -296,8 +296,11 @@ in a minor key the minor equivalents (im6 for jazz and bossa, im9, im7, the mino
   minor chord falling a fifth to a dominant is a ii (`Cm7` → `F7`), a major chord falling a
   fifth to a minor one is a V (`A` → `Dm` in A minor); I → IV, i → iv and a blues's I7 → IV7
   stay home. The longer of minor and major wins, a tie goes to the key's mode, and the
-  dominant family is taken only when nothing major rests on the tonic (a blues, a dominant
-  vamp; a tune that states `Cmaj7` is not a blues because a `C7` passes). On a dominant tonic (a blues's
+  dominant family is taken when a dominant rests on the tonic and no major 7th does (a blues, a
+  dominant vamp; a tune that states `Cmaj7` is not a blues because a `C7` passes). A triad, a
+  6th or a 6/9 says major, not which major (#1521): each sits inside the dominant's own 13th
+  chord, so a blues with a plain `C` in bar 11, or a jazz blues's `C6 A7` turnaround, still ends
+  on its dominant colour, and a tonic of triads and 6ths alone ends major. On a dominant tonic (a blues's
   `C7`, a dominant vamp's `E9`) a style whose colour carries a 7th plays its `dominant` colour,
   keeping the chart's b7: I9 for funk, the blues, bossa, disco and neo-soul, I7 for hip hop
   (jazz's 6th and the triads carry no 7th to contradict it). On a major tonic funk ends on the
@@ -347,10 +350,26 @@ in a minor key the minor equivalents (im6 for jazz and bossa, im9, im7, the mino
   opens and closes on one chord has said where home is, and ending on its written last chord is
   never wrong-sounding — and also unavoidable today: a set key can't be told from the default
   (#1521).
-- **Not every defaulted key is decidable bar by bar.** Left on C, the 8-bar blues's IV7 (`C7 |
-  C7`), Stella's held ii (`Cm7 | Cm7 | Ab7`) and rhythm changes' bridge (`C7 | C7 | F7`) still
-  read as resting on C, so they resolve into C (#1521: weigh the whole chart, or record whether
-  the key was set).
+- **A last V7 of the opening chord, over a key only a dominant 7th backs (#1521).** Left on C,
+  the 8-bar blues's IV7 (`C7 | C7`) and rhythm changes' bridge (`C7 | C7 | F7`) rest on C, but
+  a `C7` that never settles is as often a IV7 or a chain of dominants as a tonic. When nothing
+  but a dominant 7th rests on the key's tonic, the last chord is the V7 of the opening chord
+  (`D7` → `G7`, `F7` → `Bbmaj7`), and that opening is a major or dominant chord at rest off the
+  key's tonic, the band resolves to the opening chord, in its own family: the 8-bar blues ends
+  on G's dominant colour, rhythm changes on Bb's major one. A triad, a 6th, a maj7 or a minor
+  chord resting on C states C as home and keeps it (`G | Am | Dm7 | C | … | G D7` stays a C
+  tune that opens on its V); a minor opening is never taken (a tune opening on its vi, as All
+  The Things You Are does, ends with the V7 of it); a last `C7` in C is the key's own chord.
+- **A written V7–I in the last bar, with no key to resolve into (#1521).** When the key is not
+  backed and the last bar writes a dominant straight into a resting chord a fifth below it
+  (`E7 Am` in an A minor tune left on C), the band strikes the V and holds the I, as it does a
+  `G7 C`, instead of holding the bar's first chord. A backed key still resolves it: `D7 G` in a
+  C tune is the turnaround's V of V and V, and ends on C.
+- **Not every defaulted key is decidable bar by bar.** Left on C, All The Things You Are (its
+  A section's `Cmaj7 | Cmaj7`) and Stella (its held ii, `Cm7 | Cm7 | Ab7`) rest on a C that no
+  one-chord-at-a-time rule tells from a tonic, so they resolve into C; and `G | C | D | D7` is
+  the same evidence as a C tune opening on its V, so it ends on C (#1521, options B and C:
+  record whether the key was set, or weigh the whole chart).
 - **Only the ending bar's harmony changes.** The bar before it hears the resolved bar as its
   next, so its approach notes walk into the tonic (a walking bass's line toward its next
   chord, a lead-in); its chords, the comp (which never anticipates an ending) and the drums are

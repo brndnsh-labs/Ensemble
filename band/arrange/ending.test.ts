@@ -258,6 +258,38 @@ describe('a final turnaround resolves to the tonic', () => {
                 'major',
                 0,
             ],
+            // A triad or a 6th says major, not which major (#1521): a blues that states its I
+            // once as a plain `C`, or voices it `C6` in bar 11's turnaround, is still a blues.
+            // Only a major 7th on the tonic says it is not a dominant; a tonic of triads and
+            // 6ths alone ends major.
+            [
+                'a blues with a plain I',
+                score([
+                    {
+                        label: 'A',
+                        bars: 'C7 | F7 | C7 | C7 | F7 | F7 | C7 | C7 | G7 | F7 | C | G7',
+                    },
+                ]),
+                'dominant',
+                0,
+            ],
+            [
+                'a jazz blues with an I6 turnaround',
+                score([
+                    {
+                        label: 'A',
+                        bars: 'C7 | F7 | C7 | Gm7 C7 | F7 | F7 | C7 | Em7 A7 | Dm7 | G7 | C6 A7 | Dm7 G7',
+                    },
+                ]),
+                'dominant',
+                0,
+            ],
+            [
+                'a tonic of triads and 6ths',
+                score([{ label: 'A', bars: 'C6 | Am7 | Dm7 G7 | C | F | G7' }]),
+                'major',
+                0,
+            ],
         ];
         for (const style of STYLE_IDS) {
             for (const [name, chart, family, tonic] of tables) {
@@ -892,6 +924,158 @@ describe('an ending already home, or written, is played as written', () => {
         expect(heldEnding(uncounted, uncounted.bars.length - 1, STYLES.jazz.ending)).not.toBeNull();
     });
 });
+
+describe('a chart typed without its key, read one chord at a time (#1521)', () => {
+    /** The pitch class the bass holds at the end of the last bar, in a style's pass. */
+    function heldBass(timeline: Timeline, style: StyleId, seed = 'a') {
+        const { events } = performPass(timeline, settingsFor(style, seed), {
+            pass: 0,
+            looping: false,
+        });
+        return mod12(lastBar(timeline, events).bass.at(-1)!.midi);
+    }
+
+    it('a last bar that writes its own V7–I holds the I, when no key backs another', () => {
+        // Read as C major, nothing in either rests on C: an A minor tune ending `E7 Am` and a G
+        // tune opening on its ii and ending `Am7 D7 G`. Played as written, the band used to hold
+        // the bar's first chord (the E7, the Am7) and drop the I the chart writes.
+        for (const [bars, written, arrival] of [
+            ['Dm | G | E7 | E7 Am', ['E7', 'Am'], 1],
+            ['Am7 | D7 | Gmaj7 | Em7 | Am7 | D7 | Bm7 E7 | Am7:1 D7:1 G:2', ['Am7', 'D7', 'G'], 2],
+        ] as const) {
+            const timeline = compileTimeline(score([{ label: 'A', bars }]));
+            const bar = timeline.bars.at(-1)!;
+            const home = bar.spans[arrival];
+            for (const style of STYLE_IDS) {
+                const ending = heldEnding(timeline, bar.index, STYLES[style].ending);
+                expect(
+                    ending?.spans.map((span) => span.chord?.symbol),
+                    `${style} ${bars}`,
+                ).toEqual(written);
+                for (const seed of ['a', 'b']) {
+                    const where = `${style}/${seed} ${bars}`;
+                    const { events } = performPass(timeline, settingsFor(style, seed), {
+                        pass: 0,
+                        looping: false,
+                    });
+                    const { bass, comp } = lastBar(timeline, events);
+                    // The V is struck under the dominant, and the I from where it is written,
+                    // ringing to the end of the bar.
+                    const dominant = bar.spans[arrival - 1];
+                    expect(
+                        bass.some(
+                            (n) =>
+                                n.tick === dominant.start && mod12(n.midi) === dominant.chord!.root,
+                        ),
+                        `${where}: the V in the bass`,
+                    ).toBe(true);
+                    const held = bass.at(-1)!;
+                    expect([held.tick, mod12(held.midi)], `${where}: the I`).toEqual([
+                        home.start,
+                        home.chord!.root,
+                    ]);
+                    expect(held.tick + held.dur, where).toBe(bar.start + bar.meter.barTicks);
+                    expect(
+                        comp.some((n) => !n.muted && n.tick === home.start),
+                        `${where}: the comp strikes the I`,
+                    ).toBe(true);
+                }
+            }
+        }
+    });
+
+    it('a written V–I off the tonic of a key the chart rests on still resolves to the tonic', () => {
+        // `D7 G` in a C tune is the turnaround's V of V and V: the band ends on C, as before.
+        for (const bars of ['C | Am | F | D7 G', 'G7 | C | F | D7 G']) {
+            const timeline = compileTimeline(score([{ label: 'A', bars }]));
+            for (const style of STYLE_IDS) {
+                const ending = heldEnding(timeline, 3, STYLES[style].ending);
+                expect(
+                    ending?.spans.map((span) => span.chord?.root),
+                    `${style} ${bars}`,
+                ).toEqual([0]);
+                expect(heldBass(timeline, style), `${style} ${bars}`).toBe(0);
+            }
+        }
+    });
+
+    it('a final V7 of the opening chord resolves to it, when only a dominant 7th backs the key', () => {
+        // Left on C, an 8-bar blues in G holds its IV7 two bars (`C7 | C7`), rhythm changes its
+        // bridge's `C7 | C7`: a C7 that never settles is no C home. The last `D7` and `F7` send
+        // the form back to its opening G7 and Bbmaj7, and the band ends there, in the opening's
+        // family: the blues on its dominant colour, rhythm changes on its major one. A G tune
+        // that never touches C ends on G rather than holding its last `D7`.
+        const charts: [string, SemanticScore, number, TonicFamily][] = [
+            [
+                '8-bar blues',
+                score([{ label: 'A', bars: 'G7 | D7 | C7 | C7 | G7 | D7 | G7 | D7' }]),
+                7,
+                'dominant',
+            ],
+            [
+                'rhythm changes',
+                {
+                    ...FIXTURES.rhythmChanges,
+                    key: 'C',
+                    sections: FIXTURES.rhythmChanges.sections.map((section, s, all) =>
+                        s === all.length - 1
+                            ? {
+                                  ...section,
+                                  measures: [...section.measures.slice(0, -1), turnaround()],
+                              }
+                            : section,
+                    ),
+                },
+                10,
+                'major',
+            ],
+            ['no C at all', score([{ label: 'A', bars: 'G | Em | Am | D7' }]), 7, 'major'],
+        ];
+        for (const [name, chart, root, family] of charts) {
+            const timeline = compileTimeline(chart);
+            const last = timeline.bars.length - 1;
+            expect(timeline.bars[last].key.tonic, name).toBe(0);
+            for (const style of STYLE_IDS) {
+                const chord = heldEnding(timeline, last, STYLES[style].ending)?.spans[0].chord;
+                expect(chord?.root, `${style} ${name}`).toBe(root);
+                expect(chord?.intervals, `${style} ${name}`).toEqual(EXPECTED[style][family]);
+                expect(heldBass(timeline, style), `${style} ${name}`).toBe(root);
+            }
+        }
+    });
+
+    it('a key the chart states as home keeps its tonic over the opening chord', () => {
+        // The opening wins only over a key that nothing but a dominant 7th backs. A C tune that
+        // opens on its V triad and states C as a triad (#1516's `G D7` turnaround), a tune in Ab
+        // that opens on its vi (All The Things You Are's shape, its last `C7b9` the V of `Fm7`),
+        // and a C tune opening on its IV whose last `C7` is the key's own V7 of IV all resolve
+        // to the key's tonic. `G | C | D | D7` is the same evidence as the first — a C triad
+        // that rests, a G opening, a last V7 of G — so it ends on C too: whether it is a G tune
+        // left on C is for the whole chart or a key known to be set to say (#1521, B and C).
+        for (const [bars, key, tonic] of [
+            ['G | Am | Dm7 | C | G | Am | Dm7 | D7', 'C', 0],
+            ['G | C | D | D7', 'C', 0],
+            ['Fm7 | Bbm7 | Eb7 | Abmaj7 | Dbmaj7 | Dm7 G7 | Cmaj7 | Gm7b5 C7b9', 'Ab', 8],
+            ['F | G7 | C | C7', 'C', 0],
+        ] as const) {
+            const timeline = compileTimeline(score([{ label: 'A', bars }], { key }));
+            const last = timeline.bars.length - 1;
+            for (const style of STYLE_IDS) {
+                expect(
+                    heldEnding(timeline, last, STYLES[style].ending)?.spans[0].chord?.root,
+                    `${style} ${bars}`,
+                ).toBe(tonic);
+                expect(heldBass(timeline, style), `${style} ${bars}`).toBe(tonic);
+            }
+        }
+    });
+});
+
+/** Rhythm changes' last bar written as a turnaround back to the top: `Bb^7 F7`. */
+function turnaround() {
+    const bar = score([{ label: 'A', bars: 'Bb^7 F7' }]).sections[0].measures[0];
+    return { ...bar, id: 'turnaround' };
+}
 
 /** A minor groove ending on its tonic minor ninth. */
 function minorGroove() {

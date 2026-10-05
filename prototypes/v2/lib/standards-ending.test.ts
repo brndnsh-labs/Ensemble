@@ -1,11 +1,13 @@
 /**
  * The held ending on every chart the app ships (#1516): the standards catalog and a new song's
  * starting chart, as authored and as a musician might type them without setting the key (it
- * defaults to C major, `blankSong`). A pass that ends resolves only into a key the chart rests
- * in, so the ending's root is the chart's own: a chord its last bar writes, the chord it opens
- * on, or the tonic of the key it is really in — never a defaulted C it does not rest on.
+ * defaults to C major, `blankSong`). The ending's root is the chart's own (#1521): a band that
+ * plays the last bar as written ends on a chord that bar writes, and a band that resolves it
+ * ends on the tonic of the key the chart is really in — never on a defaulted C, nor on any
+ * other root that is not the tune's home.
  */
-import { compileTimeline, DEFAULT_SETTINGS, performPass } from '@band/index';
+import { heldEnding } from '@band/arrange/ending';
+import { compileTimeline, DEFAULT_SETTINGS, performPass, STYLES } from '@band/index';
 import type { SemanticScore } from '@engine/songbook/score-types';
 import { describe, expect, it } from 'vitest';
 import { buildStandardDocument, STANDARDS } from './standards';
@@ -38,8 +40,14 @@ const PC: Record<string, number> = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }
 const keyPc = (name: string) =>
     (PC[name[0]] + (name.includes('#') ? 1 : 0) - (name.includes('b') ? 1 : 0) + 12) % 12;
 
-/** The pitch class the bass holds in a pass's last bar: the ending's root. */
-function endingRoot(score: SemanticScore): { held: number; allowed: Set<number> } {
+/**
+ * Does a jazz pass end on the chart's own root, given the tonic of the key it is really in?
+ * The root is the pitch class the bass holds in the last bar. When the band resolves the bar
+ * (the chord it holds is not one the bar writes) that root must be the real tonic; only a bar
+ * played as written — held on its first chord, or split to hold a chord it writes later
+ * (`G7 C`, `D7 G`) — may end on another root the bar writes.
+ */
+function endsHome(score: SemanticScore, tonic: number): boolean {
     const timeline = compileTimeline(score);
     const { events } = performPass(
         timeline,
@@ -49,12 +57,14 @@ function endingRoot(score: SemanticScore): { held: number; allowed: Set<number> 
     const last = timeline.bars.at(-1)!;
     const bass = events.filter((e) => e.lane === 'bass' && e.bar === last.index);
     const held = bass.at(-1)!.lane === 'bass' ? (bass.at(-1) as { midi: number }).midi % 12 : -1;
-    const opening = timeline.spans.find((span) => span.chord)!.chord!;
-    const allowed = new Set([
-        ...last.spans.flatMap((span) => (span.chord ? [span.chord.bass, span.chord.root] : [])),
-        opening.root,
-    ]);
-    return { held, allowed };
+    const written = last.spans.flatMap((span) => (span.chord ? [span.chord] : []));
+    const ending = heldEnding(timeline, last.index, STYLES.jazz.ending);
+    const chord = ending?.spans.filter((span) => span.chord).at(-1)?.chord;
+    const resolved = !!chord && !written.some((w) => w.symbol === chord.symbol);
+    if (resolved) {
+        return held === tonic;
+    }
+    return written.some((w) => w.root === held || w.bass === held);
 }
 
 describe('the held ending on every shipped chart (#1516)', () => {
@@ -68,31 +78,28 @@ describe('the held ending on every shipped chart (#1516)', () => {
     ];
 
     it('ends on its own tonic, as authored', () => {
-        const wrong: string[] = [];
-        for (const [title, score, key] of charts) {
-            const { held, allowed } = endingRoot(score);
-            if (!allowed.has(held) && held !== keyPc(key)) {
-                wrong.push(`${title}: ${held}`);
-            }
-        }
+        const wrong = charts
+            .filter(([, score, key]) => !endsHome(score, keyPc(key)))
+            .map(([title]) => title);
         expect(wrong).toEqual([]);
     });
 
-    it('typed without its key (read as C major), never ends on a C it does not rest on', () => {
-        const wrong: string[] = [];
-        for (const [title, score, key] of charts) {
-            const { held, allowed } = endingRoot({ ...score, key: 'C', isMinor: false });
-            // C is the ending only where the chart is really in C, or writes it there.
-            if (!allowed.has(held) && !(held === 0 && keyPc(key) === 0)) {
-                wrong.push(title);
-            }
-        }
-        // Open in #1521 (whether to weigh the whole chart, or record whether the key was set):
-        // each holds a C chord two bars that no local rule can tell from a tonic — the 8-bar
-        // blues's IV7 (`C7 | C7 | G7`), Stella's ii (`Cm7 | Cm7 | Ab7`), rhythm changes'
-        // bridge (`C7 | C7 | F7`). So a defaulted C reads as backed, and rhythm changes' last
-        // bar, a turnaround off its opening chord (`Bbmaj7 F7`), resolves into it. Pinned so a
-        // fix (or a new case) shows up here.
-        expect(wrong).toEqual(['8-Bar Blues', 'Rhythm Changes', 'Stella by Starlight']);
+    it('typed without its key (read as C major), ends on its own tonic', () => {
+        // The key reads C; the tonic the band must resolve to is still the authored one.
+        const wrong = charts
+            .filter(
+                ([, score, key]) => !endsHome({ ...score, key: 'C', isMinor: false }, keyPc(key)),
+            )
+            .map(([title]) => title);
+        // Open in #1521's options B and C (record whether the key was set, or weigh the whole
+        // chart). Each rests on a C chord that no rule reading one chord at a time can tell
+        // from a tonic, so a defaulted C reads as home and the band resolves into it:
+        // - All The Things You Are's A section modulates to C (`Dm7 G7 | Cmaj7 | Cmaj7`), and
+        //   its last `C7b9` points back to an `Fm7` opening — exactly how a C tune that opens on
+        //   its vi ends, so the opening cannot be preferred over the key;
+        // - Stella's C section holds `Cm7 | Cm7 | Ab7` (a ii it never resolves as one), and its
+        //   last bar, `Bbmaj7` on the downbeat, is approached two bars earlier, not in the bar.
+        // Pinned so a fix (or a new case) shows up here.
+        expect(wrong).toEqual(['All The Things You Are', 'Stella by Starlight']);
     });
 });
