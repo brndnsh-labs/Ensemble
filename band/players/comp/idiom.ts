@@ -301,7 +301,21 @@ export function compIdiom(book: CompBook): PitchedIdiom {
                 // place in the form, so lap k and chorus k press in the same bars. The chord
                 // the hand already holds is pressed again in the same shape (`again`): lifted
                 // and put back down, not re-voiced.
-                const kept = planned.filter((h) => h.early);
+                // An anticipation is one press, held into its chord. A figure with two strikes
+                // in the push's eighth (disco's 14 and 15) plays both as pushes of the same chord;
+                // why: an organist presses it once and holds it — pressing it again a sixteenth
+                // later is the stutter this path exists to avoid (#1510). The first is kept.
+                // Only within that eighth: the same chord pushed again further on (a bar that
+                // changes to it twice, `C:1 F:1 C:1 F:1`) is a new arrival, pressed anew.
+                const kept: Planned[] = [];
+                for (const h of planned) {
+                    const before = kept.at(-1);
+                    const same =
+                        before?.chord.symbol === h.chord.symbol && h.step - before.step < TIE_STEPS;
+                    if (h.early && !same) {
+                        kept.push(h);
+                    }
+                }
                 const phraseTop = ctx.bar.phrase.bar === 0 && !memory.fresh;
                 // The hand let go since the last bar it played — a loop's wrap back to its top,
                 // or bars the comp sat out, where `sustain` ends the hold: whatever it last

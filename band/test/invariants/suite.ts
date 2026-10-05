@@ -228,8 +228,9 @@ function defineEndings(styles: StyleId[]): void {
  * past its end carried into it) and once through with an ending (#1488): it sounds in every bar
  * that has a chord. A holding organ holds through every chord with no gap, top of the lap
  * included; a chopped organ (`percussive`: the reggae bubble) plays its figure in every such
- * bar. On a one-chord vamp a holding organ presses the chord again at each phrase, so no hold
- * runs past a phrase. The counted vamp, a chorus at a time, is pinned with the chunks in
+ * bar. A holding organ never presses the chord it holds again within an eighth, in any bar
+ * (#1510). On a one-chord vamp a holding organ presses the chord again at each phrase, so no
+ * hold runs past a phrase. The counted vamp, a chorus at a time, is pinned with the chunks in
  * `arrange/chorus-seams.test.ts`.
  */
 function defineVamps(styles: StyleId[]): void {
@@ -308,23 +309,23 @@ function defineVamps(styles: StyleId[]): void {
                             }
                         }
                         if (holds) {
-                            // At the top of a lap, never the chord struck again an eighth after
-                            // it was pressed (a push across the wrap, then the lap's downbeat).
+                            // Never a held chord pressed again within an eighth of its press,
+                            // in any bar (#1510): not a push across the wrap and then the lap's
+                            // downbeat (#1488), nor two anticipations of the same chord.
                             const presses = new Map<number, number[]>();
                             for (const n of organ) {
                                 presses.set(n.tick, [...(presses.get(n.tick) ?? []), n.midi]);
                             }
                             const ticks = [...presses.keys()].sort((a, b) => a - b);
-                            const shape = (t: number) =>
-                                presses
-                                    .get(t)!
+                            // The chord a press sounds: its pitch classes, whatever the shape.
+                            const chordOf = (t: number) =>
+                                [...new Set(presses.get(t)!.map(mod12))]
                                     .sort((a, b) => a - b)
                                     .join(',');
                             for (let k = 1; k < ticks.length; k++) {
                                 if (
-                                    ticks[k - 1] < 0 &&
                                     ticks[k] - ticks[k - 1] <= 2 * STEP + 1e-6 &&
-                                    shape(ticks[k]) === shape(ticks[k - 1])
+                                    chordOf(ticks[k]) === chordOf(ticks[k - 1])
                                 ) {
                                     problems.push(`${seed} ${label}: re-struck at ${ticks[k]}`);
                                 }
