@@ -447,22 +447,18 @@ test('data-next skips both chords of a two-chord bar, resolves across the repeat
     await page.getByRole('button', { name: 'Stop playback', exact: true }).click();
 });
 
-test('a one-bar written repeat points at the SAME bar through pass 3, and the FOLLOWING bar on pass 4', async ({
-    page,
-}) => {
-    // Two laps of a five-bar form plus the setup; on a CPU-starved WebKit the band's clock runs
-    // at a third of real time, so this is real work rather than a hang (#1485).
-    test.setTimeout(75_000);
-    // #1458 patch review P2-1: a written-measure-keyed next-bar walk skips every later pass of a
-    // one-bar `||: :||` repeat as "the same bar as before", pointing the cue at whatever follows
-    // the WHOLE repeat for its entire 4-pass run rather than only its final pass. R1 is one
-    // written bar performed four times, so `activeId` can't tell the passes apart. The cue can:
-    // it reads `soon` in each pass's last beat and goes back to `true` on the next downbeat.
-    // So the page records every state the cue takes, and this asserts on that record (#1485):
-    // sampling at fixed offsets from the first R1 read the wrong pass whenever CI WebKit ran
-    // behind the wall clock. The SECOND lap is the one asserted: on a loaded WebKit the stand can
-    // go unpainted while audio comes up, so the first lap's opening passes may never show.
-    await buildOneBarRepeatChart(page);
+/**
+ * Plays `buildOneBarRepeatChart`'s song and returns every state the next-bar cue took through
+ * the whole of lap 2's repeat: from the first R1 after lap 1's R2, up to lap 2's R2.
+ *
+ * R1 is one written bar performed four times, so `activeId` can't tell the passes apart. The cue
+ * can: it reads `soon` in each pass's last beat and goes back to `true` on the next downbeat. So
+ * the page records every state the cue takes (#1485): sampling at fixed offsets from the first R1
+ * read the wrong pass whenever CI WebKit ran behind the wall clock. Lap 2, not lap 1: on a loaded
+ * WebKit the stand can go unpainted while audio comes up, so lap 1's opening passes may never
+ * show.
+ */
+async function oneBarRepeatLapTwo(page: Page): Promise<string[] | null> {
     await page.evaluate(() => {
         const w = window as unknown as { cues: string[] };
         w.cues = [];
@@ -499,20 +495,82 @@ test('a one-bar written repeat points at the SAME bar through pass 3, and the FO
         .poll(async () => lapTwoRepeat(await cues()) !== null, { timeout: 45_000 })
         .toBe(true);
     await page.getByRole('button', { name: 'Stop playback', exact: true }).click();
-    const repeat = lapTwoRepeat(await cues());
+    return lapTwoRepeat(await cues());
+}
+
+/** Passes 1-3 point at the SAME one-bar repeat; only pass 4 moves on to R2. */
+const ONE_BAR_REPEAT_CUES = [
+    'R1 next R1:true',
+    'R1 next R1:soon',
+    'R1 next R1:true',
+    'R1 next R1:soon',
+    'R1 next R1:true',
+    'R1 next R1:soon',
+    'R1 next R2:true',
+    'R1 next R2:soon',
+];
+
+test('a one-bar written repeat points at the SAME bar through pass 3, and the FOLLOWING bar on pass 4', async ({
+    page,
+}) => {
+    // Two laps of a five-bar form plus the setup; on a CPU-starved WebKit the band's clock runs
+    // at a third of real time, so this is real work rather than a hang (#1485).
+    test.setTimeout(75_000);
+    // #1458 patch review P2-1: a written-measure-keyed next-bar walk skips every later pass of a
+    // one-bar `||: :||` repeat as "the same bar as before", pointing the cue at whatever follows
+    // the WHOLE repeat for its entire 4-pass run rather than only its final pass.
+    await buildOneBarRepeatChart(page);
     expect(
-        repeat,
+        await oneBarRepeatLapTwo(page),
         'passes 1-3 point at the SAME one-bar repeat; only pass 4 moves on to R2',
-    ).toEqual([
-        'R1 next R1:true',
-        'R1 next R1:soon',
-        'R1 next R1:true',
-        'R1 next R1:soon',
-        'R1 next R1:true',
-        'R1 next R1:soon',
-        'R1 next R2:true',
-        'R1 next R2:soon',
-    ]);
+    ).toEqual(ONE_BAR_REPEAT_CUES);
+});
+
+test('the cue and the playing bar are painted from one instant of the band’s clock (#1506)', async ({
+    page,
+}) => {
+    test.setTimeout(75_000);
+    // The audio clock runs on its own thread, so two reads of it in one task can disagree. Here
+    // every read after the first in one animation-frame callback is 120ms later, which puts each
+    // barline between the two reads of some frame. A stand that read the playing bar and the
+    // cue's last-beat state separately then painted the bar just left with the new bar's
+    // not-yet-last-beat cue (`R1 next R2:soon`, then `R1 next R2:true`), as CI did once unforced.
+    await page.addInitScript((skew: number) => {
+        let owner: object | null = AudioContext.prototype;
+        let clock: PropertyDescriptor | undefined;
+        while (owner && !clock) {
+            clock = Object.getOwnPropertyDescriptor(owner, 'currentTime');
+            if (!clock) {
+                owner = Object.getPrototypeOf(owner);
+            }
+        }
+        const read = clock!.get!;
+        // -1 outside a frame callback, where every read is the real clock.
+        let reads = -1;
+        Object.defineProperty(owner!, 'currentTime', {
+            ...clock,
+            get(this: BaseAudioContext) {
+                const now = read.call(this) as number;
+                if (reads < 0) {
+                    return now;
+                }
+                reads += 1;
+                return reads > 1 ? now + skew : now;
+            },
+        });
+        const frame = window.requestAnimationFrame.bind(window);
+        window.requestAnimationFrame = (callback) =>
+            frame((time) => {
+                reads = 0;
+                try {
+                    callback(time);
+                } finally {
+                    reads = -1;
+                }
+            });
+    }, 0.12);
+    await buildOneBarRepeatChart(page);
+    expect(await oneBarRepeatLapTwo(page)).toEqual(ONE_BAR_REPEAT_CUES);
 });
 
 test('a repeat’s second pass strengthens the cue only in its OWN last beat, not for the whole bar', async ({

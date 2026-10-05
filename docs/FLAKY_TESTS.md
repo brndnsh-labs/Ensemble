@@ -26,6 +26,15 @@ flake (measure its fail-rate, classify it, and append an entry here).
 
 ## Registry
 
+### 🟢 `prototypes/v2/checks/following-lookahead.spec.ts` — "a one-bar written repeat points at the SAME bar through pass 3, and the FOLLOWING bar on pass 4" (second shape)
+
+- **Class:** e2e-timing, but the race is in the **app** (the stand's paint), not the test.
+- **Symptom:** `v2-suite (2, webkit-phone)` on `main` (`c0670ddb`, #1489): lap 2's recorded cue sequence had one extra trailing entry, `R1 next R2:soon` then `R1 next R2:true`, with `data-active` still on R1. A different shape from the #1485 entry below.
+- **Root cause:** the stand's `follow()` (`app/ensemble.tsx`, every animation frame) read the band's clock twice: `runtime.playheadSlot()` for the active bar, then `runtime.inLastBeat()` for the cue, each calling `songTick()` and so `AudioContext.currentTime`. That clock runs on the audio thread and can move within one task. When a barline fell between the two reads, the frame painted the bar just left (R1, pass 4, so `next` R2) with the new bar's not-yet-last-beat cue (`true`), and the next frame moved on to R2. Ruled out: the recorder's stop condition. `lapTwoRepeat` slices up to the first `R2` entry, so nothing from the next lap can fall inside it. Reproduced deterministically: an init script makes every `currentTime` read after the first in one animation-frame callback 120ms later, which puts each barline between the two reads of some frame. The unfixed build then records exactly CI's trailing entry, plus the same glitch at pass 3→4 (`R1 next R1:soon`, `R1 next R1:true`): 6/6 red across both projects. Not reproduced unforced: 0/20 under the usual contention, and 0 of this shape in 40 runs at 4 workers (34 passed. 5 hit the 45s poll or 75s budget on a starved clock, and 1 never painted lap 2's first three passes, a frozen main thread).
+- **Fix (2026-10-04, #1506):** `runtime.songTick()` is read once per paint, and `playheadSlot(tick)` and `inLastBeat(tick)` are pure functions of that one value, so the active bar and the cue always describe the same instant. The spec's recorder moved into a helper, `oneBarRepeatLapTwo`, shared with a new deterministic check, "the cue and the playing bar are painted from one instant of the band's clock (#1506)", which runs the same assertion under the 120ms skew. Mutation-tested: against the unfixed build it fails 6/6 (both projects); fixed it passes 6/6.
+- **After:** 40/40 under contention (2 pinned cores, 3 spinners on them, 2 workers): 20/20 for the original test and 20/20 for the new check.
+- **Last seen:** 2026-10-02 (`main`, `c0670ddb`).
+
 ### 🟢 `prototypes/v2/checks/following-lookahead.spec.ts` — "data-next wraps inside an active practice loop, keeping both bars visible since they fit together"
 
 - **Class:** e2e-timing — the race CI hit is in the **app** (the section letter's long-press); two test races in the same spec turned up while proving the fix.
