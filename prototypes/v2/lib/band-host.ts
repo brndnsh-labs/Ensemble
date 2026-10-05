@@ -504,8 +504,9 @@ export class BandHost {
                 // A counted chart's last section has nothing after it to carry on into: the
                 // performance ends with it. The lap under way was played as a loop (a fill
                 // back to its top); from its next barline it plays the ending instead, as the
-                // last bars of any counted performance do. With no barline left in it, the
-                // section plays once more, as written, and ends.
+                // last bars of any counted performance do. With no barline left in it to change
+                // at (none past the horizon, or its last bar's pushed downbeat already sent to
+                // the voices), the section plays once more, as written, and ends.
                 current.looping = false;
                 if (this.regenerate(current, this.settings, horizon) !== null) {
                     current.ends = true;
@@ -662,11 +663,12 @@ export class BandHost {
 
     /**
      * The song from `fromBar`. Uncounted, the rest of pass `pass` (the first, unless it follows
-     * another), after which it goes round again. Counted (#1475), the rest of `fromBar`'s chorus of a performance that began at
-     * `origin` and ends after the last chorus: a performance of up to 64 choruses is
-     * generated a chorus at a time, two seconds ahead like any segment, never all at once on
-     * Play (and a settings change regenerates the rest of one chorus, not of the song).
-     * Every chorus is pass 0: its chorus number is its time through (`PassOptions.pass`).
+     * another), after which it goes round again. Counted (#1475), the rest of `fromBar`'s
+     * chorus of a performance that began at `origin` and ends after the last chorus: a
+     * performance of up to 64 choruses is generated a chorus at a time, two seconds ahead like
+     * any segment, never all at once on Play (and a settings change regenerates the rest of
+     * one chorus, not of the song). Every chorus is pass 0, whatever `pass` says: its chorus
+     * number is its time through (`PassOptions.pass`).
      */
     private songPlan(fromBar: number, origin: number, pass = 0): SegmentPlan {
         const bars = this.timeline!.bars;

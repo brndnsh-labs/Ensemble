@@ -1147,19 +1147,68 @@ describe('BandHost a settings change near a barline', () => {
         }
     });
 
-    it('a pass queued ahead and rebuilt for a change keeps its number', () => {
-        // The next lap or pass is queued two seconds before the one playing ends; a change a
-        // second before the end drops it and builds it again. Its pass number is its time
-        // through, which picks its variation: the passes heard still count 0, 1, 2, 3.
-        const timeline = compileTimeline(aThenB);
-        const loopA = timeline.bars[2].start;
-        for (const [loopTo, segmentS, release] of [
-            [loopA, 2 * BAR_S, false],
-            [null, 4 * BAR_S, false],
-            // Released in its second lap, the loop carries on into B's two bars, then the song.
-            [loopA, 2 * BAR_S, true],
-        ] as const) {
-            const { audio, host, pumpTo, release: releaseAt } = rig(aThenB, loopTo);
+    it('a pass queued ahead and rebuilt keeps its number', () => {
+        // The next lap or pass is queued two seconds before the one playing ends; a change or a
+        // loop release a second before the end drops it and builds it again. Its pass number
+        // is its time through, which picks its variation: the passes heard still count 0, 1,
+        // 2, 3.
+        const loopA = compileTimeline(aThenB).bars[2].start;
+        const counted = { ...song([{ ...twoBars.sections[0] }]), choruses: 1 };
+        const cases: {
+            score: SemanticScore;
+            loopTo: number | null;
+            segmentS: number;
+            release: boolean;
+            change: boolean;
+            ends: boolean;
+        }[] = [
+            {
+                score: aThenB,
+                loopTo: loopA,
+                segmentS: 2 * BAR_S,
+                release: false,
+                change: true,
+                ends: false,
+            },
+            {
+                score: aThenB,
+                loopTo: null,
+                segmentS: 4 * BAR_S,
+                release: false,
+                change: true,
+                ends: false,
+            },
+            // Released in its second lap, the loop carries on into B's two bars, then the song:
+            // with a change, and without one.
+            {
+                score: aThenB,
+                loopTo: loopA,
+                segmentS: 2 * BAR_S,
+                release: true,
+                change: true,
+                ends: false,
+            },
+            {
+                score: aThenB,
+                loopTo: loopA,
+                segmentS: 2 * BAR_S,
+                release: true,
+                change: false,
+                ends: false,
+            },
+            // A loop on a counted chart's last section, released in its last bar: the section
+            // plays once more in place of the next lap, and ends.
+            {
+                score: counted,
+                loopTo: compileTimeline(counted).ticks,
+                segmentS: 2 * BAR_S,
+                release: true,
+                change: false,
+                ends: true,
+            },
+        ];
+        for (const { score, loopTo, segmentS, release, change, ends } of cases) {
+            const { audio, host, pumpTo, release: releaseAt } = rig(score, loopTo);
             const segments = watchSegments(host) as () => (Queued & {
                 pass: number;
                 cursor: number;
@@ -1169,12 +1218,19 @@ describe('BandHost a settings change near a barline', () => {
             if (release) {
                 releaseAt(end - 1);
             }
-            audio.currentTime = end - 1;
-            host.update(changed);
+            if (change) {
+                audio.currentTime = end - 1;
+                host.update(changed);
+            }
             pumpTo(end - 1, end + 4 * BAR_S + 0.5);
             const heard = segments().filter((segment) => segment.cursor > 0);
-            expect(heard.length).toBeGreaterThanOrEqual(4);
             expect(heard.map((segment) => segment.pass)).toEqual(heard.map((_, i) => i));
+            if (ends) {
+                expect(host.playing).toBe(false);
+                expect(heard).toHaveLength(3);
+            } else {
+                expect(heard.length).toBeGreaterThanOrEqual(4);
+            }
             host.stop();
         }
     });
