@@ -672,6 +672,70 @@ describe('an ending already home, or written, is played as written', () => {
         expect(heldEnding(blues, 3, STYLES.blues.ending)?.spans[0].chord?.root).toBe(0);
     });
 
+    it('typed without its key, a tune that ends where it opens is home there (#1516)', () => {
+        // Read as C major, `G | C | D | G` used to end on C (its IV backed the key), and so
+        // did `F | Bb | C | F` (its V). A tune that opens and ends on its I is home.
+        for (const [bars, root] of [
+            ['G | C | D | G', 7],
+            ['F | Bb | C | F', 5],
+            // A G minor groove ending on its G7#9: the same root, another colour.
+            ['Gm11 | Gm11 | C9 | C13 | F13 | Ebmaj7 | Dm11 | G7#9', 7],
+        ] as const) {
+            const timeline = compileTimeline(score([{ label: 'A', bars }]));
+            const last = timeline.bars.length - 1;
+            for (const style of STYLE_IDS) {
+                expect(
+                    heldEnding(timeline, last, STYLES[style].ending),
+                    `${style} ${bars}`,
+                ).toBeNull();
+                const { events } = performPass(timeline, settingsFor(style, 'a'), {
+                    pass: 0,
+                    looping: false,
+                });
+                expect(
+                    lastBar(timeline, events).bass.map((n) => mod12(n.midi)),
+                    `${style} ${bars}`,
+                ).toEqual([root]);
+            }
+        }
+        // A tune that opens on its V doesn't end at home on it: `G7 | C | F | G7` in C resolves.
+        const onV = compileTimeline(score([{ label: 'A', bars: 'G7 | C | Am | G7' }]));
+        expect(heldEnding(onV, 3, STYLES.jazz.ending)?.spans[0].chord?.root).toBe(0);
+    });
+
+    it('a ii–V on the tonic of a major key does not back it (#1516)', () => {
+        // Autumn Leaves (G minor) opens on `Cm7 F7`; rhythm changes passes through it. With the
+        // key left at C, neither is in C: their last bars are played as written.
+        for (const [bars, written] of [
+            ['Cm7 | F7 | Bbmaj7 | Ebmaj7 | Am7b5 | D7 | Gm6 | Gm6', 7],
+            ['Bbmaj7 Gm7 | Cm7 F7 | Dm7 G7 | Cm7 F7', 0],
+        ] as const) {
+            const timeline = compileTimeline(score([{ label: 'A', bars }]));
+            const last = timeline.bars.length - 1;
+            for (const style of STYLE_IDS) {
+                expect(
+                    heldEnding(timeline, last, STYLES[style].ending),
+                    `${style} ${bars}`,
+                ).toBeNull();
+                const { events } = performPass(timeline, settingsFor(style, 'a'), {
+                    pass: 0,
+                    looping: false,
+                });
+                expect(
+                    lastBar(timeline, events).bass.map((n) => mod12(n.midi)),
+                    `${style} ${bars}`,
+                ).toEqual([written]);
+            }
+        }
+        // A minor key's dorian i7–IV7 is its tonic: `Em7 | A7` in E minor ends on Em.
+        const dorian = compileTimeline(
+            score([{ label: 'A', bars: 'Em7 | A7 | Em7 | A7' }], { key: 'E', isMinor: true }),
+        );
+        expect(heldEnding(dorian, 3, STYLES.funk.ending)?.spans[0].chord?.intervals).toEqual(
+            EXPECTED.funk.minor,
+        );
+    });
+
     it('a dominant I–IV vamp is in I: it opens there, and its last IV resolves', () => {
         // Every I7 falls a fifth to the IV7, but a chart that opens on its I is in I.
         for (const [bars, key, tonic] of [

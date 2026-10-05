@@ -332,7 +332,15 @@ in a minor key the minor equivalents (im6 for jazz and bossa, im9, im7, the mino
   the band resolves only into a key the chart is in: one it opens on (a stable chord on the
   tonic as its first chord, which a dominant I–IV vamp like `E9 | A9` is), or one it rests on
   somewhere else (a chord resting on its tonic, in a bar in that key). An F tune, an F blues or
-  an A minor tune left on C keeps its written last chord.
+  an A minor tune left on C keeps its written last chord. In a major key a minor chord on the
+  tonic falling a fifth to a dominant is the ii of a ii–V, not a resting tonic (`isTwoFive`,
+  #1516): `Cm7 F7` is how Autumn Leaves, rhythm changes, Stella and Cherokee pass through C, so
+  left on C they keep their written last chord (a minor key's dorian `Em7 A7` is its tonic). And
+  a tune whose last bar opens on the chord it opens on, by root and both resting
+  (`endsWhereItOpens`), is home whatever its key says: `G | C | D | G` left on C ends on G. Not
+  every case is decidable bar by bar: left on C, the 8-bar blues's IV7 (`C7 | C7`) and Stella's
+  held ii (`Cm7 | Cm7 | Ab7`) still read as resting on C (#1516's open question: weigh the whole
+  chart, or record whether the key was set).
 - **Only the ending bar's harmony changes.** The bar before it hears the resolved bar as its
   next, so its approach notes walk into the tonic (a walking bass's line toward its next
   chord, a lead-in); its chords, the comp (which never anticipates an ending) and the drums are
