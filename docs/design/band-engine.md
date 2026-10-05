@@ -121,7 +121,9 @@ physical: its range, its strum speed, whether it sustains.
   bar or more is pressed again at the first bar of each phrase (phrases are 3–6 bars), in the
   shape the hand holds (#1488): an organist re-articulates a long vamp at each phrase, so the
   hold never runs past a phrase. A chord struck after the last bar's downbeat (a change on beat
-  3, a written anticipation) is not struck again so soon. Where the hand let go — the top of a
+  3, a written anticipation) is not struck again so soon, and an anticipation is one press
+  however many strikes the figure puts in its eighth (disco's 14 and 15, #1510): a held chord
+  is never pressed twice within an eighth. Where the hand let go — the top of a
   loop's lap, the bar after the comp sat out — the chord is pressed whatever the phrase, and
   the organ never pushes a chord across a loop's wrap: it lands on the lap's downbeat.
 - **Voicing laws for every instrument.** A written b13, #11 or 13 takes the 5th's seat; 7#9
@@ -439,7 +441,8 @@ Every canonical genre has its own style (`STYLE_FOR_GENRE` in `runtime.ts`).
   pitched onsets under N.C., no same-pitch overlaps, bass arrivals on chord tones, comp chords
   that carry their guide tones, playable guitar grips off the bass's register, and an organ
   that sounds through every chord of every fixture and of a one-chord vamp (`VAMP_FIXTURES`),
-  lap after lap, what a lap rings past its end carried into the next. It is one
+  lap after lap, what a lap rings past its end carried into the next, and never presses the
+  chord it holds again within an eighth, in any bar (#1510). It is one
   suite (`suite.ts`) split by style over `shard-*.test.ts`, only so the runner spreads it over
   its workers; a new style still joins it the moment it is registered.
 - The critique: one claims file per style (`band/test/claims/<id>.ts`, built with
