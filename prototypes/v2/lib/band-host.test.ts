@@ -1058,7 +1058,8 @@ describe('BandHost releasing a practice loop', () => {
 /**
  * A settings change takes the new music from a barline, and leaves what comes before it alone:
  * every note before that barline sounds once, as it would have without the change, however the
- * change falls against the timer and the segments' barlines (#1499).
+ * change falls against the timer and the segments' barlines (#1499). A pass or lap queued
+ * ahead and rebuilt for the change is still the one that would have followed (#1500).
  */
 describe('BandHost a settings change near a barline', () => {
     /** 4/4 at 120: two seconds a bar. */
@@ -1143,6 +1144,94 @@ describe('BandHost a settings change near a barline', () => {
                 );
                 host.stop();
             }
+        }
+    });
+
+    it('a pass queued ahead and rebuilt keeps its number', () => {
+        // The next lap or pass is queued two seconds before the one playing ends; a change or a
+        // loop release a second before the end drops it and builds it again. Its pass number
+        // is its time through, which picks its variation: the passes heard still count 0, 1,
+        // 2, 3.
+        const loopA = compileTimeline(aThenB).bars[2].start;
+        const counted = { ...song([{ ...twoBars.sections[0] }]), choruses: 1 };
+        const cases: {
+            score: SemanticScore;
+            loopTo: number | null;
+            segmentS: number;
+            release: boolean;
+            change: boolean;
+            ends: boolean;
+        }[] = [
+            {
+                score: aThenB,
+                loopTo: loopA,
+                segmentS: 2 * BAR_S,
+                release: false,
+                change: true,
+                ends: false,
+            },
+            {
+                score: aThenB,
+                loopTo: null,
+                segmentS: 4 * BAR_S,
+                release: false,
+                change: true,
+                ends: false,
+            },
+            // Released in its second lap, the loop carries on into B's two bars, then the song:
+            // with a change, and without one.
+            {
+                score: aThenB,
+                loopTo: loopA,
+                segmentS: 2 * BAR_S,
+                release: true,
+                change: true,
+                ends: false,
+            },
+            {
+                score: aThenB,
+                loopTo: loopA,
+                segmentS: 2 * BAR_S,
+                release: true,
+                change: false,
+                ends: false,
+            },
+            // A loop on a counted chart's last section, released in its last bar: the section
+            // plays once more in place of the next lap, and ends.
+            {
+                score: counted,
+                loopTo: compileTimeline(counted).ticks,
+                segmentS: 2 * BAR_S,
+                release: true,
+                change: false,
+                ends: true,
+            },
+        ];
+        for (const { score, loopTo, segmentS, release, change, ends } of cases) {
+            const { audio, host, pumpTo, release: releaseAt } = rig(score, loopTo);
+            const segments = watchSegments(host) as () => (Queued & {
+                pass: number;
+                cursor: number;
+            })[];
+            const end = 10.1 + 2 * segmentS;
+            pumpTo(10.1, end - 1);
+            if (release) {
+                releaseAt(end - 1);
+            }
+            if (change) {
+                audio.currentTime = end - 1;
+                host.update(changed);
+            }
+            pumpTo(end - 1, end + 4 * BAR_S + 0.5);
+            const heard = segments().filter((segment) => segment.cursor > 0);
+            expect(heard.map((segment) => segment.pass)).toEqual(heard.map((_, i) => i));
+            if (ends) {
+                expect(host.playing).toBe(false);
+                expect(heard).toHaveLength(3);
+            } else {
+                expect(heard.length).toBeGreaterThanOrEqual(4);
+            }
+            host.stop();
         }
     });
 });
