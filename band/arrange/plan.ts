@@ -65,7 +65,8 @@ export interface PassWindow {
     /** One past the last bar index played. */
     to: number;
     /** The bar that follows the window when the performance loops (a practice loop wraps to
-     * its own start; a play-from-here pass wraps to the top of the song). */
+     * its own start; a play-from-here pass wraps to the top of the song). `to` itself for a
+     * practice loop let go: its lap leads on into the rest of the song (`BandHost.setLoop`). */
     wrapTo: number;
     /**
      * The bar this PASS actually began on — not necessarily `from`. A fresh pass (a full pass

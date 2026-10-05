@@ -500,6 +500,15 @@ export class BandHost {
             this.segments.length = this.segments.indexOf(current) + 1;
             if (current.until < this.timeline!.bars.length) {
                 current.released = current.until;
+                // The lap was played toward its own top: its last bar pushes the loop's first
+                // chord across the wrap, and its bass walks up to it. From the first barline it
+                // can still change at (`regenerate`), it leads on into the bar the song carries
+                // on from instead (#1517). With none left, it ends as it was played.
+                const window = current.window;
+                current.window = { ...window, wrapTo: current.until };
+                if (this.regenerate(current, this.settings, horizon) === null) {
+                    current.window = window;
+                }
             } else if (this.counted) {
                 // A counted chart's last section has nothing after it to carry on into: the
                 // performance ends with it. The lap under way was played as a loop (a fill

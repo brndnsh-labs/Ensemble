@@ -102,12 +102,16 @@ export function performPass(
     // fours may open with the drummer alone): what it plays is taken from that pass's plan.
     // That next pass is always a fresh lap (a loop always restarts at the top), never a
     // resume, so its own origin is reset to its `from` — not inherited from `window.origin`,
-    // which `{ ...window }` would otherwise carry over from a resumed `window` here.
+    // which `{ ...window }` would otherwise carry over from a resumed `window` here. A lap let
+    // go (`wrapTo === to`) leads on into the rest of the song, from the bar after it.
     const wrapPlan = options.looping
         ? planBars(timeline, settings, {
               pass: options.pass + 1,
               looping: true,
-              window: { ...window, from: window.wrapTo, origin: window.wrapTo },
+              window:
+                  window.wrapTo === window.to
+                      ? { from: window.to, to: timeline.bars.length, wrapTo: 0 }
+                      : { ...window, from: window.wrapTo, origin: window.wrapTo },
               drumSolos,
           })[window.wrapTo]
         : undefined;
@@ -182,6 +186,7 @@ export function performPass(
                                   ? ending
                                   : bars[nextIndex],
                           plan: nextPlan,
+                          wraps: i === window.to - 1,
                       }
                     : null,
             heard,

@@ -12,12 +12,14 @@
  */
 import {
     type BandEvent,
+    type BandSettings,
     compileTimeline,
     DEFAULT_SETTINGS,
     type PassMemory,
     type PassWindow,
     performPass,
     STYLE_IDS,
+    STYLES,
     secondsAt,
     type Timeline,
     toMidi,
@@ -769,10 +771,15 @@ const wholeBand = {
 
 /**
  * `score` at 120 bpm (two seconds a bar), looped from the top to `loopTo` (or the song, with
- * null), the whole band, the timer firing every 25 ms from 10.1 s. `tick(t)` pumps at audio
- * time `t`.
+ * null), the whole band (or `settings`), the timer firing every 25 ms from 10.1 s. `tick(t)`
+ * pumps at audio time `t`.
  */
-function rig(score: SemanticScore, loopTo: number | null, onEnd?: () => void) {
+function rig(
+    score: SemanticScore,
+    loopTo: number | null,
+    onEnd?: () => void,
+    settings: BandSettings = wholeBand,
+) {
     for (const voice of [playDrumSound, playBassNote, playNote, playSoloNote]) {
         vi.mocked(voice).mockClear();
     }
@@ -780,7 +787,7 @@ function rig(score: SemanticScore, loopTo: number | null, onEnd?: () => void) {
     const state = fakeState(audio);
     const host = new BandHost({ state: () => state, silence: () => {}, onEnd });
     host.setScore(score);
-    host.start(wholeBand, 120, 0, loopTo === null ? null : { from: 0, to: loopTo });
+    host.start(settings, 120, 0, loopTo === null ? null : { from: 0, to: loopTo });
     const tick = (t: number) => {
         audio.currentTime = t;
         pump(host);
@@ -1242,7 +1249,8 @@ describe('BandHost a settings change near a barline', () => {
  * A practice loop released into a bar with another chord (#1507). The lap's last bar may push
  * the loop's top chord across the wrap, tied into the next lap's first eighth; released, the
  * song carries on under a different chord, and that bar's downbeat must be struck, not treated
- * as tied in to a chord it does not play.
+ * as tied in to a chord it does not play. Released before that last bar is under way, the lap
+ * rebuilds it to push the chord the song goes to instead (#1517).
  */
 describe('BandHost releasing a loop into another chord', () => {
     const BPM = 120;
@@ -1280,10 +1288,12 @@ describe('BandHost releasing a loop into another chord', () => {
                         from: 0,
                         to: after.start,
                     });
-                    // Laps are four bars (eight seconds) from 10.1 s: release in the second.
-                    run(host, audio, 10.1, 10.1 + 6 * BAR_S);
+                    // Laps are four bars (eight seconds) from 10.1 s: release in the second's
+                    // last bar, under way, so it plays on as it was, push and all. (Released
+                    // before it, the lap rebuilds that bar to lead into the song: #1517.)
+                    run(host, audio, 10.1, 10.1 + 7.5 * BAR_S);
                     host.setLoop(null);
-                    run(host, audio, 10.1 + 6 * BAR_S, 10.1 + 10 * BAR_S);
+                    run(host, audio, 10.1 + 7.5 * BAR_S, 10.1 + 10 * BAR_S);
                     host.stop();
                     const queued = segments();
                     const into = queued.findIndex((s) => s.window.from === after.index);
@@ -1357,6 +1367,269 @@ describe('BandHost releasing a loop into another chord', () => {
         // those the bar's own figure strikes its downbeat.
         expect(pushedBy.size).toBeGreaterThanOrEqual(5);
         expect(struck).toBeGreaterThanOrEqual(10);
+        expect(problems).toEqual([]);
+    });
+
+    type Lap = Queued & {
+        start: number;
+        released?: number | 'again';
+        memoryAfter: PassMemory;
+    };
+    /** The chord (its symbol) a lap's last bar pushed over its end, or null (#1507). */
+    const pushOf = (lap: Lap) => (lap.memoryAfter.comp as { pushed: string | null }).pushed;
+
+    /** The comp's notes handed to its voice, struck (not scratched): when, until when, and pitch. */
+    function compNotes(): { time: number; end: number; midi: number }[] {
+        return vi
+            .mocked(playNote)
+            .mock.calls.filter(([, , , , options]) => !options?.muted)
+            .map(([, freq, time, length]) => ({
+                time,
+                end: time + length,
+                midi: Math.round(69 + 12 * Math.log2(freq / 440)),
+            }));
+    }
+
+    /**
+     * Loop A on `score` with `settings`, released at audio time `at` (or never, with null), and
+     * played on to 38.1 s: two bars past the end of the third lap, the latest a release here
+     * can lead from. Laps are four bars (eight seconds) from 10.1 s.
+     */
+    function releasedAt(
+        score: SemanticScore,
+        settings: BandSettings,
+        at: number | null,
+        onEnd?: (time: number) => void,
+    ) {
+        let now = () => 0;
+        const { audio, host, pumpTo, release } = rig(
+            score,
+            compileTimeline(score).bars[4].start,
+            () => onEnd?.(now()),
+            settings,
+        );
+        now = () => audio.currentTime;
+        const segments = watchSegments(host) as () => Lap[];
+        const end = 10.1 + 14 * BAR_S;
+        if (at === null) {
+            pumpTo(10.1, end);
+        } else {
+            pumpTo(10.1, at);
+            release(at);
+            pumpTo(at, end);
+        }
+        host.stop();
+        return { segments: segments(), notes: compNotes(), calls: voiceCalls() };
+    }
+
+    it("released before its last bar is under way, the lap's last bar aims at the bar the song goes to (#1517)", () => {
+        // The second lap runs 18.1–26.1 s. Released in its first bar, in its second, or a
+        // moment before its last bar comes into the scheduler's lookahead, the lap still has
+        // that bar to rebuild; released in its last 150 ms, the next lap's downbeat is already
+        // with the voices, so that lap is the one under way, and it is that lap which leads
+        // into the song (#1489).
+        const lap = 10.1 + 4 * BAR_S;
+        const phases = [lap + 0.3, lap + 1.5 * BAR_S, lap + 3 * BAR_S - 0.2, lap + 4 * BAR_S - 0.1];
+        const problems: string[] = [];
+        const styles = new Set<string>();
+        let aimedAtTop = 0;
+        let aimedOn = 0;
+        for (const style of STYLE_IDS) {
+            for (const comp of ['piano', 'guitar', 'organ'] as const) {
+                for (const seed of ['a', 'b', 'c', 'd']) {
+                    const settings = { ...DEFAULT_SETTINGS, style, comp, seed };
+                    const held = releasedAt(chart, settings, null);
+                    for (const at of phases) {
+                        const where = `${style}/${comp}/${seed} released at ${at.toFixed(2)}`;
+                        const { segments, notes, calls } = releasedAt(chart, settings, at);
+                        const leads = segments.find((s) => s.released !== undefined);
+                        if (!leads) {
+                            problems.push(`${where}: no lap leads into the song`);
+                            continue;
+                        }
+                        const seam = leads.start + 4 * BAR_S;
+                        // Without the release, the same lap pushes the C at the loop's top.
+                        const twin = held.segments.find(
+                            (s) => Math.abs(s.start - leads.start) < 1e-9,
+                        );
+                        if (twin && pushOf(twin) === 'C') {
+                            aimedAtTop++;
+                        }
+                        const pushed = pushOf(leads);
+                        if (pushed === 'F') {
+                            aimedOn++;
+                            styles.add(style);
+                        } else if (pushed !== null) {
+                            problems.push(`${where}: the lap's last bar pushes ${pushed}`);
+                        }
+                        // What the voice was handed: nothing rings over the seam but a push of
+                        // the F the song goes to, with F's third.
+                        const over = notes.filter(
+                            (n) => n.time < seam - 0.01 && n.end > seam + 0.06,
+                        );
+                        if (over.length && pushed !== 'F') {
+                            problems.push(`${where}: a chord rings over the seam unpushed`);
+                        }
+                        if (over.length && !over.some((n) => n.midi % 12 === 9)) {
+                            problems.push(`${where}: what rings over the seam has no A`);
+                        }
+                        if (comp === 'organ' && !STYLES[style].comp.keyboard.percussive) {
+                            // The organ presses the F on its downbeat and holds it: a push
+                            // tied into the next segment would ring an eighth and stop (#1488).
+                            const pressed = notes.some(
+                                (n) => Math.abs(n.time - seam) < 0.05 && n.end > seam + 0.3,
+                            );
+                            if (!pressed) {
+                                problems.push(`${where}: the organ does not press the F`);
+                            }
+                        }
+                        // Everything before the barline the lap is rebuilt from is as it was.
+                        const barline = 10.1 + Math.ceil((at + 0.15 - 10.1) / BAR_S) * BAR_S - 0.05;
+                        const before = (c: { time: number }) => c.time < barline;
+                        if (
+                            JSON.stringify(calls.filter(before)) !==
+                            JSON.stringify(held.calls.filter(before))
+                        ) {
+                            problems.push(`${where}: a note before the rebuilt bars changed`);
+                        }
+                        if (doubled(calls).length) {
+                            problems.push(`${where}: a note doubled`);
+                        }
+                    }
+                }
+            }
+        }
+        // Not vacuous: unreleased, the lap pushes the loop's top in many takes, and released,
+        // in many takes across most of the styles it pushes the F instead.
+        expect(aimedAtTop).toBeGreaterThanOrEqual(40);
+        expect(aimedOn).toBeGreaterThanOrEqual(40);
+        expect(styles.size).toBeGreaterThanOrEqual(6);
+        expect(problems).toEqual([]);
+    });
+
+    it('released into a section the comp sits out, the lap pushes nothing into it', () => {
+        // B marked chords-out: the comp never pushes into a bar it sits out, so the lap that
+        // leads into B lands its last chord in its own bar, where unreleased it pushes the C.
+        const tacet: SemanticScore = {
+            ...chart,
+            sections: [chart.sections[0], { ...chart.sections[1], instruments: { chords: false } }],
+        };
+        const problems: string[] = [];
+        let aimedAtTop = 0;
+        for (const style of STYLE_IDS) {
+            for (const comp of ['piano', 'guitar'] as const) {
+                for (const seed of ['a', 'b', 'c', 'd', 'e', 'f']) {
+                    const settings = { ...DEFAULT_SETTINGS, style, comp, seed };
+                    const where = `${style}/${comp}/${seed}`;
+                    const at = 10.1 + 4 * BAR_S + 0.3;
+                    const held = releasedAt(tacet, settings, null);
+                    const { segments, notes } = releasedAt(tacet, settings, at);
+                    const leads = segments.find((s) => s.released !== undefined)!;
+                    const twin = held.segments.find((s) => Math.abs(s.start - leads.start) < 1e-9);
+                    if (twin && pushOf(twin) === 'C') {
+                        aimedAtTop++;
+                    }
+                    const seam = leads.start + 4 * BAR_S;
+                    if (
+                        pushOf(leads) !== null ||
+                        notes.some((n) => n.time < seam - 0.01 && n.end > seam + 0.06)
+                    ) {
+                        problems.push(`${where}: the lap pushes ${pushOf(leads)} into B`);
+                    }
+                }
+            }
+        }
+        // Not vacuous: unreleased, the lap pushes the loop's top in plenty of takes.
+        expect(aimedAtTop).toBeGreaterThanOrEqual(15);
+        expect(problems).toEqual([]);
+    });
+
+    it('on a counted chart, the lap leads into the next section, which then ends the performance', () => {
+        // Played once (`choruses: 1`): A looped, released early in its second lap. The lap
+        // pushes the F, B follows, and the performance ends on B's last barline, no sooner.
+        const counted = { ...chart, choruses: 1 };
+        const lapEnd = 10.1 + 8 * BAR_S;
+        const problems: string[] = [];
+        let aimedOn = 0;
+        for (const style of STYLE_IDS) {
+            for (const seed of ['a', 'b', 'c']) {
+                const where = `${style}/${seed}`;
+                const ended: number[] = [];
+                const settings = { ...DEFAULT_SETTINGS, style, comp: 'piano' as const, seed };
+                const { segments, calls } = releasedAt(counted, settings, lapEnd - 6.5, (time) =>
+                    ended.push(time),
+                );
+                const leads = segments.find((s) => s.released !== undefined);
+                if (leads && pushOf(leads) === 'F') {
+                    aimedOn++;
+                } else if (leads && pushOf(leads) !== null) {
+                    problems.push(`${where}: the lap pushes ${pushOf(leads)}`);
+                }
+                // B follows the lap, and the band stops on its last barline, four bars on.
+                const end = lapEnd + 4 * BAR_S;
+                if (
+                    ended.length !== 1 ||
+                    ended[0] < end - 1e-9 ||
+                    ended[0] > end + 0.03 ||
+                    calls.some((c) => c.time > end + 0.05)
+                ) {
+                    problems.push(`${where}: does not end after B`);
+                }
+                if (doubled(calls).length) {
+                    problems.push(`${where}: a note doubled`);
+                }
+            }
+        }
+        expect(aimedOn).toBeGreaterThanOrEqual(5);
+        expect(problems).toEqual([]);
+    });
+
+    it("released once the lap's last bar is under way, the lap plays on as it was", () => {
+        // Its last bar's first notes are with the voices (#1499): released as that bar comes
+        // into the lookahead, in its middle, and after its push of the C is already sent. The
+        // lap ends as it would have looped, and the song carries on after it, nothing twice.
+        const lapEnd = 10.1 + 8 * BAR_S;
+        const lastBar = lapEnd - BAR_S;
+        const phases = [lastBar - 0.14, lastBar + BAR_S / 2, lapEnd - 0.3];
+        const problems: string[] = [];
+        let pushSent = 0;
+        for (const style of STYLE_IDS) {
+            for (const comp of ['piano', 'guitar'] as const) {
+                for (const seed of ['a', 'b', 'c']) {
+                    const settings = { ...DEFAULT_SETTINGS, style, comp, seed };
+                    const held = releasedAt(chart, settings, null);
+                    for (const at of phases) {
+                        const where = `${style}/${comp}/${seed} released at ${at.toFixed(2)}`;
+                        const { segments, notes, calls } = releasedAt(chart, settings, at);
+                        const leads = segments.find((s) => s.released !== undefined);
+                        if (!leads || Math.abs(leads.start - (lapEnd - 4 * BAR_S)) > 1e-9) {
+                            problems.push(`${where}: the lap under way does not lead on`);
+                            continue;
+                        }
+                        const before = (c: { time: number }) => c.time < lapEnd - 0.03;
+                        if (
+                            JSON.stringify(calls.filter(before)) !==
+                            JSON.stringify(held.calls.filter(before))
+                        ) {
+                            problems.push(`${where}: the lap changed`);
+                        }
+                        if (
+                            pushOf(leads) === 'C' &&
+                            notes.some((n) => n.time < at + 0.15 - 0.025 && n.end > lapEnd + 0.06)
+                        ) {
+                            pushSent++;
+                        }
+                        if (doubled(calls).length) {
+                            problems.push(`${where}: a note doubled`);
+                        }
+                        if (!segments.some((s) => s.window.from === 4)) {
+                            problems.push(`${where}: the song does not carry on`);
+                        }
+                    }
+                }
+            }
+        }
+        expect(pushSent).toBeGreaterThanOrEqual(10);
         expect(problems).toEqual([]);
     });
 });

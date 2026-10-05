@@ -29,8 +29,12 @@ export interface BarContext {
      */
     bar: Bar;
     plan: BarPlan;
-    /** The bar after this one in performance order (wrapping when the song loops). */
-    next: { bar: Bar; plan: BarPlan } | null;
+    /**
+     * The bar after this one in performance order (wrapping when the song loops). `wraps`: the
+     * next pass plays it, not this one — a loop's wrap back to its top, or the song a released
+     * loop leads on into — so a sustaining instrument's hold ends at its barline.
+     */
+    next: { bar: Bar; plan: BarPlan; wraps: boolean } | null;
     /** What the lanes before this one already played in this bar, on the straight grid. */
     heard: { drums: DrumHit[]; bass: PitchedNote[]; lead: PitchedNote[] };
     /** The comp lane's instrument (what is physical about it: range, strum, sustain). */
