@@ -51,7 +51,6 @@ export function cloneStateForDetachedGeneration(liveState: EnsembleState): Ensem
     const detached = {
         playback: {
             ...liveState.playback,
-            modals: { ...(liveState.playback.modals || {}) },
             drawQueue: [],
             audio: null,
             audioGraph: null,

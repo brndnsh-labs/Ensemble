@@ -83,7 +83,6 @@ export const STATE_OWNERSHIP_MANIFEST = {
         flashIntensity: 'runtime-derived',
         resolutionTriggered: 'runtime-derived',
         isScheduling: 'runtime-derived',
-        modals: 'runtime-derived',
         loopLimit: 'runtime-derived',
         currentLoopCount: 'runtime-derived',
         chartLocked: 'runtime-derived',

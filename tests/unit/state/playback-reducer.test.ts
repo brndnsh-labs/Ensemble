@@ -152,7 +152,6 @@ describe('Playback Reducer', () => {
                 flashIntensity: 0.1,
                 resolutionTriggered: true,
                 isScheduling: true,
-                modals: { settings: true },
                 soloistEQ: { eq: 1 },
                 harmoniesGain: { g: 1 },
                 harmoniesEQ: { eq: 1 },

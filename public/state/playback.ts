@@ -57,16 +57,6 @@ export const playback = deepSignal<GlobalContext>({
     resolutionTriggered: false,
     isScheduling: false,
     chartLocked: true,
-    modals: {
-        settings: false,
-        share: false,
-        surpriseMe: false,
-        manual: false,
-        // Set true when the app is loaded with ?autoplay=1 (audition permalink).
-        // Renders the AuditionOverlay so a single click satisfies the browser
-        // autoplay gesture requirement and starts the rendered scene.
-        audition: false,
-    },
 });
 
 export function playbackReducer(action: Action): boolean {

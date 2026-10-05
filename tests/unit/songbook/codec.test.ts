@@ -403,7 +403,6 @@ describe('Songbook codecs (#1044)', () => {
             'history',
             'buffer',
             'audio',
-            'modals',
             'currentLoopCount',
         ]) {
             expect(encoded.json).not.toContain(`"${forbidden}"`);
