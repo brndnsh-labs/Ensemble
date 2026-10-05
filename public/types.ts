@@ -191,19 +191,6 @@ export interface PlaybackIntent {
     layBack: number;
 }
 
-export interface ModalsState {
-    settings: boolean;
-    share: boolean;
-    /**
-     * Consolidated "Surprise Me" affordance (🎲): dice / templates / library —
-     * replaces the prior Library + Generate Song + Inspiration-Hub entry points.
-     */
-    surpriseMe: boolean;
-    manual: boolean;
-    /** Audition permalink (?autoplay=1) landing — see AuditionOverlay. */
-    audition: boolean;
-}
-
 // ---------------------------------------------------------------------------
 // State-slice interfaces (lifted here from `state/*.ts` to break the
 // state ↔ types cycle the circular-import gate was flagging — dependency-cruiser
@@ -1126,8 +1113,6 @@ export interface GlobalContext {
     readonly suspendTimeout: ReturnType<typeof setTimeout> | null;
     /** The current musical key being tracked by playback. */
     readonly currentKey: string | null;
-    /** Dynamic velocity modifier (0.0-1.0) applied by Conductor. */
-    readonly conductorVelocity: number;
     /** Master output volume. */
     readonly masterVolume: number;
     /** Whether the metronome count-in is enabled. */
@@ -1144,8 +1129,6 @@ export interface GlobalContext {
     readonly resolutionTriggered: boolean;
     /** Whether the scheduler is currently active. */
     readonly isScheduling: boolean;
-    /** Visibility state for various UI modals. */
-    readonly modals: ModalsState;
     /** Number of loops before stopping (0 = infinite). */
     readonly loopLimit: number;
     /** Current loop iteration counter. */

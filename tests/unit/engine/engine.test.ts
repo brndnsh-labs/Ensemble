@@ -17,7 +17,6 @@ vi.mock('../../../public/state.js', () => {
         playback: {
             audio: { currentTime: 10.0 },
             bandIntensity: 0.5,
-            modals: {},
         },
         groove: { audioBuffers: {} },
         chords: { enabled: true, volume: 0.5, reverb: 0.5 },

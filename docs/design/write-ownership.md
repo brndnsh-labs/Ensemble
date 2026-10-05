@@ -19,6 +19,13 @@ conductor's `playback.conductorDensity`. So the persistence hazard in §2 now ap
 Save (`prototypes/v2/lib/runtime.ts`'s `captureContent`), and two of the precedents below (the
 trade layer, the density mirror) survive only as history in §5. The law itself is unchanged.
 
+**Amended 2026-10-05 (#1437):** `playback.conductorVelocity`, the last paired `runtime-derived`
+field, is gone as well: its writer (`applyConductor`) and its readers (the old scheduler) went
+with the old engine in #1404, and nothing touched it after. So **no runtime system modulates a
+`document`/`preferences` field today** — the band engine (`band/`) reads the chart's settings and
+never writes state. The law still binds the next system that wants to; §3 and §5 are the shape
+it should take.
+
 ## 1. The law
 
 > A `document`- or `preferences`-owned field is written **only** by user intent — a UI dispatch or
@@ -65,14 +72,15 @@ A paired `runtime-derived` field structurally cannot cause either failure: it is
 manifest), and it is a different memory cell than the one the user's dispatch writes, so there is
 no race to lose.
 
-## 3. Live inventory — correct precedent
+## 3. Inventory — correct precedent
 
-- **`playback.conductorVelocity`** (`state/playback.ts`, published by `applyConductor` in
-  `engine/conductor.ts`) — the conductor's own runtime-derived velocity multiplier. Never
-  assigned onto a lane's own volume/velocity field. `scheduler-core.ts` reads it directly at the
-  scheduling call sites (`baseVel = (velocity || 1.0) * (playback.conductorVelocity || 1.0)`,
-  three separate read sites) — composition happens exactly once, at the point where a note's
-  final velocity is computed, never upstream of it.
+- **`playback.conductorVelocity`** (retired, #1437) — the old conductor's own runtime-derived
+  velocity multiplier, published by `applyConductor` (`engine/conductor.ts`) and never assigned
+  onto a lane's own volume/velocity field. The old scheduler (`scheduler-core.ts`) read it at the
+  scheduling call sites (`baseVel = (velocity || 1.0) * (playback.conductorVelocity || 1.0)`) —
+  composition happened exactly once, at the point where a note's final velocity is computed,
+  never upstream of it. The conductor, the scheduler and then the field went with the old engine;
+  it stays here as the worked example of the paired-field shape, which no live field has now.
 - **`section.targetIntensity`** (`songbook/types.ts`, read via `getSectionOverride` in
   `engine/section-overrides.ts`) — a read-only input to the conductor's per-tick `stepSize`
   targeting (`conductor.ts`). The conductor reads a section's authored override to decide how
@@ -102,7 +110,7 @@ no race to lose.
 
 ## 4. Composition with the timing-model law
 
-A runtime system routinely needs to **read** across domains — the soloist reads
+A runtime system routinely needs to **read** across domains — the old engine's soloist read
 `playback.conductorVelocity` (ownership domain) *and* `getBandPocket` (timing domain) in the same
 note-generation call. That's fine: reading is not the hazard either law cares about. What neither
 law permits is a system in one domain **assigning into** another domain's user-owned field to
@@ -187,9 +195,10 @@ playback:
 1. **Never dispatch onto the existing field.** If the field a slider/toggle writes is
    `document`/`preferences` in `STATE_OWNERSHIP_MANIFEST`, that field's only legitimate writers are
    the UI dispatch and state hydration.
-2. **Add a sibling `runtime-derived` field** for the runtime system's own opinion
-   (`playback.conductorVelocity` is the live precedent; `conductorDensity` and
-   `soloist.tradeSilenced` were, until #1424, and `conductorHarmonyComplexity` until #1436). Classify it in
+2. **Add a sibling `runtime-derived` field** for the runtime system's own opinion. None is live
+   today: `conductorDensity` and `soloist.tradeSilenced` were until #1424,
+   `conductorHarmonyComplexity` until #1436 and `playback.conductorVelocity` until #1437 — §3
+   and §5 describe their shape. Classify it in
    `STATE_OWNERSHIP_MANIFEST` immediately — the `satisfies` guard fails typecheck until you do.
 3. **Compose at the read site**, not upstream of it: the one place the value actually gets used
    (a generation engine, `isInstrumentActiveAtStep`, a scheduler velocity computation) is where

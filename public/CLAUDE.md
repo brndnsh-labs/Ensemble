@@ -17,9 +17,9 @@ that don't fit either. (The old engine's logic worker and its sync contract are 
 top-level field as `document`/`preferences`/`runtime-derived` for persistence — and, per
 `docs/design/write-ownership.md`, that classification doubles as a write rule: a `document`/
 `preferences` field is written only by UI dispatch or hydration, never by a runtime system
-(conductor, trade block, worker). See that doc's precedent list (`conductorVelocity`,
-`isInstrumentActiveAtStep`) before adding a new dispatch site that touches an
-existing document field from an engine/conductor path.
+(conductor, trade block, worker). See that doc's read-time composition precedent
+(`isInstrumentActiveAtStep`) and its retired violations (§5) before adding a new dispatch site
+that touches an existing document field from an engine/conductor path.
 
 ## Effects & reactivity (`state/state-effects.ts`)
 

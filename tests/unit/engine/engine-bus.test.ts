@@ -72,7 +72,6 @@ describe('Engine Bus Management', () => {
                     soloist: bus(),
                     drums: bus(),
                 },
-                modals: {},
             },
             chords: { enabled: true, volume: 1.0, reverb: 0.2, voice: 'synth' },
             bass: { enabled: true, volume: 1.0, reverb: 0.2, voice: 'synth' },
