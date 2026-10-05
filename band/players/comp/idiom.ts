@@ -305,9 +305,14 @@ export function compIdiom(book: CompBook): PitchedIdiom {
                 // in the push's eighth (disco's 14 and 15) plays both as pushes of the same chord;
                 // why: an organist presses it once and holds it — pressing it again a sixteenth
                 // later is the stutter this path exists to avoid (#1510). The first is kept.
+                // Only within that eighth: the same chord pushed again further on (a bar that
+                // changes to it twice, `C:1 F:1 C:1 F:1`) is a new arrival, pressed anew.
                 const kept: Planned[] = [];
                 for (const h of planned) {
-                    if (h.early && kept.at(-1)?.chord.symbol !== h.chord.symbol) {
+                    const before = kept.at(-1);
+                    const same =
+                        before?.chord.symbol === h.chord.symbol && h.step - before.step < TIE_STEPS;
+                    if (h.early && !same) {
                         kept.push(h);
                     }
                 }
