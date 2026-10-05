@@ -15,6 +15,7 @@ import {
     BASS,
     bassNote,
     bassPc,
+    endingBass,
     type LineMemory,
     nextChord,
     place,
@@ -23,7 +24,16 @@ import {
 import { isPlayable } from '../players/comp/fretboard.js';
 import { compIdiom, type Hit, strums } from '../players/comp/idiom.js';
 import { drumIdiom, type Lines, snareFigure, tomRun } from '../players/drums/kit.js';
-import { at, barSteps, dyn, isCommonTime, pulses, STEP, spanSteps } from '../players/grid.js';
+import {
+    at,
+    barSteps,
+    dyn,
+    endingSpans,
+    isCommonTime,
+    pulses,
+    STEP,
+    spanSteps,
+} from '../players/grid.js';
 import { leadIdiom } from '../players/lead/idiom.js';
 import { bluesTargets, restingTones, songPentatonic } from '../players/lead/palette.js';
 import { type ChordFacts, chordPcs } from '../theory/chord.js';
@@ -213,19 +223,13 @@ const countryBass: PitchedIdiom = {
         const events: PitchedNote[] = [];
         let { last } = memory;
         if (plan.ending) {
-            const chord = bar.spans[0]?.chord;
-            if (chord) {
-                events.push(
-                    // why: the held note is the bar, in any meter (#1503).
-                    bassNote(
-                        bar,
-                        0,
-                        place(bassPc(chord), last),
-                        barSteps(bar),
-                        dyn(100, plan.energy),
-                    ),
-                );
-            }
+            const held = endingBass(
+                ctx,
+                (c, p) => place(bassPc(c), p),
+                last,
+                dyn(100, plan.energy),
+            );
+            events.push(...held.events);
             return { events, memory: { last, land: null, alternate: null } };
         }
         const common = isCommonTime(bar);
@@ -446,7 +450,9 @@ function withSixths(ctx: BarContext, events: PitchedNote[]): PitchedNote[] {
         // The held ending plays its bar's own chord (`arrange/ending.ts`): a resolved
         // turnaround is the I, and it takes its 6th like any I.
         const chord = ctx.plan.ending
-            ? (ctx.bar.spans[0]?.chord ?? null)
+            ? (endingSpans(ctx)
+                  .filter(({ from }) => at(ctx.bar, from) <= tick)
+                  .at(-1)?.span.chord ?? null)
             : chordAt(ctx.timeline, tick);
         const plain =
             chord?.family === 'major' &&
@@ -559,19 +565,26 @@ const countryGuitar: PitchedIdiom = {
                 bar: bar.index,
             });
         if (plan.ending) {
-            // The last chord gets its root under it, when the hand can hold both.
-            const chord = bar.spans[0]?.chord;
-            const grip = out.events.filter((e) => e.tick === bar.start).map((e) => e.midi);
-            if (chord && grip.length) {
+            // Each chord the ending strikes (`G7 C`: both) gets its root under it, when the hand
+            // can hold both; the last rings to the bar's end.
+            const spans = endingSpans(ctx);
+            spans.forEach(({ span, from, to }, i) => {
+                const chord = span.chord;
+                const tick = at(bar, from);
+                const grip = out.events.filter((e) => e.tick === tick).map((e) => e.midi);
+                if (!chord || !grip.length) {
+                    return;
+                }
                 const root = nearestMidi(chord.bass, 45, LO, HI);
+                const until = spans[i + 1]?.span.chord ? to : barSteps(bar);
                 if (
                     !grip.includes(root) &&
                     root < Math.min(...grip) &&
                     isPlayable([root, ...grip])
                 ) {
-                    pick(bar.start, root, barSteps(bar) * STEP, 92);
+                    pick(tick, root, (until - from) * STEP, 92);
                 }
-            }
+            });
         } else {
             const { boom } = beatsOf(ctx);
             const tier = energyTier(plan.energy);

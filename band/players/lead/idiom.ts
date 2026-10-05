@@ -872,9 +872,14 @@ function planSlot(
     // the line into it stays the one the chart's chord drew — a step or so from where it was
     // aimed — and the note it lands on is home. Only that bar's notes change; a neighbour's
     // dynamics still read the pitch the line wrote.
+    // In a bar that gets home itself (`| G7 C |`), only what is sung over the held I settles;
+    // the line over the V struck before it is sung as written (#1502).
     const final = ctx.ending;
+    const held = final?.spans.filter((span) => span.chord).at(-1);
     const resolved = onsets.map((o) =>
-        final?.spans[0]?.chord && barOf(ctx, o.tick) === final.index ? final.spans[0].chord : null,
+        held?.chord && barOf(ctx, o.tick) === final?.index && o.tick >= held.start
+            ? held.chord
+            : null,
     );
     const sung = pitches.map((m, i) => {
         const chord = resolved[i];
@@ -992,7 +997,7 @@ export function leadIdiom(book: LeadBook): PitchedIdiom {
             // planned while the pass looped (a practice loop released on the last section, its
             // lap regenerated from a barline as the ending) or under another style's ending is
             // replanned against the chord the band now holds, not kept against the written one.
-            const resolved = ctx.ending?.spans[0]?.chord?.symbol;
+            const resolved = ctx.ending?.spans.filter((span) => span.chord).at(-1)?.chord?.symbol;
             const slot =
                 (role.kind === 'trade'
                     ? `${ctx.pass}:t${role.from}:${role.bars}:${role.turn}:${role.with}`

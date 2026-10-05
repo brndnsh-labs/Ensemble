@@ -124,7 +124,9 @@ function asPlayed(timeline: Timeline, style: StyleId, looping: boolean): Timelin
     if (!ending) {
         return timeline;
     }
-    const { attack: _, ...span } = ending.spans[0];
+    // Every span the ending bar plays: the held chord, and what a bar that gets home itself
+    // strikes before it (`| G7 C |`'s V, #1502).
+    const played = ending.spans.map(({ attack: _, ...span }) => span);
     return {
         ...timeline,
         bars: timeline.bars.map((bar) => (bar.index === last ? ending : bar)),
@@ -132,7 +134,7 @@ function asPlayed(timeline: Timeline, style: StyleId, looping: boolean): Timelin
             ...timeline.spans
                 .filter((s) => s.start < ending.start)
                 .map((s) => (s.end > ending.start ? { ...s, end: ending.start } : s)),
-            span,
+            ...played,
         ],
     };
 }

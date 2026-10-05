@@ -15,6 +15,7 @@ import {
     BASS_SLOT_HI,
     bassNote,
     bassPc,
+    endingBass,
     kickSteps,
     type LineMemory,
     nextChord,
@@ -200,19 +201,13 @@ const reggaeBass: PitchedIdiom = {
         const events: PitchedNote[] = [];
         let last = memory.last;
         if (plan.ending) {
-            const chord = bar.spans[0]?.chord;
-            if (chord) {
-                events.push(
-                    // why: the held note is the bar, in any meter (#1503).
-                    bassNote(
-                        bar,
-                        0,
-                        place(bassPc(chord), last),
-                        barSteps(bar),
-                        dyn(104, plan.energy),
-                    ),
-                );
-            }
+            const held = endingBass(
+                ctx,
+                (c, p) => place(bassPc(c), p),
+                last,
+                dyn(104, plan.energy),
+            );
+            events.push(...held.events);
             return { events, memory: { last } };
         }
         const total = barSteps(bar);

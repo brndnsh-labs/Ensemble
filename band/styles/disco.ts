@@ -10,7 +10,7 @@
  */
 import { type EnergyTier, energyTier } from '../arrange/plan.js';
 import type { PitchedNote } from '../core/types.js';
-import { BASS, bassNote, type LineMemory, nextChord } from '../players/bass/line.js';
+import { BASS, bassNote, endingBass, type LineMemory, nextChord } from '../players/bass/line.js';
 import { compIdiom, type Hit, strums } from '../players/comp/idiom.js';
 import { drumIdiom, type Lines, tomRun } from '../players/drums/kit.js';
 import { barSteps, dyn, isCommonTime, type Pulse, pulses, spanSteps } from '../players/grid.js';
@@ -197,13 +197,9 @@ const discoBass: PitchedIdiom = {
         const events: PitchedNote[] = [];
         let last = memory.last;
         if (plan.ending) {
-            const chord = bar.spans[0]?.chord;
-            if (chord) {
-                const root = pumpRoot(ctx, chord.bass);
-                // why: the held note is the bar, in any meter (#1503).
-                events.push(bassNote(bar, 0, root, barSteps(bar), dyn(106, plan.energy)));
-                last = root;
-            }
+            const held = endingBass(ctx, (c) => pumpRoot(ctx, c.bass), last, dyn(106, plan.energy));
+            events.push(...held.events);
+            last = held.last;
             return { events, memory: { last } };
         }
         const total = barSteps(bar);
@@ -543,6 +539,8 @@ export const disco: Style = {
     // a second guitar would fight it for the same register and attack).
     lead: { idiom: discoLead, prefers: 'sax' },
     // why: disco's tonic colours are the major 7th and the minor 7th (the Philly strings, the
-    // Chic guitar); the ending holds the tonic in that colour.
-    ending: { major: 'maj7', minor: 'm7' },
+    // Chic guitar); the ending holds the tonic in that colour. On a dominant tonic (a dominant
+    // vamp, a blues) the major 7th would contradict the chart's b7: the I9, Chic's dominant
+    // chord (#1502).
+    ending: { major: 'maj7', minor: 'm7', dominant: '9' },
 };

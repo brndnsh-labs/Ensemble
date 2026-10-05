@@ -80,37 +80,66 @@ function keyAt(timeline: Timeline, tick: number): KeyContext | undefined {
 }
 
 /**
- * Does the chart itself rest on this key's tonic somewhere, in a bar in this key? A chart typed
- * without setting its key reads as C major, so an F tune whose last bar is `Gm7 C7` would
- * otherwise "resolve" to C, and an A minor tune ending on `E7` to C6. A key the chart never sits
- * on is not one to end in, so its written chord stands.
- * - A chart that OPENS on a stable chord on the tonic is in that key outright, whatever follows
- *   it: a dominant I–IV vamp (`E9 | A9`, `C7 | F7`) falls a fifth from every I, and is still in
- *   I. (An F blues keyed C opens on F7, an F tune on F, an A minor tune on Am: none backs C.)
- * - Anywhere else a chord counts when it rests on the tonic (`restsOnTonic`): a tonic dominant
- *   that falls a fifth to the next chord (`C7` → `F`) is a V there, not a tonic.
- * Computed afresh on each call (once per pass): a pure scan that usually stops at the first
- * chord, so the engine keeps no memo between passes.
+ * The chart's own tonic chord in this key: the chord a held ending takes its family from
+ * (#1502), or null when the chart never rests on the key's tonic. A chart typed without setting
+ * its key reads as C major, so an F tune whose last bar is `Gm7 C7` would otherwise "resolve"
+ * to C, and an A minor tune ending on `E7` to C6. A key the chart never sits on is not one to
+ * end in, so its written chord stands.
+ * - It is the LAST chord resting on the tonic (`restsOnTonic`) in a bar in this key: the home
+ *   the listener heard most recently. A tonic dominant that falls a fifth to the next chord
+ *   (`C7` → `F`) is a V there, not a tonic.
+ * - Where none does, a chart that OPENS on a stable chord on the tonic is in that key outright,
+ *   whatever follows it: a dominant I–IV vamp (`E9 | A9`, `C7 | F7`) falls a fifth from every
+ *   I, and is still in I, on its I7. (An F blues keyed C opens on F7, an F tune on F, an A
+ *   minor tune on Am: none backs C.)
+ * Computed afresh on each call (once per pass): a pure scan from the end that usually stops
+ * within the last few chords, so the engine keeps no memo between passes.
  */
-function keyBacked(timeline: Timeline, key: KeyContext): boolean {
+function writtenTonic(timeline: Timeline, key: KeyContext): ChordFacts | null {
     const { spans } = timeline;
     const sameKey = (tick: number) => {
         const here = keyAt(timeline, tick);
         return here?.tonic === key.tonic && here.minor === key.minor;
     };
+    for (let j = spans.length - 1; j >= 0; j--) {
+        const { chord, start } = spans[j];
+        if (chord && sameKey(start) && restsOnTonic(timeline, chord, start, key)) {
+            return chord;
+        }
+    }
     const opening = spans.find((span) => span.chord);
-    if (
-        opening?.chord &&
+    return opening?.chord &&
         sameKey(opening.start) &&
         opening.chord.root === key.tonic &&
         STABLE.has(opening.chord.family)
-    ) {
-        return true;
+        ? opening.chord
+        : null;
+}
+
+/**
+ * The suffix a held ending plays on the tonic: the family is the chart's (its written tonic),
+ * the colour the style's (#1502). A style's colour must not change what the tonic is: funk's
+ * I9 on a tune whose tonic is `Cmaj7` adds a b7 the tune never had, and turns the last chord
+ * into a V7 of IV.
+ * - A dominant tonic in a major key (a blues's `C7`, a dominant vamp's `E9`) takes the style's
+ *   `dominant` colour, which keeps the b7 the chart wrote. Without one the style's colour has
+ *   no 7th to contradict it (a triad, a 6th), and its major quality stands.
+ * - A minor tonic takes the minor quality, a major one the major quality, whatever the key
+ *   says: a C minor tune typed without its key ends on Cm6, not on C6.
+ * - Otherwise (a power chord, or a dominant in a minor key: the Hendrix `E7#9` tonic is a minor
+ *   key's sound) the key's mode decides, as it always did.
+ */
+function endingSuffix(quality: EndingQuality, key: KeyContext, tonic: ChordFacts): string {
+    if (tonic.family === 'dominant' && !key.minor) {
+        return quality.dominant ?? quality.major;
     }
-    return spans.some(
-        ({ chord, start }) =>
-            !!chord && sameKey(start) && restsOnTonic(timeline, chord, start, key),
-    );
+    if (tonic.family === 'minor') {
+        return quality.minor;
+    }
+    if (tonic.family === 'major') {
+        return quality.major;
+    }
+    return key.minor ? quality.minor : quality.major;
 }
 
 /**
@@ -127,8 +156,9 @@ function keyBacked(timeline: Timeline, key: KeyContext): boolean {
  *   blues, `Em9` closing a minor groove, a Picardy `E` in E minor, in the colour the chart
  *   chose for it. A tonic over another bass (`C/E`) is not home — an inversion is a passing
  *   sound, and a held ending stands on its root — and nor is `Csus4`;
- * - the chart never rests on the key's tonic anywhere (`keyBacked`): the key is not backed.
- * A bar that reaches home later (`G7 C`, `Csus4 C`) holds that written chord, as written.
+ * - the chart never rests on the key's tonic anywhere (`writtenTonic`): the key is not backed.
+ * A bar that reaches home later (`G7 C`, `Csus4 C`) strikes what comes before it as written and
+ * holds that written chord from where the chart puts it (#1502).
  */
 export function heldEnding(timeline: Timeline, index: number, quality: EndingQuality): Bar | null {
     const bar = timeline.bars[index];
@@ -145,33 +175,42 @@ export function heldEnding(timeline: Timeline, index: number, quality: EndingQua
         return null;
     }
     if (home > 0) {
-        // The bar resolves itself: the band holds the tonic the chart writes, in its colour.
-        return heldOn(bar, bar.spans[home].chord!);
+        // The bar resolves itself: a band reading `| G7 C |` strikes the G7 on 1 and holds the
+        // C from 3, the tonic the chart writes, in its colour.
+        return heldOn(bar, bar.spans[home].chord!, home);
     }
-    if (!keyBacked(timeline, bar.key)) {
+    const tonic = writtenTonic(timeline, bar.key);
+    if (!tonic) {
         return null;
     }
-    // A roman numeral names the key's tonic in either mode; the suffix is the genre's quality.
-    const suffix = bar.key.minor ? quality.minor : quality.major;
+    // A roman numeral names the key's tonic in either mode; the suffix is the genre's colour
+    // on the chart's own tonic family.
+    const suffix = endingSuffix(quality, bar.key, tonic);
     const chord = parseChord(`I${suffix}`, bar.key);
     if (!chord) {
         throw new Error(`Unknown ending quality: ${suffix}`);
     }
-    return heldOn(bar, chord);
+    return heldOn(bar, chord, 0);
 }
 
 /**
- * `bar` played as one chord, struck on its downbeat (the resolution is an arrival) and held to
- * the bar's first written rest, if it has one: the chart's stop stays where it is written.
+ * `bar` played to one held chord: the spans before `from` as written (a `G7 C` bar's G7,
+ * struck on 1), then `chord` struck where span `from` starts (the downbeat for a resolved
+ * turnaround: the resolution is an arrival) and held to the bar's first written rest after it,
+ * if it has one: the chart's stop stays where it is written, and the bar is silent from there.
+ * The held chord is always the bar's last chord, so a lane finds it there.
  */
-function heldOn(bar: Bar, chord: ChordFacts): Bar {
-    const rest = bar.spans.findIndex((span) => !span.chord);
-    const end = rest > 0 ? bar.spans[rest].start : bar.start + bar.meter.barTicks;
+function heldOn(bar: Bar, chord: ChordFacts, from: number): Bar {
+    const rest = bar.spans.findIndex((span, k) => k > from && !span.chord);
+    const start = from > 0 ? bar.spans[from].start : bar.start;
+    const barEnd = bar.start + bar.meter.barTicks;
+    const end = rest > 0 ? bar.spans[rest].start : barEnd;
     return {
         ...bar,
         spans: [
-            { start: bar.start, end, chord, fermata: false, tied: false, attack: true },
-            ...(rest > 0 ? bar.spans.slice(rest) : []),
+            ...bar.spans.slice(0, from),
+            { start, end, chord, fermata: false, tied: false, attack: true },
+            ...(rest > 0 ? [{ ...bar.spans[rest], end: barEnd }] : []),
         ],
     };
 }

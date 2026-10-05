@@ -12,6 +12,7 @@ import {
     BASS,
     bassNote,
     bassPc,
+    endingBass,
     type LineMemory,
     nextChord,
     place,
@@ -72,19 +73,8 @@ const bossaBass: PitchedIdiom = {
         const spans = spanSteps(bar);
         const next = nextChord(ctx);
         if (plan.ending) {
-            const chord = bar.spans[0]?.chord;
-            if (chord) {
-                // why: the held note is the bar, in any meter (#1503).
-                events.push(
-                    bassNote(
-                        bar,
-                        0,
-                        place(bassPc(chord), last),
-                        barSteps(bar),
-                        dyn(92, plan.energy),
-                    ),
-                );
-            }
+            const held = endingBass(ctx, (c, p) => place(bassPc(c), p), last, dyn(92, plan.energy));
+            events.push(...held.events);
             return { events, memory: { last } };
         }
         const grid =
@@ -379,6 +369,8 @@ export const bossa: Style = {
     // nylon comp would be two of the same guitar in the same register.
     lead: { idiom: bossaLead, prefers: 'sax' },
     // why: the bossa tonic is the major 7th, the nylon guitar's final Imaj7. In minor, the
-    // minor 6th a bossa cadences on (this style's own fixture closes its A on `Dm6`).
-    ending: { major: 'maj7', minor: 'm6' },
+    // minor 6th a bossa cadences on (this style's own fixture closes its A on `Dm6`). On a
+    // dominant tonic (a blues) the major 7th would contradict the b7 the chart wrote: the I9,
+    // the nylon's colour on a dominant (#1502).
+    ending: { major: 'maj7', minor: 'm6', dominant: '9' },
 };

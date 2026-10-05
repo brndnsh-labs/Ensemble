@@ -16,7 +16,15 @@ import { type BarPlan, type EnergyTier, energyTier } from '../arrange/plan.js';
 import type { Rng } from '../core/random.js';
 import type { PitchedNote } from '../core/types.js';
 import type { Bar } from '../form/timeline.js';
-import { approach, BASS, bassNote, bassPc, nextChord, place } from '../players/bass/line.js';
+import {
+    approach,
+    BASS,
+    bassNote,
+    bassPc,
+    endingBass,
+    nextChord,
+    place,
+} from '../players/bass/line.js';
 import { compIdiom, type Hit, strums } from '../players/comp/idiom.js';
 import { drumIdiom, type Lines, snareFigure } from '../players/drums/kit.js';
 import { barSteps, dyn, pulses, spanSteps } from '../players/grid.js';
@@ -302,13 +310,9 @@ const skaPunkBass: PitchedIdiom = {
         const arrive = (chord: ChordFacts) =>
             land !== null && mod12(land) === bassPc(chord) ? land : songRoot(ctx, bassPc(chord));
         if (plan.ending) {
-            const chord = bar.spans[0]?.chord;
-            if (chord) {
-                const root = arrive(chord);
-                // why: the held note is the bar, in any meter (#1503).
-                events.push(bassNote(bar, 0, root, barSteps(bar), dyn(104, plan.energy)));
-                last = root;
-            }
+            const held = endingBass(ctx, (c) => arrive(c), last, dyn(104, plan.energy));
+            events.push(...held.events);
+            last = held.last;
             return { events, memory: { last, land: null } };
         }
         const mode = modeAt(ctx);

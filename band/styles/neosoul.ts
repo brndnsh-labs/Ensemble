@@ -17,6 +17,7 @@ import {
     BASS,
     bassNote,
     bassPc,
+    endingBass,
     type LineMemory,
     nextChord,
 } from '../players/bass/line.js';
@@ -299,13 +300,14 @@ const neoBass: PitchedIdiom = {
         const events: PitchedNote[] = [];
         let last = memory.last;
         if (plan.ending) {
-            const chord = bar.spans[0]?.chord;
-            if (chord) {
-                const root = rootPlace(ctx, bassPc(chord));
-                // why: the held note is the bar, in any meter (#1503).
-                events.push(bassNote(bar, 0, root, barSteps(bar), dyn(96, plan.energy)));
-                last = root;
-            }
+            const held = endingBass(
+                ctx,
+                (c) => rootPlace(ctx, bassPc(c)),
+                last,
+                dyn(96, plan.energy),
+            );
+            events.push(...held.events);
+            last = held.last;
             return { events, memory: { last } };
         }
         const line = isCommonTime(bar)
@@ -850,6 +852,7 @@ export const neosoul: Style = {
     // slides (bent-in 3rds) and quiet vibrato are the idiom; a horn stays one pick away.
     lead: { idiom: neoLead, prefers: 'guitar' },
     // why: neo-soul voices its tonic with the 9th on top (the Rhodes maj9 and m9); a plain
-    // seventh would be the one chord in the tune without its colour.
-    ending: { major: 'maj9', minor: 'm9' },
+    // seventh would be the one chord in the tune without its colour. On a dominant tonic the
+    // 9th sits over the chart's b7, not a major 7th (#1502).
+    ending: { major: 'maj9', minor: 'm9', dominant: '9' },
 };

@@ -13,6 +13,7 @@ import {
     approach,
     BASS,
     bassNote,
+    endingBass,
     type LineMemory,
     nextChord,
     pickApproach,
@@ -20,7 +21,7 @@ import {
 import { type GripShape, grip } from '../players/comp/fretboard.js';
 import { compIdiom, type Hit, strums } from '../players/comp/idiom.js';
 import { drumIdiom, tomRun } from '../players/drums/kit.js';
-import { at, barSteps, dyn, isCommonTime, pulses, STEP, spanSteps } from '../players/grid.js';
+import { at, dyn, isCommonTime, pulses, STEP, spanSteps } from '../players/grid.js';
 import { leadIdiom } from '../players/lead/idiom.js';
 import { bluesPool, bluesTargets, restingTones } from '../players/lead/palette.js';
 import { type ChordFacts, fifthOf } from '../theory/chord.js';
@@ -247,12 +248,13 @@ const shuffleBass: PitchedIdiom = {
         const events: PitchedNote[] = [];
         let last = memory.last;
         if (plan.ending) {
-            const chord = bar.spans[0]?.chord;
-            if (chord) {
-                const root = nearestMidi(chord.bass, last ?? BASS.home, BASS.lo, BASS.hi);
-                // why: the held note is the bar, in any meter (#1503).
-                events.push(bassNote(bar, 0, root, barSteps(bar), dyn(100, plan.energy)));
-            }
+            const held = endingBass(
+                ctx,
+                (c, p) => nearestMidi(c.bass, p ?? BASS.home, BASS.lo, BASS.hi),
+                last,
+                dyn(100, plan.energy),
+            );
+            events.push(...held.events);
             return { events, memory: { last } };
         }
         const common = isCommonTime(bar);
@@ -690,6 +692,7 @@ export const blues: Style = {
     lead: { idiom: bluesLead, prefers: 'guitar' },
     // why: the blues tonic is a dominant chord, and the band's last chord is the I9 (the
     // jump-blues final hit: the 9th over the 7th the comp already plays). A minor blues ends
-    // on its im9.
-    ending: { major: '9', minor: 'm9' },
+    // on its im9. A blues band ends a non-blues tune on its I9 too: that b7 is the genre's
+    // own sound, not a change of the tonic's job (#1502).
+    ending: { major: '9', minor: 'm9', dominant: '9' },
 };

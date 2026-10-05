@@ -283,10 +283,19 @@ chord: the bass's one note, the comp's one chord and the lead's last long note, 
 final bar's first chord. Many tunes' last bar is a turnaround written to send the form round
 again (the blues fixture's `Dm7 G7`), and on the last time through a band doesn't hold it: it
 resolves it. So `arrange/ending.ts` (`heldEnding`) gives the ending bar to the lanes on the
-key's tonic, in the quality the genre ends on (`Style.ending`, a chord-symbol suffix read by
-`theory/chord.ts`): I6 for jazz, Imaj7 for bossa, I9 for the blues and funk, Imaj7 for disco
-and hip hop, Imaj9 for neo-soul, the power chord for metal and the triad for the rest; in a
-minor key the minor equivalents (im6 for jazz and bossa, im9, im7, the minor triad).
+key's tonic, in the colour the genre ends on (`Style.ending`, a chord-symbol suffix read by
+`theory/chord.ts`): I6 for jazz, Imaj7 for bossa, I9 for the blues, I6/9 for funk, Imaj7 for
+disco and hip hop, Imaj9 for neo-soul, the power chord for metal and the triad for the rest;
+in a minor key the minor equivalents (im6 for jazz and bossa, im9, im7, the minor triad).
+- **The family is the chart's, the colour the style's (#1502).** The ending takes its family
+  from the chart's own tonic (`writtenTonic`: the last chord resting on it, else the chord the
+  chart opens on), so a colour never changes what the tonic is. On a dominant tonic (a blues's
+  `C7`, a dominant vamp's `E9`) a style whose colour carries a 7th plays its `dominant` colour,
+  keeping the chart's b7: I9 for funk, the blues, bossa, disco and neo-soul, I7 for hip hop
+  (jazz's 6th and the triads carry no 7th to contradict it). On a major tonic funk ends on the
+  6/9, since its I9's b7 would turn the last chord into a V7 of IV; the blues keeps its I9, its
+  own sound on any tune. A minor tonic ends minor even where the key reads major (a C minor
+  tune typed without its key).
 - **What already counts as home.** A first chord that rests on the tonic, root and bass, in a
   stable family (major, minor, dominant, power) is held as written, in the colour the chart
   gave it: rhythm changes' `Bb6`, a blues's `C7`, a minor groove's `Em9`, a Picardy `E` in E
@@ -295,7 +304,14 @@ minor key the minor equivalents (im6 for jazz and bossa, im9, im7, the minor tri
   sound, and the held ending stands on the root. Nor is a tonic that is still moving: `Csus4`,
   `Co7`, `Cø`, `C+`.
 - **A bar that gets home itself.** When a later chord of the last bar rests on the tonic (`G7
-  C`, `Csus4 Cmaj7`), the band holds that written chord, in its own colour, not the style's.
+  C`, `Csus4 Cmaj7`), the band holds that written chord, in its own colour, not the style's,
+  and plays the bar as a band reading it does (#1502): the chords before it struck where they
+  are written (the G7 on 1), the tonic struck where the chart puts it and held from there (the
+  C from 3), bass and comp together, the drummer catching the arrival with a crash. A bass
+  under a resolution on its own root (`Csus4 Cmaj7`) holds the note through it (funk's short
+  hits strike it again), and the lead settles only what it sings over the tonic. The lanes read
+  the chords to strike from `endingSpans`; a last bar played as written (home on its downbeat,
+  a coda's) still holds its first chord.
 - **Written endings stand: how a chart asks to end off the tonic.** A fermata on the last bar,
   an N.C. on its downbeat, and the last bar of a written coda (`Timeline.coda`: reached through
   a D.C./D.S. al Coda's hop or a counted chart's last-chorus coda) are the chart's own ending,

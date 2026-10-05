@@ -9,7 +9,7 @@ import type { Rng } from '../../core/random.js';
 import type { PitchedNote } from '../../core/types.js';
 import type { BarContext, PitchedIdiom } from '../../styles/types.js';
 import type { ChordFacts } from '../../theory/chord.js';
-import { at, barSteps, dyn, STEP, spanSteps } from '../grid.js';
+import { at, barSteps, dyn, endingSpans, STEP, spanSteps } from '../grid.js';
 import { type GripShape, grip } from './fretboard.js';
 import { type VoicingKind, voice } from './voicing.js';
 
@@ -164,20 +164,24 @@ export function compIdiom(book: CompBook): PitchedIdiom {
             };
             if (plan.ending) {
                 // The held ending's chord: a final turnaround is already the tonic here, in the
-                // style's quality (`arrange/ending.ts`), the same chord the bass holds.
-                const chord = bar.spans[0]?.chord;
-                if (chord) {
-                    prev = place(chord, prev);
-                    chordAt(prev, 0, total, 92, shape && { stroke: 'down' });
-                }
+                // style's quality (`arrange/ending.ts`), the same chord the bass holds. A bar
+                // that gets home itself (`| G7 C |`) strikes each chord where it is written,
+                // the V on 1 and the I held from 3 (#1502); the last rings to the bar's end
+                // (a written stop cuts it, `perform.ts`).
+                const spans = endingSpans(ctx);
+                let held: string | null = null;
+                spans.forEach(({ span, from, to }, i) => {
+                    if (!span.chord) {
+                        return;
+                    }
+                    prev = place(span.chord, prev);
+                    const until = spans[i + 1]?.span.chord ? to : total;
+                    chordAt(prev, from, until - from, 92, shape && { stroke: 'down' });
+                    held = span.chord.symbol;
+                });
                 return {
                     events,
-                    memory: {
-                        voicing: prev,
-                        pushed: false,
-                        chord: chord?.symbol ?? null,
-                        bar: bar.index,
-                    },
+                    memory: { voicing: prev, pushed: false, chord: held, bar: bar.index },
                 };
             }
             const legato = ctx.instrument.legato && !book.percussive;

@@ -24,7 +24,8 @@ export interface BarContext {
     /**
      * The bar being played. On the last bar of a pass that ends (`plan.ending`) it is the held
      * ending's (`arrange/ending.ts`): a final turnaround arrives already resolved to the tonic,
-     * so every lane's ending, which plays `bar.spans[0].chord`, holds that one chord.
+     * so every lane's ending, which plays the chords `endingSpans` gives it, holds that one
+     * chord — or, in a bar that gets home itself (`| G7 C |`), strikes the V and holds the I.
      */
     bar: Bar;
     plan: BarPlan;
@@ -130,8 +131,18 @@ export interface Style {
     ending: EndingQuality;
 }
 
-/** Chord-symbol suffixes for the tonic a held ending resolves to (`Style.ending`). */
+/**
+ * Chord-symbol suffixes for the tonic a held ending resolves to (`Style.ending`). The family is
+ * the chart's own tonic's, the colour the style's (`arrange/ending.ts`, #1502).
+ */
 export interface EndingQuality {
     major: string;
     minor: string;
+    /**
+     * The colour on a chart whose tonic is a dominant (a blues's `C7`, a dominant vamp's
+     * `E9`), in a major key: it keeps the b7 the chart wrote. Absent, the style's `major`
+     * plays there — right for a colour with no 7th (a triad, a 6th); a style whose major
+     * colour carries a 7th must say which seventh a dominant tonic gets.
+     */
+    dominant?: string;
 }

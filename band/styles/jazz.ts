@@ -12,6 +12,7 @@ import {
     BASS,
     bassNote,
     bassPc,
+    endingBass,
     type LineMemory,
     nextChord,
     pickApproach,
@@ -230,20 +231,9 @@ const walkingBass: PitchedIdiom = {
         const beats = pulses(bar);
         const twoFeel = tier === 'low' && bar.meter.name === '4/4';
         if (plan.ending) {
-            const chord = bar.spans[0]?.chord;
-            if (chord) {
-                // why: the held note is the bar, in any meter: four beats overran a 3/4, 6/8
-                // or 7/8 ending past the band's last barline (#1503).
-                events.push(
-                    bassNote(
-                        bar,
-                        0,
-                        place(bassPc(chord), last),
-                        barSteps(bar),
-                        dyn(96, plan.energy),
-                    ),
-                );
-            }
+            // The held note lasts the bar in any meter (#1503); a written `G7 C` strikes both.
+            const held = endingBass(ctx, (c, p) => place(bassPc(c), p), last, dyn(96, plan.energy));
+            events.push(...held.events);
             return { events, memory: { last } };
         }
         spans.forEach(({ span, from, to }, i) => {

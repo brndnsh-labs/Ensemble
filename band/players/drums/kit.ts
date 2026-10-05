@@ -8,7 +8,16 @@ import { type EnergyTier, energyTier } from '../../arrange/plan.js';
 import type { Rng } from '../../core/random.js';
 import type { DrumHit, DrumPiece } from '../../core/types.js';
 import type { BarContext, DrumIdiom } from '../../styles/types.js';
-import { at, barSteps, dyn, fitCell, isCommonTime, pulses, readLine } from '../grid.js';
+import {
+    at,
+    barSteps,
+    dyn,
+    endingSpans,
+    fitCell,
+    isCommonTime,
+    pulses,
+    readLine,
+} from '../grid.js';
 
 /** One bar (or one pulse cell) of drum lines, each a pattern string per piece. */
 export type Lines = Partial<Record<DrumPiece, string>>;
@@ -101,6 +110,16 @@ export function drumIdiom(book: DrumBook): DrumIdiom {
             if (plan.ending) {
                 hit('crash', 0, 118);
                 hit('kick', 0, 110);
+                // A bar that gets home itself (`| G7 C |`): the band strikes the V on 1 and the
+                // I on 3, and the drummer catches the arrival with them, or the last chord lands
+                // with no kit under it (#1502).
+                const held = endingSpans(ctx)
+                    .filter(({ span }) => span.chord)
+                    .at(-1);
+                if (held && held.from > 0) {
+                    hit('crash', held.from, 118);
+                    hit('kick', held.from, 110);
+                }
                 return { events, memory: null };
             }
             const tier = energyTier(plan.energy);

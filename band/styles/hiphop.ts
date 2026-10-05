@@ -11,7 +11,14 @@
  */
 import { type EnergyTier, energyTier } from '../arrange/plan.js';
 import type { PitchedNote } from '../core/types.js';
-import { bassNote, bassPc, kickSteps, type LineMemory, nextChord } from '../players/bass/line.js';
+import {
+    bassNote,
+    bassPc,
+    endingBass,
+    kickSteps,
+    type LineMemory,
+    nextChord,
+} from '../players/bass/line.js';
 import { compIdiom, type Hit, pendulum, strums } from '../players/comp/idiom.js';
 import { type DrumBook, drumIdiom, fillStart, type Lines } from '../players/drums/kit.js';
 import { barSteps, dyn, isCommonTime, spanSteps } from '../players/grid.js';
@@ -243,20 +250,14 @@ const subBass: PitchedIdiom = {
         const events: PitchedNote[] = [];
         let last = memory.last;
         if (plan.ending) {
-            const chord = bar.spans[0]?.chord;
-            if (chord) {
-                // why: the held note is the bar, in any meter (#1503).
-                events.push(
-                    bassNote(
-                        bar,
-                        0,
-                        subRoot(ctx, bassPc(chord)),
-                        barSteps(bar),
-                        dyn(110, plan.energy),
-                    ),
-                );
-                last = subRoot(ctx, bassPc(chord));
-            }
+            const held = endingBass(
+                ctx,
+                (c) => subRoot(ctx, bassPc(c)),
+                last,
+                dyn(110, plan.energy),
+            );
+            events.push(...held.events);
+            last = held.last;
             return { events, memory: { last } };
         }
         const total = barSteps(bar);
@@ -573,6 +574,7 @@ export const hiphop: Style = {
     // bend to sound played rather than programmed.
     lead: { idiom: hipHopLead, prefers: 'guitar' },
     // why: a sampled soul or jazz loop sits on seventh chords; the ending holds the loop's
-    // tonic seventh, major or minor.
-    ending: { major: 'maj7', minor: 'm7' },
+    // tonic seventh, major or minor — and on a dominant tonic its own seventh, the b7, not a
+    // major 7th the loop never had (#1502).
+    ending: { major: 'maj7', minor: 'm7', dominant: '7' },
 };

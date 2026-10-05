@@ -5,7 +5,7 @@ import type { Bar, BarSpan } from '../../form/timeline.js';
 import type { BarContext } from '../../styles/types.js';
 import type { ChordFacts } from '../../theory/chord.js';
 import { mod12, nearestMidi } from '../../theory/pitch.js';
-import { at, STEP } from '../grid.js';
+import { at, barSteps, endingSpans, STEP } from '../grid.js';
 
 /**
  * The bass register (MIDI). Hard limits sit inside the band's slot (23–57); `home` is the
@@ -95,6 +95,59 @@ export function bassNote(
         offsetMs: 0,
         bar: bar.index,
         ...(muted ? { muted: true } : {}),
+    };
+}
+
+/**
+ * The held ending's bass (`plan.ending`, `arrange/ending.ts`): one note on each chord the
+ * ending bar strikes (`endingSpans`), held to the next — the resolved tonic alone on the
+ * downbeat, or a written `| G7 C |`'s V on 1 and its I from 3 (#1502). A chord on the same
+ * bass note as the one before (`Csus4 Cmaj7`) is no new note: the bass holds its root while
+ * the chord resolves above it. `pitch` places a chord's bass note as the style's line would
+ * (near `prev`, the note before it); `steps` caps how long a note rings (funk's short ending).
+ * Returns the notes and the last pitch placed.
+ */
+export function endingBass(
+    ctx: BarContext,
+    pitch: (chord: ChordFacts, prev: number | null) => number,
+    prev: number | null,
+    velocity: number,
+    steps = Number.POSITIVE_INFINITY,
+): { events: PitchedNote[]; last: number | null } {
+    const { bar } = ctx;
+    // Each struck note: where it starts, its pitch, and the step it rings to.
+    const notes: { from: number; midi: number; to: number }[] = [];
+    let last = prev;
+    const spans = endingSpans(ctx);
+    spans.forEach(({ span, from, to }, i) => {
+        const chord = span.chord;
+        if (!chord) {
+            return;
+        }
+        // The last chord rings on to the bar's end (the band's last barline), cut short only by
+        // a written stop (`perform.ts`); a chord before it rings until the next is struck.
+        const until = spans[i + 1]?.span.chord ? to : barSteps(bar);
+        const midi = pitch(chord, last);
+        const held = notes.at(-1);
+        // (A bass that plays the ending as short hits, funk's, strikes it again instead: held
+        // through, its note would stop before the chord it is under resolves.)
+        if (
+            held &&
+            held.to === from &&
+            mod12(held.midi) === mod12(midi) &&
+            until - held.from <= steps
+        ) {
+            held.to = until;
+            return;
+        }
+        notes.push({ from, midi, to: until });
+        last = midi;
+    });
+    return {
+        events: notes.map((n) =>
+            bassNote(bar, n.from, n.midi, Math.min(steps, n.to - n.from), velocity),
+        ),
+        last,
     };
 }
 
