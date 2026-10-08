@@ -558,7 +558,9 @@ function lastChorusCoda(
         );
     }
     const destination = lastChorus.direction.destination;
-    const departure = markers.get(destination.via)!;
+    // A tag (#1487) writes no departure sign: every chorus ends where its coda begins, and the
+    // last one plays on into it. That barline is its departure.
+    const departure = markers.get(destination.via ?? destination.target)!;
     if (
         departure.sectionIndex !== lastChorus.boundary.sectionIndex ||
         departure.measureIndex !== lastChorus.boundary.measureIndex ||
@@ -567,7 +569,17 @@ function lastChorusCoda(
         failAt(
             score,
             lastChorus.boundary,
-            'Place the last-chorus coda on the same bar boundary as its departure coda sign.',
+            destination.via === undefined
+                ? 'Place a last-chorus coda with no departure sign on the same bar boundary as its coda sign.'
+                : 'Place the last-chorus coda on the same bar boundary as its departure coda sign.',
+        );
+    }
+    if (destination.via === undefined && departure.position === 0) {
+        // Every chorus but the last would play nothing at all.
+        failAt(
+            score,
+            departure,
+            'A last-chorus coda with no departure sign needs at least one bar of form before it.',
         );
     }
     // Unlike a D.S. al Coda, the arrival may share the departure's barline: the coda written
@@ -734,7 +746,8 @@ export function compileScoreForm(candidate: unknown): ScoreFormVisit[] {
     if (lastChorus) {
         // The departure must be passed once a chorus, or "the last time" through it is ambiguous.
         // The play tape holds every written bar, so both markers are on it.
-        const departures = play.markers.get(lastChorus.destination.via)!;
+        const { via, target: coda } = lastChorus.destination;
+        const departures = play.markers.get(via ?? coda)!;
         // Passed once is not enough: a departure in a first ending is passed on pass 1 only,
         // and the written route then goes back behind it for the next pass (#1476 review).
         const firstBar = score.sections.map((_, index) =>
@@ -750,14 +763,17 @@ export function compileScoreForm(candidate: unknown): ScoreFormVisit[] {
                     firstBar[step.visit.sectionIndex] + step.visit.measureIndex <
                         lastChorus.departure.position,
             );
-        if (departures.length > 1 || goesBack) {
+        // A tag's sign opens its coda, so a coda that repeats passes it again without going
+        // back behind it: the first time through is still the only way in.
+        if ((via !== undefined && departures.length > 1) || goesBack) {
             failAt(
                 score,
                 lastChorus.departure,
                 'The last-chorus coda departs inside a repeated passage; which pass is the last time is ambiguous. Place its coda sign after the complete repeat in a section that plays once.',
             );
         }
-        if (play.markers.get(lastChorus.destination.target)![0] <= departures[0]) {
+        // A tag's departure is its arrival, so it has no hop to check.
+        if (via !== undefined && play.markers.get(coda)![0] <= departures[0]) {
             failAt(
                 score,
                 lastChorus.departure,
@@ -809,13 +825,15 @@ export function compileScoreForm(candidate: unknown): ScoreFormVisit[] {
                 boundary.directions.some(
                     (direction) => direction.kind === 'coda' && direction.label === label,
                 );
-            if (lastChorus && codaAt(lastChorus.destination[final ? 'via' : 'target'])) {
-                if (!final) {
-                    // Written outro material: only the last chorus plays from here on.
-                    return;
-                }
+            if (lastChorus && !final && codaAt(lastChorus.destination.target)) {
+                // Written outro material: only the last chorus plays from here on.
+                return;
+            }
+            // A tag (#1487) has no `via`: the last chorus plays straight on into its coda.
+            const via = final ? lastChorus?.destination.via : undefined;
+            if (via !== undefined && codaAt(via)) {
                 // lastChorusCoda() refuses any jump beside it, so this is still the play tape.
-                cursor = tape.markers.get(lastChorus.destination.target)![0];
+                cursor = tape.markers.get(lastChorus!.destination.target)![0];
                 continue;
             }
             const destination = active?.jump.destination;

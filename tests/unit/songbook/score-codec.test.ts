@@ -641,6 +641,38 @@ describe('chorus count and last-chorus codas (#1472)', () => {
         expect(validateSemanticScore(score).kind).toBe('ok');
     });
 
+    it('round-trips a last-chorus coda with no departure sign, a tag (#1487)', () => {
+        const source = documentFixture();
+        const score = codaScore();
+        delete score.sections[0].measures[0].end;
+        score.sections[0].measures[1].start = [
+            { kind: 'coda', label: 'coda' },
+            { kind: 'last-chorus', destination: { kind: 'coda', target: 'coda' } },
+        ];
+        source.chart.score = score;
+        const encoded = encodeChartDocumentV2(source);
+        if (encoded.kind !== 'ok') {
+            throw new Error('Fixture must encode');
+        }
+        expect(decodeChartDocumentV2(encoded.json)).toEqual({ kind: 'ok', value: source });
+    });
+
+    it('still requires a departure sign of a D.C./D.S. al Coda', () => {
+        const score = codaScore();
+        score.sections[0].measures[1].end = [
+            {
+                kind: 'jump',
+                from: 'start',
+                destination: { kind: 'coda', target: 'coda' } as never,
+                repeats: 'play',
+            },
+        ];
+        expect(issue(score)).toMatchObject({
+            path: '$.sections[0].measures[1].end[0].destination.via',
+            message: 'Missing required field.',
+        });
+    });
+
     it.each([0, 65, 2.5, -1, '3', null])('rejects %p choruses', (choruses) => {
         expect(issue({ ...codaScore(), choruses })).toMatchObject({
             path: '$.choruses',
@@ -682,6 +714,8 @@ describe('chorus count and last-chorus codas (#1472)', () => {
         ],
         [{ kind: 'coda', via: 'to-coda', target: 'nowhere' }, 'Missing coda destination.'],
         [{ kind: 'coda', via: 'to-coda' }, 'Missing required field.'],
+        [{ kind: 'coda', target: 'nowhere' }, 'Missing coda destination.'],
+        [{ kind: 'coda', via: null, target: 'coda' }, 'Expected bounded, plain display text.'],
         [null, 'A last-chorus direction takes a coda destination.'],
     ])('rejects a last-chorus destination %j', (destination, message) => {
         const score = codaScore();

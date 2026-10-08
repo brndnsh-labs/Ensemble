@@ -386,6 +386,39 @@ describe('the Jazz 1460 playlist fixtures (#1447)', () => {
             expectCanonicalRoundTrip(document);
             expect(song.diagnostics.map(({ message }) => message)).toContain(codaNote(27, 25));
         });
+
+        it('imports Ladies In Mercedes at 32 bars, its lone coda a vamp tagged on after the last chorus (#1487)', () => {
+            // The page's other form, "mark only the Coda section at the end, as in Alley Cat":
+            // "with no jump symbol in the form, the repeats play in full and the Coda is added
+            // once as a tag at the end". The written chart, 36 bars in one section:
+            //   bars  1-32  the form, sixteen chords of two bars each (Gmaj7 | % | C7#11 | % ...
+            //               Am7b5 | % | D7b9 | %), with no coda sign anywhere in it
+            //   bars 33-36  the Coda section, a repeat with the chart's one coda sign on it:
+            //               {Gmaj7 | % | C7#11 | %}
+            // So no chorus leaves anything out: the last plays all 32 bars, then the vamp twice.
+            const { document, song } = importFixture('ladies-in-mercedes');
+            expect(document.chart.score.choruses).toBeUndefined();
+            expect(performedBarCount(document)).toBe(32);
+            expect(performed(document)).toEqual(bars(0, 1, 32));
+            expect(performed(document, 2)).toEqual([
+                ...bars(0, 1, 32),
+                ...bars(1, 1, 32),
+                ...bars(1, 33, 36),
+                ...bars(1, 33, 36),
+            ]);
+            const measures = document.chart.score.sections[0].measures;
+            expect(measures[31].end).toBeUndefined();
+            expect(measures[32].start).toEqual([
+                { kind: 'repeat-start' },
+                { kind: 'coda', label: 'coda-1' },
+                { kind: 'last-chorus', destination: { kind: 'coda', target: 'coda-1' } },
+            ]);
+            expectCanonicalRoundTrip(document);
+            expect(song.diagnostics.map(({ message }) => message)).toEqual([
+                'The coda at bar 33 is played once, at the end: with a chorus count set, the last chorus plays on into it. Until then the form loops without it.',
+                expect.stringContaining('Stored key is used without transposition'),
+            ]);
+        });
     });
 
     it('imports One For My Baby at 61 performed bars, landing its closing fermata on the chord it precedes (#1451)', () => {
