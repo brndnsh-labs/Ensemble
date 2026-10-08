@@ -162,15 +162,22 @@ interface Navigation {
     endingReferences: { pass: number; path: string }[];
 }
 
-/** A coda destination's two marker references, shared by D.C./D.S. al Coda and last-chorus codas. */
+/**
+ * A coda destination's marker references, shared by D.C./D.S. al Coda and last-chorus codas.
+ * Only a last-chorus coda may leave out its departure (`tag`, #1487).
+ */
 function codaDestination(
     destination: RecordValue,
     path: string,
     owner: string,
     navigation: Navigation,
+    tag = false,
 ) {
-    object(destination, path, ['kind', 'via', 'target']);
+    object(destination, path, tag ? ['kind', 'target'] : ['kind', 'via', 'target'], ['via']);
     for (const field of ['via', 'target']) {
+        if (!Object.hasOwn(destination, field)) {
+            continue;
+        }
         navigation.references.push({
             kind: 'coda',
             label: identity(destination[field], `${path}.${field}`),
@@ -270,7 +277,7 @@ function directions(value: unknown, path: string, allowed: string[], navigation:
                 `${at}.destination`,
                 'A last-chorus direction takes a coda destination.',
             );
-            codaDestination(destination, `${at}.destination`, at, navigation);
+            codaDestination(destination, `${at}.destination`, at, navigation, true);
         } else {
             const record = object(item, at, ['kind', 'label']);
             const label = identity(record.label, `${at}.label`);

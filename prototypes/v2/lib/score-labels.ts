@@ -23,7 +23,10 @@ export function directionLabel(direction: ScoreDirection): string {
             return `${jump}${ending}`;
         }
         case 'last-chorus':
-            return 'To Coda, last chorus';
+            // A tag (#1487) has no departure: its label sits on the coda's own barline.
+            return direction.destination.via === undefined
+                ? 'Last chorus only'
+                : 'To Coda, last chorus';
         case 'repeat-start':
             return '𝄆';
         case 'repeat-end':

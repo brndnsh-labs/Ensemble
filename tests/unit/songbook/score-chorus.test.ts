@@ -399,6 +399,115 @@ describe('last-chorus coda (#1472)', () => {
     });
 });
 
+describe('last-chorus coda with no departure sign: a tag (#1487)', () => {
+    const tag: ScoreDirection = {
+        kind: 'last-chorus',
+        destination: { kind: 'coda', target: 'coda' },
+    };
+    const sign: ScoreDirection = { kind: 'coda', label: 'coda' };
+
+    /** A two-bar head, its turnaround, and a two-bar tag marked only by its own coda sign. */
+    function tagChart(choruses?: number): SemanticScore {
+        const score = scoreFixture(
+            [bar('a1'), bar('a2'), bar('turn')],
+            [bar('t1', [sign, tag]), bar('t2')],
+        );
+        return choruses === undefined ? score : { ...score, choruses };
+    }
+
+    it('plays the whole form every chorus and adds the tag once, after the last', () => {
+        // Unlike a coda with a departure sign, the last chorus skips nothing: `turn` is played.
+        expect(byChorus(tagChart(3))).toEqual([
+            ['a1', 'a2', 'turn'],
+            ['a1', 'a2', 'turn'],
+            ['a1', 'a2', 'turn', 't1', 't2'],
+        ]);
+        expect(ids(tagChart(1))).toEqual(['a1', 'a2', 'turn', 't1', 't2']);
+    });
+
+    it('never performs the tag when the choruses are not counted', () => {
+        expect(ids(tagChart())).toEqual(['a1', 'a2', 'turn']);
+    });
+
+    it('ends the band timeline in its coda only when the tag is played', () => {
+        expect(compileTimeline(tagChart(2)).coda).toBe(true);
+        expect(compileTimeline(tagChart()).coda).toBeUndefined();
+    });
+
+    it('lets the tag itself repeat: its sign is passed again, but only the first time is the way in', () => {
+        const score = scoreFixture(
+            [bar('a'), bar('b')],
+            [
+                bar('v1', [sign, tag, { kind: 'repeat-start' }]),
+                bar('v2', [], [{ kind: 'repeat-end', times: 2 }]),
+            ],
+        );
+        expect(byChorus({ ...score, choruses: 2 })).toEqual([
+            ['a', 'b'],
+            ['a', 'b', 'v1', 'v2', 'v1', 'v2'],
+        ]);
+    });
+
+    it('lets a tag be a whole repeated section, but not sit later in one', () => {
+        const score = scoreFixture([bar('a'), bar('b')], [bar('t1', [sign, tag]), bar('t2')]);
+        score.sections[1].repeat = 2;
+        expect(byChorus({ ...score, choruses: 2 })).toEqual([
+            ['a', 'b'],
+            ['a', 'b', 't1', 't2', 't1', 't2'],
+        ]);
+        delete score.sections[1].measures[0].start;
+        score.sections[1].measures[1].start = [sign, tag];
+        expect(() => compileScoreForm({ ...score, choruses: 2 })).toThrow(
+            /departs inside a repeated passage/,
+        );
+    });
+
+    it('takes a sign on the end barline of the bar before the tag too', () => {
+        const score = scoreFixture([bar('a'), bar('b', [], [sign, tag]), bar('t')]);
+        expect(byChorus({ ...score, choruses: 2 })).toEqual([
+            ['a', 'b'],
+            ['a', 'b', 't'],
+        ]);
+    });
+
+    it('must sit on its coda sign', () => {
+        const score = tagChart(2);
+        score.sections[1].measures[0].start = [sign];
+        score.sections[1].measures[1].start = [tag];
+        expect(() => compileScoreForm(score)).toThrow(
+            /B, bar 2: Place a last-chorus coda with no departure sign on the same bar boundary as its coda sign/,
+        );
+    });
+
+    it('is refused in the first bar, where every chorus but the last would be empty', () => {
+        const score = scoreFixture([bar('t1', [sign, tag]), bar('t2')]);
+        for (const candidate of [score, { ...score, choruses: 2 }]) {
+            expect(() => compileScoreForm(candidate)).toThrow(
+                /A, bar 1: A last-chorus coda with no departure sign needs at least one bar of form before it/,
+            );
+        }
+    });
+
+    it('is refused when a repeat goes back behind its sign', () => {
+        const score = scoreFixture([
+            bar('a', [{ kind: 'repeat-start' }]),
+            bar('t', [sign, tag], [{ kind: 'repeat-end', times: 2 }]),
+        ]);
+        expect(() => compileScoreForm({ ...score, choruses: 2 })).toThrow(
+            /departs inside a repeated passage/,
+        );
+    });
+
+    it('is still refused beside a D.C./D.S. jump', () => {
+        const score = tagChart(2);
+        score.sections[0].measures[0].start = [{ kind: 'segno', label: 'sign' }];
+        score.sections[0].measures[2].end = [ds({ kind: 'end' })];
+        expect(() => compileScoreForm(score)).toThrow(
+            /A last-chorus coda cannot share a chart with a D\.C\.\/D\.S\. jump yet/,
+        );
+    });
+});
+
 describe('the band timeline carries the chorus (#1472)', () => {
     it('gives every chorus its own section visits, even of a one-section form', () => {
         const single = { ...scoreFixture([bar('a'), bar('b')]), choruses: 3 };

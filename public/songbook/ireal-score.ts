@@ -791,13 +791,25 @@ function alEndingClose(
  * (#1472). Only that shape is mapped: exactly two signs, nothing else orphaned, placed as the
  * page's convention has them: 'put the "jump from" Coda symbol at the end of a measure, and the
  * "jump to" Coda symbol at the beginning of the first measure of the Coda section'. The page
- * also lets a chart "mark only the Coda section at the end, as in Alley Cat"; a last-chorus coda
- * departs from a written sign, so that form would need a departure sign the chart doesn't have,
- * and stays refused. Returns their bars and labels, or undefined for any other shape.
+ * also lets a chart "mark only the Coda section at the end, as in Alley Cat": "with no jump
+ * symbol in the form, the repeats play in full and the Coda is added once as a tag at the end".
+ * That lone start-of-bar sign is a last-chorus coda with no departure (#1487), so nothing the
+ * chart didn't write is added to it. Returns the signs' bars and labels (no `via` for a tag), or
+ * undefined for any other shape.
  */
 function unpairedCoda(
     orphaned: Marker[],
-): { via: number; target: number; labels: { via: string; target: string } } | undefined {
+): { via?: number; target: number; labels: { via?: string; target: string } } | undefined {
+    const [only] = orphaned;
+    // Not in the first bar: a tag needs a form before it.
+    if (
+        orphaned.length === 1 &&
+        only.direction.kind === 'coda' &&
+        only.edge === 'start' &&
+        only.index > 0
+    ) {
+        return { target: only.index, labels: { target: only.direction.label } };
+    }
     // Markers are in reading order, so a start-of-bar sign after an end-of-bar one is in a
     // later bar.
     const [via, target] = orphaned;
@@ -934,13 +946,20 @@ function mapNavigation(
             // stays the honest note below, never a guessed last-chorus coda.
             const coda = applyConventions && !tolerateUnpairedMarkers && unpairedCoda(orphaned);
             if (coda) {
-                // On the departure sign's own barline, as the score form requires.
-                bars[coda.via].end.push({
+                // On the departure sign's own barline, as the score form requires; a tag's is
+                // the barline its coda starts on.
+                const boundary =
+                    coda.via === undefined ? bars[coda.target].start : bars[coda.via].end;
+                boundary.push({
                     kind: 'last-chorus',
                     destination: { kind: 'coda', ...coda.labels },
                 });
                 notes.push(
-                    `The coda at bar ${coda.target + 1} is played once, at the end: with a chorus count set, the last chorus jumps to it from the end of bar ${coda.via + 1}. Until then the form loops without it.`,
+                    `The coda at bar ${coda.target + 1} is played once, at the end: with a chorus count set, the last chorus ${
+                        coda.via === undefined
+                            ? 'plays on into it'
+                            : `jumps to it from the end of bar ${coda.via + 1}`
+                    }. Until then the form loops without it.`,
                 );
                 return true;
             }

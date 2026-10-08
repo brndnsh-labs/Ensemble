@@ -21,6 +21,16 @@ export interface ScoreCodaDestination {
     target: string;
 }
 
+/**
+ * Where a last-chorus coda goes. With no `via` it is a tag (#1487): the chart writes no
+ * departure sign, so the last chorus plays the whole form and on into the coda at `target`.
+ */
+export interface ScoreLastChorusDestination {
+    kind: 'coda';
+    via?: string;
+    target: string;
+}
+
 export type ScoreDestination =
     | { kind: 'end' }
     | { kind: 'fine'; label: string }
@@ -44,9 +54,10 @@ export type ScoreDirection =
      * "To Coda, last time" (#1472). Only the final chorus of a counted performance
      * (`SemanticScore.choruses`) hops from `via` to `target`. Every other chorus, and every
      * chorus of an uncounted one, ends where `target` begins: the bars from there on are
-     * written outro material. Sits on the same boundary as its `via` marker.
+     * written outro material. Sits on the same boundary as its `via` marker; with no `via`
+     * (#1487) nothing is skipped, and it sits on its `target` marker's boundary instead.
      */
-    | { kind: 'last-chorus'; destination: ScoreCodaDestination };
+    | { kind: 'last-chorus'; destination: ScoreLastChorusDestination };
 
 export interface ScoreContext {
     key?: string;

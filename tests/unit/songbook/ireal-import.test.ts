@@ -704,10 +704,36 @@ describe('bounded source-preserving iReal import', () => {
             expect(order(2)).toEqual(['0:1', '0:2', '0:3', '0:4', '1:1', '1:2', '1:5', '1:6']);
         });
 
+        it("maps a lone coda sign at the start of a bar to a tag: iReal's other form (#1487)", () => {
+            // 'You can also mark only the Coda section at the end, as in Alley Cat': "with no jump
+            // symbol in the form, the repeats play in full and the Coda is added once as a tag at
+            // the end" (https://irealpro.com/how-the-coda-symbol-works-in-ireal-pro/).
+            const song = parseIRealImport(open('T44[C   |F   Z[QD7   |G7   Z')).songs[0];
+            const result = song.score!;
+            expect(result.choruses).toBeUndefined();
+            const measures = result.sections[0].measures;
+            // Nothing is written onto the form's last barline: the chart has no sign there.
+            expect(measures[1].end).toBeUndefined();
+            expect(measures[2].start).toEqual([
+                { kind: 'coda', label: 'coda-1' },
+                { kind: 'last-chorus', destination: { kind: 'coda', target: 'coda-1' } },
+            ]);
+            expect(song.diagnostics.map(({ message }) => message)).toEqual([
+                'The coda at bar 3 is played once, at the end: with a chorus count set, the last chorus plays on into it. Until then the form loops without it.',
+                'The stored key is used. iReal style is preserved as text, not applied as an Ensemble genre.',
+            ]);
+            const order = (choruses?: number) =>
+                prepareScorePlayback({ ...result, ...(choruses ? { choruses } : {}) }).visits.map(
+                    ({ chorus, measureIndex }) => `${chorus}:${measureIndex + 1}`,
+                );
+            expect(order()).toEqual(['0:1', '0:2']);
+            expect(order(2)).toEqual(['0:1', '0:2', '1:1', '1:2', '1:3', '1:4']);
+        });
+
         it.each([
-            // iReal's other form: only the coda section is marked. A last-chorus coda departs
-            // from a written sign, and this chart has none to depart from.
-            ['a lone coda sign at the start of a bar', 'T44[C   |F   Z[QD7   |G7   Z'],
+            // A tag needs a form before it, and a sign the form goes back behind is ambiguous.
+            ['a lone coda sign on the first bar', 'T44[QC   |F   |D7   |G7   Z'],
+            ['a lone coda sign inside a repeat', 'T44{C   |QF   }[D7   |G7   Z'],
             ['a lone departure sign', 'T44[C   |F   Q|G7   Z'],
             ['both signs at the start of a bar', 'T44[QC   |F   Z[QD7   |G7   Z'],
             ['both signs at the end of a bar', 'T44[C   Q|F   Z[D7   Q|G7   Z'],
