@@ -265,3 +265,25 @@ test('count-in (#1422) clicks one bar before the band, then the chart plays from
     await expect(page.locator('.chord[aria-current="true"]')).toHaveCount(1);
     await playButton.click();
 });
+
+test('a slider step with no pointer or key behind it is still applied', async ({ page }) => {
+    await seedStarters(page);
+    await songLink(page, 'Blue pocket', 'Blues').click();
+    await openFeel(page);
+    const humanize = page.getByLabel('Humanize', { exact: true });
+    await expect(humanize).toHaveValue('20');
+
+    // What assistive technology does to a range (a VoiceOver swipe, a switch-control step):
+    // the value moves and the input reports it final, with no pointer or key event around it.
+    await humanize.evaluate((el: HTMLInputElement) => {
+        const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')!
+            .set!;
+        setter.call(el, '55');
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await expect(humanize).toHaveValue('55');
+    await closeFeel(page);
+    // Applied to the chart, not just shown on the slider: there is something to save.
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeEnabled();
+});

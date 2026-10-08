@@ -4,6 +4,7 @@ import type { ChartDocument } from '../lib/runtime';
 import { allSoundsSizeMB, packsForInstrument } from '../lib/sounds';
 import { type Lane, visibleLanes } from './band-lanes';
 import { whenClosed } from './dialog-close';
+import { useRangeCommit } from './use-range-commit';
 
 interface RangeSettingProps {
     label: string;
@@ -16,7 +17,7 @@ interface RangeSettingProps {
 /**
  * A 0-1 document value shown/dragged as 0-100. Local state updates live while
  * dragging (cheap, click-free); the draft-worthy commit fires once per
- * gesture, on pointer-up or a keyboard nudge — never on every intermediate
+ * gesture (`useRangeCommit`) — never on every intermediate
  * `input` event a native range fires — so a drag makes exactly one undo step,
  * matching `TempoControl`'s commit-on-gesture-end contract.
  */
@@ -35,6 +36,7 @@ function RangeSetting({ label, ariaLabel, value, disabled, onCommit }: RangeSett
             onCommit(clamped / 100);
         }
     }
+    const range = useRangeCommit(commit);
     return (
         <label className="sound-range">
             {label}
@@ -47,9 +49,12 @@ function RangeSetting({ label, ariaLabel, value, disabled, onCommit }: RangeSett
                     value={Math.round(local * 100)}
                     disabled={disabled}
                     aria-label={ariaLabel}
-                    onChange={(event) => setLocal(Number(event.target.value) / 100)}
-                    onPointerUp={(event) => commit(Number(event.currentTarget.value))}
-                    onKeyUp={(event) => commit(Number(event.currentTarget.value))}
+                    ref={range.ref}
+                    onChange={(event) => {
+                        range.edited();
+                        setLocal(Number(event.target.value) / 100);
+                    }}
+                    {...range.handlers}
                 />
                 <span className="sound-range-value">{Math.round(local * 100)}</span>
             </span>
