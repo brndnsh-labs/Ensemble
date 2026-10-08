@@ -61,6 +61,5 @@ describe('detached generation state', () => {
         expect(detached.bass.lastBassGain).toBeNull();
         expect(detached.arranger.progression).toEqual(input.arranger.progression);
         expect(detached.arranger.progression).not.toBe(input.arranger.progression);
-        expect(detached.midi.chordsChannel).toBe(input.midi.chordsChannel);
     });
 });

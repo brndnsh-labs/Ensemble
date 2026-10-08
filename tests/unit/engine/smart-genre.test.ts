@@ -17,7 +17,6 @@ vi.mock('../../../public/state.js', async (importOriginal) => {
     const { arrangerReducer } = await import('../../../public/state/arranger.js');
     const { instrumentReducer } = await import('../../../public/state/instruments.js');
     const { grooveReducer } = await import('../../../public/state/groove.js');
-    const { midiReducer } = await import('../../../public/state/midi.js');
     const { vizReducer } = await import('../../../public/state/visualizer.js');
     return {
         ...actual,
@@ -29,7 +28,6 @@ vi.mock('../../../public/state.js', async (importOriginal) => {
             arrangerReducer(a);
             instrumentReducer(a);
             grooveReducer(a, playback);
-            midiReducer(a);
             vizReducer(a);
         }),
     };

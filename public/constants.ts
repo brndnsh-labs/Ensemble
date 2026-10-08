@@ -7,5 +7,4 @@ export const MODULES = {
     GROOVE: 'groove',
     ARRANGER: 'arranger',
     VIZ: 'vizState',
-    MIDI: 'midi',
 } as const;

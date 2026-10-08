@@ -2,7 +2,6 @@ import { arranger, arrangerReducer } from './state/arranger.js';
 import { conductor } from './state/conductor.js';
 import { groove, grooveReducer } from './state/groove.js';
 import { bass, chords, instrumentReducer, soloist } from './state/instruments.js';
-import { midi, midiReducer } from './state/midi.js';
 // Import Modular State Slices
 import { playback, playbackReducer } from './state/playback.js';
 import { vizReducer, vizState } from './state/visualizer.js';
@@ -16,7 +15,6 @@ export const stateMap: EnsembleState = {
     groove,
     arranger,
     vizState,
-    midi,
     conductor,
 };
 
@@ -71,7 +69,6 @@ export const dispatch: Dispatch = (action, ...args) => {
     arrangerReducer(a);
     instrumentReducer(a);
     grooveReducer(a, playback);
-    midiReducer(a);
     vizReducer(a);
 
     // Notify listeners with the same discriminated Action reducers already switch on.

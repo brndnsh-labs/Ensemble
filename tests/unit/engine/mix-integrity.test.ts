@@ -21,7 +21,6 @@ vi.mock('../../../public/state.js', () => {
     const mockBass = { volume: 1.0, enabled: true, reverb: 0.05 };
     const mockSoloist = makeSoloistMock({ volume: 1.0, enabled: true, reverb: 0.6 });
     const mockGroove = { volume: 1.0, enabled: true, reverb: 0.2, audioBuffers: { noise: {} } };
-    const mockMidi = { enabled: false, muteLocal: false };
     const mockArranger = {};
     const mockVizState = {};
     const mockConductor = {
@@ -38,7 +37,6 @@ vi.mock('../../../public/state.js', () => {
         bass: mockBass,
         soloist: mockSoloist,
         groove: mockGroove,
-        midi: mockMidi,
         arranger: mockArranger,
         vizState: mockVizState,
         conductor: mockConductor,
