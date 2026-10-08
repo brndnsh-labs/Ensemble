@@ -229,6 +229,34 @@ function sectionForm(section: ScoreSection): Node[] {
     return result;
 }
 
+/** A section labelled as an intro: the band's, before the lead comes in (`leadRole`). */
+export const isIntroLabel = (label: string) => /^intro/i.test(label.trim());
+/** A section labelled as an outro: written ending material. */
+export const isOutroLabel = (label: string) => /^outro/i.test(label.trim());
+
+/**
+ * The sections a counted chart plays once (#1483, DECISION 2026-10-08): an intro in the first
+ * chorus only, an outro in the last only, as a band plays them. By section label and by place:
+ * the intro is the sections so labelled that open the chart, the outro those that close it. One
+ * between two verses is an interlude, part of the form, and plays every chorus. Null when the
+ * chart has neither, or nothing else. An uncounted chart loops as written and never asks.
+ */
+function onceSections(score: SemanticScore): { intro: Set<number>; outro: Set<number> } | null {
+    const labels = score.sections.map(({ label }) => label);
+    const opening = labels.findIndex((label) => !isIntroLabel(label));
+    let closing = labels.length - 1;
+    while (closing >= 0 && isOutroLabel(labels[closing])) {
+        closing--;
+    }
+    // `opening > closing`: nothing lies between the intro and the outro.
+    if (opening > closing || (opening === 0 && closing === labels.length - 1)) {
+        return null;
+    }
+    const range = (from: number, to: number) =>
+        new Set(Array.from({ length: Math.max(0, to - from) }, (_, i) => from + i));
+    return { intro: range(0, opening), outro: range(closing + 1, labels.length) };
+}
+
 type Jump = Extract<ScoreDirection, { kind: 'jump' }>;
 type Marker = Extract<ScoreDirection, { kind: 'segno' | 'coda' | 'fine' }>;
 type LastChorus = Extract<ScoreDirection, { kind: 'last-chorus' }>;
@@ -783,12 +811,28 @@ export function compileScoreForm(candidate: unknown): ScoreFormVisit[] {
     }
     const visits: ScoreFormVisit[] = [];
     const choruses = score.choruses ?? 1;
-    for (let chorus = 0; chorus < choruses; chorus++) {
-        // Only the final chorus of a COUNTED performance takes a last-chorus coda. An uncounted
-        // one loops its single chorus forever, so it never reaches a last time.
-        performChorus(chorus, score.choruses !== undefined && chorus === choruses - 1);
+    let once = score.choruses === undefined ? null : onceSections(score);
+    if (!unroll() && once) {
+        // Leaving them out emptied a chorus (the form between them is itself cut short by a
+        // last-chorus coda): the chart is played as written instead.
+        once = null;
+        visits.length = 0;
+        unroll();
     }
     return visits;
+
+    /** Every chorus in turn. False when one of them played no bar at all. */
+    function unroll(): boolean {
+        let full = true;
+        for (let chorus = 0; chorus < choruses; chorus++) {
+            const before = visits.length;
+            // Only the final chorus of a COUNTED performance takes a last-chorus coda. An
+            // uncounted one loops its single chorus forever, so it never reaches a last time.
+            performChorus(chorus, score.choruses !== undefined && chorus === choruses - 1);
+            full &&= visits.length > before;
+        }
+        return full;
+    }
 
     /** One pass of the form. A D.C./D.S. is taken afresh in every chorus. */
     function performChorus(chorus: number, final: boolean): void {
@@ -798,6 +842,15 @@ export function compileScoreForm(candidate: unknown): ScoreFormVisit[] {
         let active: { jump: Jump; boundary: Boundary } | undefined;
 
         function perform(visit: RouteVisit) {
+            // Only the bars are left out: the barlines' signs and jumps are still read, so the
+            // rest of the chorus goes where it is written to go.
+            if (
+                once &&
+                ((chorus > 0 && once.intro.has(visit.sectionIndex)) ||
+                    (!final && once.outro.has(visit.sectionIndex)))
+            ) {
+                return;
+            }
             if (visits.length >= MAX_MEASURES) {
                 expansionLimit(score.choruses !== undefined);
             }

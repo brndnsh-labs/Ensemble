@@ -29,6 +29,7 @@
  * chorus before that would itself be the third, wind-down chorus, it holds the build as the
  * second instead (…, S2, S2, S3, H), so the solos peak and come down just once into the head.
  */
+import { isIntroLabel } from '../../public/songbook/score-form.js';
 import type { TradeSettings } from '../core/types.js';
 import { type Bar, beforeFinalChorus, inFinalChorus, type Timeline } from '../form/timeline.js';
 
@@ -55,7 +56,7 @@ export type LeadRole =
 /** How many passes one head-and-solos cycle lasts. */
 export const CYCLE = 4;
 
-const isIntro = (bar: Bar) => /^intro/i.test(bar.visit.label.trim());
+const isIntro = (bar: Bar) => isIntroLabel(bar.visit.label);
 
 /**
  * The lead's job at bar `index` on `pass`. With `trade`, a finite `choruses` wraps `pass` into
@@ -108,7 +109,8 @@ export function leadRole(
 
 /** One chorus's turns, as runs of bar indices; and, for each bar, its turn and place in it. */
 interface Turns {
-    count: number;
+    /** Each chorus's turns: an intro or an outro played once (#1483) gives some more or fewer. */
+    counts: Map<number, number>;
     of: Map<number, { turn: number; from: number; bars: number; at: number }>;
 }
 
@@ -121,8 +123,9 @@ const TURNS = new WeakMap<Timeline, Map<number, Turns>>();
  *
  * A counted chart's timeline holds every chorus (`SectionVisit.chorus`, #1475): each is cut
  * from its own top, exactly as an uncounted chart's one chorus is every time round, so `turn`
- * counts within the bar's chorus and `count` is one chorus's turns. Only the last chorus can
- * differ (a last-chorus coda adds bars), and no chorus follows it to be miscounted.
+ * counts within the bar's chorus and `counts` holds each chorus's turns. They can differ: a
+ * last-chorus coda or an outro adds bars to the last, and an intro played only in the first
+ * chorus (#1483) can split that one's turns where a D.C. replays it.
  */
 function turnsOf(timeline: Timeline, length: number): Turns {
     const byLength = TURNS.get(timeline) ?? new Map<number, Turns>();
@@ -146,19 +149,16 @@ function turnsOf(timeline: Timeline, length: number): Turns {
         current.push(bar.index);
     }
     const of = new Map<number, { turn: number; from: number; bars: number; at: number }>();
-    const first = runs[0]?.chorus;
-    let count = 0;
+    const counts = new Map<number, number>();
     let turn = 0;
     runs.forEach(({ chorus, bars }, i) => {
         turn = i > 0 && runs[i - 1].chorus === chorus ? turn + 1 : 0;
-        if (chorus === first) {
-            count++;
-        }
+        counts.set(chorus, turn + 1);
         bars.forEach((index, at) => {
             of.set(index, { turn, from: bars[0], bars: bars.length, at });
         });
     });
-    const turns = { count, of };
+    const turns = { counts, of };
     byLength.set(length, turns);
     return turns;
 }
@@ -181,7 +181,13 @@ function tradeRole(
     if (!place) {
         return { kind: 'rest' };
     }
-    const turn = (blockPass - 1) * turns.count + place.turn;
+    // The alternation runs over the turns actually played: those of the block's earlier
+    // choruses, then this one's. An uncounted chart's one chorus is every earlier lap too.
+    const chorus = timeline.bars[index].visit.chorus;
+    let turn = place.turn;
+    for (let back = 1; back < blockPass; back++) {
+        turn += turns.counts.get(chorus - back) ?? turns.counts.get(chorus) ?? 0;
+    }
     const bandFirst = trade.with !== 'drums';
     const isBandTurn = bandFirst ? turn % 2 === 0 : turn % 2 === 1;
     return {

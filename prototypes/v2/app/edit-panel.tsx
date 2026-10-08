@@ -154,8 +154,9 @@ export function EditPanel({
                         ))}
                     </select>
                     <p className="preview-note">
-                        Loop plays the form until you stop. A number plays it that many times, takes
-                        a last-chorus coda on the final one, then stops.
+                        Loop plays the form until you stop. A number plays it that many times, then
+                        stops: an Intro at the start plays the first time only, and an Outro at the
+                        end or a last-chorus coda the last time only.
                     </p>
                     <MeasureEditor
                         key={current.id}

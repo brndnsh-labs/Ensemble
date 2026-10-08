@@ -183,4 +183,6 @@ export const COUNTED_FIXTURES: Record<string, SemanticScore> = {
         ]),
         choruses: 3,
     },
+    /** Three times through a song whose intro plays once and whose outro ends it (#1483). */
+    popSongThree: { ...FIXTURES.popSong, choruses: 3 },
 };

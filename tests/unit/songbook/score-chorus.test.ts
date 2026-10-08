@@ -508,6 +508,131 @@ describe('last-chorus coda with no departure sign: a tag (#1487)', () => {
     });
 });
 
+describe('a counted chart plays its intro and its outro once (#1483)', () => {
+    /** Sections by label, one or two bars each, named after the label. */
+    function song(...labels: string[]): SemanticScore {
+        const score = scoreFixture(...labels.map((label) => [bar(`${label}1`), bar(`${label}2`)]));
+        score.sections.forEach((section, i) => {
+            section.label = labels[i];
+        });
+        return score;
+    }
+
+    it('plays the intro in the first chorus only and the outro in the last only', () => {
+        const score = { ...song('Intro', 'Verse', 'Outro'), choruses: 3 };
+        expect(byChorus(score)).toEqual([
+            ['Intro1', 'Intro2', 'Verse1', 'Verse2'],
+            ['Verse1', 'Verse2'],
+            ['Verse1', 'Verse2', 'Outro1', 'Outro2'],
+        ]);
+    });
+
+    it('plays a single counted chorus whole: it is the first and the last', () => {
+        const score = { ...song('Intro', 'Verse', 'Outro'), choruses: 1 };
+        expect(ids(score)).toEqual(['Intro1', 'Intro2', 'Verse1', 'Verse2', 'Outro1', 'Outro2']);
+    });
+
+    it('leaves an uncounted chart looping as written', () => {
+        expect(ids(song('Intro', 'Verse', 'Outro'))).toEqual([
+            'Intro1',
+            'Intro2',
+            'Verse1',
+            'Verse2',
+            'Outro1',
+            'Outro2',
+        ]);
+    });
+
+    it('reads the label the way the band does: its start, any case, any spacing', () => {
+        const score = { ...song(' intro 2', 'Interlude', 'OUTRO vamp'), choruses: 2 };
+        expect(byChorus(score)).toEqual([
+            [' intro 21', ' intro 22', 'Interlude1', 'Interlude2'],
+            ['Interlude1', 'Interlude2', 'OUTRO vamp1', 'OUTRO vamp2'],
+        ]);
+    });
+
+    it('takes every section that opens the chart as its intro, and every one that closes it as its outro', () => {
+        const score = { ...song('Intro', 'Intro 2', 'Verse', 'Outro', 'Outro 2'), choruses: 2 };
+        expect(byChorus(score)).toEqual([
+            ['Intro1', 'Intro2', 'Intro 21', 'Intro 22', 'Verse1', 'Verse2'],
+            ['Verse1', 'Verse2', 'Outro1', 'Outro2', 'Outro 21', 'Outro 22'],
+        ]);
+    });
+
+    it('plays an intro or outro inside the form every chorus: it is an interlude', () => {
+        // Sections share a label here, so the bars are named by section.
+        const score = scoreFixture(
+            ...['i', 'v1', 'riff', 'v2', 'out', 'end', 'o'].map((id) => [bar(id)]),
+        );
+        ['Intro', 'Verse', 'Intro', 'Verse', 'Outro', 'Ending', 'Outro'].forEach((label, i) => {
+            score.sections[i].label = label;
+        });
+        expect(byChorus({ ...score, choruses: 2 })).toEqual([
+            ['i', 'v1', 'riff', 'v2', 'out', 'end'],
+            ['v1', 'riff', 'v2', 'out', 'end', 'o'],
+        ]);
+    });
+
+    it('plays a chart that is all intro and outro as written, so no chorus is empty', () => {
+        const whole = ['Intro1', 'Intro2', 'Outro1', 'Outro2'];
+        expect(byChorus({ ...song('Intro', 'Outro'), choruses: 3 })).toEqual([whole, whole, whole]);
+        // Two choruses would leave neither empty, and would still not be the chart.
+        expect(byChorus({ ...song('Intro', 'Outro'), choruses: 2 })).toEqual([whole, whole]);
+        expect(byChorus({ ...song('Intro'), choruses: 2 })).toEqual([
+            ['Intro1', 'Intro2'],
+            ['Intro1', 'Intro2'],
+        ]);
+    });
+
+    it('plays the chart as written when leaving them out would empty a chorus', () => {
+        // The only form is the intro: a tag with no departure sign ends every chorus but the
+        // last where it begins, so without the intro the middle chorus would have no bars.
+        const score = { ...song('Intro', 'Tag'), choruses: 3 };
+        score.sections[1].measures[0].start = [
+            { kind: 'coda', label: 'coda' },
+            { kind: 'last-chorus', destination: { kind: 'coda', target: 'coda' } },
+        ];
+        expect(byChorus(score)).toEqual([
+            ['Intro1', 'Intro2'],
+            ['Intro1', 'Intro2'],
+            ['Intro1', 'Intro2', 'Tag1', 'Tag2'],
+        ]);
+    });
+
+    it('still reads the signs on a bar it leaves out', () => {
+        // D.C. al Fine from the end of the outro-less form: the Fine sits on the intro's last
+        // barline. Chorus 2 skips the intro's bars, and still stops at its Fine.
+        const score = { ...song('Intro', 'Verse'), choruses: 2 };
+        score.sections[0].measures[1].end = [{ kind: 'fine', label: 'fine' }];
+        score.sections[1].measures[1].end = [dc({ kind: 'fine', label: 'fine' })];
+        expect(byChorus(score)).toEqual([
+            ['Intro1', 'Intro2', 'Verse1', 'Verse2', 'Intro1', 'Intro2'],
+            ['Verse1', 'Verse2'],
+        ]);
+    });
+
+    it('takes a last-chorus coda and then the outro', () => {
+        const score = { ...song('Intro', 'Verse', 'Tag', 'Outro'), choruses: 2 };
+        score.sections[1].measures[0].end = [{ kind: 'coda', label: 'to-coda' }, lastChorus];
+        score.sections[2].measures[0].start = [{ kind: 'coda', label: 'coda' }];
+        expect(byChorus(score)).toEqual([
+            ['Intro1', 'Intro2', 'Verse1', 'Verse2'],
+            ['Verse1', 'Tag1', 'Tag2', 'Outro1', 'Outro2'],
+        ]);
+    });
+
+    it('gives the band a timeline with the intro and the outro once', () => {
+        const timeline = compileTimeline({ ...song('Intro', 'Verse', 'Outro'), choruses: 3 });
+        expect(timeline.visits.map(({ label, chorus }) => `${label}${chorus}`)).toEqual([
+            'Intro0',
+            'Verse0',
+            'Verse1',
+            'Verse2',
+            'Outro2',
+        ]);
+    });
+});
+
 describe('the band timeline carries the chorus (#1472)', () => {
     it('gives every chorus its own section visits, even of a one-section form', () => {
         const single = { ...scoreFixture([bar('a'), bar('b')]), choruses: 3 };
