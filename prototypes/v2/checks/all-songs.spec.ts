@@ -296,6 +296,27 @@ test('the row ⋯ menu: Star/Unstar, Rename, Duplicate, Export file, Delete…',
     await expect(page.locator('.all-songs-table .song-row')).toHaveCount(3);
 });
 
+test('deleting the last song of the filtered genre falls back to every genre', async ({ page }) => {
+    await seedStarters(page);
+    await page.getByTestId('all-songs-link').click();
+    const genre = page.locator('.all-songs-select select').nth(0);
+    await genre.selectOption('Bossa');
+    await expect(page.locator('.all-songs-table .song-name')).toHaveText(['After hours']);
+
+    await page.getByRole('button', { name: 'More actions for After hours' }).click();
+    await page.getByTestId('row-menu-delete').click();
+    await page.getByTestId('delete-guest-song-confirm').click();
+
+    // Bossa is no longer an option, so it is no longer the filter either: the select and the
+    // list agree, instead of "All genres" over "No songs match."
+    await expect(genre.locator('option')).toHaveText(['All genres', 'Blues', 'Jazz']);
+    await expect(genre).toHaveValue('');
+    await expect(page.locator('.all-songs-table .song-name')).toHaveText([
+        'Blue pocket',
+        'Minor swing sketch',
+    ]);
+});
+
 /**
  * Deleting the Continue song leaves the songbook consistent (#1440 review P5).
  *
