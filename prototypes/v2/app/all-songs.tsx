@@ -217,6 +217,10 @@ export function AllSongs({
         const present = new Set(songs.map((song) => genreOf(song)));
         return [...present].sort((a, b) => a.localeCompare(b));
     }, [songs]);
+    // The picked genre, while a song of it is still here. Deleting the last one drops the
+    // option; left alone, the stale pick would keep filtering an empty list under a select
+    // that reads "All genres".
+    const activeGenre = genres.includes(genre) ? genre : '';
 
     const starredCount = useMemo(
         () => songs.reduce((count, song) => count + (starred.has(song.id) ? 1 : 0), 0),
@@ -249,7 +253,7 @@ export function AllSongs({
             if (activeCollection !== null && !collectionOrder?.has(song.id)) {
                 return false;
             }
-            if (genre && genreOf(song) !== genre) {
+            if (activeGenre && genreOf(song) !== activeGenre) {
                 return false;
             }
             if (
@@ -261,7 +265,7 @@ export function AllSongs({
             }
             return true;
         });
-    }, [songs, view, starred, openedAt, genre, search, activeCollection, collectionOrder]);
+    }, [songs, view, starred, openedAt, activeGenre, search, activeCollection, collectionOrder]);
 
     const sorted = useMemo(() => {
         const next = [...filtered];
@@ -392,7 +396,7 @@ export function AllSongs({
                 </label>
                 <label className="all-songs-select">
                     <span className="sr">Filter by genre</span>
-                    <select value={genre} onChange={(event) => setGenre(event.target.value)}>
+                    <select value={activeGenre} onChange={(event) => setGenre(event.target.value)}>
                         <option value="">All genres</option>
                         {genres.map((option) => (
                             <option key={option} value={option}>
@@ -526,7 +530,7 @@ export function AllSongs({
                         <p className="all-songs-empty">
                             {activeCollection !== null &&
                             !search.trim() &&
-                            !genre &&
+                            !activeGenre &&
                             collectionCounts.get(activeCollection.document.id) === 0
                                 ? 'No songs in this collection yet — add one from a song’s ⋯ menu.'
                                 : 'No songs match.'}
