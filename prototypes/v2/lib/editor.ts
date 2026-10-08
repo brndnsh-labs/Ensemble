@@ -39,14 +39,19 @@ function supportedChord(token: string): boolean {
     }
     if (parts.length === 2) {
         const [head, bass] = parts;
-        // Half-written slash text (`C/9`, `Cmaj7/`) is for the user to finish, not for the
-        // parser to read charitably.
-        if (head === '' || bass === '') {
+        // Half-written slash text (`Cmaj7/`) is for the user to finish, not for the parser to
+        // read charitably.
+        if (bass === '') {
             return false;
         }
-        // A real slash bass: a quality this parser consumes, over a root.
+        // A real slash bass: a quality this parser consumes, over a root. The quality may be
+        // empty — `C/E`, `D/F#` are a plain triad over its bass, the commonest slash chord.
         if (bass.match(ROOT)?.[0] === bass) {
             return isQuality(head);
+        }
+        // Nothing before the slash and no bass after it (`C/9`): unfinished, as above.
+        if (head === '') {
+            return false;
         }
         // Otherwise the slash is notation INSIDE the quality — `6/9`, `m6/9`, `m/maj7` —
         // which is why the previous version needed a literal `6/9` special case.
