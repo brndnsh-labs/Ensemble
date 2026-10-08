@@ -34,7 +34,7 @@ export function initAudio(
     state: EnsembleState,
     options: { audioContext?: AudioContext; enableWatchdog?: boolean } = {},
 ) {
-    const { playback, groove, chords, bass, soloist, midi } = state;
+    const { playback, groove, chords, bass, soloist } = state;
     const providedAudioContext = options.audioContext;
     const usingOfflineContext = Boolean(
         providedAudioContext &&
@@ -218,12 +218,10 @@ export function initAudio(
                 return;
             }
             const gainNode = playback.audio.createGain();
-            const isLocalMuted = midi.enabled && midi.muteLocal;
 
             const isMuted = !isInstrumentEverActive(state, m.key);
 
-            const targetGain =
-                !isMuted && !isLocalMuted ? Math.max(0.0001, m.state.volume * m.mult) : 0.0001;
+            const targetGain = !isMuted ? Math.max(0.0001, m.state.volume * m.mult) : 0.0001;
             gainNode.gain.setValueAtTime(0.0001, playback.audio.currentTime);
             gainNode.gain.exponentialRampToValueAtTime(
                 targetGain,
@@ -512,7 +510,7 @@ export async function killAllNotes(state: EnsembleState) {
 }
 
 export function restoreGains(state: EnsembleState) {
-    const { playback, chords, bass, soloist, groove, midi } = state;
+    const { playback, chords, bass, soloist, groove } = state;
     if (!playback.audio) {
         return;
     }
@@ -550,11 +548,9 @@ export function restoreGains(state: EnsembleState) {
     ];
     modules.forEach((m) => {
         if (m.node && playback.audio) {
-            const isLocalMuted = midi.enabled && midi.muteLocal;
-
             const isMuted = !isInstrumentEverActive(state, m.key);
 
-            const target = !isMuted && !isLocalMuted ? m.state.volume * m.mult : 0.0001;
+            const target = !isMuted ? m.state.volume * m.mult : 0.0001;
             m.node.gain.cancelScheduledValues(t);
             m.node.gain.setTargetAtTime(target, t, 0.04);
         }
@@ -597,7 +593,7 @@ export function syncBusReverbSend(state: EnsembleState, module: InstrumentModule
  * calling `restoreGains` for every lane on a single slider drag.
  */
 export function syncBusVolume(state: EnsembleState, module: InstrumentModule): void {
-    const { playback, midi } = state;
+    const { playback } = state;
     const graph = playback.audioGraph;
     if (!playback.audio || !graph) {
         return;
@@ -606,9 +602,8 @@ export function syncBusVolume(state: EnsembleState, module: InstrumentModule): v
     const busKey = MODULE_BUS_KEY[module];
     const bus = graph[busKey];
     const mult = MIXER_GAIN_MULTIPLIERS[busKey];
-    const isLocalMuted = midi.enabled && midi.muteLocal;
     const isMuted = !isInstrumentEverActive(state, module);
-    const target = !isMuted && !isLocalMuted ? Math.max(0.0001, inst.volume * mult) : 0.0001;
+    const target = !isMuted ? Math.max(0.0001, inst.volume * mult) : 0.0001;
     const t = playback.audio.currentTime;
     bus.gain.gain.cancelScheduledValues(t);
     bus.gain.gain.setTargetAtTime(target, t, 0.04);

@@ -23,7 +23,6 @@ vi.mock('../../../public/state.js', () => {
         bass: { enabled: true, volume: 0.5, reverb: 0.5 },
         soloist: makeSoloistMock({ enabled: true, volume: 0.5, reverb: 0.5 }),
         harmony: { enabled: true, volume: 0.5, reverb: 0.5 },
-        midi: { enabled: false },
     };
     return {
         getState: () => mockState,

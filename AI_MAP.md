@@ -73,7 +73,6 @@ The ground-up replacement for the generative engine, the default since 2026-09-2
 | `public/state/arranger.ts` | Chords, sections, time signature, and key. | `arranger` |
 | `public/state/groove.ts` | Genre, swing, humanize and the drum lane's mix. | `groove` |
 | `public/state/instruments.ts` | Per-instrument synthesis parameters. | `bass`, `soloist`, `chords` |
-| `public/state/midi.ts` | WebMIDI routing and local muting state. | `midi` |
 | `public/state/visualizer.ts` | `vizState.enabled`: whether the scheduler queues visualizer note events (no visualizer ships; only the old engine's scheduler reads it, and the app no longer runs it). | `vizState` |
 | `public/state/conductor.ts` | Macro-arc, intensity drift, and form iteration state. | `conductor` |
 | `public/state/share-codec.ts` | Share-URL / preset wire format: Unicode-safe Base64 + the minified section payload, plus the section-id generator deserialization mints. Main thread only. | `compressSections`, `tryDecompressSections`, `encodeBase64Unicode`, `generateId` |

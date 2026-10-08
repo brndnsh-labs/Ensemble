@@ -113,7 +113,7 @@ One runtime per page, independent of React mounts. `initialize()` seeds the inst
 
 ### State (`public/state.ts`, `public/state/`)
 
-- Domain slices: `playback`, `arranger`, `groove`, `chords`, `bass`, `soloist`, `midi`, `vizState`, `conductor` — each a `deepSignal`.
+- Domain slices: `playback`, `arranger`, `groove`, `chords`, `bass`, `soloist`, `vizState`, `conductor` — each a `deepSignal`.
 - **All writes go through `dispatch(ACTIONS.TYPE, payload)`.** Never mutate state directly in components or controllers.
 - Hosts read with `getState()` and listen with `subscribe()` (`public/state.ts`). In v2 only `lib/runtime.ts` does either; React state lives in the shell, not in the slices.
 - `public/state/state-effects.ts` owns cross-module side effects kept deliberately outside reducers.

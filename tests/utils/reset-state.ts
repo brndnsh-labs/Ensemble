@@ -7,7 +7,6 @@ import {
     INSTRUMENT_REVERB_DEFAULTS,
     soloist,
 } from '../../public/state/instruments.js';
-import { type MidiState, midi } from '../../public/state/midi.js';
 import {
     DEFAULT_BAND_INTENSITY,
     type GlobalContext,
@@ -82,23 +81,6 @@ export function resetAllStateForTest(): void {
     g.lastSampledHatVoice = null;
     g.lastRideGain = null;
     g.lastCrashGain = null;
-
-    const m = midi as Mutable<MidiState>;
-    m.enabled = false;
-    m.selectedOutputId = null;
-    m.inputEnabled = false;
-    m.selectedInputId = null;
-    m.chordsChannel = 1;
-    m.bassChannel = 2;
-    m.soloistChannel = 3;
-    m.drumsChannel = 10;
-    m.latency = 0;
-    m.muteLocal = true;
-    m.chordsOctave = 0;
-    m.bassOctave = 0;
-    m.soloistOctave = 0;
-    m.drumsOctave = 0;
-    m.velocitySensitivity = 1.0;
 
     const v = vizState as Mutable<VisualizerState>;
     v.enabled = false;

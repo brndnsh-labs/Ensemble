@@ -77,7 +77,6 @@ describe('Engine Bus Management', () => {
             bass: { enabled: true, volume: 1.0, reverb: 0.2, voice: 'synth' },
             soloist: makeSoloistMock({ enabled: true, volume: 1.0, reverb: 0.2, voice: 'synth' }),
             groove: { enabled: true, volume: 1.0, reverb: 0.2, voice: 'synth' },
-            midi: { enabled: false, muteLocal: false },
             arranger: { sections: [] },
         };
     });
@@ -126,13 +125,6 @@ describe('Engine Bus Management', () => {
 
         it('should mute if module is disabled', () => {
             state.chords.enabled = false;
-            restoreGains(state);
-            expect(mockGain.gain.setTargetAtTime).toHaveBeenCalledWith(0.0001, 10.0, 0.04);
-        });
-
-        it('should mute local audio if MIDI muteLocal is active', () => {
-            state.midi.enabled = true;
-            state.midi.muteLocal = true;
             restoreGains(state);
             expect(mockGain.gain.setTargetAtTime).toHaveBeenCalledWith(0.0001, 10.0, 0.04);
         });
@@ -220,13 +212,6 @@ describe('Engine Bus Management', () => {
             state.arranger.sections = [{ id: 'feature', instruments: { chords: true } }];
             syncBusVolume(state, 'chords');
             expect(mockGain.gain.setTargetAtTime).toHaveBeenCalledWith(0.135, 10.0, 0.04);
-        });
-
-        it('floors to near-silent if MIDI local-mute is active', () => {
-            state.midi.enabled = true;
-            state.midi.muteLocal = true;
-            syncBusVolume(state, 'chords');
-            expect(mockGain.gain.setTargetAtTime).toHaveBeenCalledWith(0.0001, 10.0, 0.04);
         });
 
         it('maps the groove module to the drums bus', () => {

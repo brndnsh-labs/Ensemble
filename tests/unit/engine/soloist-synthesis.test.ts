@@ -95,7 +95,6 @@ vi.mock('../../../public/state.js', () => {
         groove: {},
         vizState: {},
         storage: {},
-        midi: {},
         dispatch: vi.fn(),
     };
 });

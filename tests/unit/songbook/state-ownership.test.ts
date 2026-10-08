@@ -13,8 +13,6 @@ describe('Songbook state ownership manifest (#1044)', () => {
         }
         expect(STATE_OWNERSHIP_MANIFEST.playback.sessionTimer).toBe('preferences');
         expect(STATE_OWNERSHIP_MANIFEST.playback.songMode).toBe('preferences');
-        expect(STATE_OWNERSHIP_MANIFEST.midi.chordsChannel).toBe('preferences');
-        expect(STATE_OWNERSHIP_MANIFEST.midi.drumsChannel).toBe('preferences');
         // A chart's energy (DECISION 2026-09-26): saved with the chart, set only by the user.
         expect(STATE_OWNERSHIP_MANIFEST.playback.bandIntensity).toBe('document');
         expect(STATE_OWNERSHIP_MANIFEST.playback.autoIntensity).toBe('document');

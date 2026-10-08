@@ -886,48 +886,6 @@ export interface SoloistState {
     readonly audio: SoloistAudio;
 }
 
-export interface MidiOutput {
-    id: string;
-    name: string;
-}
-
-export interface MidiState {
-    /** Whether Web MIDI output is active. */
-    readonly enabled: boolean;
-    /** List of available MIDI output ports. */
-    readonly outputs: MidiOutput[];
-    /** The ID of the currently selected MIDI output. */
-    readonly selectedOutputId: string | null;
-    /** MIDI channel for Chords (1-16). */
-    readonly chordsChannel: number;
-    /** MIDI channel for Bass (1-16). */
-    readonly bassChannel: number;
-    /** MIDI channel for Soloist (1-16). */
-    readonly soloistChannel: number;
-    /** MIDI channel for Drums (1-16). */
-    readonly drumsChannel: number;
-    /** Global MIDI latency offset in ms. */
-    readonly latency: number;
-    /** Whether to mute internal audio when MIDI is active. */
-    readonly muteLocal: boolean;
-    /** Octave offset for chords. */
-    readonly chordsOctave: number;
-    /** Octave offset for bass. */
-    readonly bassOctave: number;
-    /** Octave offset for soloist. */
-    readonly soloistOctave: number;
-    /** Octave offset for drums. */
-    readonly drumsOctave: number;
-    /** Velocity scaling factor. */
-    readonly velocitySensitivity: number;
-    /** List of available MIDI input ports. */
-    readonly inputs: MidiOutput[];
-    /** The ID of the currently selected MIDI input driving play-along. Null = any input. */
-    readonly selectedInputId: string | null;
-    /** Whether incoming Note On/Off is routed to the soloist/drum performance triggers. */
-    readonly inputEnabled: boolean;
-}
-
 /**
  * A single instrument's mix bus: volume gain, reverb send, EQ, and optional
  * stereo panning / sidechain ducking. Built by `initAudio()` in `engine.ts`.
@@ -1166,7 +1124,6 @@ export interface EnsembleState {
     chords: ChordState;
     conductor: ConductorState;
     vizState: VisualizerState;
-    midi: MidiState;
 }
 
 export interface StepInfo {

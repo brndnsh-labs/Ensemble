@@ -82,7 +82,6 @@ vi.mock('../../../public/state.js', () => {
             buffer: { clear: vi.fn(), set: vi.fn(), size: 0, delete: vi.fn() },
         }),
         vizState: { enabled: true },
-        midi: {},
     };
 
     return {

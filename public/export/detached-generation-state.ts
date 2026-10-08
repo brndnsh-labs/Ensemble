@@ -106,7 +106,6 @@ export function cloneStateForDetachedGeneration(liveState: EnsembleState): Ensem
             },
         },
         vizState: { ...liveState.vizState, enabled: false },
-        midi: { ...liveState.midi, enabled: false, muteLocal: true },
         conductor: { ...liveState.conductor },
     } satisfies EnsembleState;
 
