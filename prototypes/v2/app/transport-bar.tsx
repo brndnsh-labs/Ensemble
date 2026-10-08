@@ -1,4 +1,5 @@
 import { KEY_ORDER } from '@engine/config';
+import { normalizeKey } from '@engine/utils';
 import { Fragment } from 'react';
 import { arrangementOf, genreOf } from '../lib/documents';
 import { type ChartDocument, GENRE_NAMES } from '../lib/runtime';
@@ -79,7 +80,8 @@ export function TransportBar({
                     id="song-key"
                     className="setting-select"
                     disabled={busy}
-                    value={arrangementOf(current).key}
+                    // The picker lists flat spellings only; an imported `F#` is shown as its `Gb`.
+                    value={normalizeKey(arrangementOf(current).key)}
                     onChange={(event) => onKey(event.target.value)}
                 >
                     {KEY_ORDER.map((key) => (

@@ -12,6 +12,7 @@ import {
     getFrequency,
     getMidi,
     getStepInfo,
+    keyDistance,
     midiToNote,
     normalizeKey,
     secondsPerBeatFor,
@@ -206,6 +207,27 @@ describe('Utility Functions', () => {
         it('should transpose normalized keys across large negative intervals', () => {
             expect(transposeKeyName('C', -13)).toBe('B');
             expect(transposeKeyName('F#', -1)).toBe('F');
+        });
+    });
+
+    describe('keyDistance', () => {
+        it('counts a sharp-spelled key from its flat twin, not from index -1', () => {
+            expect(keyDistance('F#', 'G')).toBe(1);
+            expect(keyDistance('C#', 'C')).toBe(-1);
+            expect(keyDistance('Gb', 'G')).toBe(keyDistance('F#', 'G'));
+        });
+
+        it('lands on the picked key when the chart is transposed by it', () => {
+            for (const from of ['F#', 'C#', 'G#', 'D#', 'A#', 'Bb', 'C']) {
+                for (const to of ['C', 'G', 'Eb', 'B']) {
+                    expect(transposeKeyName(from, keyDistance(from, to))).toBe(to);
+                }
+            }
+        });
+
+        it('moves nothing for a key it cannot place', () => {
+            expect(keyDistance('H', 'G')).toBe(0);
+            expect(keyDistance('C', '')).toBe(0);
         });
     });
 
