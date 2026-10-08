@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { arrangementOf } from '../lib/documents';
 import type { ChartDocument } from '../lib/runtime';
 import { whenClosed } from './dialog-close';
+import { useRangeCommit } from './use-range-commit';
 
 /**
  * Compound meters already notate the shuffle feel in the written rhythm, so Swing
@@ -55,7 +56,7 @@ function toStored(display: number, max: 1 | 100): number {
 }
 
 /**
- * A range input that only commits once per gesture (pointer-up or a keyboard nudge),
+ * A range input that only commits once per gesture (`useRangeCommit`),
  * never on every intermediate `input` event — the same contract as `sounds-panel.tsx`'s
  * `RangeSetting`, generalized here with `max` so it covers both the 0-1 fields shown as
  * a percent (band intensity, master volume) and the natively-0-100 fields
@@ -73,6 +74,7 @@ function RangeSetting({ label, ariaLabel, value, max, disabled, onCommit }: Rang
             onCommit(toStored(clamped, max));
         }
     }
+    const range = useRangeCommit(commit);
     return (
         <label className="feel-range">
             {label}
@@ -85,9 +87,12 @@ function RangeSetting({ label, ariaLabel, value, max, disabled, onCommit }: Rang
                     value={local}
                     disabled={disabled}
                     aria-label={ariaLabel}
-                    onChange={(event) => setLocal(Number(event.target.value))}
-                    onPointerUp={(event) => commit(Number(event.currentTarget.value))}
-                    onKeyUp={(event) => commit(Number(event.currentTarget.value))}
+                    ref={range.ref}
+                    onChange={(event) => {
+                        range.edited();
+                        setLocal(Number(event.target.value));
+                    }}
+                    {...range.handlers}
                 />
                 <span className="feel-range-value">{local}</span>
             </span>
