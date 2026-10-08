@@ -1366,6 +1366,15 @@ export function audition(index: number): void {
     }
 }
 /**
+ * The settings an export renders with: the live band's, on the open chart's own seed. A Play
+ * records its seed on the chart (`startBand`), so this is the take just heard, or the one the
+ * next Play of a locked seed will give. `bandSeed` is not it: that is the last PLAYED chart's,
+ * and it outlives the chart it came from.
+ */
+function exportSettings(): ReturnType<typeof bandSettings> {
+    return { ...bandSettings(), seed: String(getState().arranger.seed || 'ensemble') };
+}
+/**
  * Downloads a multi-track `.mid` of the current arrangement (#1277): the band's own event
  * stream, the one it plays live (`BandHost.render`), written by `toMidi`. Rendered on the side,
  * so it never touches the live band or the audio graph — safe while the band is playing.
@@ -1373,8 +1382,7 @@ export function audition(index: number): void {
 export function exportMidi(filename: string): Promise<void> {
     const host = bandHost();
     host.setScore(scoreForBand());
-    bandSeed ||= String(getState().arranger.seed || 'ensemble');
-    const settings = bandSettings();
+    const settings = exportSettings();
     const { events, timeline } = host.render(settings);
     const bytes = toMidi(events, timeline, {
         bpm: getState().playback.bpm,
@@ -1438,11 +1446,10 @@ export async function exportAudio(
     }
     const host = bandHost();
     host.setScore(scoreForBand());
-    bandSeed ||= String(getState().arranger.seed || 'ensemble');
     const bpm = getState().playback.bpm;
     if (kind === 'mix') {
         progress('Rendering mix…');
-        const { events, timeline } = host.render(bandSettings());
+        const { events, timeline } = host.render(exportSettings());
         const result = await renderBandMixToWav(events, timeline, bpm, { filename });
         if (intent !== exportIntent) {
             return;
@@ -1454,7 +1461,7 @@ export async function exportAudio(
     // A stem always renders its lane even if it's muted live, so force every lane on for the
     // one pass every stem below is sliced from, rather than muting/soloing per-stem state.
     const { events, timeline } = host.render({
-        ...bandSettings(),
+        ...exportSettings(),
         lanes: { drums: true, bass: true, comp: true, lead: true },
     });
     try {
