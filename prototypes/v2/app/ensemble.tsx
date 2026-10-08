@@ -1,10 +1,10 @@
 'use client';
 
-import { KEY_ORDER } from '@engine/config';
 import { decodeChartLink, encodeChartLink } from '@engine/songbook/chart-link';
 import { writtenChart } from '@engine/songbook/codec';
 import type { SemanticScore } from '@engine/songbook/score-types';
 import type { InstrumentVoice } from '@engine/types';
+import { keyDistance } from '@engine/utils';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     computeAdoptCandidates,
@@ -5362,10 +5362,7 @@ export default function Ensemble() {
                         onKey={(key) =>
                             change(
                                 () =>
-                                    runtime.transpose(
-                                        KEY_ORDER.indexOf(key) -
-                                            KEY_ORDER.indexOf(arrangementOf(current).key),
-                                    ),
+                                    runtime.transpose(keyDistance(arrangementOf(current).key, key)),
                                 true,
                             )
                         }

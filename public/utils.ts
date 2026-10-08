@@ -59,6 +59,18 @@ export function transposeKeyName(key: string, semitoneShift: number): string {
     return KEY_ORDER[(((currentIndex + semitoneShift) % 12) + 12) % 12];
 }
 
+/**
+ * Semitones up from one key to another, counted on `KEY_ORDER`'s all-flat spelling. A chart may
+ * carry a sharp spelling the key picker does not list (`F#` from an iReal import), so both ends
+ * are normalized first: looked up raw, `F#` is index -1 and every shift comes out a semitone
+ * wrong. An unknown key moves nothing rather than moving by a wrong amount.
+ */
+export function keyDistance(from: string, to: string): number {
+    const start = KEY_ORDER.indexOf(normalizeKey(from));
+    const end = KEY_ORDER.indexOf(normalizeKey(to));
+    return start === -1 || end === -1 ? 0 : end - start;
+}
+
 // Pre-calculate frequencies for standard MIDI range (0-127) to avoid expensive Math.pow calls
 const FREQUENCY_CACHE = new Float32Array(128);
 for (let i = 0; i < 128; i++) {
