@@ -47,7 +47,7 @@ export function validated(candidate: unknown): ChartDocument {
 
 function open(): Promise<IDBDatabase> {
     if (!database) {
-        database = new Promise((resolve, reject) => {
+        const opening = new Promise<IDBDatabase>((resolve, reject) => {
             const request = indexedDB.open(DATABASE, 1);
             request.onupgradeneeded = () =>
                 request.result.createObjectStore(STORE, { keyPath: 'id' });
@@ -68,6 +68,14 @@ function open(): Promise<IDBDatabase> {
                 };
                 resolve(request.result);
             };
+        });
+        database = opening;
+        // A failed open is not remembered: the next read tries again, as `openCollections`
+        // does, instead of answering every call with one transient error until a reload.
+        void opening.catch(() => {
+            if (database === opening) {
+                database = undefined;
+            }
         });
     }
     return database;
