@@ -37,7 +37,12 @@ test('keyboard range selection creates, edits and removes a repeat; cancel keeps
 }) => {
     await start(page);
     await page.getByLabel('Chords in this bar').fill('Dm');
-    let dialog = await openGuide(page);
+    // Opened from the keyboard, so there is an opener to hand focus back to (a tap does not
+    // focus a button on WebKit).
+    const opener = page.getByRole('button', { name: 'Repeats and endings', exact: true });
+    await opener.focus();
+    await page.keyboard.press('Enter');
+    let dialog = page.getByRole('dialog', { name: 'Repeats and endings', exact: true });
     await dialog.getByRole('button', { name: 'Select bar 1', exact: true }).focus();
     await page.keyboard.press('Enter');
     await page.keyboard.press('Tab');
@@ -46,6 +51,8 @@ test('keyboard range selection creates, edits and removes a repeat; cancel keeps
     await expect(dialog.getByLabel('Repeated body end bar')).toHaveValue('2');
     await expect(dialog.getByTestId('guided-playback-route')).toHaveText('1–2–3 → 1–2–3–4');
     await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+    // Closing returns focus to the button that opened the guide, not to the top of the page.
+    await expect(opener).toBeFocused();
     await expect(page.getByLabel('Chords in this bar')).toHaveValue('Dm');
     await expect(page.locator('.bar .chord')).toHaveText(['C', 'G', 'Am', 'F']);
     await expect(page.locator('.bar.repeat-start')).toHaveCount(0);

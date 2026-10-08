@@ -52,8 +52,18 @@ export function GuidedForm({
 
     useEffect(() => {
         const element = dialog.current!;
+        // The editor UNMOUNTS this dialog to close it, and a dialog closed after it has left the
+        // document hands focus back to nothing. Return it to the control that opened it, as
+        // the import dialog does, when that control is still on the page.
+        const opener =
+            document.activeElement instanceof HTMLElement ? document.activeElement : null;
         element.showModal();
-        return () => element.close();
+        return () => {
+            element.close();
+            if (opener?.isConnected) {
+                opener.focus();
+            }
+        };
     }, []);
 
     const preview = useMemo(() => {
