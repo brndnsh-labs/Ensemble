@@ -467,6 +467,12 @@ export class BandHost {
             return;
         }
         const now = audio.currentTime;
+        if (this.finishIfOver(now)) {
+            // The last barline has passed and the pump has not run since. Dropping that
+            // segment below would leave an empty queue no pump could ever end.
+            this.bpm = bpm;
+            return;
+        }
         // Drop finished segments first: at a new tempo their (recomputed) ends would move.
         this.segments = this.segments.filter((s) => this.endTime(s) > now);
         const current = this.segments.find((s) => s.start <= now) ?? this.segments[0];
@@ -819,6 +825,21 @@ export class BandHost {
         return lo;
     }
 
+    /**
+     * Ends the performance if its last bar has ended: every note in it was scheduled before
+     * that barline. Stopping here means the transport reads stopped when the band falls
+     * silent — not a lookahead early, nor a lap late.
+     */
+    private finishIfOver(now: number): boolean {
+        const last = this.segments[this.segments.length - 1];
+        if (!last?.ends || now < this.endTime(last)) {
+            return false;
+        }
+        this.halt();
+        this.options.onEnd?.();
+        return true;
+    }
+
     private pump(): void {
         const audio = this.audio;
         if (!audio) {
@@ -826,15 +847,10 @@ export class BandHost {
         }
         const now = audio.currentTime;
         const horizon = now + LOOKAHEAD_S;
-        const last = this.segments[this.segments.length - 1];
-        if (last?.ends && now >= this.endTime(last)) {
-            // The performance is over: its last bar has ended, and every note in it was
-            // scheduled before that barline. Stop here, so the transport reads stopped when
-            // the band falls silent — not a lookahead early, nor a lap late.
-            this.halt();
-            this.options.onEnd?.();
+        if (this.finishIfOver(now)) {
             return;
         }
+        const last = this.segments[this.segments.length - 1];
         // Keep a segment queued ahead of the playhead.
         if (last && !last.ends && this.endTime(last) < now + PREPARE_S) {
             this.append(this.followOn(last), this.endTime(last), last.memoryAfter);

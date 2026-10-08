@@ -437,6 +437,29 @@ describe('BandHost counted choruses', () => {
         expect([...bars].sort()).toEqual([0, 1, 2, 3, 4]);
     });
 
+    it('a tempo change that lands after the last barline, before the next pump, still ends it', () => {
+        const audio = fakeAudioContext(10);
+        const state = fakeState(audio);
+        const onEnd = vi.fn();
+        const host = new BandHost({ state: () => state, silence: () => {}, onEnd });
+        const score = codaSong(2);
+        host.setScore(score);
+        host.start(drumsOnly, BPM, 0, null);
+        const timeline = compileTimeline(score);
+        const end = 10.1 + secondsAt(timeline, timeline.ticks, BPM);
+        run(host, audio, 10.1, end);
+        expect(host.playing).toBe(true);
+
+        // The timer has not fired since the barline; a tempo nudge gets there first.
+        audio.currentTime = end + 0.01;
+        host.setTempo(BPM + 12);
+        expect(onEnd).toHaveBeenCalledTimes(1);
+        expect(host.playing).toBe(false);
+
+        pump(host);
+        expect(onEnd).toHaveBeenCalledTimes(1);
+    });
+
     it('without a count loops the same chart forever and never takes the coda', () => {
         const audio = fakeAudioContext(10);
         const state = fakeState(audio);
