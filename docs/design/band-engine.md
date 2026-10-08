@@ -209,6 +209,9 @@ expression devices take turns rather than stack; one peak note per cycle.
     by the bar's place in its chorus (`chorusBars`), so chorus k plays what lap k of a loop
     plays: the head, then solos or trades, the pass lift, trading turns counted from each
     chorus's top.
+    A chart with a labelled intro or outro plays it once (#1483), so its choruses differ in
+    length: each plays what a loop of the sections it includes plays on that lap, which
+    `arrange/choruses.test.ts` holds it to.
   - **It ends on the out-head.** With two or more choruses the last is the head whatever the
     cycle has reached, and a trade hands back to the band for it (`leadRole`'s
     `inFinalChorus`): the last chorus of a performance is the melody restated, and a coda or

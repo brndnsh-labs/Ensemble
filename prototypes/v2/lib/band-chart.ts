@@ -200,7 +200,7 @@ export function slotAt(chart: BandChart, tick: number): number {
  * (#1475) performs its form once per chorus, so only the visits of the FIRST chorus that plays
  * the section count: practising a section loops one time through it (its written repeats
  * included), never a window stretched from chorus 1 to chorus N. That first chorus is chorus 0
- * for the form, and the last for a last-chorus coda, which only it plays.
+ * for the form, and the last for a last-chorus coda or an outro (#1483), which only it plays.
  */
 export function sectionSteps(chart: BandChart, id: string): { start: number; end: number } | null {
     const all = chart.sections.filter((section) => section.id === id);

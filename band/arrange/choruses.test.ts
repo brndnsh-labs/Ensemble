@@ -5,6 +5,8 @@
  * plays on its later laps — down to the lead's phrases and the notes the band plays. Except
  * the last chorus: a counted performance ends on the out-head, the melody restated.
  */
+
+import { isIntroLabel, isOutroLabel } from '../../public/songbook/score-form.js';
 import {
     type BandEvent,
     type BandSettings,
@@ -17,7 +19,7 @@ import { compileTimeline, type Timeline } from '../form/timeline.js';
 import { type PassMemory, performPass } from '../perform.js';
 import { soloArc } from '../players/lead/form.js';
 import { STYLE_IDS, STYLES } from '../styles/index.js';
-import { COUNTED_FIXTURES, FIXTURES } from '../test/scores.js';
+import { COUNTED_FIXTURES, FIXTURES, score } from '../test/scores.js';
 import { leadRole } from './cycle.js';
 import { planBars } from './plan.js';
 
@@ -39,7 +41,32 @@ describe('a counted chart plans each chorus as the loop plans that lap', () => {
             const looped = compileTimeline(fixture);
             const counted = compileTimeline({ ...fixture, choruses: CHORUSES });
             const length = looped.bars.length;
-            expect(counted.bars).toHaveLength(length * CHORUSES);
+            // A chart with a labelled intro or outro plays it once (#1483), so its choruses are
+            // not all the whole loop. Each is held to the loop of what it does play: the form
+            // without the intro after the first, and without the outro before the last.
+            const isOnce = (label: string) => isIntroLabel(label) || isOutroLabel(label);
+            const playsOnce = fixture.sections.some(({ label }) => isOnce(label));
+            const loopOf = Array.from({ length: CHORUSES }, (_, chorus) =>
+                playsOnce
+                    ? compileTimeline({
+                          ...fixture,
+                          sections: fixture.sections.filter(
+                              ({ label }) =>
+                                  !(chorus > 0 && isIntroLabel(label)) &&
+                                  !(chorus < CHORUSES - 1 && isOutroLabel(label)),
+                          ),
+                      })
+                    : looped,
+            );
+            expect(counted.bars).toHaveLength(
+                loopOf.reduce((sum, timeline) => sum + timeline.bars.length, 0),
+            );
+            if (!playsOnce) {
+                expect(counted.bars).toHaveLength(length * CHORUSES);
+            }
+            const firstOf = loopOf.map((_, chorus) =>
+                loopOf.slice(0, chorus).reduce((sum, timeline) => sum + timeline.bars.length, 0),
+            );
             const failures: string[] = [];
             for (const style of STYLE_CASES) {
                 const drumSolos = Boolean(STYLES[style].drums.solos);
@@ -56,26 +83,28 @@ describe('a counted chart plans each chorus as the loop plans that lap', () => {
                         window: { from: 0, to: counted.bars.length, wrapTo: 0 },
                         drumSolos,
                     });
-                    const laps = Array.from({ length: CHORUSES }, (_, pass) =>
-                        planBars(looped, settings, {
+                    const lap = (timeline: Timeline, pass: number) =>
+                        planBars(timeline, settings, {
                             pass,
                             looping: true,
-                            window: { from: 0, to: length, wrapTo: 0 },
+                            window: { from: 0, to: timeline.bars.length, wrapTo: 0 },
                             drumSolos,
-                        }),
-                    );
+                        });
                     for (let chorus = 0; chorus < CHORUSES; chorus++) {
-                        for (let bar = 0; bar < length; bar++) {
-                            const plan = once[chorus * length + bar];
+                        const loop = loopOf[chorus];
+                        const laps = lap(loop, chorus);
+                        const first = lap(loop, 0);
+                        for (let bar = 0; bar < loop.bars.length; bar++) {
+                            const plan = once[firstOf[chorus] + bar];
                             const where = `${style} ${JSON.stringify(trade)} chorus ${chorus} bar ${bar}`;
                             if (chorus === CHORUSES - 1) {
                                 // The out-head: the lead and the lanes of the first time through
                                 // (a trade hands back to the band), at the energy of this lap.
-                                const head = laps[0][bar];
+                                const head = first[bar];
                                 if (
                                     JSON.stringify([plan.lead, plan.lanes]) !==
                                         JSON.stringify([head.lead, head.lanes]) ||
-                                    plan.energy !== laps[chorus][bar].energy
+                                    plan.energy !== laps[bar].energy
                                 ) {
                                     failures.push(`${where} (out-head)`);
                                 }
@@ -84,13 +113,13 @@ describe('a counted chart plans each chorus as the loop plans that lap', () => {
                             if (
                                 chorus === CHORUSES - 2 &&
                                 chorus > 0 &&
-                                leadRole(looped, bar, chorus, trade).kind === 'head'
+                                leadRole(loop, bar, chorus, trade).kind === 'head'
                             ) {
                                 // Where the loop brings the head back (for the soloist, or the
                                 // band's soloist returning while you trade with the drummer),
                                 // the chorus before the out-head keeps blowing instead.
                                 if (
-                                    leadRole(counted, chorus * length + bar, chorus, trade).kind ===
+                                    leadRole(counted, firstOf[chorus] + bar, chorus, trade).kind ===
                                     'head'
                                 ) {
                                     failures.push(`${where} (head before the out-head)`);
@@ -105,11 +134,11 @@ describe('a counted chart plans each chorus as the loop plans that lap', () => {
                                           ...plan,
                                           lead: {
                                               ...plan.lead,
-                                              from: plan.lead.from - chorus * length,
+                                              from: plan.lead.from - firstOf[chorus],
                                           },
                                       }
                                     : plan;
-                            if (JSON.stringify(relative) !== JSON.stringify(laps[chorus][bar])) {
+                            if (JSON.stringify(relative) !== JSON.stringify(laps[bar])) {
                                 failures.push(where);
                             }
                         }
@@ -224,6 +253,52 @@ const ROLE_TABLES: [string, TradeSettings | null, string[]][] = [
         ),
     ],
 ];
+
+describe('trading alternates over the turns actually played (#1483)', () => {
+    it('never hands one side two turns running when the first chorus has more turns than the rest', () => {
+        // The intro plays in the first chorus only, and there a D.C. al Fine replays it between
+        // lead bars: that chorus is cut into three turns (4, 2 and 2 bars), the later ones into
+        // two (4 and 4). Counting every chorus as the first would flip the order each chorus.
+        const chart = score([
+            { label: 'Intro', bars: 'C | G | Am | F' },
+            {
+                label: 'Verse',
+                bars: 'C | G | Am | F | C | G',
+                end: {
+                    1: [{ kind: 'fine', label: 'fine' }],
+                    5: [
+                        {
+                            kind: 'jump',
+                            from: 'start',
+                            destination: { kind: 'fine', label: 'fine' },
+                            repeats: 'skip',
+                        },
+                    ],
+                },
+            },
+        ]);
+        const timeline = compileTimeline({ ...chart, choruses: 5 });
+        const trade: TradeSettings = { with: 'lead', bars: 4, choruses: null };
+        const plans = planBars(
+            timeline,
+            { ...DEFAULT_SETTINGS, style: 'jazz', lanes: ALL_LANES, trade },
+            {
+                pass: 0,
+                looping: false,
+                window: { from: 0, to: timeline.bars.length, wrapTo: 0 },
+                drumSolos: true,
+            },
+        );
+        const turns: string[] = [];
+        plans.forEach(({ lead }, index) => {
+            const chorus = timeline.bars[index].visit.chorus;
+            if (lead.kind === 'trade' && lead.at === 0 && chorus >= 1 && chorus <= 3) {
+                turns.push(lead.turn);
+            }
+        });
+        expect(turns).toEqual(['band', 'you', 'band', 'you', 'band', 'you']);
+    });
+});
 
 describe('a counted performance ends on the out-head', () => {
     for (const choruses of [2, 3, 4, 5, 8]) {
