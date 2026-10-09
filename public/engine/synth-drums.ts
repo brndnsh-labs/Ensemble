@@ -1042,12 +1042,19 @@ export function killDrumNote(state: EnsembleState): void {
     }
 }
 
-// Internal mix state for density-aware normalization
-const mixState: DrumMixState = {
-    recentHits: 0,
-    densityDuck: 1.0,
-    lastTick: 0,
-};
+// Mix state for density-aware normalization, one per audio context (#1531): an offline render
+// has its own clock and its own run of hits, and must neither inherit the live band's count nor
+// leave its own behind for the next play.
+const mixStates = new WeakMap<BaseAudioContext, DrumMixState>();
+
+function mixStateFor(audio: BaseAudioContext): DrumMixState {
+    let mixState = mixStates.get(audio);
+    if (!mixState) {
+        mixState = { recentHits: 0, densityDuck: 1.0, lastTick: 0 };
+        mixStates.set(audio, mixState);
+    }
+    return mixState;
+}
 
 /**
  * Drum synthesis engine.
@@ -1326,8 +1333,11 @@ function setupNewPercHit(
         return null;
     }
     const now = playback.audio.currentTime;
-    const densityDuck = updateDensityDucking(mixState, now, 18, 0.015);
     const playTime = Math.max(time, now + 0.002);
+    // why: counted on the hit's own time, not the context's clock (#1531). An offline render
+    // schedules every hit before its clock moves, so on the clock the count never decayed and
+    // the kit sank 2.5 dB over the first four bars of every export.
+    const densityDuck = updateDensityDucking(mixStateFor(playback.audio), playTime, 18, 0.015);
     const hitVelocity = Number.isFinite(velocity) ? velocity : 1.0;
     const masterVol = hitVelocity * 1.3 * densityDuck;
     const panner = createSimplePanner(playback.audio, panValue, playTime);
@@ -2090,11 +2100,11 @@ function playDrumSoundCurrent(
     maybeWarnUnknownSound(name);
     const now = playback.audio.currentTime;
 
-    // --- Density Normalization Logic ---
-    const densityDuck = updateDensityDucking(mixState, now, 18, 0.015);
-
     // Add a tiny 2ms buffer to ensure scheduling always happens slightly in the future
     const playTime = Math.max(time, now + 0.002);
+
+    // --- Density Normalization Logic --- (on the hit's own time: see `setupNewPercHit`)
+    const densityDuck = updateDensityDucking(mixStateFor(playback.audio), playTime, 18, 0.015);
 
     // #1068: the un-seeded `velJitter = 1 + (Math.random() - 0.5) * humanize * 0.4`
     // that used to sit here is gone. It was the largest humanize term in the

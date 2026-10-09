@@ -122,6 +122,27 @@ describe('Synthesis Utilities', () => {
             expect(mixState.densityDuck).toBe(0.75); // Min cap
         });
 
+        it("a steady beat counted on its hits' own times never ducks (#1531)", () => {
+            // The drum bus's settings (18, 0.015) and a busy bar: 8 hits every half second,
+            // for 30 seconds. The count halves each half second, so it settles at 16.
+            const mixState = { recentHits: 0, lastTick: 0, densityDuck: 1.0 };
+            for (let i = 0; i < 480; i++) {
+                expect(updateDensityDucking(mixState, i * 0.0625, 18, 0.015)).toBe(1.0);
+            }
+        });
+
+        it('a burst over the threshold ducks, then recovers as time passes', () => {
+            const mixState = { recentHits: 0, lastTick: 0, densityDuck: 1.0 };
+            for (let i = 0; i < 40; i++) {
+                updateDensityDucking(mixState, i * 0.01, 18, 0.015);
+            }
+            expect(mixState.densityDuck).toBe(0.75);
+            for (const time of [1.0, 1.6, 2.2, 2.8]) {
+                updateDensityDucking(mixState, time, 18, 0.015);
+            }
+            expect(mixState.densityDuck).toBe(1.0);
+        });
+
         it('should decay hits over time', () => {
             const mixState = { recentHits: 10, lastTick: 10.0, densityDuck: 0.5 };
             // Move forward 1 second (> 0.5 decay threshold)
