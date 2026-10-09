@@ -3,7 +3,7 @@ import type { EnsembleState, Mutable } from '../types.js';
 import { createSoftClipCurve, safeDisconnect } from './audio-graph-utils.js';
 import { resolveInstrumentSource } from './instrument-registry.js';
 import { MUTE_ATTENUATION, muteGain, normalizeMuteAmount } from './mute-contract.js';
-import { playSampledNote } from './sample-voice.js';
+import { playSampledNote, releaseSampledVoices } from './sample-voice.js';
 import {
     playPercussiveStrike,
     rampGain,
@@ -21,6 +21,8 @@ export function killBassNote(state: EnsembleState): void {
         rampGain(bass.lastBassGain.gain, 0, playback.audio.currentTime, 0.005);
         (bass as Mutable<typeof bass>).lastBassGain = null; // @direct-mutation
     }
+    // A sampled bass note has no `lastBassGain`: it is silenced with its lane (#1530).
+    releaseSampledVoices(playback.audio, 'bass', playback.audio.currentTime);
 }
 
 // Bass styles whose genre identity calls for sub-bass content (a sine an
@@ -85,6 +87,7 @@ function playSampledBass(
         velocity: v * gainForPack(packId),
         duration,
         tone: toneTiltForPack(packId),
+        lane: 'bass',
     });
     return true;
 }

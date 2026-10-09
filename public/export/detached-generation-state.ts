@@ -57,8 +57,6 @@ export function cloneStateForDetachedGeneration(liveState: EnsembleState): Ensem
             wakeLock: null,
             lastActiveDrumElements: null,
             heldNotes: new Set(),
-            activeChordVoices: [],
-            lastChordKey: null,
             suspendTimeout: null,
             isPlaying: false,
             isScheduling: false,

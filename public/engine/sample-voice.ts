@@ -28,6 +28,9 @@ import { scrambleHash } from './hash-utils.js';
  */
 const MAX_SAMPLE_PEAK = 8;
 
+/** Seconds a stopped voice takes to fade (`releaseSampledVoices`): short, and click-free. */
+const STOP_FADE = 0.01;
+
 /** A pitched sample zone: a decoded buffer recorded at a known root pitch. */
 export interface SampleZone {
     /**
@@ -55,6 +58,62 @@ export interface SampleVoiceHandle {
      * stops the source — the natural `onended` cleanup still fires exactly once.
      */
     choke(when: number): void;
+}
+
+/** The lane a sampled voice sounds in: what a stop silences together. */
+export type SampleLane = 'chords' | 'bass' | 'soloist' | 'drums';
+
+/**
+ * The sampled voices still sounding (or scheduled to), per audio context and lane (#1530), so
+ * a stop can silence them: `releaseSampledVoices`. A voice joins when it is made and leaves
+ * when its source ends, so the sets stay as small as what is ringing. Keyed by the context, not
+ * kept in the state tree: an offline render's voices are its own, and a handle closes over
+ * audio nodes no slice should hold.
+ */
+const soundingVoices = new WeakMap<
+    BaseAudioContext,
+    Map<SampleLane, Set<(when: number) => void>>
+>();
+
+/** Register `silence` for `lane`; returns the function that takes it out again. */
+function trackVoice(
+    audio: BaseAudioContext,
+    lane: SampleLane | undefined,
+    silence: (when: number) => void,
+): () => void {
+    if (!lane) {
+        return () => {};
+    }
+    let lanes = soundingVoices.get(audio);
+    if (!lanes) {
+        lanes = new Map();
+        soundingVoices.set(audio, lanes);
+    }
+    let voices = lanes.get(lane);
+    if (!voices) {
+        voices = new Set();
+        lanes.set(lane, voices);
+    }
+    voices.add(silence);
+    return () => voices.delete(silence);
+}
+
+/**
+ * Silence every sampled voice of `lane` from `when`: the ones sounding fade in a few
+ * milliseconds, the ones scheduled but not yet started never sound.
+ */
+export function releaseSampledVoices(
+    audio: BaseAudioContext,
+    lane: SampleLane,
+    when: number,
+): void {
+    const voices = soundingVoices.get(audio)?.get(lane);
+    if (!voices) {
+        return;
+    }
+    for (const silence of [...voices]) {
+        silence(when);
+    }
 }
 
 /**
@@ -116,6 +175,8 @@ export interface SampledNoteOptions {
      * negative darkens. Omitted/`0`/non-finite leaves the path un-filtered.
      */
     readonly tone?: number;
+    /** The lane a stop silences this voice with (`releaseSampledVoices`). Omitted: none. */
+    readonly lane?: SampleLane;
     readonly onEnded?: () => void;
 }
 
@@ -296,6 +357,7 @@ export function playSampledStrike(
         release = 0.01,
         velocity = 1,
         duration,
+        lane,
         onEnded,
     }: Omit<SampledNoteOptions, 'duration'> & { duration?: number } = {},
 ): SampleVoiceHandle | null {
@@ -330,7 +392,9 @@ export function playSampledStrike(
         source.connect(gain);
         gain.connect(destination);
 
+        let untrack = () => {};
         source.onended = () => {
+            untrack();
             safeDisconnect([source, gain]);
             onEnded?.();
         };
@@ -339,7 +403,7 @@ export function playSampledStrike(
         source.start(startTime);
         source.stop(naturalEnd);
 
-        return {
+        const handle: SampleVoiceHandle = {
             choke(when: number) {
                 try {
                     // Clamp into the voice's live window: never before it starts,
@@ -362,6 +426,8 @@ export function playSampledStrike(
                 }
             },
         };
+        untrack = trackVoice(audio, lane, (when) => handle.choke(when));
+        return handle;
     } catch {
         /* ignore audio errors (e.g. a closed context) */
         onEnded?.();
@@ -549,6 +615,7 @@ export function playSampledNote(
         vibrato,
         bend,
         tone,
+        lane,
         onEnded,
     }: SampledNoteOptions = {},
 ): SampledNoteHandle | null {
@@ -670,8 +737,10 @@ export function playSampledNote(
         // Disconnect the node chain once the note finishes, then fire onEnded —
         // the same self-cleanup contract as `playPercussiveStrike`, so sampled
         // notes don't leak a source+gain per played note.
+        let untrack = () => {};
         source.onended = () => {
             ended = true;
+            untrack();
             safeDisconnect([source, gain, ...(toneTilt?.nodes ?? []), ...vibratoNodes]);
             onEnded?.();
         };
@@ -679,7 +748,7 @@ export function playSampledNote(
         source.start(startTime);
         source.stop(naturalEnd);
 
-        return {
+        const handle: SampledNoteHandle = {
             extend(when: number, duration: number, velocity: number, nextTail = release): boolean {
                 if (
                     ended ||
@@ -747,6 +816,8 @@ export function playSampledNote(
                 }
             },
         };
+        untrack = trackVoice(audio, lane, (when) => handle.release(when, STOP_FADE));
+        return handle;
     } catch {
         /* ignore audio errors (e.g. a closed context) */
         onEnded?.();

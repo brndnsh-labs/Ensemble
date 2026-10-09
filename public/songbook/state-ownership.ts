@@ -66,8 +66,6 @@ export const STATE_OWNERSHIP_MANIFEST = {
         intent: 'runtime-derived',
         lastActiveDrumElements: 'runtime-derived',
         heldNotes: 'runtime-derived',
-        activeChordVoices: 'runtime-derived',
-        lastChordKey: 'runtime-derived',
         lastPlayingStep: 'runtime-derived',
         workerLogging: 'runtime-derived',
         suspendTimeout: 'runtime-derived',

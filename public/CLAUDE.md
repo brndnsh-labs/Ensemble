@@ -47,8 +47,9 @@ that touches an existing document field from an engine/conductor path.
     `export/detached-generation-state.ts`'s `cloneStateForDetachedGeneration`, which the band's
     WAV export and the listening-gate tools render from (`prototypes/v2/lib/band-export.ts`). It
     spreads the whole slice then explicitly nulls the known handle fields
-    (`lastHatGain`/`lastRideGain`/`lastCrashGain` on `groove`; `activeChordVoices`/`lastChordKey`
-    on `playback`). A new handle rides through the spread un-nulled and its first
+    (`lastHatGain`/`lastRideGain`/`lastCrashGain` on `groove`; `heldNotes` on `playback`).
+    Sampled voices are not on a slice at all: `sample-voice.ts` keeps them per audio context
+    (#1530), so an offline render's are its own. A new handle rides through the spread un-nulled and its first
     choke/ramp during an offline render pokes a **live-context** node — usually silent (the
     choke's try/catch swallows the `InvalidStateError`), so nothing crashes, it's just a stale
     cross-context reference. When adding a live-handle field, grep an existing one on that slice
