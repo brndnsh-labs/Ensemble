@@ -90,7 +90,7 @@ npm run test:vitest -- band/test/critique.test.ts   # the band's critique claims
 npx vitest run band/perform.test.ts -t "specific test name"
 
 # v2 Playwright — from prototypes/v2, after a build; projects are `laptop` and `webkit-phone`
-(cd prototypes/v2 && npx playwright test checks/semantic-playback.spec.ts --project=laptop)
+(cd prototypes/v2 && npx playwright test checks/band-engine.spec.ts --project=laptop)
 ```
 
 Local-dev note: the v2 dev server serves the default `/v2` base (`ENSEMBLE_V2_BASE` unset;

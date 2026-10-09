@@ -18,8 +18,6 @@ export const playback = deepSignal<GlobalContext>({
     step: 0,
     currentSectionId: null,
     startStep: 0,
-    loopStartStep: -1,
-    loopEndStep: -1,
     drawQueue: [],
     isDrawing: false,
     wakeLock: null,
@@ -95,27 +93,6 @@ export function playbackReducer(action: Action): boolean {
         case ACTIONS.SET_START_STEP:
             // Section-practice (#1016): seed the step the next play starts from.
             p.startStep = Number.isFinite(action.payload) ? Math.max(0, action.payload) : 0;
-            return true;
-        case ACTIONS.SET_PRACTICE_LOOP:
-            // Section-practice (#1016): `null` clears the loop; otherwise fold
-            // playback within [start, end). An empty/inverted range clears too.
-            if (
-                action.payload &&
-                Number.isFinite(action.payload.start) &&
-                Number.isFinite(action.payload.end) &&
-                action.payload.end > action.payload.start
-            ) {
-                p.loopStartStep = Math.max(0, action.payload.start);
-                p.loopEndStep = action.payload.end;
-                // A loop always begins at its own start, so seed it atomically
-                // here — the caller needn't also dispatch SET_START_STEP.
-                p.startStep = p.loopStartStep;
-            } else {
-                // Clearing a loop (e.g. the mid-play badge tap) leaves startStep
-                // alone — the playhead flows on from wherever it is.
-                p.loopStartStep = -1;
-                p.loopEndStep = -1;
-            }
             return true;
         case ACTIONS.SHOW_TOAST: {
             const toast = action.payload;

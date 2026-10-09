@@ -37,28 +37,6 @@ describe('Playback Reducer', () => {
             playbackReducer({ type: ACTIONS.SET_START_STEP, payload: Number.NaN });
             expect(playback.startStep).toBe(0);
         });
-
-        it('sets a valid practice loop, seeds startStep atomically, and clears on null', () => {
-            playbackReducer({ type: ACTIONS.SET_PRACTICE_LOOP, payload: { start: 32, end: 64 } });
-            expect(playback.loopStartStep).toBe(32);
-            expect(playback.loopEndStep).toBe(64);
-            // The loop always begins at its own start — seeded in one dispatch.
-            expect(playback.startStep).toBe(32);
-
-            // Clearing leaves startStep alone (playhead flows on from where it is).
-            playbackReducer({ type: ACTIONS.SET_PRACTICE_LOOP, payload: null });
-            expect(playback.loopStartStep).toBe(-1);
-            expect(playback.loopEndStep).toBe(-1);
-            expect(playback.startStep).toBe(32);
-        });
-
-        it('rejects an empty or inverted loop range (clears instead)', () => {
-            playbackReducer({ type: ACTIONS.SET_PRACTICE_LOOP, payload: { start: 32, end: 64 } });
-            // end <= start is not a loop — treat as clear.
-            playbackReducer({ type: ACTIONS.SET_PRACTICE_LOOP, payload: { start: 64, end: 64 } });
-            expect(playback.loopStartStep).toBe(-1);
-            expect(playback.loopEndStep).toBe(-1);
-        });
     });
 
     it('should handle generic SET_PARAM action and break for other modules (line 174)', () => {

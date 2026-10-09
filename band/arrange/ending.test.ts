@@ -366,7 +366,7 @@ describe('a final turnaround resolves to the tonic', () => {
                 const result = performPass(timeline, settings, {
                     pass: 0,
                     looping: false,
-                    window: { from, to: timeline.bars.length, wrapTo: 0, origin: 0 },
+                    window: { from, to: timeline.bars.length, origin: 0 },
                     until,
                     memory,
                 });

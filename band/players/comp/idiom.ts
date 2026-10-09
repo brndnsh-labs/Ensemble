@@ -39,8 +39,8 @@ interface CompMemory {
     /**
      * The chord (its symbol) the bar's last strike anticipated, tied over the barline into the
      * next bar's first eighth; null when it pushed nothing. Kept as the chord, not a flag, so
-     * a bar that turns out to play another chord (a practice loop released into the bar after
-     * it, where the push was aimed at the loop's top) is not mistaken for tied in (#1507).
+     * a bar that opens on another chord is never mistaken for tied in (#1507): a guard, since
+     * a push is aimed at the next bar's first chord.
      */
     pushed: string | null;
     /** The bar this memory was left by (its index), to tell a bar that follows on from one
@@ -191,8 +191,7 @@ export function compIdiom(book: CompBook): PitchedIdiom {
                 };
             }
             const legato = ctx.instrument.legato && !book.percussive;
-            // The next bar is the next pass's: a loop's wrap back to its top, or the song a
-            // released loop leads on into.
+            // The next bar is the next pass's: the looping song's wrap back to its top.
             const wraps = !!ctx.next?.wraps;
             const nextFirst = ctx.next?.bar.spans[0];
             let pushed: string | null = null;
@@ -232,8 +231,8 @@ export function compIdiom(book: CompBook): PitchedIdiom {
                         // Nor into a bar the comp sits out (the drummer's four).
                         ctx.next?.plan.lanes.comp !== false &&
                         rng.chance(book.push[tier]) &&
-                        // why: nor, on a sustaining instrument, into the next pass (a loop's
-                        // wrap, or a released loop's song). Its push would ring an eighth into
+                        // why: nor, on a sustaining instrument, into the next pass (the
+                        // looping song's wrap). Its push would ring an eighth into
                         // the next lap and stop (a pass holds nothing past its end), and that
                         // lap, tied in, would press nothing: the top of every lap silent
                         // (#1488). It lands on the downbeat.
@@ -430,8 +429,8 @@ export function compIdiom(book: CompBook): PitchedIdiom {
 /**
  * Is the bar's first chord tied in from an anticipation — struck at the end of the bar before
  * and ringing over the barline — so that its downbeat is not struck again? Only when the
- * chord pushed is the chord the bar opens on (#1507): a practice loop released into the bar
- * after it carries a push aimed at the loop's top, and that chord is not this bar's.
+ * chord pushed is the chord the bar opens on (#1507): a push aimed at another chord is not
+ * this bar's.
  */
 export function tiedFromPush(memory: { pushed?: string | null }, bar: Bar): boolean {
     return !!memory.pushed && memory.pushed === bar.spans[0]?.chord?.symbol;

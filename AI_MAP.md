@@ -62,7 +62,7 @@ The ground-up replacement for the generative engine, the default since 2026-09-2
 | `prototypes/v2/lib/band-voices.ts` | The app's names for the band's parts: genre → style, lane sound → comp/lead instrument. Type-only imports, so `scripts/band-scene.ts` reads the same tables in node. | `STYLE_FOR_GENRE`, `COMP_FOR_VOICE`, `LEAD_FOR_VOICE` |
 | `prototypes/v2/lib/render-bridge.ts` | The listening-gate tools' page side, on `window.ensemble`: renders band events it is handed through `renderBandPasses` on pinned lane sounds, returns channels plus a dispatch tap. Installed by `runtime.ts` only in a `NEXT_PUBLIC_RENDER_BRIDGE=1` build. | `installRenderBridge` |
 | `scripts/band-scene.ts` | The listening-gate tools' node side: a `mix:report` scene → score → `compileTimeline` → `performPass` passes; settings, schedule analysis and the `--write-events` dump. | `performSceneForReport`, `sceneSettings`, `buildEventDump` |
-| `prototypes/v2/lib/band-chart.ts` | The chart sheet's view of a score on the band engine, from the score + band timeline: every written event (holds, N.C., fermatas, off-grid lengths), its performed slots, section loop windows, chord names in all three notations. | `bandChart`, `slotAt`, `chordNames` |
+| `prototypes/v2/lib/band-chart.ts` | The chart sheet's view of a score on the band engine, from the score + band timeline: every written event (holds, N.C., fermatas, off-grid lengths), its performed slots, section step bounds, chord names in all three notations. | `bandChart`, `slotAt`, `chordNames` |
 | `prototypes/v2/lib/engine-mode.ts` | `checkPlayable`, the one capability check every open/edit/import path asks: the score is valid and its timeline compiles. | `checkPlayable` |
 
 ## State Management (Domain Slices)
@@ -130,7 +130,7 @@ The ground-up replacement for the generative engine, the default since 2026-09-2
 | `public/engine/synth-utils.ts` | Shared WebAudio boilerplate (ramping, voices, velocity→timbre). | `rampGain`, `killActiveVoices`, `velocityTimbre` |
 | `public/engine/humanize.ts` | Leaf module (imports only `hash-utils.ts`) owning the seeded humanization primitives every lane shares — bar-independent timing placement, bar-varying velocity/detune colour, and the knob curve, used by the synth voices. | `humanizePlacement`, `humanizeColor`, `humanizeScale`, `HUMANIZE_PROFILES` |
 | `public/engine/audio-graph-utils.ts` | Leaf Web Audio graph helpers — imports nothing from the engine, so `synth-utils.ts` and `sample-voice.ts` can both use them without an import cycle. | `safeDisconnect`, `createSoftClipCurve`, `clampFreq` |
-| `public/engine/section-overrides.ts` | Per-section instrument-enabled overrides and practice-loop step folding for a measure-less chart. | `isInstrumentActiveAtStep`, `isInstrumentEverActive`, `foldPracticeStep` |
+| `public/engine/section-overrides.ts` | Per-section instrument-enabled overrides for a measure-less chart. | `isInstrumentActiveAtStep`, `isInstrumentEverActive` |
 | `public/engine/hash-utils.ts` | Canonical deterministic hash helpers. `scrambleHash` is stateless and seed-tuple-indexed — see `public/engine/CLAUDE.md` §27. | `scrambleHash`, `stringHash33`, `stringHash31` |
 | `public/engine/soloist-mode-policy.ts` | Canonical soloist phrasing-mode rules and voice limits. | `resolveSoloistMode`, `getSoloistVoiceLimit` |
 | `public/engine/audio-recovery.ts` | Context resumption and error handling. | `audioWatchdog` |
@@ -172,7 +172,7 @@ account sync. Per-surface ownership is the navigation table in `prototypes/v2/CL
 | :--- | :--- |
 | `public/controllers/arranger-controller.ts` | High-level song structure manipulation. |
 | `public/controllers/instrument-controller.ts` | Per-instrument state and preset routing. |
-| `public/controllers/practice-controller.ts` | Section practice — start-from-here / loop-a-section entry points (#1016). |
+| `public/controllers/practice-controller.ts` | Section practice — a section's step bounds, for start-from-here (#1016). |
 | `public/export/detached-generation-state.ts` | Offline-render state clone (the band's WAV export and the listening-gate tools): preserves generation settings while stripping live handles and runtime buffers. |
 | `public/song/lead-sheet-model.ts` | Shared lead-sheet shaping for 4-measure row packing, section markers, and density selection. |
 | `public/platform.ts` | Browser hacks (WakeLock, Audio Unlock). |

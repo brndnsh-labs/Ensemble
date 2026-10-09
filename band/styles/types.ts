@@ -31,8 +31,8 @@ export interface BarContext {
     plan: BarPlan;
     /**
      * The bar after this one in performance order (wrapping when the song loops). `wraps`: the
-     * next pass plays it, not this one — a loop's wrap back to its top, or the song a released
-     * loop leads on into — so a sustaining instrument's hold ends at its barline.
+     * next pass plays it, not this one — the looping song's wrap back to its top — so a
+     * sustaining instrument's hold ends at its barline.
      */
     next: { bar: Bar; plan: BarPlan; wraps: boolean } | null;
     /** What the lanes before this one already played in this bar, on the straight grid. */

@@ -26,7 +26,7 @@ test('the band engine plays the chart round the loop and stops', async ({ page }
                 window.__band.workers++;
             }
         };
-        // Branch an analyser off the final output, as the semantic-playback check does.
+        // Branch an analyser off the final output.
         const connect = AudioNode.prototype.connect;
         const seen = new WeakSet<BaseAudioContext>();
         AudioNode.prototype.connect = function (

@@ -30,7 +30,7 @@ export type PassMemory = Record<Lane, unknown> & { lastBass?: number; at?: numbe
 
 export interface PassOptions {
     /**
-     * 0 for the first time through the song (or the first lap of a loop), 1 for the next… A
+     * 0 for the first time through the song, 1 for the next… A
      * counted chart's timeline holds all its choruses, and each bar's chorus is added to this
      * (`planBars`'s `passAt`), so one pass over it plays every chorus as its own time through.
      */
@@ -55,13 +55,6 @@ export interface PassOptions {
      * Defaults to the window's end.
      */
     until?: number;
-    /**
-     * The pass that follows the window, where it is not another lap of it: a practice loop let
-     * go leads on into the song (`BandHost.setLoop`). The window then leads to that pass's
-     * first bar, and its last bar hears that bar as that pass plays it — its plan whole, and
-     * the held ending where it ends there — not the loop's top.
-     */
-    leadsInto?: { pass: number; looping: boolean; window: PassWindow };
 }
 
 export interface PassResult {
@@ -83,9 +76,7 @@ export function performPass(
     const comp = style.comp[instrument.family];
     const lead = style.lead?.idiom;
     const leadProfile = LEAD_INSTRUMENTS[settings.lead];
-    const { leadsInto } = options;
-    const given = options.window ?? fullWindow(timeline);
-    const window = leadsInto ? { ...given, wrapTo: leadsInto.window.from } : given;
+    const window = options.window ?? fullWindow(timeline);
     const until = Math.min(options.until ?? window.to, window.to);
     // The bars actually played: past a chunk's end, a look across its barline (above) — at
     // least one bar, and on until the comp strikes again or rests, since a sustaining comp
@@ -109,30 +100,17 @@ export function performPass(
     });
     // Where the pass wraps, the next bar belongs to the next pass, whose lanes can differ (the
     // fours may open with the drummer alone): what it plays is taken from that pass's plan.
-    // That next pass is always a fresh lap (a loop always restarts at the top), never a
-    // resume, so its own origin is reset to its `from` — not inherited from `window.origin`,
-    // which `{ ...window }` would otherwise carry over from a resumed `window` here. A pass
-    // that `leadsInto` another plays into that pass's own plan of its first bar, whole: its
-    // energy, its crash, whether it ends, as well as who plays it.
-    const wrapPlan = leadsInto
+    // That next pass is always a fresh one from the top, never a resume, so its own origin is
+    // reset to its `from` — not inherited from `window.origin`, which `{ ...window }` would
+    // otherwise carry over from a resumed `window` here.
+    const wrapPlan = options.looping
         ? planBars(timeline, settings, {
-              ...leadsInto,
-              planned: leadsInto.window.from + 1,
+              pass: options.pass + 1,
+              looping: true,
+              window: { ...window, from: 0, origin: 0 },
               drumSolos,
-          })[leadsInto.window.from]
-        : options.looping
-          ? planBars(timeline, settings, {
-                pass: options.pass + 1,
-                looping: true,
-                window: { ...window, from: window.wrapTo, origin: window.wrapTo },
-                drumSolos,
-            })[window.wrapTo]
-          : undefined;
-    // And a pass it leads into that ends there holds its own ending (`arrange/ending.ts`).
-    const endingAfter =
-        leadsInto && !leadsInto.looping
-            ? heldEnding(timeline, leadsInto.window.to - 1, style.ending)
-            : null;
+          })[0]
+        : undefined;
     const memory: PassMemory = options.memory
         ? { ...options.memory }
         : {
@@ -176,8 +154,7 @@ export function performPass(
         const place = i - chorusBars(timeline, i).first;
         snapshots[i] = { ...memory, at: bar.start };
         const last = i === window.to - 1;
-        const nextIndex =
-            i + 1 < window.to ? i + 1 : options.looping || leadsInto ? window.wrapTo : -1;
+        const nextIndex = i + 1 < window.to ? i + 1 : options.looping ? 0 : -1;
         // The bar after the window is planned by the pass that plays it. "Is the next bar an
         // arrival/ending" a wrap resolves the same way; who plays it comes from `wrapPlan`.
         const wrapped = plans[nextIndex] ?? {
@@ -187,12 +164,7 @@ export function performPass(
             fill: 'none',
         };
         const nextPlan =
-            last && wrapPlan
-                ? leadsInto
-                    ? wrapPlan
-                    : { ...wrapped, lanes: wrapPlan.lanes, lead: wrapPlan.lead }
-                : wrapped;
-        const nextEnding = last && leadsInto ? endingAfter : ending;
+            last && wrapPlan ? { ...wrapped, lanes: wrapPlan.lanes, lead: wrapPlan.lead } : wrapped;
         const heard: BarContext['heard'] = { drums: [], bass: [], lead: [] };
         const barFirst = events.length;
         const context = (lane: Lane): BarContext => ({
@@ -205,8 +177,8 @@ export function performPass(
                 nextIndex >= 0
                     ? {
                           bar:
-                              nextPlan.ending && nextEnding?.index === nextIndex
-                                  ? nextEnding
+                              nextPlan.ending && ending?.index === nextIndex
+                                  ? ending
                                   : bars[nextIndex],
                           plan: nextPlan,
                           wraps: last,

@@ -10,7 +10,7 @@ import {
     resolveInstrumentSource,
 } from './instrument-registry.js';
 import { pickRoundRobin, playSampledStrike, type SampleVoiceHandle } from './sample-voice.js';
-import { foldPracticeStep, isInstrumentActiveAtStep } from './section-overrides.js';
+import { isInstrumentActiveAtStep } from './section-overrides.js';
 import {
     createSimplePanner,
     duckGain,
@@ -749,15 +749,14 @@ function noiseOffset(): number {
 }
 
 function getBandLayerCount(state: EnsembleState, step: number): number {
-    const musicalStep = foldPracticeStep(step, state.playback);
     let layers = 0;
-    if (isInstrumentActiveAtStep(state, 'bass', musicalStep)) {
+    if (isInstrumentActiveAtStep(state, 'bass', step)) {
         layers++;
     }
-    if (isInstrumentActiveAtStep(state, 'chords', musicalStep)) {
+    if (isInstrumentActiveAtStep(state, 'chords', step)) {
         layers++;
     }
-    if (isInstrumentActiveAtStep(state, 'soloist', musicalStep)) {
+    if (isInstrumentActiveAtStep(state, 'soloist', step)) {
         layers++;
     }
     return layers;

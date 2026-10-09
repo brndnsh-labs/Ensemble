@@ -80,13 +80,9 @@ test('the band engine opens and plays holds, N.C., fermatas and off-grid lengths
     const tempo = page.getByLabel('Tempo', { exact: true });
     await tempo.fill('240');
     await tempo.press('Enter');
-    // Practice-loop the section: on the band engine the loop window comes from the timeline.
-    await page.locator('.section-letter').first().press('l');
-    await expect(page.locator('.section-loop.active')).toBeVisible();
-
     await page.getByRole('button', { name: 'Start playback', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Stop playback', exact: true })).toBeEnabled();
-    // Follow the highlighted bar until the loop has come back round to the top twice.
+    // Follow the highlighted bar until the song has come back round to the top twice.
     const visits: string[] = [];
     await expect
         .poll(
@@ -111,7 +107,6 @@ test('the band engine opens and plays holds, N.C., fermatas and off-grid lengths
     await page.getByRole('button', { name: 'Stop playback', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Start playback', exact: true })).toBeEnabled();
     await expect(page.locator('.chord[aria-current="true"]')).toHaveCount(0);
-    await expect(page.locator('.section-loop.active')).toHaveCount(0);
 
     // Editing is open to them too: type a hold into a bar, then save the chart.
     await page.getByRole('button', { name: 'Edit chart', exact: true }).click();

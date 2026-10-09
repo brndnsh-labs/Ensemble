@@ -2,24 +2,20 @@
  * The count-in (#1422): one bar of clicks before a fresh Play, at the chart's own tempo and
  * meter, that shifts the band's own downbeat back by exactly that bar rather than overlapping
  * it. Pinned here: `countInPlan`'s pure math, and `BandHost.start()`'s use of it — scheduled
- * only when asked, never re-triggered by a loop wrap, and absent entirely when off.
+ * only when asked, never re-triggered when the song wraps, and absent entirely when off.
  *
  * The synth voices are mocked out: this suite is about scheduling and timing, not sound, and a
  * fake `AudioContext` has none of the nodes the real voices need.
  *
- * Also the counted chart (#1475): N choruses played once, then the host stops by itself;
- * releasing a practice loop (#1484, #1489); and a settings change near a barline (#1499).
+ * Also the counted chart (#1475): N choruses played once, then the host stops by itself; and
+ * a settings change near a barline (#1499).
  */
 import {
     type BandEvent,
     type BandSettings,
     compileTimeline,
     DEFAULT_SETTINGS,
-    type PassMemory,
-    type PassWindow,
     performPass,
-    STYLE_IDS,
-    STYLES,
     secondsAt,
     type Timeline,
     toMidi,
@@ -36,7 +32,7 @@ import type {
 } from '@engine/songbook/score-types';
 import type { EnsembleState } from '@engine/types';
 import { describe, expect, it, vi } from 'vitest';
-import { BandHost, countInPlan, type Loop } from './band-host';
+import { BandHost, countInPlan } from './band-host';
 
 vi.mock('@engine/engine/synth-drums', () => ({ playDrumSound: vi.fn() }));
 vi.mock('@engine/engine/synth-bass', () => ({ playBassNote: vi.fn() }));
@@ -174,7 +170,7 @@ describe('BandHost count-in scheduling', () => {
         const host = new BandHost({ state: () => state, silence: () => {} });
         host.setScore(twoBars);
         const bpm = 120;
-        host.start(drumsOnly, bpm, 0, null, true);
+        host.start(drumsOnly, bpm, 0, true);
 
         const timeline = compileTimeline(twoBars);
         const plan = countInPlan(timeline, bpm, 0);
@@ -200,7 +196,7 @@ describe('BandHost count-in scheduling', () => {
         const state = fakeState(audio);
         const host = new BandHost({ state: () => state, silence: () => {} });
         host.setScore(twoBars);
-        host.start(drumsOnly, 120, 0, null, true);
+        host.start(drumsOnly, 120, 0, true);
         const clicks = audio.createOscillator.mock.results.map((r) => r.value);
         expect(clicks.length).toBeGreaterThan(0);
         // Each click schedules its own natural stop once, when it is created.
@@ -217,21 +213,20 @@ describe('BandHost count-in scheduling', () => {
         expect(host.countingInBeat()).toBeNull();
     });
 
-    it('does not re-trigger on a loop wrap', () => {
+    it('does not re-trigger when the song wraps', () => {
         const audio = fakeAudioContext(10);
         const state = fakeState(audio);
         const host = new BandHost({ state: () => state, silence: () => {} });
         host.setScore(twoBars);
         const bpm = 120;
         const timeline = compileTimeline(twoBars);
-        const barTicks = timeline.bars[0].meter.barTicks;
         const plan = countInPlan(timeline, bpm, 0);
-        // A one-bar loop, so the fast-forward below crosses several wraps.
-        host.start(drumsOnly, bpm, 0, { from: 0, to: barTicks }, true);
+        // A two-bar song, so the fast-forward below crosses several wraps.
+        host.start(drumsOnly, bpm, 0, true);
         expect(audio.createOscillator).toHaveBeenCalledTimes(plan.times.length);
 
         const segmentStart = 10 + 0.1 + plan.seconds;
-        const lapSeconds = secondsAt(timeline, barTicks, bpm);
+        const lapSeconds = secondsAt(timeline, timeline.ticks, bpm);
         for (let lap = 0; lap < 6; lap++) {
             audio.currentTime = segmentStart + lap * lapSeconds + lapSeconds / 2;
             pump(host);
@@ -247,7 +242,7 @@ describe('BandHost count-in scheduling', () => {
         const state = fakeState(audio);
         const host = new BandHost({ state: () => state, silence: () => {} });
         host.setScore(twoBars);
-        host.start(drumsOnly, 120, 0, null, false);
+        host.start(drumsOnly, 120, 0, false);
 
         expect(audio.createOscillator).not.toHaveBeenCalled();
         audio.currentTime = 10 + 0.1 + 0.0001;
@@ -264,7 +259,7 @@ describe('BandHost count-in scheduling', () => {
         host.setScore(twoBars);
         // `start()`'s own default: callers that don't ask for a count-in (every restart path
         // except a fresh Play) simply omit the argument.
-        host.start(drumsOnly, 120, 0, null);
+        host.start(drumsOnly, 120, 0);
 
         expect(audio.createOscillator).not.toHaveBeenCalled();
         audio.currentTime = 10 + 0.1 + 0.0001;
@@ -345,58 +340,6 @@ describe('BandHost counted choruses', () => {
         expect(bassIn(timeline.bars.length - 1)).toEqual([0]);
     });
 
-    it('a loop released on the last section ends with the lead on the resolved tonic too (#1482)', () => {
-        // The lap's phrase was planned as a loop, against the written ii–V; released, the lap
-        // ends from its next barline, and the lead must hear the tonic the band resolves to.
-        const audio = fakeAudioContext(10);
-        const state = fakeState(audio);
-        const host = new BandHost({ state: () => state, silence: () => {} });
-        const score = {
-            ...song([
-                {
-                    id: 'a',
-                    label: 'A',
-                    repeat: 1,
-                    measures: [
-                        bar('a1', [chord('C', 4)]),
-                        bar('a2', [chord('Am7', 4)]),
-                        bar('a3', [chord('Fmaj7', 4)]),
-                        bar('a4', [chord('Dm7', 2), chord('G7', 2)]),
-                    ],
-                },
-            ]),
-            choruses: 1,
-        };
-        host.setScore(score);
-        const timeline = compileTimeline(score);
-        const band = {
-            ...DEFAULT_SETTINGS,
-            seed: 'ensemble',
-            lanes: { drums: true, bass: true, comp: true, lead: true },
-        };
-        host.start(band, BPM, 0, { from: 0, to: timeline.ticks });
-        // Into the second lap's first bar, then release.
-        run(host, audio, 10.1, 10.1 + 4.25 * BAR_S);
-        host.setLoop(null);
-        const internals = host as unknown as {
-            segments: { pass: number; ends: boolean; events: BandEvent[] }[];
-        };
-        const lap = internals.segments.find((s) => s.pass === 1)!;
-        expect(lap.ends).toBe(true);
-        const inLast = (lane: string) =>
-            lap.events.flatMap((e) =>
-                e.lane === lane && e.bar === 3 && !(e.lane !== 'drums' && e.muted)
-                    ? [e.lane === 'drums' ? -1 : e.midi % 12]
-                    : [],
-            );
-        const tonic = [0, 4, 7]; // rock ends on the triad
-        expect(inLast('bass')).toEqual([0]);
-        expect(inLast('comp').every((pc) => tonic.includes(pc))).toBe(true);
-        // Planned as a loop, the lead sang A and F over this bar against the written Dm7 G7;
-        // replanned for the ending, whatever it plays there is a tone of the tonic.
-        expect(inLast('lead').every((pc) => tonic.includes(pc))).toBe(true);
-    });
-
     it('plays every chorus, the coda only in the last, and stops at the end of its final bar', () => {
         const audio = fakeAudioContext(10);
         const state = fakeState(audio);
@@ -405,7 +348,7 @@ describe('BandHost counted choruses', () => {
         const score = codaSong(2);
         host.setScore(score);
         const segments = watchSegments(host);
-        host.start(drumsOnly, BPM, 0, null);
+        host.start(drumsOnly, BPM, 0);
         const start = 10.1;
         const timeline = compileTimeline(score);
         // a1 a2 | a1 a2 c1: the coda is the last chorus's alone.
@@ -444,7 +387,7 @@ describe('BandHost counted choruses', () => {
         const host = new BandHost({ state: () => state, silence: () => {}, onEnd });
         const score = codaSong(2);
         host.setScore(score);
-        host.start(drumsOnly, BPM, 0, null);
+        host.start(drumsOnly, BPM, 0);
         const timeline = compileTimeline(score);
         const end = 10.1 + secondsAt(timeline, timeline.ticks, BPM);
         run(host, audio, 10.1, end);
@@ -468,131 +411,12 @@ describe('BandHost counted choruses', () => {
         host.setScore(codaSong());
         expect(compileTimeline(codaSong()).bars.map((b) => b.visit.label)).toEqual(['A', 'A']);
         const segments = watchSegments(host);
-        host.start(drumsOnly, BPM, 0, null);
+        host.start(drumsOnly, BPM, 0);
         run(host, audio, 10.1, 10.1 + 4 * 2 * BAR_S);
         expect(onEnd).not.toHaveBeenCalled();
         expect(host.playing).toBe(true);
         expect(segments().length).toBeGreaterThanOrEqual(4);
         host.stop();
-    });
-
-    it('a practice loop on a counted chart ignores the count and keeps looping', () => {
-        const audio = fakeAudioContext(10);
-        const state = fakeState(audio);
-        const onEnd = vi.fn();
-        const host = new BandHost({ state: () => state, silence: () => {}, onEnd });
-        const score = codaSong(2);
-        host.setScore(score);
-        const barTicks = compileTimeline(score).bars[0].meter.barTicks;
-        host.start(drumsOnly, BPM, 0, { from: 0, to: barTicks });
-        run(host, audio, 10.1, 10.1 + 8 * BAR_S);
-        expect(onEnd).not.toHaveBeenCalled();
-        expect(host.playing).toBe(true);
-        host.stop();
-    });
-
-    it('leaving a practice loop carries the counted performance on to its end', () => {
-        const audio = fakeAudioContext(10);
-        const state = fakeState(audio);
-        const onEnd = vi.fn();
-        const host = new BandHost({ state: () => state, silence: () => {}, onEnd });
-        const score = codaSong(2);
-        host.setScore(score);
-        const segments = watchSegments(host);
-        const barTicks = compileTimeline(score).bars[0].meter.barTicks;
-        host.start(drumsOnly, BPM, 0, { from: 0, to: barTicks });
-        run(host, audio, 10.1, 10.1 + 2.5 * BAR_S);
-        host.setLoop(null);
-        // The lap under way (the third) ends 3 bars in; then the rest of chorus 1 (a2), then
-        // chorus 2 (a1 a2 c1): 7 bars in all. (The fourth lap, queued two seconds ahead, was
-        // dropped when the loop was released.)
-        const end = 10.1 + 7 * BAR_S;
-        run(host, audio, 10.1 + 2.5 * BAR_S, end);
-        expect(onEnd).not.toHaveBeenCalled();
-        expect(
-            segments()
-                .slice(-2)
-                .map((s) => s.window.from),
-        ).toEqual([1, 2]);
-        audio.currentTime = end;
-        pump(host);
-        expect(onEnd).toHaveBeenCalledTimes(1);
-    });
-
-    it('released in the last bar of the last section, it plays once more with the ending, then stops', () => {
-        // No barline is left in the lap to change at: the section plays once more as written,
-        // ending, rather than stopping dead on a fill back to its top.
-        const audio = fakeAudioContext(10);
-        const state = fakeState(audio);
-        const onEnd = vi.fn();
-        const host = new BandHost({ state: () => state, silence: () => {}, onEnd });
-        const score = { ...song([{ ...twoBars.sections[0] }]), choruses: 1 };
-        host.setScore(score);
-        const timeline = compileTimeline(score);
-        const segments = watchSegments(host);
-        host.start(drumsOnly, BPM, 0, { from: 0, to: timeline.ticks });
-        // Into the second lap's last bar (laps are two bars, from 10.1 s), then release.
-        run(host, audio, 10.1, 10.1 + 3.25 * BAR_S);
-        host.setLoop(null);
-        const end = 10.1 + 6 * BAR_S;
-        run(host, audio, 10.1 + 3.25 * BAR_S, end);
-        expect(onEnd).not.toHaveBeenCalled();
-        const last = segments().at(-1) as unknown as { looping: boolean; ends: boolean };
-        expect(last.looping).toBe(false);
-        expect(last.ends).toBe(true);
-        audio.currentTime = end;
-        pump(host);
-        expect(onEnd).toHaveBeenCalledTimes(1);
-    });
-
-    it('released on the last section, the lap under way plays the ending, then stops', () => {
-        // One chorus of a1 a2: a loop on A is a loop on the chart's last section.
-        const audio = fakeAudioContext(10);
-        const state = fakeState(audio);
-        const onEnd = vi.fn();
-        const host = new BandHost({ state: () => state, silence: () => {}, onEnd });
-        const score = { ...song([{ ...twoBars.sections[0] }]), choruses: 1 };
-        host.setScore(score);
-        const timeline = compileTimeline(score);
-        const loop = { from: 0, to: timeline.ticks };
-        host.start(drumsOnly, BPM, 0, loop);
-        // Into the second lap's first bar, then release: its second bar can still change.
-        run(host, audio, 10.1, 10.1 + 2.25 * BAR_S);
-        const internals = host as unknown as {
-            segments: {
-                pass: number;
-                looping: boolean;
-                ends: boolean;
-                events: BandEvent[];
-                snapshots: PassMemory[];
-            }[];
-        };
-        const lap = internals.segments.find((s) => s.pass === 1)!;
-        host.setLoop(null);
-        expect(lap.looping).toBe(false);
-        expect(lap.ends).toBe(true);
-        // Its last bar is now what a performance's last bar plays: the ending, not the fill
-        // back to the top that a lap plays.
-        const ending = performPass(timeline, drumsOnly, {
-            pass: 1,
-            looping: false,
-            memory: lap.snapshots[1],
-            window: { from: 1, to: 2, wrapTo: 0, origin: 0 },
-        });
-        const looped = performPass(timeline, drumsOnly, {
-            pass: 1,
-            looping: true,
-            memory: lap.snapshots[1],
-            window: { from: 1, to: 2, wrapTo: 0, origin: 0 },
-        });
-        const lastBar = JSON.stringify(lap.events.filter((e) => e.bar === 1));
-        expect(lastBar).toBe(JSON.stringify(ending.events));
-        expect(lastBar).not.toBe(JSON.stringify(looped.events));
-        run(host, audio, 10.1 + 2.25 * BAR_S, 10.1 + 4 * BAR_S);
-        expect(onEnd).not.toHaveBeenCalled();
-        audio.currentTime = 10.1 + 4 * BAR_S;
-        pump(host);
-        expect(onEnd).toHaveBeenCalledTimes(1);
     });
 
     it('exports exactly the performance it plays: three choruses and the coda', () => {
@@ -608,7 +432,7 @@ describe('BandHost counted choruses', () => {
             comp: 'organ' as const,
             lanes: { drums: true, bass: true, comp: true, lead: true },
         };
-        host.start(band, BPM, 0, null);
+        host.start(band, BPM, 0);
         run(host, audio, 10.1, 10.1 + 7 * BAR_S + 0.1);
         expect(host.playing).toBe(false);
 
@@ -715,7 +539,7 @@ describe('BandHost looping laps', () => {
                 const host = new BandHost({ state: () => state, silence: () => {} });
                 host.setScore(blues);
                 const segments = watchSegments(host) as () => (Queued & { pass: number })[];
-                host.start(settings, BPM, 0, null);
+                host.start(settings, BPM, 0);
                 run(host, audio, 10.1, 10.1 + 2.5 * length * BAR_S);
                 host.stop();
                 const once = performPass(counted, settings, { pass: 0, looping: false });
@@ -739,7 +563,7 @@ describe('BandHost looping laps', () => {
     });
 });
 
-/** A (two bars) then B (two bars): a loop on A has a song to carry on into. */
+/** A (two bars) then B (two bars). */
 const aThenB = song([
     {
         id: 'a',
@@ -793,16 +617,10 @@ const wholeBand = {
 };
 
 /**
- * `score` at 120 bpm (two seconds a bar), looped from the top to `loopTo` (or the song, with
- * null), the whole band (or `settings`), the timer firing every 25 ms from 10.1 s. `tick(t)`
- * pumps at audio time `t`.
+ * `score` at 120 bpm (two seconds a bar), the whole band (or `settings`), the timer firing
+ * every 25 ms from 10.1 s. `tick(t)` pumps at audio time `t`.
  */
-function rig(
-    score: SemanticScore,
-    loopTo: number | Loop | null,
-    onEnd?: () => void,
-    settings: BandSettings = wholeBand,
-) {
+function rig(score: SemanticScore, onEnd?: () => void, settings: BandSettings = wholeBand) {
     for (const voice of [playDrumSound, playBassNote, playNote, playSoloNote]) {
         vi.mocked(voice).mockClear();
     }
@@ -810,7 +628,7 @@ function rig(
     const state = fakeState(audio);
     const host = new BandHost({ state: () => state, silence: () => {}, onEnd });
     host.setScore(score);
-    host.start(settings, 120, 0, typeof loopTo === 'number' ? { from: 0, to: loopTo } : loopTo);
+    host.start(settings, 120, 0);
     const tick = (t: number) => {
         audio.currentTime = t;
         pump(host);
@@ -820,272 +638,8 @@ function rig(
             tick(from + i * 0.025);
         }
     };
-    const release = (t: number) => {
-        audio.currentTime = t;
-        host.setLoop(null);
-    };
-    return { audio, host, tick, pumpTo, release };
+    return { audio, host, tick, pumpTo };
 }
-
-/**
- * Releasing a practice loop: the lap under way finishes, then the song carries on from the bar
- * after the loop. A settings change after the release regenerates what is still to come, and
- * must regenerate it from the same place (#1484). The lap under way is the one at the
- * scheduler's horizon, so a release inside the lookahead never sounds a downbeat twice (#1489).
- */
-describe('BandHost releasing a practice loop', () => {
-    const BPM = 120;
-    /** 4/4 at 120: two seconds a bar. */
-    const BAR_S = 2;
-    it('a settings change in the last two seconds of the lap still carries on after the loop', () => {
-        const audio = fakeAudioContext(10);
-        const state = fakeState(audio);
-        const host = new BandHost({ state: () => state, silence: () => {} });
-        host.setScore(aThenB);
-        const timeline = compileTimeline(aThenB);
-        const loopA = { from: 0, to: timeline.bars[2].start };
-        host.start(drumsOnly, BPM, 0, loopA);
-        // Laps of A are two bars (four seconds) from 10.1 s: release a second into the second.
-        const lapEnd = 10.1 + 4 * BAR_S;
-        run(host, audio, 10.1, lapEnd - 3);
-        host.setLoop(null);
-        // The bar after the loop is queued two seconds ahead of the lap's end; then the band
-        // changes, inside that window.
-        run(host, audio, lapEnd - 3, lapEnd - 1);
-        host.update({ ...drumsOnly, intensity: 0.9 });
-        run(host, audio, lapEnd - 1, lapEnd + BAR_S / 2);
-        // Half a bar after the lap, the band is in B's first bar, not back at the top.
-        const tick = host.songTick();
-        expect(tick).not.toBeNull();
-        expect(tick!).toBeGreaterThanOrEqual(timeline.bars[2].start);
-        expect(tick!).toBeLessThan(timeline.bars[3].start);
-        host.stop();
-    });
-
-    it('on a counted chart, a settings change after a last-bar release still plays the section once more', () => {
-        // The counted twin: released in the last bar of the last section, the section plays
-        // once more and ends. A settings change after that must not cut the extra time short.
-        const audio = fakeAudioContext(10);
-        const state = fakeState(audio);
-        const onEnd = vi.fn();
-        const host = new BandHost({ state: () => state, silence: () => {}, onEnd });
-        const score = { ...song([{ ...twoBars.sections[0] }]), choruses: 1 };
-        host.setScore(score);
-        const timeline = compileTimeline(score);
-        host.start(drumsOnly, BPM, 0, { from: 0, to: timeline.ticks });
-        // Into the second lap's last bar (laps are two bars, from 10.1 s), then release.
-        run(host, audio, 10.1, 10.1 + 3.25 * BAR_S);
-        host.setLoop(null);
-        run(host, audio, 10.1 + 3.25 * BAR_S, 10.1 + 3.5 * BAR_S);
-        host.update({ ...drumsOnly, intensity: 0.9 });
-        const end = 10.1 + 6 * BAR_S;
-        run(host, audio, 10.1 + 3.5 * BAR_S, end);
-        expect(onEnd).not.toHaveBeenCalled();
-        audio.currentTime = end;
-        pump(host);
-        expect(onEnd).toHaveBeenCalledTimes(1);
-    });
-
-    /**
-     * Loop A with the whole band, pumping every 25 ms as the host's own timer does; release the
-     * loop `early` seconds before the second lap ends, then play on `after` seconds past it.
-     */
-    function releaseBefore(early: number, after: number) {
-        const band = {
-            ...DEFAULT_SETTINGS,
-            lanes: { drums: true, bass: true, comp: true, lead: true },
-        };
-        for (const voice of [playDrumSound, playBassNote, playNote, playSoloNote]) {
-            vi.mocked(voice).mockClear();
-        }
-        const audio = fakeAudioContext(10);
-        const state = fakeState(audio);
-        const host = new BandHost({ state: () => state, silence: () => {} });
-        host.setScore(aThenB);
-        const timeline = compileTimeline(aThenB);
-        host.start(band, BPM, 0, { from: 0, to: timeline.bars[2].start });
-        const lapEnd = 10.1 + 4 * BAR_S;
-        const pumpTo = (from: number, to: number) => {
-            for (let i = 0; from + i * 0.025 < to - 1e-9; i++) {
-                audio.currentTime = from + i * 0.025;
-                pump(host);
-            }
-        };
-        pumpTo(10.1, lapEnd - early);
-        const before = voiceCalls();
-        audio.currentTime = lapEnd - early;
-        host.setLoop(null);
-        pumpTo(lapEnd - early, lapEnd + after);
-        return { host, timeline, lapEnd, before, calls: voiceCalls() };
-    }
-
-    it('released just inside the lookahead, no note is handed to the voices twice (#1489)', () => {
-        // The scheduler hands the voices everything that starts within the next 150 ms, so
-        // 100 ms before the lap's end the next lap's downbeat has already gone to them.
-        const { host, timeline, lapEnd, before, calls } = releaseBefore(0.1, 2 * BAR_S + BAR_S / 2);
-        const onBarline = (call: { time: number }) => Math.abs(call.time - lapEnd) < 0.03;
-        expect(before.some(onBarline)).toBe(true);
-        expect(doubled(calls)).toEqual([]);
-        // The bass plays one note at a time: one note on the lap's barline, not two.
-        expect(
-            calls.filter((call) => call.note.startsWith('bass') && onBarline(call)),
-        ).toHaveLength(1);
-        // The lap whose downbeat was sounding plays out, and then the song carries on past
-        // the loop: B's first bar, half a bar after that lap.
-        const tick = host.songTick();
-        expect(tick).not.toBeNull();
-        expect(tick!).toBeGreaterThanOrEqual(timeline.bars[2].start);
-        expect(tick!).toBeLessThan(timeline.bars[3].start);
-        host.stop();
-    });
-
-    it('released a second before the lap ends, the bar after the loop takes the barline', () => {
-        // Outside the lookahead nothing of the next lap has been scheduled, so the lap under
-        // way is the last and the song's next bar takes the barline. Nothing is doubled here
-        // either: the band itself never strikes one note twice within 20 ms.
-        const { host, timeline, lapEnd, before, calls } = releaseBefore(1, BAR_S / 2);
-        expect(before.some((call) => call.time > lapEnd - 0.05)).toBe(false);
-        expect(doubled(calls)).toEqual([]);
-        const tick = host.songTick();
-        expect(tick).not.toBeNull();
-        expect(tick!).toBeGreaterThanOrEqual(timeline.bars[2].start);
-        expect(tick!).toBeLessThan(timeline.bars[3].start);
-        host.stop();
-    });
-
-    it("on a counted chart's last section, released just inside the lookahead, the lap under way ends it", () => {
-        // The next lap's downbeat is already with the voices: that lap is the one under way,
-        // so it plays the ending and the performance stops after it, nothing struck twice.
-        for (const voice of [playDrumSound, playBassNote, playNote, playSoloNote]) {
-            vi.mocked(voice).mockClear();
-        }
-        const audio = fakeAudioContext(10);
-        const state = fakeState(audio);
-        const onEnd = vi.fn();
-        const host = new BandHost({ state: () => state, silence: () => {}, onEnd });
-        const score = { ...song([{ ...twoBars.sections[0] }]), choruses: 1 };
-        host.setScore(score);
-        const timeline = compileTimeline(score);
-        host.start(
-            { ...DEFAULT_SETTINGS, lanes: { drums: true, bass: true, comp: true, lead: true } },
-            BPM,
-            0,
-            { from: 0, to: timeline.ticks },
-        );
-        const lapEnd = 10.1 + 4 * BAR_S;
-        const pumpTo = (from: number, to: number) => {
-            for (let i = 0; from + i * 0.025 < to - 1e-9; i++) {
-                audio.currentTime = from + i * 0.025;
-                pump(host);
-            }
-        };
-        pumpTo(10.1, lapEnd - 0.1);
-        audio.currentTime = lapEnd - 0.1;
-        host.setLoop(null);
-        pumpTo(lapEnd - 0.1, lapEnd + 2 * BAR_S);
-        expect(doubled(voiceCalls())).toEqual([]);
-        expect(onEnd).not.toHaveBeenCalled();
-        audio.currentTime = lapEnd + 2 * BAR_S;
-        pump(host);
-        expect(onEnd).toHaveBeenCalledTimes(1);
-    });
-
-    it('after a stalled timer, a release near the end of the queue still carries on after the loop', () => {
-        // The timer stalled (a busy main thread, a background tab) two seconds before the
-        // release, so nothing past the lap under way was queued: the queue ends 120 ms after
-        // the release, inside the lookahead.
-        const timeline = compileTimeline(aThenB);
-        const { host, pumpTo, release } = rig(aThenB, timeline.bars[2].start);
-        const lapEnd = 10.1 + 4 * BAR_S;
-        const at = lapEnd - 0.12;
-        pumpTo(10.1, at - 2);
-        release(at);
-        pumpTo(at, lapEnd + BAR_S / 2);
-        const tick = host.songTick();
-        expect(tick).not.toBeNull();
-        expect(tick!).toBeGreaterThanOrEqual(timeline.bars[2].start);
-        expect(tick!).toBeLessThan(timeline.bars[3].start);
-        expect(doubled(voiceCalls())).toEqual([]);
-        host.stop();
-    });
-
-    it('after a stalled timer, a counted last section released in its last bar plays once more, then ends', () => {
-        const score = { ...song([{ ...twoBars.sections[0] }]), choruses: 1 };
-        const onEnd = vi.fn();
-        const { audio, pumpTo, release, tick } = rig(score, compileTimeline(score).ticks, () =>
-            onEnd(audio.currentTime),
-        );
-        const lapEnd = 10.1 + 4 * BAR_S;
-        const at = lapEnd - 0.12;
-        pumpTo(10.1, at - 2);
-        release(at);
-        // The section once more, as written: two bars after the lap under way, and no sooner.
-        pumpTo(at, lapEnd + 2 * BAR_S);
-        expect(onEnd).not.toHaveBeenCalled();
-        tick(lapEnd + 2 * BAR_S);
-        expect(onEnd).toHaveBeenCalledTimes(1);
-        expect(onEnd).toHaveBeenCalledWith(lapEnd + 2 * BAR_S);
-        expect(doubled(voiceCalls())).toEqual([]);
-    });
-
-    it('after a stalled timer, a lap that has started is under way though nothing of it was sent', () => {
-        // The next lap was queued two seconds ahead, then the timer stalled past its barline:
-        // the playhead is in that lap, so the release finishes it, as for any lap playing.
-        const timeline = compileTimeline(aThenB);
-        const { host, tick, pumpTo, release } = rig(aThenB, timeline.bars[2].start);
-        const lapEnd = 10.1 + 4 * BAR_S;
-        pumpTo(10.1, lapEnd - 1.9);
-        release(lapEnd + 0.4);
-        tick(lapEnd + 0.4);
-        // Still the lap (A's first bar), then B once it ends.
-        expect(host.songTick()!).toBeLessThan(timeline.bars[1].start);
-        pumpTo(lapEnd + 0.425, lapEnd + 2 * BAR_S + BAR_S / 2);
-        const at = host.songTick();
-        expect(at).not.toBeNull();
-        expect(at!).toBeGreaterThanOrEqual(timeline.bars[2].start);
-        expect(at!).toBeLessThan(timeline.bars[3].start);
-        host.stop();
-    });
-
-    it('after the timer stalled past the end of the queue, a release still carries on after the loop', () => {
-        // Stalled before the next lap was queued, and released after the queued lap's end:
-        // nothing is playing at the release, and the lap that was is the one it leads on from.
-        const timeline = compileTimeline(aThenB);
-        const { host, pumpTo, release } = rig(aThenB, timeline.bars[2].start);
-        const lapEnd = 10.1 + 4 * BAR_S;
-        pumpTo(10.1, lapEnd - 2.2);
-        release(lapEnd + 0.2);
-        pumpTo(lapEnd + 0.2, lapEnd + BAR_S / 2);
-        const at = host.songTick();
-        expect(at).not.toBeNull();
-        expect(at!).toBeGreaterThanOrEqual(timeline.bars[2].start);
-        expect(at!).toBeLessThan(timeline.bars[3].start);
-        host.stop();
-    });
-
-    it('a note pushed ahead of the next lap, already sent, makes that lap the one under way', () => {
-        // The band pushes the next lap's kick a few ms ahead of the barline. A pump 152 ms
-        // before the lap ends has sent it; a release a millisecond later still sees the lap's
-        // end beyond its own lookahead, but that kick is already with the voices.
-        const timeline = compileTimeline(aThenB);
-        const { host, tick, pumpTo, release } = rig(aThenB, timeline.bars[2].start);
-        const lapEnd = 10.1 + 4 * BAR_S;
-        pumpTo(10.1, 17.9);
-        tick(lapEnd - 0.152);
-        expect(voiceCalls().some((call) => call.time > lapEnd - 0.01 && call.time < lapEnd)).toBe(
-            true,
-        );
-        release(lapEnd - 0.151);
-        pumpTo(lapEnd - 0.13, lapEnd + 2 * BAR_S + BAR_S / 2);
-        expect(doubled(voiceCalls())).toEqual([]);
-        // That lap plays out, then the song carries on into B.
-        const at = host.songTick();
-        expect(at).not.toBeNull();
-        expect(at!).toBeGreaterThanOrEqual(timeline.bars[2].start);
-        expect(at!).toBeLessThan(timeline.bars[3].start);
-        host.stop();
-    });
-});
 
 /**
  * A settings change takes the new music from a barline, and leaves what comes before it alone:
@@ -1103,14 +657,14 @@ describe('BandHost a settings change near a barline', () => {
         // ahead; the change looks 150 ms ahead. The notes in between have not gone to the
         // voices yet, and must still go: a change in each timer tick of the song's first two
         // bars.
-        const { pumpTo } = rig(aThenB, null);
+        const { pumpTo } = rig(aThenB);
         pumpTo(10.1, 10.1 + 3 * BAR_S);
         const unchanged = voiceCalls();
         const missing: string[] = [];
         let inBetween = 0;
         for (let i = 0; i < (2 * BAR_S) / 0.025; i++) {
             const at = 10.1 + i * 0.025 + 0.024;
-            const { audio, host, pumpTo } = rig(aThenB, null);
+            const { audio, host, pumpTo } = rig(aThenB);
             pumpTo(10.1, at);
             audio.currentTime = at;
             host.update(changed);
@@ -1141,12 +695,10 @@ describe('BandHost a settings change near a barline', () => {
     it('a bar whose pushed downbeat is already sent plays on as it was; the change follows it', () => {
         // The band pushes a downbeat a few ms ahead of its barline, so a pump 150 ms before the
         // barline (or 152 ms, a millisecond before the change) has sent it, while the change
-        // still sees the barline beyond its own lookahead. On the next lap's barline, too: that
-        // lap is under way, and is not dropped and rebuilt under its own downbeat.
-        const timeline = compileTimeline(aThenB);
-        const loopTo = timeline.bars[2].start;
+        // still sees the barline beyond its own lookahead. On the next pass's barline, too: that
+        // pass is under way, and is not dropped and rebuilt under its own downbeat.
         const lapEnd = 10.1 + 4 * BAR_S;
-        const { pumpTo } = rig(aThenB, loopTo);
+        const { pumpTo } = rig(aThenB);
         pumpTo(10.1, lapEnd + 2 * BAR_S);
         const unchanged = voiceCalls();
         const inBar = (calls: { note: string; time: number }[], from: number) =>
@@ -1156,7 +708,7 @@ describe('BandHost a settings change near a barline', () => {
                 [barline - 0.15, barline - 0.15],
                 [barline - 0.152, barline - 0.151],
             ]) {
-                const { audio, host, tick, pumpTo } = rig(aThenB, loopTo);
+                const { audio, host, tick, pumpTo } = rig(aThenB);
                 pumpTo(10.1, pumpAt);
                 tick(pumpAt);
                 const onBarline = (call: { time: number }) => Math.abs(call.time - barline) < 0.03;
@@ -1180,625 +732,23 @@ describe('BandHost a settings change near a barline', () => {
     });
 
     it('a pass queued ahead and rebuilt keeps its number', () => {
-        // The next lap or pass is queued two seconds before the one playing ends; a change or a
-        // loop release a second before the end drops it and builds it again. Its pass number
-        // is its time through, which picks its variation: the passes heard still count 0, 1,
-        // 2, 3.
-        const loopA = compileTimeline(aThenB).bars[2].start;
-        const counted = { ...song([{ ...twoBars.sections[0] }]), choruses: 1 };
-        const cases: {
-            score: SemanticScore;
-            loopTo: number | null;
-            segmentS: number;
-            release: boolean;
-            change: boolean;
-            ends: boolean;
-        }[] = [
-            {
-                score: aThenB,
-                loopTo: loopA,
-                segmentS: 2 * BAR_S,
-                release: false,
-                change: true,
-                ends: false,
-            },
-            {
-                score: aThenB,
-                loopTo: null,
-                segmentS: 4 * BAR_S,
-                release: false,
-                change: true,
-                ends: false,
-            },
-            // Released in its second lap, the loop carries on into B's two bars, then the song:
-            // with a change, and without one.
-            {
-                score: aThenB,
-                loopTo: loopA,
-                segmentS: 2 * BAR_S,
-                release: true,
-                change: true,
-                ends: false,
-            },
-            {
-                score: aThenB,
-                loopTo: loopA,
-                segmentS: 2 * BAR_S,
-                release: true,
-                change: false,
-                ends: false,
-            },
-            // A loop on a counted chart's last section, released in its last bar: the section
-            // plays once more in place of the next lap, and ends.
-            {
-                score: counted,
-                loopTo: compileTimeline(counted).ticks,
-                segmentS: 2 * BAR_S,
-                release: true,
-                change: false,
-                ends: true,
-            },
-        ];
-        for (const { score, loopTo, segmentS, release, change, ends } of cases) {
-            const { audio, host, pumpTo, release: releaseAt } = rig(score, loopTo);
-            const segments = watchSegments(host) as () => (Queued & {
-                pass: number;
-                cursor: number;
-            })[];
-            const end = 10.1 + 2 * segmentS;
-            pumpTo(10.1, end - 1);
-            if (release) {
-                releaseAt(end - 1);
-            }
-            if (change) {
-                audio.currentTime = end - 1;
-                host.update(changed);
-            }
-            pumpTo(end - 1, end + 4 * BAR_S + 0.5);
-            const heard = segments().filter((segment) => segment.cursor > 0);
-            expect(heard.map((segment) => segment.pass)).toEqual(heard.map((_, i) => i));
-            if (ends) {
-                expect(host.playing).toBe(false);
-                expect(heard).toHaveLength(3);
-            } else {
-                expect(heard.length).toBeGreaterThanOrEqual(4);
-            }
-            host.stop();
-        }
-    });
-});
-
-/**
- * A practice loop released into a bar with another chord (#1507). The lap's last bar may push
- * the loop's top chord across the wrap, tied into the next lap's first eighth; released, the
- * song carries on under a different chord, and that bar's downbeat must be struck, not treated
- * as tied in to a chord it does not play. Released before that last bar is under way, the lap
- * rebuilds it to push the chord the song goes to instead (#1517).
- */
-describe('BandHost releasing a loop into another chord', () => {
-    const BPM = 120;
-    /** 4/4 at 120: two seconds a bar. */
-    const BAR_S = 2;
-    /** A loop on A (`C | Am | Dm | G7`, its G7 pushing the C at its top), released into B's F. */
-    const chart = song(
-        [
-            ['A', ['C', 'Am', 'Dm', 'G7']],
-            ['B', ['F', 'F', 'G7', 'C']],
-        ].map(([label, symbols]) => ({
-            id: label as string,
-            label: label as string,
-            repeat: 1,
-            measures: (symbols as string[]).map((s, i) => bar(`${label}${i}`, [chord(s, 4)])),
-        })),
-    );
-
-    it('the comp strikes the downbeat of the bar after the loop, in every style whose lap pushed into the wrap', () => {
-        const timeline = compileTimeline(chart);
-        const after = timeline.bars[4];
-        const problems: string[] = [];
-        const pushedBy = new Set<string>();
-        let struck = 0;
-        for (const style of STYLE_IDS) {
-            // The organ never pushes across a loop's wrap (#1488): a struck keyboard and a guitar.
-            for (const comp of ['piano', 'guitar'] as const) {
-                for (const seed of ['a', 'b', 'c', 'd', 'e', 'f']) {
-                    const audio = fakeAudioContext(10);
-                    const state = fakeState(audio);
-                    const host = new BandHost({ state: () => state, silence: () => {} });
-                    host.setScore(chart);
-                    const segments = watchSegments(host);
-                    host.start({ ...DEFAULT_SETTINGS, style, comp, seed }, BPM, 0, {
-                        from: 0,
-                        to: after.start,
-                    });
-                    // Laps are four bars (eight seconds) from 10.1 s: release in the second's
-                    // last bar, under way, so it plays on as it was, push and all. (Released
-                    // before it, the lap rebuilds that bar to lead into the song: #1517.)
-                    run(host, audio, 10.1, 10.1 + 7.5 * BAR_S);
-                    host.setLoop(null);
-                    run(host, audio, 10.1 + 7.5 * BAR_S, 10.1 + 10 * BAR_S);
-                    host.stop();
-                    const queued = segments();
-                    const into = queued.findIndex((s) => s.window.from === after.index);
-                    expect(into, `${style}/${comp}/${seed}: the song carries on`).toBeGreaterThan(
-                        0,
-                    );
-                    // The lap's last bar rang a chord over the wrap: a push toward the loop's top.
-                    const pushed = queued[into - 1].events.some(
-                        (e) =>
-                            e.lane === 'comp' &&
-                            !e.muted &&
-                            e.bar === after.index - 1 &&
-                            e.tick + e.dur > after.start,
-                    );
-                    if (!pushed) {
-                        continue;
-                    }
-                    pushedBy.add(style);
-                    // What the bar plays arrived at with nothing tied into it: the same pass,
-                    // from the same memory, less the push that was aimed at the loop's top.
-                    const song = queued[into] as Queued & {
-                        pass: number;
-                        until: number;
-                        looping: boolean;
-                        window: PassWindow;
-                        memoryBefore: PassMemory;
-                    };
-                    const memory = song.memoryBefore;
-                    const unpushed = performPass(
-                        timeline,
-                        { ...DEFAULT_SETTINGS, style, comp, seed },
-                        {
-                            pass: song.pass,
-                            looping: song.looping,
-                            window: song.window,
-                            until: song.until,
-                            memory: {
-                                ...memory,
-                                comp: { ...(memory.comp as object), pushed: null },
-                            },
-                        },
-                    );
-                    const where = `${style}/${comp}/${seed}`;
-                    const firstBar = (events: BandEvent[]) =>
-                        JSON.stringify(
-                            events.filter((e) => e.lane === 'comp' && e.bar === after.index),
-                        );
-                    if (firstBar(song.events) !== firstBar(unpushed.events)) {
-                        problems.push(`${where}: the bar plays as if the C were tied into it`);
-                    }
-                    // So where the figure strikes the downbeat, F is struck there, with its A —
-                    // the chord the bar plays, not the C the push was aimed at.
-                    const downbeat = (events: BandEvent[]) =>
-                        events.some(
-                            (e) =>
-                                e.lane === 'comp' &&
-                                !e.muted &&
-                                e.tick === after.start &&
-                                e.midi % 12 === 9,
-                        );
-                    if (downbeat(unpushed.events)) {
-                        struck++;
-                        if (!downbeat(song.events)) {
-                            problems.push(`${where}: no F on the downbeat`);
-                        }
-                    }
-                }
-            }
-        }
-        // Not vacuous: most of the styles push across the wrap in some take, and in plenty of
-        // those the bar's own figure strikes its downbeat.
-        expect(pushedBy.size).toBeGreaterThanOrEqual(5);
-        expect(struck).toBeGreaterThanOrEqual(10);
-        expect(problems).toEqual([]);
-    });
-
-    type Lap = Queued & {
-        start: number;
-        released?: number | 'again';
-        memoryAfter: PassMemory;
-    };
-    /** The chord (its symbol) a lap's last bar pushed over its end, or null (#1507). */
-    const pushOf = (lap: Lap) => (lap.memoryAfter.comp as { pushed: string | null }).pushed;
-    /** The last bass note a lap plays in bar `index`. */
-    const lastBass = (lap: Lap, index: number) =>
-        lap.events.flatMap((e) => (e.lane === 'bass' && e.bar === index ? [e.midi] : [])).at(-1);
-    /** Is `midi` a half or whole step from pitch class `pc`: an approach to it? */
-    const stepsTo = (midi: number | undefined, pc: number) => {
-        const d = midi === undefined ? 0 : (((midi - pc) % 12) + 12) % 12;
-        return d === 1 || d === 2 || d === 10 || d === 11;
-    };
-
-    /** The comp's notes handed to its voice, struck (not scratched): when, until when, and pitch. */
-    function compNotes(): { time: number; end: number; midi: number }[] {
-        return vi
-            .mocked(playNote)
-            .mock.calls.filter(([, , , , options]) => !options?.muted)
-            .map(([, freq, time, length]) => ({
-                time,
-                end: time + length,
-                midi: Math.round(69 + 12 * Math.log2(freq / 440)),
-            }));
-    }
-
-    /**
-     * A loop on `score` with `settings` — on bars `[from, to)`, A by default — released at audio
-     * time `at` (or never, with null), and played on to `end`: by default 38.1 s, two bars past
-     * the end of A's third lap, the latest a release here can lead from. Laps start at 10.1 s.
-     */
-    function releasedAt(
-        score: SemanticScore,
-        settings: BandSettings,
-        at: number | null,
-        {
-            onEnd,
-            loop = [0, 4],
-            end = 10.1 + 14 * BAR_S,
-        }: { onEnd?: (time: number) => void; loop?: [number, number]; end?: number } = {},
-    ) {
-        let now = () => 0;
-        const { bars } = compileTimeline(score);
-        const { audio, host, pumpTo, release } = rig(
-            score,
-            { from: bars[loop[0]].start, to: bars[loop[1]].start },
-            () => onEnd?.(now()),
-            settings,
-        );
-        now = () => audio.currentTime;
-        const segments = watchSegments(host) as () => Lap[];
-        if (at === null) {
-            pumpTo(10.1, end);
-        } else {
-            pumpTo(10.1, at);
-            release(at);
-            pumpTo(at, end);
-        }
+        // The next pass is queued two seconds before the one playing ends; a change a second
+        // before the end drops it and builds it again. Its pass number is its time through,
+        // which picks its variation: the passes heard still count 0, 1, 2, 3.
+        const { audio, host, pumpTo } = rig(aThenB);
+        const segments = watchSegments(host) as () => (Queued & {
+            pass: number;
+            cursor: number;
+        })[];
+        const end = 10.1 + 2 * 4 * BAR_S;
+        pumpTo(10.1, end - 1);
+        audio.currentTime = end - 1;
+        host.update(changed);
+        pumpTo(end - 1, end + 4 * BAR_S + 0.5);
+        const heard = segments().filter((segment) => segment.cursor > 0);
+        expect(heard.map((segment) => segment.pass)).toEqual(heard.map((_, i) => i));
+        expect(heard.length).toBeGreaterThanOrEqual(3);
         host.stop();
-        return { segments: segments(), notes: compNotes(), calls: voiceCalls() };
-    }
-
-    it("released before its last bar is under way, the lap's last bar aims at the bar the song goes to (#1517)", () => {
-        // The second lap runs 18.1–26.1 s. Released in its first bar, in its second, or a
-        // moment before its last bar comes into the scheduler's lookahead, the lap still has
-        // that bar to rebuild; released in its last 150 ms, the next lap's downbeat is already
-        // with the voices, so that lap is the one under way, and it is that lap which leads
-        // into the song (#1489).
-        const lap = 10.1 + 4 * BAR_S;
-        const phases = [lap + 0.3, lap + 1.5 * BAR_S, lap + 3 * BAR_S - 0.2, lap + 4 * BAR_S - 0.1];
-        const problems: string[] = [];
-        const styles = new Set<string>();
-        let aimedAtTop = 0;
-        let aimedOn = 0;
-        const walks = { held: { C: 0, F: 0 }, released: { C: 0, F: 0 } };
-        for (const style of STYLE_IDS) {
-            for (const comp of ['piano', 'guitar', 'organ'] as const) {
-                for (const seed of ['a', 'b', 'c', 'd']) {
-                    const settings = { ...DEFAULT_SETTINGS, style, comp, seed };
-                    const held = releasedAt(chart, settings, null);
-                    for (const at of phases) {
-                        const where = `${style}/${comp}/${seed} released at ${at.toFixed(2)}`;
-                        const { segments, notes, calls } = releasedAt(chart, settings, at);
-                        const leads = segments.find((s) => s.released !== undefined);
-                        if (!leads) {
-                            problems.push(`${where}: no lap leads into the song`);
-                            continue;
-                        }
-                        const seam = leads.start + 4 * BAR_S;
-                        // Without the release, the same lap pushes the C at the loop's top.
-                        const twin = held.segments.find(
-                            (s) => Math.abs(s.start - leads.start) < 1e-9,
-                        );
-                        if (twin && pushOf(twin) === 'C') {
-                            aimedAtTop++;
-                        }
-                        // And its bass steps into the C; released, into the F.
-                        if (twin) {
-                            walks.held.C += stepsTo(lastBass(twin, 3), 0) ? 1 : 0;
-                            walks.held.F += stepsTo(lastBass(twin, 3), 5) ? 1 : 0;
-                        }
-                        walks.released.C += stepsTo(lastBass(leads, 3), 0) ? 1 : 0;
-                        walks.released.F += stepsTo(lastBass(leads, 3), 5) ? 1 : 0;
-                        const pushed = pushOf(leads);
-                        if (pushed === 'F') {
-                            aimedOn++;
-                            styles.add(style);
-                        } else if (pushed !== null) {
-                            problems.push(`${where}: the lap's last bar pushes ${pushed}`);
-                        }
-                        // What the voice was handed: nothing rings over the seam but a push of
-                        // the F the song goes to, with F's third.
-                        const over = notes.filter(
-                            (n) => n.time < seam - 0.01 && n.end > seam + 0.06,
-                        );
-                        if (over.length && pushed !== 'F') {
-                            problems.push(`${where}: a chord rings over the seam unpushed`);
-                        }
-                        if (over.length && !over.some((n) => n.midi % 12 === 9)) {
-                            problems.push(`${where}: what rings over the seam has no A`);
-                        }
-                        if (comp === 'organ' && !STYLES[style].comp.keyboard.percussive) {
-                            // The organ presses the F on its downbeat and holds it: a push
-                            // tied into the next segment would ring an eighth and stop (#1488).
-                            const pressed = notes.some(
-                                (n) => Math.abs(n.time - seam) < 0.05 && n.end > seam + 0.3,
-                            );
-                            if (!pressed) {
-                                problems.push(`${where}: the organ does not press the F`);
-                            }
-                        }
-                        // Everything before the barline the lap is rebuilt from is as it was.
-                        const barline = 10.1 + Math.ceil((at + 0.15 - 10.1) / BAR_S) * BAR_S - 0.05;
-                        const before = (c: { time: number }) => c.time < barline;
-                        if (
-                            JSON.stringify(calls.filter(before)) !==
-                            JSON.stringify(held.calls.filter(before))
-                        ) {
-                            problems.push(`${where}: a note before the rebuilt bars changed`);
-                        }
-                        if (doubled(calls).length) {
-                            problems.push(`${where}: a note doubled`);
-                        }
-                    }
-                }
-            }
-        }
-        // Not vacuous: unreleased, the lap pushes the loop's top in many takes, and released,
-        // in many takes across most of the styles it pushes the F instead.
-        expect(aimedAtTop).toBeGreaterThanOrEqual(40);
-        expect(aimedOn).toBeGreaterThanOrEqual(40);
-        expect(styles.size).toBeGreaterThanOrEqual(6);
-        expect(problems).toEqual([]);
-        // The bass's last note, a step from the next root, turns from the C to the F. (Some of
-        // G7's own tones are a step from both, so a measure over every take, by a clear margin.)
-        expect(walks.released.F - walks.held.F).toBeGreaterThanOrEqual(50);
-        expect(walks.held.C - walks.released.C).toBeGreaterThanOrEqual(100);
-    });
-
-    it('released into a section the comp sits out, the lap pushes nothing into it', () => {
-        // B marked chords-out: the comp never pushes into a bar it sits out, so the lap that
-        // leads into B lands its last chord in its own bar, where unreleased it pushes the C.
-        const tacet: SemanticScore = {
-            ...chart,
-            sections: [chart.sections[0], { ...chart.sections[1], instruments: { chords: false } }],
-        };
-        const problems: string[] = [];
-        let aimedAtTop = 0;
-        for (const style of STYLE_IDS) {
-            for (const comp of ['piano', 'guitar'] as const) {
-                for (const seed of ['a', 'b', 'c', 'd', 'e', 'f']) {
-                    const settings = { ...DEFAULT_SETTINGS, style, comp, seed };
-                    const where = `${style}/${comp}/${seed}`;
-                    const at = 10.1 + 4 * BAR_S + 0.3;
-                    const held = releasedAt(tacet, settings, null);
-                    const { segments, notes } = releasedAt(tacet, settings, at);
-                    const leads = segments.find((s) => s.released !== undefined)!;
-                    const twin = held.segments.find((s) => Math.abs(s.start - leads.start) < 1e-9);
-                    if (twin && pushOf(twin) === 'C') {
-                        aimedAtTop++;
-                    }
-                    const seam = leads.start + 4 * BAR_S;
-                    if (
-                        pushOf(leads) !== null ||
-                        notes.some((n) => n.time < seam - 0.01 && n.end > seam + 0.06)
-                    ) {
-                        problems.push(`${where}: the lap pushes ${pushOf(leads)} into B`);
-                    }
-                }
-            }
-        }
-        // Not vacuous: unreleased, the lap pushes the loop's top in plenty of takes.
-        expect(aimedAtTop).toBeGreaterThanOrEqual(15);
-        expect(problems).toEqual([]);
-    });
-
-    it('on a counted chart, the lap leads into the next section, which then ends the performance', () => {
-        // Played once (`choruses: 1`): A looped, released early in its second lap. The lap
-        // pushes the F, B follows, and the performance ends on B's last barline, no sooner.
-        const counted = { ...chart, choruses: 1 };
-        const lapEnd = 10.1 + 8 * BAR_S;
-        const problems: string[] = [];
-        let aimedOn = 0;
-        for (const style of STYLE_IDS) {
-            for (const seed of ['a', 'b', 'c']) {
-                const where = `${style}/${seed}`;
-                const ended: number[] = [];
-                const settings = { ...DEFAULT_SETTINGS, style, comp: 'piano' as const, seed };
-                const { segments, calls } = releasedAt(counted, settings, lapEnd - 6.5, {
-                    onEnd: (time) => ended.push(time),
-                });
-                const leads = segments.find((s) => s.released !== undefined);
-                if (leads && pushOf(leads) === 'F') {
-                    aimedOn++;
-                } else if (leads && pushOf(leads) !== null) {
-                    problems.push(`${where}: the lap pushes ${pushOf(leads)}`);
-                }
-                // B follows the lap, and the band stops on its last barline, four bars on.
-                const end = lapEnd + 4 * BAR_S;
-                if (
-                    ended.length !== 1 ||
-                    ended[0] < end - 1e-9 ||
-                    ended[0] > end + 0.03 ||
-                    calls.some((c) => c.time > end + 0.05)
-                ) {
-                    problems.push(`${where}: does not end after B`);
-                }
-                if (doubled(calls).length) {
-                    problems.push(`${where}: a note doubled`);
-                }
-            }
-        }
-        expect(aimedOn).toBeGreaterThanOrEqual(5);
-        expect(problems).toEqual([]);
-    });
-
-    /** `C | Am | Dm | G7` twice, played once: the second time ends on a G7 held as the tonic. */
-    const twice: SemanticScore = {
-        ...chart,
-        sections: [
-            chart.sections[0],
-            {
-                ...chart.sections[0],
-                id: 'B',
-                label: 'B',
-                measures: chart.sections[0].measures.map((m, i) => ({ ...m, id: `B${i}` })),
-            },
-        ],
-        choruses: 1,
-    };
-
-    it('on a counted chart, a lap released into the held ending pushes nothing over it, and its bass heads for the chord held', () => {
-        // The loop is B's first three bars; the bar after it is the performance's last, a G7 the
-        // band resolves and holds as the tonic (`arrange/ending.ts`). The final chord lands on
-        // its downbeat, never early, so the lap pushes nothing into it, and its bass heads for
-        // the C held, as it does into the C at its own top, not for the G7 as written. Laps
-        // are three bars (six seconds) from 10.1 s: released early in the second.
-        const problems: string[] = [];
-        let pushedAtTop = 0;
-        let heldToG = 0;
-        let releasedToG = 0;
-        for (const style of STYLE_IDS) {
-            for (const comp of ['piano', 'guitar'] as const) {
-                for (const seed of ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']) {
-                    const where = `${style}/${comp}/${seed}`;
-                    const settings = { ...DEFAULT_SETTINGS, style, comp, seed };
-                    const options = { loop: [4, 7] as [number, number], end: 28 };
-                    const held = releasedAt(twice, settings, null, options);
-                    const { segments, notes } = releasedAt(twice, settings, 16.4, options);
-                    const leads = segments.find((s) => s.released !== undefined)!;
-                    const twin = held.segments.find((s) => Math.abs(s.start - leads.start) < 1e-9)!;
-                    const seam = leads.start + 3 * BAR_S;
-                    if (pushOf(twin) !== null) {
-                        pushedAtTop++;
-                    }
-                    if (pushOf(leads) !== null) {
-                        problems.push(`${where}: the lap pushes ${pushOf(leads)} into the ending`);
-                    }
-                    if (notes.some((n) => n.time < seam - 0.01 && n.end > seam + 0.06)) {
-                        problems.push(`${where}: a chord rings over the ending's downbeat`);
-                    }
-                    if (!notes.some((n) => Math.abs(n.time - seam) < 0.05)) {
-                        problems.push(`${where}: the final chord is not struck on its downbeat`);
-                    }
-                    heldToG += stepsTo(lastBass(twin, 6), 7) ? 1 : 0;
-                    releasedToG += stepsTo(lastBass(leads, 6), 7) ? 1 : 0;
-                }
-            }
-        }
-        // Not vacuous: unreleased, the lap pushes the C at its top in some takes.
-        expect(pushedAtTop).toBeGreaterThanOrEqual(5);
-        expect(problems).toEqual([]);
-        // The bass steps toward G (the written G7) no more often than when it wraps to the C.
-        expect(releasedToG).toBeLessThanOrEqual(heldToG + 10);
-    });
-
-    it('on a counted chart traded with the drummer, the lap leads into the bar as the chorus it carries on in plays it', () => {
-        // Three choruses of A and B, the soloist's place traded with the drummer in turns of
-        // four bars or eight. A looped in the head (chorus 0) or under a traded chorus (chorus
-        // 1), then released in its first lap or its second: the lap leads into that chorus's B,
-        // whatever lap it was. Where the bass plays that bar, the lap's walk steps into its F;
-        // where the drummer has it alone, the lap pushes nothing into it.
-        const three = { ...chart, choruses: 3 };
-        const problems: string[] = [];
-        let alone = 0;
-        let walkedGroups = 0;
-        for (const bars of [4, 8] as const) {
-            for (const [from, at] of [0, 8].flatMap((f) => [10.4, 18.4].map((t) => [f, t]))) {
-                let walked = 0;
-                let toF = 0;
-                const group = `turns of ${bars}, chorus ${from / 8}, released at ${at}`;
-                for (const comp of ['piano', 'guitar'] as const) {
-                    for (let s = 0; s < 16; s++) {
-                        const where = `${group}, ${comp}/${s}`;
-                        const settings = {
-                            ...DEFAULT_SETTINGS,
-                            style: 'jazz' as const,
-                            comp,
-                            seed: `s${s}`,
-                            trade: { with: 'drums' as const, bars, choruses: null },
-                        };
-                        const { segments } = releasedAt(three, settings, at, {
-                            loop: [from, from + 4],
-                            end: 32,
-                        });
-                        const leads = segments.find((seg) => seg.released !== undefined)!;
-                        const next = segments.find(
-                            (seg) => seg !== leads && seg.window.from === from + 4,
-                        )!;
-                        const band = next.events.some(
-                            (e) => (e.lane === 'bass' || e.lane === 'comp') && e.bar === from + 4,
-                        );
-                        if (!band) {
-                            alone++;
-                            if (pushOf(leads) !== null) {
-                                problems.push(`${where}: pushes into the drummer's turn`);
-                            }
-                            continue;
-                        }
-                        walked++;
-                        toF += stepsTo(lastBass(leads, from + 3), 5) ? 1 : 0;
-                    }
-                }
-                if (walked) {
-                    walkedGroups++;
-                    if (toF < walked * 0.75) {
-                        problems.push(`${group}: the bass steps to F in ${toF} of ${walked}`);
-                    }
-                }
-            }
-        }
-        // Not vacuous: one of them leads into the drummer's turn, the others into the band.
-        expect(alone).toBeGreaterThanOrEqual(16);
-        expect(walkedGroups).toBeGreaterThanOrEqual(3);
-        expect(problems).toEqual([]);
-    });
-
-    it("released once the lap's last bar is under way, the lap plays on as it was", () => {
-        // Its last bar's first notes are with the voices (#1499): released as that bar comes
-        // into the lookahead, in its middle, and after its push of the C is already sent. The
-        // lap ends as it would have looped, and the song carries on after it, nothing twice.
-        const lapEnd = 10.1 + 8 * BAR_S;
-        const lastBar = lapEnd - BAR_S;
-        const phases = [lastBar - 0.14, lastBar + BAR_S / 2, lapEnd - 0.3];
-        const problems: string[] = [];
-        let pushSent = 0;
-        for (const style of STYLE_IDS) {
-            for (const comp of ['piano', 'guitar'] as const) {
-                for (const seed of ['a', 'b', 'c']) {
-                    const settings = { ...DEFAULT_SETTINGS, style, comp, seed };
-                    const held = releasedAt(chart, settings, null);
-                    for (const at of phases) {
-                        const where = `${style}/${comp}/${seed} released at ${at.toFixed(2)}`;
-                        const { segments, notes, calls } = releasedAt(chart, settings, at);
-                        const leads = segments.find((s) => s.released !== undefined);
-                        if (!leads || Math.abs(leads.start - (lapEnd - 4 * BAR_S)) > 1e-9) {
-                            problems.push(`${where}: the lap under way does not lead on`);
-                            continue;
-                        }
-                        const before = (c: { time: number }) => c.time < lapEnd - 0.03;
-                        if (
-                            JSON.stringify(calls.filter(before)) !==
-                            JSON.stringify(held.calls.filter(before))
-                        ) {
-                            problems.push(`${where}: the lap changed`);
-                        }
-                        if (
-                            pushOf(leads) === 'C' &&
-                            notes.some((n) => n.time < at + 0.15 - 0.025 && n.end > lapEnd + 0.06)
-                        ) {
-                            pushSent++;
-                        }
-                        if (doubled(calls).length) {
-                            problems.push(`${where}: a note doubled`);
-                        }
-                        if (!segments.some((s) => s.window.from === 4)) {
-                            problems.push(`${where}: the song does not carry on`);
-                        }
-                    }
-                }
-            }
-        }
-        expect(pushSent).toBeGreaterThanOrEqual(10);
-        expect(problems).toEqual([]);
     });
 });
 
@@ -1841,3 +791,50 @@ function noteOnTicks(bytes: Uint8Array): number[] {
     }
     return out;
 }
+
+describe('a style change in the last phrase of a counted song (#1482)', () => {
+    it('ends the lead on the chord the new style resolves to', () => {
+        // Rock ends on the triad, jazz on a sixth chord. The lead planned its last phrase
+        // against rock's ending; changed to jazz in the bar before, it is planned again for
+        // the chord the band now holds, and ends as a band that played jazz all along does.
+        const score = {
+            ...song([
+                {
+                    id: 'a',
+                    label: 'A',
+                    repeat: 1,
+                    measures: [
+                        bar('a1', [chord('C', 4)]),
+                        bar('a2', [chord('Am7', 4)]),
+                        bar('a3', [chord('Fmaj7', 4)]),
+                        bar('a4', [chord('Dm7', 2), chord('G7', 2)]),
+                    ],
+                },
+            ]),
+            choruses: 1,
+        };
+        const withLead = (style: BandSettings['style']): BandSettings => ({
+            ...wholeBand,
+            lanes: { drums: true, bass: true, comp: true, lead: true },
+            style,
+        });
+        const change = 10.1 + 2.5 * 2;
+        const lastBar = (from: BandSettings['style']) => {
+            const { audio, host, pumpTo } = rig(score, undefined, withLead(from));
+            pumpTo(10.1, change);
+            audio.currentTime = change;
+            host.update(withLead('jazz'));
+            pumpTo(change + 0.025, 10.1 + 4 * 2);
+            const { segments } = host as unknown as { segments: { events: BandEvent[] }[] };
+            const lead = segments.flatMap((segment) =>
+                segment.events.flatMap((e) =>
+                    e.lane === 'lead' && e.bar === 3 && !e.muted ? [e.midi % 12] : [],
+                ),
+            );
+            host.stop();
+            return lead;
+        };
+        expect(lastBar('rock')).toEqual(lastBar('jazz'));
+        expect(lastBar('rock')).not.toEqual([]);
+    });
+});

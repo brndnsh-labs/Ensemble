@@ -19,7 +19,7 @@ async function observePointer(page: Page) {
     await page.addInitScript(() => {
         const evidence = { armed: false, current: [] as string[] };
         window.__chorusEvidence = evidence;
-        // Read the mutation RECORDS, not the DOM (as `semantic-playback.spec.ts` does): a
+        // Read the mutation RECORDS, not the DOM: a
         // starved tab can batch two transitions, and only the records keep both.
         new MutationObserver((records) => {
             if (!evidence.armed) {

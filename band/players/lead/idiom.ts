@@ -1039,9 +1039,8 @@ export function leadIdiom(book: LeadBook): PitchedIdiom {
             // A trade's turn is keyed by its shape too, so changing the trade mid-turn replans
             // it rather than keeping a plan made for another length (or for a solo chorus).
             // And a pass that ends on a resolved tonic keys its slots by that chord: a phrase
-            // planned while the pass looped (a practice loop released on the last section, its
-            // lap regenerated from a barline as the ending) or under another style's ending is
-            // replanned against the chord the band now holds, not kept against the written one.
+            // planned under another style's ending is replanned against the chord the band now
+            // holds, not kept against the old one.
             // Keyed by where the held chord arrives too: `G7 C` and `G7:3 C:1` hold the same C
             // from different beats, and a plan landing on one is not the other's.
             const held = ctx.ending?.spans.filter((span) => span.chord).at(-1);

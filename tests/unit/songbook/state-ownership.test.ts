@@ -23,7 +23,6 @@ describe('Songbook state ownership manifest (#1044)', () => {
         expect(STATE_OWNERSHIP_MANIFEST.arranger.stepMap).toBe('runtime-derived');
         expect(STATE_OWNERSHIP_MANIFEST.arranger.history).toBe('runtime-derived');
         expect(STATE_OWNERSHIP_MANIFEST.playback.step).toBe('runtime-derived');
-        expect(STATE_OWNERSHIP_MANIFEST.playback.loopStartStep).toBe('runtime-derived');
         expect(STATE_OWNERSHIP_MANIFEST.playback.audioGraph).toBe('runtime-derived');
         expect(STATE_OWNERSHIP_MANIFEST.groove.sectionSeedMap).toBe('runtime-derived');
         expect(STATE_OWNERSHIP_MANIFEST.groove.buffer).toBe('runtime-derived');

@@ -490,7 +490,7 @@ describe('Drum Synthesis', () => {
         );
     });
 
-    it('mixes cymbals from folded per-section participation, not global lane flags', () => {
+    it('mixes cymbals from per-section participation, not global lane flags', () => {
         const sections = [
             {
                 id: 'full',
@@ -517,12 +517,7 @@ describe('Drum Synthesis', () => {
             soloist: makeSoloistMock({ enabled: false }),
         };
         const forcedSparseState = {
-            playback: {
-                bandIntensity: 0.7,
-                step: 32,
-                loopStartStep: 16,
-                loopEndStep: 32,
-            },
+            playback: { bandIntensity: 0.7, step: 16 },
             arranger,
             bass: { enabled: true },
             chords: { enabled: true },
@@ -530,9 +525,9 @@ describe('Drum Synthesis', () => {
         };
 
         const crowded = getCymbalMixScale(forcedFullState, 'Crash', 0);
-        const sparseOnSecondPracticePass = getCymbalMixScale(forcedSparseState, 'Crash', 32);
+        const sparse = getCymbalMixScale(forcedSparseState, 'Crash', 16);
 
-        expect(crowded).toBeLessThan(sparseOnSecondPracticePass);
+        expect(crowded).toBeLessThan(sparse);
     });
 
     it('should keep ride and crash present even in crowded high-intensity sections', () => {

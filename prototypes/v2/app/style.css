@@ -26,7 +26,6 @@
     --bar-line-strong: light-dark(#788172, #8a9389);
     --bar-number: light-dark(#91978a, #8e958b);
     --bar-current: light-dark(#e6eadb, #263a2e);
-    --bar-looped: light-dark(#edf0e630, #2a3a3080);
     --bar-repeat-ink: light-dark(#53644c, #b9c8b3);
     /* Following's next-bar cue (#1458) — a blue outline, so it never reads as the green
        playing highlight (`--green`) or the orange edit-selection ring (`--accent`); "soon"
@@ -832,11 +831,9 @@ html [hidden] {
     /* A named section (#1374) reads as a tag; a lone letter still sits in the 24px square. */
     padding: 0 4px;
     cursor: pointer;
-    /* #1211 — long-press target. `manipulation`, NOT `none`: the chart is scrolled
-       with a thumb and this badge sits at the top-left of every section, so opting
-       out of browser panning here would swallow a drag that merely started on it.
-       A touch that turns into a scroll fires `pointercancel`, which the button's
-       handler uses to abandon the press timer. */
+    /* `manipulation`, NOT `none`: the chart is scrolled with a thumb and this badge
+       sits at the top-left of every section, so opting out of browser panning here
+       would swallow a drag that merely started on it. */
     touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
 }
@@ -854,24 +851,6 @@ html [hidden] {
     background: var(--accent-light);
     padding: 4px 8px;
     border-radius: 4px;
-}
-.section-loop {
-    font-size: 10px;
-    color: var(--muted);
-    margin-left: auto;
-    padding: 4px 8px;
-    display: flex;
-    gap: 4px;
-    align-items: center;
-    border-radius: 5px;
-}
-.section-loop svg {
-    height: 13px;
-    width: 13px;
-}
-.section-loop.active {
-    background: var(--green-light);
-    color: var(--green);
 }
 .bars {
     display: grid;
@@ -925,9 +904,6 @@ html [hidden] {
 }
 .bar.current .bar-number {
     color: var(--green);
-}
-.bar.looped {
-    background: var(--bar-looped);
 }
 .bar.repeat .chord {
     font-family: Georgia, serif;
@@ -1659,10 +1635,6 @@ dialog textarea {
         min-width: 22px;
         height: 21px;
     }
-    .section-loop {
-        font-size: 10px;
-        padding: 3px 5px;
-    }
     .bars {
         grid-template-columns: repeat(2, minmax(0, 1fr));
         row-gap: 9px;
@@ -1905,7 +1877,7 @@ dialog textarea {
     box-shadow: inset 0 -3px var(--green);
 }
 /* Following's next-bar cue (#1458): a quiet outline, not a fill, so it reads as "coming up"
-   rather than "playing now" even where it lands on the same bar as `.active` (a one-bar loop).
+   rather than "playing now" even where it lands on the same bar as `.active` (a one-bar chart).
    `data-next="soon"` (the playing bar's last felt pulse) thickens and darkens the same outline —
    ordinary React state (`nextSoon`, `app/ensemble.tsx`), edge-triggered off a 60ms poll of the
    engine so it flips only twice a bar, not a DOM write bypassing React. */
@@ -1916,7 +1888,7 @@ dialog textarea {
 .bar[data-next="soon"] {
     box-shadow: inset 0 0 0 3px var(--bar-next-soon);
 }
-/* A one-bar practice loop can make a bar both `.active` and `[data-next]` at once; combine
+/* A one-bar chart loops onto itself, which makes its bar both `.active` and `[data-next]` at once; combine
    rather than let the later rule silently win and drop the green underline. */
 .bar.active[data-next] {
     box-shadow:

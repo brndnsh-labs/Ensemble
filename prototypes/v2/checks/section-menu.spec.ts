@@ -1,10 +1,8 @@
 import { appUrl, editorRevealed, expect, test } from './fixtures';
 
 /**
- * The section tap menu (#1422): the section letter's plain tap, which used to be a no-op,
- * now opens "Loop this section" / "Start here". Long-press and the 'L' key still go straight
- * to the loop toggle, unchanged — `semantic-playback.spec.ts`'s long-press test is the proof
- * that gesture still confines playback; this file is about the MENU wiring, not re-proving that.
+ * The section tap menu (#1422): a tap on the section letter opens "Start here". The section
+ * practice loop that shared this menu was retired in #1528.
  */
 async function newTwoSectionSong(page: import('@playwright/test').Page) {
     await page.goto(appUrl());
@@ -24,12 +22,12 @@ async function newTwoSectionSong(page: import('@playwright/test').Page) {
     await expect(tempo).toHaveValue('240');
 }
 
-test('tapping a section letter opens a menu with Loop this section and Start here', async ({
+test('tapping a section letter opens a menu with Start here, and nothing that loops', async ({
     page,
 }) => {
     await newTwoSectionSong(page);
     const sectionA = page.getByRole('button', {
-        name: 'Section A · hold to practice-loop',
+        name: 'Section A',
         exact: true,
     });
     await expect(sectionA).toHaveAttribute('aria-expanded', 'false');
@@ -38,10 +36,13 @@ test('tapping a section letter opens a menu with Loop this section and Start her
 
     const menu = page.getByRole('menu', { name: 'Section A' });
     await expect(menu).toBeVisible();
-    const loopItem = menu.getByRole('menuitem', { name: 'Loop this section', exact: true });
-    const startItem = menu.getByRole('menuitem', { name: 'Start here', exact: true });
-    await expect(loopItem).toBeVisible();
-    await expect(startItem).toBeVisible();
+    await expect(menu.getByRole('menuitem')).toHaveText(['Start here']);
+    // No shortcut starts a loop either (#1528): 'L' on the letter does nothing.
+    await page.keyboard.press('Escape');
+    await sectionA.press('l');
+    await expect(sectionA).not.toHaveAttribute('aria-pressed');
+    await expect(page.getByText('Looping', { exact: true })).toHaveCount(0);
+    await sectionA.click();
 
     // Keyboard accessible: Escape closes it and gives focus back to the section letter.
     await page.keyboard.press('Escape');
@@ -55,91 +56,10 @@ test('tapping a section letter opens a menu with Loop this section and Start her
     await expect(menu).toHaveCount(0);
 });
 
-test('Loop this section arms the same loop the long-press gesture does, and toggles off as Stop looping', async ({
-    page,
-}) => {
-    await newTwoSectionSong(page);
-    const sectionA = page.getByRole('button', {
-        name: 'Section A · hold to practice-loop',
-        exact: true,
-    });
-    await expect(sectionA).toHaveAttribute('aria-pressed', 'false');
-
-    await sectionA.click();
-    await page.getByRole('menuitem', { name: 'Loop this section', exact: true }).click();
-    await expect(sectionA).toHaveAttribute('aria-pressed', 'true');
-    await expect(page.locator('.section-loop.active')).toHaveCount(1);
-
-    // Reopening the menu on an already-looping section offers to stop it instead.
-    await sectionA.click();
-    const menu = page.getByRole('menu', { name: 'Section A' });
-    await expect(menu.getByRole('menuitem', { name: 'Loop this section' })).toHaveCount(0);
-    const stopItem = menu.getByRole('menuitem', { name: 'Stop looping', exact: true });
-    await expect(stopItem).toBeVisible();
-    await stopItem.click();
-    await expect(sectionA).toHaveAttribute('aria-pressed', 'false');
-    await expect(page.locator('.section-loop.active')).toHaveCount(0);
-
-    // The long-press gesture still works too, unchanged by any of the above.
-    await sectionA.click({ delay: 600 });
-    await expect(sectionA).toHaveAttribute('aria-pressed', 'true');
-    await sectionA.click({ delay: 600 });
-    await expect(sectionA).toHaveAttribute('aria-pressed', 'false');
-});
-
-/**
- * #1496: a hold is timed by a 500ms timer, and when the main thread is busy across that timer's
- * due time both engines handle the queued release FIRST, so a real hold read as a tap and opened
- * the menu (CI caught it on a loaded WebKit runner). The stall injected here starts after the
- * press and ends after the release, which reproduces that on every run.
- */
-test('a hold the page was too busy to time still arms the loop, and a tap through a stall is still a tap (#1496)', async ({
-    page,
-}) => {
-    await newTwoSectionSong(page);
-    const sectionA = page.getByRole('button', {
-        name: 'Section A · hold to practice-loop',
-        exact: true,
-    });
-    // Blocks the main thread for `forMs`, starting `afterMs` into the next press only.
-    const stallNextPress = (afterMs: number, forMs: number) =>
-        page.evaluate(
-            ([afterMs, forMs]) => {
-                window.addEventListener(
-                    'pointerdown',
-                    () => {
-                        window.setTimeout(() => {
-                            const end = performance.now() + forMs;
-                            while (performance.now() < end) {
-                                // busy: nothing else on the page runs until the release has queued
-                            }
-                        }, afterMs);
-                    },
-                    { capture: true, once: true },
-                );
-            },
-            [afterMs, forMs],
-        );
-
-    // A 600ms hold: the timer comes due at 500ms inside a stall from 450ms to 750ms, and the
-    // release queues behind that stall at 600ms.
-    await stallNextPress(450, 300);
-    await sectionA.click({ delay: 600 });
-    await expect(sectionA).toHaveAttribute('aria-pressed', 'true');
-    await expect(sectionA).toHaveAttribute('aria-expanded', 'false');
-
-    // A 100ms tap held up past the 500ms mark by a stall from 50ms to 700ms is still a tap: it
-    // opens the menu and leaves the loop alone.
-    await stallNextPress(50, 650);
-    await sectionA.click({ delay: 100 });
-    await expect(sectionA).toHaveAttribute('aria-expanded', 'true');
-    await expect(sectionA).toHaveAttribute('aria-pressed', 'true');
-});
-
 test('Start here starts a stopped song from that section', async ({ page }) => {
     await newTwoSectionSong(page);
     const sectionB = page.getByRole('button', {
-        name: 'Section B · hold to practice-loop',
+        name: 'Section B',
         exact: true,
     });
     await sectionB.click();
@@ -160,7 +80,7 @@ test('Start here jumps a playing song into that section immediately, without sto
     await expect(page.getByRole('button', { name: 'Stop playback', exact: true })).toBeVisible();
 
     const sectionB = page.getByRole('button', {
-        name: 'Section B · hold to practice-loop',
+        name: 'Section B',
         exact: true,
     });
     await sectionB.click();
@@ -187,7 +107,7 @@ test('Start here re-engages Following, even after a scroll while stopped turned 
     await page.locator('.chart-scroll').press('PageDown');
 
     const sectionB = page.getByRole('button', {
-        name: 'Section B · hold to practice-loop',
+        name: 'Section B',
         exact: true,
     });
     await sectionB.click();
