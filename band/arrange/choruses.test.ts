@@ -80,14 +80,14 @@ describe('a counted chart plans each chorus as the loop plans that lap', () => {
                     const once = planBars(counted, settings, {
                         pass: 0,
                         looping: false,
-                        window: { from: 0, to: counted.bars.length, wrapTo: 0 },
+                        window: { from: 0, to: counted.bars.length },
                         drumSolos,
                     });
                     const lap = (timeline: Timeline, pass: number) =>
                         planBars(timeline, settings, {
                             pass,
                             looping: true,
-                            window: { from: 0, to: timeline.bars.length, wrapTo: 0 },
+                            window: { from: 0, to: timeline.bars.length },
                             drumSolos,
                         });
                     for (let chorus = 0; chorus < CHORUSES; chorus++) {
@@ -285,7 +285,7 @@ describe('trading alternates over the turns actually played (#1483)', () => {
             {
                 pass: 0,
                 looping: false,
-                window: { from: 0, to: timeline.bars.length, wrapTo: 0 },
+                window: { from: 0, to: timeline.bars.length },
                 drumSolos: true,
             },
         );

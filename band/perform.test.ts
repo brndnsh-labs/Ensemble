@@ -9,7 +9,7 @@ import {
     type TradeSettings,
 } from './core/types.js';
 import { chordAt, compileTimeline } from './form/timeline.js';
-import { type PassMemory, performPass } from './perform.js';
+import { performPass } from './perform.js';
 import { STYLE_IDS, STYLES } from './styles/index.js';
 import { FIXTURES, score } from './test/scores.js';
 import { fifthOf } from './theory/chord.js';
@@ -25,30 +25,9 @@ describe('performPass windows', () => {
         const { events } = performPass(timeline, settings, {
             pass: 0,
             looping: true,
-            window: { from: 2, to: 6, wrapTo: 2 },
+            window: { from: 2, to: 6 },
         });
         expect(events.every((e) => e.bar >= 2 && e.bar < 6)).toBe(true);
-    });
-
-    it('leads a practice loop back to its own start, not on to the next section', () => {
-        // Loop section A (bars 0–7). Its last bar anticipates Dm7 (bar 0), never B's Gm7.
-        for (const seed of ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']) {
-            const { events } = performPass(
-                timeline,
-                { ...settings, seed },
-                {
-                    pass: 1,
-                    looping: true,
-                    window: { from: 0, to: 8, wrapTo: 0 },
-                },
-            );
-            const pushed = events.filter(
-                (e) => e.lane === 'comp' && e.bar === 7 && e.tick >= 7 * BAR + 14 * 120,
-            );
-            const pcs = new Set(pushed.map((e) => (e.lane === 'comp' ? e.midi % 12 : -1)));
-            // Gm7 would bring a Bb (10); Dm's anticipation never does.
-            expect(pcs.has(10), `seed ${seed}`).toBe(false);
-        }
     });
 
     it('resumes at any barline from the snapshot and reproduces the rest of the pass', () => {
@@ -60,7 +39,7 @@ describe('performPass windows', () => {
             // `origin: 0` marks this as a real `BandHost.update()` resume of a pass that began
             // at the top, not a fresh play-from-here start at bar 5 — the two read differently
             // at bar 5 itself if it happens to open a section (`planBars`'s `first`).
-            window: { from: 5, to: timeline.bars.length, wrapTo: 0, origin: 0 },
+            window: { from: 5, to: timeline.bars.length, origin: 0 },
         });
         const strip = (es: typeof whole.events) => JSON.stringify(es.filter((e) => e.bar >= 5));
         expect(strip(tail.events)).toBe(strip(whole.events));
@@ -99,7 +78,7 @@ describe.each(STYLE_IDS)('%s resume parity', (styleId) => {
                             // starts at bar 0 (`BandHost`'s own `songWindow(0)`), so a resume of
                             // it is a continuation of pass `pass` from the top, not a fresh
                             // start at `from` (`planBars`'s `PassWindow.origin`).
-                            window: { from, to: timeline.bars.length, wrapTo: 0, origin: 0 },
+                            window: { from, to: timeline.bars.length, origin: 0 },
                         });
                         const expected = JSON.stringify(full.events.filter((e) => e.bar >= from));
                         const actual = JSON.stringify(resumed.events);
@@ -116,9 +95,9 @@ describe.each(STYLE_IDS)('%s resume parity', (styleId) => {
 
 /**
  * A resumed window isn't always the whole song from the top: `BandHost.start()`'s play-from-
- * here and `setLoop()`'s practice loop both begin fresh somewhere other than bar 0, then can
- * themselves be resumed by a settings change mid-flight. Both need `PassWindow.origin` set to
- * where THAT window's own pass truly began (`fromBar`/the loop's own `from`), not 0 — the
+ * here begins fresh somewhere other than bar 0, then can itself be resumed by a settings
+ * change mid-flight. It needs `PassWindow.origin` set to where THAT window's own pass truly
+ * began (`fromBar`), not 0 — the
  * resume-parity suite above only ever resumes a window whose origin is the song's own top.
  */
 describe('resume from a fresh, mid-song window', () => {
@@ -128,7 +107,7 @@ describe('resume from a fresh, mid-song window', () => {
         // Bar 8 is the A section's own repeat (`repeat: 2` in the fixture) — a real arrival a
         // fresh start must suppress and a later resume within the same pass must not.
         const fromBar = 8;
-        const window = { from: fromBar, to: timeline.bars.length, wrapTo: 0 };
+        const window = { from: fromBar, to: timeline.bars.length };
         const failures: string[] = [];
         for (const styleId of STYLE_IDS) {
             for (const comp of RESUME_COMPS) {
@@ -144,7 +123,7 @@ describe('resume from a fresh, mid-song window', () => {
                         pass: 0,
                         looping: true,
                         memory: whole.snapshots[from],
-                        window: { from, to: timeline.bars.length, wrapTo: 0, origin: fromBar },
+                        window: { from, to: timeline.bars.length, origin: fromBar },
                     });
                     const expected = JSON.stringify(whole.events.filter((e) => e.bar >= from));
                     const actual = JSON.stringify(resumed.events);
@@ -157,54 +136,10 @@ describe('resume from a fresh, mid-song window', () => {
         expect(failures).toEqual([]);
     });
 
-    it('resumes a practice loop at any later barline exactly as its own unresumed lap, on pass 0 and pass 1', () => {
-        // Spans the B section's own arrival (bar 16) and the closing A's (bar 24).
-        const loopWindow = { from: 8, to: 24, wrapTo: 8 };
-        const failures: string[] = [];
-        for (const styleId of STYLE_IDS) {
-            for (const comp of RESUME_COMPS) {
-                const settings: BandSettings = {
-                    ...DEFAULT_SETTINGS,
-                    style: styleId,
-                    comp,
-                    seed: 'loop',
-                };
-                for (const pass of [0, 1] as const) {
-                    const whole = performPass(timeline, settings, {
-                        pass,
-                        looping: true,
-                        window: loopWindow,
-                    });
-                    for (let from = loopWindow.from + 1; from < loopWindow.to; from++) {
-                        const resumed = performPass(timeline, settings, {
-                            pass,
-                            looping: true,
-                            memory: whole.snapshots[from],
-                            window: {
-                                from,
-                                to: loopWindow.to,
-                                wrapTo: loopWindow.wrapTo,
-                                origin: loopWindow.from,
-                            },
-                        });
-                        const expected = JSON.stringify(whole.events.filter((e) => e.bar >= from));
-                        const actual = JSON.stringify(resumed.events);
-                        if (actual !== expected) {
-                            failures.push(`${styleId} ${comp} pass ${pass} from ${from}`);
-                        }
-                    }
-                }
-            }
-        }
-        expect(failures).toEqual([]);
-    });
-
     it('does not crash on the first bar of a fresh mid-song start, matching the engine before this fix', () => {
         // Confirmed unchanged against origin/main's pre-#1410 engine (5b1bb911): a fresh start
         // has nothing before it, so it suppresses the arrival crash on its own opening bar even
-        // when that bar opens a section — a play-from-here pass, and a practice loop's first
-        // lap. A loop's later laps DO crash back in on their own first bar, same as a
-        // whole-song repeat's own top — confirmed against the same oracle.
+        // when that bar opens a section — a play-from-here pass.
         const settings: BandSettings = { ...DEFAULT_SETTINGS, style: 'rock', seed: 'r' };
         const crashAt = (events: BandEvent[], bar: number) =>
             events.some(
@@ -218,18 +153,9 @@ describe('resume from a fresh, mid-song window', () => {
             const { events } = performPass(timeline, settings, {
                 pass: 0,
                 looping: true,
-                window: { from: fromBar, to: timeline.bars.length, wrapTo: 0 },
+                window: { from: fromBar, to: timeline.bars.length },
             });
             expect(crashAt(events, fromBar), `play-from-here ${fromBar}`).toBe(false);
-        }
-        const loopWindow = { from: 8, to: 24, wrapTo: 8 };
-        for (const pass of [0, 1] as const) {
-            const { events } = performPass(timeline, settings, {
-                pass,
-                looping: true,
-                window: loopWindow,
-            });
-            expect(crashAt(events, loopWindow.from), `loop pass ${pass}`).toBe(pass > 0);
         }
     });
 });
@@ -298,7 +224,7 @@ describe('fermatas', () => {
                     pass: 0,
                     looping: true,
                     memory: full.snapshots[from],
-                    window: { from, to: timeline.bars.length, wrapTo: 0, origin: 0 },
+                    window: { from, to: timeline.bars.length, origin: 0 },
                 });
                 const expected = JSON.stringify(full.events.filter((e) => e.bar >= from));
                 if (JSON.stringify(resumed.events) !== expected) {
@@ -462,30 +388,6 @@ describe('comp instruments', () => {
                 expect(downbeats(presses(chart, style), 8), style).not.toContain(4);
             }
         });
-
-        it('a practice loop that starts mid-phrase presses its chord at the top of every lap', () => {
-            // The lap's first bar is no phrase top, but the hand let go at the wrap: the vamp's
-            // chord is pressed again there, not left silent until the next phrase.
-            const vamp = compileTimeline(
-                score([{ label: 'A', bars: 'Dm7 | Dm7 | Dm7 | Dm7 | Dm7 | Dm7 | Dm7 | Dm7' }]),
-            );
-            const window = { from: 2, to: 4, wrapTo: 2 };
-            for (const style of HOLDING) {
-                let memory: PassMemory | undefined;
-                for (let pass = 0; pass < 3; pass++) {
-                    const result = performPass(
-                        vamp,
-                        { ...DEFAULT_SETTINGS, style, comp: 'organ', seed: 'r' },
-                        { pass, looping: true, memory, window },
-                    );
-                    memory = result.memory;
-                    const top = result.events.filter(
-                        (e) => e.lane === 'comp' && !e.muted && e.tick === vamp.bars[2].start,
-                    );
-                    expect(top.length, `${style} lap ${pass}`).toBeGreaterThan(0);
-                }
-            }
-        });
     });
 });
 
@@ -628,7 +530,7 @@ describe('trading with the player', () => {
                         looping: true,
                         memory: full.snapshots[from],
                         // A trading pass is still a whole-song lap starting at bar 0.
-                        window: { from, to: rhythmChanges.bars.length, wrapTo: 0, origin: 0 },
+                        window: { from, to: rhythmChanges.bars.length, origin: 0 },
                     });
                     expect(
                         JSON.stringify(resumed.events),
@@ -719,7 +621,7 @@ describe('trading with the player', () => {
             pass: 1,
             looping: true,
             memory: played.snapshots[2],
-            window: { from: 2, to: rhythmChanges.bars.length, wrapTo: 0, origin: 0 },
+            window: { from: 2, to: rhythmChanges.bars.length, origin: 0 },
         });
         const leadBars = new Set(resumed.events.filter((e) => e.lane === 'lead').map((e) => e.bar));
         expect([4, 5, 6].some((bar) => leadBars.has(bar))).toBe(true);
@@ -728,7 +630,7 @@ describe('trading with the player', () => {
     it('keeps the soloist out after the head whenever you asked to trade with the drummer', () => {
         const wanted = { ...jazz, trade: fours('drums') };
         const cases = [
-            { settings: wanted, window: { from: 0, to: 8, wrapTo: 0 } },
+            { settings: wanted, window: { from: 0, to: 8 } },
             { settings: { ...wanted, style: 'bossa' as const }, window: undefined },
             { settings: { ...wanted, lanes: { ...lanes, drums: false } }, window: undefined },
         ];
@@ -771,7 +673,7 @@ describe('trading with the player', () => {
         }
     });
 
-    it("doesn't trade in a practice loop, without its partner, or where the drummer can't solo", () => {
+    it("doesn't trade without its partner, in part of the song, or where the drummer can't solo", () => {
         const plain = performPass(rhythmChanges, jazz, { pass: 1, looping: true }).events;
         const cases = [
             {
@@ -782,7 +684,7 @@ describe('trading with the player', () => {
                 settings: { ...jazz, trade: fours('drums'), lanes: { ...lanes, drums: false } },
                 window: undefined,
             },
-            { settings: { ...jazz, trade: fours('drums') }, window: { from: 0, to: 8, wrapTo: 0 } },
+            { settings: { ...jazz, trade: fours('drums') }, window: { from: 0, to: 8 } },
             {
                 settings: { ...jazz, style: 'bossa' as const, trade: fours('drums') },
                 window: undefined,

@@ -11,11 +11,7 @@ import {
 } from '@band/index';
 import { transposeKey } from '@engine/controllers/arranger-controller';
 import { flushBuffers, togglePower } from '@engine/controllers/instrument-controller';
-import {
-    loopSection as armSectionLoop,
-    clearPracticeLoop,
-    getSectionStepBounds,
-} from '@engine/controllers/practice-controller';
+import { getSectionStepBounds } from '@engine/controllers/practice-controller';
 import { autoVoiceForGenre } from '@engine/data/genre-sound-map';
 import { GENRE_NAMES, SMART_GENRES } from '@engine/data/smart-genres';
 import { validateProgression } from '@engine/engine/chords-engine';
@@ -252,13 +248,6 @@ function bandSettings(): BandSettings {
     };
 }
 
-function bandLoop(): { from: number; to: number } | null {
-    const { playback } = getState();
-    return playback.loopStartStep >= 0 && playback.loopEndStep > playback.loopStartStep
-        ? { from: playback.loopStartStep * STEP_TICKS, to: playback.loopEndStep * STEP_TICKS }
-        : null;
-}
-
 /**
  * `freshPlay` marks a genuine Play-from-stopped gesture (`toggle`, `startSection` when
  * stopped) — the only case a count-in is even considered, and only then if the
@@ -296,7 +285,6 @@ function startBand(freshPlay = false): void {
         bandSettings(),
         playback.bpm,
         (playback.startStep || 0) * STEP_TICKS,
-        bandLoop(),
         freshPlay && playback.countIn,
     );
     param('playback', 'isPlaying', true);
@@ -428,7 +416,6 @@ function syncBand(): void {
         return;
     }
     host.setTempo(playback.bpm);
-    host.setLoop(bandLoop());
     host.update(bandSettings());
 }
 
@@ -604,81 +591,14 @@ function endPerformance(): void {
 
 function halt(ringOut: boolean): void {
     playIntent++;
-    // #1211 — Stop always releases an armed/live practice loop; the drill is a
-    // performance-mode overlay on the transport, not a setting that survives it.
-    // Stop the band before clearing the loop, so the loop change can't restart it.
     if (band?.playing || getState().playback.isPlaying) {
         stopBand(ringOut);
     }
-    clearPracticeLoop();
 }
 
 /**
- * Arm a section-practice loop (#1211). Wraps the practice controller so the app
- * shell never imports `@engine/controllers/*` directly. Returns false (and
- * changes nothing) when the section id doesn't resolve to a step span — e.g. a
- * stale id from a chart that changed shape after this render.
- */
-export function loopSection(sectionId: string): boolean {
-    if (bandView) {
-        // The old engine's section map is empty for a band-engine score; the timeline has it.
-        const bounds = sectionSteps(bandView, sectionId);
-        if (!bounds) {
-            return false;
-        }
-        dispatch(ACTIONS.SET_PRACTICE_LOOP, bounds);
-        return true;
-    }
-    if (!getSectionStepBounds(sectionId)) {
-        return false;
-    }
-    armSectionLoop(sectionId);
-    return true;
-}
-
-/** Drop out of a running or armed practice loop (#1211). */
-export function clearLoop(): void {
-    clearPracticeLoop();
-}
-
-/**
- * The id of the section currently armed/looping, or null when no loop is set.
- * Maps `playback.loopStartStep/loopEndStep` back to the `arranger.sectionMap`
- * entry with the matching span — using `getSectionStepBounds` so a section with
- * more than one map entry (a written repeat) resolves the same collapsed span
- * `loopSection` armed it with, rather than a single raw map row (#1211).
- */
-export function loopedSection(): string | null {
-    const { playback, arranger } = getState();
-    if (playback.loopStartStep < 0) {
-        return null;
-    }
-    if (bandView) {
-        const view = bandView;
-        const match = view.sections.find(({ id }) => {
-            const bounds = sectionSteps(view, id);
-            return bounds?.start === playback.loopStartStep && bounds.end === playback.loopEndStep;
-        });
-        return match?.id ?? null;
-    }
-    const ids = new Set(arranger.sectionMap.map((entry) => entry.id));
-    for (const id of ids) {
-        const bounds = getSectionStepBounds(id);
-        if (
-            bounds &&
-            bounds.start === playback.loopStartStep &&
-            bounds.end === playback.loopEndStep
-        ) {
-            return id;
-        }
-    }
-    return null;
-}
-
-/**
- * Section tap menu's "Start here" (#1422). `bounds.start` off the same lookups `loopSection`/
- * `loopedSection` use is already the section's FIRST PERFORMED visit, not a written position:
- * both `sectionSteps` (band-timeline visits) and `getSectionStepBounds` (the old engine's
+ * Section tap menu's "Start here" (#1422). `bounds.start` is already the section's FIRST
+ * PERFORMED visit, not a written position: both `sectionSteps` (band-timeline visits) and `getSectionStepBounds` (the old engine's
  * `sectionMap`) collapse every occurrence of the id to `{ min(start), max(end) }`, and since
  * ticks only increase across one pass, that min is the earliest one. So a repeated section (a
  * second ending, a `repeat` count) still lands on the bar a musician would actually call "the
@@ -1024,7 +944,6 @@ function apply(content: DocumentContent): void {
     param('groove', 'swingSub', band.groove.swingSub);
     param('groove', 'humanize', band.groove.humanize);
     applyGenre(chartGenre(band.groove));
-    dispatch(ACTIONS.SET_PRACTICE_LOOP, null);
     dispatch(ACTIONS.SET_START_STEP, 0);
     param('arranger', 'history', []);
 }

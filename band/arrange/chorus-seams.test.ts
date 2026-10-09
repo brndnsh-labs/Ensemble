@@ -39,7 +39,7 @@ function chunked(timeline: Timeline, settings: BandSettings): BandEvent[] {
             pass: 0,
             looping: false,
             memory,
-            window: { from, to: timeline.bars.length, wrapTo: 0, origin: 0 },
+            window: { from, to: timeline.bars.length, origin: 0 },
             until,
         });
         events.push(...result.events);
@@ -54,7 +54,7 @@ describe('a counted performance generated a chorus at a time (`PassOptions.until
         const timeline = compileTimeline({ ...FIXTURES.blues, choruses: 3 });
         const length = timeline.bars.length / 3;
         const settings = { ...DEFAULT_SETTINGS, style: 'blues' as const, seed: 'chunk' };
-        const window = { from: 0, to: timeline.bars.length, wrapTo: 0, origin: 0 };
+        const window = { from: 0, to: timeline.bars.length, origin: 0 };
         const first = performPass(timeline, settings, {
             pass: 0,
             looping: false,
@@ -159,7 +159,7 @@ describe('a counted performance generated a chorus at a time (`PassOptions.until
             const { events } = performPass(timeline, ORGAN, {
                 pass: 0,
                 looping: false,
-                window: { from: 0, to: timeline.bars.length, wrapTo: 0, origin: 0 },
+                window: { from: 0, to: timeline.bars.length, origin: 0 },
                 until: 8,
             });
             const last = events.filter((e) => e.lane === 'comp').at(-1)!;
@@ -266,7 +266,7 @@ function chunkBars(timeline: Timeline, length: number, count = Number.POSITIVE_I
                 pass: 0,
                 looping: false,
                 memory,
-                window: { from, to: timeline.bars.length, wrapTo: 0, origin: 0 },
+                window: { from, to: timeline.bars.length, origin: 0 },
                 until: from + length,
             });
             memory = result.memory;

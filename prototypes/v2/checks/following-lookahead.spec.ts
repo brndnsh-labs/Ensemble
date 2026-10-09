@@ -9,7 +9,7 @@ import { appUrl, editorRevealed, expect, test } from './fixtures';
 
 /**
  * Following's look-ahead scroll (#1458): a look-ahead row scroll, a next-bar cue that strengthens
- * on the playing bar's last FELT beat, and a jump-ahead scroll across a repeat/loop/practice-loop
+ * on the playing bar's last FELT beat, and a jump-ahead scroll across a repeat or the form's own
  * wrap. `app/ensemble.tsx`'s Following effects, `app/chart-sheet.tsx`'s `data-next`, and
  * `app/use-chart-view.ts`'s `displayNext` are the surfaces under test; `lib/band-chart.ts`'s
  * `BandChart.bars` and `lib/runtime.ts`'s `inLastBeat()` are the engine reads behind it.
@@ -70,26 +70,18 @@ function chordBar(
 }
 
 /**
- * A three- (or, with `sectionDBars`, four-) section chart, tall enough to overflow
+ * A three-section chart, tall enough to overflow
  * `.chart-scroll` on both projects: section A repeats (a genuine `repeat-end`, no endings) and
  * its third bar (A3) holds TWO chords — the next-bar cue must skip past both of them to A4,
  * never landing on A3 itself. Section B is `sectionBBars` plain bars (the "longer than the
  * viewport" body; a small value plus a shrunk viewport keeps a full lap fast for a
- * timing-sensitive test). Section C is `sectionCBars` bars (3 by default, right before the form
- * wraps back to bar 1 — short so a test can reach the form's own end fast; a caller after
- * `scrollForJump`'s "keep both if they fit" branch instead wants it tall enough to scroll its own
- * start out of view, patch review P2-4). `sectionDBars`, when given, adds a trailing section AFTER
- * C — without it, C sits at the very BOTTOM of the whole document, and once deep enough into it
- * there is nothing further down left to scroll INTO: the anchor's desired position clamps at the
- * document's own max scrollTop, which (counterintuitively) leaves C's own early bars on screen
- * far longer than the top-third anchor alone would ever explain.
+ * timing-sensitive test). Section C is 3 bars, right before the form wraps back to bar 1 —
+ * short so a test can reach the form's own end fast.
  */
 async function buildLookaheadChart(
     page: Page,
     opts: {
         sectionBBars?: number;
-        sectionCBars?: number;
-        sectionDBars?: number;
         bpm?: number;
         /** False drops section A's repeat, for a test that only needs the form's own wrap and
          * would otherwise sit through A's second pass every lap. */
@@ -97,8 +89,7 @@ async function buildLookaheadChart(
     } = {},
 ): Promise<void> {
     const sectionBBars = opts.sectionBBars ?? 40;
-    const sectionCBars = opts.sectionCBars ?? 3;
-    const sectionDBars = opts.sectionDBars ?? 0;
+    const sectionCBars = 3;
     const bpm = opts.bpm ?? 240;
     await page.goto(appUrl());
     await page.getByRole('button', { name: '＋ New song', exact: true }).click();
@@ -108,10 +99,6 @@ async function buildLookaheadChart(
     await page.getByLabel('Chords in this bar').fill('C');
     await page.getByRole('button', { name: '＋ Section', exact: true }).click();
     await page.getByLabel('Chords in this bar').fill('C');
-    if (sectionDBars > 0) {
-        await page.getByRole('button', { name: '＋ Section', exact: true }).click();
-        await page.getByLabel('Chords in this bar').fill('C');
-    }
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
 
@@ -130,18 +117,11 @@ async function buildLookaheadChart(
     score.sections[2].measures = Array.from({ length: sectionCBars }, (_, i) =>
         chordBar(`C${i + 1}`),
     );
-    if (sectionDBars > 0) {
-        score.sections[3].measures = Array.from({ length: sectionDBars }, (_, i) =>
-            chordBar(`D${i + 1}`),
-        );
-    }
     document.title = 'Lookahead study (long)';
 
     await importFile(page, document);
     await expect(page.locator('.error-banner')).toHaveCount(0);
-    await expect(page.locator('.sheet .bar')).toHaveCount(
-        4 + sectionBBars + sectionCBars + sectionDBars,
-    );
+    await expect(page.locator('.sheet .bar')).toHaveCount(4 + sectionBBars + sectionCBars);
     const tempo = page.getByLabel('Tempo', { exact: true });
     await tempo.fill(String(bpm));
     await tempo.press('Enter');
@@ -186,7 +166,7 @@ async function buildOneBarRepeatChart(page: Page): Promise<void> {
 
 function sectionLetter(page: Page, label: string) {
     return page.getByRole('button', {
-        name: `Section ${label} · hold to practice-loop`,
+        name: `Section ${label}`,
         exact: true,
     });
 }
@@ -795,89 +775,6 @@ test('the jump-ahead fires in the last felt beat (not the downbeat), and fires a
     ).toBeGreaterThanOrEqual(200);
     expect(lap2.sincePaint).toBeLessThanOrEqual(900);
 
-    await page.getByRole('button', { name: 'Stop playback', exact: true }).click();
-});
-
-test('data-next wraps inside an active practice loop, keeping both bars visible since they fit together', async ({
-    page,
-}) => {
-    // Sixteen bars at 240bpm plus the setup; under contention the whole test took up to 50s,
-    // nearly all of it the starved audio clock (#1496).
-    test.setTimeout(75_000);
-    // A 3-bar loop (the section's earlier size) never scrolls its own start out of view in the
-    // first place, so `scrollForJump`'s "keep both if they fit" branch was never actually
-    // exercised — the loop start was already on screen and the effect returned early before ever
-    // calling it (patch review P2-4). 16 bars (4 rows on a 4-per-row desktop layout) is enough to
-    // scroll C1 out of view by the time playback reaches the far end, while the whole section
-    // stays short enough that C1 and C16 can still share one screenful once the loop wraps.
-    //
-    // `sectionDBars` matters here specifically: without a section AFTER the loop, C sits at the
-    // very bottom of the whole document, and the anchor's desired scrollTop clamps at the
-    // document's own max the moment there is nothing further down left to reveal — which leaves
-    // C1 on screen far longer than the top-third anchor alone would, since the page simply can't
-    // scroll any further to honor it. A trailing section gives the scroll room it needs.
-    await buildLookaheadChart(page, { sectionCBars: 16, sectionDBars: 8 });
-    await startHere(page, 'C');
-    await pollSamples(page, (s) => s.activeId === 'C1');
-    // Arm the loop on C while already inside it, with the section letter's 'L' key: the same
-    // toggle the long-press reaches, without a gesture to time. A long-press here raced the stand
-    // (#1496): Playwright holds a MOUSE at fixed coordinates, and the follow scroll at the next
-    // row change can carry the letter out from under it mid-hold, which cancels the hold. The
-    // gesture itself is pinned by `section-menu.spec.ts` and `semantic-playback.spec.ts`.
-    await sectionLetter(page, 'C').press('l');
-    await expect(sectionLetter(page, 'C')).toHaveAttribute('aria-pressed', 'true');
-    // Confirm the precondition: three rows into the section, its own start has actually scrolled
-    // out of view — otherwise this test would not be exercising anything P2-4 didn't. Twelve bars
-    // are twelve seconds at 240bpm, but a CPU-starved WebKit's audio clock can run at under half
-    // of real time: under contention this took up to 31s (#1496), past the poll's 20s default.
-    await pollSamples(page, (s) => s.activeId === 'C13', { timeoutMs: 45_000 });
-    expect(
-        await inView(page, 'C1'),
-        'the loop start should have scrolled out of view three rows into a 16-bar section',
-    ).toBe(false);
-    const resolved = await waitForActiveNext(page, 'C16', 'C1');
-    expect(resolved.nextCount).toBe(1);
-    // Whether the geometry can even show both at once (2-per-row phone makes 16 bars 8 tall
-    // rows, not 4 — "laptop, and phone if the geometry allows", patch review P2-4). The relative
-    // distance between two elements is scroll-position-independent (scrolling shifts both
-    // identically), so this can be measured any time, without regard to what's currently in view.
-    const bothCouldFit = await page.evaluate(() => {
-        const scrollEl = document.querySelector('.chart-scroll');
-        const c1 = document.querySelector('.bar[data-measure-id="C1"]');
-        const c16 = document.querySelector('.bar[data-measure-id="C16"]');
-        if (!scrollEl || !c1 || !c16) {
-            return false;
-        }
-        const a = c1.getBoundingClientRect();
-        const b = c16.getBoundingClientRect();
-        return Math.max(a.bottom, b.bottom) - Math.min(a.top, b.top) <= scrollEl.clientHeight;
-    });
-    // The jump-ahead should show BOTH the playing bar and the loop's start once it fires
-    // (Touches #3's "keeping the playing bar visible where both fit"), not just the target —
-    // unlike the far-apart form-loop wrap (last bar to bar 1) below, where showing both would
-    // require the WHOLE many-row chart to already fit the viewport (i.e. never need to scroll at
-    // all), a short loop's own two ends are close enough to co-exist in one screenful WHEN the
-    // geometry allows it.
-    const deadline = Date.now() + 15_000;
-    let sawC1 = false;
-    let bothVisible = false;
-    while (Date.now() < deadline) {
-        if (await inView(page, 'C1')) {
-            sawC1 = true;
-            bothVisible = await inView(page, 'C16');
-            break;
-        }
-        await page.waitForTimeout(40);
-    }
-    if (bothCouldFit) {
-        expect(
-            bothVisible,
-            'both the playing bar and the loop start should be visible together',
-        ).toBe(true);
-    } else {
-        // Touches #3's own tie-break when they can't both fit: the target (the loop start) wins.
-        expect(sawC1, 'the loop start should still win when both cannot fit together').toBe(true);
-    }
     await page.getByRole('button', { name: 'Stop playback', exact: true }).click();
 });
 

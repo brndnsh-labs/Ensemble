@@ -128,16 +128,8 @@ test('the footer sets how many times a measure chart plays, and the band stops a
     await page.keyboard.press('Escape');
     await expect(menu).toHaveCount(0);
     await expect(footer).toBeFocused();
-    // The menu's keys are its own: with a practice loop armed, arrowing through the menu and
-    // Escaping out of it closes the menu and leaves the loop alone (the chart reads a bare
-    // Escape as "clear the loop").
-    const sectionA = page.getByRole('button', {
-        name: 'Section A · hold to practice-loop',
-        exact: true,
-    });
-    await sectionA.focus();
-    await page.keyboard.press('l');
-    await expect(sectionA).toHaveAttribute('aria-pressed', 'true');
+    // The menu's keys are its own: arrowing through it and Escaping out closes the menu and
+    // gives focus back to the footer.
     await footer.click();
     await page.keyboard.press('ArrowDown');
     await expect(
@@ -150,10 +142,6 @@ test('the footer sets how many times a measure chart plays, and the band stops a
     await page.keyboard.press('Escape');
     await expect(menu).toHaveCount(0);
     await expect(footer).toBeFocused();
-    await expect(sectionA).toHaveAttribute('aria-pressed', 'true');
-    await sectionA.focus();
-    await page.keyboard.press('l');
-    await expect(sectionA).toHaveAttribute('aria-pressed', 'false');
     // The popover stays inside the viewport and the page never scrolls sideways.
     await footer.click();
     const box = await page.locator('.form-length-menu').boundingBox();

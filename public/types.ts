@@ -995,19 +995,10 @@ export interface GlobalContext {
     /**
      * Section-practice ("drill") — the absolute step at which the next play
      * should begin. Normally 0; set to a section's first step by "start from
-     * here" / "loop this section" (#1016). `startPlayback` and the count-in
+     * here" (#1016). `startPlayback` and the count-in
      * completion seed `step` from this, then it resets to 0 on stop.
      */
     readonly startStep: number;
-    /**
-     * Section-practice loop bounds, in absolute steps within one pass through
-     * the chart (`[0, totalSteps)`). Both `-1` means no loop. While a loop is
-     * active the scheduler folds `step` within `[loopStartStep, loopEndStep)`
-     * and the worker folds its buffer fill to match — song-mode form
-     * progression / ending is suspended until the loop is cleared (#1016).
-     */
-    readonly loopStartStep: number;
-    readonly loopEndStep: number;
     /** Queue of normalized visual events waiting to be rendered. */
     readonly drawQueue: VisualizerQueuedEvent[];
     /** Whether the visualizer loop is active. */
@@ -1227,11 +1218,6 @@ export interface ActionPayloadMap {
     SET_NOTATION: string;
     /** Section-practice: seed the step the next play begins from (#1016). */
     SET_START_STEP: number;
-    /**
-     * Section-practice loop bounds (#1016). `null` clears the loop; otherwise
-     * `{ start, end }` are absolute steps within `[0, totalSteps)`.
-     */
-    SET_PRACTICE_LOOP: { start: number; end: number } | null;
     TOAST_EXPIRED: string;
     FLASH_EXPIRED?: undefined;
     PROG_VALIDATED?: undefined;
@@ -1285,7 +1271,6 @@ export const ACTIONS = {
     SET_METRONOME: 'SET_METRONOME',
     SET_NOTATION: 'SET_NOTATION',
     SET_START_STEP: 'SET_START_STEP',
-    SET_PRACTICE_LOOP: 'SET_PRACTICE_LOOP',
 
     // --- Signal-only / Lifecycle (payload-less notifications) ---
     TOAST_EXPIRED: 'TOAST_EXPIRED',

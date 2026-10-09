@@ -27,7 +27,8 @@ a further product decision.
 3. **Parity bar: core parity.** Before v2 takes `/` it must have: share links (v2-only,
    #1212), import of v1 local data (`ensemble_userPresets`, current state) as a one-time,
    source-preserving copy, the full instrument/sound settings inventory, MIDI and audio export,
-   the section practice loop (long-press on the section label, #1211), and offline install
+   the section practice loop (long-press on the section label, #1211; retired again in #1528,
+   DECISION 2026-10-07), and offline install
    (service worker + manifest at root scope). Visualizer, MIDI in/out and the manual ship after
    cutover as v2 features. **Amended 2026-09-15 (Brandon: "don't over-engineer the cutover, we
    don't have a significant userbase"):** opening v1 `?s=` links on the stand is best-effort,

@@ -18,8 +18,6 @@ describe('detached generation state', () => {
                 activeChordVoices: [{ release: vi.fn() }],
                 suspendTimeout: 99,
                 isPlaying: true,
-                loopStartStep: 16,
-                loopEndStep: 32,
             },
             arranger: {
                 ...live.arranger,
@@ -50,8 +48,6 @@ describe('detached generation state', () => {
             activeChordVoices: [],
             suspendTimeout: null,
             isPlaying: false,
-            loopStartStep: 16,
-            loopEndStep: 32,
         });
         expect(detached.playback.heldNotes).toEqual(new Set());
         expect(detached.groove.buffer).toEqual(new Map());

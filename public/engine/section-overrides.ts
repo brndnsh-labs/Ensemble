@@ -11,57 +11,6 @@ import type { ArrangerState, EnsembleState, Section, SectionInstrumentKey } from
 import { binarySearchMap } from '../utils.js';
 
 /**
- * Section-practice loop (#1016). A minimal structural view of the two playback
- * fields the fold reads — lets both the main-thread scheduler and the worker's
- * buffer manager share one folding authority without importing the full slice.
- */
-interface PracticeLoopBounds {
-    readonly loopStartStep?: number;
-    readonly loopEndStep?: number;
-}
-
-/**
- * True when a section-practice loop is active — a valid, non-empty window.
- * Both `-1` (the cleared sentinel) or an inverted range read as "no loop".
- */
-export function isPracticeLooping(
-    pb: PracticeLoopBounds | null | undefined,
-): pb is PracticeLoopBounds & { loopStartStep: number; loopEndStep: number } {
-    if (!pb) {
-        return false;
-    }
-    const start = pb.loopStartStep ?? -1;
-    const end = pb.loopEndStep ?? -1;
-    return start >= 0 && end > start;
-}
-
-/**
- * Fold a monotonic step into the active practice-loop window `[start, end)`.
- *
- * The scheduler and worker keep `step` **monotonic** (so buffer keys stay unique
- * and buffer-head bookkeeping is untouched) and call this only to derive the
- * *musical* chart position: chord lookup, section awareness, drum/soloist
- * seeding. Because the folded value lands inside `[0, totalSteps)`, every engine
- * `step % totalSteps` downstream resolves to the drilled section with no engine
- * changes. Steps before the window pass through unchanged (the drill hasn't
- * reached the loop yet); at/after it they cycle within it. Identity (returns
- * `step`) when no loop is active — so non-looping playback is byte-for-byte
- * unchanged. (#1016)
- */
-export function foldPracticeStep(step: number, pb: PracticeLoopBounds | null | undefined): number {
-    if (!pb || !isPracticeLooping(pb)) {
-        return step;
-    }
-    const start = pb.loopStartStep;
-    const end = pb.loopEndStep;
-    if (step < start) {
-        return step;
-    }
-    const width = end - start;
-    return start + ((step - start) % width);
-}
-
-/**
  * Find the section that owns `step`, walking the live `sections[]` and matching
  * by `sectionMap` ranges (which are populated by `validateProgression`). Returns
  * `null` when the arranger has no resolved sectionMap yet (e.g. pre-validate).
@@ -95,11 +44,7 @@ function sectionAtStep(arranger: ArrangerState | null | undefined, step: number)
  * its test for now.
  */
 export function effectiveTargetIntensity(state: EnsembleState, step: number): number {
-    // Transport remains monotonic during a section-practice drill. Resolve the
-    // authored section from the folded musical position so pass two does not
-    // accidentally fall through to another section's intensity override.
-    const musicalStep = foldPracticeStep(step, state?.playback);
-    const sec = sectionAtStep(state?.arranger, musicalStep);
+    const sec = sectionAtStep(state?.arranger, step);
     const override = sec?.targetIntensity;
     return typeof override === 'number' ? override : (state?.conductor?.targetIntensity ?? 0.35);
 }

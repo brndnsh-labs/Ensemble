@@ -178,7 +178,7 @@ expression devices take turns rather than stack; one peak note per cycle.
       statement, never a crash, even on a section downbeat; the crash is the band coming back
       in — whether that's your next turn or the returning head. Asking to trade with the
       drummer makes you the soloist for every pass but a returned head, even where the trade
-      can't happen (a practice loop, the drums off, a drummer who doesn't solo): the band's
+      can't happen (the drums off, a drummer who doesn't solo): the band's
       soloist never plays over you, but it does play the head when it comes back.
     - **The head returns** (the Trade sheet's "Head returns" setting, `SoloistTradeChoruses`,
       default 2 choruses): with `choruses` set to N, the cycle is the head, then N traded
@@ -190,7 +190,7 @@ expression devices take turns rather than stack; one peak note per cycle.
     - Nothing rings into the drummer's turn: the organ's hold stops, the comp doesn't
       anticipate into it and the bass doesn't approach it, including across the barline
       into the next pass (`performPass` takes the wrap bar's lanes from the next pass's plan).
-    - No trading in a practice loop, without the partner (the soloist off, or the drums off),
+    - No trading without the partner (the soloist off, or the drums off),
       or with the drummer in a style whose drummer doesn't solo; the Trade control shows the
       trade as paused, and says why (`runtime.tradeBlocked`, mirroring the plan's gate). A pass
       resumed at a barline (a settings change) trades exactly as the full pass, and changing
@@ -396,8 +396,7 @@ in a minor key the minor equivalents (im6 for jazz and bossa, im9, im7, the mino
   unchanged, and every bar before it is byte-identical. The lead's last note is chosen against
   the written chord and then moved to the nearest of the tonic's resting tones
   (`LeadBook.settle`, rank-weighted as any phrase's last note is), so the line into it is
-  unchanged. A lead phrase planned while the pass looped (a practice loop released on the last
-  section) is replanned for the ending: its slot is keyed by the resolved chord.
+  unchanged. A lead phrase planned under another style's ending is replanned when the style changes: its slot is keyed by the resolved chord.
 - **The held chord lasts the bar, in any meter**, and nothing rings past the band's last
   barline: a bass that held four beats overran a 3/4, 6/8 or 7/8 ending (#1503). The invariant
   suite ends a chart in every meter it plays (`METER_ENDINGS`) to hold it.
@@ -408,7 +407,7 @@ in a minor key the minor equivalents (im6 for jazz and bossa, im9, im7, the mino
 ## The live host (`prototypes/v2/lib/band-host.ts`)
 
 The runtime's play, stop and resume paths go through `startBand`/`stopBand`; the old worker
-never starts. The host keeps a queue of *segments*, one pass of the song or one lap of a practice loop each, and
+never starts. The host keeps a queue of *segments*, one pass of the song each, and
 schedules everything due in the next 150 ms on a 25 ms timer.
 - **Tempo** re-anchors the clock.
 - **Style, intensity, lanes, swing, humanize and the comp instrument** regenerate the pass from
@@ -436,13 +435,11 @@ schedules everything due in the next 150 ms on a 25 ms timer.
   that never struck again would have its hold end at the cap). When the last segment's
   final bar ends, the host stops by itself and calls `onEnd`; the runtime brings the transport
   to stopped by Stop's own path, except that the last notes ring out (as an export's release
-  tail does) instead of being cut. A practice loop ignores the count; released, the
-  performance carries on from the bar after it to its end — and released on the chart's last
-  section, the lap under way plays the ending from its next barline (or, with no barline left
-  in it, the section plays once more as written) and the band stops. A chord the lap's last
-  bar pushed toward the loop's top is tied into the bar after it only if that bar opens on the
-  same chord: the comp remembers which chord it pushed (`CompMemory.pushed`,
-  `tiedFromPush`), and otherwise strikes the bar as written (#1507). `render()` builds the
+  tail does) instead of being cut. A chord a bar's last strike pushed ahead is tied into the
+  bar after it only if that bar opens on the same chord: the comp remembers which chord it
+  pushed (`CompMemory.pushed`, `tiedFromPush`), and otherwise strikes the bar as written
+  (#1507). There is no section practice loop: it was retired in #1528 (DECISION 2026-10-07),
+  with the host's lap and release paths and the band's `leadsInto` input. `render()` builds the
   export the same chorus at a time, so it is exactly the performance that plays.
 
 A pass is generated on the main thread, two seconds before it is needed: about 8 ms for 32

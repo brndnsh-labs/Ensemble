@@ -11,7 +11,7 @@ It is built for practice first: mute the part you play and play along with a ban
 ## I want to know what it is
 
 - **A songbook.** Starter charts and your own songs, saved on the device. Save is explicit; an unsaved experiment is kept for you and offered back, with Revert to saved.
-- **A music stand.** During playback the chart is the screen. Tempo, genre, meter and per-instrument mutes sit around it; a section can be looped for practice.
+- **A music stand.** During playback the chart is the screen. Tempo, genre, meter and per-instrument mutes sit around it.
 - **Smart genre feels.** Thirteen genres (Jazz, Funk, Rock, Bossa, Neo-Soul, Hip Hop, and more) re-voice the whole band's drums, bass, comping and phrasing.
 - **A soloist with a Dynamic Head.** The soloist writes a seed melody for your progression, states it like a head, then develops it over successive choruses — coherent rather than random.
 - **Real sounds, offline.** Downloadable sample packs per instrument, and an installable app that plays without a connection once its sounds are stored.

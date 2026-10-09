@@ -47,8 +47,6 @@ export const STATE_OWNERSHIP_MANIFEST = {
         step: 'runtime-derived',
         currentSectionId: 'runtime-derived',
         startStep: 'runtime-derived',
-        loopStartStep: 'runtime-derived',
-        loopEndStep: 'runtime-derived',
         drawQueue: 'runtime-derived',
         isDrawing: 'runtime-derived',
         wakeLock: 'runtime-derived',

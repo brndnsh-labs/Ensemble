@@ -58,18 +58,15 @@ export function energyTier(energy: number): EnergyTier {
     return energy < 0.42 ? 'low' : energy < 0.7 ? 'mid' : 'high';
 }
 
-/** Which bars a pass plays, in order, and where it goes after the last one. */
+/** Which bars a pass plays, in order. A pass that loops goes on to the top of the song. */
 export interface PassWindow {
     /** First bar index played. */
     from: number;
     /** One past the last bar index played. */
     to: number;
-    /** The bar that follows the window when the performance loops (a practice loop wraps to
-     * its own start; a play-from-here pass wraps to the top of the song). */
-    wrapTo: number;
     /**
      * The bar this PASS actually began on — not necessarily `from`. A fresh pass (a full pass
-     * from the top, a practice loop's own lap, a play-from-here start) has nothing before it,
+     * from the top, a play-from-here start) has nothing before it,
      * so this defaults to `from`. A pass resumed mid-flight by a settings change
      * (`BandHost.update()`) carries the original pass's own origin forward instead, so its own
      * first bar (now `from`) is still a continuation, not a fresh start: it still crashes into
@@ -80,13 +77,13 @@ export interface PassWindow {
 }
 
 export function fullWindow(timeline: Timeline): PassWindow {
-    return { from: 0, to: timeline.bars.length, wrapTo: 0 };
+    return { from: 0, to: timeline.bars.length };
 }
 
 /**
  * Plans for the bars in `window`, indexed by bar index (bars outside it are absent).
- * `next` is resolved in performance order, so a practice loop's last bar leads back to the
- * loop's first bar rather than on to the next section. `planned` stops planning there (a chunk
+ * `next` is resolved in performance order: a looping pass's last bar leads back to the top of
+ * the song. `planned` stops planning there (a chunk
  * of a long counted performance needs only its own bars and the ones it looks across); the
  * window, and so where the performance goes and ends, is unchanged.
  *
@@ -118,14 +115,13 @@ export function planBars(
     const origin = window.origin ?? window.from;
     // The band's pass at bar `index` of lap `onPass` — see above.
     const passAt = (index: number, onPass: number) => onPass + bars[index].visit.chorus;
-    // The player trades over the whole song (a pass resumed at a barline still is one); a
-    // practice loop keeps its band. Trading with the soloist needs it on; trading with the
+    // The player trades over the whole song (a pass resumed at a barline still is one).
+    // Trading with the soloist needs it on; trading with the
     // drummer needs the drums on and a drummer who can solo in this style.
     const wanted = settings.trade ?? null;
     const trade =
         wanted &&
         window.to === bars.length &&
-        window.wrapTo === 0 &&
         (wanted.with === 'lead' ? settings.lanes.lead : settings.lanes.drums && drumSolos)
             ? wanted
             : null;
@@ -142,9 +138,7 @@ export function planBars(
     // The fill bar `index` would get on `onPass`, worked out from the form alone — the ONE
     // rule for a bar inside this call's own window (bar `i`, in the loop below) and one
     // outside it (its predecessor, when a resumed pass or a fresh pass's own origin needs it),
-    // so the two can't drift apart. "Last bar" is window-relative (`window.to - 1`), not the
-    // song's own last bar: a practice loop's own lap-end gets its big fill on the loop's own
-    // last bar, whatever the song's length.
+    // so the two can't drift apart. "Last bar" is window-relative (`window.to - 1`).
     const fillAt = (index: number, onPass: number): Fill => {
         const bar = bars[index];
         const isLast = index === window.to - 1;
@@ -154,7 +148,7 @@ export function planBars(
             // non-looping song plays a held ending instead.
             return 'none';
         }
-        const next = isLast ? (looping ? bars[window.wrapTo] : null) : bars[index + 1];
+        const next = isLast ? (looping ? bars[0] : null) : bars[index + 1];
         const visitEnd = bar.barInVisit === bar.visit.barCount - 1;
         // A counted chart's chorus ends into its next chorus the way a looping song's last
         // bar wraps to the top: a section fill, even out of a seamless section.
@@ -175,7 +169,7 @@ export function planBars(
     for (let i = window.from; i < Math.min(planned, window.to); i++) {
         const bar = bars[i];
         const isLast = i === window.to - 1;
-        const next = isLast ? (looping ? bars[window.wrapTo] : null) : bars[i + 1];
+        const next = isLast ? (looping ? bars[0] : null) : bars[i + 1];
         const section = sectionEnergy(bar);
         // A manual intensity sets the level; the form still shapes around it at half depth.
         let energy =
@@ -204,7 +198,7 @@ export function planBars(
             leadRole(timeline, i, passAt(i, pass), wanted).kind !== 'head'
         ) {
             // Asking to trade with the drummer makes you the soloist for every pass but a
-            // returned head, even where the trade can't happen (a practice loop, the drums
+            // returned head, even where the trade can't happen (the drums
             // off, a drummer who doesn't solo): the band's soloist never plays over you, but
             // it does play the head when it comes back.
             lanes.lead = false;
@@ -223,7 +217,7 @@ export function planBars(
         // The bar this PASS truly began on (`origin`), not this call's own window: a pass
         // resumed by a settings change (`BandHost.update()`) is a continuation of one already
         // under way, so its own first bar still arrives with a crash if the form says so. A
-        // genuinely fresh start (play-from-here, a practice loop's own first lap) has nothing
+        // genuinely fresh start (play-from-here) has nothing
         // before it and keeps the old suppression — its origin defaults to its own `from`.
         // `pass` here is the lap, not the band's pass (`passAt`): what matters is whether
         // anything was played before this bar, and a counted chart's later chorus has nothing

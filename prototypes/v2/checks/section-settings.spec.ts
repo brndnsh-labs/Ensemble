@@ -28,7 +28,7 @@ test('a new section can be named, repeated and put in 6/8, and it plays', async 
     await page.getByLabel('Section plays').press('Enter');
     await page.getByLabel('Section meter').selectOption('6/8');
 
-    const bridge = page.getByRole('button', { name: 'Section Bridge · hold to practice-loop' });
+    const bridge = page.getByRole('button', { name: 'Section Bridge', exact: true });
     await expect(bridge).toBeVisible();
     await expect(page.locator('.section-repeat')).toHaveText('Section ×2');
     // The section's first bar carries its meter mark; the song itself is still in 4/4.

@@ -550,9 +550,6 @@ export default function Ensemble() {
     // The count-in beat sounding now (0-based), or null when not counting in (#1422) — cheap
     // enough to ride the same 60ms poll `playing`/`active` already use, no new interval.
     const [countInBeat, setCountInBeat] = useState<number | null>(null);
-    // #1211 — id of the section a practice loop is armed/running on, or null.
-    // Polled alongside playing/active below; the engine is the source of truth.
-    const [loopedSectionId, setLoopedSectionId] = useState<string | null>(null);
     // #1458 — is playback in the ACTIVE bar's last FELT pulse right now? Strengthens the next-bar
     // cue and gates the Following look-ahead's jump-ahead scroll. Edge-triggered off the same
     // 60ms poll below (`runtime.inLastBeat()`, a pure engine read off the song tick the active slot
@@ -1155,7 +1152,6 @@ export default function Ensemble() {
             setPlaying(playingNow);
             // No slot while counting in or between two queued segments: the pointer holds.
             setActive((previous) => (!playingNow ? null : slot >= 0 ? slot : previous));
-            setLoopedSectionId(runtime.loopedSection());
             setCountInBeat(runtime.countInBeat());
             // #1458 — a pure engine read off the live song tick, not the ACTIVE bar's rendered DOM
             // node: React hasn't necessarily committed `active`'s new value yet on the very frame
@@ -2135,8 +2131,8 @@ export default function Ensemble() {
     }, [active, following]);
     // The jump-ahead (#1458, Touches #3): fires once per bar, on `nextSoon`'s rising edge (the
     // playing bar's last beat), only when the next performed bar isn't document-adjacent to the
-    // active one and isn't already on screen — a repeat back, an ending skip, the form's loop to
-    // bar 1, or a practice loop's wrap. `followJumpedFor` is the de-dupe, keyed on the PERFORMED
+    // active one and isn't already on screen — a repeat back, an ending skip, or the form's loop
+    // to bar 1. `followJumpedFor` is the de-dupe, keyed on the PERFORMED
     // BAR rather than `active`'s slot (patch review P3-2): a chord landing exactly on the last
     // felt pulse changes `active` without changing the bar, and a slot-keyed de-dupe would let
     // that re-fire the jump a second time inside the very same bar. `nextSoon` stays true for
@@ -2494,27 +2490,11 @@ export default function Ensemble() {
         pendingText.current = next.size > 0;
         setBuffers(next);
     }
-    // #1211 — long-press on a section letter arms/releases a practice loop
-    // confined to that section. Idempotent toggle: re-reads the engine after
-    // dispatching rather than trusting local state, so it stays correct if the
-    // loop was cleared elsewhere (Stop, Escape, editing) between renders.
-    function toggleSectionLoop(id: string | undefined) {
-        // `LeadSheetSectionBlock.id` is optional in the shared model (legacy fixtures
-        // predate it); every live block sets it, but stay a no-op rather than arm a
-        // loop keyed on `undefined` if one ever doesn't.
-        if (!id) {
-            return;
-        }
-        if (runtime.loopedSection() === id) {
-            runtime.clearLoop();
-        } else {
-            runtime.loopSection(id);
-        }
-        setLoopedSectionId(runtime.loopedSection());
-    }
     // Section tap menu's "Start here" (#1422): jump playback to a section's first performed
-    // bar, same `id`-may-be-undefined guard as `toggleSectionLoop` above.
+    // bar.
     function startHereSection(id: string | undefined) {
+        // `LeadSheetSectionBlock.id` is optional in the shared model (legacy fixtures
+        // predate it); every live block sets it, but stay a no-op if one ever doesn't.
         if (!id) {
             return;
         }
@@ -2524,7 +2504,6 @@ export default function Ensemble() {
         setFollowing(true);
         void run(async () => {
             await runtime.startSection(id, setSoundProgress);
-            setLoopedSectionId(runtime.loopedSection());
             setSoundProgress('');
         });
     }
@@ -5491,13 +5470,6 @@ export default function Ensemble() {
                                 ) {
                                     setFollowing(false);
                                 }
-                                // #1211 — Escape clears an active practice loop from
-                                // anywhere in the chart (bubbles up from a focused
-                                // section-letter button too).
-                                if (e.key === 'Escape' && loopedSectionId) {
-                                    runtime.clearLoop();
-                                    setLoopedSectionId(null);
-                                }
                             }}
                             tabIndex={0}
                             aria-label="Chord chart"
@@ -5511,13 +5483,11 @@ export default function Ensemble() {
                                 activeEvent={activeEvent}
                                 writtenBars={writtenBars}
                                 writtenSections={writtenSections}
-                                loopedSectionId={loopedSectionId}
                                 editing={editing}
                                 busy={busy}
                                 playing={playing}
                                 playbackActive={playbackActive}
                                 totalBars={totalBars}
-                                onToggleLoop={toggleSectionLoop}
                                 onStartHere={startHereSection}
                                 onEditSection={(block) => {
                                     if (current.schemaVersion === 2) {

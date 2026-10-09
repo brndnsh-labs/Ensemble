@@ -15,10 +15,6 @@ import { directionLabel } from '../lib/score-labels';
 type WrittenSection = SemanticScore['sections'][number];
 type WrittenBar = WrittenSection['measures'][number];
 
-/** How long a press on a section letter must last to arm the practice loop instead of opening
- * the section menu. */
-const SECTION_HOLD_MS = 500;
-
 /**
  * The counts the footer's form-length menu offers (#1511): a short list of the Edit panel's
  * 1–16 (`CHORUS_COUNTS` in `edit-panel.tsx`), plus the chart's own count when it is not listed.
@@ -87,8 +83,8 @@ interface ChartSheetProps {
     blocks: ChartBlock[];
     /** Display index of the sounding chord, or null while stopped. */
     displayActive: number | null;
-    /** Display index of the next performed bar (#1458), wrapping across a repeat, the form's
-     * own loop and an active practice loop — see `useChartView`'s `displayNext`. Null while
+    /** Display index of the next performed bar (#1458), wrapping across a repeat and the form's
+     * own loop — see `useChartView`'s `displayNext`. Null while
      * stopped, or when the chart has nothing after `displayActive` to point at. */
     displayNext: number | null;
     /** Following's look-ahead scroll (`app/ensemble.tsx`) is in the playing bar's last beat —
@@ -98,13 +94,11 @@ interface ChartSheetProps {
     activeEvent: { start: number; end: number } | null;
     writtenBars: Map<string, WrittenBar>;
     writtenSections: Map<string, WrittenSection>;
-    loopedSectionId: string | null;
     editing: boolean;
     busy: boolean;
     playing: boolean;
     playbackActive: boolean;
     totalBars: number;
-    onToggleLoop: (sectionId: string | undefined) => void;
     /** Section tap menu's "Start here" (#1422) — jumps playback to the section's first
      * performed bar, starting it if stopped. */
     onStartHere: (sectionId: string | undefined) => void;
@@ -126,30 +120,19 @@ export function ChartSheet({
     activeEvent,
     writtenBars,
     writtenSections,
-    loopedSectionId,
     editing,
     busy,
     playing,
     playbackActive,
     totalBars,
-    onToggleLoop,
     onStartHere,
     onEditSection,
     onEditBar,
     onAudition,
     onChoruses,
 }: ChartSheetProps) {
-    // Long-press bookkeeping for the section-letter loop gesture: the pending
-    // timer so pointerup/leave/cancel can cancel it, and a suppression flag so
-    // the click that follows a fired long-press doesn't also fire the plain-tap
-    // handler below (the section menu, #1422).
-    const sectionLoopPress = useRef<number | null>(null);
-    // When the pending press went down, on the input events' own clock (`event.timeStamp`).
-    const sectionPressStart = useRef(0);
-    const suppressSectionTap = useRef(false);
-    // A plain tap opens this small menu (#1422) instead of the long-press/'L' loop
-    // toggle above, which it leaves untouched. One menu for the whole sheet, not
-    // one per section: cheaper, and only one can be open at a time anyway.
+    // A tap on a section letter opens this small menu (#1422). One menu for the whole
+    // sheet, not one per section: cheaper, and only one can be open at a time anyway.
     const [sectionMenu, setSectionMenu] = useState<{
         id: string;
         label: string;
@@ -262,8 +245,8 @@ export function ChartSheet({
     }, [formMenuOpen]);
 
     /**
-     * The menu's own keys. They stop here, because the chart around the sheet reads Escape as
-     * "clear the practice loop" and an arrow as browsing away from Following.
+     * The menu's own keys. They stop here, because the chart around the sheet reads an arrow
+     * as browsing away from Following.
      */
     function onFormMenuKey(event: ReactKeyboardEvent<HTMLDivElement>) {
         const all = Array.from(
@@ -332,83 +315,11 @@ export function ChartSheet({
                         <button
                             type="button"
                             className="section-letter"
-                            aria-pressed={loopedSectionId === block.id}
-                            aria-label={`Section ${block.label || 'A'} · hold to practice-loop`}
-                            aria-keyshortcuts="L"
+                            aria-label={`Section ${block.label || 'A'}`}
                             aria-haspopup="menu"
                             aria-expanded={sectionMenu?.id === block.id}
-                            onPointerDown={(event) => {
-                                // A long-press whose click never arrived (a
-                                // touch released off-target) must not leave
-                                // the flag set and swallow the NEXT tap, which
-                                // opens the section menu below.
-                                suppressSectionTap.current = false;
-                                if (sectionLoopPress.current !== null) {
-                                    window.clearTimeout(sectionLoopPress.current);
-                                }
-                                sectionPressStart.current = event.timeStamp;
-                                sectionLoopPress.current = window.setTimeout(() => {
-                                    sectionLoopPress.current = null;
-                                    suppressSectionTap.current = true;
-                                    onToggleLoop(block.id);
-                                }, SECTION_HOLD_MS);
-                            }}
-                            onPointerUp={(event) => {
-                                if (sectionLoopPress.current === null) {
-                                    return;
-                                }
-                                window.clearTimeout(sectionLoopPress.current);
-                                sectionLoopPress.current = null;
-                                // The timer can lose to the release: when the
-                                // main thread is busy across its due time,
-                                // both engines run the queued pointerup
-                                // before the overdue timer, so a real hold
-                                // read as a tap and opened the menu (#1496).
-                                // The events' own timestamps say how long the
-                                // press lasted, however late they are handled.
-                                if (
-                                    event.timeStamp - sectionPressStart.current >=
-                                    SECTION_HOLD_MS
-                                ) {
-                                    suppressSectionTap.current = true;
-                                    onToggleLoop(block.id);
-                                }
-                            }}
-                            onPointerLeave={() => {
-                                if (sectionLoopPress.current !== null) {
-                                    window.clearTimeout(sectionLoopPress.current);
-                                    sectionLoopPress.current = null;
-                                }
-                            }}
-                            onPointerCancel={() => {
-                                if (sectionLoopPress.current !== null) {
-                                    window.clearTimeout(sectionLoopPress.current);
-                                    sectionLoopPress.current = null;
-                                }
-                            }}
-                            onClick={(event) => {
-                                // A long-press above already acted and set
-                                // this flag; swallow the click that follows
-                                // it so it doesn't ALSO open the menu.
-                                if (suppressSectionTap.current) {
-                                    suppressSectionTap.current = false;
-                                    return;
-                                }
-                                // A plain tap opens the section menu (#1422):
-                                // "Loop this section"/"Start here". Enter/Space
-                                // reach the same handler (native button
-                                // semantics), so no separate key handling here.
-                                openSectionMenu(event, block);
-                            }}
-                            onKeyDown={(e) => {
-                                // Long-press has no keyboard equivalent, so
-                                // 'l'/'L' stays the keyboard path straight to
-                                // the loop toggle, bypassing the menu.
-                                if (e.key === 'l' || e.key === 'L') {
-                                    e.preventDefault();
-                                    onToggleLoop(block.id);
-                                }
-                            }}
+                            // Enter/Space reach the same handler (native button semantics).
+                            onClick={(event) => openSectionMenu(event, block)}
                         >
                             {block.label || 'A'}
                         </button>
@@ -427,9 +338,6 @@ export function ChartSheet({
                                     }
                                 </span>
                             )}
-                        {loopedSectionId === block.id && (
-                            <span className="section-loop active">Looping</span>
-                        )}
                         {editing && (
                             <button
                                 className="section-edit"
@@ -743,17 +651,6 @@ export function ChartSheet({
                     className="popover section-menu"
                     style={{ position: 'fixed', top: sectionMenu.top, left: sectionMenu.left }}
                 >
-                    <button
-                        type="button"
-                        role="menuitem"
-                        className="option"
-                        onClick={() => {
-                            onToggleLoop(sectionMenu.id);
-                            closeSectionMenu();
-                        }}
-                    >
-                        {loopedSectionId === sectionMenu.id ? 'Stop looping' : 'Loop this section'}
-                    </button>
                     <button
                         type="button"
                         role="menuitem"

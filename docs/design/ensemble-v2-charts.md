@@ -221,8 +221,7 @@ one section, so its intro is not a labelled section and is not affected.
 
 The band plays a counted chart once and stops (#1475): every chorus, the last-chorus coda on
 the final one, then the transport returns to stopped at the end of the last bar, its notes
-ringing out as they do at the end of an export. A section practice loop ignores the count and
-loops its section as written in the first chorus that plays it. `.mid` and audio export render
+ringing out as they do at the end of an export. `.mid` and audio export render
 the whole counted performance. The Edit panel's **Choruses** select sets the count: Loop (the
 default, which removes the field) or 1–16; a chart that already counts more keeps its number.
 

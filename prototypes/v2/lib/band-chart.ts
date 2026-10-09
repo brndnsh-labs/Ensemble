@@ -21,7 +21,7 @@ import type { ScoreDuration, SemanticScore } from '@engine/songbook/score-types'
 import type { ChordNamePart, FormattedChordNames } from '@engine/types';
 import { type ChartBlock, type ChartChord, type ChartMeasure, writtenBlocks } from './lead-sheet';
 
-/** One sixteenth in band ticks: the unit the chart sheet and the practice loop speak. */
+/** One sixteenth in band ticks: the unit the chart sheet speaks. */
 const STEP_TICKS = PPQ / 4;
 
 export interface BandChartChord extends ChartChord {
@@ -58,7 +58,7 @@ export interface BandChart {
     /** Every performed event in performance order. */
     slots: BandSlot[];
     /**
-     * Each section visit's step range, for practice loops, and which chorus of a counted
+     * Each section visit's step range, for "Start here", and which chorus of a counted
      * performance (`SemanticScore.choruses`) it belongs to — 0 throughout an uncounted chart.
      */
     sections: { id: string; start: number; end: number; chorus: number }[];
@@ -198,8 +198,8 @@ export function slotAt(chart: BandChart, tick: number): number {
  * A section's whole span in steps, every visit collapsed into one window — the same rule as
  * `getSectionStepBounds`, which reads the old engine's section map instead. A counted chart
  * (#1475) performs its form once per chorus, so only the visits of the FIRST chorus that plays
- * the section count: practising a section loops one time through it (its written repeats
- * included), never a window stretched from chorus 1 to chorus N. That first chorus is chorus 0
+ * the section count: "Start here" begins at its first performed bar there, never at a window
+ * stretched from chorus 1 to chorus N. That first chorus is chorus 0
  * for the form, and the last for a last-chorus coda or an outro (#1483), which only it plays.
  */
 export function sectionSteps(chart: BandChart, id: string): { start: number; end: number } | null {

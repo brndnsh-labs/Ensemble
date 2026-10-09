@@ -32,8 +32,8 @@ export function measureOfGlobalIndex(blocks: ChartBlock[]): Map<number, number> 
  * The next performed item whose PERFORMED BAR differs from `active`'s (#1458's next-bar cue) —
  * walking forward past every further chord still inside that same bar, not just `active + 1`,
  * which a bar holding more than one chord would otherwise point the cue at itself with (P1-1).
- * Wraps to the loop's first item once none remain inside it, or to item 0 when `loop` is null
- * (the band loops the whole form at the end, so after the last bar comes the top).
+ * Wraps to item 0 once none remain (the band loops the whole form at the end, so after the
+ * last bar comes the top).
  *
  * `barOf` identifies "performed bar", which is deliberately NOT "written measure": a `||: F7 :||
  * x4` repeat performs the SAME written bar four times, and each of those four is its own
@@ -48,29 +48,17 @@ export function measureOfGlobalIndex(blocks: ChartBlock[]): Map<number, number> 
 export function nextBarIndex<T extends { start: number }>(
     items: readonly T[],
     active: number,
-    loop: { start: number; end: number } | null,
     barOf: (item: T, index: number) => number,
 ): number | null {
     if (active < 0 || active >= items.length) {
         return null;
     }
     const activeBar = barOf(items[active], active);
-    const inLoop = (i: number) =>
-        i >= 0 &&
-        i < items.length &&
-        (!loop || (items[i].start >= loop.start && items[i].start < loop.end));
     let i = active + 1;
-    while (inLoop(i) && barOf(items[i], i) === activeBar) {
+    while (i < items.length && barOf(items[i], i) === activeBar) {
         i += 1;
     }
-    if (inLoop(i)) {
-        return i;
-    }
-    if (loop) {
-        const start = items.findIndex((item) => item.start >= loop.start && item.start < loop.end);
-        return start >= 0 ? start : null;
-    }
-    return items.length > 0 ? 0 : null;
+    return i < items.length ? i : 0;
 }
 
 /**
@@ -99,31 +87,25 @@ export function useChartView(current: ChartDocument | null, active: number | nul
     const measureOf = useMemo(() => measureOfGlobalIndex(blocks), [blocks]);
     /**
      * The next performed bar's display index (#1458's next-bar cue), skipping past any further
-     * chords still inside `active`'s own bar, then wrapping across a repeat, the form's own loop
-     * back to the top, and an active practice loop — see `nextBarIndex` above.
+     * chords still inside `active`'s own bar, then wrapping across a repeat and the form's own
+     * loop back to the top — see `nextBarIndex` above.
      *
      * Read plain, not memoized — same as `displayActive`/`activeEvent` below, which read
-     * `runtime.state()` fresh every call for the same reason: this hook has no render boundary of
-     * its own, so it runs again whenever its caller does, including the render `app/ensemble.tsx`
-     * makes when ITS `loopedSectionId` state changes (a genuine value change, so React does not
-     * bail out of it) — which is what makes arming or clearing a practice loop reach this
-     * computation immediately, even on a bar `active` hasn't moved off yet. A `useMemo` keyed on
-     * `[active, band]` alone would miss exactly that render.
+     * `runtime.state()` fresh every call: this hook has no render boundary of its own, so it
+     * runs again whenever its caller does.
      */
     const displayNext = ((): number | null => {
         if (active === null) {
             return null;
         }
-        const { loopStartStep, loopEndStep } = runtime.state().playback;
-        const loop = loopStartStep >= 0 ? { start: loopStartStep, end: loopEndStep } : null;
         if (band) {
-            const next = nextBarIndex(band.slots, active, loop, (slot) => slot.bar);
+            const next = nextBarIndex(band.slots, active, (slot) => slot.bar);
             return next === null ? null : band.slots[next].display;
         }
         // No per-item field to read `barOf` off (a measure-less chart's `display` IS its index),
         // so the raw `stepMap` goes straight in — no per-render copy (patch review P3-6).
         const stepMap = runtime.state().arranger.stepMap;
-        return nextBarIndex(stepMap, active, loop, (_step, i) => measureOf.get(i) ?? -1);
+        return nextBarIndex(stepMap, active, (_step, i) => measureOf.get(i) ?? -1);
     })();
     const activeEvent =
         active === null

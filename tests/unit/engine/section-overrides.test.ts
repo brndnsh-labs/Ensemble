@@ -38,7 +38,7 @@ describe('section instrument overrides', () => {
         expect(isInstrumentEverActive(state, 'bass')).toBe(false);
     });
 
-    it('folds later practice passes before resolving a section intensity override', () => {
+    it('resolves a section intensity override from the section the step is in', () => {
         const state = {
             arranger: {
                 totalSteps: 32,
@@ -46,18 +46,15 @@ describe('section instrument overrides', () => {
                     { id: 'verse', start: 0, end: 16 },
                     { id: 'chorus', start: 16, end: 32 },
                 ],
-                sections: [
-                    { id: 'verse', targetIntensity: 0.2 },
-                    { id: 'chorus', targetIntensity: 0.8 },
-                ],
+                sections: [{ id: 'verse', targetIntensity: 0.2 }, { id: 'chorus' }],
             },
-            playback: { loopStartStep: 16, loopEndStep: 32 },
             conductor: { targetIntensity: 0.35 },
         } as unknown as EnsembleState;
 
-        expect(effectiveTargetIntensity(state, 16)).toBe(0.8);
-        expect(effectiveTargetIntensity(state, 32)).toBe(0.8);
-        expect(effectiveTargetIntensity(state, 48)).toBe(0.8);
+        expect(effectiveTargetIntensity(state, 0)).toBe(0.2);
+        expect(effectiveTargetIntensity(state, 15)).toBe(0.2);
+        // No override on the chorus: the global target.
+        expect(effectiveTargetIntensity(state, 16)).toBe(0.35);
     });
 
     it('ignores stale soloist busy memory while the current section force-mutes it', () => {
