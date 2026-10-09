@@ -1,4 +1,4 @@
-import { gainForPack, toneTiltForPack } from '../data/sound-packs.js';
+import { gainForPack, packSustains, toneTiltForPack } from '../data/sound-packs.js';
 import type { EnsembleState, Mutable } from '../types.js';
 import { getMidi } from '../utils.js';
 import { safeDisconnect } from './audio-graph-utils.js';
@@ -168,6 +168,7 @@ function playSampledChord(
         velocity,
         duration,
         tone: toneTiltForPack(packId),
+        sustain: packSustains(packId),
         lane: 'chords',
     });
 }

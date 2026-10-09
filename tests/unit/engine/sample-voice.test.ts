@@ -860,3 +860,85 @@ describe('sample-voice — a stop silences its lane (#1530)', () => {
         expect(source.stop.mock.calls[0][0]).toBeLessThan(5.7);
     });
 });
+
+describe('sample-voice — a sustaining note outlasts its recording (#1532)', () => {
+    // A context that hands out a new source and gain each time, and keeps them.
+    function makeLoopCtx() {
+        const sources: any[] = [];
+        const gains: any[] = [];
+        const ctx = {
+            currentTime: 0,
+            createBufferSource: vi.fn(() => {
+                const source = {
+                    playbackRate: fakeParam(),
+                    connect: vi.fn(),
+                    disconnect: vi.fn(),
+                    start: vi.fn(),
+                    stop: vi.fn(),
+                    onended: null as null | (() => void),
+                    buffer: null,
+                };
+                sources.push(source);
+                return source;
+            }),
+            createGain: vi.fn(() => {
+                const gain = {
+                    gain: { ...fakeParam(), setValueCurveAtTime: vi.fn() },
+                    connect: vi.fn(),
+                    disconnect: vi.fn(),
+                };
+                gains.push(gain);
+                return gain;
+            }),
+        } as unknown as AudioContext;
+        return { ctx, sources, gains };
+    }
+    const organ: SampleZone = { rootMidi: 60, buffer: fakeBuffer(4) };
+    const lastStop = (source: any) => source.stop.mock.calls.at(-1)[0];
+
+    it('plays the recording again from past its attack, each pass overlapping the last', () => {
+        const { ctx, sources } = makeLoopCtx();
+        playSampledNote(ctx, organ, {} as AudioNode, 60, 1, { duration: 12, sustain: true });
+        // One pass is the recording less its fade (3.65 s); a later one also skips the first
+        // half second, and each starts a quarter second before the one before it ends.
+        const starts = sources.map((source) => source.start.mock.calls[0]);
+        expect(starts[0]).toEqual([1]);
+        expect(starts.slice(1)).toEqual([4.4, 7.3, 10.2].map((at) => [expect.closeTo(at, 6), 0.5]));
+        // The last pass stops with the note (hold + release), the others at their own ends.
+        expect(lastStop(sources[0])).toBeCloseTo(4.66, 6);
+        expect(lastStop(sources[3])).toBeCloseTo(13.09, 6);
+    });
+
+    it('leaves a note its recording covers as one source', () => {
+        const { ctx, sources, gains } = makeLoopCtx();
+        playSampledNote(ctx, organ, {} as AudioNode, 60, 1, { duration: 2, sustain: true });
+        expect(sources).toHaveLength(1);
+        expect(gains).toHaveLength(1);
+    });
+
+    it('does not loop a pack that does not sustain', () => {
+        const { ctx, sources } = makeLoopCtx();
+        playSampledNote(ctx, organ, {} as AudioNode, 60, 1, { duration: 12 });
+        expect(sources).toHaveLength(1);
+    });
+
+    it('a release stops every pass, and the voice ends when the last one has', () => {
+        const { ctx, sources } = makeLoopCtx();
+        const onEnded = vi.fn();
+        const voice = playSampledNote(ctx, organ, {} as AudioNode, 60, 1, {
+            duration: 12,
+            sustain: true,
+            onEnded,
+        });
+        voice?.release(6, 0.01);
+        for (const source of sources) {
+            expect(lastStop(source)).toBeLessThan(6.1);
+        }
+        sources.slice(0, -1).forEach((source) => {
+            source.onended();
+        });
+        expect(onEnded).not.toHaveBeenCalled();
+        sources.at(-1).onended();
+        expect(onEnded).toHaveBeenCalledTimes(1);
+    });
+});

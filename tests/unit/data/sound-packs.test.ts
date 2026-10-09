@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
     gainForPack,
+    packSustains,
     packsForInstrument,
     reverbSendForPack,
     SOUND_PACKS,
@@ -63,5 +64,18 @@ describe('sound-packs catalog', () => {
         for (const pack of bassPacks) {
             expect(pack.instruments).toContain('bass');
         }
+    });
+});
+
+describe('packSustains (#1532)', () => {
+    it('is the organ alone: every other pack is struck or plucked, or plays short notes', () => {
+        expect(SOUND_PACKS.filter((pack) => packSustains(pack.id)).map((pack) => pack.id)).toEqual([
+            'hammond-organ',
+        ]);
+    });
+
+    it('is false for the synth voice and an unknown pack', () => {
+        expect(packSustains(null)).toBe(false);
+        expect(packSustains('constructor')).toBe(false);
     });
 });

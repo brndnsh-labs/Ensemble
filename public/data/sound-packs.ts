@@ -61,6 +61,13 @@ export interface SoundPack {
      */
     readonly toneTiltDb?: number;
     /**
+     * A sustaining instrument: a note held longer than its recording plays on, the recording
+     * crossfaded into itself (#1532, `playSampledNote`'s `sustain`). For an organ, whose key
+     * sounds for as long as it is down. Omitted for anything struck or plucked, whose note
+     * should die away with its recording.
+     */
+    readonly sustains?: boolean;
+    /**
      * Cache-bust revision for this pack's audio (#752). Pack files live at stable
      * `/packs/<id>/*` URLs served `CacheFirst` (correct while packs are add-only/
      * immutable). If a pack's audio is ever **re-encoded in place**, bump `rev`:
@@ -107,6 +114,8 @@ export const SOUND_PACKS: readonly SoundPack[] = [
         // DI-dry tonewheel emulation (no recorded room) — push the send up so it
         // shares the band's space instead of sitting flat up front. #686 start.
         reverbSend: 1.5,
+        // The band holds an organ chord for bars; the recordings are four seconds (#1532).
+        sustains: true,
     },
     {
         id: 'clavinet',
@@ -413,6 +422,11 @@ export function toneTiltForPack(packId: string | null): number {
     }
     const pack = SOUND_PACKS.find((entry) => entry.id === packId);
     return pack?.toneTiltDb ?? 0;
+}
+
+/** Whether a pack is a sustaining instrument (`SoundPack.sustains`, #1532). */
+export function packSustains(packId: string | null): boolean {
+    return SOUND_PACKS.find((entry) => entry.id === packId)?.sustains === true;
 }
 
 /**

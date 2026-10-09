@@ -28,6 +28,28 @@ import { scrambleHash } from './hash-utils.js';
  */
 const MAX_SAMPLE_PEAK = 8;
 
+/**
+ * A sustaining pack's loop (#1532). A recording is a few seconds long; an organ chord is held
+ * for bars. A note that outlasts its recording plays it again from past the attack, each pass
+ * crossfaded into the next at equal power. A crossfade, not loop points: the tonewheels are
+ * not phase-locked to the fundamental, so no stretch of the recording joins its own start
+ * (measured: a shift of any whole number of periods leaves the waveform uncorrelated).
+ */
+/** Buffer seconds left unplayed at the end of each pass: the recording's own fade-out. */
+const SUSTAIN_TAIL = 0.35;
+/** Buffer seconds a later pass starts at: past the key click and the attack. */
+const SUSTAIN_LOOP_START = 0.5;
+/** Seconds two passes overlap. Long enough to hide the join, short beside a pass. */
+const SUSTAIN_CROSSFADE = 0.25;
+/** A bound on passes for one note: about three minutes of a four-second recording. */
+const SUSTAIN_MAX_PASSES = 64;
+
+const fadeCurve = (shape: (x: number) => number): Float32Array =>
+    Float32Array.from({ length: 65 }, (_, i) => shape((i / 64) * (Math.PI / 2)));
+/** Equal power: the two passes are uncorrelated, so their powers add, not their amplitudes. */
+const FADE_IN = fadeCurve(Math.sin);
+const FADE_OUT = fadeCurve(Math.cos);
+
 /** Seconds a stopped voice takes to fade (`releaseSampledVoices`): short, and click-free. */
 const STOP_FADE = 0.01;
 
@@ -175,6 +197,12 @@ export interface SampledNoteOptions {
      * negative darkens. Omitted/`0`/non-finite leaves the path un-filtered.
      */
     readonly tone?: number;
+    /**
+     * A sustaining instrument (an organ): a note held past the end of its recording plays on,
+     * the recording crossfaded into itself (#1532). Omitted, the note ends with its recording,
+     * as a struck or plucked one should. A note the recording covers is untouched either way.
+     */
+    readonly sustain?: boolean;
     /** The lane a stop silences this voice with (`releaseSampledVoices`). Omitted: none. */
     readonly lane?: SampleLane;
     readonly onEnded?: () => void;
@@ -615,6 +643,7 @@ export function playSampledNote(
         vibrato,
         bend,
         tone,
+        sustain,
         lane,
         onEnded,
     }: SampledNoteOptions = {},
@@ -656,7 +685,32 @@ export function playSampledNote(
         const gain = audio.createGain();
         const releaseStart = scheduleEnvelope(gain, startTime, peak, attack, hold, release);
 
-        source.connect(gain);
+        // Every source of this note and the fade it plays through. One of each unless the
+        // note outlasts its recording on a sustaining pack (see `SUSTAIN_CROSSFADE`).
+        const sources = [source];
+        const passGains: GainNode[] = [];
+        const passLength = (zone.buffer.duration - SUSTAIN_TAIL - SUSTAIN_LOOP_START) / baseRate;
+        const firstEnd = startTime + (zone.buffer.duration - SUSTAIN_TAIL) / baseRate;
+        const looped =
+            sustain === true &&
+            !bend &&
+            !vibrato &&
+            releaseStart + release > firstEnd &&
+            passLength > 2 * SUSTAIN_CROSSFADE;
+        if (looped) {
+            const first = audio.createGain();
+            first.gain.setValueAtTime(1, startTime);
+            first.gain.setValueCurveAtTime(
+                FADE_OUT,
+                firstEnd - SUSTAIN_CROSSFADE,
+                SUSTAIN_CROSSFADE,
+            );
+            source.connect(first);
+            first.connect(gain);
+            passGains.push(first);
+        } else {
+            source.connect(gain);
+        }
         // Opt-in per-pack tone correction (#755): splice a tilt between the note
         // gain and the bus so only this pack is reshaped — the synth voice shares
         // `destination` and must stay untouched. No tilt → the un-filtered path.
@@ -737,21 +791,68 @@ export function playSampledNote(
         // Disconnect the node chain once the note finishes, then fire onEnded —
         // the same self-cleanup contract as `playPercussiveStrike`, so sampled
         // notes don't leak a source+gain per played note.
-        let untrack = () => {};
-        source.onended = () => {
-            ended = true;
-            untrack();
-            safeDisconnect([source, gain, ...(toneTilt?.nodes ?? []), ...vibratoNodes]);
-            onEnded?.();
+        // The later passes of a looped note, each starting as the one before fades out.
+        const stops = [looped ? firstEnd + 0.01 : Number.POSITIVE_INFINITY];
+        if (looped) {
+            let from = firstEnd - SUSTAIN_CROSSFADE;
+            while (from < naturalEnd && sources.length < SUSTAIN_MAX_PASSES) {
+                const pass = audio.createBufferSource();
+                pass.buffer = zone.buffer;
+                pass.playbackRate.setValueAtTime(baseRate, from);
+                const fade = audio.createGain();
+                fade.gain.setValueAtTime(0, startTime);
+                fade.gain.setValueCurveAtTime(FADE_IN, from, SUSTAIN_CROSSFADE);
+                fade.gain.setValueCurveAtTime(
+                    FADE_OUT,
+                    from + passLength - SUSTAIN_CROSSFADE,
+                    SUSTAIN_CROSSFADE,
+                );
+                pass.connect(fade);
+                fade.connect(gain);
+                pass.start(from, SUSTAIN_LOOP_START);
+                sources.push(pass);
+                passGains.push(fade);
+                stops.push(from + passLength + 0.01);
+                from += passLength - SUSTAIN_CROSSFADE;
+            }
+        }
+        /** Stop every source at `end`, or at the end of its own pass if that is sooner. */
+        const stopAll = (end: number) => {
+            sources.forEach((each, i) => {
+                each.stop(Math.min(end, stops[i]));
+            });
         };
 
+        let untrack = () => {};
+        let sounding = sources.length;
+        const finish = () => {
+            sounding--;
+            if (sounding > 0) {
+                return;
+            }
+            ended = true;
+            untrack();
+            safeDisconnect([
+                ...sources,
+                ...passGains,
+                gain,
+                ...(toneTilt?.nodes ?? []),
+                ...vibratoNodes,
+            ]);
+            onEnded?.();
+        };
+        for (const each of sources) {
+            each.onended = finish;
+        }
+
         source.start(startTime);
-        source.stop(naturalEnd);
+        stopAll(naturalEnd);
 
         const handle: SampledNoteHandle = {
             extend(when: number, duration: number, velocity: number, nextTail = release): boolean {
                 if (
                     ended ||
+                    looped ||
                     Number.isFinite(releasedAt) ||
                     bend ||
                     vibrato ||
@@ -809,7 +910,7 @@ export function playSampledNote(
                     const tc = Math.max(0.004, (Number.isFinite(fade) ? fade : 0.05) / 4);
                     holdEnvelope(at);
                     gain.gain.setTargetAtTime(0, at, tc);
-                    source.stop(Math.min(naturalEnd, at + tc * 8));
+                    stopAll(Math.min(naturalEnd, at + tc * 8));
                     releasedAt = at;
                 } catch {
                     /* already stopped / closed context — release is a no-op */
