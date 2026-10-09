@@ -6,6 +6,7 @@ import {
     pitchRatio,
     playSampledNote,
     playSampledStrike,
+    releaseSampledVoices,
     type SampleZone,
 } from '../../../public/engine/sample-voice.js';
 
@@ -800,5 +801,62 @@ describe('sample-voice — playSampledNote tone insertion (#755)', () => {
         playSampledNote(ctx, zone(60), dest, 60, 5, { duration: 0.5 });
         expect(biquads).toHaveLength(0);
         expect(gain.connect).toHaveBeenCalledWith(dest);
+    });
+});
+
+describe('sample-voice — a stop silences its lane (#1530)', () => {
+    it("releases a sounding note of the lane, and no other lane's", () => {
+        const { ctx, source, gain } = makeCtx();
+        playSampledNote(ctx, zone(60), {} as AudioNode, 60, 5, { duration: 8, lane: 'chords' });
+        source.stop.mockClear();
+
+        releaseSampledVoices(ctx, 'bass', 6);
+        expect(gain.gain.setTargetAtTime).not.toHaveBeenCalled();
+
+        releaseSampledVoices(ctx, 'chords', 6);
+        expect(gain.gain.setTargetAtTime).toHaveBeenCalledWith(0, 6, expect.any(Number));
+        // Stopped within tens of milliseconds, not at the end of its eight-second hold.
+        expect(source.stop).toHaveBeenCalledTimes(1);
+        expect(source.stop.mock.calls[0][0]).toBeLessThan(6.1);
+    });
+
+    it('a note scheduled ahead never sounds', () => {
+        const { ctx, source, gain } = makeCtx();
+        // The host sends notes up to 150 ms ahead: this one starts after the stop.
+        playSampledNote(ctx, zone(60), {} as AudioNode, 60, 5.1, { duration: 2, lane: 'chords' });
+        source.stop.mockClear();
+        releaseSampledVoices(ctx, 'chords', 5);
+        // Held at its level on its start (silence, before the attack) and faded from there.
+        expect(gain.gain.calls.slice(-2)).toEqual([
+            { op: 'ramp', value: 0, time: 5.1 },
+            { op: 'target', value: 0, time: 5.1 },
+        ]);
+        expect(source.stop.mock.calls[0][0]).toBeLessThan(5.2);
+    });
+
+    it('forgets a note once it has ended', () => {
+        const { ctx, source, gain } = makeCtx();
+        playSampledNote(ctx, zone(60), {} as AudioNode, 60, 5, { duration: 1, lane: 'chords' });
+        source.onended();
+        releaseSampledVoices(ctx, 'chords', 6);
+        expect(gain.gain.setTargetAtTime).not.toHaveBeenCalled();
+    });
+
+    it('a note with no lane is left alone', () => {
+        const { ctx, gain } = makeCtx();
+        playSampledNote(ctx, zone(60), {} as AudioNode, 60, 5, { duration: 8 });
+        for (const lane of ['chords', 'bass', 'soloist', 'drums'] as const) {
+            releaseSampledVoices(ctx, lane, 6);
+        }
+        expect(gain.gain.setTargetAtTime).not.toHaveBeenCalled();
+    });
+
+    it('chokes a ringing drum sample', () => {
+        const { ctx, source, gain } = makeCtx();
+        playSampledStrike(ctx, fakeBuffer(3), {} as AudioNode, 5, { lane: 'drums' });
+        source.stop.mockClear();
+        releaseSampledVoices(ctx, 'drums', 5.5);
+        expect(gain.gain.setTargetAtTime).toHaveBeenCalledWith(0, 5.5, expect.any(Number));
+        expect(source.stop.mock.calls[0][0]).toBeLessThan(5.7);
     });
 });

@@ -5,7 +5,12 @@ import { safeDisconnect } from './audio-graph-utils.js';
 import { HUMANIZE_PROFILES, humanizePlacement, humanizeScale } from './humanize.js';
 import { resolveInstrumentSource } from './instrument-registry.js';
 import { getPackZones } from './pack-runtime.js';
-import { pickZone, playSampledNote, type SampledNoteHandle } from './sample-voice.js';
+import {
+    pickZone,
+    playSampledNote,
+    releaseSampledVoices,
+    type SampledNoteHandle,
+} from './sample-voice.js';
 import {
     createSimplePanner,
     playPercussiveStrike,
@@ -68,17 +73,13 @@ export function killAllPianoNotes(state: EnsembleState): void {
         });
         playback.heldNotes.clear();
     }
-    // #691 — sampled chord voices aren't in `heldNotes`; release + clear their
-    // own active list so a stop/pause/voice-switch silences them too (previously
-    // they had no kill path and rang out their full duration).
-    const mutPlayback = playback as Mutable<typeof playback>;
-    if (mutPlayback.activeChordVoices?.length) {
-        for (const handle of mutPlayback.activeChordVoices) {
-            handle.release(now, 0.01); // @direct-mutation
-        }
+    // Sampled chord voices aren't in `heldNotes`: each registers itself with its lane as it
+    // is made (#1530), so a stop, restart or voice switch silences them too. An organ holds
+    // for bars; unreleased, it rang on under whatever came next.
+    if (playback.audio) {
+        releaseSampledVoices(playback.audio, 'chords', now);
     }
-    mutPlayback.activeChordVoices = []; // @direct-mutation
-    mutPlayback.lastChordKey = null; // @direct-mutation
+    const mutPlayback = playback as Mutable<typeof playback>;
     mutPlayback.sustainActive = false; // @direct-mutation
 }
 
@@ -107,7 +108,7 @@ const SYNTH_CHORD_LEVEL = 0.85;
 
 // #707/#691 — the release contract shared by the sampled and synth chord
 // voices. The scheduler calls `release(when, fade)` on the previous voicing
-// when the harmony changes; this matches `EnsembleState.activeChordVoices` and
+// when the harmony changes; this is the shape `playSampledNote` returns and
 // is structurally satisfied by the sampled `SampledNoteHandle`.
 type ChordVoiceHandle = { release(when: number, fade: number): void };
 
@@ -160,13 +161,14 @@ function playSampledChord(
     // vol ≈ 0.25). Same trap as #1332 (soloist) and #660 (bass); defer to
     // playSampledNote's MAX_SAMPLE_PEAK envelope ceiling instead.
     const velocity = (vol / Math.sqrt(numVoices)) * gainForPack(packId);
-    // Return the voice handle so the scheduler can release this voicing when the
+    // Return the voice handle so a caller can release this voicing when the
     // harmony changes (#691) — sustained packs hold flat and would otherwise ring
     // into the next chord.
     return playSampledNote(audio, zone, dest, targetMidi, Math.max(time, audio.currentTime), {
         velocity,
         duration,
         tone: toneTiltForPack(packId),
+        lane: 'chords',
     });
 }
 

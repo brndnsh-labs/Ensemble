@@ -3,7 +3,13 @@ import type { EnsembleState, Mutable, SoloistExpression, SoloistVoice } from '..
 import { clampFreq, safeDisconnect } from './audio-graph-utils.js';
 import { scrambleHash } from './hash-utils.js';
 import { resolveInstrumentSource } from './instrument-registry.js';
-import { clampFrac, playSampledNote, type SampleBend, type SampleVibrato } from './sample-voice.js';
+import {
+    clampFrac,
+    playSampledNote,
+    releaseSampledVoices,
+    type SampleBend,
+    type SampleVibrato,
+} from './sample-voice.js';
 import { STYLE_CONFIG, type StyleConfig } from './soloist-config.js';
 import {
     getSoloistVoiceLimit,
@@ -32,6 +38,8 @@ export function killSoloistNote(state: EnsembleState): void {
     const { playback, soloist } = state;
     if (playback.audio) {
         killActiveVoices(soloist.audio.activeVoices, playback.audio.currentTime, 0.01);
+        // A sampled lead note is not among `activeVoices`: it is silenced with its lane (#1530).
+        releaseSampledVoices(playback.audio, 'soloist', playback.audio.currentTime);
     }
 }
 
@@ -194,6 +202,7 @@ function playSampledSolo(
         // or the guitar legato slur synthesized just above (#855).
         bend,
         tone: toneTiltForPack(packId),
+        lane: 'soloist',
     });
     return true;
 }

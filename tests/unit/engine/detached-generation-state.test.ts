@@ -15,7 +15,6 @@ describe('detached generation state', () => {
                 wakeLock: { release: vi.fn() },
                 lastActiveDrumElements: [{ remove: vi.fn() }],
                 heldNotes: new Set([{ stop: vi.fn() }]),
-                activeChordVoices: [{ release: vi.fn() }],
                 suspendTimeout: 99,
                 isPlaying: true,
             },
@@ -45,7 +44,6 @@ describe('detached generation state', () => {
             audioGraph: null,
             wakeLock: null,
             lastActiveDrumElements: null,
-            activeChordVoices: [],
             suspendTimeout: null,
             isPlaying: false,
         });

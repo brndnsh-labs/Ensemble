@@ -9,7 +9,12 @@ import {
     packIdFromVoice,
     resolveInstrumentSource,
 } from './instrument-registry.js';
-import { pickRoundRobin, playSampledStrike, type SampleVoiceHandle } from './sample-voice.js';
+import {
+    pickRoundRobin,
+    playSampledStrike,
+    releaseSampledVoices,
+    type SampleVoiceHandle,
+} from './sample-voice.js';
 import { isInstrumentActiveAtStep } from './section-overrides.js';
 import {
     createSimplePanner,
@@ -1040,6 +1045,8 @@ export function killDrumNote(state: EnsembleState): void {
         rampGain(groove.lastCrashGain.gain, 0, playback.audio.currentTime, 0.12);
         (groove as Mutable<typeof groove>).lastCrashGain = null; // @direct-mutation
     }
+    // Every other sampled hit — a crash or ride still ringing — is silenced with its lane (#1530).
+    releaseSampledVoices(playback.audio, 'drums', playback.audio.currentTime);
 }
 
 // Mix state for density-aware normalization, one per audio context (#1531): an offline render
@@ -1215,6 +1222,7 @@ function tryPlaySampledDrum(
     let voice: SampleVoiceHandle | null = null;
     voice = playSampledStrike(ctx.audio, buffer, ctx.panner, ctx.playTime, {
         velocity: ctx.masterVol * gainForPack(packId),
+        lane: 'drums',
         onEnded: () => {
             // Clear the slot if this voice is the active one and ended naturally,
             // so a later choke never pokes a freed source.
