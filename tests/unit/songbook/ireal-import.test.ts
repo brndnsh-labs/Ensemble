@@ -214,6 +214,16 @@ describe('bounded source-preserving iReal import', () => {
                 [3, 2],
             ],
         ],
+        // 3/4: 2 chords, 2 raw cells each at half a beat a cell — a beat and a half apiece, the
+        // change on the "and" of 2. Heard in iReal Pro's own playback (#1454), shipped in #1546.
+        [
+            '3/4',
+            'T34[C F Z',
+            [
+                [3, 2],
+                [3, 2],
+            ],
+        ],
         // 6/4: 2 chords, 2 raw cells each (4 total, the usual grid), already summing to the
         // meter's own 6-beat count via the default weight of 1 — no adjustment needed.
         [
@@ -235,19 +245,15 @@ describe('bounded source-preserving iReal import', () => {
         },
     );
 
-    it.each(['3/4', '3/2', '6/8'])(
+    it.each(['3/2', '6/8'])(
         'still refuses a multi-chord bar in %s — a scope decision, not a technical gap (#1453)',
         (meter) => {
             // `multiChordDurations` implements the cited algorithm generally, but
-            // `SHIPPED_MULTI_CHORD_METERS` deliberately excludes these three: 3/4 and 3/2's 0.5
-            // beat-per-cell weight makes a plain two-chord bar split 1.5+1.5, landing on the "and"
-            // of beat 2 in most waltzes (measured at 168 of 181 such bars, 43 songs, across the
-            // whole Jazz 1460 playlist) — the reference converter's own comment calls this
-            // specific algorithm "unknown", so it isn't an established rule under #1171 without an
-            // explicit by-ear check against iReal Pro's own playback. 6/8 has no real-playlist
-            // multi-chord evidence at all. A single-chord bar in any of these three is unaffected
-            // (see the "does not mistake..." and other single-event tests elsewhere in this file).
-            const token = { '3/4': '34', '3/2': '32', '6/8': '68' }[meter];
+            // `SHIPPED_MULTI_CHORD_METERS` leaves these two out: 3/2 has 3/4's half-beat cell
+            // but, unlike 3/4 (#1454), nobody has checked it against iReal Pro's own playback,
+            // and 6/8 has no real-playlist multi-chord evidence at all. A single-chord bar in
+            // either is unaffected (see the single-event tests elsewhere in this file).
+            const token = { '3/2': '32', '6/8': '68' }[meter];
             blocked(`T${token}[C F Z`);
         },
     );
@@ -763,10 +769,10 @@ describe('bounded source-preserving iReal import', () => {
         });
 
         it('names the blocker a mapped pair leaves, not the signs it no longer has to refuse', () => {
-            // Eight Jazz 1460 charts ("Very Early") carry the pair and multi-chord bars in a meter
-            // the importer doesn't time yet (#1453): the refusal is now that bar, which is what's
-            // in the way.
-            const song = parseIRealImport(open('T34[C   |F   Q|D G7 |C   Z[QD7   Z')).songs[0];
+            // A chart with the pair and a multi-chord bar in a meter the importer doesn't time
+            // (#1453; 3/2 here, as 3/4 was until #1546): the refusal is that bar, which is
+            // what's in the way.
+            const song = parseIRealImport(open('T32[C   |F   Q|D G7 |C   Z[QD7   Z')).songs[0];
             expect(song.score).toBeUndefined();
             expect(song.diagnostics).toEqual([
                 expect.objectContaining({

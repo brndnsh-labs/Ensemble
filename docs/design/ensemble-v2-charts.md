@@ -245,13 +245,22 @@ refuses. The score form refuses a departure the written route goes back behind, 
 repeat or a first ending: which pass is the last time is ambiguous. Coda signs beside
 navigation prose ("Original takes Coda every time") stay ignored signs with a note: the prose
 says when the coda is taken. Across the Jazz 1460 playlist, 66 charts now import; 8 more with
-the same pair are still refused, now by their multi-chord bars in a meter the importer doesn't
-time yet; every other chart's import is unchanged. Of the playlist's 11 lone-sign charts
+the same pair were still refused, by their multi-chord bars in a meter the importer didn't
+time yet (3/4, since shipped: see below); every other chart's import is unchanged. Of the playlist's 11 lone-sign charts
 (#1487), 7 import (Blood Count, Desert Air, Happiness Is A Thing Called Joe, Ladies In
 Mercedes, Lady Sings The Blues, Search For Peace, Unrequited); 3 are now refused by a
 different blocker, named in their message, and Brazilian Suite by its unclosed repeat, with
 the message it had before. Repeats replayed after a D.C./D.S. jump are
 still refused: no primary source says whether iReal replays them.
+
+Multi-chord bars in 3/4 (#1546). iReal draws every bar four cells wide, so in 3/4 a cell is
+half a beat and a plain two-chord bar splits a beat and a half each, the change on the "and"
+of 2. The reference converter says so but calls its own timing rule "unknown", so 3/4 waited
+for an ear: Brandon heard iReal Pro play *502 Blues* that way (#1454, 2026-10-08). Only that
+plain two-chord case was heard; the other 3/4 layouts follow the same half-beat cell. Across
+the Jazz 1460 playlist 55 more charts import (1293 to 1348) and no chart that imported before
+changes. 3/2 (same cell, never heard) and 6/8 (no multi-chord bar in the playlist) are still
+refused.
 
 D.C./D.S. al Nth ending (#1473), `destination: { kind: 'ending', pass }`, follows iReal Pro's
 own definition (https://www.irealpro.com/learn/repeats-endings-and-jumps/): "D.C. al 2nd ending

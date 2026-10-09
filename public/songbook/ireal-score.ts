@@ -75,15 +75,16 @@ const CELL_BEATS = new Map([
 // technical limitation — `multiChordDurations` below implements the cited algorithm generally).
 // A whole-playlist measurement found real evidence for 5/4 (Take Five's own Ebm(3)+Bbm7(2) vamp)
 // and 6/4 (West Coast Blues); 12/8's beatUnit of 3 (one written cell = one whole dotted-quarter
-// beat) has no split-the-beat ambiguity either. 3/4 and 3/2 are held back: their beatUnit of 0.5
-// means a plain two-chord bar splits 1.5+1.5 beats, landing on the "and" of beat 2 — measured
-// across the whole playlist at 168 of 181 such bars (43 songs), and the reference converter's own
-// comment calls this specific algorithm "unknown" — not an established rule under #1171 without
-// an explicit by-ear check against iReal Pro's own playback. 6/8 has zero real-playlist evidence
-// either way (its one 6/8 chart has no multi-chord bar). A bar in an excluded meter still refuses
-// with the existing message; a single-chord bar in one is unaffected, since that path (see
-// `timedEvents`) never consults this set at all.
-const SHIPPED_MULTI_CHORD_METERS = new Set(['4/4', '5/4', '6/4', '12/8']);
+// beat) has no split-the-beat ambiguity either. 3/4's beatUnit of 0.5 means a plain two-chord
+// bar splits 1.5+1.5 beats, landing on the "and" of beat 2 — 168 of the playlist's 181 such bars
+// (43 songs). The reference converter's own comment calls this algorithm "unknown", so it waited
+// for a by-ear check against iReal Pro's own playback: Brandon heard *502 Blues* give each chord
+// a beat and a half (#1454, 2026-10-08), and 3/4 ships (#1546). 3/2 has the same cell weight but
+// nobody has heard it, and 6/8 has zero real-playlist evidence either way (its one 6/8 chart has
+// no multi-chord bar): both stay held back. A bar in an excluded meter still refuses with the
+// existing message; a single-chord bar in one is unaffected, since that path (see `timedEvents`)
+// never consults this set at all.
+const SHIPPED_MULTI_CHORD_METERS = new Set(['3/4', '4/4', '5/4', '6/4', '12/8']);
 
 // Equivalent spellings only, not approximated voicings or dropped extensions.
 // https://www.irealpro.com/learn/chord-symbols/ (official shorthand table)
