@@ -94,6 +94,8 @@ export interface BridgeLive {
     settings: () => BandSettings;
     /** Whether a fresh Play counts a bar in first (`playback.countIn`), which shifts the music. */
     countIn: () => boolean;
+    /** The score the band is playing, so an offline reference can compose the same performance. */
+    score: () => SemanticScore;
 }
 
 /** One marker on the live audio clock, and where it lands in the captured samples. */
@@ -129,7 +131,10 @@ interface RenderBridge {
     renderBand: (request: BandRenderRequest) => Promise<BandRenderResult>;
     loadPack: (packId: string) => Promise<{ zones: number; loaded: boolean }>;
     /** Present when the runtime lent its transport (#1562). */
-    transport?: Pick<BridgeLive, 'prime' | 'play' | 'stop' | 'voices' | 'settings' | 'countIn'>;
+    transport?: Pick<
+        BridgeLive,
+        'prime' | 'play' | 'stop' | 'voices' | 'settings' | 'countIn' | 'score'
+    >;
     capture?: LiveCapture;
 }
 
@@ -366,6 +371,7 @@ export function installRenderBridge(live?: BridgeLive): void {
                       voices: live.voices,
                       settings: live.settings,
                       countIn: live.countIn,
+                      score: live.score,
                   },
                   capture: createCapture(live),
               }

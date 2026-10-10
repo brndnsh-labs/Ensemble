@@ -14,6 +14,7 @@ describe('live:capture', () => {
             json: false,
             offline: 'page',
             off: [],
+            match: 'live',
         });
         const options = parseLiveCaptureArgs([
             '--scene=jazz-ride',
@@ -24,11 +25,14 @@ describe('live:capture', () => {
             '--json',
             '--offline=node',
             '--off=chords,soloist',
+            '--match=scene',
         ]);
         expect(options.scene).toBe('jazz-ride');
         expect(options.bars).toBe(4);
         expect(options.offline).toBe('node');
         expect(options.off).toEqual(['chords', 'soloist']);
+        expect(options.match).toBe('scene');
+        expect(() => parseLiveCaptureArgs(['--match=take'])).toThrow(/--match/);
         expect(() => parseLiveCaptureArgs(['--bars=0'])).toThrow(/--bars/);
         expect(() => parseLiveCaptureArgs(['--offline=firefox'])).toThrow(/--offline/);
         expect(() => parseLiveCaptureArgs(['--off=drums'])).toThrow(/--off=drums/);

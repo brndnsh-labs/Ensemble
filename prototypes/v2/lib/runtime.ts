@@ -590,6 +590,7 @@ export function initialize(): Promise<void> {
                     },
                     settings: bandSettings,
                     countIn: () => getState().playback.countIn,
+                    score: scoreForBand,
                 });
                 document.documentElement.dataset.renderBridge = 'ready';
             }
