@@ -62,6 +62,39 @@ export function updateSustain(
     }
 }
 
+/**
+ * The synth chord voices still sounding (or scheduled to), per audio context (#1569) — the
+ * synth sibling of `sample-voice.ts`'s registry for #1530. A no-pedal note used to live
+ * nowhere Stop could find it: `heldNotes` holds pedal-held notes only, so `killAllPianoNotes`
+ * released the sampled voices and whatever the pedal held, and a whole-note piano chord rang
+ * to its written end after Stop. A voice joins as it is made and leaves when its fundamental
+ * ends, so the set stays as small as what is ringing. Keyed by the context, not the state
+ * tree: an offline render's voices are its own.
+ */
+const soundingChordVoices = new WeakMap<BaseAudioContext, Set<(when: number) => void>>();
+
+function trackChordVoice(audio: BaseAudioContext, silence: (when: number) => void): () => void {
+    let voices = soundingChordVoices.get(audio);
+    if (!voices) {
+        voices = new Set();
+        soundingChordVoices.set(audio, voices);
+    }
+    voices.add(silence);
+    return () => voices.delete(silence);
+}
+
+/** Silence every synth chord voice of the context from `when`: the ones sounding fade in a
+ * few milliseconds, the ones scheduled but not yet started never sound. */
+function releaseSynthChordVoices(audio: BaseAudioContext, when: number): void {
+    const voices = soundingChordVoices.get(audio);
+    if (!voices) {
+        return;
+    }
+    for (const silence of [...voices]) {
+        silence(when);
+    }
+}
+
 export function killAllPianoNotes(state: EnsembleState): void {
     const { playback } = state;
     const now = playback.audio?.currentTime || 0;
@@ -78,6 +111,7 @@ export function killAllPianoNotes(state: EnsembleState): void {
     // for bars; unreleased, it rang on under whatever came next.
     if (playback.audio) {
         releaseSampledVoices(playback.audio, 'chords', now);
+        releaseSynthChordVoices(playback.audio, now);
     }
     const mutPlayback = playback as Mutable<typeof playback>;
     mutPlayback.sustainActive = false; // @direct-mutation
@@ -321,7 +355,26 @@ function playSynthNote(...args: PlayNoteArgs): ChordVoiceHandle | null {
             // `stop()` cut, otherwise short/staccato chords click. A fixed
             // 1.0 s tail gives ~5.4 τ — residual well under 0.5% of peak.
             brightOsc.stop(startTime + 1.0);
-            brightOsc.onended = () => safeDisconnect([brightOsc, brightGain]);
+            // Stop reaches the bloom too (#1569): one scheduled ahead of the clock never
+            // sounds, one sounding takes a 5 ms fade.
+            const untrackBright = trackChordVoice(playback.audio, (when) => {
+                try {
+                    if (when <= startTime) {
+                        brightGain.gain.cancelScheduledValues(0);
+                        brightGain.gain.setValueAtTime(0, 0);
+                        brightOsc.stop(startTime);
+                    } else {
+                        rampGain(brightGain.gain, 0, when, 0.005);
+                        brightOsc.stop(when + 0.5);
+                    }
+                } catch {
+                    /* already stopped */
+                }
+            });
+            brightOsc.onended = () => {
+                untrackBright();
+                safeDisconnect([brightOsc, brightGain]);
+            };
         }
     }
 
@@ -452,7 +505,13 @@ function playAdditiveBody(
     // abort the note (and, un-caught, the whole chord). The fundamental
     // (n=1) always exists and is stopped no later than any other partial, so
     // tearing the graph down off its `onended` fires `safeDisconnect` once.
-    oscs[0].onended = () => safeDisconnect([...oscs, ...gains, bodyGain, hpf, panner]);
+    // `untrack` is set once the voice's silence function exists below; the fundamental's end
+    // takes the voice out of Stop's reach and tears the graph down.
+    let untrack: () => void = () => {};
+    oscs[0].onended = () => {
+        untrack();
+        safeDisconnect([...oscs, ...gains, bodyGain, hpf, panner]);
+    };
     for (const o of oscs) {
         o.start(startTime);
     }
@@ -522,6 +581,27 @@ function playAdditiveBody(
             }
         },
     };
+    // Stop's handle (#1569). A voice scheduled ahead of the clock but not yet sounding must
+    // never sound: cancelling its attack from its own start would leave the gain at the
+    // default 1 for a few milliseconds — a click — so its oscillators are stopped at their
+    // start instead and the gain pinned to 0 now. A sounding voice takes the panic stop the
+    // pedal path takes (`stopBody`), not `release`: that one clamps into the written window,
+    // and a pedal-held note past its written end would be cut at its live gain.
+    untrack = trackChordVoice(audio, (when) => {
+        if (when <= startTime) {
+            try {
+                bodyGain.gain.cancelScheduledValues(0);
+                bodyGain.gain.setValueAtTime(0, 0);
+                for (const o of oscs) {
+                    o.stop(startTime);
+                }
+            } catch {
+                /* already stopped */
+            }
+            return;
+        }
+        stopBody(when, true);
+    });
     return releaseHandle;
 }
 
