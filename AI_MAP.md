@@ -209,6 +209,7 @@ account sync. Per-surface ownership is the navigation table in `prototypes/v2/CL
 | `.github/SECURITY.md` | Private vulnerability reporting guidance. |
 | `.github/CODE_OF_CONDUCT.md` | Community behavior standards. |
 | `tests/` | Vitest unit, integration, critique (`standards/`) and browser-mode suites. The app's Playwright suite is `prototypes/v2/checks/`. |
+| `tests/oracle/` | The chord-symbol oracle (#1579): `chord-reference.ts` reads a chord quality from the `@tonaljs/chord` dictionary, `chord-clash.ts` lists the notes a symbol rules out, and `chord-oracle.test.ts` holds the band's chord table and every comp chord (the standards catalog, plus one bar of every quality in every style) to them. |
 | `CLAUDE.md` | Primary operational guide and architectural rules. |
 | `AGENTS.md` | Pointer to `CLAUDE.md` for AGENTS.md-aware tools. |
 | `AI_MAP.md` | Codebase navigation (this file). |

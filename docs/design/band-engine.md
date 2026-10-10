@@ -69,7 +69,10 @@ from any bar reproduces the same music.
    C5). A guitar keeps its physical range but its grips stay at or above C3 when a bass plays:
    the guitar leaves the low strings to the bassist.
 5. **One chord authority.** `theory/chord.ts` parses every quality the chart codec accepts;
-   lanes read `ChordFacts` and never re-read symbol text. A parity test pins it to the codec.
+   lanes read `ChordFacts` and never re-read symbol text. A parity test pins it to the codec,
+   and the chord-symbol oracle (`tests/oracle/`, #1579) pins it to an outside dictionary: every
+   quality must read as `@tonaljs/chord` reads it, bar the differences that file pins with a
+   reason, and no comp chord may hold a note its symbol rules out.
 6. **Musical intent is documented at the decision.** Every probability and pattern says why.
 
 ## Styles and idioms
