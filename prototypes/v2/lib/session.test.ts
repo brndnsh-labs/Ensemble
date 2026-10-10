@@ -15,12 +15,16 @@ import {
     hasDeclinedV1Import,
     legacyStarredIds,
     openedAtMap,
+    patchShellPreferences,
     recordOpened,
     rememberAllSongsSort,
     rememberCountIn,
+    rememberShellPreferences,
     rememberV1Import,
     rememberV1ImportDecline,
     rememberV1SessionMark,
+    type ShellPreferences,
+    shellPreferences,
     v1ImportLedger,
     v1SessionMark,
 } from './session';
@@ -269,5 +273,65 @@ describe('the All songs sort preference (#1440)', () => {
     it('rejects a hand-edited value instead of trusting it', () => {
         store.set('ensemble-v2-preview:all-songs-sort', 'nonsense');
         expect(allSongsSortPreference()).toBeNull();
+    });
+});
+
+describe('the neck preferences (#1586)', () => {
+    const KEY = 'ensemble-v2-preview:shell-prefs';
+    const defaults: ShellPreferences = {
+        instrument: 'guitar',
+        home: [2, 7],
+        rootStrings: 'all',
+        labels: 'finger',
+    };
+
+    it('defaults to guitar, frets 2–7, all root strings and finger labels', () => {
+        expect(shellPreferences()).toEqual(defaults);
+    });
+
+    it('round-trips a full set, including no home window', () => {
+        const uke: ShellPreferences = {
+            instrument: 'uke-low-g',
+            home: [4, 9],
+            rootStrings: 'classic',
+            labels: 'note',
+        };
+        rememberShellPreferences(uke);
+        expect(shellPreferences()).toEqual(uke);
+        rememberShellPreferences({ ...uke, home: null });
+        expect(shellPreferences().home).toBeNull();
+    });
+
+    it('falls back to the defaults for a blob that is not a preferences object', () => {
+        for (const bad of ['not json', '[1,2]', 'null', '"guitar"', '42']) {
+            store.set(KEY, bad);
+            expect(shellPreferences()).toEqual(defaults);
+        }
+    });
+
+    it('rejects each unknown field on its own and keeps the rest', () => {
+        store.set(
+            KEY,
+            JSON.stringify({
+                instrument: 'banjo',
+                home: [0, 99],
+                rootStrings: 'classic',
+                labels: 'colour',
+            }),
+        );
+        expect(shellPreferences()).toEqual({ ...defaults, rootStrings: 'classic' });
+        // A uke with a broken window gets the uke's default window, not the guitar's.
+        store.set(KEY, JSON.stringify({ instrument: 'uke', home: [7, 2] }));
+        expect(shellPreferences()).toEqual({ ...defaults, instrument: 'uke', home: [1, 6] });
+    });
+
+    it('swaps a default home window with the instrument, and keeps one the musician moved', () => {
+        const uke = patchShellPreferences(defaults, { instrument: 'uke' });
+        expect(uke.home).toEqual([1, 6]);
+        expect(patchShellPreferences(uke, { instrument: 'guitar' }).home).toEqual([2, 7]);
+        expect(patchShellPreferences(uke, { instrument: 'uke-low-g' }).home).toEqual([1, 6]);
+        const moved = { ...defaults, home: [5, 10] as [number, number] };
+        expect(patchShellPreferences(moved, { instrument: 'uke' }).home).toEqual([5, 10]);
+        expect(patchShellPreferences(defaults, { instrument: 'uke', home: null }).home).toBeNull();
     });
 });

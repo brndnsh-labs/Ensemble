@@ -1,4 +1,5 @@
 import type { V1SessionMark } from './import-v1';
+import type { HomeWindow, ShellPrefs } from './shells';
 
 const LAST_OPENED = 'ensemble-v2-preview:last-opened';
 
@@ -170,6 +171,113 @@ export function rememberTheme(choice: ThemeChoice): void {
     } catch {
         // The stand still switches for this page; only the memory is lost.
     }
+}
+
+const SHELL_PREFS = 'ensemble-v2-preview:shell-prefs';
+
+export type ShellLabels = 'finger' | 'degree' | 'note';
+/** The neck's per-device settings (#1586): the voicer's `ShellPrefs` plus what the dots show. */
+export interface ShellPreferences extends ShellPrefs {
+    labels: ShellLabels;
+}
+
+const SHELL_INSTRUMENTS: readonly ShellPrefs['instrument'][] = ['guitar', 'uke', 'uke-low-g'];
+const SHELL_ROOT_STRINGS: readonly ShellPrefs['rootStrings'][] = ['all', 'classic'];
+const SHELL_LABELS: readonly ShellLabels[] = ['finger', 'degree', 'note'];
+/** The neck draws frets 0–15; a home window lives on frets 1–15. */
+const SHELL_MAX_FRET = 15;
+
+/** A guitar's hand starts on frets 2–7; a uke's (either tuning) on 1–6. */
+export function defaultShellHome(instrument: ShellPrefs['instrument']): HomeWindow {
+    return instrument === 'guitar' ? [2, 7] : [1, 6];
+}
+
+export function defaultShellPreferences(): ShellPreferences {
+    return {
+        instrument: 'guitar',
+        home: defaultShellHome('guitar'),
+        rootStrings: 'all',
+        labels: 'finger',
+    };
+}
+
+const isHomeWindow = (value: unknown): value is HomeWindow =>
+    Array.isArray(value) &&
+    value.length === 2 &&
+    value.every((f) => Number.isInteger(f) && f >= 1 && f <= SHELL_MAX_FRET) &&
+    value[0] <= value[1];
+
+const pick = <T>(allowed: readonly T[], value: unknown, fallback: T): T =>
+    allowed.includes(value as T) ? (value as T) : fallback;
+
+/**
+ * Device-local neck preferences — never document fields: which instrument, where the hand
+ * lives, which strings may hold a root and what the dots say. Each field is validated on its
+ * own, so one unknown value falls back to its default without losing the rest; anything that is
+ * not a JSON object is all defaults.
+ */
+export function shellPreferences(): ShellPreferences {
+    const defaults = defaultShellPreferences();
+    let raw: unknown;
+    try {
+        const stored = localStorage.getItem(SHELL_PREFS);
+        if (stored === null) {
+            return defaults;
+        }
+        raw = JSON.parse(stored);
+    } catch {
+        return defaults;
+    }
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+        return defaults;
+    }
+    const stored = raw as Record<string, unknown>;
+    const instrument = pick(SHELL_INSTRUMENTS, stored.instrument, defaults.instrument);
+    let home: HomeWindow | null = defaultShellHome(instrument);
+    if (stored.home === null) {
+        home = null;
+    } else if (isHomeWindow(stored.home)) {
+        home = [stored.home[0], stored.home[1]];
+    }
+    return {
+        instrument,
+        home,
+        rootStrings: pick(SHELL_ROOT_STRINGS, stored.rootStrings, defaults.rootStrings),
+        labels: pick(SHELL_LABELS, stored.labels, defaults.labels),
+    };
+}
+
+export function rememberShellPreferences(prefs: ShellPreferences): void {
+    try {
+        const { instrument, home, rootStrings, labels } = prefs;
+        localStorage.setItem(
+            SHELL_PREFS,
+            JSON.stringify({ instrument, home, rootStrings, labels }),
+        );
+    } catch {
+        // The neck still follows the change for this page; only the memory is lost.
+    }
+}
+
+/**
+ * Apply a change. Switching between guitar and uke carries the home window along only when the
+ * musician moved it: a window still on the old instrument's default becomes the new one's.
+ */
+export function patchShellPreferences(
+    prev: ShellPreferences,
+    patch: Partial<ShellPreferences>,
+): ShellPreferences {
+    const next = { ...prev, ...patch };
+    const sameWindow = (a: HomeWindow | null, b: HomeWindow) =>
+        a !== null && a[0] === b[0] && a[1] === b[1];
+    if (
+        patch.home === undefined &&
+        next.instrument !== prev.instrument &&
+        sameWindow(prev.home, defaultShellHome(prev.instrument))
+    ) {
+        next.home = defaultShellHome(next.instrument);
+    }
+    return next;
 }
 
 const MASTER_VOLUME = 'ensemble-v2-preview:master-volume';

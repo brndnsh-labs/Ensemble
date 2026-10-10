@@ -81,6 +81,10 @@ The ground-up replacement for the generative engine, the default since 2026-09-2
 | `prototypes/v2/lib/shells/fingering.ts` | Fingering, planned across a chart so a held note keeps its finger. | `fingerSequence`, `fingerMap` |
 | `prototypes/v2/lib/shells/motion.ts` | Root moves, finger moves and the hand-travel summary (the narration text). | `rootMove`, `fingerMoves`, `handTravel` |
 | `prototypes/v2/lib/shells/test/keys.ts` | Test fixture only: the prototype's key families and song shapes, feeding the 360-chart parity suite (`test/prototype-parity.test.ts` against `test/golden.json`). | `keyFamily`, `songChart`, `SONG_SHAPES`, `keyRoot` |
+| `prototypes/v2/app/neck.tsx` | The practice view's fretboard (#1586): a dumb SVG renderer over `lib/shells` types — the grip, the next-chord preview (root path, finger arrows, hold rings), the home-window slider. No runtime, state or document imports. | `Neck`, `NeckProps` |
+| `prototypes/v2/app/neck-geometry.ts` | Fret and string geometry for the neck (`fx`, `dx`, `neckLayout`), shared by the component and its test. | `fx`, `dx`, `fretAt`, `neckLayout` |
+| `prototypes/v2/app/neck.css` | The neck's presentation; the `--d-*` degree and board tokens live on `:root` in `style.css`. | — |
+| `prototypes/v2/app/use-shell-prefs.ts` | Per-device neck settings (instrument, home window, root strings, labels) over `lib/session.ts`'s `shellPreferences`; never document fields. | `useShellPrefs` |
 
 ## State Management (Domain Slices)
 

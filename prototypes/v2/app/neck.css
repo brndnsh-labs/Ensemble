@@ -1,0 +1,253 @@
+/* The practice view's fretboard (#1586). Colours are the `--d-*` / board tokens on `:root` in
+   style.css, so Day and Stage both follow from light-dark(). Geometry is in neck.tsx; the one
+   inline style is each dot's runtime transform. */
+.neck {
+    display: block;
+    width: 100%;
+    height: auto;
+    font-family: inherit;
+    user-select: none;
+}
+.neck-wood {
+    fill: var(--wood);
+}
+.neck-wood-edge {
+    fill: var(--wood-edge);
+}
+.neck-inlay {
+    fill: var(--inlay);
+    opacity: 0.5;
+}
+.neck-fret {
+    fill: var(--fret);
+}
+.neck-string {
+    stroke: var(--string);
+    opacity: 0.85;
+}
+.neck-text {
+    fill: var(--muted);
+    font-weight: 500;
+    pointer-events: none;
+}
+.neck-string-letter {
+    font-size: 11px;
+}
+.neck-fret-number {
+    font-size: 12px;
+    text-anchor: middle;
+}
+
+/* Home window: everything outside it shaded, the window itself outlined. */
+.neck-shade {
+    fill: var(--paper);
+    opacity: 0.42;
+}
+.neck-window {
+    fill: none;
+    stroke: var(--move);
+    stroke-width: 2;
+    stroke-opacity: 0.7;
+}
+.neck-handle {
+    cursor: grab;
+    touch-action: none;
+    outline: none;
+}
+.neck-handle:active {
+    cursor: grabbing;
+}
+.neck-handle rect {
+    fill: var(--move);
+}
+.neck-handle:focus-visible rect {
+    stroke: var(--ink);
+    stroke-width: 2;
+}
+.neck-handle text {
+    fill: var(--wood);
+    font-size: 12px;
+    font-weight: 600;
+    text-anchor: middle;
+    pointer-events: none;
+}
+
+.neck-outline {
+    fill: var(--inlay);
+    fill-opacity: 0.13;
+    stroke: var(--inlay);
+    stroke-opacity: 0.45;
+    stroke-dasharray: 4 4;
+}
+
+/* Next-chord preview. Strength scales the whole layer; `off` never renders it. */
+.neck-rootpath,
+.neck-preview {
+    pointer-events: none;
+    transition: opacity 0.25s;
+}
+.neck.is-soft .neck-rootpath {
+    opacity: 0.5;
+}
+.neck.is-soft .neck-preview {
+    opacity: 0.7;
+}
+.neck-rootpath-line {
+    fill: none;
+    stroke: var(--d-root);
+    stroke-width: 4.5;
+    stroke-linecap: round;
+}
+.neck-rootpath-label {
+    fill: var(--dot-ink);
+    font-size: 12px;
+    font-weight: 600;
+    text-anchor: middle;
+}
+.neck-move-fill {
+    fill: var(--move);
+}
+.neck-arrow {
+    fill: none;
+    stroke: var(--move);
+    stroke-width: 2.6;
+    stroke-dasharray: 6 4;
+    stroke-linecap: round;
+}
+.neck.is-strong .neck-arrow {
+    animation: neck-draw 0.45s ease-out both;
+}
+@keyframes neck-draw {
+    from {
+        stroke-dashoffset: 120;
+    }
+    to {
+        stroke-dashoffset: 0;
+    }
+}
+.neck-target circle {
+    fill: var(--wood);
+    stroke: var(--move);
+    stroke-width: 2;
+    stroke-dasharray: 3 3;
+}
+.neck-target text {
+    fill: var(--move);
+    font-size: 12.5px;
+    font-weight: 600;
+    text-anchor: middle;
+}
+
+/* The grip. Dots are keyed by finger, so the transform transition slides each one to where that
+   finger goes next. */
+.neck-active {
+    transition: opacity 0.3s;
+}
+.neck-active.is-dimmed {
+    opacity: 0.45;
+}
+.neck-dot {
+    pointer-events: none;
+    transition:
+        transform 0.5s cubic-bezier(0.3, 0.7, 0.2, 1),
+        opacity 0.3s;
+}
+@starting-style {
+    .neck-dot {
+        opacity: 0;
+    }
+}
+.neck.is-strong .neck-dot.is-lift {
+    opacity: 0.45;
+}
+.neck-ring {
+    fill: none;
+    stroke: var(--hold);
+    stroke-width: 3;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+.neck-dot.is-hold .neck-ring {
+    opacity: 0.8;
+}
+.neck.is-strong .neck-dot.is-hold .neck-ring {
+    opacity: 1;
+}
+.neck-body {
+    stroke: var(--wood-edge);
+    stroke-width: 1.5;
+    transition: fill 0.25s ease 0.18s;
+}
+.neck-body.is-root {
+    stroke: var(--surface);
+    stroke-width: 2.5;
+}
+.neck-dot-label {
+    fill: var(--dot-ink);
+    font-size: 13px;
+    font-weight: 600;
+    text-anchor: middle;
+}
+.neck-dot-label.is-dark {
+    fill: var(--dot-ink-dark);
+}
+.neck-dot-label.is-small {
+    font-size: 10px;
+}
+.neck-active.is-strike .neck-core {
+    animation: neck-strike 0.3s ease-out;
+    transform-box: fill-box;
+    transform-origin: center;
+}
+@keyframes neck-strike {
+    0% {
+        transform: scale(1);
+    }
+    35% {
+        transform: scale(1.22);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+/* Degree fills: one class per `--d-*` token (`DEGREE_FILL` in neck.tsx). */
+.neck-fill-root {
+    fill: var(--d-root);
+}
+.neck-fill-3 {
+    fill: var(--d-3);
+}
+.neck-fill-b3 {
+    fill: var(--d-b3);
+}
+.neck-fill-7 {
+    fill: var(--d-7);
+}
+.neck-fill-b7 {
+    fill: var(--d-b7);
+}
+.neck-fill-6 {
+    fill: var(--d-6);
+}
+.neck-fill-5 {
+    fill: var(--d-5);
+}
+.neck-fill-9 {
+    fill: var(--d-9);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .neck-dot,
+    .neck-ring,
+    .neck-body,
+    .neck-active,
+    .neck-rootpath,
+    .neck-preview {
+        transition: none;
+    }
+    .neck.is-strong .neck-arrow,
+    .neck-active.is-strike .neck-core {
+        animation: none;
+    }
+}

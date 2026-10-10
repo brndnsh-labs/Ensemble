@@ -36,6 +36,25 @@
     --chord-hover: light-dark(#e6decd, #383a30);
     --backdrop: light-dark(#20272066, #000000a0);
     --shadow: 0 16px 60px light-dark(#232a2414, #00000080);
+    /* The neck (#1586): colour means degree, always; fingers get numbers and motion, never colour. */
+    --d-root: light-dark(#d4472a, #ee5b3b);
+    --d-3: light-dark(#2d67d6, #4d85f0);
+    --d-b3: light-dark(#8549d2, #a26dee);
+    --d-7: light-dark(#e2a30c, #f0b52a);
+    --d-b7: light-dark(#17946a, #2bb07f);
+    --d-6: light-dark(#d23f7c, #ec5893);
+    --d-5: light-dark(#6c7b8b, #8796a6);
+    --d-9: light-dark(#0e9fae, #22b8c6);
+    --move: light-dark(#ffe7a8, #f5d98a);
+    --hold: light-dark(#7ce0b4, #5fd3a1);
+    --wood: light-dark(#3e2b21, #33241c);
+    --wood-edge: light-dark(#2c1e17, #1e1511);
+    --fret: light-dark(#cfc6b6, #a99f8f);
+    --string: light-dark(#e3daca, #cfc5b4);
+    --inlay: light-dark(#e6dcc8, #cbbfa9);
+    --board-label: light-dark(#b9a894, #8e7d6b);
+    --dot-ink: #ffffff;
+    --dot-ink-dark: #241a02;
     --radius: 16px;
     font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     color: var(--ink);
