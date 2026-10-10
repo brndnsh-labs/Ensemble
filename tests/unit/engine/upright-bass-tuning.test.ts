@@ -11,6 +11,8 @@ import { describe, expect, it } from 'vitest';
 // the offset. This guard stops a future re-sample/edit from silently regressing to
 // lazy integer roots. It intentionally does NOT pin exact cents — those stay open to
 // by-ear nudging on ensembletest — only the invariants that keep the pack in tune.
+// #1575 re-measured zones 34, 38, 42 and 45 over the first 400 ms after the pluck, with
+// `mix:verify`'s TUNING readout; that readout on a walking-bass scene is the real check.
 
 const manifestUrl = new URL('../../../public/packs/upright-bass/manifest.json', import.meta.url);
 const manifest = JSON.parse(readFileSync(fileURLToPath(manifestUrl), 'utf8')) as {

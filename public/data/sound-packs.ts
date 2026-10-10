@@ -366,6 +366,14 @@ export const SOUND_PACKS: readonly SoundPack[] = [
         // per-zone detuning (zones 31/42/45 read −12/+23/+18c — audibly off while
         // the rest sang). The fractional roots in the manifest cancel that. If a
         // re-measure or re-sample lands a zone back on an integer, suspect this.
+        // Re-measured over the first 400 ms after the pluck (#1575): a pizzicato
+        // note drifts as it rings, and the band's bass notes are heard in that first
+        // stretch, where #754's whole-sample roots played zone 42 43 cents flat and
+        // zone 45 16 sharp. Zone 42 is flatter still in its first 200 ms, so its
+        // root sits between what a short funk note and a walking quarter read
+        // (−8 and +7 cents). Zones 34 and 38 moved 4 cents the same way. Measured
+        // with `mix:verify`'s TUNING readout; `rev` 2 refreshes the manifest on
+        // devices that hold the pack.
         // Source is loudnorm-leveled (VSCO is quiet) + mono. Calibrated 2026-06-22
         // (#697) via `mix:report --calibrate-pack=bass:upright-bass`: pack sat
         // 3.2 dB under the synth bass across rock/blues/jazz/funk (RMS-match =
@@ -375,6 +383,7 @@ export const SOUND_PACKS: readonly SoundPack[] = [
         // so seated just over the match at 1.5×. Confirm/nudge by ear on
         // ensembletest (jazz walking / bossa / blues).
         gain: 1.5,
+        rev: 2,
         // Close-mic'd DI-ish pizz, fairly dry — a small lift to seat it in the
         // room without washing out the low end. #686-style start; tune by ear.
         reverbSend: 0.6,
