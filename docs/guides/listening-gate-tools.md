@@ -104,6 +104,16 @@ measures the engines, not your change. Two node renders of one request agree to 
 CPU load, the same class as Chromium's −99 dBFS floor below — and the one real cross-render
 state is #1552's (4.5e-2, on the synth kit's cymbals).
 
+**`npm run webaudio:parity` is where those numbers come from.** `scripts/webaudio-parity.ts`
+renders the same graph snippet in node (through the shim, so the shim is under test) and in
+headless Chromium and compares them per probe: RMS and peak delta, best lag, aligned
+correlation, residual, with `<<<` past 0.5 dB or under 0.98 correlation. `--mode=envelope`
+samples gain envelopes over time, `--mode=latency` tracks an impulse through each node type,
+`--probe=a,b` runs a subset, `--json` for a script. About 10 s. Re-run it after a
+`node-web-audio-api` bump; the two residuals it should still flag today are `compressor`
+(−1.1 dB on a steady tone, +2 dB on transients, 120 samples less latency) and `delayComb`
+(the reverb's feedback combs, correlation 0.86).
+
 **`mix:diff` across engines is not a parity test.** `computeSpectralProbes` measures four
 4096-sample windows spread over the stem's *active* region, and the region starts at the first
 sample above 1e-4 (−80 dBFS). Both engines emit a few LSB before the first note (the master
