@@ -37,6 +37,23 @@ still hold for any statistical claim:
   then revert. These tests are deterministic (seeded), so the printed value is stable across runs —
   set thresholds with real headroom below the measured minimum, not a guessed floor.
 
+## The chord-symbol oracle (`tests/oracle/`)
+
+The band's own tests take `band/theory/chord.ts` as the truth, so a misread symbol passes all of
+them. The oracle is the outside answer key: the `@tonaljs/chord` dictionary's reading of every
+quality, and the notes each symbol rules out (`chord-clash.ts`).
+
+- **Never fill a reference row from what the band plays.** `ALIASES` is the dictionary's name for
+  the same chord; `COMPOSED` is a dictionary chord plus the notes the symbol itself names. A row
+  copied from the band checks nothing.
+- **A red oracle is a question, not an instruction to pin.** A new `DIVERGENCES` row needs a
+  reason a player would recognise. If the dictionary is right, fix the band's table.
+- **Only the comp is held to the clash rules.** A walking line and a solo reach wrong notes on
+  purpose (approach notes, enclosures, blue notes); a rule cannot tell a good one from a bad one.
+- **`@tonaljs/chord` is pinned, with three `overrides` in `package.json`.** The 2026-09-28
+  releases of the library ship a `main` that points at a file they do not contain, so node cannot
+  load them. Drop the pin and the overrides once a later release loads under `npx tsx`.
+
 ## Determinism & seeding
 
 - **Proving an engine is fully seeded (no surviving raw `Math.random()`) needs *different* stub

@@ -50,6 +50,7 @@
     "devDependencies": {
         "@biomejs/biome": "^2.4.10",
         "@playwright/test": "1.63.0",
+        "@tonaljs/chord": "6.1.2",
         "@types/chai": "^5.2.3",
         "@vitest/browser": "^5.0.3",
         "@vitest/browser-playwright": "^5.0.3",
@@ -70,5 +71,10 @@
     "dependencies": {
         "@preact/signals-core": "^1.14.4",
         "deepsignal": "^1.6.0"
+    },
+    "overrides": {
+        "@tonaljs/pitch-distance": "5.0.5",
+        "@tonaljs/pitch-interval": "6.1.0",
+        "@tonaljs/pitch-note": "6.1.0"
     }
 }

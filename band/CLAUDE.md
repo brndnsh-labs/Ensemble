@@ -7,7 +7,10 @@ shape and its laws. Rules that bind every change here:
   `public/engine`, `public/state` or the DOM. `public/songbook/` (the chart codecs) is the only
   outside dependency. Randomness goes through `ctx.rng(purpose, scope)`.
 - **Timing moves only in `feel/feel.ts`.** Players write on the straight sixteenth grid.
-- **Chord meaning comes only from `theory/chord.ts`.** Never parse a symbol in a player.
+- **Chord meaning comes only from `theory/chord.ts`.** Never parse a symbol in a player. A new
+  quality spelling also needs its outside reading in `tests/oracle/chord-reference.ts` (the
+  chord-symbol oracle fails until it has one). Fill that row from the dictionary or from the
+  chord's name, never from what the band plays.
 - **A guitar chord is found on the fretboard, never placed on a keyboard** (`players/comp/
   fretboard.ts`). The invariant suite rejects any grip a hand can't fret.
 - **One genre, one file** (`styles/<id>.ts`). Shared machinery goes in `players/`, never in
