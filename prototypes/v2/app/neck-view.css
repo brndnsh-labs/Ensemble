@@ -45,12 +45,24 @@
     font-size: 12px;
     color: var(--muted);
 }
-.neck-narration {
+/* The headline is one line; reserving it keeps the board still when it empties (playing, no
+   next chord). The finger detail is opt-in and may wrap. */
+.neck-headline {
     margin: 0;
     font-size: 14px;
     line-height: 1.45;
     color: var(--ink);
-    min-height: 2.9em;
+    min-height: 1.45em;
+}
+.neck-fingers {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.45;
+    color: var(--muted);
+}
+.neck-check input {
+    margin: 0;
+    accent-color: var(--green);
 }
 .neck-settings {
     display: flex;
@@ -77,14 +89,17 @@
     .neck-next {
         font-size: 18px;
     }
-    .neck-narration {
+    .neck-headline {
         font-size: 13px;
     }
     .neck-settings {
         gap: 8px 16px;
     }
 }
-/* Focus chart: the neck keeps its grips and loses its settings, like the header's controls. */
-.performance-focus .neck-settings {
+/* Focus chart: the neck keeps its names and grips and loses its words and settings, like the
+   header's controls. */
+.performance-focus .neck-settings,
+.performance-focus .neck-headline,
+.performance-focus .neck-fingers {
     display: none;
 }

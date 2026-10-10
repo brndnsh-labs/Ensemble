@@ -9,7 +9,8 @@ import { neckModel, SHELL_INSTRUMENTS } from './use-neck-view';
 import './neck-view.css';
 
 // The stand's Neck mode (#1587): the grip for the chord sounding now, a preview of the next one
-// and the sentence that walks the hand there, following the band. Presentational: the shell
+// and a one-line headline of the root's move there (the finger-by-finger detail on request),
+// following the band. Presentational: the shell
 // hands it the band's chart, the voiced grips and the playhead; settings go back through
 // `onPrefs`. The fretboard itself is `<Neck>` (#1586).
 
@@ -80,7 +81,10 @@ export function NeckView({ band, voiced, active, nextSoon, prefs, onPrefs }: Nec
                                     </span>
                                 )}
                             </div>
-                            {model.narration && <p className="neck-narration">{model.narration}</p>}
+                            {model.headline && <p className="neck-headline">{model.headline}</p>}
+                            {prefs.fingers && model.fingers && (
+                                <p className="neck-fingers">{model.fingers}</p>
+                            )}
                         </div>
                         <Neck
                             id={id}
@@ -162,6 +166,15 @@ export function NeckView({ band, voiced, active, nextSoon, prefs, onPrefs }: Nec
                                 </option>
                             ))}
                         </select>
+                    </label>
+                    <label className="neck-setting neck-check">
+                        <input
+                            type="checkbox"
+                            aria-label="Say the fingers"
+                            checked={prefs.fingers}
+                            onChange={(e) => onPrefs({ fingers: e.target.checked })}
+                        />
+                        <span className="setting-label">Say the fingers</span>
                     </label>
                 </div>
             </div>

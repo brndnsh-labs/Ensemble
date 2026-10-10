@@ -14,7 +14,7 @@ import {
 import { useShellPrefs } from './use-shell-prefs';
 
 // The neck view's follow logic (#1587): which grip sounds on a performed slot, which one comes
-// next, and the sentence that walks the hand between them. Pure functions over the band's chart
+// next, and the headline and finger detail between them. Pure functions over the band's chart
 // (`lib/band-chart.ts`), so the stand's per-frame `active` slot is all the view needs.
 
 export const SHELL_INSTRUMENTS: Record<ShellPrefs['instrument'], InstrumentDef> = {
@@ -97,17 +97,28 @@ const holdsPhrase = (fingers: number[]): string =>
         : `Fingers ${fingers.slice(0, -1).join(', ')} and ${fingers.at(-1)} stay down`;
 
 /**
- * How the hand gets from `from` to `to`, in one sentence group: the root's move, then which
- * fingers stay down and where each moving finger goes. Lifts are left out — the strong preview
- * already dims the dots that come off, and naming them is noise.
+ * The root's move from `from` to `to`, for the headline: the interval, then where it lands on
+ * the neck ("root up a 4th, same fret, one string over").
  */
-export function narrateChange(
+export function rootLine(
     instrument: InstrumentDef,
     from: VoicedBandChord,
     to: VoicedBandChord,
 ): string {
     const root = rootMove(instrument, from, to);
-    const rootLine = `root ${root.text}${root.geometry ? ` — ${root.geometry}` : ''}.`;
+    return `root ${root.text}${root.geometry ? `, ${root.geometry}` : ''}`;
+}
+
+/**
+ * The finger-by-finger detail of the change, as one sentence: which fingers stay down, then where
+ * each moving finger goes, or '' when nothing moves. Lifts are left out — the strong preview
+ * already dims the dots that come off, and naming them is noise.
+ */
+export function fingersLine(
+    instrument: InstrumentDef,
+    from: VoicedBandChord,
+    to: VoicedBandChord,
+): string {
     const { moves } = fingerMoves(instrument, from, to);
     const holds = moves.filter((m) => m.kind === 'hold').map((m) => m.finger);
     const parts = [
@@ -115,13 +126,11 @@ export function narrateChange(
         ...moves.filter((m) => m.kind === 'move').map((m) => `finger ${m.finger} ${m.text}`),
     ];
     if (!parts.length) {
-        return rootLine;
+        return '';
     }
-    const fingers = parts.join('; ');
-    return `${rootLine} ${fingers[0].toUpperCase()}${fingers.slice(1)}.`;
+    const sentence = parts.join('; ');
+    return `${sentence[0].toUpperCase()}${sentence.slice(1)}.`;
 }
-
-const capitalise = (s: string): string => s[0].toUpperCase() + s.slice(1);
 
 export interface NeckModel {
     /** The grip on the neck: the sounding chord, or the held one under a hold or N.C. */
@@ -132,8 +141,13 @@ export interface NeckModel {
     /** The playhead is on a hold (the grip rings on) or an N.C. (the grip is shown, not played). */
     held: 'hold' | 'no-chord' | null;
     nextName: string | null;
-    /** The narration line under the names. */
-    narration: string;
+    /**
+     * The one-line headline under the names: stopped, `Starts on Dm7 · then G7: root up a 4th,
+     * …`; playing, `Next: G7 · root up a 4th, …`; '' while playing with no next chord.
+     */
+    headline: string;
+    /** The finger-by-finger detail of the change to the next grip (`fingersLine`), or ''. */
+    fingers: string;
     /** The chart's own symbol for an approximated grip ("the chart says C"), else null. */
     approximatedFrom: string | null;
 }
@@ -165,20 +179,22 @@ export function neckModel(
     const held = written.kind === 'hold' ? 'hold' : written.kind === 'no-chord' ? 'no-chord' : null;
     const name = held === 'no-chord' ? 'N.C.' : writtenName(soundingChord);
     const nextName = nextChord ? writtenName(nextChord) : null;
-    const change = grip && next ? narrateChange(instrument, grip, next) : null;
-    let narration = '';
+    const change = grip && next && nextName ? rootLine(instrument, grip, next) : null;
+    let headline = '';
     if (active === null) {
-        narration = `Starts on ${name}.${nextName && change ? ` Then ${nextName}: ${change}` : ''}`;
-    } else if (nextName && change) {
-        narration = `Next: ${nextName}. ${capitalise(change)}`;
+        headline = `Starts on ${name}${change ? ` · then ${nextName}: ${change}` : ''}`;
+    } else if (change) {
+        headline = `Next: ${nextName} · ${change}`;
     }
+    const fingers = grip && next ? fingersLine(instrument, grip, next) : '';
     return {
         grip,
         next,
         name,
         held,
         nextName,
-        narration,
+        headline,
+        fingers,
         approximatedFrom: grip?.approximation ? writtenName(soundingChord) : null,
     };
 }

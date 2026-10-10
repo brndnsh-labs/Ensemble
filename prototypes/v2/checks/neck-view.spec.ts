@@ -36,7 +36,21 @@ test('the neck shows the grip, follows the band and is remembered', async ({ pag
     await expect(view.locator('.neck-dot')).toHaveCount(3);
     await expect(view.getByTestId('neck-current')).toHaveText('Dm7');
     await expect(view.getByTestId('neck-next')).toContainText('G7');
-    await expect(view.locator('.neck-narration')).toContainText('Then G7: root up a 4th');
+    const headline = view.locator('.neck-headline');
+    await expect(headline).toContainText('then G7');
+    await expect(headline).toContainText('root up a 4th');
+    // The finger-by-finger detail is off until asked for, and remembered once it is.
+    await expect(view.locator('.neck-fingers')).toHaveCount(0);
+    const sayFingers = view.getByRole('checkbox', { name: 'Say the fingers' });
+    await expect(sayFingers).not.toBeChecked();
+    await sayFingers.check();
+    await expect(view.locator('.neck-fingers')).toBeVisible();
+    await expect(view.locator('.neck-fingers')).toContainText('Finger 2 stays down');
+    await expect(view.locator('.neck-fingers')).toContainText('goes down');
+    await page.reload();
+    await songLink(page, 'Neck study').first().click();
+    await expect(view.getByRole('checkbox', { name: 'Say the fingers' })).toBeChecked();
+    await expect(view.locator('.neck-fingers')).toBeVisible();
 
     // The phone keeps the page inside the screen in Neck mode.
     expect(
@@ -66,7 +80,7 @@ test('the neck shows the grip, follows the band and is remembered', async ({ pag
     await expect(page.getByRole('button', { name: 'Stop playback', exact: true })).toBeEnabled();
     await expect(view.getByTestId('neck-current')).toHaveText('G7', { timeout: 20_000 });
     await expect(view.locator('.neck-preview')).toHaveCount(1);
-    await expect(view.locator('.neck-narration')).toContainText('Next: Cmaj7.');
+    await expect(headline).toContainText('Next: Cmaj7');
     await page.getByRole('button', { name: 'Stop playback', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Start playback', exact: true })).toBeEnabled();
 

@@ -283,9 +283,10 @@ describe('the neck preferences (#1586)', () => {
         home: [2, 7],
         rootStrings: 'all',
         labels: 'finger',
+        fingers: false,
     };
 
-    it('defaults to guitar, frets 2–7, all root strings and finger labels', () => {
+    it('defaults to guitar, frets 2–7, all root strings, finger labels and no finger detail', () => {
         expect(shellPreferences()).toEqual(defaults);
     });
 
@@ -295,6 +296,7 @@ describe('the neck preferences (#1586)', () => {
             home: [4, 9],
             rootStrings: 'classic',
             labels: 'note',
+            fingers: true,
         };
         rememberShellPreferences(uke);
         expect(shellPreferences()).toEqual(uke);
@@ -317,6 +319,7 @@ describe('the neck preferences (#1586)', () => {
                 home: [0, 99],
                 rootStrings: 'classic',
                 labels: 'colour',
+                fingers: 'yes',
             }),
         );
         expect(shellPreferences()).toEqual({ ...defaults, rootStrings: 'classic' });

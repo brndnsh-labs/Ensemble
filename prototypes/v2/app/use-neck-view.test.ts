@@ -1,7 +1,7 @@
 /**
  * The neck view's follow logic (#1587), on real band charts (`bandChart` over a compiled
  * timeline): which grip sounds at a performed slot, which comes next in performance order, and
- * the narration between them.
+ * the headline and finger detail between them.
  */
 import { compileTimeline } from '@band/index';
 import type { ScoreEvent, ScoreMeasure, SemanticScore } from '@engine/songbook/score-types';
@@ -141,18 +141,32 @@ describe('neckModel', () => {
         ),
     );
 
-    it('stopped, shows the first grip and narrates the change to the second', () => {
+    it('stopped, shows the first grip and heads the change to the second', () => {
         const model = neckModel(band, voiced, null, GUITAR)!;
         expect(model.name).toBe('Dm7');
         expect(model.nextName).toBe('G7');
         expect(model.grip?.symbol).toBe('Dm7');
-        expect(model.narration).toMatch(/^Starts on Dm7\. Then G7: root up a 4th/);
+        expect(model.headline).toBe(
+            'Starts on Dm7 · then G7: root up a 4th, over to the 6th string, 2 frets lower',
+        );
+        expect(model.fingers).toBe(
+            'Finger 2 stays down; finger 1 goes down on the 6th string, fret 3; ' +
+                'finger 3 moves to the 3rd string, fret 4.',
+        );
     });
 
     it('playing, names the next chord and the root move', () => {
         const model = neckModel(band, voiced, 0, GUITAR)!;
-        expect(model.narration).toMatch(/^Next: G7\. Root up a 4th/);
-        expect(model.narration).not.toMatch(/lifts off/);
+        expect(model.headline).toBe(
+            'Next: G7 · root up a 4th, over to the 6th string, 2 frets lower',
+        );
+        expect(model.fingers).not.toMatch(/lifts off/);
+        const second = neckModel(band, voiced, 1, GUITAR)!;
+        expect(second.headline).toBe('Next: C · root up a 4th, same fret, one string over');
+        expect(second.fingers).toBe(
+            'Finger 3 stays down; finger 2 moves to the 5th string, fret 3; ' +
+                'finger 4 goes down on the 2nd string, fret 5.',
+        );
     });
 
     it('says when the grip approximates the written chord, and holds it dimmed under a hold', () => {
@@ -164,6 +178,22 @@ describe('neckModel', () => {
         expect(held.held).toBe('hold');
         expect(held.grip).toBe(triad.grip);
         expect(held.nextName).toBe('Dm7');
+    });
+
+    it('heads a chart of one chord with its name alone, and says nothing while it plays', () => {
+        const one = view([
+            { id: 'a', label: 'A', repeat: 1, measures: [bar('m1', [chord('G7', 4)])] },
+        ]);
+        const grips = new Map(
+            voiceBandChart(one, { instrument: 'guitar', home: [2, 7], rootStrings: 'all' }).map(
+                (v) => [v.globalIndex, v] as const,
+            ),
+        );
+        expect(neckModel(one, grips, null, GUITAR)).toMatchObject({
+            headline: 'Starts on G7',
+            fingers: '',
+        });
+        expect(neckModel(one, grips, 0, GUITAR)).toMatchObject({ headline: '', fingers: '' });
     });
 
     it('writes chord names in letters, as the chart prints them', () => {

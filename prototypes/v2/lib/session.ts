@@ -196,9 +196,13 @@ export function rememberStandMode(mode: StandMode): void {
 const SHELL_PREFS = 'ensemble-v2-preview:shell-prefs';
 
 export type ShellLabels = 'finger' | 'degree' | 'note';
-/** The neck's per-device settings (#1586): the voicer's `ShellPrefs` plus what the dots show. */
+/**
+ * The neck's per-device settings (#1586): the voicer's `ShellPrefs` plus what the dots show and
+ * whether the finger-by-finger detail is spoken under the headline (#1587, off by default).
+ */
 export interface ShellPreferences extends ShellPrefs {
     labels: ShellLabels;
+    fingers: boolean;
 }
 
 const SHELL_INSTRUMENTS: readonly ShellPrefs['instrument'][] = ['guitar', 'uke', 'uke-low-g'];
@@ -218,6 +222,7 @@ export function defaultShellPreferences(): ShellPreferences {
         home: defaultShellHome('guitar'),
         rootStrings: 'all',
         labels: 'finger',
+        fingers: false,
     };
 }
 
@@ -232,9 +237,9 @@ const pick = <T>(allowed: readonly T[], value: unknown, fallback: T): T =>
 
 /**
  * Device-local neck preferences — never document fields: which instrument, where the hand
- * lives, which strings may hold a root and what the dots say. Each field is validated on its
- * own, so one unknown value falls back to its default without losing the rest; anything that is
- * not a JSON object is all defaults.
+ * lives, which strings may hold a root, what the dots say and whether the fingers are spoken.
+ * Each field is validated on its own, so one unknown value falls back to its default without
+ * losing the rest; anything that is not a JSON object is all defaults.
  */
 export function shellPreferences(): ShellPreferences {
     const defaults = defaultShellPreferences();
@@ -264,15 +269,16 @@ export function shellPreferences(): ShellPreferences {
         home,
         rootStrings: pick(SHELL_ROOT_STRINGS, stored.rootStrings, defaults.rootStrings),
         labels: pick(SHELL_LABELS, stored.labels, defaults.labels),
+        fingers: typeof stored.fingers === 'boolean' ? stored.fingers : defaults.fingers,
     };
 }
 
 export function rememberShellPreferences(prefs: ShellPreferences): void {
     try {
-        const { instrument, home, rootStrings, labels } = prefs;
+        const { instrument, home, rootStrings, labels, fingers } = prefs;
         localStorage.setItem(
             SHELL_PREFS,
-            JSON.stringify({ instrument, home, rootStrings, labels }),
+            JSON.stringify({ instrument, home, rootStrings, labels, fingers }),
         );
     } catch {
         // The neck still follows the change for this page; only the memory is lost.
