@@ -117,13 +117,16 @@ samples gain envelopes over time, `--mode=latency` tracks an impulse through eac
 (−1.1 dB on a steady tone, +2 dB on transients, 120 samples less latency) and `delayComb`
 (the reverb's feedback combs, correlation 0.86).
 
-**`mix:diff` across engines is not a parity test.** `computeSpectralProbes` measures four
-4096-sample windows spread over the stem's *active* region, and the region starts at the first
-sample above 1e-4 (−80 dBFS). Both engines emit a few LSB before the first note (the master
-chain settling on the soft-clip curve's −1 LSB DC offset); node's reaches 5 LSB where Chromium's
-stays at 3, so node's region starts at 59 ms and Chromium's at the first note, 260 ms — and the
-four windows land on different music. Measured over every window instead, the band shares agree
-within 1 point on the chords and full stems and 4 on the bass. The probe's anchoring is #1556.
+**`mix:diff` across engines flags real engine differences, not noise.** The spectral probes
+average every consecutive 4096-sample window of the stem's active region, which starts at the
+first sample above −60 dBFS (`computeSpectralProbes`, #1556). Until 2026-10-10 they measured
+four windows from a −80 dBFS floor, and the few LSB a render's master chain emits before the
+first note moved the windows onto different bars per engine (bass sub/low read 33/50 in node,
+57/24 in Chromium). On `funk-pocket` / `MIX_AUDIT` the two engines now agree within 3 points on
+every band of every stem. `mix:diff`'s ±5% is relative, so it still flags the small bands
+(presence, air: shares under 2%) at 6 to 10%, which is the engines' real difference.
+**Spectral numbers from before 2026-10-10 are not comparable** with numbers from after; re-make
+a `mix:diff` baseline instead of reading an old one.
 
 **Speed.** The pack scene's six stems render in 9 s; the all-synth scene's take 70 s, against
 86 s for `--engine=chromium --no-build` on the same scene plus the Next build when the bridge

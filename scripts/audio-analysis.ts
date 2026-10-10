@@ -112,10 +112,12 @@ export function toDb(value: number): number {
     return 20 * Math.log10(value);
 }
 
-export function activeBounds(samples: Float32Array): { start: number; end: number } {
+export function activeBounds(
+    samples: Float32Array,
+    threshold = 1e-4,
+): { start: number; end: number } {
     let start = 0;
     let end = samples.length - 1;
-    const threshold = 1e-4;
     while (start < samples.length && Math.abs(samples[start]) < threshold) {
         start++;
     }
@@ -212,10 +214,25 @@ const SPECTRAL_BAND_CENTERS = {
     air: 7200,
 } as const;
 
+/**
+ * Where the spectral probes start and stop listening: the first and last sample above −60 dBFS.
+ * The general `activeBounds` floor (−80 dBFS) sits inside a render's master-chain settling, a
+ * few LSB before the first note that differ by engine and build, so it cannot anchor a
+ * measurement meant to compare renders (#1556).
+ */
+export const SPECTRAL_ACTIVITY_THRESHOLD = 1e-3;
+const SPECTRAL_WINDOW = 4096;
+
+/**
+ * Each band's share of the summed probe magnitudes, averaged over every consecutive
+ * 4096-sample window of the active region. Every window, not a sample of them: a handful of
+ * windows lands on whichever notes sit under them, so the shares moved with the region's first
+ * sample (bass sub/low read 33/50 or 57/24 for the same music, #1556).
+ */
 export function computeSpectralProbes(samples: Float32Array, sampleRate: number): SpectralProbes {
-    const bounds = activeBounds(samples);
-    const active = samples.slice(bounds.start, bounds.end);
-    const windowSize = Math.min(4096, active.length);
+    const bounds = activeBounds(samples, SPECTRAL_ACTIVITY_THRESHOLD);
+    const active = samples.subarray(bounds.start, bounds.end);
+    const windowSize = Math.min(SPECTRAL_WINDOW, active.length);
     if (windowSize < 256) {
         return {
             sub: 0,
@@ -230,10 +247,8 @@ export function computeSpectralProbes(samples: Float32Array, sampleRate: number)
     }
 
     const windows: Float32Array[] = [];
-    const hop = Math.max(1, Math.floor((active.length - windowSize) / 3));
-    for (let i = 0; i < 4; i++) {
-        const start = Math.min(active.length - windowSize, hop * i);
-        windows.push(active.slice(start, start + windowSize));
+    for (let start = 0; start + windowSize <= active.length; start += windowSize) {
+        windows.push(active.subarray(start, start + windowSize));
     }
 
     const totals: Record<string, number> = {

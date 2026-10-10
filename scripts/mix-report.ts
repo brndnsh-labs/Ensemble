@@ -448,10 +448,9 @@ async function renderAndMeasureInPage({ request, loopCount, wavName }) {
         return 'irregular';
     }
 
-    function activeBounds(samples) {
+    function activeBounds(samples, threshold = 1e-4) {
         let start = 0;
         let end = samples.length - 1;
-        const threshold = 1e-4;
         while (start < samples.length && Math.abs(samples[start]) < threshold) {
             start++;
         }
@@ -488,18 +487,18 @@ async function renderAndMeasureInPage({ request, loopCount, wavName }) {
             air5k: 5000,
             air: 7200,
         };
-        const bounds = activeBounds(samples);
-        const active = samples.slice(bounds.start, bounds.end);
+        // Mirror of computeSpectralProbes in scripts/audio-analysis.ts: every consecutive
+        // window of the region above SPECTRAL_ACTIVITY_THRESHOLD (#1556).
+        const bounds = activeBounds(samples, 1e-3);
+        const active = samples.subarray(bounds.start, bounds.end);
         const windowSize = Math.min(4096, active.length);
         const totals = { sub: 0, low: 0, lowMid: 0, mid: 0, presence: 0, air5k: 0, air: 0 };
         if (windowSize < 256) {
             return { ...totals, centroid: 0 };
         }
         const windows = [];
-        const hop = Math.max(1, Math.floor((active.length - windowSize) / 3));
-        for (let i = 0; i < 4; i++) {
-            const start = Math.min(active.length - windowSize, hop * i);
-            windows.push(active.slice(start, start + windowSize));
+        for (let start = 0; start + windowSize <= active.length; start += windowSize) {
+            windows.push(active.subarray(start, start + windowSize));
         }
         for (const windowSamples of windows) {
             for (const [band, freq] of Object.entries(centers)) {
