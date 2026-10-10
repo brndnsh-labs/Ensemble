@@ -25,6 +25,7 @@ import path from 'node:path';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
 import playwright from '@playwright/test';
+import { compileTimeline, performPass } from '../band/index.js';
 import { encodeWav } from '../public/engine/wav-encoder.js';
 import { buildAuditionLink } from './audition-link.js';
 import { laneEvents, performSceneForReport, sceneSettings, sceneVoices } from './band-scene.js';
@@ -65,6 +66,13 @@ interface Options {
     offline: 'page' | 'node';
     /** Lanes switched off on the stand through the link (`bnd`): soloist, bass, chords. */
     off: Array<'soloist' | 'bass' | 'chords'>;
+    /**
+     * What the offline side plays: `live` composes the SAME performance the stand did — its score,
+     * its settings, its seed, one looping pass — so the two sides align sample for sample and the
+     * residual is the live path alone; `scene` composes the scene's own settings and seed, as
+     * `mix:report` does, so the comparison also carries whatever the stand does differently.
+     */
+    match: 'live' | 'scene';
 }
 
 export function parseLiveCaptureArgs(argv: string[]): Options {
@@ -78,6 +86,7 @@ export function parseLiveCaptureArgs(argv: string[]): Options {
         json: false,
         offline: 'page',
         off: [],
+        match: 'live',
     };
     for (const arg of argv) {
         if (arg.startsWith('--scene=')) {
@@ -108,6 +117,12 @@ export function parseLiveCaptureArgs(argv: string[]): Options {
                 }
                 options.off.push(lane);
             }
+        } else if (arg.startsWith('--match=')) {
+            const match = arg.slice('--match='.length);
+            if (match !== 'live' && match !== 'scene') {
+                throw new Error(`--match=${match}: live or scene`);
+            }
+            options.match = match;
         } else if (arg === '--build') {
             options.build = true;
         } else if (arg === '--json') {
@@ -239,6 +254,7 @@ export async function runLiveCapture(argv = process.argv.slice(2)): Promise<void
             voices: liveVoices,
             settings: liveSettings,
             countIn,
+            score: liveScore,
         } = await page.evaluate(async () => {
             const bridge = window.ensemble!;
             bridge.capture!.mark('play');
@@ -248,6 +264,7 @@ export async function runLiveCapture(argv = process.argv.slice(2)): Promise<void
                 voices: bridge.transport!.voices(),
                 settings: bridge.transport!.settings(),
                 countIn: bridge.transport!.countIn(),
+                score: bridge.transport!.score(),
             };
         });
         await page.waitForTimeout(playSeconds * 1000);
@@ -351,23 +368,48 @@ export async function runLiveCapture(argv = process.argv.slice(2)): Promise<void
                 ? "band settings: the stand plays the scene's settings\n"
                 : `band settings differ: ${settingDiffs.join('; ')}\n`,
         );
-        const performed = performSceneForReport(scene, options.seed, 1, voices);
-        const liveLanes = { ...performed.settings.lanes };
-        for (const lane of options.off) {
-            liveLanes[lane === 'chords' ? 'comp' : lane === 'soloist' ? 'lead' : 'bass'] = false;
-        }
         const fullStem = MIX_REPORT_STEMS.find((stem) => stem.id === 'full')!;
-        const request = {
-            score: performed.score,
-            passes: laneEvents(
+        const bandLanes = fullStem.lanes as Array<'drums' | 'bass' | 'comp' | 'lead'>;
+        let offlineScore: typeof liveScore;
+        let offlinePasses: ReturnType<typeof laneEvents>;
+        if (options.match === 'live') {
+            // The stand's own performance, recomposed: its score, its settings (lanes already as
+            // switched), its seed, the first pass of a looping chart — the band is deterministic
+            // for those, so the events are the ones the live host scheduled.
+            offlineScore = liveScore;
+            const pass = performPass(compileTimeline(liveScore), liveSettings, {
+                pass: 0,
+                looping: true,
+            });
+            offlinePasses = laneEvents(
+                [pass.events],
+                bandLanes.filter((lane) => liveSettings.lanes[lane]),
+            );
+            log.write(
+                `offline composed from the stand's score, settings and seed ${liveSettings.seed}\n`,
+            );
+        } else {
+            const performed = performSceneForReport(scene, options.seed, 1, voices);
+            const liveLanes = { ...performed.settings.lanes };
+            for (const lane of options.off) {
+                liveLanes[lane === 'chords' ? 'comp' : lane === 'soloist' ? 'lead' : 'bass'] =
+                    false;
+            }
+            offlineScore = performed.score;
+            offlinePasses = laneEvents(
                 performed.bed,
-                (fullStem.lanes as Array<'drums' | 'bass' | 'comp' | 'lead'>).filter(
-                    (lane) => liveLanes[lane],
-                ),
-            ),
+                bandLanes.filter((lane) => liveLanes[lane]),
+            );
+        }
+        const request = {
+            score: offlineScore,
+            passes: offlinePasses,
             bpm: scene.bpm,
             sampleRate,
-            intensity: scene.intensity ?? 0.7,
+            intensity:
+                options.match === 'live'
+                    ? (liveSettings.intensity ?? scene.intensity ?? 0.7)
+                    : (scene.intensity ?? 0.7),
             voices,
             randomSeed: `${scene.id}:${options.seed}`,
             genreFeel: scene.genreFeel,
@@ -418,8 +460,49 @@ export async function runLiveCapture(argv = process.argv.slice(2)): Promise<void
                   )
                 : null;
 
+        // Same performance both sides: align them and read the residual, the live path alone.
+        let aligned: { lagMs: number; correlation: number; residualDb: number } | null = null;
+        if (options.match === 'live' && levels && comparedBars >= 2) {
+            const liveFrom = steady.from;
+            const liveTo = musicStart + Math.round(comparedBars * barSeconds * sampleRate);
+            const offFrom = Math.round((offline.leadInSeconds + barSeconds) * sampleRate);
+            const span = liveTo - liveFrom;
+            const maxLag = Math.round(0.3 * sampleRate);
+            let best = Number.NEGATIVE_INFINITY;
+            let lag = 0;
+            for (let l = -maxLag; l <= maxLag; l += 4) {
+                let sum = 0;
+                for (let i = 0; i < span; i += 8) {
+                    sum += mono[liveFrom + i] * (offlineMono[offFrom + i + l] ?? 0);
+                }
+                if (sum > best) {
+                    best = sum;
+                    lag = l;
+                }
+            }
+            let sa = 0;
+            let sb = 0;
+            let sab = 0;
+            let sr = 0;
+            for (let i = 0; i < span; i++) {
+                const a = mono[liveFrom + i];
+                const b = offlineMono[offFrom + i + lag] ?? 0;
+                sa += a * a;
+                sb += b * b;
+                sab += a * b;
+                sr += (a - b) ** 2;
+            }
+            aligned = {
+                lagMs: (lag / sampleRate) * 1000,
+                correlation: sab / Math.sqrt(sa * sb || 1),
+                residualDb: 20 * Math.log10(Math.sqrt(sr / span) || 1e-12),
+            };
+        }
+
         const report = {
             scene: scene.id,
+            match: options.match,
+            aligned,
             seed: options.seed,
             bars: options.bars,
             playedBars,
@@ -462,6 +545,11 @@ export async function runLiveCapture(argv = process.argv.slice(2)): Promise<void
             );
         } else {
             log.write('live/offline   NOT VERIFIABLE: fewer than two whole bars to compare\n');
+        }
+        if (aligned) {
+            log.write(
+                `same take      aligned at ${aligned.lagMs >= 0 ? '+' : ''}${aligned.lagMs.toFixed(1)} ms · correlation ${aligned.correlation.toFixed(3)} · residual ${aligned.residualDb.toFixed(1)} dBFS (what the live path adds to or takes from the render)\n`,
+            );
         }
     } finally {
         await browser.close();

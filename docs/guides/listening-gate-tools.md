@@ -156,12 +156,18 @@ the threshold it states, never a verdict on how it sounds:
 | stop silence | RMS 1.2–1.6 s after Stop against −60 dBFS, the 0.4–0.8 s tail for scale, and the time to fall under the floor; NOT VERIFIABLE when nothing sounded before Stop or the capture ends inside the window | a voice Stop never released (#1530) — the reverb's tail is the room, so the judged window sits past it |
 | stop click | the largest `measureDiscontinuity` in the 400 ms after Stop, against `CLICK_DISCONTINUITY` | a hard cut at Stop |
 | tempo | onsets in the steady region against the nominal sixteenth grid (its phase the circular mean of the onsets, so a swung offbeat cannot drag it): median deviation, drift in ms per bar, and the tempo they describe. The deviation carries the style's swing and humanise feel; read it against those, not as error | the metronome-core promise, in numbers |
-| live/offline | the same scene rendered in node on the sounds the stand actually played (`transport.voices()`), compared on RMS and dense band shares over the same bars | a live path that differs from the export (#1531: 2.5 dB) |
+| live/offline | the same scene rendered offline on the sounds the stand actually played (`transport.voices()`), compared on RMS and dense band shares over the same whole bars | a live path that differs from the export (#1531: 2.5 dB) |
+| same take | with `--match=live` (the default), the offline side is the stand's OWN performance recomposed — its score, settings and seed, one looping pass — so the two sides align sample for sample: lag, correlation and residual in dBFS | what the live path adds or removes, with the performance held equal |
 
-**Read the live/offline row with care.** The stand re-rolls the performance seed on Play, so
-the two sides are different performances of the same chart on the same sounds: level and
-spectrum compare, samples do not. The offline side uses the `full` stem (the lead lane is off by
-default on the stand), minus any lane `--off=` switched off. Both sides skip their first bar and
+**Two ways to build the offline side.** `--match=live` (the default) recomposes the stand's own
+performance from the score, settings and seed `transport` reports, so the comparison holds the
+music equal and reads the path: on `funk-pocket` it put live against offline at +0.1 dB and
+within 1.3 points per band for the whole band, −0.0 dB for drums alone (2026-10-10). The
+aligned correlation sits near 0.7 because the voices humanise with `Math.random` live and the
+seeded sequence offline — expected, not a defect. `--match=scene` composes the scene's settings
+and seed as `mix:report` does, so the comparison also carries whatever the stand does
+differently: that is how #1564 was found. The offline side uses the `full` stem (the lead lane is
+off by default on the stand), minus any lane `--off=` switched off. Both sides skip their first bar and
 cover the whole bars the stand got through before Stop; the stand counts a bar in by default
 (`playback.countIn`), which the script reads and skips. Playback is real time: eight bars at
 104 bpm is eighteen seconds, nineteen with the count-in.
@@ -183,12 +189,11 @@ sounds):** the live clock held a 0.6–1.0 ms median deviation from the sixteent
 offline render of the same state: drums alone and drums + bass agree within 3 points per band;
 with the comp on, the live mix carries 17 points more sub and 11 less low — because the stand
 plays the comp on **piano** (`bandSettings()` maps the synth chords voice to piano) while the
-tools render the style's preferred **clav** (#1564). The live mix also ran above the offline
-render in every configuration — drums alone +0.4, +1.6 and +1.7 dB over three runs, the whole
-band +0.9 to +1.0 — a spread wide enough that part of it is the re-rolled performance (#1565).
-`--off=` is how those were separated: switch lanes off on the stand and the offline side
-follows. `jazz-ride` read −0.0 dB live against offline, with too few onsets in the full mix for
-the tempo fit.
+tools render the style's preferred **clav** (#1564). Those first runs also read live 0.4–1.7 dB
+above offline; `--match=live` showed that to be take-to-take variance, not the path (#1565,
+closed on the measurement). `--off=` is how the lanes were separated: switch lanes off on the
+stand and the offline side follows. `jazz-ride` had too few onsets in the full mix for the
+tempo fit.
 
 `--offline=node` renders the reference in node from node's default state instead; use it to
 compare the stand against what `mix:report` measures, knowing #1563 (the clone's genre) and the
