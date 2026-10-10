@@ -1007,4 +1007,84 @@ describe('audio-verify — tuning and voicing over a held note (#1568)', () => {
             'PITCH NOT CONFIRMED: step 4 midi 45',
         );
     });
+
+    /** A solo line at constant level: each pitch runs straight into the next, no gaps. */
+    function slurred(sounding: number[], written = sounding) {
+        const events: ScheduledEvent[] = written.map((midi, index) => ({
+            track: 'soloist',
+            time: META.leadInSeconds + index * 0.3,
+            midi,
+            duration: 0.3,
+            velocity: 0.8,
+        }));
+        const samples = new Float32Array(Math.ceil(RENDER_SECONDS * SAMPLE_RATE));
+        sounding.forEach((midi, index) => {
+            const tone = held(midi, 0, 0.3);
+            const start = Math.floor(events[index].time * SAMPLE_RATE);
+            // Only the very first note has an attack; the rest take over at full level.
+            for (let i = 0; i < tone.length; i++) {
+                samples[start + i] = tone[i] * (index === 0 ? Math.min(1, i / 176) : 1);
+            }
+        });
+        return verifyStem({
+            stemId: 'soloist',
+            tracks: ['soloist'],
+            samples,
+            events,
+            meta: META,
+            pitched: true,
+            singleLane: true,
+            outputLatencyMs: 0,
+        });
+    }
+
+    it('finds a slurred note by its pitch when the level never rises (#1582)', () => {
+        const result = slurred([67, 69, 72, 74, 71, 67]);
+        expect(result.matchedAttacks).toBe(6);
+        expect(result.matchedByPitch).toBe(5);
+        expect(result.missed).toEqual([]);
+        expect(result.pitch).toMatchObject({ measured: 6, measuredConfirmed: 6 });
+        expect(result.attacks.filter((attack) => attack.byPitch)).toHaveLength(5);
+        expect(formatVerificationTable([result], META)).toContain('5 found by pitch');
+    });
+
+    it('still calls a slurred note missing when the note before it rings on instead', () => {
+        // The third written note (72) never plays: the 69 before it holds through its slot.
+        const result = slurred([67, 69, 69, 74, 71, 67], [67, 69, 72, 74, 71, 67]);
+        expect(result.missed.map((group) => group.midis)).toEqual([[72]]);
+        expect(result.matchedAttacks).toBe(5);
+    });
+
+    it('does not take a ringing note as proof of a repeated one', () => {
+        // Written 69 twice; one unbroken 69 sounds. Pitch cannot tell one note from two.
+        const result = slurred([67, 69, 69, 74], [67, 69, 69, 74]);
+        expect(result.missed.map((group) => group.midis)).toEqual([[69]]);
+    });
+
+    it('does not find a note by pitch on a mixed stem', () => {
+        const mixed = slurred([67, 69, 72]);
+        expect(mixed.matchedByPitch).toBe(2);
+        const events: ScheduledEvent[] = [67, 69, 72].map((midi, index) => ({
+            track: 'soloist',
+            time: META.leadInSeconds + index * 0.3,
+            midi,
+            duration: 0.3,
+            velocity: 0.8,
+        }));
+        const samples = new Float32Array(Math.ceil(RENDER_SECONDS * SAMPLE_RATE));
+        [67, 69, 72].forEach((midi, index) => {
+            samples.set(held(midi, 0, 0.3), Math.floor(events[index].time * SAMPLE_RATE));
+        });
+        const full = verifyStem({
+            stemId: 'full',
+            tracks: ['soloist', 'bass'],
+            samples,
+            events,
+            meta: META,
+            pitched: true,
+            singleLane: false,
+            outputLatencyMs: 0,
+        });
+        expect(full.matchedByPitch).toBe(0);
+    });
 });

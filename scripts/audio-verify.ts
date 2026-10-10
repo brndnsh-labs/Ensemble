@@ -115,6 +115,11 @@ export interface AttackRow {
     level: number | null;
     attenuated: boolean;
     present: boolean;
+    /**
+     * Set when the attack showed no rise in level and was found by its pitch instead: a note
+     * slurred out of the one before it on a voice that sustains (`legatoSounded`).
+     */
+    byPitch?: boolean;
     riseDb: number;
     peak: number;
 }
@@ -126,6 +131,8 @@ export interface StemVerification {
     pitched: boolean;
     expectedAttacks: number;
     matchedAttacks: number;
+    /** How many of `matchedAttacks` were found by pitch alone (`legatoSounded`). */
+    matchedByPitch: number;
     /** null when nothing was scheduled — distinct from 0, which means all dropped. */
     matchRate: number | null;
     missed: AttackGroup[];
@@ -1118,6 +1125,40 @@ export interface VerifyStemInput {
  */
 export const PRESENCE_RISE_DB = 2;
 
+/** How long an attack is heard alone: its written length, cut at the next attack. */
+function heldUntilNext(groups: AttackGroup[], group: AttackGroup): number {
+    const next = groups[groups.indexOf(group) + 1];
+    return Math.min(
+        group.duration ?? Number.POSITIVE_INFINITY,
+        next ? next.time - group.time : Number.POSITIVE_INFINITY,
+    );
+}
+
+/**
+ * Whether a single note with no rise in level sounded anyway, judged by its pitch: the
+ * tuning readout confirms the written pitch over the time the note is held. Not asked of a
+ * repeated note — the one before it, still ringing, would confirm a note that never played —
+ * nor of a chord or a note too short for `measurePitchCents`; those stay missed.
+ */
+function legatoSounded(
+    samples: Float32Array,
+    sampleRate: number,
+    groups: AttackGroup[],
+    group: AttackGroup,
+    latencySec: number,
+): boolean {
+    const pitches = [...new Set(group.midis)];
+    const before = groups[groups.indexOf(group) - 1];
+    const held = heldUntilNext(groups, group);
+    if (pitches.length !== 1 || !Number.isFinite(held) || before?.midis.includes(pitches[0])) {
+        return false;
+    }
+    return (
+        measurePitchCents(samples, sampleRate, group.time + latencySec, held, pitches[0])
+            ?.confirmed ?? false
+    );
+}
+
 export function verifyStem(input: VerifyStemInput): StemVerification {
     const { stemId, tracks, samples, events, meta } = input;
     const toleranceMs = input.toleranceMs ?? 25;
@@ -1176,6 +1217,27 @@ export function verifyStem(input: VerifyStemInput): StemVerification {
         } else {
             missed.push(group);
         }
+    }
+
+    // A slurred note has no rise to find: on a voice that sustains (a sax, an overdriven
+    // guitar) the level holds while the pitch changes, and the rise check called 28 of 36
+    // notes of a rock solo missing at full level (#1582). Its pitch arriving on time is the
+    // evidence it sounded.
+    let matchedByPitch = 0;
+    if (input.pitched && input.singleLane) {
+        for (const group of [...missed]) {
+            if (legatoSounded(samples, meta.sampleRate, groups, group, latencySec)) {
+                missed.splice(missed.indexOf(group), 1);
+                present.push(group);
+                matchedByPitch++;
+                const row = attacks.find((attack) => attack.time === group.time);
+                if (row) {
+                    row.present = true;
+                    row.byPitch = true;
+                }
+            }
+        }
+        present.sort((a, b) => a.time - b.time);
     }
 
     // An onset is "unscheduled" only if no expected attack sits near it.
@@ -1246,11 +1308,7 @@ export function verifyStem(input: VerifyStemInput): StemVerification {
         const readings: PitchReading[] = [];
         for (const group of present) {
             const at = group.time + latencySec;
-            const next = groups[groups.indexOf(group) + 1];
-            const held = Math.min(
-                group.duration ?? Number.POSITIVE_INFINITY,
-                next ? next.time - group.time : Number.POSITIVE_INFINITY,
-            );
+            const held = heldUntilNext(groups, group);
             const pitches = [...new Set(group.midis)];
             if (pitches.length > 1) {
                 const match = Number.isFinite(held)
@@ -1337,6 +1395,7 @@ export function verifyStem(input: VerifyStemInput): StemVerification {
         pitched: Boolean(input.pitched),
         expectedAttacks: groups.length,
         matchedAttacks: present.length,
+        matchedByPitch,
         // null, not 0, when nothing was scheduled: "0.0%" for an empty lane is
         // visually identical to "every note was dropped", which is the opposite
         // conclusion. Also null for mixed stems, where it is not attributable.
@@ -1468,6 +1527,11 @@ export function formatVerificationTable(
             `${result.stemId.padEnd(14)} expected ${String(result.expectedAttacks).padStart(4)}  ` +
                 `matched ${String(result.matchedAttacks).padStart(4)}  (${rate})`,
         );
+        if (result.matchedByPitch > 0) {
+            lines.push(
+                `${' '.repeat(11)}${result.matchedByPitch} found by pitch: slurred, no rise in level, so no timing reading`,
+            );
+        }
 
         if (result.missed.length > 0) {
             const shown = result.missed

@@ -579,6 +579,15 @@ satisfies the bass note's evidence. Measured — muting the bass lane entirely o
   not a *rise* over what they replace at any level. That is a limit of rise-based
   presence detection, not a defect in anything it is measuring — a lane whose idiom is
   the repeated sixteenth has a floor on what this method can verify.
+- **A slurred note is found by its pitch, not by a rise (#1582).** On a voice that sustains
+  (the overdriven guitar, the sax) a note slurred out of the one before it keeps the level
+  where it was, so the rise check called 28 of 36 notes of the rock solo missing at full
+  level (22%; blues 46%, jazz 42%). On a single-lane pitched stem, a single note with no rise
+  now counts as sounded when `measurePitchCents` confirms its written pitch over the time it
+  is held; the report says how many (`N found by pitch`), and those carry no timing reading.
+  It is not asked of a repeated note (the one before, still ringing, would confirm a note that
+  never played), a chord, or a note under 150 ms: those still need a rise. After it: rock
+  36/36, blues 27/28, jazz 26/26.
 - **Pitch is not judged on a short low note, and octaves are only half seen.** A single
   note held under 150 ms below roughly **MIDI 69** gets no pitch claim (the 80 ms probe
   cannot tell it from its neighbors: measured, it confirmed 8 of 10 *wrong* pitches), and
