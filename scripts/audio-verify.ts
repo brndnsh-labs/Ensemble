@@ -86,6 +86,11 @@ export interface AttackGroup {
     time: number;
     step: number;
     midis: number[];
+    /**
+     * The shortest written length (seconds) among the group's events, or null when none
+     * carried one. The pitch measurement listens only while every note is still held.
+     */
+    duration?: number | null;
     /** Max velocity across the group's events, or null if no event carried one. */
     velocity: number | null;
     /**
@@ -141,7 +146,48 @@ export interface StemVerification {
     velocityPeakR: number | null;
     /** Why a null metric is null — printed verbatim so a gap never reads as a pass. */
     notVerifiable: Record<string, string>;
+    /** Share of the probed attacks whose pitch (or voicing) was confirmed; see `pitch`. */
     pitchConfirmedRate: number | null;
+    /** What the pitch claim is made of, and the tuning readout (#1568). Null when unpitched. */
+    pitch: PitchSummary | null;
+}
+
+/** One note's measured tuning. */
+export interface PitchReading {
+    step: number;
+    midi: number;
+    cents: number;
+    /** Why the note was not confirmed; absent on a confirmed one. */
+    why?: string;
+}
+
+/** The pitch section of a stem's verification (#1568). */
+export interface PitchSummary {
+    /** Single notes long enough for the long-window measurement, and how many confirmed. */
+    measured: number;
+    measuredConfirmed: number;
+    /** Short single notes that fell back to the 80 ms probe (resolvable register only). */
+    shortProbed: number;
+    shortConfirmed: number;
+    /** Chord attacks checked by pitch class, and how many carried every voiced class. */
+    chordsProbed: number;
+    chordsMatched: number;
+    /** Sounded attacks no method could judge (too short for their register). */
+    skipped: number;
+    /**
+     * Held notes the measurement did not confirm, with where the nearest pitch read. A bend
+     * or a slide lands here honestly: the note left its written pitch on purpose.
+     */
+    unconfirmed: PitchReading[];
+    /** Median |cents| from the written pitch over the measured, confirmed notes. */
+    medianAbsCents: number | null;
+    /** The confirmed note furthest from its written pitch. */
+    worst: PitchReading | null;
+    /**
+     * Written pitches whose median reading is more than `OFF_PITCH_CENTS` out, from at least
+     * two notes: the mis-rooted sample zone class (public/engine/CLAUDE.md rule 24).
+     */
+    offPitch: Array<{ midi: number; medianCents: number; count: number }>;
 }
 
 // ── The four thresholds that decide a verdict ──────────────────────────────────
@@ -469,6 +515,9 @@ export function groupSimultaneous(
         if (last && (event.time - last.time) * 1000 <= epsilonMs) {
             last.midis.push(event.midi);
             last.eventCount++;
+            if (typeof event.duration === 'number') {
+                last.duration = Math.min(last.duration ?? Number.POSITIVE_INFINITY, event.duration);
+            }
             if (typeof event.velocity === 'number') {
                 last.velocity = Math.max(last.velocity ?? 0, event.velocity);
             }
@@ -484,6 +533,7 @@ export function groupSimultaneous(
             time: event.time,
             step: Math.round((event.time - meta.leadInSeconds) / meta.stepSeconds),
             midis: [event.midi],
+            duration: typeof event.duration === 'number' ? event.duration : null,
             velocity: typeof event.velocity === 'number' ? event.velocity : null,
             level,
             attenuated,
@@ -683,6 +733,318 @@ export function probeHarmonicPresence(
     return reference > 0 ? harmonic / reference : Number.POSITIVE_INFINITY;
 }
 
+/**
+ * `goertzelWindow` under a Hann taper. The rectangular window leaks −13 dB into its
+ * neighbours, enough for a strong partial to read as energy at a pitch that is not sounding;
+ * the taper trades that for a main lobe twice as wide (±2/W Hz).
+ */
+export function goertzelHann(
+    samples: Float32Array,
+    sampleRate: number,
+    freq: number,
+    startIndex: number,
+    length: number,
+): number {
+    const end = Math.min(samples.length, startIndex + length);
+    const start = Math.max(0, startIndex);
+    const count = end - start;
+    if (count < 8) {
+        return 0;
+    }
+    const coeff = 2 * Math.cos((2 * Math.PI * freq) / sampleRate);
+    const taper = (2 * Math.PI) / (count - 1);
+    let s1 = 0;
+    let s2 = 0;
+    for (let i = 0; i < count; i++) {
+        const s0 = samples[start + i] * (0.5 - 0.5 * Math.cos(taper * i)) + coeff * s1 - s2;
+        s2 = s1;
+        s1 = s0;
+    }
+    const magSquared = s1 * s1 + s2 * s2 - coeff * s1 * s2;
+    // Half the amplitude, as `goertzelWindow` reads it: the taper's gain is ½.
+    return magSquared > 0 ? Math.sqrt(magSquared) / (count / 2) : 0;
+}
+
+/** The attack the long-window pitch measurement skips: the transient is not the pitch. */
+const PITCH_ATTACK_SKIP_SECONDS = 0.02;
+/** The longest stretch of a held note the pitch measurement listens to. */
+const PITCH_WINDOW_MAX_SECONDS = 0.4;
+/**
+ * The shortest window the long measurement takes. At 150 ms a Goertzel resolves ~6.7 Hz;
+ * shorter notes keep the 80 ms probe and its register floor.
+ */
+export const PITCH_WINDOW_MIN_SECONDS = 0.15;
+/** The shortest held chord the voicing check takes. */
+export const VOICING_WINDOW_MIN_SECONDS = 0.1;
+/** Partials summed by the pitch estimate, weighted 1/k. */
+const PITCH_PARTIALS = 4;
+/** Energy between a note's partials (½f, 1½f), against f or 2f, at which a lower note sounds. */
+const PITCH_BETWEEN_RATIO = 0.25;
+/** The least a note's odd partials (f, 3f) may carry against its even ones (2f, 4f). */
+const PITCH_ODD_RATIO = 0.12;
+/** The least share of the window's energy a confirmed note's first eight partials carry. */
+const PITCH_SHARE_MIN = 0.25;
+/** A written pitch whose notes read further out than this (median) is reported as off-pitch. */
+export const OFF_PITCH_CENTS = 10;
+/**
+ * The least a written chord note may sound against the loudest one. A missing note reads
+ * under 0.24 (its neighbours' leakage); the quietest right note measured read 0.9 on the
+ * synth and, standing on its second partial, over 0.25 on the grand.
+ */
+export const VOICING_MATCH_RATIO = 0.25;
+/** The least share of the window's power the judged notes of a matched chord carry. */
+const VOICING_SHARE_MIN = 0.1;
+
+/** Mean square of a window under the Hann taper `goertzelHann` uses, taper gain removed. */
+function hannPower(samples: Float32Array, startIndex: number, length: number): number {
+    const end = Math.min(samples.length, startIndex + length);
+    const start = Math.max(0, startIndex);
+    const count = end - start;
+    if (count < 8) {
+        return 0;
+    }
+    const taper = (2 * Math.PI) / (count - 1);
+    let sum = 0;
+    for (let i = 0; i < count; i++) {
+        sum += (samples[start + i] * (0.5 - 0.5 * Math.cos(taper * i))) ** 2;
+    }
+    // The taper's own mean square is 3/8.
+    return sum / (count * 0.375);
+}
+
+/** The stretch of a held note the pitch measurements listen to: after the attack, while held. */
+function heldWindow(
+    sampleRate: number,
+    onsetTime: number,
+    durationSeconds: number,
+): { start: number; length: number; seconds: number } {
+    const seconds = Math.min(
+        Math.max(0, durationSeconds - PITCH_ATTACK_SKIP_SECONDS),
+        PITCH_WINDOW_MAX_SECONDS,
+    );
+    return {
+        start: Math.floor((onsetTime + PITCH_ATTACK_SKIP_SECONDS) * sampleRate),
+        length: Math.floor(seconds * sampleRate),
+        seconds,
+    };
+}
+
+export interface PitchMeasurement {
+    /** Offset of the sounding pitch from the written one, in cents (+ is sharp). */
+    cents: number;
+    /** Harmonic energy at the estimate against the pitches a semitone either side. */
+    ratio: number;
+    /** The written pitch is the one sounding: the peak is inside ±50 cents and stands clear. */
+    confirmed: boolean;
+    /** Why not, when not confirmed. */
+    why: string | null;
+}
+
+/**
+ * Measure a held note's tuning against its written pitch (#1568).
+ *
+ * Harmonic summation: for candidate fundamentals from −100 to +100 cents in 5-cent steps, sum
+ * the Goertzel magnitudes at partials 1–4 (weighted 1/k) over up to 400 ms of the held note,
+ * then interpolate the peak. The upper partials are what make a low note measurable: at MIDI
+ * 28 a semitone is 2.4 Hz at the fundamental but 9.8 Hz at the fourth partial, against a
+ * 400 ms window's 2.5 Hz.
+ *
+ * Returns null when the note is too short to measure: under 150 ms held, or a window that
+ * cannot separate a semitone even at the highest partial under Nyquist.
+ *
+ * Blind to octave errors (a note an octave up puts its energy on this note's even partials)
+ * and biased by a bend or slide, which is the note doing what it was written to do. Read the
+ * median, and treat one far-out note as a question, not a fault.
+ */
+export function measurePitchCents(
+    samples: Float32Array,
+    sampleRate: number,
+    onsetTime: number,
+    durationSeconds: number,
+    midi: number,
+): PitchMeasurement | null {
+    const window = heldWindow(sampleRate, onsetTime, durationSeconds);
+    if (
+        window.seconds < PITCH_WINDOW_MIN_SECONDS ||
+        window.start + window.length > samples.length
+    ) {
+        return null;
+    }
+    const f0 = midiToFreq(midi);
+    const semitone = 2 ** (1 / 12);
+    let partials = 0;
+    for (let k = 1; k <= PITCH_PARTIALS; k++) {
+        if (f0 * k * semitone < sampleRate / 2) {
+            partials = k;
+        }
+    }
+    if (partials === 0 || f0 * partials * (semitone - 1) < 2 / window.seconds) {
+        return null;
+    }
+    const score = (cents: number): number => {
+        const f = f0 * 2 ** (cents / 1200);
+        let sum = 0;
+        for (let k = 1; k <= partials; k++) {
+            sum += goertzelWindow(samples, sampleRate, f * k, window.start, window.length) / k;
+        }
+        return sum;
+    };
+    const step = 5;
+    const grid: number[] = [];
+    for (let cents = -100; cents <= 100; cents += step) {
+        grid.push(score(cents));
+    }
+    let peak = 0;
+    for (let i = 1; i < grid.length; i++) {
+        if (grid[i] > grid[peak]) {
+            peak = i;
+        }
+    }
+    const last = grid.length - 1;
+    if (grid[peak] <= 0) {
+        return { cents: 0, ratio: 0, confirmed: false, why: 'nothing sounds near the pitch' };
+    }
+    // A peak on the edge of the search is a pitch at least a semitone away: no reading.
+    if (peak === 0 || peak === last) {
+        return {
+            cents: peak === 0 ? -100 : 100,
+            ratio: 1,
+            confirmed: false,
+            why: 'the pitch sounding is a semitone or more away',
+        };
+    }
+    const [y0, y1, y2] = [grid[peak - 1], grid[peak], grid[peak + 1]];
+    const curve = y0 - 2 * y1 + y2;
+    const cents = -100 + (peak + (curve === 0 ? 0 : (0.5 * (y0 - y2)) / curve)) * step;
+    const neighbours = (grid[0] + grid[last]) / 2;
+    const ratio = neighbours > 0 ? y1 / neighbours : Number.POSITIVE_INFINITY;
+    // The harmonic sum peaks just as well on a note a fifth or an octave from the one
+    // sounding, because their partials coincide, and on the ring of the note before. Three
+    // facts about the spectrum tell those apart, read under a taper so a strong partial does
+    // not leak into an empty bin. Thresholds from five scenes (funk on the synth and on the
+    // sample band, rock, blues, jazz), probing every held note at its own pitch and at ±2, 5,
+    // 7 and ±12 semitones:
+    //   • nothing sounds between this note's partials. Energy at ½f or 1½f means the real
+    //     fundamental is lower: the written note is an octave or a twelfth too high (right
+    //     notes read ≤ 0.16 of the stronger of f and 2f, a legato lead's overlap; wrong ones
+    //     ≥ 0.37);
+    //   • this note's odd partials sound. With f and 3f both missing under 2f and 4f the real
+    //     fundamental is 2f: an octave too low, or a fifth out (right ≥ 0.20, the lead's
+    //     formant on a high note; wrong ≤ 0.09);
+    //   • the note is most of what sounds. Its first eight partials carry the window's
+    //     energy; a ringing previous note carries a few percent (right ≥ 0.35, wrong ≤ 0.04).
+    const f = f0 * 2 ** (cents / 1200);
+    const at = (multiple: number): number =>
+        f * multiple * semitone < sampleRate / 2
+            ? goertzelHann(samples, sampleRate, f * multiple, window.start, window.length)
+            : 0;
+    const strongest = Math.max(at(1), at(2));
+    const between = Math.max(at(0.5), at(1.5));
+    const odd = Math.max(at(1), at(3));
+    const even = Math.max(at(2), at(4));
+    let harmonicPower = 0;
+    for (let k = 1; k <= 8; k++) {
+        // `goertzelHann` reads half the amplitude: a partial of amplitude A carries A²/2.
+        harmonicPower += 2 * at(k) ** 2;
+    }
+    const share = harmonicPower / hannPower(samples, window.start, window.length);
+    let why: string | null = null;
+    if (ratio < PITCH_CONFIRM_RATIO || Math.abs(cents) > 50) {
+        why = 'it does not stand clear of the semitones either side';
+    } else if (between >= PITCH_BETWEEN_RATIO * strongest) {
+        why = 'a lower note sounds under it (energy between its partials)';
+    } else if (odd < PITCH_ODD_RATIO * even) {
+        why = 'its odd partials are missing: the note sounding is an octave up or a fifth out';
+    } else if (share < PITCH_SHARE_MIN) {
+        why = `it carries ${(share * 100).toFixed(0)}% of what sounds: another note is louder`;
+    }
+    return { cents, ratio, confirmed: why === null, why };
+}
+
+export interface VoicingMatch {
+    /** Written notes the window could judge (the rest are too low for it, or doubled). */
+    judged: number;
+    /** The quietest judged note, as a share of the loudest. */
+    weakest: number;
+    matched: boolean;
+}
+
+/** Semitones above a note where its partials 2–5 fall. */
+const PARTIAL_SEMITONES = [12, 19, 24, 28];
+
+/**
+ * Is the written voicing what sounds? Every written note must sound at
+ * `VOICING_MATCH_RATIO` of the loudest one, read at its fundamental over the held chord
+ * (#1568). A note whose fundamental is thin (a piano's low G under a bus high-pass reads
+ * 20 dB down) may stand on its second partial instead, when no other written note or partial
+ * falls there. A note another written note explains (an octave doubling) and a note too low
+ * for the window to separate from its semitone (`1/W` Hz) are not judged.
+ *
+ * Measured on the funk scene, synth and sample band, with each written note moved in turn:
+ * every right voicing matched; of the wrong notes it could judge, none 2, 3, 4 or 5 semitones
+ * out passed and 3% of semitone errors did. **Blind to a note an octave or a twelfth from a
+ * right one** (its energy lands on that note's partials, and a wrong note that lands on
+ * another written note's partial is not judged at all), and to tuning. Null when the chord is
+ * held under 100 ms or fewer than two notes can be judged (one note alone is the loudest by
+ * definition, so it proves nothing).
+ */
+export function voicingMatch(
+    samples: Float32Array,
+    sampleRate: number,
+    onsetTime: number,
+    durationSeconds: number,
+    midis: number[],
+): VoicingMatch | null {
+    const window = heldWindow(sampleRate, onsetTime, durationSeconds);
+    if (
+        window.seconds < VOICING_WINDOW_MIN_SECONDS ||
+        window.start + window.length > samples.length
+    ) {
+        return null;
+    }
+    const written = [...new Set(midis)];
+    const magnitude = (midi: number): number =>
+        goertzelWindow(samples, sampleRate, midiToFreq(midi), window.start, window.length);
+    const levels: number[] = [];
+    for (const midi of written) {
+        const semitoneHz = midiToFreq(midi) * (2 ** (1 / 12) - 1);
+        if (semitoneHz < 1 / window.seconds) {
+            continue;
+        }
+        const explained = new Set<number>();
+        for (const other of written) {
+            if (other !== midi) {
+                explained.add(other);
+                for (const semitones of PARTIAL_SEMITONES) {
+                    explained.add(other + semitones);
+                }
+            }
+        }
+        if (explained.has(midi)) {
+            continue;
+        }
+        levels.push(Math.max(magnitude(midi), explained.has(midi + 12) ? 0 : magnitude(midi + 12)));
+    }
+    // One judged note is as loud as the loudest by definition: no claim from it.
+    if (levels.length < 2) {
+        return null;
+    }
+    const loudest = Math.max(...levels);
+    // The written notes must be a real part of what sounds, or noise "matches": every bin
+    // of a hiss is as loud as the next. Right voicings carried 38% and up across five scenes.
+    let windowPower = 0;
+    for (let i = window.start; i < window.start + window.length; i++) {
+        windowPower += samples[i] ** 2;
+    }
+    windowPower /= window.length;
+    const writtenPower = levels.reduce((sum, level) => sum + 2 * level ** 2, 0);
+    if (loudest <= 0 || writtenPower < VOICING_SHARE_MIN * windowPower) {
+        return { judged: levels.length, weakest: 0, matched: false };
+    }
+    const weakest = Math.min(...levels) / loudest;
+    return { judged: levels.length, weakest, matched: weakest >= VOICING_MATCH_RATIO };
+}
+
 /** Peak absolute amplitude in a short window after an attack. */
 export function measureAttackPeak(
     samples: Float32Array,
@@ -854,48 +1216,102 @@ export function verifyStem(input: VerifyStemInput): StemVerification {
     }
 
     let pitchConfirmedRate: number | null = null;
+    let pitch: PitchSummary | null = null;
     if (!input.pitched) {
         notVerifiable.pitchConfirmedRate =
             'unpitched or mixed stem — harmonic probe not meaningful';
     } else if (present.length === 0) {
         notVerifiable.pitchConfirmedRate = 'no sounded attacks to probe';
     } else {
-        // Two gates, both of which the probe silently fails without:
-        //   • MONOPHONIC — the probe assumes nothing else is sounding, but inside a
-        //     chord a neighbor's own partials land on this note's probe or reference
-        //     bins. `chords` and `harmony` are both single-lane and polyphonic, and
-        //     are the stems a reader most wants to read as "the voicing sounded".
-        //   • RESOLVABLE — see `isPitchResolvable`. Below the floor the probe
-        //     confirmed 8 of 10 wrong pitches in testing.
-        let confirmed = 0;
-        let probed = 0;
-        let skippedUnresolvable = 0;
+        // Three methods, by what the attack is (#1568):
+        //   • a single note held ≥ 150 ms: `measurePitchCents`, a tuning readout that reaches
+        //     the bottom of the bass;
+        //   • a chord held ≥ 100 ms: `voicingMatch`, every written note against the loudest;
+        //   • a short single note: the 80 ms probe, which only resolves ~MIDI 69 and up
+        //     (`isPitchResolvable`; below it the probe confirmed 8 of 10 wrong pitches).
+        // A note listens only until the next attack: after that another pitch is sounding.
+        const summary: PitchSummary = {
+            measured: 0,
+            measuredConfirmed: 0,
+            shortProbed: 0,
+            shortConfirmed: 0,
+            chordsProbed: 0,
+            chordsMatched: 0,
+            skipped: 0,
+            unconfirmed: [],
+            medianAbsCents: null,
+            worst: null,
+            offPitch: [],
+        };
+        const readings: PitchReading[] = [];
         for (const group of present) {
-            if (new Set(group.midis).size !== 1) {
-                continue;
-            }
-            if (!isPitchResolvable(group.midis[0])) {
-                skippedUnresolvable++;
-                continue;
-            }
-            probed++;
-            const ratio = probeHarmonicPresence(
-                samples,
-                meta.sampleRate,
-                group.time + latencySec,
-                group.midis[0],
+            const at = group.time + latencySec;
+            const next = groups[groups.indexOf(group) + 1];
+            const held = Math.min(
+                group.duration ?? Number.POSITIVE_INFINITY,
+                next ? next.time - group.time : Number.POSITIVE_INFINITY,
             );
-            if (ratio > PITCH_CONFIRM_RATIO) {
-                confirmed++;
+            const pitches = [...new Set(group.midis)];
+            if (pitches.length > 1) {
+                const match = Number.isFinite(held)
+                    ? voicingMatch(samples, meta.sampleRate, at, held, pitches)
+                    : null;
+                if (match) {
+                    summary.chordsProbed++;
+                    summary.chordsMatched += match.matched ? 1 : 0;
+                } else {
+                    summary.skipped++;
+                }
+                continue;
+            }
+            const measurement = Number.isFinite(held)
+                ? measurePitchCents(samples, meta.sampleRate, at, held, pitches[0])
+                : null;
+            if (measurement) {
+                summary.measured++;
+                const reading = { step: group.step, midi: pitches[0], cents: measurement.cents };
+                if (measurement.confirmed) {
+                    summary.measuredConfirmed++;
+                    readings.push(reading);
+                } else {
+                    summary.unconfirmed.push({ ...reading, why: measurement.why ?? undefined });
+                }
+            } else if (isPitchResolvable(pitches[0])) {
+                summary.shortProbed++;
+                const ratio = probeHarmonicPresence(samples, meta.sampleRate, at, pitches[0]);
+                summary.shortConfirmed += ratio > PITCH_CONFIRM_RATIO ? 1 : 0;
+            } else {
+                summary.skipped++;
             }
         }
+        if (readings.length > 0) {
+            summary.medianAbsCents = median(readings.map((reading) => Math.abs(reading.cents)));
+            summary.worst = readings.reduce((worst, reading) =>
+                Math.abs(reading.cents) > Math.abs(worst.cents) ? reading : worst,
+            );
+            const byMidi = new Map<number, number[]>();
+            for (const reading of readings) {
+                byMidi.set(reading.midi, [...(byMidi.get(reading.midi) ?? []), reading.cents]);
+            }
+            for (const [midi, cents] of [...byMidi].sort((a, b) => a[0] - b[0])) {
+                const medianCents = median(cents) as number;
+                if (cents.length >= 2 && Math.abs(medianCents) > OFF_PITCH_CENTS) {
+                    summary.offPitch.push({ midi, medianCents, count: cents.length });
+                }
+            }
+        }
+        pitch = summary;
+        const probed = summary.measured + summary.shortProbed + summary.chordsProbed;
         if (probed === 0) {
             notVerifiable.pitchConfirmedRate =
-                skippedUnresolvable > 0
-                    ? `every sounded attack is below the pitch-resolvable floor (~MIDI 69); an 80 ms window cannot tell those notes from their semitone neighbors`
-                    : 'every sounded attack is polyphonic — the harmonic probe cannot separate simultaneous partials';
+                'every sounded attack is too short for its register: a single note needs 150 ms held (or MIDI 69 and up for the 80 ms probe), a chord 100 ms';
         } else {
-            pitchConfirmedRate = confirmed / probed;
+            pitchConfirmedRate =
+                (summary.measuredConfirmed + summary.shortConfirmed + summary.chordsMatched) /
+                probed;
+            if (summary.skipped > 0) {
+                notVerifiable.pitchOfShortNotes = `${summary.skipped} of ${present.length} sounded attacks could not be judged: too short for their register (a single note under 150 ms below MIDI 69, a chord under 100 ms), of unknown length, or a chord with fewer than two separable notes`;
+            }
         }
     }
 
@@ -940,7 +1356,51 @@ export function verifyStem(input: VerifyStemInput): StemVerification {
         velocityPeakR,
         notVerifiable,
         pitchConfirmedRate,
+        pitch,
     };
+}
+
+const signedCents = (cents: number): string => `${cents >= 0 ? '+' : ''}${cents.toFixed(1)}¢`;
+
+/** The pitch lines under a stem's VERIFIED row: what was checked, and the tuning readout. */
+export function formatPitchSummary(pitch: PitchSummary | null): string[] {
+    if (!pitch) {
+        return [];
+    }
+    const lines: string[] = [];
+    const parts: string[] = [];
+    if (pitch.measured > 0) {
+        parts.push(`${pitch.measuredConfirmed}/${pitch.measured} held notes`);
+    }
+    if (pitch.shortProbed > 0) {
+        parts.push(`${pitch.shortConfirmed}/${pitch.shortProbed} short notes`);
+    }
+    if (pitch.chordsProbed > 0) {
+        parts.push(`${pitch.chordsMatched}/${pitch.chordsProbed} chord voicings`);
+    }
+    if (parts.length > 0) {
+        lines.push(`PITCH: ${parts.join(', ')} confirmed`);
+    }
+    if (pitch.unconfirmed.length > 0) {
+        const shown = pitch.unconfirmed
+            .slice(0, 6)
+            .map((row) => `step ${row.step} midi ${row.midi}: ${row.why ?? 'not confirmed'}`)
+            .join('; ');
+        const more = pitch.unconfirmed.length > 6 ? `, +${pitch.unconfirmed.length - 6} more` : '';
+        lines.push(`PITCH NOT CONFIRMED: ${shown}${more}`);
+    }
+    if (pitch.medianAbsCents !== null && pitch.worst) {
+        lines.push(
+            `TUNING: median |${pitch.medianAbsCents.toFixed(1)}¢| from the written pitch; worst ${signedCents(pitch.worst.cents)} (step ${pitch.worst.step}, midi ${pitch.worst.midi})`,
+        );
+    }
+    if (pitch.offPitch.length > 0) {
+        const named = pitch.offPitch
+            .map((row) => `midi ${row.midi} ${signedCents(row.medianCents)} (n=${row.count})`)
+            .join(', ');
+        lines.push(`OFF-PITCH (median over ${OFF_PITCH_CENTS}¢): ${named}`);
+    }
+    return lines;
 }
 
 const DRUM_LABELS: Record<number, string> = {
@@ -1075,6 +1535,9 @@ export function formatVerificationTable(
             stats.push(`pitch confirmed ${(result.pitchConfirmedRate * 100).toFixed(0)}%`);
         }
         lines.push(`${' '.repeat(11)}VERIFIED: ${stats.join('  |  ')}`);
+        for (const line of formatPitchSummary(result.pitch)) {
+            lines.push(`${' '.repeat(11)}${line}`);
+        }
 
         for (const [metric, reason] of Object.entries(result.notVerifiable)) {
             lines.push(`${' '.repeat(11)}NOT VERIFIABLE: ${metric} — ${reason}`);
