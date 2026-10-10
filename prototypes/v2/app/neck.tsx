@@ -1,6 +1,6 @@
 'use client';
 
-import { type KeyboardEvent, type PointerEvent, useRef } from 'react';
+import { type KeyboardEvent, type PointerEvent, useRef, useState } from 'react';
 import {
     DEGREES,
     type Degree,
@@ -12,15 +12,35 @@ import {
     spellDegree,
     type Voicing,
 } from '../lib/voicings';
-import { BOARD_TOP, dx, END, fretAt, fx, HOME_W, NF, NUT, neckLayout } from './neck-geometry';
+import {
+    BOARD_TOP,
+    type BoardTransform,
+    boardTransform,
+    boardX,
+    dx,
+    END,
+    fretAt,
+    fx,
+    HOME_W,
+    NF,
+    NUT,
+    neckLayout,
+    viewWindow,
+} from './neck-geometry';
 import './neck.css';
 
 // Neck mode's fretboard (#1586): a dumb renderer, voicing in and SVG out. Ported from the
 // handoff prototype's `createNeck`; everything it knows about grips, fingers and motion comes
 // from `lib/voicings`. Colour means degree, always; fingers get numbers and motion, never colour.
 
+/**
+ * The next-grip preview (#1592): `strong` (the last beat before a change) shows WHERE the next grip
+ * is — its ghost dots and the root's path; `soft` and `off` show the current grip only.
+ */
 export type NeckPreview = 'off' | 'soft' | 'strong';
 export type NeckLabels = 'finger' | 'degree' | 'note';
+/** `board` draws the whole neck; `window` zooms onto the hand's frets (a phone, #1593). */
+export type NeckZoom = 'board' | 'window';
 
 export interface NeckProps {
     instrument: InstrumentDef;
@@ -30,6 +50,13 @@ export interface NeckProps {
     next: Voicing | null;
     /** Preview layer strength. */
     preview: NeckPreview;
+    /**
+     * HOW to get there, on request (the "Say the fingers" pref): the strong preview adds an arrow
+     * and a numbered target per moving finger, and rings the fingers that stay down.
+     */
+    fingers?: boolean;
+    /** The whole neck, or zoomed onto the home window / the grips' frets. */
+    zoom?: NeckZoom;
     /** What's inside the dots. */
     labels: NeckLabels;
     /** Shaded window + draggable handle; null = no band. */
@@ -125,16 +152,27 @@ export function Neck({
     active,
     next,
     preview,
+    fingers = false,
     labels,
     home,
     onHome,
     dimmed = false,
     strike = false,
+    zoom = 'board',
     id,
 }: NeckProps) {
     const svgRef = useRef<SVGSVGElement>(null);
-    // The one piece of interaction memory: where a handle drag started.
-    const drag = useRef<{ start: number; fret: number; last: number } | null>(null);
+    // Where a handle drag started, and the zoom it started under: the drag maps the pointer
+    // through that zoom, which holds still until the drag ends (`held`).
+    const drag = useRef<{
+        start: number;
+        fret: number;
+        last: number;
+        view: BoardTransform;
+    } | null>(null);
+    // A zoomed view that followed the window mid-drag would slide the board under the pointer and
+    // feed the drag back on itself, so the view waits for the release.
+    const [held, setHeld] = useState<[number, number] | null>(null);
 
     const n = instrument.strings;
     const { spacing, sy, boardBottom, height } = neckLayout(n);
@@ -142,6 +180,10 @@ export function Neck({
     const midY = (sy(1) + sy(n)) / 2;
     const inlays = INLAYS[instrument.id] ?? INLAYS.guitar;
     const isUke = instrument.id === 'uke';
+
+    // The frets in view when zoomed (held still through a handle drag); null shows the whole neck.
+    const shown = zoom === 'window' ? (held ?? viewWindow(home, active, next)) : null;
+    const view: BoardTransform = shown ? boardTransform(shown) : { tx: 0, scale: 1 };
 
     const svgX = (e: PointerEvent): number => {
         const svg = svgRef.current;
@@ -157,7 +199,15 @@ export function Neck({
             return;
         }
         e.preventDefault();
-        drag.current = { start: home[0], fret: fretAt(svgX(e)), last: home[0] };
+        drag.current = {
+            start: home[0],
+            fret: fretAt(boardX(view, svgX(e))),
+            last: home[0],
+            view,
+        };
+        if (shown) {
+            setHeld(shown);
+        }
         try {
             svgRef.current?.setPointerCapture(e.pointerId);
         } catch {
@@ -169,7 +219,7 @@ export function Neck({
         if (!d) {
             return;
         }
-        const start = clampStart(d.start + fretAt(svgX(e)) - d.fret);
+        const start = clampStart(d.start + fretAt(boardX(d.view, svgX(e))) - d.fret);
         if (start !== d.last) {
             d.last = start;
             onHome?.(start);
@@ -177,6 +227,7 @@ export function Neck({
     };
     const endDrag = () => {
         drag.current = null;
+        setHeld(null);
     };
     const onHandleKey = (e: KeyboardEvent<SVGGElement>) => {
         if (!home) {
@@ -199,9 +250,12 @@ export function Neck({
         }
     };
 
+    // Where the next grip is: only on the last beat, so the board is the current grip all bar.
+    const ahead = active !== null && next !== null && preview === 'strong';
+    // How to get there: on request only.
+    const showFingers = ahead && fingers;
     // Root motion: a bold path from this root to the next one, labelled with the interval.
-    const showPreview = active !== null && next !== null && preview !== 'off';
-    const motion = showPreview ? rootMove(instrument, active, next) : null;
+    const motion = ahead ? rootMove(instrument, active, next) : null;
     const rootPair =
         motion?.from &&
         motion.to &&
@@ -213,7 +267,7 @@ export function Neck({
     const holds = new Set<string>();
     const lifts = new Set<string>();
     const moves: Array<{ finger: number; from: Note | undefined; to: Note }> = [];
-    if (showPreview) {
+    if (showFingers) {
         const A = fingerMap(active.notes);
         const B = fingerMap(next.notes);
         for (let f = 1; f <= 4; f++) {
@@ -263,13 +317,13 @@ export function Neck({
     }
 
     const dots = active ? [...active.notes].sort((a, b) => dotKey(a).localeCompare(dotKey(b))) : [];
-    const strength = preview === 'strong' ? 'is-strong' : 'is-soft';
 
     return (
         <svg
             ref={svgRef}
-            className={`neck ${strength}`}
-            viewBox={`0 0 1000 ${height}`}
+            className="neck"
+            // Zoomed, the board scales uniformly (round dots), so the svg grows by the same factor.
+            viewBox={`0 0 1000 ${Math.round(height * view.scale)}`}
             onPointerMove={onPointerMove}
             onPointerUp={endDrag}
             onPointerCancel={endDrag}
@@ -298,220 +352,245 @@ export function Neck({
                     <path d="M0 0 L10 5 L0 10 Z" className="neck-fill-root" />
                 </marker>
             </defs>
-            <g role="img" aria-label={boardLabel}>
-                <g className="neck-board">
-                    <rect
-                        className="neck-wood"
-                        x={NUT}
-                        y={BOARD_TOP}
-                        width={END - NUT}
-                        height={boardHeight}
-                        rx={3}
-                    />
-                    <rect
-                        className="neck-wood-edge"
-                        x={NUT}
-                        y={boardBottom - 4}
-                        width={END - NUT}
-                        height={4}
-                    />
-                    {inlays.single.map((f) => (
-                        <circle key={f} className="neck-inlay" cx={dx(f)} cy={midY} r={6} />
-                    ))}
-                    {inlays.double.flatMap((f) =>
-                        [midY - spacing, midY + spacing].map((y) => (
-                            <circle
-                                key={`${f}-${y}`}
-                                className="neck-inlay"
-                                cx={dx(f)}
-                                cy={y}
-                                r={6}
-                            />
-                        )),
-                    )}
-                    {Array.from({ length: NF }, (_, i) => i + 1).map((f) => (
+            <g
+                className="neck-zoom"
+                style={
+                    shown
+                        ? { transform: `translate(${view.tx}px, 0px) scale(${view.scale})` }
+                        : undefined
+                }
+            >
+                <g role="img" aria-label={boardLabel}>
+                    <g className="neck-board">
                         <rect
-                            key={f}
-                            className="neck-fret"
-                            x={fx(f) - 1.5}
-                            y={BOARD_TOP}
-                            width={3}
-                            height={boardHeight}
-                        />
-                    ))}
-                    <rect
-                        className="neck-fret"
-                        x={NUT - 5}
-                        y={BOARD_TOP - 2}
-                        width={7}
-                        height={boardHeight + 4}
-                        rx={1.5}
-                    />
-                    {Array.from({ length: n }, (_, i) => i + 1).map((s) => (
-                        <g key={s}>
-                            <line
-                                className="neck-string"
-                                x1={NUT - 44}
-                                x2={END}
-                                y1={sy(s)}
-                                y2={sy(s)}
-                                strokeWidth={
-                                    isUke ? 1.1 + [0.2, 0.5, 0.9, 0.35][s - 1] : 0.8 + s * 0.32
-                                }
-                            />
-                            <text className="neck-text neck-string-letter" x={6} y={sy(s) + 4}>
-                                {instrument.letters[s - 1]}
-                            </text>
-                        </g>
-                    ))}
-                    {Array.from({ length: NF + 1 }, (_, f) => f).map((f) => (
-                        <text
-                            key={f}
-                            className="neck-text neck-fret-number"
-                            x={dx(f)}
-                            y={boardBottom + 22}
-                        >
-                            {f}
-                        </text>
-                    ))}
-                </g>
-                {band && (
-                    <g className="neck-band">
-                        <rect
-                            className="neck-shade"
+                            className="neck-wood"
                             x={NUT}
                             y={BOARD_TOP}
-                            width={Math.max(0, band.x1 - NUT)}
+                            width={END - NUT}
                             height={boardHeight}
+                            rx={3}
                         />
                         <rect
-                            className="neck-shade"
-                            x={band.x2}
-                            y={BOARD_TOP}
-                            width={Math.max(0, END - band.x2)}
-                            height={boardHeight}
+                            className="neck-wood-edge"
+                            x={NUT}
+                            y={boardBottom - 4}
+                            width={END - NUT}
+                            height={4}
                         />
+                        {inlays.single.map((f) => (
+                            <circle key={f} className="neck-inlay" cx={dx(f)} cy={midY} r={6} />
+                        ))}
+                        {inlays.double.flatMap((f) =>
+                            [midY - spacing, midY + spacing].map((y) => (
+                                <circle
+                                    key={`${f}-${y}`}
+                                    className="neck-inlay"
+                                    cx={dx(f)}
+                                    cy={y}
+                                    r={6}
+                                />
+                            )),
+                        )}
+                        {Array.from({ length: NF }, (_, i) => i + 1).map((f) => (
+                            <rect
+                                key={f}
+                                className="neck-fret"
+                                x={fx(f) - 1.5}
+                                y={BOARD_TOP}
+                                width={3}
+                                height={boardHeight}
+                            />
+                        ))}
                         <rect
-                            className="neck-window"
-                            x={band.x1}
-                            y={BOARD_TOP}
-                            width={band.x2 - band.x1}
-                            height={boardHeight}
+                            className="neck-fret"
+                            x={NUT - 5}
+                            y={BOARD_TOP - 2}
+                            width={7}
+                            height={boardHeight + 4}
+                            rx={1.5}
                         />
+                        {Array.from({ length: n }, (_, i) => i + 1).map((s) => (
+                            <g key={s}>
+                                <line
+                                    className="neck-string"
+                                    x1={NUT - 44}
+                                    x2={END}
+                                    y1={sy(s)}
+                                    y2={sy(s)}
+                                    strokeWidth={
+                                        isUke ? 1.1 + [0.2, 0.5, 0.9, 0.35][s - 1] : 0.8 + s * 0.32
+                                    }
+                                />
+                                <text className="neck-text neck-string-letter" x={6} y={sy(s) + 4}>
+                                    {instrument.letters[s - 1]}
+                                </text>
+                            </g>
+                        ))}
+                        {Array.from({ length: NF + 1 }, (_, f) => f).map((f) => (
+                            <text
+                                key={f}
+                                className="neck-text neck-fret-number"
+                                x={dx(f)}
+                                y={boardBottom + 22}
+                            >
+                                {f}
+                            </text>
+                        ))}
                     </g>
-                )}
-                {outline && <rect className="neck-outline" rx={18} {...outline} />}
-                {rootPair && (
-                    <RootPath
-                        from={point(rootPair.from)}
-                        to={point(rootPair.to)}
-                        sameString={rootPair.from.string === rootPair.to.string}
-                        text={rootPair.text}
-                        marker={`url(#${id}-roothead)`}
-                    />
-                )}
-                {showPreview && (
-                    <g className="neck-preview">
-                        {moves.map(({ finger, from, to }) => {
-                            const b = point(to);
-                            const isRootPath =
-                                rootPair !== null && from === rootPair.from && to === rootPair.to;
-                            const arrow =
-                                from && !isRootPath
-                                    ? curve(
-                                          point(from),
-                                          b,
-                                          16,
-                                          15,
-                                          from.string === to.string ? -26 : 16,
-                                          from.string === to.string ? -6 : 0,
-                                      )
-                                    : null;
-                            return (
-                                <g key={finger}>
-                                    {arrow && (
-                                        <path
-                                            className="neck-arrow"
-                                            d={arrow.d}
-                                            pathLength={120}
-                                            markerEnd={`url(#${id}-head)`}
-                                        />
-                                    )}
-                                    <g
-                                        className="neck-target"
-                                        transform={`translate(${b.x},${b.y})`}
-                                    >
-                                        <circle r={12} />
-                                        <text y={4.5}>{finger}</text>
-                                    </g>
-                                </g>
-                            );
-                        })}
-                    </g>
-                )}
-                {active && (
-                    <g
-                        className={`neck-active${dimmed ? ' is-dimmed' : ''}${strike ? ' is-strike' : ''}`}
-                    >
-                        {dots.map((x) => {
-                            const key = dotKey(x);
-                            const root = x.role === 'R';
-                            const label = labelFor(x, active.root, labels);
-                            const state = holds.has(key)
-                                ? ' is-hold'
-                                : lifts.has(key)
-                                  ? ' is-lift'
-                                  : '';
-                            return (
-                                <g
-                                    key={key}
-                                    className={`neck-dot${state}`}
-                                    data-dot={key}
-                                    style={{
-                                        transform: `translate(${dx(x.fret)}px, ${sy(x.string)}px)`,
-                                    }}
-                                >
-                                    <circle className="neck-ring" r={19} />
-                                    <g
-                                        key={strike ? strikeId(active) : 'core'}
-                                        className="neck-core"
-                                    >
-                                        <circle
-                                            className={`neck-body ${DEGREE_FILL[x.degree]}${root ? ' is-root' : ''}`}
-                                            r={root ? 16 : 14}
-                                        />
-                                        <text
-                                            className={`neck-dot-label${x.degree === '7' ? ' is-dark' : ''}${label.length > 2 ? ' is-small' : ''}`}
-                                            y={4.5}
+                    {band && (
+                        <g className="neck-band">
+                            <rect
+                                className="neck-shade"
+                                x={NUT}
+                                y={BOARD_TOP}
+                                width={Math.max(0, band.x1 - NUT)}
+                                height={boardHeight}
+                            />
+                            <rect
+                                className="neck-shade"
+                                x={band.x2}
+                                y={BOARD_TOP}
+                                width={Math.max(0, END - band.x2)}
+                                height={boardHeight}
+                            />
+                            <rect
+                                className="neck-window"
+                                x={band.x1}
+                                y={BOARD_TOP}
+                                width={band.x2 - band.x1}
+                                height={boardHeight}
+                            />
+                        </g>
+                    )}
+                    {outline && <rect className="neck-outline" rx={18} {...outline} />}
+                    {ahead && (
+                        <g className="neck-ghost">
+                            {next.notes.map((x) => (
+                                <circle
+                                    key={`${x.string}-${x.fret}`}
+                                    className={`neck-ghost-dot ${DEGREE_FILL[x.degree]}`}
+                                    data-ghost={`${x.string}-${x.fret}`}
+                                    cx={dx(x.fret)}
+                                    cy={sy(x.string)}
+                                    r={x.role === 'R' ? 16 : 14}
+                                />
+                            ))}
+                        </g>
+                    )}
+                    {rootPair && (
+                        <RootPath
+                            from={point(rootPair.from)}
+                            to={point(rootPair.to)}
+                            sameString={rootPair.from.string === rootPair.to.string}
+                            text={rootPair.text}
+                            marker={`url(#${id}-roothead)`}
+                        />
+                    )}
+                    {showFingers && (
+                        <g className="neck-preview">
+                            {moves.map(({ finger, from, to }) => {
+                                const b = point(to);
+                                const isRootPath =
+                                    rootPair !== null &&
+                                    from === rootPair.from &&
+                                    to === rootPair.to;
+                                const arrow =
+                                    from && !isRootPath
+                                        ? curve(
+                                              point(from),
+                                              b,
+                                              16,
+                                              15,
+                                              from.string === to.string ? -26 : 16,
+                                              from.string === to.string ? -6 : 0,
+                                          )
+                                        : null;
+                                return (
+                                    <g key={finger}>
+                                        {arrow && (
+                                            <path
+                                                className="neck-arrow"
+                                                d={arrow.d}
+                                                pathLength={120}
+                                                markerEnd={`url(#${id}-head)`}
+                                            />
+                                        )}
+                                        <g
+                                            className="neck-target"
+                                            transform={`translate(${b.x},${b.y})`}
                                         >
-                                            {label}
-                                        </text>
+                                            <circle r={12} />
+                                            <text y={4.5}>{finger}</text>
+                                        </g>
                                     </g>
-                                </g>
-                            );
-                        })}
+                                );
+                            })}
+                        </g>
+                    )}
+                    {active && (
+                        <g
+                            className={`neck-active${dimmed ? ' is-dimmed' : ''}${strike ? ' is-strike' : ''}`}
+                        >
+                            {dots.map((x) => {
+                                const key = dotKey(x);
+                                const root = x.role === 'R';
+                                const label = labelFor(x, active.root, labels);
+                                const state = holds.has(key)
+                                    ? ' is-hold'
+                                    : lifts.has(key)
+                                      ? ' is-lift'
+                                      : '';
+                                return (
+                                    <g
+                                        key={key}
+                                        className={`neck-dot${state}`}
+                                        data-dot={key}
+                                        style={{
+                                            transform: `translate(${dx(x.fret)}px, ${sy(x.string)}px)`,
+                                        }}
+                                    >
+                                        <circle className="neck-ring" r={19} />
+                                        <g
+                                            key={strike ? strikeId(active) : 'core'}
+                                            className="neck-core"
+                                        >
+                                            <circle
+                                                className={`neck-body ${DEGREE_FILL[x.degree]}${root ? ' is-root' : ''}`}
+                                                r={root ? 16 : 14}
+                                            />
+                                            <text
+                                                className={`neck-dot-label${x.degree === '7' ? ' is-dark' : ''}${label.length > 2 ? ' is-small' : ''}`}
+                                                y={4.5}
+                                            >
+                                                {label}
+                                            </text>
+                                        </g>
+                                    </g>
+                                );
+                            })}
+                        </g>
+                    )}
+                </g>
+                {home && band && (
+                    <g
+                        className="neck-handle"
+                        tabIndex={0}
+                        role="slider"
+                        aria-label="Hand position"
+                        aria-valuemin={1}
+                        aria-valuemax={MAX_START}
+                        aria-valuenow={home[0]}
+                        aria-valuetext={`frets ${home[0]} to ${home[1]}`}
+                        onPointerDown={onHandleDown}
+                        onKeyDown={onHandleKey}
+                    >
+                        <rect x={band.x1} y={4} width={band.x2 - band.x1} height={20} rx={10} />
+                        <text x={(band.x1 + band.x2) / 2} y={18}>
+                            {`‹ Home · frets ${home[0]}–${home[1]} ›`}
+                        </text>
                     </g>
                 )}
             </g>
-            {home && band && (
-                <g
-                    className="neck-handle"
-                    tabIndex={0}
-                    role="slider"
-                    aria-label="Hand position"
-                    aria-valuemin={1}
-                    aria-valuemax={MAX_START}
-                    aria-valuenow={home[0]}
-                    aria-valuetext={`frets ${home[0]} to ${home[1]}`}
-                    onPointerDown={onHandleDown}
-                    onKeyDown={onHandleKey}
-                >
-                    <rect x={band.x1} y={4} width={band.x2 - band.x1} height={20} rx={10} />
-                    <text x={(band.x1 + band.x2) / 2} y={18}>
-                        {`‹ Home · frets ${home[0]}–${home[1]} ›`}
-                    </text>
-                </g>
-            )}
         </svg>
     );
 }

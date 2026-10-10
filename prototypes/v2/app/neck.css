@@ -1,12 +1,16 @@
 /* Neck mode's fretboard (#1586). Colours are the `--d-*` / board tokens on `:root` in
-   style.css, so Day and Stage both follow from light-dark(). Geometry is in neck.tsx; the one
-   inline style is each dot's runtime transform. */
+   style.css, so Day and Stage both follow from light-dark(). Geometry is in neck.tsx; the inline
+   styles are runtime transforms only: each dot's position and the zoomed board's (#1593). */
 .neck {
     display: block;
     width: 100%;
     height: auto;
     font-family: inherit;
     user-select: none;
+}
+/* A phone's board follows the hand: the zoom slides when the window moves. */
+.neck-zoom {
+    transition: transform 0.3s ease;
 }
 .neck-wood {
     fill: var(--wood);
@@ -80,17 +84,30 @@
     stroke-dasharray: 4 4;
 }
 
-/* Next-chord preview. Strength scales the whole layer; `off` never renders it. */
+/* Next-chord preview (#1592), on the last beat only: where the next grip is (ghost dots and the
+   root's path), plus how to get there (finger arrows and targets) when the fingers are asked for.
+   It fades in as it mounts. */
+.neck-ghost,
 .neck-rootpath,
 .neck-preview {
     pointer-events: none;
-    transition: opacity 0.25s;
+    transition: opacity 0.2s;
 }
-.neck.is-soft .neck-rootpath {
-    opacity: 0.5;
+@starting-style {
+    .neck-ghost,
+    .neck-rootpath,
+    .neck-preview {
+        opacity: 0;
+    }
 }
-.neck.is-soft .neck-preview {
-    opacity: 0.7;
+/* A ghost is the next grip's dot in its degree colour, washed out and dashed so it never reads
+   as a note to play now. */
+.neck-ghost-dot {
+    fill-opacity: 0.4;
+    stroke: var(--string);
+    stroke-opacity: 0.9;
+    stroke-width: 2;
+    stroke-dasharray: 4 3;
 }
 .neck-rootpath-line {
     fill: none;
@@ -114,7 +131,7 @@
     stroke-dasharray: 6 4;
     stroke-linecap: round;
 }
-.neck.is-strong .neck-arrow {
+.neck-arrow {
     animation: neck-draw 0.45s ease-out both;
 }
 @keyframes neck-draw {
@@ -157,7 +174,7 @@
         opacity: 0;
     }
 }
-.neck.is-strong .neck-dot.is-lift {
+.neck-dot.is-lift {
     opacity: 0.45;
 }
 .neck-ring {
@@ -168,9 +185,6 @@
     transition: opacity 0.3s;
 }
 .neck-dot.is-hold .neck-ring {
-    opacity: 0.8;
-}
-.neck.is-strong .neck-dot.is-hold .neck-ring {
     opacity: 1;
 }
 .neck-body {
@@ -242,11 +256,13 @@
     .neck-ring,
     .neck-body,
     .neck-active,
+    .neck-zoom,
+    .neck-ghost,
     .neck-rootpath,
     .neck-preview {
         transition: none;
     }
-    .neck.is-strong .neck-arrow,
+    .neck-arrow,
     .neck-active.is-strike .neck-core {
         animation: none;
     }

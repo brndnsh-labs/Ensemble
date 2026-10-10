@@ -1,10 +1,10 @@
 'use client';
 
-import { useId, useMemo } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import type { BandChart } from '../lib/band-chart';
 import { defaultNeckHome, type NeckLabels, type NeckPreferences } from '../lib/session';
 import { NECK_INSTRUMENTS, type VoicedBandChord } from '../lib/voicings';
-import { Neck, type NeckPreview } from './neck';
+import { Neck, type NeckPreview, type NeckZoom } from './neck';
 import { neckModel } from './use-neck-view';
 import './neck-view.css';
 
@@ -38,18 +38,38 @@ const LABEL_CHOICES: [NeckLabels, string][] = [
     ['note', 'Notes'],
 ];
 
+/** `neck-view.css`'s phone breakpoint: below it the board zooms onto the hand (#1593). */
+const PHONE = '(max-width: 760px)';
+
+/**
+ * The board's zoom for this viewport: the whole neck, or the hand's frets on a phone. The static
+ * export prerenders the whole neck; the viewport is read on mount and on every change.
+ */
+function useNeckZoom(): NeckZoom {
+    const [phone, setPhone] = useState(false);
+    useEffect(() => {
+        const media = window.matchMedia(PHONE);
+        const read = () => setPhone(media.matches);
+        read();
+        media.addEventListener('change', read);
+        return () => media.removeEventListener('change', read);
+    }, []);
+    return phone ? 'window' : 'board';
+}
+
 /** The grip's symbol in the chart's own ASCII accidentals, so the notice reads as one chart. */
 const ascii = (symbol: string): string => symbol.replaceAll('♭', 'b').replaceAll('♯', '#');
 
 export function NeckView({ band, voiced, active, nextSoon, prefs, onPrefs }: NeckViewProps) {
     const id = useId();
     const instrument = NECK_INSTRUMENTS[prefs.instrument];
+    const zoom = useNeckZoom();
     const model = useMemo(
         () => (band && voiced ? neckModel(band, voiced, active, instrument) : null),
         [band, voiced, active, instrument],
     );
-    // Stopped, the first grip soft-previews the second, so the view is never empty; playing,
-    // the preview strengthens on the last beat before the change.
+    // The board previews the next grip only on the last beat before the change (#1592): all bar
+    // long it is the grip sounding now. Stopped, the strip names the next chord instead.
     const preview: NeckPreview = active !== null && nextSoon ? 'strong' : 'soft';
 
     return (
@@ -99,6 +119,9 @@ export function NeckView({ band, voiced, active, nextSoon, prefs, onPrefs }: Nec
                             active={model.grip}
                             next={model.next}
                             preview={preview}
+                            // The same pref says the fingers in the strip and draws them here.
+                            fingers={prefs.fingers}
+                            zoom={zoom}
                             labels={prefs.labels}
                             home={prefs.home}
                             onHome={(start) => onPrefs({ home: [start, start + 5] })}

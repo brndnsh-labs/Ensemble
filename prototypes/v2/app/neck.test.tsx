@@ -9,7 +9,17 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { build, GUITAR, type Note, UKULELE, type Voicing } from '../lib/voicings';
 import { Neck, type NeckProps } from './neck';
-import { dx, neckLayout } from './neck-geometry';
+import {
+    boardTransform,
+    boardX,
+    dx,
+    fretAt,
+    fx,
+    HOME_W,
+    NF,
+    neckLayout,
+    viewWindow,
+} from './neck-geometry';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -132,11 +142,47 @@ describe('Neck: a Gmaj7 on the 6A shape', () => {
     });
 });
 
-describe('Neck: previewing the next chord', () => {
-    it('Gmaj7 → G7: no root path, an arrow for the 7th, rings for the holds', () => {
-        render({ next: g7, preview: 'strong' });
+describe('Neck: previewing the next chord (#1592)', () => {
+    const c7 = build(GUITAR, GUITAR.shapes[2], { name: 'C', pc: 0, letter: 0 }, 'dom7')!;
+    const ghosts = () => [...host.querySelectorAll<SVGCircleElement>('.neck-ghost-dot')];
+
+    it('soft: the current grip only, nothing ahead', () => {
+        render({ next: c7, preview: 'soft', fingers: true });
+        expect(dots()).toHaveLength(3);
+        expect(host.querySelector('.neck-ghost')).toBeNull();
+        expect(host.querySelector('.neck-rootpath')).toBeNull();
+        expect(host.querySelector('.neck-preview')).toBeNull();
+        expect(host.querySelector('.is-hold, .is-lift')).toBeNull();
+    });
+
+    it('strong: the next grip as ghost dots where it sits, and one labelled root path', () => {
+        render({ next: c7, preview: 'strong' });
+        const { sy } = neckLayout(GUITAR.strings);
+        expect(ghosts()).toHaveLength(c7.notes.length);
+        for (const note of c7.notes) {
+            const ghost = host.querySelector(`[data-ghost="${note.string}-${note.fret}"]`)!;
+            expect(Number(ghost.getAttribute('cx'))).toBeCloseTo(dx(note.fret), 6);
+            expect(Number(ghost.getAttribute('cy'))).toBeCloseTo(sy(note.string), 6);
+            expect(ghost.getAttribute('r')).toBe(note.role === 'R' ? '16' : '14');
+        }
+        const rootGhost = c7.notes.find((n) => n.role === 'R')!;
+        expect(
+            host.querySelector(`[data-ghost="${rootGhost.string}-${rootGhost.fret}"]`)!.classList,
+        ).toContain('neck-fill-root');
+        const paths = host.querySelectorAll('.neck-rootpath');
+        expect(paths).toHaveLength(1);
+        expect(paths[0].textContent).toBe('up a 4th');
+        // Where, not how: no finger arrows, targets or hold/lift styling without the fingers.
+        expect(host.querySelector('.neck-preview')).toBeNull();
+        expect(host.querySelector('.neck-arrow, .neck-target')).toBeNull();
+        expect(host.querySelector('.is-hold, .is-lift')).toBeNull();
+    });
+
+    it('strong with the fingers: Gmaj7 → G7 adds an arrow for the 7th and rings the holds', () => {
+        render({ next: g7, preview: 'strong', fingers: true });
         // Same root on the same spot: nothing to draw.
         expect(host.querySelector('.neck-rootpath')).toBeNull();
+        expect(ghosts()).toHaveLength(g7.notes.length);
 
         const seventh = gmaj7.notes.find((n) => n.degree === '7')!;
         const flat7 = g7.notes.find((n) => n.degree === 'b7')!;
@@ -157,19 +203,16 @@ describe('Neck: previewing the next chord', () => {
         }
     });
 
-    it('draws one root path, labelled with the interval, when the root moves', () => {
-        const c7 = build(GUITAR, GUITAR.shapes[2], { name: 'C', pc: 0, letter: 0 }, 'dom7')!;
-        render({ next: c7, preview: 'soft' });
-        const paths = host.querySelectorAll('.neck-rootpath');
-        expect(paths).toHaveLength(1);
-        expect(paths[0].textContent).toBe('up a 4th');
-        expect(host.querySelector('svg')!.classList).toContain('is-soft');
-    });
-
-    it('shows nothing ahead when the preview is off', () => {
-        render({ next: g7, preview: 'off' });
+    it('shows nothing ahead when the preview is off, fingers or not', () => {
+        render({ next: g7, preview: 'off', fingers: true });
+        expect(host.querySelector('.neck-ghost')).toBeNull();
         expect(host.querySelector('.neck-preview')).toBeNull();
         expect(host.querySelector('.is-hold')).toBeNull();
+    });
+
+    it('keeps the landing pulse', () => {
+        render({ next: g7, preview: 'soft', strike: true });
+        expect(host.querySelector('.neck-active')!.classList).toContain('is-strike');
     });
 });
 
@@ -221,5 +264,139 @@ describe('Neck: ukulele', () => {
         expect(host.querySelector('svg')!.getAttribute('viewBox')).toBe(
             `0 0 1000 ${neckLayout(4).height}`,
         );
+    });
+});
+
+describe('neck geometry: the zoomed view window (#1593)', () => {
+    const grip = (...frets: number[]) => ({ notes: frets.map((fret) => ({ fret })) });
+
+    it('shows a locked home window ±1 fret', () => {
+        expect(viewWindow([5, 10], null, null)).toEqual([4, 11]);
+        expect(viewWindow([5, 10], grip(5, 7, 7), grip(6, 8))).toEqual([4, 11]);
+    });
+
+    it('takes in the nut when the window starts at fret 1 or 2', () => {
+        expect(viewWindow([1, 6], null, null)).toEqual([0, 8]);
+        expect(viewWindow([2, 7], null, null)).toEqual([0, 8]);
+        expect(viewWindow([3, 8], null, null)).toEqual([2, 9]);
+    });
+
+    it('clamps to the top of the neck and keeps its width there', () => {
+        expect(viewWindow([10, 15], null, null)).toEqual([8, NF]);
+    });
+
+    it('unlocked: the union of both grips ±1, never narrower than HOME_W + 2 frets', () => {
+        // A two-fret grip pads to the right rather than zooming in further.
+        expect(viewWindow(null, grip(7, 8), null)).toEqual([6, 6 + HOME_W + 1]);
+        // Two grips far apart: all of both.
+        expect(viewWindow(null, grip(3, 5), grip(10, 12))).toEqual([2, 13]);
+        // High up the neck the span grows left instead.
+        expect(viewWindow(null, grip(14, 15), null)).toEqual([NF - HOME_W - 1, NF]);
+        // Open strings and an empty board bring in the nut.
+        expect(viewWindow(null, grip(0, 2, 3), null)).toEqual([0, HOME_W + 2]);
+        expect(viewWindow(null, null, null)).toEqual([0, HOME_W + 2]);
+    });
+
+    it('keeps a note outside a locked window in view', () => {
+        expect(viewWindow([5, 10], grip(0, 5, 7), null)).toEqual([0, 11]);
+    });
+
+    it('maps the window onto the whole 1000-wide viewBox', () => {
+        const [lo, hi] = [4, 11];
+        const t = boardTransform([lo, hi]);
+        const left = fx(lo - 1) * t.scale + t.tx;
+        const right = fx(hi) * t.scale + t.tx;
+        expect(left).toBeGreaterThanOrEqual(0);
+        expect(left).toBeLessThan(10);
+        expect(right).toBeLessThanOrEqual(1000);
+        expect(right).toBeGreaterThan(990);
+        // About eight frets on a phone: roughly twice the size of the whole neck.
+        expect(t.scale).toBeGreaterThan(1.8);
+        expect(t.scale).toBeLessThan(2.6);
+        // From the nut, x = 0 stays put.
+        const open = boardTransform([0, 8]);
+        expect(open.tx).toBeCloseTo(0, 9);
+        expect(open.scale).toBeGreaterThan(1);
+    });
+
+    it("inverts for the handle drag: a dot's zoomed x maps back to its fret", () => {
+        const t = boardTransform([4, 11]);
+        for (let f = 4; f <= 11; f++) {
+            expect(fretAt(boardX(t, dx(f) * t.scale + t.tx))).toBe(f);
+        }
+    });
+});
+
+describe('Neck: zoomed onto the hand (#1593)', () => {
+    const zoomGroup = () => host.querySelector<SVGGElement>('.neck-zoom')!;
+    function scaleOf(): number {
+        const m = /scale\(([\d.]+)\)/.exec(zoomGroup().style.transform);
+        return m ? Number(m[1]) : 1;
+    }
+
+    it('draws the whole neck unzoomed by default', () => {
+        render({ home: [5, 10] });
+        expect(zoomGroup().style.transform).toBe('');
+        expect(host.querySelector('svg')!.getAttribute('viewBox')).toBe(
+            `0 0 1000 ${neckLayout(6).height}`,
+        );
+    });
+
+    it('zooms onto the home window and grows the svg by the same factor', () => {
+        render({ active: null, home: [5, 10], zoom: 'window' });
+        const t = boardTransform([4, 11]);
+        expect(scaleOf()).toBeCloseTo(t.scale, 6);
+        expect(zoomGroup().style.transform).toContain(`translate(${t.tx}px, 0px)`);
+        expect(host.querySelector('svg')!.getAttribute('viewBox')).toBe(
+            `0 0 1000 ${Math.round(neckLayout(6).height * t.scale)}`,
+        );
+        // The board, its dots and the handle all ride the zoom.
+        expect(zoomGroup().querySelector('[role="img"]')).not.toBeNull();
+        expect(zoomGroup().querySelector('[role="slider"]')).not.toBeNull();
+    });
+
+    it('follows the window when it moves', () => {
+        render({ active: null, home: [5, 10], zoom: 'window' });
+        const before = zoomGroup().style.transform;
+        render({ active: null, home: [8, 13], zoom: 'window' });
+        expect(zoomGroup().style.transform).not.toBe(before);
+        expect(scaleOf()).toBeCloseTo(boardTransform([7, 14]).scale, 6);
+    });
+
+    it('drags the handle through the zoom, holding the view still until release', () => {
+        const svgProto = Object.getPrototypeOf(
+            document.createElementNS('http://www.w3.org/2000/svg', 'svg'),
+        );
+        // Screen px = viewBox units, so a pointer x is a viewBox x.
+        const ctm = vi.spyOn(svgProto, 'getScreenCTM').mockReturnValue(new DOMMatrix());
+        try {
+            const onHome = vi.fn();
+            render({ active: null, home: [5, 10], zoom: 'window', onHome });
+            const t = boardTransform([4, 11]);
+            const at = (fret: number) => dx(fret) * t.scale + t.tx;
+            const handle = host.querySelector<SVGGElement>('[role="slider"]')!;
+            const svg = host.querySelector('svg')!;
+            const fire = (el: Element, type: string, x: number) =>
+                act(() => {
+                    el.dispatchEvent(
+                        new PointerEvent(type, { clientX: x, clientY: 10, bubbles: true }),
+                    );
+                });
+            fire(handle, 'pointerdown', at(6));
+            // One fret right in the zoomed board is one fret right on the neck — not ~2.
+            fire(svg, 'pointermove', at(7));
+            expect(onHome).toHaveBeenLastCalledWith(6);
+            // The parent moves the window; mid-drag the view holds still.
+            const before = zoomGroup().style.transform;
+            render({ active: null, home: [6, 11], zoom: 'window', onHome });
+            expect(zoomGroup().style.transform).toBe(before);
+            fire(svg, 'pointermove', at(9));
+            expect(onHome).toHaveBeenLastCalledWith(8);
+            render({ active: null, home: [8, 13], zoom: 'window', onHome });
+            fire(svg, 'pointerup', at(9));
+            expect(scaleOf()).toBeCloseTo(boardTransform([7, 14]).scale, 6);
+        } finally {
+            ctm.mockRestore();
+        }
     });
 });
