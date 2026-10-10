@@ -142,11 +142,13 @@ display still uses (`chords-engine.ts`'s `validateProgression`).
 
 The listening-gate tools (`npm run mix:report` and `mix:ab`/`mix:verify`/`mix:spectro`/`mix:plant`
 built on it) render the band engine: `scripts/band-scene.ts` composes each scene in node
-(`compileTimeline` → `performPass`), and `prototypes/v2/lib/render-bridge.ts` renders the events
-in the app through `renderBandPasses` (`lib/band-export.ts`, the export's own offline render) on
-`window.ensemble`. The v2 runtime installs the bridge only in a build made with
-`NEXT_PUBLIC_RENDER_BRIDGE=1`, which `mix:report` makes for itself; a production build compiles it
-out. See `docs/guides/listening-gate-tools.md`.
+(`compileTimeline` → `performPass`), and `prototypes/v2/lib/render-bridge.ts`'s `renderBand`
+renders the events through `renderBandPasses` (`lib/band-export.ts`, the export's own offline
+render). By default (`--engine=node`, since 2026-10-09) that runs in node on `node-web-audio-api`
+with `scripts/node-webaudio.ts` standing in for the browser — no build, no browser.
+`--engine=chromium` renders in the app instead, on `window.ensemble`: the v2 runtime installs the
+bridge only in a build made with `NEXT_PUBLIC_RENDER_BRIDGE=1`, which `mix:report` then makes for
+itself; a production build compiles it out. See `docs/guides/listening-gate-tools.md`.
 
 There is no visualizer. `vizState` and `public/visualizer/visualizer-events.ts`'s types survive only as leftovers of the old engine's scheduler; nothing turns `vizState` on.
 
