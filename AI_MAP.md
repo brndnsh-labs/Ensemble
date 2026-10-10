@@ -71,6 +71,16 @@ The ground-up replacement for the generative engine, the default since 2026-09-2
 | `scripts/golden-render.ts` | `npm run golden`: renders the frozen requests in `tests/golden/fixtures/` in node and compares each stem's fingerprint with the committed ones — the CI check that fixed notes still sound the same (#1577). | `fingerprint`, `compareFingerprints`, `freezeScene`, `GOLDEN_SCENES`, `TOLERANCE` |
 | `prototypes/v2/lib/band-chart.ts` | The chart sheet's view of a score on the band engine, from the score + band timeline: every written event (holds, N.C., fermatas, off-grid lengths), its performed slots, section step bounds, chord names in all three notations. | `bandChart`, `slotAt`, `chordNames` |
 | `prototypes/v2/lib/engine-mode.ts` | `checkPlayable`, the one capability check every open/edit/import path asks: the score is valid and its timeline compiles. | `checkPlayable` |
+| `prototypes/v2/lib/shells/index.ts` | The shell-voicing engine's public surface (#1585): three-note R/3/7 grips for guitar and ukulele, a Viterbi pass over grips and one over fingers, root-motion and finger-move narration. Pure TS, vendored from the Shell Voicing Map handoff; no DOM, audio or state. | `voiceBandChart`, `voiceChart`, `voiceNext`, `rootMove`, `fingerMoves`, `handTravel` |
+| `prototypes/v2/lib/shells/adapter.ts` | Ensemble's chords as shells: `ChordFacts` (the band's chord authority) → one of the six shell qualities, the Freddie-Green reduction named in `approximation`, the root spelled by `spellPitchClass` as the chart sheet spells it. The engine has no parser or root table of its own. | `shellChord`, `spellRoot` |
+| `prototypes/v2/lib/shells/voice-chart.ts` | A whole `BandChart` voiced in one pass, written chords only, each voicing carrying its `globalIndex` and `approximation`. | `voiceBandChart`, `ShellPrefs` |
+| `prototypes/v2/lib/shells/types.ts` | The engine's data contracts: `Spelled`, `Quality`, `Voicing`, `ChartChord`, `VoiceOptions`. | — |
+| `prototypes/v2/lib/shells/theory.ts` | Degree and quality tables, degree spelling. | `DEGREES`, `QUALITIES`, `spellDegree` |
+| `prototypes/v2/lib/shells/instruments.ts` | Guitar (six grips) and ukulele (four grips, plus low G). | `GUITAR`, `UKULELE`, `UKULELE_LOW_G` |
+| `prototypes/v2/lib/shells/voicing.ts` | Grip building and the chart voicer (Viterbi over every grip in the home window). | `voiceChart`, `voiceNext`, `build`, `allPositions` |
+| `prototypes/v2/lib/shells/fingering.ts` | Fingering, planned across a chart so a held note keeps its finger. | `fingerSequence`, `fingerMap` |
+| `prototypes/v2/lib/shells/motion.ts` | Root moves, finger moves and the hand-travel summary (the narration text). | `rootMove`, `fingerMoves`, `handTravel` |
+| `prototypes/v2/lib/shells/test/keys.ts` | Test fixture only: the prototype's key families and song shapes, feeding the 360-chart parity suite (`test/prototype-parity.test.ts` against `test/golden.json`). | `keyFamily`, `songChart`, `SONG_SHAPES`, `keyRoot` |
 
 ## State Management (Domain Slices)
 
