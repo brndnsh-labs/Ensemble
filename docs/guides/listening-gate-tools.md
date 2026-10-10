@@ -16,19 +16,28 @@ worker engine no longer runs in the app.
   semantic score (its sections' `|`-separated bars, in the chart editor's bar syntax), runs
   `compileTimeline`, then `performPass` once per `--loops` chorus, each pass remembering the
   one before and the last one playing the ending — the stand looping the song, then stopping.
-- **The audio is rendered in the app.** Unless `--no-build`, `mix:report` builds
-  `prototypes/v2` at `ENSEMBLE_V2_BASE=/` with `NEXT_PUBLIC_RENDER_BRIDGE=1`
-  (`next build --webpack` + `scripts/offline.mjs`, which copies the sample packs), serves
-  `prototypes/v2/out`, and drives Chromium. The page's render bridge
-  (`prototypes/v2/lib/render-bridge.ts`, on `window.ensemble`) hands the events to
-  `renderBandPasses` (`lib/band-export.ts`) — the same offline render, through the same
-  `playBandEvent` voice mapping, as the app's WAV/stem export — and returns raw channels plus
-  a dispatch tap (every event with the time, length and level its voice was handed).
-  Metrics are measured in the page; the report is built in node (`mix-report-utils.ts`).
-- **That build overwrites the same `out/` the v2 Playwright suite serves**, so rebuild
-  (`npm run build --prefix prototypes/v2`) before trusting that suite after a mix report. A
-  normal build compiles the bridge out: grep `out/` for `ensemble-band-render-bridge` — it
-  appears only in a bridge build.
+- **The audio is rendered through the render bridge's `renderBand`**
+  (`prototypes/v2/lib/render-bridge.ts`), which hands the events to `renderBandPasses`
+  (`lib/band-export.ts`) — the same offline render, through the same `playBandEvent` voice
+  mapping, as the app's WAV/stem export — and returns raw channels plus a dispatch tap (every
+  event with the time, length and level its voice was handed). Two engines run it:
+  - **`--engine=node`, the default (since 2026-10-09).** `scripts/mix-render-node.ts` calls
+    `renderBand` in node on `node-web-audio-api`, with `scripts/node-webaudio.ts` standing in
+    for the browser (the Web Audio globals, the sample packs read from `public/packs/`, and
+    a shim for the library's differences — see *Rendering in node* below). No build, no
+    browser; metrics are measured with `scripts/audio-analysis.ts`.
+  - **`--engine=chromium`.** Unless `--no-build` (a no-op on the node engine), `mix:report` builds `prototypes/v2` at
+    `ENSEMBLE_V2_BASE=/` with `NEXT_PUBLIC_RENDER_BRIDGE=1` (`next build --webpack` +
+    `scripts/offline.mjs`, which copies the sample packs), serves `prototypes/v2/out`, and
+    drives Chromium; the bridge is on `window.ensemble` and the metrics are measured in the
+    page. This is the render the app itself makes — use it for the final check of a change
+    whose point is how Chromium's nodes behave, and for a bit-level A/B against an app export.
+  The report is built in node either way (`mix-report-utils.ts`). `mix:verify`, `mix:ab` and
+  `mix:spectro` pass `--engine=` through to the `mix:report` they drive.
+- **A Chromium build overwrites the same `out/` the v2 Playwright suite serves**, so rebuild
+  (`npm run build --prefix prototypes/v2`) before trusting that suite after a Chromium mix
+  report. A normal build compiles the bridge out: grep `out/` for
+  `ensemble-band-render-bridge` — it appears only in a bridge build.
 
 **Scene → band settings.** Style from the scene's `genreFeel` (one of the 13; anything else
 is refused). Energy: `intensity`, held for the whole render (default 0.7). Seed:
@@ -62,42 +71,51 @@ ids keep their old names so reports, `mix:diff` baselines and `--stems=` filters
 - The `harmony` findings (voice cap, retriggers, sharp edges, top-end air) and the `harmony`
   entry in `--cohesion`'s sample band.
 
-## `npm run render:node` — the same render, in node, no browser
+## Rendering in node (`--engine=node`, `npm run render:node`)
 
-`scripts/render-node.ts` renders a scene's stems through the SAME `renderBand` the page's
-render bridge runs (`prototypes/v2/lib/render-bridge.ts`), on `node-web-audio-api` instead of
-Chromium, with no Next build and no browser. A spike as of 2026-10-09: it writes the stems'
-WAVs and prints each stem's peak and render time; the metric table, event dumps and the tools
-built on `mix:report` still run the Chromium path.
+`scripts/node-webaudio.ts` is what lets the engine run in node: it installs `node-web-audio-api`'s
+classes as the Web Audio globals, serves `/packs/` from `public/packs/` on disk (each `.m4a`
+decoded once through ffmpeg into `tmp/node-webaudio/`, because the node decoder refuses the
+packs' non-faststart layout and does not trim AAC priming, which put every sampled note ~23 ms
+late), and corrects three library differences found with a node-vs-Chromium parity probe over
+identical graph snippets — its comments say which: `setTargetAtTime`/`setValueCurveAtTime`
+evaluated before their start time (a release at 0.5 s multiplied the whole sustain by
+e^(0.5/τ)), and built-in `sawtooth`/`square` 1.4 dB hotter than Chromium's.
+`tests/scripts/node-webaudio-automation.test.ts` holds the shim to the spec's envelope formulas
+and to Chromium's oscillator levels; `tests/scripts/mix-render-node.test.ts` renders a stem
+through the backend in the unit suite.
 
-```bash
-npm run render:node -- funk-pocket MIX_AUDIT tmp/node-render           # a default scene
-npm run render:node -- funk-packs ALPHA out --scenes-from=scenes.json  # an external scene
-npm run render:node -- jazz-ride ALPHA out --stems=bass,drums --mute-reverb
-```
-
-`scripts/node-webaudio.ts` is what makes the engine run in node: it installs the Web Audio
-classes as globals, serves `/packs/` from `public/packs/` on disk (decoding each `.m4a` through
-ffmpeg once into `tmp/node-webaudio/`), and works around two `node-web-audio-api` 2.2.0 bugs
-that the parity probes found — its header says which. `tests/scripts/node-webaudio-automation.test.ts`
-holds the workaround to the spec's envelope formulas.
+`npm run render:node -- <scene> <seed> <dir> [--scenes-from=<json>] [--stems=a,b] [--mute-reverb]`
+writes a scene's stem WAVs through the same backend without the report — the quick way to get
+audio to look at.
 
 **Measured against Chromium (2026-10-09, `funk-pocket` / `MIX_AUDIT`, and the same scene on
-the sample band).** Every lane's level is within 1.4 dB of Chromium's; `mix:verify`'s checks
-(presence, timing, `vel→peak r`, pitch) give the same verdicts on both renders; a sampled lane
-is sample-identical after a constant 176-sample (4 ms) offset from the master chain's
-compressor and waveshaper latencies (aligned correlation 0.99–1.00, residual −46 to −52 dBFS).
-A synth lane keeps its energy and timing but not its waveform (per-note correlation 0.5–0.98):
-the two engines' compressors shape transients differently (node lets loud hits through about
-2 dB hotter), node's sawtooth and square run 1.4 dB hotter, and the comb-delay reverb differs
-in detail. So: read levels, spectra, presence and timing off a node render; compare node
-against node, never a node render against a Chromium one by subtraction. A node render is
-byte-identical across processes.
+the sample band).** `mix:verify`'s checks give the same verdicts on both renders (drums
+106/113, chords 36/36, soloist 28/28 with pitch confirmed 100%, bass 43 vs 46 matched — the
+muted-note class at the detection floor). Every lane's level is within 1 dB. A sampled lane is
+sample-identical after a constant 176-sample (4 ms) offset from the master chain's compressor
+and waveshaper latencies (aligned correlation 0.99–1.00, residual −46 to −52 dBFS). A synth
+lane keeps its energy, spectrum and timing but not its exact waveform: node's compressor passes
+loud transients about 2 dB hotter, its `WaveShaper` `4x` oversampling is its `2x`, and the
+reverb's feedback combs differ in detail. So: read levels, spectra, presence and timing off a
+node render, and compare node against node; a node render subtracted from a Chromium one
+measures the engines, not your change. Two node renders of one request agree to ~4e-6
+(−108 dBFS) — float summation order across the library's render threads, visible only under
+CPU load, the same class as Chromium's −99 dBFS floor below — and the one real cross-render
+state is #1552's (4.5e-2, on the synth kit's cymbals).
+
+**`mix:diff` across engines is not a parity test.** `computeSpectralProbes` measures four
+4096-sample windows spread over the stem's *active* region, and the region starts at the first
+sample above 1e-4 (−80 dBFS). Both engines emit a few LSB before the first note (the master
+chain settling on the soft-clip curve's −1 LSB DC offset); node's reaches 5 LSB where Chromium's
+stays at 3, so node's region starts at 59 ms and Chromium's at the first note, 260 ms — and the
+four windows land on different music. Measured over every window instead, the band shares agree
+within 1 point on the chords and full stems and 4 on the bass. The probe's anchoring is #1556.
 
 **Speed.** The pack scene's six stems render in 9 s; the all-synth scene's take 70 s, against
-86 s for `mix:report --no-build` on the same scene (plus the Next build when the bridge export
-is stale). node-web-audio-api's cost scales with node count: the synth chords build 11
-oscillators per event.
+86 s for `--engine=chromium --no-build` on the same scene plus the Next build when the bridge
+export is stale. node-web-audio-api's cost scales with node count (the synth chords build 11
+oscillators per event).
 
 ## `npm run mix:report`
 
@@ -106,9 +124,10 @@ spectral probes, stereo) and a `Findings:` line. The scene header names what pla
 `style jazz · comp piano · lead sax`.
 
 ```bash
-npm run mix:report                                  # the four default scenes
+npm run mix:report                                  # the four default scenes, rendered in node
 npm run mix:report -- --scene=jazz-ride --seeds=ALPHA,BETA
 npm run --silent mix:report -- --json --scene=funk-pocket > report.json
+npm run mix:report -- --engine=chromium --scene=funk-pocket   # the app's own render, built + driven headless
 ```
 
 The default scenes are `rock-backbeat`, `blues-shuffle`, `jazz-ride`, `funk-pocket`
@@ -613,8 +632,10 @@ git bisect start bad good && git bisect run npm run --silent mix:ab -- --scene=f
 ```
 
 Each ref renders with its own harness, so a ref from before these tools moved to the band engine
-(2026-09-25) renders the old engine: comparing across that boundary measures the engine swap,
-not your change. Compare refs on the same side of it.
+(2026-09-25) renders the old engine, and a ref from before `mix:report` rendered in node
+(2026-10-09) renders in Chromium — with the Next build that path needs: comparing across either
+boundary measures the engine swap, not your change. Compare refs on the same side of it (pass
+`--engine=chromium` to compare two refs the way the app renders them).
 
 Per stem it reports total residual RMS, **residual per bar** (so the change is
 addressable — "bass, bar 3"), the note-level event delta, and writes the residual

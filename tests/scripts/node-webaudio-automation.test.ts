@@ -108,3 +108,63 @@ describe('node Web Audio shim: automation follows the spec before and after an e
         expect(at(out, 1.3)).toBeCloseTo(0, 5); // holds the curve's last value after it ends
     });
 });
+
+/**
+ * The shim swaps node's built-in `sawtooth`/`square` for a band-limited Fourier wave normalised
+ * the way Chromium normalises its own. Chromium's measured RMS-to-peak ratios (parity probes,
+ * 2026-10-09): sawtooth −6.13 dB, square −1.43 dB; node's built-ins read −4.8 and −0.0.
+ */
+describe('node Web Audio shim: sawtooth and square sit at Chromium level', () => {
+    async function rmsToPeakDb(type: OscillatorType, frequency: number): Promise<number> {
+        const ctx = new OfflineAudioContext(1, SR, SR);
+        const osc = ctx.createOscillator();
+        osc.type = type;
+        osc.frequency.value = frequency;
+        osc.connect(ctx.destination);
+        osc.start(0);
+        const rendered = await ctx.startRendering();
+        const out = new Float32Array(rendered.length);
+        rendered.copyFromChannel(out, 0);
+        let sum = 0;
+        let peak = 0;
+        for (let i = 4096; i < out.length; i++) {
+            sum += out[i] * out[i];
+            peak = Math.max(peak, Math.abs(out[i]));
+        }
+        return 10 * Math.log10(sum / (out.length - 4096)) - 20 * Math.log10(peak);
+    }
+
+    it("a sawtooth at 82 Hz has Chromium's RMS-to-peak ratio, not the ideal wave's", async () => {
+        expect(await rmsToPeakDb('sawtooth', 82.4)).toBeCloseTo(-6.13, 0);
+    });
+
+    it("a square at 220 Hz has Chromium's RMS-to-peak ratio", async () => {
+        expect(await rmsToPeakDb('square', 220)).toBeCloseTo(-1.43, 0);
+    });
+
+    it('an explicit periodic wave is left alone', async () => {
+        const ctx = new OfflineAudioContext(1, SR, SR);
+        const osc = ctx.createOscillator();
+        osc.type = 'sawtooth';
+        const real = new Float32Array([0, 0]);
+        const imag = new Float32Array([0, 1]); // a sine, as a wave
+        osc.setPeriodicWave(ctx.createPeriodicWave(real, imag));
+        osc.frequency.value = 440;
+        osc.connect(ctx.destination);
+        osc.start(0);
+        const rendered = await ctx.startRendering();
+        const out = new Float32Array(rendered.length);
+        rendered.copyFromChannel(out, 0);
+        // A sine's RMS-to-peak is −3.01 dB.
+        let sum = 0;
+        let peak = 0;
+        for (let i = 4096; i < out.length; i++) {
+            sum += out[i] * out[i];
+            peak = Math.max(peak, Math.abs(out[i]));
+        }
+        expect(10 * Math.log10(sum / (out.length - 4096)) - 20 * Math.log10(peak)).toBeCloseTo(
+            -3.01,
+            1,
+        );
+    });
+});

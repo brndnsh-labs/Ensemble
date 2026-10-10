@@ -95,6 +95,8 @@ const REPORT_LIMIT = 6;
 // ── CLI ───────────────────────────────────────────────────────────────────────
 
 export interface MixAbOptions {
+    /** `mix:report --engine=` pass-through; null leaves the report its default (node). */
+    engine: string | null;
     scene: string | null;
     seed: string | null;
     loops: number;
@@ -133,6 +135,7 @@ export function parseRefsSpec(spec: string): { fromRef: string; toRef: string } 
 
 export function parseMixAbArgs(argv: string[]): MixAbOptions {
     const options: MixAbOptions = {
+        engine: null,
         scene: null,
         seed: null,
         loops: 1,
@@ -147,6 +150,8 @@ export function parseMixAbArgs(argv: string[]): MixAbOptions {
     for (const arg of argv) {
         if (arg === '--keep') {
             options.keep = true;
+        } else if (arg.startsWith('--engine=')) {
+            options.engine = arg.slice('--engine='.length).trim() || null;
         } else if (arg.startsWith('--scene=')) {
             options.scene = arg.slice('--scene='.length);
         } else if (arg.startsWith('--seed=')) {
@@ -880,7 +885,19 @@ function restoreRef(original: RefDescriptor): void {
  * writes no dumps — which the caller detects by their absence and reports as a
  * NOT VERIFIABLE event delta rather than failing the run.
  */
-function runMixReport(outDir: string, options: MixAbOptions): void {
+/** Which engine the checked-out ref's harness will render with: a ref from before `mix:report`
+ * learned `--engine` (2026-10-09, the node backend's module is the tell) ignores the flag and
+ * renders in Chromium, whatever this tree would do. */
+function harnessEngine(options: MixAbOptions): 'node' | 'chromium' {
+    const knowsEngines = existsSync(path.join(REPO_ROOT, 'scripts', 'mix-render-node.ts'));
+    if (!knowsEngines) {
+        return 'chromium';
+    }
+    return options.engine === 'chromium' ? 'chromium' : 'node';
+}
+
+function runMixReport(outDir: string, options: MixAbOptions): 'node' | 'chromium' {
+    const engine = harnessEngine(options);
     const args = [
         'tsx',
         'scripts/mix-report.ts',
@@ -889,6 +906,9 @@ function runMixReport(outDir: string, options: MixAbOptions): void {
         `--loops=${options.loops}`,
         '--json',
     ];
+    if (options.engine) {
+        args.push(`--engine=${options.engine}`);
+    }
     if (options.scene) {
         args.push(`--scene=${options.scene}`);
     }
@@ -905,6 +925,7 @@ function runMixReport(outDir: string, options: MixAbOptions): void {
     if (result.status !== 0) {
         throw new Error(`mix:report exited with code ${result.status}`);
     }
+    return engine;
 }
 
 interface LoadedRender {
@@ -1048,9 +1069,19 @@ async function main(argv: string[]): Promise<void> {
     try {
         try {
             checkoutSha(refA.sha);
-            runMixReport(dirA, options);
+            const engineA = runMixReport(dirA, options);
             checkoutSha(refB.sha);
-            runMixReport(dirB, options);
+            const engineB = runMixReport(dirB, options);
+            if (engineA !== engineB) {
+                // One side rendered in node, the other in Chromium: the residual would be the
+                // engines' difference wearing the change's label. Chromium is the engine both
+                // harnesses can run.
+                throw new Error(
+                    `${refA.spec} rendered in ${engineA} and ${refB.spec} in ${engineB} — ` +
+                        'a ref from before mix:report rendered in node (2026-10-09) always ' +
+                        'renders in Chromium; pass --engine=chromium so both sides do',
+                );
+            }
         } finally {
             restoreRef(original);
         }

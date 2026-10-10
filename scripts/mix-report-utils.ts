@@ -342,6 +342,17 @@ function buildReportAggregate(sceneRows) {
     };
 }
 
+const MIX_REPORT_ENGINES = ['node', 'chromium'];
+
+function parseEngine(value) {
+    if (!MIX_REPORT_ENGINES.includes(value)) {
+        throw new Error(
+            `--engine=${value} is not an engine (one of: ${MIX_REPORT_ENGINES.join(', ')})`,
+        );
+    }
+    return value;
+}
+
 export function resolveMixReportCliOptions(argv = []) {
     const options = parseCliArgs(argv);
     const baseSeed = readStringOption(options, 'seed', DEFAULT_SEED);
@@ -367,6 +378,11 @@ export function resolveMixReportCliOptions(argv = []) {
         scenesFrom: readStringOption(options, 'scenes-from', '') || null,
         focusLimit: Math.max(1, Math.floor(readNumberOption(options, 'focus-limit', 3))),
         noBuild: readBooleanOption(options, 'no-build', false),
+        // `--engine=node|chromium` → where the audio is rendered. `node` (the default) renders
+        // through `mix-render-node.ts` with no build and no browser; `chromium` builds the v2
+        // export with the render bridge and drives a headless browser, the path to use for a
+        // check against what the app itself renders.
+        engine: parseEngine(readStringOption(options, 'engine', 'node')),
         writeWav: readStringOption(options, 'write-wav', '') || null,
         // `--write-events=<dir>` → dump each stem's band events as their voices received
         // them (render-absolute times, feel offsets included, every lane including drums)

@@ -490,8 +490,10 @@ describe('mix-spectro — CLI parsing', () => {
                 '--out=tmp/sheet.png',
                 '--range=bar3..bar5',
                 '--no-build',
+                '--engine=chromium',
             ]),
         ).toEqual({
+            engine: 'chromium',
             scene: 'funk-pocket',
             stems: ['bass', 'drums'],
             loops: 3,

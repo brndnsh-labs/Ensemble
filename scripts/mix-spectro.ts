@@ -70,6 +70,8 @@ export interface LoadedStem {
 }
 
 export interface MixSpectroOptions {
+    /** `mix:report --engine=` pass-through; null leaves the report its default (node). */
+    engine: string | null;
     scene: string | null;
     stems: string[];
     loops: number;
@@ -88,6 +90,7 @@ export function parseMixSpectroArgs(argv: string[]): MixSpectroOptions {
     // so the `--from` rejection below needs its own sentinel.
     let sawLoops = false;
     const options: MixSpectroOptions = {
+        engine: null,
         scene: null,
         stems: [],
         loops: 1,
@@ -100,6 +103,8 @@ export function parseMixSpectroArgs(argv: string[]): MixSpectroOptions {
     for (const arg of argv) {
         if (arg === '--no-build') {
             options.noBuild = true;
+        } else if (arg.startsWith('--engine=')) {
+            options.engine = arg.slice('--engine='.length).trim() || null;
         } else if (arg.startsWith('--scene=')) {
             options.scene = arg.slice('--scene='.length);
         } else if (arg.startsWith('--stems=')) {
@@ -131,9 +136,12 @@ export function parseMixSpectroArgs(argv: string[]): MixSpectroOptions {
     // describing a render that never happened — `--loops` most misleadingly of
     // all, since it silently changes nothing while the caption's bar count comes
     // from the dump and therefore still looks right.
-    if (options.from && (options.scene || options.seed || options.noBuild || sawLoops)) {
+    if (
+        options.from &&
+        (options.scene || options.seed || options.noBuild || options.engine || sawLoops)
+    ) {
         throw new Error(
-            '--from replays an existing render; --scene/--seed/--loops/--no-build do not apply',
+            '--from replays an existing render; --scene/--seed/--loops/--no-build/--engine do not apply',
         );
     }
     return options;
@@ -152,6 +160,9 @@ function runMixReport(outDir: string, options: MixSpectroOptions): void {
         `--loops=${options.loops}`,
         '--json',
     ];
+    if (options.engine) {
+        args.push(`--engine=${options.engine}`);
+    }
     if (options.scene) {
         args.push(`--scene=${options.scene}`);
     }

@@ -78,6 +78,11 @@ describe('mix report utilities', () => {
         const negative = resolveMixReportCliOptions(['--loops=-2']);
         expect(negative.loops).toBe(1);
 
+        // The render engine: node by default, chromium on request, nothing else.
+        expect(defaults.engine).toBe('node');
+        expect(resolveMixReportCliOptions(['--engine=chromium']).engine).toBe('chromium');
+        expect(() => resolveMixReportCliOptions(['--engine=firefox'])).toThrow(/--engine=firefox/);
+
         const selected = selectMixReportScenes(DEFAULT_MIX_REPORT_SCENES, ['jazz-ride']);
         expect(selected).toHaveLength(1);
         expect(selected[0].id).toBe('jazz-ride');
