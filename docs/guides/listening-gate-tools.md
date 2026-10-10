@@ -127,6 +127,70 @@ within 1 point on the chords and full stems and 4 on the bass. The probe's ancho
 export is stale. node-web-audio-api's cost scales with node count (the synth chords build 11
 oscillators per event).
 
+## `npm run live:capture` — record the LIVE transport, then measure it
+
+Every other tool here renders offline. `scripts/live-capture.ts` (#1562) records what the stand's
+real `AudioContext` plays: it serves the bridge export, opens the stand on a `mix:report` scene
+(the same link `audition-link` builds), presses Play through `window.ensemble.transport`, taps
+the master limiter through `window.ensemble.capture` for N bars of wall-clock time, presses
+Stop, keeps recording through the release, and writes `tmp/live/<scene>-<seed>.wav` plus a
+markers file (the audio-clock time of `play`, `scheduled` and `stop`, and where each lands in
+the samples). The transport and the tap exist only in a bridge build
+(`NEXT_PUBLIC_RENDER_BRIDGE=1`); a production build compiles them out with the rest of the
+bridge, and `grep ensemble-band-render-bridge prototypes/v2/out` stays empty.
+
+```bash
+npm run live:capture -- --scene=funk-pocket --bars=8          # needs a bridge build (mix:report --engine=chromium leaves one)
+npm run live:capture -- --scene=jazz-ride --bars=4 --build    # build it first
+npm run live:capture -- --scenes-from=scenes.json --scene=my-scene --json
+```
+
+Four checks (`scripts/live-checks.ts`, unit-tested on synthetic signals), each a number against
+the threshold it states, never a verdict on how it sounds:
+
+| Check | What it reads | Catches |
+| :- | :- | :- |
+| stop silence | RMS 1.2–1.6 s after Stop against −60 dBFS, the 0.4–0.8 s tail for scale, and the time to fall under the floor; NOT VERIFIABLE when nothing sounded before Stop or the capture ends inside the window | a voice Stop never released (#1530) — the reverb's tail is the room, so the judged window sits past it |
+| stop click | the largest `measureDiscontinuity` in the 400 ms after Stop, against `CLICK_DISCONTINUITY` | a hard cut at Stop |
+| tempo | onsets in the steady region against the nominal sixteenth grid (its phase the circular mean of the onsets, so a swung offbeat cannot drag it): median deviation, drift in ms per bar, and the tempo they describe. The deviation carries the style's swing and humanise feel; read it against those, not as error | the metronome-core promise, in numbers |
+| live/offline | the same scene rendered in node on the sounds the stand actually played (`transport.voices()`), compared on RMS and dense band shares over the same bars | a live path that differs from the export (#1531: 2.5 dB) |
+
+**Read the live/offline row with care.** The stand re-rolls the performance seed on Play, so
+the two sides are different performances of the same chart on the same sounds: level and
+spectrum compare, samples do not. The offline side uses the `full` stem (the lead lane is off by
+default on the stand), minus any lane `--off=` switched off. Both sides skip their first bar and
+cover the whole bars the stand got through before Stop; the stand counts a bar in by default
+(`playback.countIn`), which the script reads and skips. Playback is real time: eight bars at
+104 bpm is eighteen seconds, nineteen with the count-in.
+
+**Two facts about the tap worth knowing.** `ScriptProcessorNode`'s `playbackTime` names when
+its *output* plays; the input block it hands over was rendered two buffers (186 ms) earlier, and
+the anchor corrects for that — measured by the count-in's first click, scheduled 100 ms after
+Play, landing at +287 ms before the correction and +76 ms after (the marker itself is taken a quantum or two after the schedule). And the processor runs on the
+main thread: a late block is counted as a dropout and the run warns, because the capture then
+has a seam that reads as timing.
+
+The run also prints the stand's `BandSettings` against the scene's (`sceneSettings`): a
+difference there is a reason the two performances differ before any audio is compared.
+
+**Measured on the first runs (2026-10-10, `funk-pocket`, 8 bars, the stand's default synth
+sounds):** the live clock held a 0.6–1.0 ms median deviation from the sixteenth grid and under
+0.35 ms/bar of drift (103.98–104.01 bpm against 104); no click at Stop; the band fell under
+−60 dBFS 0.8 s after Stop with a −35 dBFS reverb tail at 0.4–0.8 s. Live against the page's own
+offline render of the same state: drums alone and drums + bass agree within 3 points per band;
+with the comp on, the live mix carries 17 points more sub and 11 less low — because the stand
+plays the comp on **piano** (`bandSettings()` maps the synth chords voice to piano) while the
+tools render the style's preferred **clav** (#1564). The live mix also ran above the offline
+render in every configuration — drums alone +0.4, +1.6 and +1.7 dB over three runs, the whole
+band +0.9 to +1.0 — a spread wide enough that part of it is the re-rolled performance (#1565).
+`--off=` is how those were separated: switch lanes off on the stand and the offline side
+follows. `jazz-ride` read −0.0 dB live against offline, with too few onsets in the full mix for
+the tempo fit.
+
+`--offline=node` renders the reference in node from node's default state instead; use it to
+compare the stand against what `mix:report` measures, knowing #1563 (the clone's genre) and the
+stand's preferences (humanize 20 against the funk style's 25) sit in that difference too.
+
 ## `npm run mix:report`
 
 Prints, per scene and seed, a per-stem table (peak/RMS/crest, transients, schedule pressure,

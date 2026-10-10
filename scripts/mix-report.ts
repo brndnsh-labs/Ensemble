@@ -111,7 +111,7 @@ function runCommand(command, args, options = {}) {
     });
 }
 
-async function createStaticServer(rootDir, port) {
+export async function createStaticServer(rootDir, port) {
     const server = http.createServer(async (req, res) => {
         try {
             const requestUrl = new URL(req.url || '/', `http://${HOST}`);
