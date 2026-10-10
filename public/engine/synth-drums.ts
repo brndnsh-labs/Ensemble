@@ -611,7 +611,22 @@ const CYMBAL_POOL_SIZE = 4;
 // Per-cymbal cursor for the last buffer handed out, so the picker can avoid an
 // immediate repeat — a non-repeating random walk over the pool reads as more
 // varied than a fixed round-robin cycle (which is itself just a period-4 loop).
-const cymbalPoolLastIndex: Record<string, number> = {};
+// Keyed by the `audioBuffers` cache the pool lives in, as `warming` is, so it lives
+// and dies with it: the offline-render clone starts with a fresh `audioBuffers`
+// (`cloneStateForDetachedGeneration`), and a module-level record here made a
+// seeded render's hat picks depend on what had rendered before it in the same
+// page (#1552) — the first render took the no-previous branch, the next one the
+// other, with the first's last index.
+const cymbalPoolLastIndex = new WeakMap<object, Record<string, number>>();
+
+function lastIndexFor(groove: GrooveState): Record<string, number> {
+    let cursors = cymbalPoolLastIndex.get(groove.audioBuffers);
+    if (!cursors) {
+        cursors = {};
+        cymbalPoolLastIndex.set(groove.audioBuffers, cursors);
+    }
+    return cursors;
+}
 
 /**
  * Variation-pool buffer fetch for the `new` hi-hat voices (Epic 4 S4).
@@ -650,7 +665,8 @@ function getVariedCymbalBuffer(
         return fresh;
     }
     // Full pool — pick a random buffer, but never repeat the previous one.
-    const last = cymbalPoolLastIndex[profile.key] ?? -1;
+    const cursors = lastIndexFor(groove);
+    const last = cursors[profile.key] ?? -1;
     let index: number;
     if (last < 0) {
         // First pick after the pool filled — no previous buffer to avoid.
@@ -664,7 +680,7 @@ function getVariedCymbalBuffer(
             index++;
         }
     }
-    cymbalPoolLastIndex[profile.key] = index;
+    cursors[profile.key] = index;
     return pool[index];
 }
 
