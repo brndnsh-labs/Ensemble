@@ -565,7 +565,32 @@ export function initialize(): Promise<void> {
             // compiles this branch — and the bridge module — out entirely.
             if (process.env.NEXT_PUBLIC_RENDER_BRIDGE === '1') {
                 const { installRenderBridge } = await import('./render-bridge');
-                installRenderBridge();
+                // The live transport too (#1562), so `scripts/live-capture.ts` can record what
+                // the real graph plays: this file is the one that may touch the engine's state.
+                installRenderBridge({
+                    prime: warmAudio,
+                    play: async () => {
+                        if (!getState().playback.isPlaying) {
+                            await toggle(() => {});
+                        }
+                    },
+                    stop,
+                    audio: () => {
+                        const { playback } = getState();
+                        return { audio: playback.audio, graph: playback.audioGraph };
+                    },
+                    voices: () => {
+                        const state = getState();
+                        return [
+                            { module: 'groove', voice: state.groove.voice },
+                            { module: 'bass', voice: state.bass.voice },
+                            { module: 'chords', voice: state.chords.voice },
+                            { module: 'soloist', voice: state.soloist.voice },
+                        ];
+                    },
+                    settings: bandSettings,
+                    countIn: () => getState().playback.countIn,
+                });
                 document.documentElement.dataset.renderBridge = 'ready';
             }
         })();
