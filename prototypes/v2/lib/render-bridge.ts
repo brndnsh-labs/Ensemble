@@ -48,6 +48,12 @@ export interface BandRenderRequest {
     muteReverb?: boolean;
     /** Seeds `Math.random` for the voices' own humanising, so a render repeats. */
     randomSeed: string;
+    /**
+     * The scene's genre, for the bus EQ `initAudio` builds from `groove.genreFeel` (#1563): a
+     * Jazz feel moves the bass highpass to 55 Hz and reshapes two shelves. Without it the clone
+     * keeps the host state's genre — the slice default, Rock, for node and a chart-less page.
+     */
+    genreFeel?: string;
 }
 
 /** One event as its voice received it: where, how long, and at what level. */
@@ -189,6 +195,9 @@ export async function renderBand(request: BandRenderRequest): Promise<BandRender
         const playback = state.playback as Mutable<EnsembleState['playback']>;
         playback.bpm = request.bpm;
         playback.bandIntensity = request.intensity;
+        if (request.genreFeel) {
+            (state.groove as Mutable<EnsembleState['groove']>).genreFeel = request.genreFeel;
+        }
         for (const pin of pins) {
             (state[pin.module as LaneModule] as { voice: InstrumentVoice }).voice =
                 pin.voice as InstrumentVoice;

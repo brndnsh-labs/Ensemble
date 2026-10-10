@@ -37,6 +37,7 @@ describe('mix:report node render backend', () => {
                 intensity: 0.7,
                 voices,
                 randomSeed: 'two-bar-funk:TEST',
+                genreFeel: scene.genreFeel,
             },
             1,
         );
@@ -88,6 +89,7 @@ describe('mix:report node render backend', () => {
                 intensity: fixture.intensity ?? 0.7,
                 voices,
                 randomSeed: `${fixture.id}:${seed}`,
+                genreFeel: fixture.genreFeel,
             };
             const a = await renderer.renderAndMeasure(request, 1);
             const b = await renderer.renderAndMeasure(request, 1);
@@ -101,4 +103,59 @@ describe('mix:report node render backend', () => {
         },
         90_000,
     );
+
+    // #1563: the clone used to keep the host state's genre (Rock) whatever the scene said, so a
+    // Jazz scene was measured through Rock's bus EQ. The Jazz bass bus highpasses at 55 Hz and
+    // flattens the +2 dB low shelf to −1; a low E (41 Hz) must come out quieter than on Rock.
+    it("renders the bass bus EQ of the scene's genre, not the slice default", async () => {
+        const renderer = await createNodeRenderer();
+        const jazzScene = parseExternalScenes(
+            JSON.stringify([
+                {
+                    id: 'low-e',
+                    genreFeel: 'Jazz',
+                    bpm: 100,
+                    key: 'E',
+                    sections: [{ value: 'Em7 | Em7' }],
+                },
+            ]),
+        )[0];
+        const voices = sceneVoices(jazzScene);
+        const performed = performSceneForReport(jazzScene, 'TEST', 1, voices);
+        const subEnergyDb = async (genreFeel: string | undefined) => {
+            const render = await renderer.renderAndMeasure(
+                {
+                    score: performed.score,
+                    passes: laneEvents(performed.band, ['bass']),
+                    bpm: jazzScene.bpm,
+                    sampleRate: 44100,
+                    intensity: 0.7,
+                    voices,
+                    randomSeed: 'low-e:TEST',
+                    genreFeel,
+                },
+                1,
+            );
+            // Energy around 41 Hz (the low E): a Goertzel over the whole render.
+            const mono = render.channels[0];
+            const omega = (2 * Math.PI * 41.2) / 44100;
+            const coefficient = 2 * Math.cos(omega);
+            let s0 = 0;
+            let s1 = 0;
+            let s2 = 0;
+            for (let i = 0; i < mono.length; i++) {
+                s0 = mono[i] + coefficient * s1 - s2;
+                s2 = s1;
+                s1 = s0;
+            }
+            return (
+                20 * Math.log10(Math.sqrt(s1 * s1 + s2 * s2 - coefficient * s1 * s2) / mono.length)
+            );
+        };
+        const jazz = await subEnergyDb('Jazz');
+        const rock = await subEnergyDb('Rock');
+        const unset = await subEnergyDb(undefined);
+        expect(unset).toBeCloseTo(rock, 1); // the slice default is Rock: unset keeps old behaviour
+        expect(rock - jazz).toBeGreaterThan(3); // the Jazz highpass and shelf take the low E down
+    }, 90_000);
 });

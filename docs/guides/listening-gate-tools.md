@@ -40,7 +40,10 @@ worker engine no longer runs in the app.
   `ensemble-band-render-bridge` — it appears only in a bridge build.
 
 **Scene → band settings.** Style from the scene's `genreFeel` (one of the 13; anything else
-is refused). Energy: `intensity`, held for the whole render (default 0.7). Seed:
+is refused), and since 2026-10-10 (#1563) the clone's `groove.genreFeel` too, which is what
+`initAudio` builds the bus EQ from — a Jazz scene's bass now meets the Jazz highpass at 55 Hz
+and its shelves, as it does on the stand. Before that the clone kept the host's genre (Rock),
+so Jazz scenes' spectral numbers from before #1563 are not comparable with later ones. Energy: `intensity`, held for the whole render (default 0.7). Seed:
 `<sceneId>:<seed>` for the band, and the same string seeds `Math.random` for the voices' own
 humanising, so a render repeats. Lanes: all on, unless `includeDrums`/`includeBass`/
 `includeChords`/`includeSoloist` is `false`. Sounds: every lane plays **the synth** unless a
