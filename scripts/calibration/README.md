@@ -19,6 +19,16 @@ The original run also produced three `.log` files. They held nothing but a
 `Wrote 28 WAV files to <dir>` banner each, so they were dropped rather than
 force-added past the `*.log` gitignore rule.
 
+## The probes changed method on 2026-10-10
+
+The spectral `probes` in every file here were measured the old way: four 4096-sample windows
+spread over the track. `computeSpectralProbes` now averages every window (#1556), so a fresh
+`mix:analyze` of the same audio reads a little differently (within 1 point on our renders, and
+a long commercial track was only ever sampled at four moments). The thresholds these numbers
+justify did not move: the method estimates the same shares with less scatter. The source MP3s
+are not in the repo, so the references were not re-measured; do that if a threshold is ever
+re-derived from them.
+
 ## Where the audio went
 
 `calibration.json` measured two different kinds of source:
