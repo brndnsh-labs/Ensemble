@@ -71,6 +71,7 @@ npm test                 # mutation check + Biome + docs lint + Vitest (node/hap
 npm run test:vitest      # Vitest only — fast targeted iteration, not the full gate
 npm run test:browser     # Vitest browser-mode audio guards (real OfflineAudioContext, headless Chromium)
 npm run test:sync        # v2 account storage contract in real IndexedDB (Chromium + WebKit)
+npm run golden           # golden-render check: do fixed notes still sound the same? (--update / --refreeze)
 npm run validate         # format + jscpd + `npm run ci` (typecheck, typecheck:tests, knip, npm test)
 npm run depcheck         # circular-import gate (Biome noImportCycles) — RUNTIME cycles only
 
@@ -149,6 +150,13 @@ with `scripts/node-webaudio.ts` standing in for the browser — no build, no bro
 `--engine=chromium` renders in the app instead, on `window.ensemble`: the v2 runtime installs the
 bridge only in a build made with `NEXT_PUBLIC_RENDER_BRIDGE=1`, which `mix:report` then makes for
 itself; a production build compiles it out. See `docs/guides/listening-gate-tools.md`.
+
+`npm run golden` is the one of them CI runs on every PR (#1577): it renders four frozen band
+requests in node and compares each stem's fingerprint with
+`tests/golden/fixtures/fingerprints.json`. A change to a voice, bus, pack or the master chain
+turns it red; a `band/` change does not, because the notes are frozen. If you meant to change
+the sound, run `npm run golden -- --update` and commit the fingerprints with the change — it
+is evidence for the `Needs-ear` stop, never a substitute for it.
 
 There is no visualizer. `vizState` and `public/visualizer/visualizer-events.ts`'s types survive only as leftovers of the old engine's scheduler; nothing turns `vizState` on.
 

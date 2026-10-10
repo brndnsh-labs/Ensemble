@@ -35,6 +35,7 @@
         "live:capture": "tsx scripts/live-capture.ts",
         "webaudio:parity": "tsx scripts/webaudio-parity.ts",
         "mix:diff": "tsx scripts/mix-diff.ts",
+        "golden": "tsx scripts/golden-render.ts",
         "mix:analyze": "tsx scripts/mix-analyze.ts",
         "mix:verify": "tsx scripts/mix-verify.ts",
         "mix:spectro": "tsx scripts/mix-spectro.ts",
