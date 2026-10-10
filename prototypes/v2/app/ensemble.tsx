@@ -75,6 +75,7 @@ import {
     v1ImportLedger,
     v1SessionMark,
 } from '../lib/session';
+import { legacyBandChart } from '../lib/shells/legacy-chart';
 import { withSongMeter } from '../lib/song-meter';
 import { allSoundsAvailableOffline, installAllSounds, soundsAvailableOffline } from '../lib/sounds';
 import { buildStandardDocument, standardFor } from '../lib/standards';
@@ -1112,7 +1113,16 @@ export default function Ensemble() {
         writtenBars,
         writtenSections,
     } = useChartView(current, active);
-    const neckVoicing = useNeckVoicing(band, neck);
+    // A measure-less chart has no band chart; the neck follows it over the old maps instead.
+    // Reading `runtime.state()` inside the memo is safe: the step map is derived from `current`,
+    // so it changes exactly when `blocks` does.
+    const neckBand = useMemo(
+        () =>
+            band ??
+            (blocks.length ? legacyBandChart(blocks, runtime.state().arranger.stepMap) : null),
+        [band, blocks],
+    );
+    const neckVoicing = useNeckVoicing(neckBand, neck);
     const hasPendingText = buffers.size > 0 || pendingMeasures;
     const text =
         buffers.get(sectionId) ??
@@ -5479,7 +5489,7 @@ export default function Ensemble() {
                     <div className={`workspace-body ${editing ? 'editing' : ''}`}>
                         {neck ? (
                             <NeckView
-                                band={band}
+                                band={neckBand}
                                 voiced={neckVoicing.voiced}
                                 active={active}
                                 nextSoon={nextSoon}

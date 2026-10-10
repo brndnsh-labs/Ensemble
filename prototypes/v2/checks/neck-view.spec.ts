@@ -1,4 +1,4 @@
-import { appUrl, editorRevealed, expect, songLink, test } from './fixtures';
+import { appUrl, editorRevealed, expect, seedStarters, songLink, test } from './fixtures';
 
 /**
  * The stand's Neck mode (#1587): a third view beside Chart and Edit chart that shows the grip for
@@ -81,5 +81,31 @@ test('the neck shows the grip, follows the band and is remembered', async ({ pag
     await expect(page.getByRole('region', { name: 'Neck' })).toHaveCount(0);
     await page.getByRole('button', { name: 'Chart', exact: true }).click();
     await expect(page.locator('.chord')).toHaveText(['Dm7', 'G7', 'Cmaj7', 'Cmaj7']);
+    expect(errors).toEqual([]);
+});
+
+test('the neck follows an older chord list without bars', async ({ page }) => {
+    test.setTimeout(60_000);
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    // 'Blue pocket' is a schemaVersion-1 chart: a chord list in sections, no measures.
+    await seedStarters(page);
+    await songLink(page, 'Blue pocket', 'Blues').click();
+    await page.getByRole('button', { name: 'Neck', exact: true }).click();
+    const view = page.getByRole('region', { name: 'Neck' });
+    await expect(view.locator('svg.neck')).toBeVisible();
+    expect(await view.locator('.neck-dot').count()).toBeGreaterThanOrEqual(3);
+    const current = view.getByTestId('neck-current');
+    await expect(current).toHaveText('C7');
+    await expect(view.getByTestId('neck-next')).toContainText('F7');
+
+    const tempo = page.getByLabel('Tempo', { exact: true });
+    await tempo.fill('240');
+    await tempo.press('Enter');
+    await page.getByRole('button', { name: 'Start playback', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Stop playback', exact: true })).toBeEnabled();
+    await expect(current).toHaveText('F7', { timeout: 20_000 });
+    await page.getByRole('button', { name: 'Stop playback', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Start playback', exact: true })).toBeEnabled();
     expect(errors).toEqual([]);
 });

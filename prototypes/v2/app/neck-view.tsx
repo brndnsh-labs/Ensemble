@@ -14,7 +14,7 @@ import './neck-view.css';
 // `onPrefs`. The fretboard itself is `<Neck>` (#1586).
 
 interface NeckViewProps {
-    /** The band's chart, or null for a measure-less chart, which the neck cannot follow. */
+    /** The band's chart (`legacyBandChart` for a measure-less one), or null for an empty chart. */
     band: BandChart | null;
     /** Every written chord's grip, keyed by `globalIndex` (`useNeckVoicing`). */
     voiced: ReadonlyMap<number, VoicedBandChord> | null;
@@ -54,12 +54,7 @@ export function NeckView({ band, voiced, active, nextSoon, prefs, onPrefs }: Nec
     return (
         <section className="neck-view" aria-label="Neck">
             <div className="neck-view-inner">
-                {!band ? (
-                    <p className="neck-view-empty">
-                        The neck follows charts written in bars, and this song is an older chord
-                        list without them.
-                    </p>
-                ) : !model ? (
+                {!model ? (
                     <p className="neck-view-empty">This chart has no chords to finger.</p>
                 ) : (
                     <>
