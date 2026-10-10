@@ -297,7 +297,8 @@ The one listening-gate tool that runs on every PR (#1577, the `e2e-tests` CI job
 requests are frozen in `tests/golden/fixtures/<scene>.request.json`: the score, the events
 the band played, the lane sounds and the seed. Each stem of each (the whole band, then drums,
 bass, comp and lead alone) is rendered in node and reduced to a fingerprint: RMS, peak, the
-level at eight octave bands, the side channel's level, and the RMS of every half second. The
+level at eight octave bands, the side channel's level, the left/right balance, and the RMS of
+every half second. The
 check compares them with `tests/golden/fixtures/fingerprints.json` and exits 1 on a
 difference, printing what moved per scene and stem. About 30 s.
 
@@ -308,9 +309,13 @@ npm run golden -- --update           # an intended sound change: rewrite the fin
 npm run golden -- --refreeze         # recompose the frozen events from the band, then update
 ```
 
-**The notes are frozen on purpose.** A `band/` style change does not move this check; the
-critique claims hold what the band plays. A change to a voice, a bus, a pack, its manifest or
-the master chain does. So a red golden check means *the same notes sound different*.
+**The notes are frozen on purpose.** A change to what the band plays (`band/` styles,
+players, feel) does not move this check; the critique claims hold that. A change to a voice,
+a bus, a pack, its manifest or the master chain does. So a red golden check means *the same
+notes sound different*. One part of `band/` is still live: the render recompiles the frozen
+score, so a change to how a score becomes time (`compileTimeline`, `secondsAt`, `PPQ`) moves
+it too. The fixtures test names that case ("still compile to the timeline they were frozen
+on"); the answer is `--refreeze`, not `--update`.
 
 - **You meant to change the sound:** `npm run golden -- --update`, commit the fingerprints
   with the change, and say in the PR what moved. The fingerprint diff is one line per metric,
@@ -326,16 +331,18 @@ the master chain does. So a red golden check means *the same notes sound differe
   commit, apart from any sound change, or the two cannot be told apart.
 
 **Tolerances** (`TOLERANCE` in `scripts/golden-render.ts`): 0.1 dB on every level, 0.5 dB
-below −60 dBFS. A node render repeats to within 0.02 dB, idle or with every core busy.
-Planted changes it catches: a 0.5 dB gain change on the synth bass, the reverb highpass moved
-600 → 500 Hz, a presence EQ moved 2500 → 2800 Hz, a pack gain 1.5 → 1.55, a pack zone root
-10 cents out.
+only below −80 dBFS (one band of a mix reads −60 to −80 as a matter of course, so the line
+sits under that). A node render repeats to within 0.02 dB, idle or with every core busy, and
+the fingerprints made on the dev box hold on the CI runner. Planted changes it catches: a
+0.5 dB gain change on the synth bass, the reverb highpass moved 600 → 500 Hz, a presence EQ
+moved 2500 → 2800 Hz, a pack gain 1.5 → 1.55, a pack zone root 10 cents out.
 
-**What it cannot see.** Anything the four scenes do not play: nine genres' bus EQs, the organ,
-clav, nylon and the driven guitars, and any articulation outside the frozen events. Pitch
-only weakly (a 10-cent zone error moved one metric; `mix:verify`'s TUNING readout is the
-tool for that). And it renders in node, so a Chromium-only difference is invisible to it
-(`npm run webaudio:parity`).
+**What it cannot see.** Anything the four scenes do not play: the organ, clav, nylon and the
+driven guitars; the drum pieces no frozen pass uses (rim, ride bell, toms, shaker); any
+articulation outside the frozen events; and any genre-specific mix path other than Funk's,
+Jazz's and Neo-Soul's. Pitch only weakly (a 10-cent zone error moved one metric;
+`mix:verify`'s TUNING readout is the tool for that). And it renders in node, so a
+Chromium-only difference is invisible to it (`npm run webaudio:parity`).
 
 ## `npm run --silent mix:diff -- before.json after.json`
 

@@ -154,7 +154,8 @@ itself; a production build compiles it out. See `docs/guides/listening-gate-tool
 `npm run golden` is the one of them CI runs on every PR (#1577): it renders four frozen band
 requests in node and compares each stem's fingerprint with
 `tests/golden/fixtures/fingerprints.json`. A change to a voice, bus, pack or the master chain
-turns it red; a `band/` change does not, because the notes are frozen. If you meant to change
+turns it red; a change to what the band plays does not, because the notes are frozen (a
+change to how a score becomes time still does: `--refreeze`). If you meant to change
 the sound, run `npm run golden -- --update` and commit the fingerprints with the change — it
 is evidence for the `Needs-ear` stop, never a substitute for it.
 

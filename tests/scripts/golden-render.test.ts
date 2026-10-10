@@ -2,6 +2,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { compileTimeline } from '../../band/index.js';
 import {
     compareFingerprints,
     compareRun,
@@ -66,6 +67,27 @@ describe('fingerprint', () => {
     });
 });
 
+describe('fingerprint edges', () => {
+    it('reads a lean to one side, and a mono stem as centred with no side', () => {
+        const [left, right] = tone(0.5);
+        const leaning = fingerprint([left, right.map((v) => v * 0.5)], SR);
+        expect(leaning.balanceDb).toBeCloseTo(6.02, 1);
+        const mono = fingerprint([left], SR);
+        expect(mono.balanceDb).toBe(0);
+        expect(mono.sideDb).toBe(FLOOR_DB);
+    });
+
+    it('keeps a short final block, and drops one too short to measure', () => {
+        const samples = (seconds: number) => [tone(0.5)[0].subarray(0, Math.round(seconds * SR))];
+        expect(fingerprint(samples(1.3), SR).blocksDb).toHaveLength(3);
+        expect(fingerprint(samples(1.05), SR).blocksDb).toHaveLength(2);
+        // Shorter than one band window: no tone reading, and nothing thrown.
+        const blip = fingerprint(samples(0.05), SR);
+        expect(blip.bandsDb.every((db) => db === FLOOR_DB)).toBe(true);
+        expect(fingerprint([], SR).rmsDb).toBe(FLOOR_DB);
+    });
+});
+
 describe('compareFingerprints', () => {
     const golden = fingerprint(tone(0.5), SR);
 
@@ -106,7 +128,11 @@ describe('compareFingerprints', () => {
         expect(metrics).toContain('tone 2 kHz');
 
         const wider = compareFingerprints(golden, fingerprint(tone(0.5, { side: 0.05 }), SR));
-        expect(wider.map((difference) => difference.metric)).toEqual(['stereo side']);
+        // The helper widens by making one side louder, so the lean moves with the width.
+        expect(wider.map((difference) => difference.metric)).toEqual([
+            'stereo side',
+            'left/right balance',
+        ]);
     });
 
     it('fails a render that got longer or lost its tail', () => {
@@ -121,13 +147,54 @@ describe('compareFingerprints', () => {
     });
 
     it('gives quiet levels the wider tolerance, and only when both sides are quiet', () => {
-        const quiet = { ...golden, sideDb: -75 };
-        const within = { ...quiet, sideDb: -75 - TOLERANCE.quietToleranceDb + 0.01 };
-        const beyond = { ...quiet, sideDb: -75 - TOLERANCE.quietToleranceDb - 0.01 };
+        const quiet = { ...golden, sideDb: -85 };
+        const within = { ...quiet, sideDb: -85 - TOLERANCE.quietToleranceDb + 0.01 };
+        const beyond = { ...quiet, sideDb: -85 - TOLERANCE.quietToleranceDb - 0.01 };
         expect(compareFingerprints(quiet, within)).toEqual([]);
         expect(compareFingerprints(quiet, beyond)).toHaveLength(1);
         // Quiet on one side only is a real change: a stem that gained a side signal.
-        expect(compareFingerprints(quiet, { ...quiet, sideDb: -59.9 })).toHaveLength(1);
+        expect(compareFingerprints(quiet, { ...quiet, sideDb: -79.9 })).toHaveLength(1);
+    });
+
+    it('holds a band of a mix at −70 dBFS to the tight tolerance', () => {
+        // One band of a full mix reads −60 to −80 as a matter of course: a 0.3 dB air-shelf
+        // change there must not hide under the quiet rule.
+        const bands = golden.bandsDb.map(() => -70);
+        const was = { ...golden, bandsDb: bands };
+        const now = { ...golden, bandsDb: bands.map((db, index) => (index === 7 ? db + 0.3 : db)) };
+        expect(compareFingerprints(was, now).map((d) => d.metric)).toEqual(['tone 8 kHz']);
+    });
+
+    it('fails a swapped or shifted left/right balance the mono measures cannot see', () => {
+        const [left, right] = tone(0.5);
+        const quieter = right.map((v) => v * 0.4);
+        const leansLeft = fingerprint([left, quieter], SR);
+        const leansRight = fingerprint([quieter, left], SR);
+        const metrics = compareFingerprints(leansLeft, leansRight).map((d) => d.metric);
+        expect(metrics).toEqual(['left/right balance']);
+    });
+
+    it('fails a fingerprint with a value missing, by name, never in silence', () => {
+        // A damaged file compares as NaN, and NaN is never "greater than the tolerance".
+        const louder = fingerprint(tone(0.9), SR);
+        const damaged = JSON.parse(JSON.stringify(golden));
+        delete damaged.rmsDb;
+        delete damaged.seconds;
+        delete damaged.balanceDb;
+        damaged.bandsDb = damaged.bandsDb.slice(0, 4);
+        const metrics = compareFingerprints(damaged, louder).map((d) => d.metric);
+        expect(metrics).toContain('level (RMS)');
+        expect(metrics).toContain('length (s)');
+        expect(metrics).toContain('left/right balance');
+        expect(metrics).toContain('tone 8 kHz');
+        // And against an identical render too: the gap itself is the failure.
+        expect(compareFingerprints(damaged, golden).map((d) => d.metric)).toContain('level (RMS)');
+    });
+
+    it('fails a contour that lost a block', () => {
+        const shorter = { ...golden, blocksDb: golden.blocksDb.slice(0, 3) };
+        const metrics = compareFingerprints(golden, shorter).map((d) => d.metric);
+        expect(metrics).toEqual(['contour 1.5–2.0 s']);
     });
 });
 
@@ -150,6 +217,24 @@ describe('compareRun and its report', () => {
         expect(report).not.toContain('scene / mix');
         expect(report).toMatch(/\+\d+ more/);
     });
+
+    it('reports a committed fingerprint the run no longer renders, on a full run only', () => {
+        const withExtra: FingerprintFile = {
+            version: FINGERPRINT_VERSION,
+            scenes: { scene: { mix: print, bass: print }, retired: { mix: print } },
+        };
+        const run = { scene: { mix: print } };
+        const stale = (full: boolean) =>
+            compareRun(withExtra, run, full)
+                .filter((row) => row.stale)
+                .map((row) => `${row.scene}/${row.stem}`);
+        // A dropped stem shows either way; a scene the run skipped only on a full run.
+        expect(stale(false)).toEqual(['scene/bass']);
+        expect(stale(true)).toEqual(['scene/bass', 'retired/mix']);
+        expect(formatResults(compareRun(withExtra, run, true))).toContain(
+            'retired / mix: a committed fingerprint the check no longer renders',
+        );
+    });
 });
 
 describe('parseGoldenArgs', () => {
@@ -170,6 +255,8 @@ describe('parseGoldenArgs', () => {
     it('refuses an unknown flag or scene', () => {
         expect(() => parseGoldenArgs(['--bless'])).toThrow(/unknown argument/);
         expect(() => parseGoldenArgs(['--scene=polka'])).toThrow(/no scene "polka"/);
+        // An empty list would render nothing and report a pass.
+        expect(() => parseGoldenArgs(['--scene='])).toThrow(/names no scene/);
     });
 });
 
@@ -204,6 +291,28 @@ describe('the committed fixtures', () => {
                 expect(request.voices, scene.id).toContainEqual(pin);
             }
             expect(request.genreFeel).toBe(scene.genreFeel);
+        }
+    });
+
+    it('hold no fingerprint for a scene or stem the check no longer renders', () => {
+        const stems = GOLDEN_STEMS.map((stem) => stem.id).sort();
+        for (const [scene, prints] of Object.entries(file.scenes)) {
+            expect(Object.keys(prints).sort(), scene).toEqual(stems);
+        }
+    });
+
+    it('still compile to the timeline they were frozen on', () => {
+        // The render recompiles the frozen score. If a score now becomes a different length
+        // of time, every fingerprint moves for a reason that is not the sound: recompose
+        // with `npm run golden -- --refreeze`, in a commit of its own.
+        for (const scene of GOLDEN_SCENES) {
+            const request = frozen(scene.id);
+            const ticks = compileTimeline(request.score as never).ticks;
+            expect(ticks, `${scene.id}: run \`npm run golden -- --refreeze\``).toBe(request.ticks);
+            const last = Math.max(
+                ...request.passes.flat().map((e) => (e as never as { tick: number }).tick),
+            );
+            expect(last).toBeLessThan(ticks);
         }
     });
 

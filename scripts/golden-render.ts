@@ -8,10 +8,12 @@
  *
  * A few render requests are frozen in `tests/golden/fixtures/<scene>.request.json`: the score,
  * the events the band played, the lane sounds and the seed. Frozen, so the check is about the
- * sound of FIXED notes. A `band/` style change does not move it (the critique claims hold what
- * the band plays); a voice, bus, pack or master-chain change does. Each stem of each request
- * is rendered in node (`mix-render-node.ts`) and reduced to a fingerprint (level, tone, width
- * and a loudness contour), compared with `tests/golden/fixtures/fingerprints.json` inside
+ * sound of FIXED notes. A change to what the band plays (`band/` styles, players, feel) does
+ * not move it: the critique claims hold that. A voice, bus, pack or master-chain change does,
+ * and so does a change to how a score becomes time (`compileTimeline`, `secondsAt`, `PPQ`),
+ * which the render still runs on the frozen score. Each stem of each request is rendered in
+ * node (`mix-render-node.ts`) and reduced to a fingerprint (level, tone, width, balance and a
+ * loudness contour), compared with `tests/golden/fixtures/fingerprints.json` inside
  * `TOLERANCE`. A difference prints what moved and exits 1.
  *
  * It measures; it does not listen. A fingerprint that holds says the render did not move,
@@ -109,6 +111,12 @@ export interface FrozenRequest {
     voices: VoicePin[];
     randomSeed: string;
     genreFeel: string;
+    /**
+     * The length of the score's timeline in ticks when it was frozen. The render recompiles
+     * the frozen score (`compileTimeline`), so a change to how a score becomes a timeline
+     * moves the render too; the fixtures test compares this to say so by name.
+     */
+    ticks: number;
 }
 
 /** Compose a scene with the band as it plays today and freeze the result. */
@@ -124,6 +132,7 @@ export function freezeScene(scene: MixScene): FrozenRequest {
         voices,
         randomSeed: `${scene.id}:${SEED}`,
         genreFeel: scene.genreFeel,
+        ticks: performance.timeline.ticks,
     };
 }
 
@@ -131,6 +140,8 @@ export function freezeScene(scene: MixScene): FrozenRequest {
 export const FINGERPRINT_BANDS = [60, 125, 250, 500, 1000, 2000, 4000, 8000] as const;
 const BAND_WINDOW = 4096;
 const BLOCK_SECONDS = 0.5;
+/** A final block shorter than this is too little signal to hold a level to. */
+const MIN_BLOCK_SECONDS = 0.1;
 /** Levels under this are reported as this: below it a dB figure is rounding noise. */
 export const FLOOR_DB = -90;
 
@@ -143,6 +154,8 @@ export interface Fingerprint {
     bandsDb: number[];
     /** The side channel's level; `FLOOR_DB` for a mono stem. */
     sideDb: number;
+    /** Left level minus right, in dB: which way the stem leans. 0 for a mono stem. */
+    balanceDb: number;
     /** RMS of each half second: the loudness contour (envelopes, tails, ducking). */
     blocksDb: number[];
 }
@@ -182,12 +195,20 @@ export function fingerprint(channels: Float32Array[], sampleRate: number): Finge
 
     const blockLength = Math.round(BLOCK_SECONDS * sampleRate);
     const blocksDb: number[] = [];
-    for (let start = 0; start + blockLength <= length; start += blockLength) {
-        blocksDb.push(floored(toDb(computeRms(mono.subarray(start, start + blockLength)))));
+    // The last block may be short: a tail's final tenths of a second still count.
+    for (let start = 0; start < length; start += blockLength) {
+        const end = Math.min(length, start + blockLength);
+        if (end - start >= MIN_BLOCK_SECONDS * sampleRate) {
+            blocksDb.push(floored(toDb(computeRms(mono.subarray(start, end)))));
+        }
     }
 
     let sideDb = FLOOR_DB;
+    let balanceDb = 0;
     if (channels.length >= 2) {
+        const left = floored(toDb(computeRms(channels[0])));
+        const right = floored(toDb(computeRms(channels[1])));
+        balanceDb = round2(left - right);
         const side = new Float32Array(length);
         for (let i = 0; i < length; i++) {
             side[i] = (channels[0][i] - channels[1][i]) * 0.5;
@@ -201,26 +222,28 @@ export function fingerprint(channels: Float32Array[], sampleRate: number): Finge
         peakDb: floored(toDb(computePeak(mono))),
         bandsDb,
         sideDb,
+        balanceDb,
         blocksDb,
     };
 }
 
 /**
  * How far a fingerprint may move before the check fails, in dB. A node render repeats to
- * within 0.02 dB on every metric (the same requests twice, idle and with every core busy), so
- * these sit five times over the noise and well under the smallest change worth hearing: a
- * planted 0.5 dB voice change, a bus filter move and a reverb send change all trip them.
- * Levels quieter than `quietDb` are compared at `quietToleranceDb`: far down, a dB is a tiny
- * absolute change.
+ * within 0.02 dB on every metric, down to −80 dBFS (the same requests twice, idle and with
+ * every core busy), so these sit five times over the noise and well under the smallest change
+ * worth hearing: a planted 0.5 dB voice change, a bus filter move and a reverb send change
+ * all trip them. Only below `quietDb` does the wider `quietToleranceDb` apply: a single
+ * band of a mix reads −60 to −80 dBFS as a matter of course, so the line sits under that.
  */
 export const TOLERANCE = {
     levelDb: 0.1,
     peakDb: 0.1,
     bandDb: 0.1,
     sideDb: 0.1,
+    balanceDb: 0.1,
     blockDb: 0.1,
     seconds: 0.02,
-    quietDb: -60,
+    quietDb: -80,
     quietToleranceDb: 0.5,
 } as const;
 
@@ -239,11 +262,13 @@ export function compareFingerprints(golden: Fingerprint, actual: Fingerprint): D
         const quiet = was < TOLERANCE.quietDb && now < TOLERANCE.quietDb;
         const allowed = quiet ? Math.max(tolerance, TOLERANCE.quietToleranceDb) : tolerance;
         const delta = now - was;
-        if (Math.abs(delta) > allowed + 1e-9) {
+        // A value missing from either side (a damaged or hand-edited file) compares as NaN,
+        // and NaN is never "greater than": it has to fail by name, not pass in silence.
+        if (!Number.isFinite(delta) || Math.abs(delta) > allowed + 1e-9) {
             differences.push({ metric, golden: was, actual: now, delta, tolerance: allowed });
         }
     };
-    if (Math.abs(actual.seconds - golden.seconds) > TOLERANCE.seconds) {
+    if (!(Math.abs(actual.seconds - golden.seconds) <= TOLERANCE.seconds)) {
         differences.push({
             metric: 'length (s)',
             golden: golden.seconds,
@@ -255,6 +280,17 @@ export function compareFingerprints(golden: Fingerprint, actual: Fingerprint): D
     check('level (RMS)', golden.rmsDb, actual.rmsDb, TOLERANCE.levelDb);
     check('peak', golden.peakDb, actual.peakDb, TOLERANCE.peakDb);
     check('stereo side', golden.sideDb, actual.sideDb, TOLERANCE.sideDb);
+    // A lean is a difference of two levels, never "quiet": compared at its own tolerance.
+    const lean = actual.balanceDb - golden.balanceDb;
+    if (!(Math.abs(lean) <= TOLERANCE.balanceDb + 1e-9)) {
+        differences.push({
+            metric: 'left/right balance',
+            golden: golden.balanceDb,
+            actual: actual.balanceDb,
+            delta: lean,
+            tolerance: TOLERANCE.balanceDb,
+        });
+    }
     FINGERPRINT_BANDS.forEach((freq, index) => {
         const label = freq >= 1000 ? `${freq / 1000} kHz` : `${freq} Hz`;
         check(`tone ${label}`, golden.bandsDb[index], actual.bandsDb[index], TOLERANCE.bandDb);
@@ -285,12 +321,19 @@ export interface SceneResult {
     differences: Difference[];
     /** Set when the committed file has no fingerprint for this stem. */
     missing: boolean;
+    /** Set when the committed file holds a fingerprint the run no longer produces. */
+    stale?: boolean;
 }
 
-/** Compare a run with the committed fingerprints, scene by scene and stem by stem. */
+/**
+ * Compare a run with the committed fingerprints, scene by scene and stem by stem. On a
+ * `full` run (every scene), a committed fingerprint the run did not produce is reported too:
+ * a scene or stem dropped from the check must leave the file with it.
+ */
 export function compareRun(
     golden: FingerprintFile,
     actual: Record<string, Record<string, Fingerprint>>,
+    full = false,
 ): SceneResult[] {
     const results: SceneResult[] = [];
     for (const [scene, stems] of Object.entries(actual)) {
@@ -304,6 +347,16 @@ export function compareRun(
             });
         }
     }
+    for (const [scene, stems] of Object.entries(golden.scenes)) {
+        if (!full && !actual[scene]) {
+            continue;
+        }
+        for (const stem of Object.keys(stems)) {
+            if (!actual[scene]?.[stem]) {
+                results.push({ scene, stem, missing: false, stale: true, differences: [] });
+            }
+        }
+    }
     return results;
 }
 
@@ -315,6 +368,12 @@ export function formatResults(results: SceneResult[], limit = 6): string {
     for (const result of results) {
         if (result.missing) {
             lines.push(`${result.scene} / ${result.stem}: no committed fingerprint`);
+            continue;
+        }
+        if (result.stale) {
+            lines.push(
+                `${result.scene} / ${result.stem}: a committed fingerprint the check no longer renders`,
+            );
             continue;
         }
         if (result.differences.length === 0) {
@@ -355,6 +414,9 @@ export function parseGoldenArgs(argv: string[]): GoldenOptions {
             options.json = true;
         } else if (arg.startsWith('--scene=')) {
             options.scenes = arg.slice('--scene='.length).split(',').filter(Boolean);
+            if (options.scenes.length === 0) {
+                throw new Error('golden: --scene= names no scene');
+            }
         } else {
             throw new Error(
                 `golden: unknown argument "${arg}" (--update, --refreeze, --scene=<id,…>, --json)`,
@@ -383,14 +445,17 @@ async function main(argv: string[]): Promise<void> {
         (scene) => !options.scenes || options.scenes.includes(scene.id),
     );
     mkdirSync(GOLDEN_DIR, { recursive: true });
+    const full = !options.scenes;
 
-    if (options.refreeze) {
-        for (const scene of scenes) {
-            writeJson(requestPath(scene.id), freezeScene(scene));
-        }
-    }
+    // Recomposed requests stay in memory until the renders succeed: a failed render must
+    // not leave new events on disk beside the old fingerprints.
+    const frozen = new Map<string, FrozenRequest>();
     for (const scene of scenes) {
-        if (!existsSync(requestPath(scene.id))) {
+        if (options.refreeze) {
+            frozen.set(scene.id, freezeScene(scene));
+        } else if (existsSync(requestPath(scene.id))) {
+            frozen.set(scene.id, JSON.parse(readFileSync(requestPath(scene.id), 'utf8')));
+        } else {
             throw new Error(
                 `golden: ${path.relative(REPO_ROOT, requestPath(scene.id))} is missing; run \`npm run golden -- --refreeze\``,
             );
@@ -406,12 +471,15 @@ async function main(argv: string[]): Promise<void> {
         }
     };
     for (const scene of scenes) {
-        const frozen = JSON.parse(readFileSync(requestPath(scene.id), 'utf8')) as FrozenRequest;
+        const request = frozen.get(scene.id) as FrozenRequest;
         const started = Date.now();
         actual[scene.id] = {};
         for (const stem of GOLDEN_STEMS) {
-            const request = { ...frozen, passes: laneEvents(frozen.passes as never, stem.lanes) };
-            const render = await renderer.renderAndMeasure(request as never, 1);
+            const stemRequest = {
+                ...request,
+                passes: laneEvents(request.passes as never, stem.lanes),
+            };
+            const render = await renderer.renderAndMeasure(stemRequest as never, 1);
             actual[scene.id][stem.id] = fingerprint(render.channels, render.sampleRate);
         }
         log(`rendered ${scene.id} (${((Date.now() - started) / 1000).toFixed(1)} s)`);
@@ -421,20 +489,28 @@ async function main(argv: string[]): Promise<void> {
         const previous: FingerprintFile = existsSync(FINGERPRINTS_PATH)
             ? JSON.parse(readFileSync(FINGERPRINTS_PATH, 'utf8'))
             : { version: FINGERPRINT_VERSION, scenes: {} };
+        if (!full && previous.version !== FINGERPRINT_VERSION) {
+            throw new Error(
+                `golden: fingerprints are version ${previous.version}, this check writes ${FINGERPRINT_VERSION}; update every scene at once (no --scene=)`,
+            );
+        }
         const next: FingerprintFile = {
             version: FINGERPRINT_VERSION,
-            // A `--scene=` update keeps the other scenes' fingerprints.
-            scenes: {
-                ...(previous.version === FINGERPRINT_VERSION ? previous.scenes : {}),
-                ...actual,
-            },
+            // A `--scene=` update keeps the other scenes' fingerprints; a full one is the
+            // whole file, so a scene or stem dropped from the check leaves it.
+            scenes: full ? actual : { ...previous.scenes, ...actual },
         };
+        if (options.refreeze) {
+            for (const [id, request] of frozen) {
+                writeJson(requestPath(id), request);
+            }
+        }
         writeFileSync(FINGERPRINTS_PATH, `${JSON.stringify(next, null, 4)}\n`);
         // Biome's JSON layout (one array per line), so the commit hook leaves the file alone
         // and a fingerprint change reads as one line per metric.
         execFileSync('npx', ['biome', 'format', '--write', FINGERPRINTS_PATH], {
             cwd: REPO_ROOT,
-            stdio: 'ignore',
+            stdio: ['ignore', 'ignore', 'inherit'],
         });
         log(`wrote ${path.relative(REPO_ROOT, FINGERPRINTS_PATH)}`);
         return;
@@ -449,8 +525,10 @@ async function main(argv: string[]): Promise<void> {
             `golden: fingerprints are version ${golden.version}, this check reads ${FINGERPRINT_VERSION}; run \`npm run golden -- --update\``,
         );
     }
-    const results = compareRun(golden, actual);
-    const moved = results.filter((result) => result.missing || result.differences.length > 0);
+    const results = compareRun(golden, actual, full);
+    const moved = results.filter(
+        (result) => result.missing || result.stale || result.differences.length > 0,
+    );
     if (options.json) {
         process.stdout.write(`${JSON.stringify({ moved: moved.length, results }, null, 2)}\n`);
     } else if (moved.length === 0) {
