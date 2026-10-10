@@ -411,8 +411,11 @@ never starts. The host keeps a queue of *segments*, one pass of the song each, a
 schedules everything due in the next 150 ms on a 25 ms timer.
 - **Tempo** re-anchors the clock.
 - **Style, intensity, lanes, swing, humanize and the comp instrument** regenerate the pass from
-  the next barline. The comp instrument follows the chords lane's sound (`COMP_FOR_VOICE` in
-  `runtime.ts`); a genre's Auto sound is its style's `prefers`, unless
+  the next barline. The comp instrument follows the chords lane's sound (`compForChordsLane`
+  in `lib/band-voices.ts`): a pack names its instrument, and the built-in voice on Auto plays
+  the style's `prefers`, as the lead does, so a device without packs still hears funk's clav
+  grips and bossa's nylon strums (#1564); the built-in voice chosen by hand is a piano. A
+  genre's Auto sound is its style's `prefers`, unless
   `AUTO_VOICE_FOR_STYLE` names another sound for the same instrument (metal: the crunch guitar).
 - **A staged genre** is committed at once; `setGenre` then waits for the barline where the band
   first plays it (`BandHost.changeHeard`), so "Switching feel at the next bar" reads true.

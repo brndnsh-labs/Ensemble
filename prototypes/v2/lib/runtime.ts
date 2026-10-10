@@ -70,7 +70,7 @@ import {
 import { BandHost } from './band-host';
 import {
     AUTO_VOICE_FOR_STYLE,
-    COMP_FOR_VOICE,
+    compForChordsLane,
     LEAD_FOR_VOICE,
     STYLE_FOR_GENRE,
     VOICE_FOR_COMP,
@@ -229,7 +229,7 @@ function bandSettings(): BandSettings {
             comp: chords.enabled,
             lead: soloist.enabled,
         },
-        comp: COMP_FOR_VOICE[chords.voice] ?? 'piano',
+        comp: compForChordsLane(chords, STYLES[style].prefers),
         lead: bandLead(style),
         intensity: playback.autoIntensity ? null : playback.bandIntensity,
         swing: groove.swing,
