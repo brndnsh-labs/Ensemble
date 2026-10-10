@@ -53,6 +53,8 @@ Ensemble is not AI-generated audio. The codebase is AI-assisted and agents are f
 
 One app, the music stand (`prototypes/v2/app/`): a songbook home (recent songs, the standards catalog, new/import), the chart sheet, the transport, an edit panel and a sounds panel. Tempo, genre, instrument mutes and the transport are primary; key is one obvious action away; loop and start-from belong at the section they act on. Editing keeps the chart's spatial structure, and editing controls step aside during playback.
 
+The stand has three modes — Chart, Neck and Edit chart. Neck (#1587) puts a guitar or ukulele fretboard in place of the chart: the shell grip for the chord sounding now, a preview of the next grip on the last beat before the change, and one line saying how the hand gets there.
+
 Designed for laptop, tablet and phone alike. Tablet is the sweet spot: readable at arm's length on a music stand, touch-friendly, portable to a rehearsal room. Whole measures and readable chord symbols survive every width.
 
 ## What's next

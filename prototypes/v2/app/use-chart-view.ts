@@ -147,6 +147,8 @@ export function useChartView(current: ChartDocument | null, active: number | nul
         [current],
     );
     return {
+        /** The band's chart (`runtime.bandChartView()`), memoized per document; null for a measure-less chart. */
+        band,
         blocks,
         displayActive,
         displayNext,

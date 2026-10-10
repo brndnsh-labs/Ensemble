@@ -85,6 +85,9 @@ The ground-up replacement for the generative engine, the default since 2026-09-2
 | `prototypes/v2/app/neck-geometry.ts` | Fret and string geometry for the neck (`fx`, `dx`, `neckLayout`), shared by the component and its test. | `fx`, `dx`, `fretAt`, `neckLayout` |
 | `prototypes/v2/app/neck.css` | The neck's presentation; the `--d-*` degree and board tokens live on `:root` in `style.css`. | — |
 | `prototypes/v2/app/use-shell-prefs.ts` | Per-device neck settings (instrument, home window, root strings, labels) over `lib/session.ts`'s `shellPreferences`; never document fields. | `useShellPrefs` |
+| `prototypes/v2/app/neck-view.tsx` | The stand's Neck mode (#1587): chord strip (current, next, narration, approximation notice), the `<Neck>` and its settings row, in place of the chart sheet. Presentational; the shell hands it the band chart, the voiced grips and the playhead. | `NeckView` |
+| `prototypes/v2/app/neck-view.css` | Neck mode's layout: the strip, the fretboard and the settings row. | — |
+| `prototypes/v2/app/use-neck-view.ts` | Neck mode's follow logic over `BandChart`: the sounding grip under a slot (held through a hold/N.C.), the next DIFFERENT chord in performance order (`nextVoicedSlot`, not the chart's next-bar cue), the narration sentence, and `useNeckVoicing` (whole chart voiced once per chart + prefs, never per frame). | `neckModel`, `nextVoicedSlot`, `soundingSlot`, `narrateChange`, `useNeckVoicing` |
 
 ## State Management (Domain Slices)
 

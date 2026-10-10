@@ -66,9 +66,12 @@ import {
     recordOpened as recordOpenedGuest,
     rememberAllSongsSort,
     rememberSong,
+    rememberStandMode,
     rememberV1Import,
     rememberV1ImportDecline,
     rememberV1SessionMark,
+    type StandMode,
+    standMode,
     v1ImportLedger,
     v1SessionMark,
 } from '../lib/session';
@@ -109,6 +112,7 @@ import { EditPanel } from './edit-panel';
 import { FeelSheet, type FeelSnapshot } from './feel-sheet';
 import { ImportDialog } from './import-dialog';
 import type { MeasureEditorHandle } from './measure-editor';
+import { NeckView } from './neck-view';
 import { SongHeader } from './song-header';
 import { SongMenu } from './song-menu';
 import { SongRowMenu, type SongRowMenuTarget } from './song-row-menu';
@@ -119,6 +123,7 @@ import { TradeSheet } from './trade-sheet';
 import { TransportBar } from './transport-bar';
 import { useChartView } from './use-chart-view';
 import { useCollections } from './use-collections';
+import { useNeckVoicing } from './use-neck-view';
 import { useOfflineInstall } from './use-offline-install';
 import { useStageTheme } from './use-stage-theme';
 
@@ -531,6 +536,9 @@ export default function Ensemble() {
     // the gesture effect below clears it on the first pointer or key event anywhere on the page.
     const [pendingAutoplay, setPendingAutoplay] = useState(false);
     const [editing, setEditing] = useState(false);
+    // The stand's Neck mode (#1587), the third view beside Chart and Edit chart and exclusive
+    // with editing: every way into the editor goes through `showEditor`, which clears it.
+    const [neck, setNeck] = useState(false);
     const [sectionId, setSectionId] = useState('');
     const [buffers, setBuffers] = useState(new Map<string, string>());
     const [measureId, setMeasureId] = useState('');
@@ -1094,6 +1102,7 @@ export default function Ensemble() {
     // has no render boundary of its own, so calling it here instead of later changes nothing
     // about what it computes, only where its already-fresh-every-render result becomes available.
     const {
+        band,
         blocks,
         displayActive,
         displayNext,
@@ -1103,6 +1112,7 @@ export default function Ensemble() {
         writtenBars,
         writtenSections,
     } = useChartView(current, active);
+    const neckVoicing = useNeckVoicing(band, neck);
     const hasPendingText = buffers.size > 0 || pendingMeasures;
     const text =
         buffers.get(sectionId) ??
@@ -1114,6 +1124,9 @@ export default function Ensemble() {
     const playbackActive = playing || playbackPending;
     const focused = playbackActive && !showControls && !editing;
 
+    useEffect(() => {
+        setNeck(standMode() === 'neck');
+    }, []);
     useEffect(() => {
         // #1389 — a real production visit only; no-op everywhere else (dev, ensembletest, the
         // Playwright export). Independent of `start()`'s engine boot below, so a slow/failed
@@ -2507,10 +2520,20 @@ export default function Ensemble() {
             setSoundProgress('');
         });
     }
+    /** Into the editor: the one way `editing` turns on, so Neck mode (#1587) always yields. */
+    function showEditor() {
+        setNeck(false);
+        setEditing(true);
+    }
+    function showStand(mode: StandMode) {
+        setEditing(false);
+        setNeck(mode === 'neck');
+        rememberStandMode(mode);
+    }
     function revealEditor(id = sectionId) {
         runtime.stop();
         setSectionId(id);
-        setEditing(true);
+        showEditor();
         setEditorRequest((request) => request + 1);
     }
     function applyScore(score: SemanticScore): ChartDocument {
@@ -2543,7 +2566,7 @@ export default function Ensemble() {
                 return applyScore(measureEditor.current.commit());
             } catch (error) {
                 setMenu(false);
-                setEditing(true);
+                showEditor();
                 throw error;
             }
         }
@@ -2580,7 +2603,7 @@ export default function Ensemble() {
             return next;
         } catch (error) {
             setMenu(false);
-            setEditing(true);
+            showEditor();
             setEditorRequest((request) => request + 1);
             throw error;
         }
@@ -3260,7 +3283,7 @@ export default function Ensemble() {
                 const opened = await open(document);
                 draft({ ...opened.current, title: trimmed }, opened.saved);
                 focusTitleOnReveal.current = true;
-                setEditing(true);
+                showEditor();
                 setEditorRequest((n) => n + 1);
                 // Re-review P3 — BOTH branches are `warning`: touch has no hover to pause an
                 // `info` message's ~4s clock, so a musician who tapped Rename and looked away for
@@ -5308,11 +5331,13 @@ export default function Ensemble() {
                         playbackActive={playbackActive}
                         focused={focused}
                         editing={editing}
+                        neck={neck}
                         onHome={goHome}
                         onToggleTheme={toggleTheme}
                         onSounds={() => setSoundMenu(true)}
                         onToggleControls={() => setShowControls(!showControls)}
-                        onShowChart={() => setEditing(false)}
+                        onShowChart={() => showStand('chart')}
+                        onShowNeck={() => showStand('neck')}
                         onEditChart={() => revealEditor()}
                         onSave={() => void run(() => (sharedDraft ? keepSharedCopy() : save()))}
                         onMenu={() =>
@@ -5452,57 +5477,70 @@ export default function Ensemble() {
                         onNotation={(notation) => change(() => runtime.setNotation(notation))}
                     />
                     <div className={`workspace-body ${editing ? 'editing' : ''}`}>
-                        <div
-                            className="chart-scroll"
-                            ref={scroll}
-                            onWheel={() => setFollowing(false)}
-                            onTouchMove={() => setFollowing(false)}
-                            onKeyDown={(e) => {
-                                if (
-                                    [
-                                        'ArrowDown',
-                                        'ArrowUp',
-                                        'PageDown',
-                                        'PageUp',
-                                        'Home',
-                                        'End',
-                                    ].includes(e.key)
-                                ) {
-                                    setFollowing(false);
-                                }
-                            }}
-                            tabIndex={0}
-                            aria-label="Chord chart"
-                        >
-                            <ChartSheet
-                                current={current}
-                                blocks={blocks}
-                                displayActive={displayActive}
-                                displayNext={displayNext}
+                        {neck ? (
+                            <NeckView
+                                band={band}
+                                voiced={neckVoicing.voiced}
+                                active={active}
                                 nextSoon={nextSoon}
-                                activeEvent={activeEvent}
-                                writtenBars={writtenBars}
-                                writtenSections={writtenSections}
-                                editing={editing}
-                                busy={busy}
-                                playing={playing}
-                                playbackActive={playbackActive}
-                                totalBars={totalBars}
-                                onStartHere={startHereSection}
-                                onEditSection={(block) => {
-                                    if (current.schemaVersion === 2) {
-                                        setMeasureId(block.measures[0]?.chords[0]?.measureId ?? '');
-                                    }
-                                    revealEditor(block.id);
-                                }}
-                                onEditBar={(measure) => {
-                                    setMeasureId(measure.chords[0]?.measureId ?? '');
-                                    revealEditor(measure.sectionId);
-                                }}
-                                onAudition={(index) => runtime.audition(index)}
-                                onChoruses={changeChoruses}
+                                prefs={neckVoicing.prefs}
+                                onPrefs={neckVoicing.setPrefs}
                             />
-                        </div>
+                        ) : (
+                            <div
+                                className="chart-scroll"
+                                ref={scroll}
+                                onWheel={() => setFollowing(false)}
+                                onTouchMove={() => setFollowing(false)}
+                                onKeyDown={(e) => {
+                                    if (
+                                        [
+                                            'ArrowDown',
+                                            'ArrowUp',
+                                            'PageDown',
+                                            'PageUp',
+                                            'Home',
+                                            'End',
+                                        ].includes(e.key)
+                                    ) {
+                                        setFollowing(false);
+                                    }
+                                }}
+                                tabIndex={0}
+                                aria-label="Chord chart"
+                            >
+                                <ChartSheet
+                                    current={current}
+                                    blocks={blocks}
+                                    displayActive={displayActive}
+                                    displayNext={displayNext}
+                                    nextSoon={nextSoon}
+                                    activeEvent={activeEvent}
+                                    writtenBars={writtenBars}
+                                    writtenSections={writtenSections}
+                                    editing={editing}
+                                    busy={busy}
+                                    playing={playing}
+                                    playbackActive={playbackActive}
+                                    totalBars={totalBars}
+                                    onStartHere={startHereSection}
+                                    onEditSection={(block) => {
+                                        if (current.schemaVersion === 2) {
+                                            setMeasureId(
+                                                block.measures[0]?.chords[0]?.measureId ?? '',
+                                            );
+                                        }
+                                        revealEditor(block.id);
+                                    }}
+                                    onEditBar={(measure) => {
+                                        setMeasureId(measure.chords[0]?.measureId ?? '');
+                                        revealEditor(measure.sectionId);
+                                    }}
+                                    onAudition={(index) => runtime.audition(index)}
+                                    onChoruses={changeChoruses}
+                                />
+                            </div>
+                        )}
                         <EditPanel
                             panelRef={editPanel}
                             measureEditorRef={measureEditor}
@@ -5668,7 +5706,7 @@ export default function Ensemble() {
                          * `:focus-visible`-only outline (not plain `:focus`) is what keeps a
                          * pointer tap from drawing a visible ring around the whole chart.
                          */}
-                        {playbackActive && !following && (
+                        {playbackActive && !following && !neck && (
                             <button
                                 className="resume-follow-pill"
                                 data-testid="resume-follow"

@@ -1,0 +1,90 @@
+/* The stand's Neck mode (#1587): the chord strip, the fretboard and its settings, in place of the
+   chart sheet. The fretboard's own styles are neck.css. */
+.neck-view {
+    flex: 1;
+    min-width: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
+    padding: 25px 48px 40px;
+}
+.neck-view-inner {
+    max-width: 1100px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+.neck-view-empty {
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1.5;
+}
+.neck-strip {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.neck-strip-names {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 6px 14px;
+}
+.neck-current {
+    font-size: var(--chord-size, 40px);
+    font-weight: 650;
+    line-height: 1.1;
+    color: var(--ink);
+}
+.neck-next {
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--muted);
+}
+.neck-note {
+    font-size: 12px;
+    color: var(--muted);
+}
+.neck-narration {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.45;
+    color: var(--ink);
+    min-height: 2.9em;
+}
+.neck-settings {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px 22px;
+}
+.neck-setting {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.neck-hand-toggle {
+    padding: 7px 12px;
+    font-size: 12px;
+}
+@media (max-width: 760px) {
+    .neck-view {
+        padding: 16px 16px 30px;
+    }
+    .neck-view-inner {
+        gap: 12px;
+    }
+    .neck-next {
+        font-size: 18px;
+    }
+    .neck-narration {
+        font-size: 13px;
+    }
+    .neck-settings {
+        gap: 8px 16px;
+    }
+}
+/* Focus chart: the neck keeps its grips and loses its settings, like the header's controls. */
+.performance-focus .neck-settings {
+    display: none;
+}

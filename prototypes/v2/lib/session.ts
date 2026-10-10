@@ -173,6 +173,26 @@ export function rememberTheme(choice: ThemeChoice): void {
     }
 }
 
+const STAND_MODE = 'ensemble-v2-preview:stand-mode';
+export type StandMode = 'chart' | 'neck';
+
+/** Which view the stand shows a song in (#1587): the chart sheet or the neck. Editing is never remembered. */
+export function standMode(): StandMode {
+    try {
+        return localStorage.getItem(STAND_MODE) === 'neck' ? 'neck' : 'chart';
+    } catch {
+        return 'chart';
+    }
+}
+
+export function rememberStandMode(mode: StandMode): void {
+    try {
+        localStorage.setItem(STAND_MODE, mode);
+    } catch {
+        // The stand still switches for this page; only the memory is lost.
+    }
+}
+
 const SHELL_PREFS = 'ensemble-v2-preview:shell-prefs';
 
 export type ShellLabels = 'finger' | 'degree' | 'note';

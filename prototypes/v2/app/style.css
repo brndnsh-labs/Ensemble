@@ -586,6 +586,7 @@ html [hidden] {
     margin-right: 8px;
 }
 .mode-switch button {
+    white-space: nowrap;
     padding: 8px 12px;
     border-radius: 6px;
     font-size: 12px;
@@ -1550,6 +1551,10 @@ dialog textarea {
         padding: 8px;
     }
     .mode-switch svg {
+        display: none;
+    }
+    /* Chart | Neck | Edit (#1587): three modes fit the phone's header row with the short label. */
+    .mode-label-long {
         display: none;
     }
     .song-actions .menu-btn {

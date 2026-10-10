@@ -13,11 +13,14 @@ interface SongHeaderProps {
     playbackActive: boolean;
     focused: boolean;
     editing: boolean;
+    /** The stand shows the neck (#1587) instead of the chart sheet. */
+    neck: boolean;
     onHome: () => void;
     onToggleTheme: () => void;
     onSounds: () => void;
     onToggleControls: () => void;
     onShowChart: () => void;
+    onShowNeck: () => void;
     onEditChart: () => void;
     onSave: () => void;
     onMenu: () => void;
@@ -35,11 +38,13 @@ export function SongHeader({
     playbackActive,
     focused,
     editing,
+    neck,
     onHome,
     onToggleTheme,
     onSounds,
     onToggleControls,
     onShowChart,
+    onShowNeck,
     onEditChart,
     onSave,
     onMenu,
@@ -96,15 +101,20 @@ export function SongHeader({
                     </button>
                 )}
                 <div className="mode-switch">
-                    <button className={!editing ? 'active' : ''} onClick={onShowChart}>
+                    <button className={!editing && !neck ? 'active' : ''} onClick={onShowChart}>
                         Chart
+                    </button>
+                    <button className={neck ? 'active' : ''} onClick={onShowNeck}>
+                        Neck
                     </button>
                     <button
                         className={editing ? 'active' : ''}
                         disabled={busy}
+                        // The phone shows "Edit" (three modes share its header row); the name stays whole.
+                        aria-label="Edit chart"
                         onClick={onEditChart}
                     >
-                        Edit chart
+                        Edit<span className="mode-label-long"> chart</span>
                     </button>
                 </div>
                 <button className="btn primary save-btn" disabled={busy || !dirty} onClick={onSave}>
