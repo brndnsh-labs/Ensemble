@@ -1546,9 +1546,12 @@ dialog textarea {
     .mode-switch {
         margin-right: 0;
     }
+    /* Chart | Neck | Edit (#1587): three modes on the phone row. 6px sides, and the row's
+       indent below trimmed, buy ~24px of slack — CI's WebKit sets text ~10px wider than local,
+       and the row fit with none before. */
     .mode-switch button {
         font-size: 11px;
-        padding: 8px;
+        padding: 8px 6px;
     }
     .mode-switch svg {
         display: none;
@@ -1742,7 +1745,7 @@ dialog textarea {
     .song-header .song-actions {
         flex-basis: 100%;
         justify-content: flex-start;
-        padding-left: 40px;
+        padding-left: 28px;
     }
     .song-actions .save-btn {
         margin-left: auto;
