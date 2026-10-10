@@ -8,11 +8,15 @@ import {
     handTravel,
     type InstrumentDef,
     inHome,
+    inversionOf,
+    QUALITIES,
     type Quality,
     rootMove,
     shellChord,
+    spellDegree,
     spellRoot,
     UKULELE,
+    UKULELE_LOW_G,
     type Voicing,
     voiceChart,
     voiceNext,
@@ -36,6 +40,105 @@ describe('"All the notes are right there"', () => {
             for (let w = 1; w <= 10; w++) {
                 for (const root of ROOTS) {
                     for (const q of ['maj7', 'dom7', 'm7'] as Quality[]) {
+                        const fits = allPositions(inst, root, q).some((v) => inHome(v, [w, w + 5]));
+                        expect(fits, `${root.name}${q} in frets ${w}-${w + 5}`).toBe(true);
+                    }
+                }
+            }
+        });
+    }
+});
+
+describe('triad grips (#1588)', () => {
+    /** Every grip of one shape for a chord, low to high on the neck. */
+    const tabsOf = (inst: InstrumentDef, root: string, quality: Quality, id: string) =>
+        allPositions(inst, R(root), quality)
+            .filter((v) => v.shape.id === id)
+            .map((v) => tab(inst, v));
+
+    it('guitar C on strings 1–3 in three closed inversions', () => {
+        expect(tabsOf(GUITAR, 'C', 'maj', 'T321-0')).toEqual(['x x x 5 5 3']);
+        expect(tabsOf(GUITAR, 'C', 'maj', 'T321-1')).toEqual(['x x x 9 8 8']);
+        // The 2nd inversion also exists in open position (G C E on the open G string).
+        expect(tabsOf(GUITAR, 'C', 'maj', 'T321-2')).toEqual(['x x x 0 1 0', 'x x x 12 13 12']);
+    });
+    it('names the inversion by the lowest-pitched note', () => {
+        const at = (id: string, fret: number) =>
+            allPositions(GUITAR, R('C'), 'maj').find(
+                (v) => v.shape.id === id && v.rootFret === fret,
+            )!;
+        expect(inversionOf(GUITAR, at('T321-0', 5))).toBe(0);
+        expect(inversionOf(GUITAR, at('T321-1', 8))).toBe(1);
+        expect(inversionOf(GUITAR, at('T321-2', 13))).toBe(2);
+        // Uke C 0003 is G C E C, but the re-entrant G string is high: the C string's C is the
+        // lowest note, so it is root position. With a low G, the G is the bass.
+        const c = build(UKULELE, shape(UKULELE, 'UTC'), R('C'), 'maj')!;
+        expect(inversionOf(UKULELE, c)).toBe(0);
+        expect(inversionOf(UKULELE_LOW_G, c)).toBe(2);
+        // A shell always reads as root position.
+        expect(inversionOf(GUITAR, build(GUITAR, shape(GUITAR, '6A'), R('G'), 'maj7')!)).toBe(0);
+    });
+    it('the ukulele triads are the standard first-position chords', () => {
+        const uke = (id: string, root: string, quality: Quality) =>
+            tab(UKULELE, build(UKULELE, shape(UKULELE, id), R(root), quality)!);
+        expect(uke('UTC', 'C', 'maj')).toBe('0 0 0 3');
+        expect(uke('UTF', 'F', 'maj')).toBe('2 0 1 0');
+        expect(uke('UTG', 'G', 'maj')).toBe('0 2 3 2');
+        expect(uke('UTA', 'A', 'min')).toBe('2 0 0 0');
+        expect(uke('UTD', 'D', 'min')).toBe('2 2 1 0');
+        expect(uke('UTE', 'E', 'min')).toBe('0 4 3 2');
+        expect(uke('UTD', 'D', 'maj')).toBe('2 2 2 0');
+        expect(uke('UTA', 'A', 'maj')).toBe('2 1 0 0');
+    });
+    it('a power chord is root, 5th and octave: E5 on the 6th string is 0 2 2', () => {
+        expect(tab(GUITAR, build(GUITAR, shape(GUITAR, 'P6'), R('E'), 'five')!)).toBe(
+            '0 2 2 x x x',
+        );
+    });
+    it('sus and aug spell their own tones: C sus4 has F, sus2 has D, aug has G♯', () => {
+        const names = (quality: Quality) =>
+            build(GUITAR, shape(GUITAR, 'T321-0'), R('C'), quality)!
+                .notes.map((n) => spellDegree(R('C'), n.degree))
+                .join(' ');
+        expect(names('sus4')).toBe('C F G');
+        expect(names('sus2')).toBe('C D G');
+        expect(names('aug')).toBe('C E G♯');
+    });
+    it('shells and triads never share a shape', () => {
+        for (const inst of [GUITAR, UKULELE]) {
+            expect(allPositions(inst, R('C'), 'maj7').every((v) => v.shape.kind === 'shell')).toBe(
+                true,
+            );
+            expect(allPositions(inst, R('C'), 'maj').every((v) => v.shape.kind === 'triad')).toBe(
+                true,
+            );
+            expect(allPositions(inst, R('C'), 'five').every((v) => v.shape.kind === 'power')).toBe(
+                true,
+            );
+        }
+    });
+    it('the classic root-string limit leaves triad grips alone', () => {
+        const all = allPositions(GUITAR, R('C'), 'maj');
+        const classic = allPositions(GUITAR, R('C'), 'maj', { rootStrings: [6, 5] });
+        expect(classic.map((v) => tab(GUITAR, v))).toEqual(all.map((v) => tab(GUITAR, v)));
+    });
+    it('every quality has a grip for every root on both instruments', () => {
+        for (const inst of [GUITAR, UKULELE]) {
+            for (const root of ROOTS) {
+                for (const q of Object.keys(QUALITIES) as Quality[]) {
+                    expect(
+                        allPositions(inst, root, q).length,
+                        `${inst.name} ${root.name}${q}`,
+                    ).toBeGreaterThan(0);
+                }
+            }
+        }
+    });
+    for (const inst of [GUITAR, UKULELE]) {
+        it(`${inst.name}: every major and minor triad in all 12 keys fits in any 6-fret window`, () => {
+            for (let w = 1; w <= 10; w++) {
+                for (const root of ROOTS) {
+                    for (const q of ['maj', 'min'] as Quality[]) {
                         const fits = allPositions(inst, root, q).some((v) => inHome(v, [w, w + 5]));
                         expect(fits, `${root.name}${q} in frets ${w}-${w + 5}`).toBe(true);
                     }
@@ -70,6 +173,69 @@ describe('grips', () => {
     it('fingers follow standard teaching (R–3–7: 2-1-3)', () => {
         const v = build(GUITAR, shape(GUITAR, '6B'), R('G'), 'maj7')!;
         expect(v.notes.map((n) => n.finger)).toEqual([2, 1, 3]);
+    });
+});
+
+describe('voiceChart on triads (#1588): the hand stays put, open chords win first position', () => {
+    const chart = (names: string[]) =>
+        names.map((s) => {
+            const p = shellChord(parseChord(s, { tonic: 0, minor: false })!, 'C', false);
+            return { root: p.root, quality: p.quality };
+        });
+    const tabs = (inst: InstrumentDef, names: string[], home: [number, number] | null) =>
+        voiceChart(chart(names), { instrument: inst, home }).map((v) => tab(inst, v));
+
+    it('ukulele C Am F G is the first-position set, in the default window and unlocked', () => {
+        const canon = ['0 0 0 3', '2 0 0 0', '2 0 1 0', '0 2 3 2'];
+        expect(tabs(UKULELE, ['C', 'Am', 'F', 'G'], [1, 6])).toEqual(canon);
+        expect(tabs(UKULELE, ['C', 'Am', 'F', 'G'], null)).toEqual(canon);
+    });
+    it('ukulele G C D and C G Am F keep their open chords too', () => {
+        expect(tabs(UKULELE, ['G', 'C', 'D', 'G'], [1, 6])).toEqual([
+            '0 2 3 2',
+            '0 0 0 3',
+            '2 2 2 0',
+            '0 2 3 2',
+        ]);
+        expect(tabs(UKULELE, ['C', 'G', 'Am', 'F'], [1, 6])).toEqual([
+            '0 0 0 3',
+            '0 2 3 2',
+            '2 0 0 0',
+            '2 0 1 0',
+        ]);
+    });
+    it('ukulele C Am F G locked to frets 5–10 moves to the closed shapes up the neck', () => {
+        const v = voiceChart(chart(['C', 'Am', 'F', 'G']), { instrument: UKULELE, home: [5, 10] });
+        expect(v.every((x) => inHome(x, [5, 10]) && x.notes.every((n) => n.fret >= 5))).toBe(true);
+    });
+    it('guitar C G Am F in frets 2–7 stays within two frets of the 5th, all closed', () => {
+        const v = voiceChart(chart(['C', 'G', 'Am', 'F']), { instrument: GUITAR, home: [2, 7] });
+        const frets = v.flatMap((x) => x.notes.map((n) => n.fret));
+        expect(Math.min(...frets)).toBeGreaterThanOrEqual(4);
+        expect(Math.max(...frets)).toBeLessThanOrEqual(6);
+        expect(v.map((x) => x.shape.kind)).toEqual(['triad', 'triad', 'triad', 'triad']);
+    });
+    it('guitar unlocked C Am F G takes the open-position triads', () => {
+        expect(tabs(GUITAR, ['C', 'Am', 'F', 'G'], null)).toEqual([
+            'x 3 2 0 x x',
+            'x 3 2 2 x x',
+            'x 3 3 2 x x',
+            'x 2 0 0 x x',
+        ]);
+    });
+    it('power chords: E5 A5 B5 in frets 1–6 are the rock shapes', () => {
+        expect(tabs(GUITAR, ['E5', 'A5', 'B5'], [1, 6])).toEqual([
+            '0 2 2 x x x',
+            'x 0 2 2 x x',
+            'x 2 4 4 x x',
+        ]);
+    });
+    it('a shell chart is costed exactly as before (the triad costs never see one)', () => {
+        expect(tabs(UKULELE, ['Dm7', 'G7', 'Cmaj7'], [1, 6])).toEqual([
+            '5 5 5 5',
+            '4 5 3 5',
+            '4 4 3 3',
+        ]);
     });
 });
 

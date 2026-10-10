@@ -53,6 +53,10 @@ const INLAYS: Record<string, { single: number[]; double: number[] }> = {
 /** Degree → the class that fills a dot with its `--d-*` token. */
 const DEGREE_FILL: Record<Degree, string> = {
     R: 'neck-fill-root',
+    // A sus chord's 2nd or 4th sits where the 3rd would: teal, the colour of a suspension
+    // (shared with the 9th, the same pitch class as the 2nd).
+    '2': 'neck-fill-9',
+    '4': 'neck-fill-9',
     '3': 'neck-fill-3',
     b3: 'neck-fill-b3',
     '7': 'neck-fill-7',
@@ -62,6 +66,7 @@ const DEGREE_FILL: Record<Degree, string> = {
     '13': 'neck-fill-6',
     '5': 'neck-fill-5',
     b5: 'neck-fill-5',
+    '#5': 'neck-fill-5',
     '9': 'neck-fill-9',
 };
 

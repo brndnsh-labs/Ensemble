@@ -34,7 +34,37 @@ const twoFiveOne: SemanticScore = {
     ],
 };
 
+/** C | Am | F | G: the pop progression, all triads. */
+const pop: SemanticScore = {
+    ...twoFiveOne,
+    sections: [
+        {
+            id: 'a',
+            label: 'A',
+            repeat: 1,
+            measures: ['C', 'Am', 'F', 'G'].map((symbol, i) => ({
+                id: `m${i}`,
+                content: { kind: 'events', events: [chord(symbol)] },
+            })),
+        },
+    ],
+};
+
 describe('voiceBandChart', () => {
+    it('voices C | Am | F | G as four triad grips in frets 1–6, none approximated (#1588)', () => {
+        const chart = bandChart(pop, compileTimeline(pop));
+        for (const instrument of ['guitar', 'uke'] as const) {
+            const voiced = voiceBandChart(chart, { instrument, home: [1, 6], rootStrings: 'all' });
+            expect(voiced.map((v) => v.symbol)).toEqual(['C', 'Am', 'F', 'G']);
+            expect(voiced.every((v) => v.shape.kind === 'triad')).toBe(true);
+            expect(voiced.map((v) => v.approximation)).toEqual([null, null, null, null]);
+            expect(
+                voiced.every((v) => inHome(v, [1, 6])),
+                instrument,
+            ).toBe(true);
+        }
+    });
+
     it('voices a ii–V–I in frets 2–7 and skips the hold and the N.C.', () => {
         const chart = bandChart(twoFiveOne, compileTimeline(twoFiveOne));
         expect(chart.chords.map((c) => c.kind)).toEqual([

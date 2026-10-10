@@ -12,4 +12,12 @@ export { DEGREES, QUALITIES, spellDegree } from './theory';
 export * from './types';
 export type { ShellPrefs, VoicedBandChord } from './voice-chart';
 export { voiceBandChart } from './voice-chart';
-export { allPositions, build, center, inHome, voiceChart, voiceNext } from './voicing';
+export {
+    allPositions,
+    build,
+    center,
+    inHome,
+    inversionOf,
+    voiceChart,
+    voiceNext,
+} from './voicing';

@@ -130,7 +130,8 @@ describe('neckModel', () => {
             measures: [
                 bar('m1', [chord('Dm7', 4)]),
                 bar('m2', [chord('G7', 4)]),
-                bar('m3', [chord('C', 4)]),
+                // A chord the grips approximate: no shell plays its ♯5.
+                bar('m3', [chord('Cmaj7#5', 4)]),
                 bar('m4', [hold]),
             ],
         },
@@ -162,7 +163,7 @@ describe('neckModel', () => {
         );
         expect(model.fingers).not.toMatch(/lifts off/);
         const second = neckModel(band, voiced, 1, GUITAR)!;
-        expect(second.headline).toBe('Next: C · root up a 4th, same fret, one string over');
+        expect(second.headline).toBe('Next: Cmaj7#5 · root up a 4th, same fret, one string over');
         expect(second.fingers).toBe(
             'Finger 3 stays down; finger 2 moves to the 5th string, fret 3; ' +
                 'finger 4 goes down on the 2nd string, fret 5.',
@@ -170,14 +171,37 @@ describe('neckModel', () => {
     });
 
     it('says when the grip approximates the written chord, and holds it dimmed under a hold', () => {
-        const triad = neckModel(band, voiced, 2, GUITAR)!;
-        expect(triad.name).toBe('C');
-        expect(triad.grip?.symbol).toBe('Cmaj7');
-        expect(triad.approximatedFrom).toBe('C');
+        const augmented = neckModel(band, voiced, 2, GUITAR)!;
+        expect(augmented.name).toBe('Cmaj7#5');
+        expect(augmented.grip?.symbol).toBe('Cmaj7');
+        expect(augmented.approximatedFrom).toBe('Cmaj7#5');
+        expect(augmented.inversion).toBe(0);
         const held = neckModel(band, voiced, 3, GUITAR)!;
         expect(held.held).toBe('hold');
-        expect(held.grip).toBe(triad.grip);
+        expect(held.grip).toBe(augmented.grip);
         expect(held.nextName).toBe('Dm7');
+    });
+
+    it('a triad is its own grip, and names its inversion (#1588)', () => {
+        const pop = view([
+            {
+                id: 'a',
+                label: 'A',
+                repeat: 1,
+                measures: ['C', 'G', 'Am', 'F'].map((name, i) => bar(`m${i}`, [chord(name, 4)])),
+            },
+        ]);
+        const grips = new Map(
+            voiceBandChart(pop, { instrument: 'guitar', home: [2, 7], rootStrings: 'all' }).map(
+                (v) => [v.globalIndex, v] as const,
+            ),
+        );
+        const models = [0, 1, 2, 3].map((slot) => neckModel(pop, grips, slot, GUITAR)!);
+        expect(models.map((m) => m.grip?.symbol)).toEqual(['C', 'G', 'Am', 'F']);
+        expect(models.every((m) => m.approximatedFrom === null)).toBe(true);
+        // The hand stays at the 5th fret: C x x 5 5 5 x (G C E), G x 5 5 4 x x (D G B),
+        // Am x x x 5 5 5 (C E A), F x x x 5 6 5 (C F A).
+        expect(models.map((m) => m.inversion)).toEqual([2, 2, 1, 2]);
     });
 
     it('heads a chart of one chord with its name alone, and says nothing while it plays', () => {
@@ -197,6 +221,6 @@ describe('neckModel', () => {
     });
 
     it('writes chord names in letters, as the chart prints them', () => {
-        expect(band.chords.map(writtenName)).toEqual(['Dm7', 'G7', 'C', expect.any(String)]);
+        expect(band.chords.map(writtenName)).toEqual(['Dm7', 'G7', 'Cmaj7#5', expect.any(String)]);
     });
 });

@@ -4,6 +4,7 @@ import {
     fingerMoves,
     GUITAR,
     type InstrumentDef,
+    inversionOf,
     rootMove,
     type ShellPrefs,
     UKULELE,
@@ -150,6 +151,8 @@ export interface NeckModel {
     fingers: string;
     /** The chart's own symbol for an approximated grip ("the chart says C"), else null. */
     approximatedFrom: string | null;
+    /** The grip's inversion (#1588): 0 root position (and every shell), 1 first, 2 second. */
+    inversion: 0 | 1 | 2;
 }
 
 /**
@@ -196,6 +199,7 @@ export function neckModel(
         headline,
         fingers,
         approximatedFrom: grip?.approximation ? writtenName(soundingChord) : null,
+        inversion: grip ? inversionOf(instrument, grip) : 0,
     };
 }
 

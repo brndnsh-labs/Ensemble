@@ -15,6 +15,7 @@ import type {
     Note,
     Quality,
     ShapeDef,
+    ShapeRole,
     Spelled,
     Tone,
     VoicedChord,
@@ -52,10 +53,22 @@ export const center = (v: { notes: Note[] }): number => {
 export const inHome = (v: { notes: Note[] }, home: HomeWindow | null | undefined): boolean =>
     !home || v.notes.every((n) => n.fret === 0 || (n.fret >= home[0] && n.fret <= home[1]));
 
-export function allowedShapes(inst: InstrumentDef, rootStrings?: number[]): ShapeDef[] {
-    return rootStrings
-        ? inst.shapes.filter((sh) => rootStrings.includes(sh.rootString))
-        : inst.shapes;
+/**
+ * The shapes a quality may use: its own kind (a shell never borrows a triad grip, nor a triad a
+ * shell), and for shells only, the root-string limit (`classic` shells keep the root on the 6th
+ * and 5th strings; a triad grip lives on the top strings, so the limit never excludes one).
+ */
+export function allowedShapes(
+    inst: InstrumentDef,
+    rootStrings: number[] | undefined,
+    quality: Quality,
+): ShapeDef[] {
+    const kind = QUALITIES[quality].kind;
+    return inst.shapes.filter(
+        (sh) =>
+            sh.kind === kind &&
+            (kind !== 'shell' || !rootStrings || rootStrings.includes(sh.rootString)),
+    );
 }
 
 /** Build one grip with its root at fret `r`. Returns null if any note falls off the neck. */
@@ -68,8 +81,20 @@ export function buildAt(
     r: number,
 ): Voicing | null {
     const q = QUALITIES[quality];
-    const degOf = (role: 'R' | 'T' | 'S' | 'F'): Degree =>
-        role === 'R' ? 'R' : role === 'T' ? q.third : role === 'S' ? q.seventh : q.five;
+    const degOf = (role: ShapeRole): Degree => {
+        const deg =
+            role === 'R' || role === 'R2' || role === 'O'
+                ? 'R'
+                : role === 'T' || role === 'T2'
+                  ? q.third
+                  : role === 'S'
+                    ? q.seventh
+                    : q.five;
+        if (!deg) {
+            throw new Error(`${quality} has no ${role} for shape ${shape.id}`);
+        }
+        return deg;
+    };
     const notes: Note[] = shape.voices.map(([s, role]) => ({
         string: s,
         role,
@@ -152,6 +177,22 @@ export function rootFrets(inst: InstrumentDef, shape: ShapeDef, root: Spelled): 
     return [r0, r0 + 12];
 }
 
+/**
+ * A grip's inversion, by pitch: 0 when the lowest sounding note is the root, 1 when it is the
+ * T role's degree (the 3rd, or a sus chord's 4th or 2nd), 2 when it is the 5th. Only a triad has
+ * inversions: a shell always starts on its root, and a power chord (no 3rd) names none, so both
+ * read 0. Pitch, not string: a re-entrant uke's G string is not its lowest note.
+ */
+export function inversionOf(inst: InstrumentDef, v: Voicing): 0 | 1 | 2 {
+    const q = QUALITIES[v.quality];
+    if (q.kind !== 'triad' || !v.notes.length) {
+        return 0;
+    }
+    const pitch = (n: Note) => inst.open[n.string] + n.fret;
+    const lowest = v.notes.reduce((a, b) => (pitch(b) < pitch(a) ? b : a));
+    return lowest.degree === q.third ? 1 : lowest.degree === q.five ? 2 : 0;
+}
+
 /** Lowest-fret playable version of a grip. */
 export function build(
     inst: InstrumentDef,
@@ -195,7 +236,7 @@ export function allPositions(
     opts: { rootStrings?: number[]; tone?: Tone } = {},
 ): Voicing[] {
     const out: Voicing[] = [];
-    allowedShapes(inst, opts.rootStrings).forEach((sh) =>
+    allowedShapes(inst, opts.rootStrings, quality).forEach((sh) =>
         rootFrets(inst, sh, root).forEach((r) => {
             const b = buildAt(inst, sh, root, quality, opts.tone ?? 'none', r);
             if (b) {
@@ -245,6 +286,9 @@ function viterbi<T>(states: T[][], unary: (s: T) => number, trans: (a: T, b: T) 
 function unaryCost(v: Voicing, opts: VoiceOptions): number {
     const home = opts.home ?? null;
     const target = home ? (home[0] + home[1]) / 2 : opts.instrument.defaultTarget;
+    if (v.shape.kind !== 'shell') {
+        return triadUnaryCost(v, target, home);
+    }
     return (
         Math.abs(center(v) - target) * (home ? 0.15 : 0.45) +
         (spanOf(v.notes.map((n) => n.fret)) > 3 ? 0.4 : 0) +
@@ -254,6 +298,9 @@ function unaryCost(v: Voicing, opts: VoiceOptions): number {
 
 /** Keep the hand still and the root's path simple: same string or the neighboring string, few frets. */
 function transCost(a: Voicing, b: Voicing): number {
+    if (a.shape.kind !== 'shell' || b.shape.kind !== 'shell') {
+        return triadTransCost(a, b);
+    }
     const ra = a.notes.find((n) => n.role === 'R')!,
         rb = b.notes.find((n) => n.role === 'R')!;
     const ds = Math.abs(ra.string - rb.string),
@@ -264,6 +311,46 @@ function transCost(a: Voicing, b: Voicing): number {
         rootCost +
         (a.shape.id !== b.shape.id && a.root.pc === b.root.pc ? 0.5 : 0)
     );
+}
+
+// ---------- triad and power grips (#1588) ----------
+//
+// A shell's costs are a jazz comper's: the hand sits mid-window and the ROOT takes a simple path
+// (up a 4th is "same fret, one string over"), because the root on a bass string is the shell's
+// whole story. A triad is the opposite: its inversions move the root around on purpose, and an
+// open string costs the hand nothing — the first-position C, Am, F and G a uke player learns
+// are "in position" at the nut. So a triad's position is read off its FRETTED notes only, its
+// move cost counts the fingers that actually change, and in first position (a window from
+// fret 1, or no window) each open string earns a little: open strings ring, and they are the
+// whole point of the chords a player learns first.
+
+/** Where the fretting hand is for a triad grip: the fretted notes' centre; at the nut when all open. */
+function handAt(v: Voicing): number {
+    const fretted = v.notes.filter((n) => n.fret > 0).map((n) => n.fret);
+    return fretted.length ? (Math.min(...fretted) + Math.max(...fretted)) / 2 : 0;
+}
+
+/** First position: the nut is in reach, so open strings are part of the hand's position. */
+const atTheNut = (home: HomeWindow | null): boolean => home === null || home[0] === 1;
+
+function triadUnaryCost(v: Voicing, target: number, home: HomeWindow | null): number {
+    const open = v.notes.filter((n) => n.fret === 0).length;
+    return (
+        Math.abs(handAt(v) - target) * (home ? 0.15 : 0.45) +
+        (spanOf(v.notes.map((n) => n.fret)) > 3 ? 0.4 : 0) +
+        (inHome(v, home) ? 0 : 5) -
+        (atTheNut(home) ? open * 0.2 : 0)
+    );
+}
+
+/**
+ * Keep the hand where it is and move as few fingers as possible: a held note is a finger that
+ * stays. A shift inside one fret is free — the hand has not moved, a finger has reached.
+ */
+function triadTransCost(a: Voicing, b: Voicing): number {
+    const held = new Set(a.notes.map((n) => `${n.string}:${n.fret}`));
+    const moved = b.notes.filter((n) => n.fret > 0 && !held.has(`${n.string}:${n.fret}`)).length;
+    return Math.max(0, Math.abs(handAt(b) - handAt(a)) - 1) * 0.7 + moved * 0.35;
 }
 
 function candidates(c: ChartChord, opts: VoiceOptions): Voicing[] {

@@ -1,6 +1,7 @@
 /**
- * The shell adapter (#1585): Ensemble's chord authority (`parseChord`) and key-aware speller
- * (`spellPitchClass`) read as the engine's six shells. Pinned here: the codec's whole quality
+ * The shell adapter (#1585, #1588): Ensemble's chord authority (`parseChord`) and key-aware
+ * speller (`spellPitchClass`) read as the engine's six shells, six triads and power chord. Pinned
+ * here: the codec's whole quality
  * vocabulary adapts, the faithful/approximated split, key spelling, and every bundled standard
  * voicing inside a hand window.
  */
@@ -56,24 +57,35 @@ describe('faithful and approximated shells', () => {
         ['C7b9', 'dom7'],
         ['Cmaj9', 'maj7'],
         ['Cm11', 'm7'],
+        ['C', 'maj'],
+        ['Cmaj', 'maj'],
+        ['Cm', 'min'],
+        ['C-', 'min'],
+        ['Cdim', 'dim'],
+        ['Co', 'dim'],
+        ['Caug', 'aug'],
+        ['C+', 'aug'],
+        ['Csus4', 'sus4'],
+        ['Csus', 'sus4'],
+        ['Csus2', 'sus2'],
+        ['C2', 'sus2'],
+        ['C5', 'five'],
     ])('%s is a faithful %s', (symbol, quality) => {
         expect(shell(symbol)).toMatchObject({ quality, approximation: null });
     });
 
     it.each([
-        ['C', 'maj7', /major triad/],
-        ['Cm', 'm7', /minor triad/],
-        ['Csus4', 'dom7', /sus/],
         ['C7sus4', 'dom7', /sus/],
         ['Cm6', 'm7', /m6/],
         ['C-^7', 'm7', /minor-major/],
-        ['Cdim', 'dim7', /diminished triad/],
-        ['Caug', 'dom7', /augmented/],
         ['C7#5', 'dom7', /augmented/],
         ['Cmaj7#5', 'maj7', /augmented/],
-        ['C5', 'maj7', /power chord/],
         ['Cm#5', 'm7', /♯5/],
-        ['Cmb6', 'm7', /♭6/],
+        ['Cadd9', 'maj', /plain major triad \(the added 9 is not played\)/],
+        ['Cadd2', 'maj', /plain major triad/],
+        ['Cmaj(add4)', 'maj', /plain major triad \(the added 4 is not played\)/],
+        ['Cmin(add4)', 'min', /plain minor triad/],
+        ['Cmb6', 'min', /plain minor triad \(the added ♭6 is not played\)/],
     ])('%s is approximated as %s', (symbol, quality, reason) => {
         const chord = shell(symbol);
         expect(chord.quality).toBe(quality);
@@ -85,6 +97,10 @@ describe('faithful and approximated shells', () => {
         expect(chord.quality).toBe('dom7');
         expect(chord.approximation).toMatch(/bass note E not played/);
         expect(shell('Cmaj7/B').approximation).toMatch(/bass note B not played/);
+        expect(shell('C/E')).toMatchObject({
+            quality: 'maj',
+            approximation: 'bass note E not played',
+        });
     });
 });
 
@@ -137,7 +153,16 @@ describe('every bundled standard voices', () => {
                 approximated: guitar.filter((v) => v.approximation !== null).length,
             });
         }
-        // A report, not an assertion: how much of each standard the shells approximate.
+        // A report: how much of each standard the grips approximate.
         console.table(table);
+        // The pop, rock and country grooves are triads and power chords (#1588): every chord in
+        // them has a real grip, so none is approximated.
+        const triadCharts = table.filter((row) =>
+            /Pop|Country|Rock|Canon|Andalusian|Alternative|Metal/.test(row.title),
+        );
+        expect(triadCharts.length).toBeGreaterThan(0);
+        for (const row of triadCharts) {
+            expect(row.approximated, row.title).toBe(0);
+        }
     });
 });

@@ -64,6 +64,13 @@ export function NeckView({ band, voiced, active, nextSoon, prefs, onPrefs }: Nec
                                 <span className="neck-current" data-testid="neck-current">
                                     {model.name}
                                 </span>
+                                {/* Guitar only: a uke's standard chords are shapes, and its
+                                    re-entrant G would call most of them inverted by pitch. */}
+                                {prefs.instrument === 'guitar' && model.inversion !== 0 && (
+                                    <span className="neck-note" data-testid="neck-inversion">
+                                        {model.inversion === 1 ? '1st inv.' : '2nd inv.'}
+                                    </span>
+                                )}
                                 {model.held === 'hold' && <span className="neck-note">held</span>}
                                 {model.approximatedFrom && model.grip && (
                                     <span

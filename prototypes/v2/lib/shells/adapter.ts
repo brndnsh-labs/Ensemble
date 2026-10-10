@@ -1,18 +1,19 @@
 /**
- * Ensemble's chords, read as shells (#1585). The engine voices six qualities as three-note
- * R/3/7 grips; this adapter is the only place a chart chord becomes one. It reads the band's
+ * Ensemble's chords, read as shells (#1585) and triads (#1588). The engine voices six 7th-chord
+ * qualities as three-note R/3/7 grips, plain triads (major, minor, dim, aug, sus4, sus2) as
+ * closed triad grips and a power chord as root–5th–octave; this adapter is the only place a chart chord becomes one. It reads the band's
  * chord authority (`parseChord`'s `ChordFacts`) rather than re-parsing the symbol, and spells
  * the root with the chart sheet's own key-aware speller (`spellPitchClass`), so the neck names
  * a chord the way the chart above it does: B♭ major has E♭, never D♯.
  *
- * Everything outside the six shells reduces the way a rhythm player (Freddie Green style)
+ * Everything else reduces the way a rhythm player (Freddie Green style)
  * would comp it, and says so in `approximation`. Extensions and alterations on a 7th chord
  * are not approximations: a shell never plays them anyway, and the 7th chord underneath is
  * the harmony.
  */
 import type { ChordFacts } from '@band/index';
 import { spellPitchClass } from '@engine/engine/note-spelling';
-import { LETTERS } from './theory';
+import { DEGREES, LETTERS, QUALITIES } from './theory';
 import type { Quality, Spelled } from './types';
 
 export interface ShellChord {
@@ -39,12 +40,82 @@ export function spellRoot(pc: number, key: string, isMinor: boolean, written = '
 
 type Reading = [Quality, string | null];
 
-/** The six shells, and the reduction (with its reason) for every other chord. */
+/** How the approximation notice names a triad grip ("played as a plain major triad"). */
+const TRIAD_WORDS: Partial<Record<Quality, string>> = {
+    maj: 'major triad',
+    min: 'minor triad',
+    dim: 'diminished triad',
+    aug: 'augmented triad',
+    sus4: 'sus4',
+    sus2: 'sus2',
+    five: 'power chord',
+};
+
+/** An added tone's name as a chart writes it, by its interval above the root. */
+const ADDED_NAMES: Record<number, string> = {
+    1: '♭2',
+    2: '2',
+    3: '♯2',
+    5: '4',
+    6: '♯4',
+    8: '♭6',
+    13: '♭9',
+    14: '9',
+    15: '♯9',
+    17: '11',
+    18: '♯11',
+    20: '♭13',
+};
+
+/**
+ * A chord with no 7th and no 6th as the triad grip that plays it (#1588), or null when it is not
+ * one of the six triads or a power chord (a minor ♯5, say, keeps the shell reduction). Added tones
+ * (add9, add4, a minor ♭6) are left out: the triad under them is the harmony, and a closed
+ * triad grip has no string to spare, so the notice names what the grip doesn't play.
+ */
+function readTriad(chord: ChordFacts): Reading | null {
+    const { third, fifth, seventh, sixth, family, intervals } = chord;
+    if (seventh !== null || sixth || fifth === null) {
+        return null;
+    }
+    let quality: Quality | null = null;
+    if (family === 'power' && fifth === 7) {
+        quality = 'five';
+    } else if (family === 'sus' && fifth === 7) {
+        // The 4th wins a sus2/4: it is the suspension that resolves to the 3rd.
+        quality = intervals.includes(5) ? 'sus4' : 'sus2';
+    } else if (third === 4) {
+        quality = fifth === 7 ? 'maj' : fifth === 8 ? 'aug' : null;
+    } else if (third === 3) {
+        quality = fifth === 7 ? 'min' : fifth === 6 ? 'dim' : null;
+    }
+    if (quality === null) {
+        return null;
+    }
+    const q = QUALITIES[quality];
+    const played = new Set([0, DEGREES[q.five].int, ...(q.third ? [DEGREES[q.third].int] : [])]);
+    const added = intervals.filter((n) => !played.has(n % 12));
+    if (!added.length) {
+        return [quality, null];
+    }
+    const names = added.map((n) => ADDED_NAMES[n] ?? String(n)).join(', ');
+    return [
+        quality,
+        `played as a plain ${TRIAD_WORDS[quality]} (the added ${names} ${added.length > 1 ? 'are' : 'is'} not played)`,
+    ];
+}
+
+/** The triads, the six shells, and the reduction (with its reason) for every other chord. */
 function read(chord: ChordFacts): Reading {
+    const triad = readTriad(chord);
+    if (triad) {
+        return triad;
+    }
     const { third, fifth, seventh, sixth } = chord;
     if (third === null) {
-        // No third to voice, so the shell supplies one. A sus resolves to its dominant (the
-        // 3rd replaces the 4th); a power chord keeps whichever 7th it wrote, else the plain maj7.
+        // A sus or power chord with a 7th (7sus4, 9sus): a shell can't hold both the suspension
+        // and the 7th, so it supplies the 3rd. A sus resolves to its dominant (the 3rd replaces
+        // the 4th); a power chord keeps whichever 7th it wrote, else the plain maj7.
         if (chord.family === 'power') {
             return seventh === 10
                 ? ['dom7', 'power chord played as a 7 (adds the 3rd)']
