@@ -106,7 +106,7 @@ function mulberry32(seed: number): () => number {
 }
 
 /** Load a pack into the module-global cache the voices read, and say whether it arrived. */
-async function loadPack(packId: string): Promise<{ zones: number; loaded: boolean }> {
+export async function loadPack(packId: string): Promise<{ zones: number; loaded: boolean }> {
     // A throwaway context: decoded buffers are shared across contexts through the cache.
     await ensurePackLoaded(new OfflineAudioContext(1, 44100, 44100), packId);
     const zones = getPackZones(packId)?.length ?? 0;
@@ -115,7 +115,7 @@ async function loadPack(packId: string): Promise<{ zones: number; loaded: boolea
     return { zones, loaded: zones > 0 || isPackLoaded(packId) };
 }
 
-async function renderBand(request: BandRenderRequest): Promise<BandRenderResult> {
+export async function renderBand(request: BandRenderRequest): Promise<BandRenderResult> {
     const pins = request.voices.filter((pin) => isLaneModule(pin.module));
     for (const pin of pins) {
         if (!pin.voice.startsWith('pack:')) {
