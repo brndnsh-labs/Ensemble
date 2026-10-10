@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { STYLES } from '../../band/index.js';
+import { compForChordsLane } from '../../prototypes/v2/lib/band-voices.js';
+import { GENRE_NAMES } from '../../public/data/smart-genres.js';
 import {
     analyzeSchedule,
     buildEventDump,
@@ -118,6 +120,19 @@ describe('band-scene — settings', () => {
             module: 'chords',
             voice: 'synth',
         });
+    });
+
+    it('renders the comp instrument the stand plays on its default sound, in every genre', () => {
+        // A scene with no pinned chords pack and the stand's built-in voice on Auto must be
+        // the same band, or the tools measure an instrument nobody hears (#1564).
+        for (const genreFeel of GENRE_NAMES) {
+            const s = scene({ genreFeel });
+            const stand = compForChordsLane(
+                { voice: 'synth', autoSound: true },
+                STYLES[sceneStyle(s)].prefers,
+            );
+            expect(sceneSettings(s, 'A', sceneVoices(s)).comp, genreFeel).toBe(stand);
+        }
     });
 
     it("plays the style's instruments on the synth, and the instrument a pinned pack names", () => {

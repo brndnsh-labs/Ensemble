@@ -45,6 +45,23 @@ export const COMP_FOR_VOICE: Record<string, CompInstrument> = Object.assign(Obje
     'pack:electric-guitar-driven': 'guitar',
 });
 /**
+ * The comp instrument the band plays. The chords lane's sound names it, with the same exception
+ * as the lead: the built-in voice on Auto is only the sound a device without packs has, so the
+ * style's own instrument (`preferred`, its `Style.prefers`) still decides how the comp plays:
+ * funk grips a clav, bossa strums a nylon guitar, whatever it sounds on. That is also the band
+ * the listening-gate tools render (`sceneSettings` in scripts/band-scene.ts), so what they
+ * measure is what the stand plays (#1564). The built-in voice chosen by hand is a piano.
+ */
+export function compForChordsLane(
+    lane: { voice: string; autoSound?: boolean },
+    preferred: CompInstrument,
+): CompInstrument {
+    if (lane.autoSound && lane.voice === 'synth') {
+        return preferred;
+    }
+    return COMP_FOR_VOICE[lane.voice] ?? 'piano';
+}
+/**
  * A native style whose Auto sound is not its comp instrument's default sound. Metal's comp is
  * the guitar book, but heard through the crunch pack (the old engine's #698): power chords are
  * what a *distorted* guitar plays, and on the clean pack they sound thin. The sound is the
