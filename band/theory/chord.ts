@@ -103,7 +103,9 @@ const QUALITY_TABLE: readonly (readonly [spellings: readonly string[], formula: 
     [['-7', 'm7'], '1 b3 5 b7'],
     [['-9', 'm9'], '1 b3 5 b7 9'],
     [['-11', 'm11'], '1 b3 5 b7 9 11'],
-    [['m13', 'min13'], '1 b3 5 b7 9 11 13'],
+    // A 13th chord names its 13th, not the 11th under it: the same reading as `min^13`,
+    // `13` and `^13` here, and the one chord dictionaries give (#1580).
+    [['m13', 'min13'], '1 b3 5 b7 9 13'],
     [['-6', 'm6'], '1 b3 5 6'],
     [['-69'], '1 b3 5 6 9'],
     [['-^7'], '1 b3 5 7'],
@@ -291,11 +293,13 @@ function chordScale(
                 // Sus: mixolydian without the 3rd, taking any written b9/b13 (7b9sus = phrygian).
                 return [0, has(1) ? 1 : 2, 5, 7, has(8) ? 8 : 9, 10];
             }
-            if (has(3) && (has(8) || d.fifth !== 7)) {
+            // A b9 over a #5 is altered too (7b9#5): phrygian dominant below would hand a
+            // line the natural 5th and 11th of a chord that has neither (#1580).
+            if ((has(3) && (has(8) || d.fifth !== 7)) || (has(1) && d.fifth === 8)) {
                 return [0, 1, 3, 4, 6, 8, 10]; // altered
             }
             if (has(1) && has(8)) {
-                return [0, 1, 4, 5, 7, 8, 10]; // phrygian dominant
+                return [0, 1, 4, 5, 7, 8, 10]; // phrygian dominant: a b13 over a natural 5th
             }
             if (has(1) || has(3)) {
                 return [0, 1, 3, 4, 6, 7, 9, 10]; // half-whole diminished

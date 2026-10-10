@@ -122,4 +122,16 @@ describe('chord facts', () => {
             }
         },
     );
+
+    it('gives a b9 over a #5 the altered scale, and over a natural 5th phrygian dominant (#1580)', () => {
+        // 7b9#5 has no natural 5th and no 11th for a line to land on; 7b9b13 keeps its 5th.
+        expect(facts('G7b9#5', C).scale).toEqual([0, 1, 3, 4, 6, 8, 10]);
+        expect(facts('G7b9b13', C).scale).toEqual([0, 1, 4, 5, 7, 8, 10]);
+    });
+
+    it('reads both minor 13ths without the 11th (#1580)', () => {
+        expect(facts('Dm13', C).intervals).toEqual([0, 3, 7, 10, 14, 21]);
+        expect(facts('Dmin13', C).intervals).toEqual([0, 3, 7, 10, 14, 21]);
+        expect(facts('Dmin^13', C).intervals).toEqual([0, 3, 7, 11, 14, 21]);
+    });
 });

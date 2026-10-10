@@ -70,12 +70,6 @@ const ROOTS = [
 const DIVERGENCES: Readonly<
     Record<string, { bandOnly: number[]; referenceOnly: number[]; why: string }>
 > = {
-    m13: {
-        bandOnly: [5],
-        referenceOnly: [],
-        why: 'A minor 13th stacks every third, the 11th included (it does not clash with a minor 3rd). The dictionary leaves it out.',
-    },
-    min13: { bandOnly: [5], referenceOnly: [], why: 'The same chord as m13.' },
     '7b13': {
         bandOnly: [7],
         referenceOnly: [],
