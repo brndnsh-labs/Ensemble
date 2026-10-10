@@ -142,6 +142,17 @@ jobs:
       - name: Verify account storage in Chromium and WebKit
         run: npm run test:sync
 
+      # The golden-render check (#1577): renders four frozen band requests in node and
+      # compares each stem's fingerprint with tests/golden/fixtures/fingerprints.json, so a
+      # PR that changes how fixed notes SOUND fails here unless it carries the fingerprint
+      # update. It lives in this job because this is the required audio context; it needs no
+      # browser, only ffmpeg to decode the sample packs (about 30 s of rendering).
+      - name: Install ffmpeg for the pack decode
+        run: command -v ffmpeg || (sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg)
+
+      - name: Golden-render check
+        run: npm run golden
+
 
   # The v2 music stand (prototypes/v2, Next static export): build + its own Playwright
   # suite, and the required gate for this app. Runs on every PR, not only v2-touching
