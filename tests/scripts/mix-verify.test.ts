@@ -13,8 +13,10 @@ describe('mix-verify — CLI parsing', () => {
             '--no-build',
             '--json',
             '--scenes-from=tmp/scenes.json',
+            '--engine=chromium',
         ]);
         expect(options).toEqual({
+            engine: 'chromium',
             scene: 'funk-pocket',
             stems: ['bass', 'drums'],
             loops: 3,

@@ -31,7 +31,7 @@
         "test:bench": "npx vitest run --config vitest.bench.config.ts tests/bench",
         "test:loop": "node scripts/test-loop.ts",
         "mix:report": "tsx scripts/mix-report.ts",
-        "render:node": "tsx --tsconfig tsconfig.scripts.json scripts/render-node.ts",
+        "render:node": "tsx scripts/render-node.ts",
         "mix:diff": "tsx scripts/mix-diff.ts",
         "mix:analyze": "tsx scripts/mix-analyze.ts",
         "mix:verify": "tsx scripts/mix-verify.ts",

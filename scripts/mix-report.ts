@@ -37,10 +37,12 @@ import {
 // mix:report — render the band engine offline and measure it, stem by stem.
 //
 // The music is composed here in node (`band-scene.ts`: each scene's chart → `compileTimeline`
-// → `performPass`); the audio is rendered in the v2 app itself, built with the render bridge
-// (`prototypes/v2/lib/render-bridge.ts`), through `renderBandPasses` — the offline render the
-// app's WAV export uses, on today's voices and sample packs. Metrics are measured in the page;
-// the report is built in node (`mix-report-utils.ts`).
+// → `performPass`); the audio is rendered through the render bridge's `renderBand`
+// (`prototypes/v2/lib/render-bridge.ts`) — the offline render the app's WAV export uses, on
+// today's voices and sample packs — by one of two backends: `--engine=node` (the default,
+// `mix-render-node.ts`: node Web Audio, no build, no browser, measured here) or
+// `--engine=chromium` (the v2 app built with the bridge, driven headless, measured in the page).
+// The report is built in node (`mix-report-utils.ts`).
 
 export const REPO_ROOT = path.resolve(import.meta.dirname, '..');
 const SAMPLE_RATE = 44100;
@@ -577,7 +579,103 @@ async function renderAndMeasureInPage({ request, loopCount, wavName }) {
     };
 }
 
+/**
+ * The Chromium render backend: serve the bridge build, drive a headless page, render and measure
+ * in the page (`renderAndMeasureInPage`), and hand WAVs back through `__writeWav`.
+ */
+async function openChromiumBackend({ wavDir, writtenWavPaths, loopCount }) {
+    const { server, port } = await createStaticServer(DIST_DIR, REQUESTED_PORT);
+    const baseUrl = `http://${HOST}:${port}`;
+    const closeServer = () =>
+        new Promise((resolve, reject) => {
+            server.close((error) => {
+                if (error) {
+                    reject(error);
+                    return;
+                }
+                resolve();
+            });
+        });
+    let browser = null;
+    try {
+        browser = await chromium.launch({ headless: true });
+        const page = await browser.newPage();
+        // tsx transpiles via esbuild with keepNames=true, which wraps named
+        // functions with `__name(fn, 'name')` calls in the page.evaluate body.
+        // That helper is undefined in the browser; inject a no-op shim onto
+        // window before navigation so all subsequent eval'd code finds it.
+        await page.addInitScript(() => {
+            (window as unknown as { __name: <T>(fn: T) => T }).__name = (fn) => fn;
+        });
+
+        if (wavDir) {
+            // Bridge: the page hands raw float channel data back to Node so
+            // we can encode + write WAVs with the shared encoder, instead of
+            // shipping audio through the evaluate return value.
+            await page.exposeFunction('__writeWav', async (fileName, channels, sampleRate) => {
+                const buffers = channels.map((channel) => Float32Array.from(channel));
+                const wav = encodeWav(buffers, sampleRate);
+                const outPath = path.join(wavDir, fileName);
+                await writeFile(outPath, Buffer.from(wav));
+                writtenWavPaths.push(outPath);
+            });
+        }
+
+        await page.goto(baseUrl, { waitUntil: 'networkidle' });
+        await page.waitForFunction(
+            () =>
+                document.documentElement.dataset.renderBridge === 'ready' &&
+                Boolean(window.ensemble?.renderBand),
+            undefined,
+            { timeout: 20000 },
+        );
+        return {
+            renderAndMeasure: (request, wavName) =>
+                page.evaluate(renderAndMeasureInPage, { request, loopCount, wavName }),
+            loadPack: (packId) => page.evaluate((id) => window.ensemble.loadPack(id), packId),
+            close: async () => {
+                try {
+                    await browser.close();
+                } finally {
+                    await closeServer();
+                }
+            },
+        };
+    } catch (error) {
+        try {
+            await browser?.close();
+        } finally {
+            await closeServer();
+        }
+        throw error;
+    }
+}
+
+/**
+ * The node render backend (`mix-render-node.ts`): the bridge's own `renderBand` on node Web
+ * Audio, measured here. No build, no browser. Loaded on demand so the Chromium path never
+ * touches the native addon.
+ */
+async function openNodeBackend({ wavDir, writtenWavPaths, loopCount }) {
+    const { createNodeRenderer } = await import('./mix-render-node.js');
+    const renderer = await createNodeRenderer();
+    return {
+        renderAndMeasure: async (request, wavName) => {
+            const { channels, ...measured } = await renderer.renderAndMeasure(request, loopCount);
+            if (wavName && wavDir) {
+                const outPath = path.join(wavDir, wavName);
+                await writeFile(outPath, Buffer.from(encodeWav(channels, measured.sampleRate)));
+                writtenWavPaths.push(outPath);
+            }
+            return measured;
+        },
+        loadPack: renderer.loadPack,
+        close: async () => {},
+    };
+}
+
 async function renderSceneReports({
+    engine,
     scenes,
     seeds,
     writeWav,
@@ -587,8 +685,6 @@ async function renderSceneReports({
     cohesion,
 }) {
     const loopCount = Math.max(1, Math.floor(loops || 1));
-    const { server, port } = await createStaticServer(DIST_DIR, REQUESTED_PORT);
-    const baseUrl = `http://${HOST}:${port}`;
     const writtenWavPaths = [];
     const writtenEventPaths = [];
 
@@ -606,271 +702,221 @@ async function renderSceneReports({
         await mkdir(eventDir, { recursive: true });
     }
 
+    const backend =
+        engine === 'chromium'
+            ? await openChromiumBackend({ wavDir, writtenWavPaths, loopCount })
+            : await openNodeBackend({ wavDir, writtenWavPaths, loopCount });
     try {
-        const browser = await chromium.launch({ headless: true });
-        try {
-            const page = await browser.newPage();
-            // tsx transpiles via esbuild with keepNames=true, which wraps named
-            // functions with `__name(fn, 'name')` calls in the page.evaluate body.
-            // That helper is undefined in the browser; inject a no-op shim onto
-            // window before navigation so all subsequent eval'd code finds it.
-            await page.addInitScript(() => {
-                (window as unknown as { __name: <T>(fn: T) => T }).__name = (fn) => fn;
-            });
-
-            if (wavDir) {
-                // Bridge: the page hands raw float channel data back to Node so
-                // we can encode + write WAVs with the shared encoder, instead of
-                // shipping audio through the evaluate return value.
-                await page.exposeFunction('__writeWav', async (fileName, channels, sampleRate) => {
-                    const buffers = channels.map((channel) => Float32Array.from(channel));
-                    const wav = encodeWav(buffers, sampleRate);
-                    const outPath = path.join(wavDir, fileName);
-                    await writeFile(outPath, Buffer.from(wav));
-                    writtenWavPaths.push(outPath);
-                });
-            }
-
-            await page.goto(baseUrl, { waitUntil: 'networkidle' });
-            await page.waitForFunction(
-                () =>
-                    document.documentElement.dataset.renderBridge === 'ready' &&
-                    Boolean(window.ensemble?.renderBand),
-                undefined,
-                { timeout: 20000 },
+        /**
+         * Render one stem of a scene's performance on the given lane sounds, measure it,
+         * and (for an ordinary render) write its WAV and event dump. `dump: false` is for
+         * the paired renders (`--calibrate-pack`, `--cohesion`), which render the SAME
+         * scene/stem/seed twice, so both writes would land on one filename and the second
+         * would silently win.
+         */
+        async function renderStem(scene, seed, performance, stem, voices, options = {}) {
+            const { muteReverb = false, dump = false } = options;
+            const request = {
+                score: performance.score,
+                passes: laneEvents(performance[stem.performance], stem.lanes),
+                bpm: scene.bpm,
+                sampleRate: SAMPLE_RATE,
+                intensity: performance.settings.intensity ?? 0.7,
+                voices,
+                muteReverb,
+                // Keyed on the scene and seed, as the old harness keyed its renders, so
+                // the voices' own humanising repeats from run to run.
+                randomSeed: `${scene.id}:${seed}`,
+            };
+            const measured = await backend.renderAndMeasure(
+                request,
+                dump && wavDir ? `${scene.id}-${stem.id}-${seed}.wav` : null,
             );
-
-            /**
-             * Render one stem of a scene's performance on the given lane sounds, measure it,
-             * and (for an ordinary render) write its WAV and event dump. `dump: false` is for
-             * the paired renders (`--calibrate-pack`, `--cohesion`), which render the SAME
-             * scene/stem/seed twice, so both writes would land on one filename and the second
-             * would silently win.
-             */
-            async function renderStem(scene, seed, performance, stem, voices, options = {}) {
-                const { muteReverb = false, dump = false } = options;
-                const request = {
-                    score: performance.score,
-                    passes: laneEvents(performance[stem.performance], stem.lanes),
-                    bpm: scene.bpm,
-                    sampleRate: SAMPLE_RATE,
-                    intensity: performance.settings.intensity ?? 0.7,
-                    voices,
-                    muteReverb,
-                    // Keyed on the scene and seed, as the old harness keyed its renders, so
-                    // the voices' own humanising repeats from run to run.
-                    randomSeed: `${scene.id}:${seed}`,
-                };
-                const measured = await page.evaluate(renderAndMeasureInPage, {
-                    request,
-                    loopCount,
-                    wavName: dump && wavDir ? `${scene.id}-${stem.id}-${seed}.wav` : null,
+            if (dump && eventDir) {
+                const eventDump = buildEventDump({
+                    scene: scene.id,
+                    stem: stem.id,
+                    seed,
+                    lanes: stem.lanes,
+                    meta: renderMeta(performance.timeline, scene.bpm, loopCount, measured),
+                    dispatched: measured.dispatched,
                 });
-                if (dump && eventDir) {
-                    const eventDump = buildEventDump({
-                        scene: scene.id,
-                        stem: stem.id,
-                        seed,
-                        lanes: stem.lanes,
-                        meta: renderMeta(performance.timeline, scene.bpm, loopCount, measured),
-                        dispatched: measured.dispatched,
+                const outPath = path.join(eventDir, `${scene.id}-${stem.id}-${seed}.events.json`);
+                await writeFile(outPath, JSON.stringify(eventDump, null, 2));
+                writtenEventPaths.push(outPath);
+            }
+            return {
+                ...measured.metrics,
+                schedule: stem.schedule
+                    ? analyzeSchedule(
+                          measured.dispatched,
+                          stem.schedule.lanes,
+                          stem.schedule.voiceLimit,
+                      )
+                    : null,
+            };
+        }
+
+        function stemById(id) {
+            return MIX_REPORT_STEMS.find((stem) => stem.id === id);
+        }
+
+        const sceneRuns = [];
+        // The paired modes' deliverable is their own block (Node returns it without the
+        // per-stem report), so they skip the whole N-stem × scenes × seeds render.
+        for (const scene of calibratePack || cohesion ? [] : scenes) {
+            const seedReports = [];
+            let band = null;
+            for (const seed of seeds) {
+                const voices = sceneVoices(scene);
+                const performance = performSceneForReport(scene, seed, loopCount, voices);
+                band ??= {
+                    style: performance.settings.style,
+                    comp: performance.settings.comp,
+                    lead: performance.settings.lead,
+                };
+                const stems = {};
+                for (const stem of MIX_REPORT_STEMS) {
+                    stems[stem.id] = await renderStem(scene, seed, performance, stem, voices, {
+                        dump: true,
                     });
-                    const outPath = path.join(
-                        eventDir,
-                        `${scene.id}-${stem.id}-${seed}.events.json`,
-                    );
-                    await writeFile(outPath, JSON.stringify(eventDump, null, 2));
-                    writtenEventPaths.push(outPath);
                 }
-                return {
-                    ...measured.metrics,
-                    schedule: stem.schedule
-                        ? analyzeSchedule(
-                              measured.dispatched,
-                              stem.schedule.lanes,
-                              stem.schedule.voiceLimit,
-                          )
-                        : null,
-                };
+                seedReports.push({ seed, stems });
             }
+            sceneRuns.push({
+                id: scene.id,
+                label: scene.label || scene.id,
+                genreFeel: scene.genreFeel,
+                bpm: scene.bpm,
+                intensity: scene.intensity,
+                band,
+                source: scene.source || 'default',
+                findingThresholds: scene.findingThresholds || null,
+                seeds: seedReports,
+            });
+        }
 
-            function stemById(id) {
-                return MIX_REPORT_STEMS.find((stem) => stem.id === id);
-            }
-
-            const sceneRuns = [];
-            // The paired modes' deliverable is their own block (Node returns it without the
-            // per-stem report), so they skip the whole N-stem × scenes × seeds render.
-            for (const scene of calibratePack || cohesion ? [] : scenes) {
-                const seedReports = [];
-                let band = null;
-                for (const seed of seeds) {
-                    const voices = sceneVoices(scene);
-                    const performance = performSceneForReport(scene, seed, loopCount, voices);
-                    band ??= {
-                        style: performance.settings.style,
-                        comp: performance.settings.comp,
-                        lead: performance.settings.lead,
-                    };
-                    const stems = {};
-                    for (const stem of MIX_REPORT_STEMS) {
-                        stems[stem.id] = await renderStem(scene, seed, performance, stem, voices, {
-                            dump: true,
-                        });
-                    }
-                    seedReports.push({ seed, stems });
-                }
-                sceneRuns.push({
-                    id: scene.id,
-                    label: scene.label || scene.id,
-                    genreFeel: scene.genreFeel,
-                    bpm: scene.bpm,
-                    intensity: scene.intensity,
-                    band,
-                    source: scene.source || 'default',
-                    findingThresholds: scene.findingThresholds || null,
-                    seeds: seedReports,
-                });
-            }
-
-            // Pack calibration: render the target lane's stem twice per scene/seed — once on
-            // the synth voice (baseline), once on the pack — and report the RMS + centroid the
-            // Node side turns into a suggested gain. Both legs play the SAME performance (the
-            // pack decides the instrument the band plays, for both), so the only difference
-            // is the voice under test.
-            let calibration = null;
-            if (calibratePack) {
-                const { module, packId } = calibratePack;
-                const stem = stemById(CALIBRATION_STEM[module]);
-                const status = await page.evaluate((id) => window.ensemble.loadPack(id), packId);
-                if (!status.loaded) {
-                    calibration = {
-                        module,
-                        packId,
-                        error: `pack "${packId}" failed to load (prototypes/v2/out/packs/${packId} present? built?)`,
-                    };
-                } else {
-                    const target = { module, voice: `pack:${packId}` };
-                    const rows = [];
-                    for (const scene of scenes) {
-                        for (const seed of seeds) {
-                            const packVoices = sceneVoices(scene, [target]);
-                            const performance = performSceneForReport(
-                                scene,
-                                seed,
-                                loopCount,
-                                packVoices,
-                            );
-                            const synthMetrics = await renderStem(
-                                scene,
-                                seed,
-                                performance,
-                                stem,
-                                sceneVoices(scene, [{ module, voice: 'synth' }]),
-                            );
-                            const packMetrics = await renderStem(
-                                scene,
-                                seed,
-                                performance,
-                                stem,
-                                packVoices,
-                            );
-                            rows.push({
-                                sceneId: scene.id,
-                                seed,
-                                synthRmsDb: synthMetrics.rmsDb,
-                                packRmsDb: packMetrics.rmsDb,
-                                synthCentroid: synthMetrics.probes?.centroid || 0,
-                                packCentroid: packMetrics.probes?.centroid || 0,
-                            });
-                        }
-                    }
-                    calibration = { module, packId, rows };
-                }
-            }
-
-            // Cohesion (#687): render the full band (full+solo stem) all-synth vs all-sample
-            // per scene, plus an all-sample dry leg (reverb muted) for the wet/dry proxy. The
-            // performance is the scene's own for all three legs; only the sounds differ.
-            let cohesionReport = null;
-            if (cohesion) {
-                const stem = stemById('full+solo');
-                const synthBand = Object.keys(CALIBRATION_STEM).map((module) => ({
+        // Pack calibration: render the target lane's stem twice per scene/seed — once on
+        // the synth voice (baseline), once on the pack — and report the RMS + centroid the
+        // Node side turns into a suggested gain. Both legs play the SAME performance (the
+        // pack decides the instrument the band plays, for both), so the only difference
+        // is the voice under test.
+        let calibration = null;
+        if (calibratePack) {
+            const { module, packId } = calibratePack;
+            const stem = stemById(CALIBRATION_STEM[module]);
+            const status = await backend.loadPack(packId);
+            if (!status.loaded) {
+                calibration = {
                     module,
-                    voice: 'synth',
-                }));
+                    packId,
+                    error: `pack "${packId}" failed to load (prototypes/v2/out/packs/${packId} present? built?)`,
+                };
+            } else {
+                const target = { module, voice: `pack:${packId}` };
                 const rows = [];
                 for (const scene of scenes) {
                     for (const seed of seeds) {
+                        const packVoices = sceneVoices(scene, [target]);
                         const performance = performSceneForReport(
                             scene,
                             seed,
                             loopCount,
-                            sceneVoices(scene),
+                            packVoices,
                         );
-                        const sampleVoices = sceneVoices(scene, COHESION_SAMPLE_BAND);
-                        const synthM = await renderStem(
+                        const synthMetrics = await renderStem(
                             scene,
                             seed,
                             performance,
                             stem,
-                            sceneVoices(scene, synthBand),
+                            sceneVoices(scene, [{ module, voice: 'synth' }]),
                         );
-                        const sampleM = await renderStem(
+                        const packMetrics = await renderStem(
                             scene,
                             seed,
                             performance,
                             stem,
-                            sampleVoices,
-                        );
-                        const sampleDryM = await renderStem(
-                            scene,
-                            seed,
-                            performance,
-                            stem,
-                            sampleVoices,
-                            { muteReverb: true },
+                            packVoices,
                         );
                         rows.push({
                             sceneId: scene.id,
                             seed,
-                            synth: {
-                                rmsDb: synthM.rmsDb,
-                                crestDb: synthM.crestDb,
-                                sideRatio: synthM.stereo?.sideRatio ?? null,
-                            },
-                            sample: {
-                                rmsDb: sampleM.rmsDb,
-                                crestDb: sampleM.crestDb,
-                                sideRatio: sampleM.stereo?.sideRatio ?? null,
-                            },
-                            sampleWetnessDb: sampleM.rmsDb - sampleDryM.rmsDb,
+                            synthRmsDb: synthMetrics.rmsDb,
+                            packRmsDb: packMetrics.rmsDb,
+                            synthCentroid: synthMetrics.probes?.centroid || 0,
+                            packCentroid: packMetrics.probes?.centroid || 0,
                         });
                     }
                 }
-                cohesionReport = { stemId: stem.id, rows };
+                calibration = { module, packId, rows };
             }
-
-            return {
-                sceneRuns,
-                calibration,
-                cohesion: cohesionReport,
-                writtenWavPaths,
-                writtenEventPaths,
-            };
-        } finally {
-            await browser.close();
         }
-    } finally {
-        await new Promise((resolve, reject) => {
-            server.close((error) => {
-                if (error) {
-                    reject(error);
-                    return;
+
+        // Cohesion (#687): render the full band (full+solo stem) all-synth vs all-sample
+        // per scene, plus an all-sample dry leg (reverb muted) for the wet/dry proxy. The
+        // performance is the scene's own for all three legs; only the sounds differ.
+        let cohesionReport = null;
+        if (cohesion) {
+            const stem = stemById('full+solo');
+            const synthBand = Object.keys(CALIBRATION_STEM).map((module) => ({
+                module,
+                voice: 'synth',
+            }));
+            const rows = [];
+            for (const scene of scenes) {
+                for (const seed of seeds) {
+                    const performance = performSceneForReport(
+                        scene,
+                        seed,
+                        loopCount,
+                        sceneVoices(scene),
+                    );
+                    const sampleVoices = sceneVoices(scene, COHESION_SAMPLE_BAND);
+                    const synthM = await renderStem(
+                        scene,
+                        seed,
+                        performance,
+                        stem,
+                        sceneVoices(scene, synthBand),
+                    );
+                    const sampleM = await renderStem(scene, seed, performance, stem, sampleVoices);
+                    const sampleDryM = await renderStem(
+                        scene,
+                        seed,
+                        performance,
+                        stem,
+                        sampleVoices,
+                        { muteReverb: true },
+                    );
+                    rows.push({
+                        sceneId: scene.id,
+                        seed,
+                        synth: {
+                            rmsDb: synthM.rmsDb,
+                            crestDb: synthM.crestDb,
+                            sideRatio: synthM.stereo?.sideRatio ?? null,
+                        },
+                        sample: {
+                            rmsDb: sampleM.rmsDb,
+                            crestDb: sampleM.crestDb,
+                            sideRatio: sampleM.stereo?.sideRatio ?? null,
+                        },
+                        sampleWetnessDb: sampleM.rmsDb - sampleDryM.rmsDb,
+                    });
                 }
-                resolve();
-            });
-        });
+            }
+            cohesionReport = { stemId: stem.id, rows };
+        }
+
+        return {
+            sceneRuns,
+            calibration,
+            cohesion: cohesionReport,
+            writtenWavPaths,
+            writtenEventPaths,
+        };
+    } finally {
+        await backend.close();
     }
 }
 
@@ -890,7 +936,7 @@ export async function generateMixReport(argv = process.argv.slice(2)) {
         : resolveScenes(cliOptions, focusInput);
     const { seeds, source } = resolveSeeds(cliOptions, focusInput);
 
-    if (!cliOptions.noBuild) {
+    if (cliOptions.engine === 'chromium' && !cliOptions.noBuild) {
         log.write('Building the v2 stand for mix analysis...\n');
         // The offline render drives `window.ensemble` (`prototypes/v2/lib/render-bridge.ts`),
         // which the v2 runtime installs only in a build made with NEXT_PUBLIC_RENDER_BRIDGE=1 —
@@ -911,6 +957,7 @@ export async function generateMixReport(argv = process.argv.slice(2)) {
 
     const { sceneRuns, calibration, cohesion, writtenWavPaths, writtenEventPaths } =
         await renderSceneReports({
+            engine: cliOptions.engine,
             scenes,
             seeds,
             writeWav: cliOptions.writeWav,
@@ -947,6 +994,7 @@ export async function generateMixReport(argv = process.argv.slice(2)) {
     const report = buildRenderedMixReport({
         sceneRuns,
         options: {
+            engine: cliOptions.engine,
             seeds,
             sceneIds: scenes.map((scene) => scene.id),
             focusFrom: cliOptions.focusFrom,

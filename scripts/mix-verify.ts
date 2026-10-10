@@ -58,6 +58,8 @@ interface EventDump {
 }
 
 export interface MixVerifyOptions {
+    /** `mix:report --engine=` pass-through; null leaves the report its default (node). */
+    engine: string | null;
     scene: string | null;
     stems: string[];
     loops: number;
@@ -72,6 +74,7 @@ export interface MixVerifyOptions {
 
 export function parseMixVerifyArgs(argv: string[]): MixVerifyOptions {
     const options: MixVerifyOptions = {
+        engine: null,
         scene: null,
         stems: [],
         loops: 1,
@@ -88,6 +91,8 @@ export function parseMixVerifyArgs(argv: string[]): MixVerifyOptions {
             options.json = true;
         } else if (arg.startsWith('--scenes-from=')) {
             options.scenesFrom = arg.slice('--scenes-from='.length);
+        } else if (arg.startsWith('--engine=')) {
+            options.engine = arg.slice('--engine='.length).trim() || null;
         } else if (arg.startsWith('--scene=')) {
             options.scene = arg.slice('--scene='.length);
         } else if (arg.startsWith('--stems=')) {
@@ -182,6 +187,9 @@ function runMixReport(outDir: string, options: MixVerifyOptions): void {
         `--loops=${options.loops}`,
         '--json',
     ];
+    if (options.engine) {
+        args.push(`--engine=${options.engine}`);
+    }
     if (options.scene) {
         args.push(`--scene=${options.scene}`);
     }

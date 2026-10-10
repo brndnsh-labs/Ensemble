@@ -217,6 +217,105 @@ function patchAudioParam(): void {
 
 patchAudioParam();
 
+/**
+ * `node-web-audio-api`'s built-in `sawtooth` and `square` run 1.4 dB hotter than Chromium's at
+ * the same peak: Chromium builds them as band-limited periodic waves and normalises the table,
+ * node does not. A Fourier-series `PeriodicWave` with every partial up to Nyquist for the
+ * oscillator's highest frequency reproduces Chromium's within 0.1 dB RMS at 82–330 Hz (0.6 dB at
+ * 1.76 kHz), correlation 0.999 — measured with the parity probes. `triangle` and `sine` already
+ * match and are left alone. The wave is chosen at `start()`, once the voice has scheduled the
+ * oscillator's frequency, so it can be band-limited for the highest pitch it will reach (an LFO
+ * wired into `frequency`/`detune` is not counted; the engine's vibrato depths are cents). Only
+ * the `type` setter is patched: an `OscillatorNode` built with constructor options would keep
+ * the library's wave, and no voice builds one that way.
+ */
+type ShapedType = 'sawtooth' | 'square';
+
+const pendingShape = new WeakMap<OscillatorNode, ShapedType>();
+const waveCache = new WeakMap<BaseAudioContext, Map<string, PeriodicWave>>();
+
+function fourierWave(context: BaseAudioContext, type: ShapedType, partials: number): PeriodicWave {
+    let cache = waveCache.get(context);
+    if (!cache) {
+        cache = new Map();
+        waveCache.set(context, cache);
+    }
+    const key = `${type}:${partials}`;
+    let wave = cache.get(key);
+    if (!wave) {
+        const real = new Float32Array(partials + 1);
+        const imag = new Float32Array(partials + 1);
+        for (let n = 1; n <= partials; n++) {
+            if (type === 'sawtooth') {
+                imag[n] = (n % 2 ? 2 : -2) / (Math.PI * n);
+            } else if (n % 2) {
+                imag[n] = 4 / (Math.PI * n);
+            }
+        }
+        wave = context.createPeriodicWave(real, imag);
+        cache.set(key, wave);
+    }
+    return wave;
+}
+
+/** The highest frequency an oscillator is scheduled to play: its parameter's value and every
+ * recorded automation value, shifted by the most its detune is scheduled to reach. */
+function highestFrequency(oscillator: OscillatorNode): number {
+    // `param.value` reads the default (440) even after `setValueAtTime`, so it counts only when
+    // nothing was scheduled — otherwise it would cap a bass note at 50 partials.
+    const values = (param: AudioParam) => [
+        ...(eventsOf(param).length === 0 ? [param.value] : []),
+        ...eventsOf(param)
+            .filter((event) => event.kind !== 'curve')
+            .map((event) => (event as { value: number }).value),
+        ...eventsOf(param)
+            .filter((event) => event.kind === 'curve')
+            .flatMap((event) => Array.from((event as { values: Float32Array }).values)),
+    ];
+    const frequency = Math.max(...values(oscillator.frequency).map(Math.abs));
+    const detune = Math.max(...values(oscillator.detune).map(Math.abs));
+    return frequency * 2 ** (detune / 1200);
+}
+
+function patchOscillator(): void {
+    const proto = webaudio.OscillatorNode.prototype as OscillatorNode;
+    const typeAccessor = Object.getOwnPropertyDescriptor(proto, 'type');
+    const nativeSetPeriodicWave = proto.setPeriodicWave;
+    const nativeStart = proto.start;
+    if (!typeAccessor?.set || !typeAccessor.get) {
+        return;
+    }
+    const setType = typeAccessor.set;
+    Object.defineProperty(proto, 'type', {
+        configurable: true,
+        get: typeAccessor.get,
+        set(this: OscillatorNode, type: OscillatorType) {
+            if (type === 'sawtooth' || type === 'square') {
+                pendingShape.set(this, type);
+            } else {
+                pendingShape.delete(this);
+            }
+            setType.call(this, type);
+        },
+    });
+    proto.setPeriodicWave = function (wave: PeriodicWave) {
+        pendingShape.delete(this);
+        return nativeSetPeriodicWave.call(this, wave);
+    };
+    proto.start = function (when?: number) {
+        const shape = pendingShape.get(this);
+        if (shape) {
+            pendingShape.delete(this);
+            const nyquist = this.context.sampleRate / 2;
+            const partials = Math.max(1, Math.floor(nyquist / Math.max(1, highestFrequency(this))));
+            nativeSetPeriodicWave.call(this, fourierWave(this.context, shape, partials));
+        }
+        return nativeStart.call(this, when);
+    };
+}
+
+patchOscillator();
+
 Object.assign(globalThis, {
     OfflineAudioContext: webaudio.OfflineAudioContext,
     AudioContext: webaudio.AudioContext,
