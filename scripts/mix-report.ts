@@ -727,6 +727,7 @@ async function renderSceneReports({
                 // Keyed on the scene and seed, as the old harness keyed its renders, so
                 // the voices' own humanising repeats from run to run.
                 randomSeed: `${scene.id}:${seed}`,
+                genreFeel: scene.genreFeel,
             };
             const measured = await backend.renderAndMeasure(
                 request,
