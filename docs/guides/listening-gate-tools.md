@@ -415,7 +415,11 @@ checks in `scripts/audio-verify.ts` over each stem:
 | graph latency | the render's constant output delay, measured and removed before any timing claim |
 | median deviation | per-note timing against the grid after latency removal (pocket as a number, not a feel) |
 | vel→peak r | whether the loudest hit of each attack reaches the output at the level its velocity asked for |
-| pitch confirmed | harmonic energy at the expected f0 vs its semitone neighbors (monophonic, resolvable pitches only) |
+| pitch confirmed | share of the judged attacks whose written pitch is what sounds. Three methods by what the attack is (#1568): a single note held ≥ 150 ms is *measured* (`measurePitchCents`, any register); a chord held ≥ 100 ms is checked note by note against its loudest (`voicingMatch`); a short single note keeps the 80 ms probe, MIDI 69 and up only |
+| PITCH | what the rate is made of: `36/36 held notes, 8/8 short notes, 36/36 chord voicings confirmed` |
+| PITCH NOT CONFIRMED | each held note that failed, with the reason (a semitone or more away; a lower note under it; odd partials missing; another note louder). A bend or a slide lands here honestly |
+| TUNING | median \|cents\| from the written pitch over the confirmed held notes, and the worst note |
+| OFF-PITCH | written pitches whose notes read more than 10 cents out (median, at least two notes): the mis-rooted sample zone of `public/engine/CLAUDE.md` rule 24. A smooth ramp across the register is a piano's stretch tuning, not a bug |
 | QUIET (intended) | attacks whose events are all deliberately attenuated (`levelScale ≤ 0.2` — the old engine's 0.15 palm-mute floor plus margin, kept tight so a half-muted dropped note still reads MISSED; the band's muted bass note carries 0.2775, `muteGain(0.85)`, so it is *not* excluded — see the blind spots) and show no rise — excluded from the match-rate denominator, printed so the exclusion is never silent |
 
 **No intent → dispatch stage on the band engine.** The old engine generated notes into
@@ -522,13 +526,19 @@ satisfies the bass note's evidence. Measured — muting the bass lane entirely o
   not a *rise* over what they replace at any level. That is a limit of rise-based
   presence detection, not a defect in anything it is measuring — a lane whose idiom is
   the repeated sixteenth has a floor on what this method can verify.
-- **Pitch confirmation is monophonic AND high-register only.** Inside a chord a
-  neighbor's partials land on a note's probe bins, so `chords`/`harmony` decline it.
-  Separately, an 80 ms Goertzel resolves ~12.5 Hz while a semitone at MIDI 45 spans
-  6.5 Hz — below roughly **MIDI 69** the probe cannot tell a pitch from its
-  neighbors at all (measured: it confirmed 8 of 10 *wrong* pitches), so it declines
-  there too. In practice only upper-register soloist notes get a pitch claim. An
-  octave above still confirms, since that partial genuinely is present.
+- **Pitch is not judged on a short low note, and octaves are only half seen.** A single
+  note held under 150 ms below roughly **MIDI 69** gets no pitch claim (the 80 ms probe
+  cannot tell it from its neighbors: measured, it confirmed 8 of 10 *wrong* pitches), and
+  neither does a chord held under 100 ms or with fewer than two separable notes (an
+  octave dyad, a low root under one high note); the report counts them under
+  `NOT VERIFIABLE: pitchOfShortNotes`. A held single note is checked against the octave,
+  the fifth and the fourth either side (probing five scenes' notes at ±2, 5, 7 and ±12
+  semitones confirmed none). A **chord** is not: a wrong note an octave or a twelfth from
+  a right one passes, a wrong note that lands on another written note's partial is not
+  judged, and 3% of semitone errors passed. The chord check reads pitch, not tuning.
+- **A tuning readout is the median, not a verdict on one note.** A bend, a slide or
+  vibrato moves a note off its written pitch on purpose and shows as the worst note or
+  under PITCH NOT CONFIRMED. `OFF-PITCH` needs two notes on the same pitch to agree.
 - **`vel→peak r` only sees each attack's loudest hit.** Both the velocity and the
   peak collapse onto whatever dominates — on a kit, the kick. A ghost hat whose
   accent fails *under* a louder hit (the #1273 class) does not move this number;

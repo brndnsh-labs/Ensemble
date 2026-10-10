@@ -4,11 +4,14 @@ import {
     CLICK_DISCONTINUITY,
     detectOnsets,
     effectiveLevel,
+    formatPitchSummary,
     formatVerificationTable,
+    goertzelHann,
     groupSimultaneous,
     isPitchResolvable,
     measureAttackEvidence,
     measureDiscontinuity,
+    measurePitchCents,
     midiToFreq,
     PITCH_CONFIRM_RATIO,
     PRESENCE_RISE_DB,
@@ -19,6 +22,7 @@ import {
     type ScheduledEvent,
     splitBands,
     verifyStem,
+    voicingMatch,
 } from '../../scripts/audio-verify.js';
 
 const SAMPLE_RATE = 44100;
@@ -291,11 +295,13 @@ describe('audio-verify — validation deck (planted defects)', () => {
         expect(result.unscheduled).toHaveLength(0);
         expect(Math.abs(result.medianOffsetMs ?? 99)).toBeLessThan(5);
         expect(result.velocityPeakR ?? 0).toBeGreaterThan(0.9);
-        // The deck runs at MIDI 45, below the pitch-resolvable floor — so the honest
-        // result is a refusal, not a score. Asserting that here keeps the gate from
-        // being quietly removed.
-        expect(result.pitchConfirmedRate).toBeNull();
-        expect(result.notVerifiable.pitchConfirmedRate).toContain('resolvable');
+        // The deck runs at MIDI 45, under the 80 ms probe's floor, but each note is held
+        // 200 ms: long enough for the long-window measurement (#1568), which confirms the
+        // pitch and reads its tuning.
+        expect(result.pitchConfirmedRate).toBe(1);
+        expect(result.pitch?.measured).toBe(8);
+        expect(result.pitch?.medianAbsCents ?? 99).toBeLessThan(3);
+        expect(result.pitch?.offPitch).toEqual([]);
     });
 
     it('muted scheduled note: reported missing, and localized to its step', () => {
@@ -467,31 +473,37 @@ describe('audio-verify — output discipline', () => {
         expect(result.velocityPeakR).toBeNull();
     });
 
-    it('refuses to score pitch on polyphonic attacks rather than guessing', () => {
-        // chords and harmony are both single-lane AND polyphonic, so without this
-        // gate they would print an unqualified "pitch confirmed N%" from a probe
-        // that assumes nothing else is sounding — on exactly the two stems a reader
-        // is most likely to read as "the voicing came out".
-        const chordEvents: ScheduledEvent[] = [0, 1, 2, 3].flatMap((index) =>
-            [55, 59, 62, 66].map((midi) => ({
-                track: 'chords',
-                time: META.leadInSeconds + index * 4 * META.stepSeconds,
-                midi,
-                velocity: 0.7,
-            })),
-        );
-        const result = verifyStem({
-            stemId: 'chords',
-            tracks: ['chords'],
-            samples: renderEvents(chordEvents),
-            events: chordEvents,
-            meta: META,
-            pitched: true,
-            singleLane: true,
-            outputLatencyMs: 0,
-        });
-        expect(result.pitchConfirmedRate).toBeNull();
-        expect(result.notVerifiable.pitchConfirmedRate).toContain('polyphonic');
+    it('scores a chord by its voicing, and never by the single-note probe', () => {
+        // chords is single-lane AND polyphonic: the single-note probes assume nothing
+        // else is sounding, so a chord goes to `voicingMatch` instead (#1568). The last
+        // chord has no written length and nothing after it, so it is not judged.
+        const voicing = [55, 59, 62, 66];
+        const at = (index: number) => META.leadInSeconds + index * 4 * META.stepSeconds;
+        const chordEvents = (midis: number[]): ScheduledEvent[] =>
+            [0, 1, 2, 3].flatMap((index) =>
+                midis.map((midi) => ({ track: 'chords', time: at(index), midi, velocity: 0.7 })),
+            );
+        const verifyChords = (written: number[]) =>
+            verifyStem({
+                stemId: 'chords',
+                tracks: ['chords'],
+                samples: renderEvents(chordEvents(voicing)),
+                events: chordEvents(written),
+                meta: META,
+                pitched: true,
+                singleLane: true,
+                outputLatencyMs: 0,
+            });
+        const right = verifyChords(voicing);
+        expect(right.pitch).toMatchObject({ chordsProbed: 3, chordsMatched: 3, measured: 0 });
+        expect(right.pitchConfirmedRate).toBe(1);
+        expect(right.notVerifiable.pitchOfShortNotes).toContain('1 of 4');
+        expect(formatVerificationTable([right], META)).toContain('3/3 chord voicings confirmed');
+
+        // The same audio against a chart with one note a whole tone out.
+        const wrong = verifyChords([55, 59, 64, 66]);
+        expect(wrong.pitch).toMatchObject({ chordsProbed: 3, chordsMatched: 0 });
+        expect(wrong.pitchConfirmedRate).toBe(0);
     });
 
     it('reports an empty lane as unscheduled rather than a 0% failure', () => {
@@ -726,5 +738,273 @@ describe('audio-verify — effective level & intended attenuation (#1351)', () =
         const loudest = result.attacks.reduce((a, b) => ((a.level ?? 0) > (b.level ?? 0) ? a : b));
         const quietest = result.attacks.reduce((a, b) => ((a.level ?? 1) < (b.level ?? 1) ? a : b));
         expect(loudest.peak).toBeGreaterThan(quietest.peak);
+    });
+});
+
+describe('audio-verify — tuning and voicing over a held note (#1568)', () => {
+    /** A steady tone: `midi` detuned by `cents`, partials at the given amplitudes. */
+    function held(
+        midi: number,
+        cents = 0,
+        seconds = 1,
+        partials: number[] = [0.5, 0.25, 0.12],
+    ): Float32Array {
+        const out = new Float32Array(Math.round(seconds * SAMPLE_RATE));
+        const f = midiToFreq(midi) * 2 ** (cents / 1200);
+        for (let i = 0; i < out.length; i++) {
+            const t = i / SAMPLE_RATE;
+            for (let k = 0; k < partials.length; k++) {
+                out[i] += partials[k] * Math.sin(2 * Math.PI * f * (k + 1) * t);
+            }
+        }
+        return out;
+    }
+    function chord(midis: number[], seconds = 1): Float32Array {
+        const out = new Float32Array(Math.round(seconds * SAMPLE_RATE));
+        for (const midi of midis) {
+            const tone = held(midi, 0, seconds, [0.3, 0.1]);
+            for (let i = 0; i < out.length; i++) {
+                out[i] += tone[i];
+            }
+        }
+        return out;
+    }
+
+    it('reads a detuned note within 3 cents, down to the bottom of the bass', () => {
+        for (const [midi, cents] of [
+            [45, 30],
+            [45, -12],
+            [28, 20],
+            [64, 0],
+            [40, 45],
+        ]) {
+            const reading = measurePitchCents(held(midi, cents), SAMPLE_RATE, 0, 1, midi);
+            expect(reading, `midi ${midi}`).not.toBeNull();
+            expect(Math.abs((reading?.cents ?? 99) - cents), `midi ${midi} ${cents}¢`).toBeLessThan(
+                3,
+            );
+            expect(reading?.confirmed, `midi ${midi} ${cents}¢`).toBe(true);
+            expect(reading?.why).toBeNull();
+        }
+    });
+
+    it('does not confirm a wrong note: a semitone, a fourth, a fifth or an octave away', () => {
+        // The harmonic sum alone peaks on a fifth and on both octaves, where the partials
+        // coincide; each of these is rejected by a different rule, and says which.
+        const samples = held(45);
+        const whys = new Set<string>();
+        for (const wrong of [44, 46, 43, 47, 50, 52, 57, 33]) {
+            const reading = measurePitchCents(samples, SAMPLE_RATE, 0, 1, wrong);
+            expect(reading?.confirmed, `probed as ${wrong}`).toBe(false);
+            expect(reading?.why, `probed as ${wrong}`).toBeTruthy();
+            whys.add(reading?.why ?? '');
+        }
+        expect(whys.size).toBeGreaterThanOrEqual(3);
+    });
+
+    it('does not confirm the octave above a note whose even partials are the strong ones', () => {
+        // A hollow-fundamental tone (a bass sample, a formant lead): probed an octave up,
+        // its even partials read as a full, well-formed note. Only the energy between
+        // them, the real odd partials, says a lower note is sounding.
+        const samples = held(45, 0, 1, [0.2, 0.5, 0.1, 0.4, 0.05, 0.2]);
+        expect(measurePitchCents(samples, SAMPLE_RATE, 0, 1, 45)?.confirmed).toBe(true);
+        const octaveUp = measurePitchCents(samples, SAMPLE_RATE, 0, 1, 57);
+        expect(octaveUp?.confirmed).toBe(false);
+        expect(octaveUp?.why).toContain('a lower note sounds under it');
+    });
+
+    it('does not confirm a note under a louder one', () => {
+        // The ring of the previous note is not this note: a quiet A under a loud E♭,
+        // which shares none of its first partials.
+        const samples = held(51);
+        const quiet = held(45, 0, 1, [0.125, 0.06, 0.03]);
+        for (let i = 0; i < samples.length; i++) {
+            samples[i] += quiet[i];
+        }
+        const reading = measurePitchCents(samples, SAMPLE_RATE, 0, 1, 45);
+        expect(reading?.confirmed).toBe(false);
+        expect(reading?.why).toContain('another note is louder');
+        expect(measurePitchCents(samples, SAMPLE_RATE, 0, 1, 51)?.confirmed).toBe(true);
+    });
+
+    it('declines a note too short to measure, bracketing the 150 ms floor', () => {
+        const samples = held(45);
+        // 20 ms of attack is skipped, so 170 ms held is a 150 ms window.
+        expect(measurePitchCents(samples, SAMPLE_RATE, 0, 0.169, 45)).toBeNull();
+        expect(measurePitchCents(samples, SAMPLE_RATE, 0, 0.171, 45)).not.toBeNull();
+        // A window that runs past the end of the render is not measured either.
+        expect(measurePitchCents(samples, SAMPLE_RATE, 0.9, 0.5, 45)).toBeNull();
+    });
+
+    it('goertzelHann reads half the amplitude at the tone and nearly nothing a fifth away', () => {
+        const samples = held(57, 0, 1, [0.5]);
+        const length = Math.round(0.4 * SAMPLE_RATE);
+        expect(goertzelHann(samples, SAMPLE_RATE, midiToFreq(57), 0, length)).toBeCloseTo(0.25, 2);
+        expect(goertzelHann(samples, SAMPLE_RATE, midiToFreq(64), 0, length)).toBeLessThan(0.001);
+    });
+
+    it('matches the written voicing and rejects one with a wrong note', () => {
+        const samples = chord([48, 52, 55]);
+        expect(voicingMatch(samples, SAMPLE_RATE, 0, 1, [48, 52, 55])?.matched).toBe(true);
+        expect(voicingMatch(samples, SAMPLE_RATE, 0, 1, [55, 48, 52, 48])?.matched).toBe(true);
+        for (const wrong of [
+            [48, 52, 56],
+            [48, 51, 55],
+            [50, 52, 55],
+            [48, 52, 55, 58],
+        ]) {
+            const match = voicingMatch(samples, SAMPLE_RATE, 0, 1, wrong);
+            expect(match?.matched, wrong.join('/')).toBe(false);
+            expect(match?.weakest ?? 1, wrong.join('/')).toBeLessThan(0.1);
+        }
+    });
+
+    it('judges only the notes a short stab can separate, and none under 100 ms', () => {
+        const samples = chord([55, 62, 66]);
+        // 120 ms held is a 100 ms window: 10 Hz, a semitone only from MIDI 52 up.
+        expect(voicingMatch(samples, SAMPLE_RATE, 0, 0.121, [55, 62, 66])?.judged).toBe(3);
+        expect(voicingMatch(samples, SAMPLE_RATE, 0, 0.121, [41, 62, 66])?.judged).toBe(2);
+        expect(voicingMatch(samples, SAMPLE_RATE, 0, 0.119, [55, 62, 66])).toBeNull();
+        // An octave doubling is its lower note's second partial: not judged, never a miss.
+        expect(voicingMatch(samples, SAMPLE_RATE, 0, 1, [55, 62, 66, 67])?.judged).toBe(3);
+    });
+
+    it('makes no claim from one judged note, and none from noise', () => {
+        // One note is the loudest by definition: an octave dyad, or a low root under one
+        // high note, would "match" audio that holds neither.
+        const wrong = held(47, 0, 1, [0.3, 0.1]);
+        expect(voicingMatch(wrong, SAMPLE_RATE, 0, 1, [40, 52])).toBeNull();
+        expect(voicingMatch(held(60, 0, 1, [0.3]), SAMPLE_RATE, 0, 0.2, [30, 60])).toBeNull();
+        // In a hiss every bin is as loud as the next; the written notes carry none of it.
+        const noise = new Float32Array(SAMPLE_RATE);
+        let seed = 11;
+        for (let i = 0; i < noise.length; i++) {
+            seed = (seed * 1103515245 + 12345) >>> 0;
+            noise[i] = seed / 4294967296 - 0.5;
+        }
+        const hiss = voicingMatch(noise, SAMPLE_RATE, 0, 1, [48, 52, 55]);
+        expect(hiss?.judged).toBe(3);
+        expect(hiss?.matched).toBe(false);
+    });
+
+    it('picks the method by how long each note is held, and counts what it cannot judge', () => {
+        // Four single notes: held long; long on paper but cut by the next attack 100 ms
+        // on (high: the 80 ms probe; low: nothing can judge it); and a last low note with
+        // no written length and nothing after it.
+        const t = META.leadInSeconds;
+        const line: ScheduledEvent[] = [
+            { track: 'soloist', time: t, midi: 45, duration: 0.4, velocity: 0.8 },
+            { track: 'soloist', time: t + 0.5, midi: 76, duration: 0.4, velocity: 0.8 },
+            { track: 'soloist', time: t + 0.6, midi: 45, duration: 0.4, velocity: 0.8 },
+            { track: 'soloist', time: t + 0.7, midi: 72, duration: 0.4, velocity: 0.8 },
+            { track: 'soloist', time: t + 1.5, midi: 45, velocity: 0.8 },
+        ];
+        const lengths = [0.4, 0.1, 0.1, 0.4, 0.4];
+        const samples = new Float32Array(Math.ceil(RENDER_SECONDS * SAMPLE_RATE));
+        line.forEach((event, index) => {
+            const tone = held(event.midi, 0, lengths[index]);
+            const start = Math.floor(event.time * SAMPLE_RATE);
+            for (let i = 0; i < tone.length; i++) {
+                samples[start + i] += tone[i] * Math.min(1, i / (0.004 * SAMPLE_RATE));
+            }
+        });
+        const result = verifyStem({
+            stemId: 'soloist',
+            tracks: ['soloist'],
+            samples,
+            events: line,
+            meta: META,
+            pitched: true,
+            singleLane: true,
+            outputLatencyMs: 0,
+        });
+        expect(result.matchedAttacks).toBe(5);
+        expect(result.pitch).toMatchObject({
+            measured: 2,
+            measuredConfirmed: 2,
+            shortProbed: 1,
+            shortConfirmed: 1,
+            skipped: 2,
+        });
+        expect(result.pitchConfirmedRate).toBe(1);
+        expect(result.notVerifiable.pitchOfShortNotes).toContain('2 of 5');
+        expect(formatPitchSummary(result.pitch)[0]).toBe(
+            'PITCH: 2/2 held notes, 1/1 short notes confirmed',
+        );
+    });
+
+    it('names a pitch whose notes all read sharp, the mis-rooted sample zone', () => {
+        // A bass line on two pitches; every MIDI 47 sounds 14 cents sharp, as a pack zone
+        // with an integer-rounded root does (public/engine/CLAUDE.md rule 24).
+        const pitches = [45, 47, 45, 47, 45, 47];
+        const lineEvents: ScheduledEvent[] = pitches.map((midi, index) => ({
+            track: 'bass',
+            time: META.leadInSeconds + index * 4 * META.stepSeconds,
+            midi,
+            duration: 0.45,
+            velocity: 0.8,
+        }));
+        const samples = new Float32Array(Math.ceil(RENDER_SECONDS * SAMPLE_RATE));
+        for (const event of lineEvents) {
+            const tone = held(event.midi, event.midi === 47 ? 14 : 0, 0.45);
+            const start = Math.floor(event.time * SAMPLE_RATE);
+            for (let i = 0; i < tone.length; i++) {
+                // A 4 ms attack so the presence check sees a rise, then steady.
+                samples[start + i] += tone[i] * Math.min(1, i / (0.004 * SAMPLE_RATE));
+            }
+        }
+        const result = verifyStem({
+            stemId: 'bass',
+            tracks: ['bass'],
+            samples,
+            events: lineEvents,
+            meta: META,
+            pitched: true,
+            singleLane: true,
+            outputLatencyMs: 0,
+        });
+        expect(result.pitch?.measuredConfirmed).toBe(6);
+        expect(result.pitch?.offPitch).toHaveLength(1);
+        expect(result.pitch?.offPitch[0]).toMatchObject({ midi: 47, count: 3 });
+        expect(Math.abs((result.pitch?.offPitch[0].medianCents ?? 0) - 14)).toBeLessThan(2);
+        expect(result.pitch?.worst?.midi).toBe(47);
+        const lines = formatPitchSummary(result.pitch).join('\n');
+        expect(lines).toContain('6/6 held notes confirmed');
+        expect(lines).toContain('OFF-PITCH');
+        expect(lines).toContain('midi 47 +14');
+    });
+
+    it('lists a held note that sounds a semitone off its written pitch, with the reason', () => {
+        const written: ScheduledEvent[] = [0, 1, 2].map((index) => ({
+            track: 'bass',
+            time: META.leadInSeconds + index * 4 * META.stepSeconds,
+            midi: 45,
+            duration: 0.45,
+            velocity: 0.8,
+        }));
+        const samples = new Float32Array(Math.ceil(RENDER_SECONDS * SAMPLE_RATE));
+        written.forEach((event, index) => {
+            const tone = held(index === 1 ? 46 : 45, 0, 0.45);
+            const start = Math.floor(event.time * SAMPLE_RATE);
+            for (let i = 0; i < tone.length; i++) {
+                samples[start + i] += tone[i] * Math.min(1, i / (0.004 * SAMPLE_RATE));
+            }
+        });
+        const result = verifyStem({
+            stemId: 'bass',
+            tracks: ['bass'],
+            samples,
+            events: written,
+            meta: META,
+            pitched: true,
+            singleLane: true,
+            outputLatencyMs: 0,
+        });
+        expect(result.pitchConfirmedRate).toBeCloseTo(2 / 3, 6);
+        expect(result.pitch?.unconfirmed).toHaveLength(1);
+        expect(result.pitch?.unconfirmed[0]).toMatchObject({ step: 4, midi: 45 });
+        expect(formatVerificationTable([result], META)).toContain(
+            'PITCH NOT CONFIRMED: step 4 midi 45',
+        );
     });
 });
