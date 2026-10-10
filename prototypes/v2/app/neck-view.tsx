@@ -5,6 +5,7 @@ import type { BandChart } from '../lib/band-chart';
 import { defaultNeckHome, type NeckLabels, type NeckPreferences } from '../lib/session';
 import { NECK_INSTRUMENTS, type VoicedBandChord } from '../lib/voicings';
 import { Neck, type NeckPreview, type NeckZoom } from './neck';
+import { HOME_W } from './neck-geometry';
 import { neckModel } from './use-neck-view';
 import './neck-view.css';
 
@@ -27,11 +28,6 @@ interface NeckViewProps {
     onPrefs: (patch: Partial<NeckPreferences>) => void;
 }
 
-const INSTRUMENT_LABELS: [NeckPreferences['instrument'], string][] = [
-    ['guitar', 'Guitar'],
-    ['uke', 'Ukulele'],
-    ['uke-low-g', 'Ukulele (low G)'],
-];
 const LABEL_CHOICES: [NeckLabels, string][] = [
     ['finger', 'Fingers'],
     ['degree', 'Degrees'],
@@ -124,7 +120,7 @@ export function NeckView({ band, voiced, active, nextSoon, prefs, onPrefs }: Nec
                             zoom={zoom}
                             labels={prefs.labels}
                             home={prefs.home}
-                            onHome={(start) => onPrefs({ home: [start, start + 5] })}
+                            onHome={(start) => onPrefs({ home: [start, start + HOME_W - 1] })}
                             dimmed={model.held !== null}
                             // The neck re-runs the strike per voicing object, so a steady `true`
                             // while playing pulses each chord as it lands, and nothing while stopped.
@@ -145,9 +141,9 @@ export function NeckView({ band, voiced, active, nextSoon, prefs, onPrefs }: Nec
                                 })
                             }
                         >
-                            {INSTRUMENT_LABELS.map(([value, label]) => (
+                            {Object.entries(NECK_INSTRUMENTS).map(([value, instrument]) => (
                                 <option key={value} value={value}>
-                                    {label}
+                                    {instrument.name}
                                 </option>
                             ))}
                         </select>

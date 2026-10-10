@@ -1,7 +1,6 @@
 import { type Barre, barres, fingerMap } from './fingering';
 import { mod } from './theory';
 import type { InstrumentDef, Note, Voicing } from './types';
-import { center } from './voicing';
 
 const ROOT_MOVES: Record<number, [string, string]> = {
     0: ['stays put', '='],
@@ -174,38 +173,4 @@ export function fingerMoves(
         }
     }
     return { moves, openStrings: b.notes.filter((n) => n.fret === 0).map((n) => n.string) };
-}
-
-export interface TravelSummary {
-    /** Sum of hand-position shifts across the chart, in frets. */
-    totalFrets: number;
-    /** Finger changes that are just "stay down", out of all finger changes (repeated chords excluded). */
-    holds: number;
-    changes: number;
-    lowestFret: number;
-    highestFret: number;
-}
-export function handTravel(inst: InstrumentDef, chords: Voicing[]): TravelSummary {
-    let total = 0,
-        holds = 0,
-        changes = 0;
-    for (let i = 1; i < chords.length; i++) {
-        const a = chords[i - 1],
-            b = chords[i];
-        total += Math.abs(center(b) - center(a));
-        if (a.root.pc === b.root.pc && a.quality === b.quality && a.rootFret === b.rootFret) {
-            continue;
-        }
-        const m = fingerMoves(inst, a, b).moves;
-        holds += m.filter((x) => x.kind === 'hold').length;
-        changes += m.length;
-    }
-    const fretted = chords.flatMap((c) => c.notes.map((n) => n.fret).filter((f) => f > 0));
-    return {
-        totalFrets: Math.round(total),
-        holds,
-        changes,
-        lowestFret: fretted.length ? Math.min(...fretted) : 0,
-        highestFret: fretted.length ? Math.max(...fretted) : 0,
-    };
 }

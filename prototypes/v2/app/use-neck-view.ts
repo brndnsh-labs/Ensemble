@@ -73,15 +73,6 @@ export function nextVoicedSlot(band: BandChart, slot: number): number | null {
     return null;
 }
 
-/** A written event's letter-name symbol, as the chart prints it in letter notation. */
-export function writtenName(chord: BandChartChord): string {
-    const name = chord.display?.name;
-    if (!name) {
-        return chord.absName;
-    }
-    return `${name.root}${name.suffix}${name.bass ? `/${name.bass}` : ''}`;
-}
-
 const holdsPhrase = (fingers: number[]): string =>
     fingers.length === 1
         ? `Finger ${fingers[0]} stays down`
@@ -170,8 +161,8 @@ export function neckModel(
     const nextChord = nextSlot === null ? null : slotChord(band, nextSlot)!;
     const next = nextChord ? (voiced.get(nextChord.globalIndex) ?? null) : null;
     const held = written.kind === 'hold' ? 'hold' : written.kind === 'no-chord' ? 'no-chord' : null;
-    const name = held === 'no-chord' ? 'N.C.' : writtenName(soundingChord);
-    const nextName = nextChord ? writtenName(nextChord) : null;
+    const name = held === 'no-chord' ? 'N.C.' : soundingChord.absName;
+    const nextName = nextChord ? nextChord.absName : null;
     const change = grip && next && nextName ? rootLine(instrument, grip, next) : null;
     let headline = '';
     if (active === null) {
@@ -188,7 +179,7 @@ export function neckModel(
         nextName,
         headline,
         fingers,
-        approximatedFrom: grip?.approximation ? writtenName(soundingChord) : null,
+        approximatedFrom: grip?.approximation ? soundingChord.absName : null,
         inversion: grip ? inversionOf(instrument, grip) : 0,
     };
 }

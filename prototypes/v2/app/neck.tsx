@@ -1,6 +1,7 @@
 'use client';
 
 import { type KeyboardEvent, type PointerEvent, useRef, useState } from 'react';
+import type { NeckLabels } from '../lib/session';
 import {
     type Barre,
     barres,
@@ -41,7 +42,6 @@ import './neck.css';
  * is — its ghost dots and the root's path; `soft` and `off` show the current grip only.
  */
 export type NeckPreview = 'off' | 'soft' | 'strong';
-export type NeckLabels = 'finger' | 'degree' | 'note';
 /** `board` draws the whole neck; `window` zooms onto the hand's frets (a phone, #1593). */
 export type NeckZoom = 'board' | 'window';
 
@@ -83,8 +83,8 @@ const INLAYS: Record<string, { single: number[]; double: number[] }> = {
 /** Degree → the class that fills a dot with its `--d-*` token. */
 const DEGREE_FILL: Record<Degree, string> = {
     R: 'neck-fill-root',
-    // A sus chord's 2nd or 4th sits where the 3rd would: teal, the colour of a suspension
-    // (shared with the 9th, the same pitch class as the 2nd).
+    // A sus chord's 2nd or 4th sits where the 3rd would: teal, the colour of a suspension (the
+    // `9` token: the 9th is the 2nd's pitch class).
     '2': 'neck-fill-9',
     '4': 'neck-fill-9',
     '3': 'neck-fill-3',
@@ -93,11 +93,9 @@ const DEGREE_FILL: Record<Degree, string> = {
     b7: 'neck-fill-b7',
     bb7: 'neck-fill-6',
     '6': 'neck-fill-6',
-    '13': 'neck-fill-6',
     '5': 'neck-fill-5',
     b5: 'neck-fill-5',
     '#5': 'neck-fill-5',
-    '9': 'neck-fill-9',
 };
 
 /** The highest start fret the handle can reach: the window ends on the last fret. */

@@ -36,24 +36,7 @@ export type GripKind = 'shell' | 'triad' | 'power';
  * Chord degrees used in voicings. `bb7` is the diminished 7th (same fret as a 6th); `2` and `4`
  * are a sus chord's suspensions, `#5` an augmented triad's 5th.
  */
-export type Degree =
-    | 'R'
-    | '2'
-    | '3'
-    | 'b3'
-    | '4'
-    | '7'
-    | 'b7'
-    | 'bb7'
-    | '6'
-    | '5'
-    | 'b5'
-    | '#5'
-    | '9'
-    | '13';
-
-/** Optional extra tone a player can stack on a shell. */
-export type Tone = 'none' | '5' | '9' | '13';
+export type Degree = 'R' | '2' | '3' | 'b3' | '4' | '7' | 'b7' | 'bb7' | '6' | '5' | 'b5' | '#5';
 
 /**
  * Role of a shape's note.
@@ -79,7 +62,7 @@ export interface ShapeDef {
 }
 
 export interface InstrumentDef {
-    id: 'guitar' | 'uke' | string;
+    id: string;
     name: string;
     strings: number;
     maxFret: number;
@@ -87,8 +70,6 @@ export interface InstrumentDef {
     open: Record<number, number>;
     /** One-letter string names indexed by string number - 1. */
     letters: string;
-    /** Strings that can hold a root (UI hint for "tap a root" interactions). */
-    rootStrings: number[];
     /** Fret the voicer aims for when the hand isn't locked to a window. */
     defaultTarget: number;
     shapes: ShapeDef[];
@@ -141,6 +122,4 @@ export interface VoiceOptions {
      * Defaults to every shape. Triad and power grips ignore it.
      */
     rootStrings?: number[];
-    /** Optional color tone stacked on every chord. */
-    tone?: Tone;
 }

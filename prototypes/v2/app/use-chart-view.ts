@@ -134,10 +134,8 @@ export function useChartView(current: ChartDocument | null, active: number | nul
         [current],
     );
     return {
-        /** The band's chart (`runtime.bandChartView()`), memoized per document; null for a measure-less chart. */
-        band,
-        /** The chart the band performs, for either schema (`band`, or `legacyBandChart` for a
-         * measure-less chart); null for an empty chart. */
+        /** The chart the band performs, for either schema (`runtime.bandChartView()`, or
+         * `legacyBandChart` for a measure-less chart); null for an empty chart. */
         followChart,
         blocks,
         displayActive,

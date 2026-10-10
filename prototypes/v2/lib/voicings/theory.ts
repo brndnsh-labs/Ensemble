@@ -1,4 +1,4 @@
-import type { Degree, GripKind, Quality, Spelled, Tone } from './types';
+import type { Degree, GripKind, Quality, Spelled } from './types';
 
 export const LETTERS = 'CDEFGAB';
 export const NAT = [0, 2, 4, 5, 7, 9, 11];
@@ -45,8 +45,6 @@ export const DEGREES: Record<Degree, DegreeDef> = {
     '5': { label: '5', int: 7, step: 4, name: '5th' },
     b5: { label: '♭5', int: 6, step: 4, name: 'Flat 5th' },
     '#5': { label: '♯5', int: 8, step: 4, name: 'Sharp 5th' },
-    '9': { label: '9', int: 14, step: 1, name: '9th' },
-    '13': { label: '13', int: 21, step: 5, name: '13th' },
 };
 
 /** Spell a chord tone, e.g. the ♭7 of G is F. */
@@ -100,18 +98,3 @@ export const QUALITIES: Record<Quality, QualityDef> = {
     // A power chord has no 3rd: root, 5th and the octave root is what rock guitar plays.
     five: { kind: 'power', symbol: '5', third: null, five: '5', required: [] },
 };
-
-/** Which degree an optional tone becomes for a given quality (null if it duplicates a chord tone). */
-export function toneDegree(quality: Quality, tone: Tone | undefined): Degree | null {
-    // A triad or power grip has no free string for a colour tone yet (#1588 keeps them plain).
-    if (!tone || tone === 'none' || QUALITIES[quality].kind !== 'shell') {
-        return null;
-    }
-    if (tone === '5') {
-        return quality === 'm7b5' ? null : quality === 'dim7' ? 'b5' : '5';
-    }
-    if (tone === '13' && (quality === 'six' || quality === 'dim7')) {
-        return null;
-    }
-    return tone;
-}

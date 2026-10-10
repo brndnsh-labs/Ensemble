@@ -1,12 +1,5 @@
-import {
-    applyFingers,
-    assignFingers,
-    currentFingering,
-    fingerOptions,
-    fingerSequence,
-    fingerTransCost,
-} from './fingering';
-import { DEGREES, mod, QUALITIES, toneDegree } from './theory';
+import { assignFingers, fingerSequence } from './fingering';
+import { DEGREES, mod, QUALITIES } from './theory';
 import type {
     ChartChord,
     Degree,
@@ -17,7 +10,6 @@ import type {
     ShapeDef,
     ShapeRole,
     Spelled,
-    Tone,
     VoicedChord,
     VoiceOptions,
     Voicing,
@@ -83,7 +75,6 @@ export function buildAt(
     shape: ShapeDef,
     root: Spelled,
     quality: Quality,
-    tone: Tone,
     r: number,
 ): Voicing | null {
     const q = QUALITIES[quality];
@@ -112,34 +103,9 @@ export function buildAt(
         return null;
     }
 
-    const filler = notes.find((n) => n.role === 'F');
+    // A required tone (m7♭5's ♭5) goes on a free string — unless a helper (F) note already plays it.
     const missing: Degree[] = [];
-    const td = toneDegree(quality, tone);
-    const extras: Degree[] = filler ? [] : [...q.required];
-    if (td) {
-        if (!filler) {
-            extras.push(td);
-        } else if (filler.degree !== td) {
-            // On uke the helper string is the only free one: swap the helper for the tone if it fits
-            if (q.required.includes(filler.degree)) {
-                missing.push(td);
-            } else {
-                const base = fretFor(inst, filler.string, shape.rootString, r, DEGREES[td].int);
-                const others = notes.filter((n) => n !== filler).map((n) => n.fret);
-                const opts = [base, base + 12, base - 12]
-                    .filter(
-                        (f) => f >= 0 && f <= inst.maxFret && spanOf([...others, f]) <= MAX_SPAN,
-                    )
-                    .sort((a, b) => spanOf([...others, a]) - spanOf([...others, b]));
-                if (opts.length) {
-                    filler.degree = td;
-                    filler.fret = opts[0];
-                } else {
-                    missing.push(td);
-                }
-            }
-        }
-    }
+    const extras: Degree[] = notes.some((n) => n.role === 'F') ? [] : [...q.required];
     for (const deg of extras) {
         const used = new Set(notes.map((n) => n.string));
         let best: { s: number; f: number; span: number } | null = null;
@@ -205,29 +171,10 @@ export function build(
     shape: ShapeDef,
     root: Spelled,
     quality: Quality,
-    tone: Tone = 'none',
 ): Voicing | null {
     for (const r of rootFrets(inst, shape, root)) {
-        const b = buildAt(inst, shape, root, quality, tone, r);
+        const b = buildAt(inst, shape, root, quality, r);
         if (b) {
-            return b;
-        }
-    }
-    return null;
-}
-
-/** A grip inside the home window, if one exists. */
-export function buildIn(
-    inst: InstrumentDef,
-    shape: ShapeDef,
-    root: Spelled,
-    quality: Quality,
-    tone: Tone,
-    home: HomeWindow | null | undefined,
-): Voicing | null {
-    for (const r of rootFrets(inst, shape, root)) {
-        const b = buildAt(inst, shape, root, quality, tone, r);
-        if (b && inHome(b, home)) {
             return b;
         }
     }
@@ -239,12 +186,12 @@ export function allPositions(
     inst: InstrumentDef,
     root: Spelled,
     quality: Quality,
-    opts: { rootStrings?: number[]; tone?: Tone } = {},
+    opts: { rootStrings?: number[] } = {},
 ): Voicing[] {
     const out: Voicing[] = [];
     allowedShapes(inst, opts.rootStrings, quality).forEach((sh) =>
         rootFrets(inst, sh, root).forEach((r) => {
-            const b = buildAt(inst, sh, root, quality, opts.tone ?? 'none', r);
+            const b = buildAt(inst, sh, root, quality, r);
             if (b) {
                 out.push(b);
             }
@@ -360,10 +307,7 @@ function triadTransCost(a: Voicing, b: Voicing): number {
 }
 
 function candidates(c: ChartChord, opts: VoiceOptions): Voicing[] {
-    const all = allPositions(opts.instrument, c.root, c.quality, {
-        rootStrings: opts.rootStrings,
-        tone: opts.tone,
-    });
+    const all = allPositions(opts.instrument, c.root, c.quality, { rootStrings: opts.rootStrings });
     const inside = all.filter((v) => inHome(v, opts.home));
     return inside.length ? inside : all;
 }
@@ -376,7 +320,8 @@ function stamp<C extends ChartChord>(v: Voicing, c: C): VoicedChord<C> {
         ...rest,
         root,
         quality,
-        symbol: root.name + QUALITIES[quality].symbol,
+        // `buildAt` named it from this same root and quality; restated so an extra field can't shadow it.
+        symbol: v.symbol,
     } as VoicedChord<C>;
 }
 
@@ -396,44 +341,5 @@ export function voiceChart<C extends ChartChord>(chart: C[], opts: VoiceOptions)
     );
     const out = picked.map((v, i) => stamp(v, chart[i]));
     fingerSequence(out.map((v) => ({ notes: v.notes, barre: mayBarre(v.shape) })));
-    return out;
-}
-
-/** Voice one chord near where the hand already is (for tapped pads or live input). */
-export function voiceNext<C extends ChartChord>(
-    prev: Voicing | null,
-    chord: C,
-    opts: VoiceOptions,
-): VoicedChord<C> {
-    let best: Voicing | null = null,
-        bc = Infinity;
-    candidates(chord, opts).forEach((v) => {
-        const c = unaryCost(v, opts) + (prev ? transCost(prev, v) : 0);
-        if (c < bc) {
-            bc = c;
-            best = v;
-        }
-    });
-    if (!best) {
-        throw new Error(
-            `No voicing for ${chord.root.name}${QUALITIES[chord.quality].symbol} on ${opts.instrument.name}`,
-        );
-    }
-    const out = stamp(best, chord);
-    if (prev) {
-        const prevOpt = currentFingering(prev.notes);
-        let bo = null,
-            bv = Infinity;
-        for (const o of fingerOptions(out.notes, { barre: mayBarre(out.shape) })) {
-            const v = o.cost + fingerTransCost(prevOpt, o);
-            if (v < bv) {
-                bv = v;
-                bo = o;
-            }
-        }
-        if (bo) {
-            applyFingers(out.notes, bo);
-        }
-    }
     return out;
 }

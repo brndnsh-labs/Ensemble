@@ -5,9 +5,9 @@
  * was voiced with.
  */
 import type { BandChart } from '../band-chart';
-import { voicingChord } from './adapter';
+import { type VoicingChord, voicingChord } from './adapter';
 import { GUITAR, UKULELE, UKULELE_LOW_G } from './instruments';
-import type { HomeWindow, InstrumentDef, Quality, Spelled, VoicedChord } from './types';
+import type { HomeWindow, InstrumentDef, VoicedChord } from './types';
 import { voiceChart } from './voicing';
 
 export interface NeckPrefs {
@@ -18,14 +18,8 @@ export interface NeckPrefs {
     rootStrings: 'all' | 'classic';
 }
 
-// A type alias, not an interface: `ChartChord`'s extra-fields index signature needs one.
-type BandVoicingChord = {
-    root: Spelled;
-    quality: Quality;
-    /** Index into `BandChart.chords`. */
-    globalIndex: number;
-    approximation: string | null;
-};
+/** A chord to voice, with its index into `BandChart.chords`. */
+type BandVoicingChord = VoicingChord & { globalIndex: number };
 
 export type VoicedBandChord = VoicedChord<BandVoicingChord>;
 

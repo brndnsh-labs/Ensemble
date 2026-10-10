@@ -16,12 +16,13 @@ import { spellPitchClass } from '@engine/engine/note-spelling';
 import { DEGREES, LETTERS, QUALITIES } from './theory';
 import type { Quality, Spelled } from './types';
 
-export interface VoicingChord {
+// A type alias, not an interface: `ChartChord`'s extra-fields index signature needs one.
+export type VoicingChord = {
     root: Spelled;
     quality: Quality;
     /** What the shell changes about the written chord, or null when it is a faithful reading. */
     approximation: string | null;
-}
+};
 
 /** An ASCII note name (`Eb`, `F#`) as the engine's `Spelled` (`E♭`, `F♯`). */
 function spelled(name: string, pc: number): Spelled {

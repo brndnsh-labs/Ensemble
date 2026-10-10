@@ -28,24 +28,23 @@ export function legacyBandChart(
 ): BandChart {
     // A v1 chart plays straight through, so a chord's written measure is its performed bar.
     const measureOf = measureOfGlobalIndex(blocks);
+    // `buildLeadSheetSections` numbers the progression in order, so this is already written order.
     const written: { chord: BandChartChord; bar: number }[] = blocks
         .flatMap((block) => block.measures.flatMap((measure) => measure.chords))
-        // Negative is a bar the form never reaches: nothing to perform or voice.
-        .filter((chord) => chord.globalIndex >= 0)
         .map((chord) => ({
             bar: measureOf.get(chord.globalIndex) ?? 0,
             chord: {
                 ...chord,
                 kind: 'chord',
                 fermata: false,
-                // Null when the band's parser refuses it: the neck leaves it unvoiced.
-                chord: parseChord(chord.absName.replaceAll('♭', 'b').replaceAll('♯', '#'), {
+                // Null when the band's parser refuses it: the neck leaves it unvoiced. (`parseChord`
+                // reads ♭/♯ glyphs itself.)
+                chord: parseChord(chord.absName, {
                     tonic: notePc(chord.key),
                     minor: chord.keyIsMinor === true,
                 }),
             },
         }));
-    written.sort((a, b) => a.chord.globalIndex - b.chord.globalIndex);
     // Both maps come from the same progression, so they agree in length; should they ever not,
     // only the slots both describe are performed, rather than a slot pointing at no chord.
     const count = Math.min(written.length, stepMap.length);

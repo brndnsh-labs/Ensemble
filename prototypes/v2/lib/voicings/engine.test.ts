@@ -1,29 +1,26 @@
 import { parseChord } from '@band/index';
 import { describe, expect, it } from 'vitest';
+import { spellRoot, voicingChord } from './adapter';
 import { assignFingers, barres, fingerOptions } from './fingering';
 import {
     allPositions,
     build,
     fingerMoves,
     GUITAR,
-    handTravel,
     type InstrumentDef,
     inHome,
     inversionOf,
-    QUALITIES,
-    type Quality,
+    type Note,
     rootMove,
     spellDegree,
-    spellRoot,
     UKULELE,
-    UKULELE_LOW_G,
     type Voicing,
     voiceChart,
-    voiceNext,
-    voicingChord,
 } from './index';
-import { keyFamily, keyRoot } from './test/keys';
-import type { Note } from './types';
+import { UKULELE_LOW_G } from './instruments';
+import { keyRoot } from './test/keys';
+import { QUALITIES } from './theory';
+import type { Quality } from './types';
 
 const tab = (inst: InstrumentDef, v: Voicing) => {
     const m = new Map(v.notes.map((n) => [n.string, n.fret]));
@@ -280,8 +277,8 @@ describe('voiceChart', () => {
             instrument: GUITAR,
             home: [3, 8],
         });
-        const t = handTravel(GUITAR, v);
-        expect(t.highestFret - t.lowestFret).toBeLessThanOrEqual(5);
+        const fretted = v.flatMap((x) => x.notes.map((n) => n.fret).filter((f) => f > 0));
+        expect(Math.max(...fretted) - Math.min(...fretted)).toBeLessThanOrEqual(5);
     });
 });
 
@@ -406,51 +403,13 @@ describe('barres (#1594): what guitarists and uke players actually do', () => {
     });
 });
 
-describe('voiceNext', () => {
-    it('picks a grip near the previous chord', () => {
-        const prev = voiceNext(
-            null,
-            { root: R('C'), quality: 'maj7' },
-            { instrument: GUITAR, home: [2, 7] },
-        );
-        const next = voiceNext(
-            prev,
-            { root: R('F'), quality: 'maj7' },
-            { instrument: GUITAR, home: [2, 7] },
-        );
-        expect(inHome(next, [2, 7])).toBe(true);
-        expect(rootMove(GUITAR, prev, next).text).toBe('up a 4th');
-    });
-});
-
 describe('rootMove', () => {
     it('names the interval and the path on the neck', () => {
-        const a = build(GUITAR, shape(GUITAR, '6A'), R('C'), 'm7', 'none'); // 8th fret, 6th string
-        const b = build(GUITAR, shape(GUITAR, '5A'), R('F'), 'dom7', 'none'); // 8th fret, 5th string
+        const a = build(GUITAR, shape(GUITAR, '6A'), R('C'), 'm7'); // 8th fret, 6th string
+        const b = build(GUITAR, shape(GUITAR, '5A'), R('F'), 'dom7'); // 8th fret, 5th string
         const m = rootMove(GUITAR, a!, b!);
         expect(m.text).toBe('up a 4th');
         expect(m.geometry).toBe('same fret, one string over');
         expect(m.straightAcross).toBe(true);
-    });
-});
-
-describe('keyFamily', () => {
-    it('C major: Cmaj7 Dm7 Em7 Fmaj7 G7 Am7 Bm7♭5', () => {
-        expect(keyFamily(R('C'), 'major').map((c) => c.root.name + c.quality)).toEqual([
-            'Cmaj7',
-            'Dm7',
-            'Em7',
-            'Fmaj7',
-            'Gdom7',
-            'Am7',
-            'Bm7b5',
-        ]);
-    });
-    it('spells by key: B♭ major has E♭, not D♯', () => {
-        expect(keyFamily(R('B♭'), 'major')[3].root.name).toBe('E♭');
-    });
-    it('minor uses the harmonic-minor V7', () => {
-        const fam = keyFamily(R('A'), 'minor');
-        expect(fam[4].root.name + fam[4].quality).toBe('Edom7');
     });
 });

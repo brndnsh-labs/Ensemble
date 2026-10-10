@@ -139,8 +139,6 @@
     stroke-width: 2.6;
     stroke-dasharray: 6 4;
     stroke-linecap: round;
-}
-.neck-arrow {
     animation: neck-draw 0.45s ease-out both;
 }
 @keyframes neck-draw {

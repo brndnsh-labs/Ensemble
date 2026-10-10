@@ -8,13 +8,7 @@ import type { ScoreEvent, ScoreMeasure, SemanticScore } from '@engine/songbook/s
 import { describe, expect, it } from 'vitest';
 import { bandChart } from '../lib/band-chart';
 import { GUITAR, voiceBandChart } from '../lib/voicings';
-import {
-    firstVoicedSlot,
-    neckModel,
-    nextVoicedSlot,
-    soundingSlot,
-    writtenName,
-} from './use-neck-view';
+import { firstVoicedSlot, neckModel, nextVoicedSlot, soundingSlot } from './use-neck-view';
 
 const chord = (symbol: string, n: number): ScoreEvent => ({
     kind: 'chord',
@@ -223,9 +217,5 @@ describe('neckModel', () => {
             fingers: '',
         });
         expect(neckModel(one, grips, 0, GUITAR)).toMatchObject({ headline: '', fingers: '' });
-    });
-
-    it('writes chord names in letters, as the chart prints them', () => {
-        expect(band.chords.map(writtenName)).toEqual(['Dm7', 'G7', 'Cmaj7#5', expect.any(String)]);
     });
 });

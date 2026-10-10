@@ -209,8 +209,6 @@ export interface NeckPreferences extends NeckPrefs {
 const NECK_INSTRUMENT_IDS = Object.keys(NECK_INSTRUMENTS) as NeckPrefs['instrument'][];
 const NECK_ROOT_STRINGS: readonly NeckPrefs['rootStrings'][] = ['all', 'classic'];
 const NECK_LABELS: readonly NeckLabels[] = ['finger', 'degree', 'note'];
-/** The neck draws frets 0–15; a home window lives on frets 1–15. */
-const NECK_MAX_FRET = 15;
 
 /** A guitar's hand starts on frets 2–7; a uke's (either tuning) on 1–6. */
 export function defaultNeckHome(instrument: NeckPrefs['instrument']): HomeWindow {
@@ -227,10 +225,13 @@ export function defaultNeckPreferences(): NeckPreferences {
     };
 }
 
-const isHomeWindow = (value: unknown): value is HomeWindow =>
+/** A home window lives on the instrument's fretted frets, 1 to its `maxFret`. */
+const isHomeWindow = (value: unknown, instrument: NeckPrefs['instrument']): value is HomeWindow =>
     Array.isArray(value) &&
     value.length === 2 &&
-    value.every((f) => Number.isInteger(f) && f >= 1 && f <= NECK_MAX_FRET) &&
+    value.every(
+        (f) => Number.isInteger(f) && f >= 1 && f <= NECK_INSTRUMENTS[instrument].maxFret,
+    ) &&
     value[0] <= value[1];
 
 const pick = <T>(allowed: readonly T[], value: unknown, fallback: T): T =>
@@ -262,7 +263,7 @@ export function neckPreferences(): NeckPreferences {
     let home: HomeWindow | null = defaultNeckHome(instrument);
     if (stored.home === null) {
         home = null;
-    } else if (isHomeWindow(stored.home)) {
+    } else if (isHomeWindow(stored.home, instrument)) {
         home = [stored.home[0], stored.home[1]];
     }
     return {

@@ -353,9 +353,3 @@ export function fingerSequence(chords: Array<{ notes: Note[]; barre?: boolean }>
         }
     }
 }
-
-/** The fingering currently on a voicing, as a FingerOption (for planning the next chord from it). */
-export function currentFingering(notes: Note[]): FingerOption {
-    const fr = notes.filter((n) => n.fret > 0);
-    return { fr, p: fr.map((n) => n.finger), cost: 0 };
-}
