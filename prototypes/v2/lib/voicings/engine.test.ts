@@ -12,7 +12,6 @@ import {
     QUALITIES,
     type Quality,
     rootMove,
-    shellChord,
     spellDegree,
     spellRoot,
     UKULELE,
@@ -20,6 +19,7 @@ import {
     type Voicing,
     voiceChart,
     voiceNext,
+    voicingChord,
 } from './index';
 import { keyFamily, keyRoot } from './test/keys';
 
@@ -179,7 +179,7 @@ describe('grips', () => {
 describe('voiceChart on triads (#1588): the hand stays put, open chords win first position', () => {
     const chart = (names: string[]) =>
         names.map((s) => {
-            const p = shellChord(parseChord(s, { tonic: 0, minor: false })!, 'C', false);
+            const p = voicingChord(parseChord(s, { tonic: 0, minor: false })!, 'C', false);
             return { root: p.root, quality: p.quality };
         });
     const tabs = (inst: InstrumentDef, names: string[], home: [number, number] | null) =>
@@ -242,7 +242,7 @@ describe('voiceChart on triads (#1588): the hand stays put, open chords win firs
 describe('voiceChart', () => {
     const chart = (names: string[]) =>
         names.map((s) => {
-            const p = shellChord(parseChord(s, { tonic: 0, minor: false })!, 'C', false);
+            const p = voicingChord(parseChord(s, { tonic: 0, minor: false })!, 'C', false);
             return { root: p.root, quality: p.quality, label: s };
         });
 

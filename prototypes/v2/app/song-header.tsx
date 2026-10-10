@@ -13,7 +13,7 @@ interface SongHeaderProps {
     playbackActive: boolean;
     focused: boolean;
     editing: boolean;
-    /** The stand shows the neck (#1587) instead of the chart sheet. */
+    /** The remembered stand mode is Neck (#1587); the neck shows while not `editing`. */
     neck: boolean;
     onHome: () => void;
     onToggleTheme: () => void;
@@ -104,7 +104,7 @@ export function SongHeader({
                     <button className={!editing && !neck ? 'active' : ''} onClick={onShowChart}>
                         Chart
                     </button>
-                    <button className={neck ? 'active' : ''} onClick={onShowNeck}>
+                    <button className={neck && !editing ? 'active' : ''} onClick={onShowNeck}>
                         Neck
                     </button>
                     <button

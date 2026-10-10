@@ -7,7 +7,7 @@ import { compileTimeline } from '@band/index';
 import type { ScoreEvent, ScoreMeasure, SemanticScore } from '@engine/songbook/score-types';
 import { describe, expect, it } from 'vitest';
 import { bandChart } from '../lib/band-chart';
-import { GUITAR, voiceBandChart } from '../lib/shells';
+import { GUITAR, voiceBandChart } from '../lib/voicings';
 import {
     firstVoicedSlot,
     neckModel,

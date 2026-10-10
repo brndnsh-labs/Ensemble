@@ -12,12 +12,11 @@ import { TIME_SIGNATURES } from '@engine/config';
 import { buildLeadSheetSections } from '@engine/song/lead-sheet-model';
 import type { ChartDocument } from '@engine/songbook/types';
 import { describe, expect, it } from 'vitest';
-import { firstVoicedSlot, neckModel, nextVoicedSlot } from '../../app/use-neck-view';
-import { load, state } from '../runtime';
-import { bandForGenre } from '../standards';
-import { GUITAR } from './instruments';
-import { legacyBandChart } from './legacy-chart';
-import { voiceBandChart } from './voice-chart';
+import { firstVoicedSlot, neckModel, nextVoicedSlot } from '../app/use-neck-view';
+import { legacyBandChart } from './legacy-band-chart';
+import { load, state } from './runtime';
+import { bandForGenre } from './standards';
+import { GUITAR, voiceBandChart } from './voicings';
 
 function v1Chart(value: string): ChartDocument {
     return {

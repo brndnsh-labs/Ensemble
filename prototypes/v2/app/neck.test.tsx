@@ -7,7 +7,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { build, GUITAR, type Note, UKULELE, type Voicing } from '../lib/shells';
+import { build, GUITAR, type Note, UKULELE, type Voicing } from '../lib/voicings';
 import { Neck, type NeckProps } from './neck';
 import { dx, neckLayout } from './neck-geometry';
 

@@ -14,17 +14,17 @@ import {
     forgetOpened,
     hasDeclinedV1Import,
     legacyStarredIds,
+    type NeckPreferences,
+    neckPreferences,
     openedAtMap,
-    patchShellPreferences,
+    patchNeckPreferences,
     recordOpened,
     rememberAllSongsSort,
     rememberCountIn,
-    rememberShellPreferences,
+    rememberNeckPreferences,
     rememberV1Import,
     rememberV1ImportDecline,
     rememberV1SessionMark,
-    type ShellPreferences,
-    shellPreferences,
     v1ImportLedger,
     v1SessionMark,
 } from './session';
@@ -277,8 +277,8 @@ describe('the All songs sort preference (#1440)', () => {
 });
 
 describe('the neck preferences (#1586)', () => {
-    const KEY = 'ensemble-v2-preview:shell-prefs';
-    const defaults: ShellPreferences = {
+    const KEY = 'ensemble-v2-preview:neck-prefs';
+    const defaults: NeckPreferences = {
         instrument: 'guitar',
         home: [2, 7],
         rootStrings: 'all',
@@ -287,27 +287,27 @@ describe('the neck preferences (#1586)', () => {
     };
 
     it('defaults to guitar, frets 2–7, all root strings, finger labels and no finger detail', () => {
-        expect(shellPreferences()).toEqual(defaults);
+        expect(neckPreferences()).toEqual(defaults);
     });
 
     it('round-trips a full set, including no home window', () => {
-        const uke: ShellPreferences = {
+        const uke: NeckPreferences = {
             instrument: 'uke-low-g',
             home: [4, 9],
             rootStrings: 'classic',
             labels: 'note',
             fingers: true,
         };
-        rememberShellPreferences(uke);
-        expect(shellPreferences()).toEqual(uke);
-        rememberShellPreferences({ ...uke, home: null });
-        expect(shellPreferences().home).toBeNull();
+        rememberNeckPreferences(uke);
+        expect(neckPreferences()).toEqual(uke);
+        rememberNeckPreferences({ ...uke, home: null });
+        expect(neckPreferences().home).toBeNull();
     });
 
     it('falls back to the defaults for a blob that is not a preferences object', () => {
         for (const bad of ['not json', '[1,2]', 'null', '"guitar"', '42']) {
             store.set(KEY, bad);
-            expect(shellPreferences()).toEqual(defaults);
+            expect(neckPreferences()).toEqual(defaults);
         }
     });
 
@@ -322,19 +322,19 @@ describe('the neck preferences (#1586)', () => {
                 fingers: 'yes',
             }),
         );
-        expect(shellPreferences()).toEqual({ ...defaults, rootStrings: 'classic' });
+        expect(neckPreferences()).toEqual({ ...defaults, rootStrings: 'classic' });
         // A uke with a broken window gets the uke's default window, not the guitar's.
         store.set(KEY, JSON.stringify({ instrument: 'uke', home: [7, 2] }));
-        expect(shellPreferences()).toEqual({ ...defaults, instrument: 'uke', home: [1, 6] });
+        expect(neckPreferences()).toEqual({ ...defaults, instrument: 'uke', home: [1, 6] });
     });
 
     it('swaps a default home window with the instrument, and keeps one the musician moved', () => {
-        const uke = patchShellPreferences(defaults, { instrument: 'uke' });
+        const uke = patchNeckPreferences(defaults, { instrument: 'uke' });
         expect(uke.home).toEqual([1, 6]);
-        expect(patchShellPreferences(uke, { instrument: 'guitar' }).home).toEqual([2, 7]);
-        expect(patchShellPreferences(uke, { instrument: 'uke-low-g' }).home).toEqual([1, 6]);
+        expect(patchNeckPreferences(uke, { instrument: 'guitar' }).home).toEqual([2, 7]);
+        expect(patchNeckPreferences(uke, { instrument: 'uke-low-g' }).home).toEqual([1, 6]);
         const moved = { ...defaults, home: [5, 10] as [number, number] };
-        expect(patchShellPreferences(moved, { instrument: 'uke' }).home).toEqual([5, 10]);
-        expect(patchShellPreferences(defaults, { instrument: 'uke', home: null }).home).toBeNull();
+        expect(patchNeckPreferences(moved, { instrument: 'uke' }).home).toEqual([5, 10]);
+        expect(patchNeckPreferences(defaults, { instrument: 'uke', home: null }).home).toBeNull();
     });
 });

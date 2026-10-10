@@ -2,10 +2,10 @@
 
 import { useId, useMemo } from 'react';
 import type { BandChart } from '../lib/band-chart';
-import { defaultShellHome, type ShellLabels, type ShellPreferences } from '../lib/session';
-import type { VoicedBandChord } from '../lib/shells';
+import { defaultNeckHome, type NeckLabels, type NeckPreferences } from '../lib/session';
+import { NECK_INSTRUMENTS, type VoicedBandChord } from '../lib/voicings';
 import { Neck, type NeckPreview } from './neck';
-import { neckModel, SHELL_INSTRUMENTS } from './use-neck-view';
+import { neckModel } from './use-neck-view';
 import './neck-view.css';
 
 // The stand's Neck mode (#1587): the grip for the chord sounding now, a preview of the next one
@@ -23,16 +23,16 @@ interface NeckViewProps {
     active: number | null;
     /** The playing bar's last felt pulse (#1458): the next grip is about to land. */
     nextSoon: boolean;
-    prefs: ShellPreferences;
-    onPrefs: (patch: Partial<ShellPreferences>) => void;
+    prefs: NeckPreferences;
+    onPrefs: (patch: Partial<NeckPreferences>) => void;
 }
 
-const INSTRUMENT_LABELS: [ShellPreferences['instrument'], string][] = [
+const INSTRUMENT_LABELS: [NeckPreferences['instrument'], string][] = [
     ['guitar', 'Guitar'],
     ['uke', 'Ukulele'],
     ['uke-low-g', 'Ukulele (low G)'],
 ];
-const LABEL_CHOICES: [ShellLabels, string][] = [
+const LABEL_CHOICES: [NeckLabels, string][] = [
     ['finger', 'Fingers'],
     ['degree', 'Degrees'],
     ['note', 'Notes'],
@@ -43,7 +43,7 @@ const ascii = (symbol: string): string => symbol.replaceAll('♭', 'b').replaceA
 
 export function NeckView({ band, voiced, active, nextSoon, prefs, onPrefs }: NeckViewProps) {
     const id = useId();
-    const instrument = SHELL_INSTRUMENTS[prefs.instrument];
+    const instrument = NECK_INSTRUMENTS[prefs.instrument];
     const model = useMemo(
         () => (band && voiced ? neckModel(band, voiced, active, instrument) : null),
         [band, voiced, active, instrument],
@@ -118,7 +118,7 @@ export function NeckView({ band, voiced, active, nextSoon, prefs, onPrefs }: Nec
                             value={prefs.instrument}
                             onChange={(e) =>
                                 onPrefs({
-                                    instrument: e.target.value as ShellPreferences['instrument'],
+                                    instrument: e.target.value as NeckPreferences['instrument'],
                                 })
                             }
                         >
@@ -134,7 +134,7 @@ export function NeckView({ band, voiced, active, nextSoon, prefs, onPrefs }: Nec
                         className="btn neck-hand-toggle"
                         onClick={() =>
                             onPrefs({
-                                home: prefs.home ? null : defaultShellHome(prefs.instrument),
+                                home: prefs.home ? null : defaultNeckHome(prefs.instrument),
                             })
                         }
                     >
@@ -150,7 +150,7 @@ export function NeckView({ band, voiced, active, nextSoon, prefs, onPrefs }: Nec
                                 onChange={(e) =>
                                     onPrefs({
                                         rootStrings: e.target
-                                            .value as ShellPreferences['rootStrings'],
+                                            .value as NeckPreferences['rootStrings'],
                                     })
                                 }
                             >
@@ -165,7 +165,7 @@ export function NeckView({ band, voiced, active, nextSoon, prefs, onPrefs }: Nec
                             className="setting-select"
                             aria-label="Labels"
                             value={prefs.labels}
-                            onChange={(e) => onPrefs({ labels: e.target.value as ShellLabels })}
+                            onChange={(e) => onPrefs({ labels: e.target.value as NeckLabels })}
                         >
                             {LABEL_CHOICES.map(([value, label]) => (
                                 <option key={value} value={value}>

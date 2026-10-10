@@ -10,7 +10,7 @@ import { SCORE_CHORD_QUALITIES } from '@engine/songbook/score-text';
 import { describe, expect, it } from 'vitest';
 import { bandChart } from '../band-chart';
 import { buildStandardDocument, STANDARDS } from '../standards';
-import { shellChord } from './adapter';
+import { voicingChord } from './adapter';
 import { voiceBandChart } from './voice-chart';
 import { inHome } from './voicing';
 
@@ -19,7 +19,7 @@ const shell = (symbol: string, key = 'C', minor = false) => {
     if (!facts) {
         throw new Error(`parseChord refused ${symbol}`);
     }
-    return shellChord(facts, key, minor);
+    return voicingChord(facts, key, minor);
 };
 
 describe('every codec quality adapts', () => {
@@ -35,7 +35,7 @@ describe('every codec quality adapts', () => {
                     refused.push(symbol);
                     continue;
                 }
-                expect(() => shellChord(facts, key, false), symbol).not.toThrow();
+                expect(() => voicingChord(facts, key, false), symbol).not.toThrow();
             }
         }
         expect(refused).toEqual([]);
@@ -116,8 +116,8 @@ describe('spelling by key', () => {
         const facts = parseChord('D#7', { tonic: notePc('Bb'), minor: false });
         expect(facts).not.toBeNull();
         if (facts) {
-            expect(shellChord(facts, 'Bb', false).root.name).toBe('E♭');
-            expect(shellChord(facts, 'Bb', false, 'D#').root.name).toBe('D♯');
+            expect(voicingChord(facts, 'Bb', false).root.name).toBe('E♭');
+            expect(voicingChord(facts, 'Bb', false, 'D#').root.name).toBe('D♯');
         }
     });
 });

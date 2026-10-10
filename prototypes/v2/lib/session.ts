@@ -1,5 +1,5 @@
 import type { V1SessionMark } from './import-v1';
-import type { HomeWindow, ShellPrefs } from './shells';
+import { type HomeWindow, NECK_INSTRUMENTS, type NeckPrefs } from './voicings';
 
 const LAST_OPENED = 'ensemble-v2-preview:last-opened';
 
@@ -193,33 +193,34 @@ export function rememberStandMode(mode: StandMode): void {
     }
 }
 
-const SHELL_PREFS = 'ensemble-v2-preview:shell-prefs';
+const NECK_PREFS = 'ensemble-v2-preview:neck-prefs';
 
-export type ShellLabels = 'finger' | 'degree' | 'note';
+export type NeckLabels = 'finger' | 'degree' | 'note';
 /**
- * The neck's per-device settings (#1586): the voicer's `ShellPrefs` plus what the dots show and
+ * The neck's per-device settings (#1586): the voicer's `NeckPrefs` plus what the dots show and
  * whether the finger-by-finger detail is spoken under the headline (#1587, off by default).
  */
-export interface ShellPreferences extends ShellPrefs {
-    labels: ShellLabels;
+export interface NeckPreferences extends NeckPrefs {
+    labels: NeckLabels;
     fingers: boolean;
 }
 
-const SHELL_INSTRUMENTS: readonly ShellPrefs['instrument'][] = ['guitar', 'uke', 'uke-low-g'];
-const SHELL_ROOT_STRINGS: readonly ShellPrefs['rootStrings'][] = ['all', 'classic'];
-const SHELL_LABELS: readonly ShellLabels[] = ['finger', 'degree', 'note'];
+// A stored id is checked against the one instrument table's keys before anything indexes it.
+const NECK_INSTRUMENT_IDS = Object.keys(NECK_INSTRUMENTS) as NeckPrefs['instrument'][];
+const NECK_ROOT_STRINGS: readonly NeckPrefs['rootStrings'][] = ['all', 'classic'];
+const NECK_LABELS: readonly NeckLabels[] = ['finger', 'degree', 'note'];
 /** The neck draws frets 0–15; a home window lives on frets 1–15. */
-const SHELL_MAX_FRET = 15;
+const NECK_MAX_FRET = 15;
 
 /** A guitar's hand starts on frets 2–7; a uke's (either tuning) on 1–6. */
-export function defaultShellHome(instrument: ShellPrefs['instrument']): HomeWindow {
+export function defaultNeckHome(instrument: NeckPrefs['instrument']): HomeWindow {
     return instrument === 'guitar' ? [2, 7] : [1, 6];
 }
 
-export function defaultShellPreferences(): ShellPreferences {
+export function defaultNeckPreferences(): NeckPreferences {
     return {
         instrument: 'guitar',
-        home: defaultShellHome('guitar'),
+        home: defaultNeckHome('guitar'),
         rootStrings: 'all',
         labels: 'finger',
         fingers: false,
@@ -229,7 +230,7 @@ export function defaultShellPreferences(): ShellPreferences {
 const isHomeWindow = (value: unknown): value is HomeWindow =>
     Array.isArray(value) &&
     value.length === 2 &&
-    value.every((f) => Number.isInteger(f) && f >= 1 && f <= SHELL_MAX_FRET) &&
+    value.every((f) => Number.isInteger(f) && f >= 1 && f <= NECK_MAX_FRET) &&
     value[0] <= value[1];
 
 const pick = <T>(allowed: readonly T[], value: unknown, fallback: T): T =>
@@ -241,11 +242,11 @@ const pick = <T>(allowed: readonly T[], value: unknown, fallback: T): T =>
  * Each field is validated on its own, so one unknown value falls back to its default without
  * losing the rest; anything that is not a JSON object is all defaults.
  */
-export function shellPreferences(): ShellPreferences {
-    const defaults = defaultShellPreferences();
+export function neckPreferences(): NeckPreferences {
+    const defaults = defaultNeckPreferences();
     let raw: unknown;
     try {
-        const stored = localStorage.getItem(SHELL_PREFS);
+        const stored = localStorage.getItem(NECK_PREFS);
         if (stored === null) {
             return defaults;
         }
@@ -257,8 +258,8 @@ export function shellPreferences(): ShellPreferences {
         return defaults;
     }
     const stored = raw as Record<string, unknown>;
-    const instrument = pick(SHELL_INSTRUMENTS, stored.instrument, defaults.instrument);
-    let home: HomeWindow | null = defaultShellHome(instrument);
+    const instrument = pick(NECK_INSTRUMENT_IDS, stored.instrument, defaults.instrument);
+    let home: HomeWindow | null = defaultNeckHome(instrument);
     if (stored.home === null) {
         home = null;
     } else if (isHomeWindow(stored.home)) {
@@ -267,17 +268,17 @@ export function shellPreferences(): ShellPreferences {
     return {
         instrument,
         home,
-        rootStrings: pick(SHELL_ROOT_STRINGS, stored.rootStrings, defaults.rootStrings),
-        labels: pick(SHELL_LABELS, stored.labels, defaults.labels),
+        rootStrings: pick(NECK_ROOT_STRINGS, stored.rootStrings, defaults.rootStrings),
+        labels: pick(NECK_LABELS, stored.labels, defaults.labels),
         fingers: typeof stored.fingers === 'boolean' ? stored.fingers : defaults.fingers,
     };
 }
 
-export function rememberShellPreferences(prefs: ShellPreferences): void {
+export function rememberNeckPreferences(prefs: NeckPreferences): void {
     try {
         const { instrument, home, rootStrings, labels, fingers } = prefs;
         localStorage.setItem(
-            SHELL_PREFS,
+            NECK_PREFS,
             JSON.stringify({ instrument, home, rootStrings, labels, fingers }),
         );
     } catch {
@@ -289,19 +290,19 @@ export function rememberShellPreferences(prefs: ShellPreferences): void {
  * Apply a change. Switching between guitar and uke carries the home window along only when the
  * musician moved it: a window still on the old instrument's default becomes the new one's.
  */
-export function patchShellPreferences(
-    prev: ShellPreferences,
-    patch: Partial<ShellPreferences>,
-): ShellPreferences {
+export function patchNeckPreferences(
+    prev: NeckPreferences,
+    patch: Partial<NeckPreferences>,
+): NeckPreferences {
     const next = { ...prev, ...patch };
     const sameWindow = (a: HomeWindow | null, b: HomeWindow) =>
         a !== null && a[0] === b[0] && a[1] === b[1];
     if (
         patch.home === undefined &&
         next.instrument !== prev.instrument &&
-        sameWindow(prev.home, defaultShellHome(prev.instrument))
+        sameWindow(prev.home, defaultNeckHome(prev.instrument))
     ) {
-        next.home = defaultShellHome(next.instrument);
+        next.home = defaultNeckHome(next.instrument);
     }
     return next;
 }

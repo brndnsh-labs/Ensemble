@@ -11,13 +11,13 @@ import {
     rootMove,
     spellDegree,
     type Voicing,
-} from '../lib/shells';
+} from '../lib/voicings';
 import { BOARD_TOP, dx, END, fretAt, fx, HOME_W, NF, NUT, neckLayout } from './neck-geometry';
 import './neck.css';
 
-// The practice view's fretboard (#1586): a dumb renderer, voicing in and SVG out. Ported from the
+// Neck mode's fretboard (#1586): a dumb renderer, voicing in and SVG out. Ported from the
 // handoff prototype's `createNeck`; everything it knows about grips, fingers and motion comes
-// from `lib/shells`. Colour means degree, always; fingers get numbers and motion, never colour.
+// from `lib/voicings`. Colour means degree, always; fingers get numbers and motion, never colour.
 
 export type NeckPreview = 'off' | 'soft' | 'strong';
 export type NeckLabels = 'finger' | 'degree' | 'note';

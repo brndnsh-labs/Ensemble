@@ -1,12 +1,12 @@
 /**
  * The Following look-ahead's next-bar cue (#1458). Pinned here: `nextBarIndex`'s bar-skip and
- * wrap rules, and `measureOfGlobalIndex`'s written-measure bucketing, in isolation from the band
+ * wrap rules, and `measureOfGlobalIndex`'s (`lib/lead-sheet.ts`) written-measure bucketing, in isolation from the band
  * engine and React — `use-chart-view.test.ts`'s own sibling coverage for what
  * `band-chart.test.ts` pins at the `BandChart` level (`BandSlot.bar`).
  */
 import { describe, expect, it } from 'vitest';
-import type { ChartBlock } from '../lib/lead-sheet';
-import { measureOfGlobalIndex, nextBarIndex } from './use-chart-view';
+import { type ChartBlock, measureOfGlobalIndex } from '../lib/lead-sheet';
+import { nextBarIndex } from './use-chart-view';
 
 /** A minimal item `nextBarIndex` can walk: `start` in steps, `bar` its performed-bar ordinal. */
 const item = (start: number, bar: number) => ({ start, bar });

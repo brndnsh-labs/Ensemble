@@ -16,7 +16,7 @@ import { spellPitchClass } from '@engine/engine/note-spelling';
 import { DEGREES, LETTERS, QUALITIES } from './theory';
 import type { Quality, Spelled } from './types';
 
-export interface ShellChord {
+export interface VoicingChord {
     root: Spelled;
     quality: Quality;
     /** What the shell changes about the written chord, or null when it is a faithful reading. */
@@ -184,12 +184,12 @@ function read(chord: ChordFacts): Reading {
  * (a key change mid-chart spells by the new key); `written` is the chart's letter name for the
  * root, when it has one, so a written accidental agrees with the chart sheet.
  */
-export function shellChord(
+export function voicingChord(
     chord: ChordFacts,
     key: string,
     isMinor: boolean,
     written = '',
-): ShellChord {
+): VoicingChord {
     const [quality, reduction] = read(chord);
     // A shell starts on the root, so a slash chord's bass is left to the bass player.
     const bass =

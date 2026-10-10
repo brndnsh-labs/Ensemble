@@ -1,32 +1,11 @@
 import { TIME_SIGNATURES } from '@engine/config';
 import { buildLeadSheetSections } from '@engine/song/lead-sheet-model';
 import { useMemo } from 'react';
-import type { ChartBlock } from '../lib/lead-sheet';
+import type { BandChart } from '../lib/band-chart';
+import { type ChartBlock, measureOfGlobalIndex } from '../lib/lead-sheet';
+import { legacyBandChart } from '../lib/legacy-band-chart';
 import type { ChartDocument } from '../lib/runtime';
 import * as runtime from '../lib/runtime';
-
-/**
- * Every written event's `globalIndex`, bucketed by which WRITTEN MEASURE it belongs to (an
- * ordinal position among every measure in `blocks`, in written order). This is a measure-less
- * (v1) chart's only notion of "performed bar" — v1 has no repeat/ending marks (`ScoreDirection`
- * is a schemaVersion-2 concept only), so its performance is one straight pass and "written
- * measure" and "performed bar" name the exact same thing there. For a schemaVersion-2 chart,
- * `BandSlot.bar` (`lib/band-chart.ts`) is the real performed-bar identity instead — see
- * `nextBarIndex`'s doc for why the two must NOT be conflated.
- */
-export function measureOfGlobalIndex(blocks: ChartBlock[]): Map<number, number> {
-    const map = new Map<number, number>();
-    let m = 0;
-    for (const block of blocks) {
-        for (const measure of block.measures) {
-            for (const chord of measure.chords) {
-                map.set(chord.globalIndex, m);
-            }
-            m += 1;
-        }
-    }
-    return map;
-}
 
 /**
  * The next performed item whose PERFORMED BAR differs from `active`'s (#1458's next-bar cue) —
@@ -82,6 +61,14 @@ export function useChartView(current: ChartDocument | null, active: number | nul
         const a = runtime.state().arranger;
         return buildLeadSheetSections(a.progression, a.sections, TIME_SIGNATURES[a.timeSignature]);
     }, [current, band]);
+    // What follows the band (the neck): the score's chart, or a measure-less chart's equivalent
+    // built from the old maps. `band` itself stays null there — its truthiness means schema 2.
+    const followChart = useMemo(
+        (): BandChart | null =>
+            band ??
+            (blocks.length ? legacyBandChart(blocks, runtime.state().arranger.stepMap) : null),
+        [band, blocks],
+    );
     const displayIndices = useMemo(() => band?.slots.map((slot) => slot.display) ?? [], [band]);
     const displayActive = active === null ? null : (displayIndices[active] ?? active);
     const measureOf = useMemo(() => measureOfGlobalIndex(blocks), [blocks]);
@@ -149,6 +136,9 @@ export function useChartView(current: ChartDocument | null, active: number | nul
     return {
         /** The band's chart (`runtime.bandChartView()`), memoized per document; null for a measure-less chart. */
         band,
+        /** The chart the band performs, for either schema (`band`, or `legacyBandChart` for a
+         * measure-less chart); null for an empty chart. */
+        followChart,
         blocks,
         displayActive,
         displayNext,

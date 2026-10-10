@@ -75,7 +75,6 @@ import {
     v1ImportLedger,
     v1SessionMark,
 } from '../lib/session';
-import { legacyBandChart } from '../lib/shells/legacy-chart';
 import { withSongMeter } from '../lib/song-meter';
 import { allSoundsAvailableOffline, installAllSounds, soundsAvailableOffline } from '../lib/sounds';
 import { buildStandardDocument, standardFor } from '../lib/standards';
@@ -537,8 +536,9 @@ export default function Ensemble() {
     // the gesture effect below clears it on the first pointer or key event anywhere on the page.
     const [pendingAutoplay, setPendingAutoplay] = useState(false);
     const [editing, setEditing] = useState(false);
-    // The stand's Neck mode (#1587), the third view beside Chart and Edit chart and exclusive
-    // with editing: every way into the editor goes through `showEditor`, which clears it.
+    // The stand's remembered mode (#1587): Neck instead of Chart. Editing never touches it — the
+    // editor overlays whichever mode it is, and leaving the editor by any path lands back on it.
+    // The neck shows on `neck && !editing`.
     const [neck, setNeck] = useState(false);
     const [sectionId, setSectionId] = useState('');
     const [buffers, setBuffers] = useState(new Map<string, string>());
@@ -1103,7 +1103,7 @@ export default function Ensemble() {
     // has no render boundary of its own, so calling it here instead of later changes nothing
     // about what it computes, only where its already-fresh-every-render result becomes available.
     const {
-        band,
+        followChart,
         blocks,
         displayActive,
         displayNext,
@@ -1113,16 +1113,8 @@ export default function Ensemble() {
         writtenBars,
         writtenSections,
     } = useChartView(current, active);
-    // A measure-less chart has no band chart; the neck follows it over the old maps instead.
-    // Reading `runtime.state()` inside the memo is safe: the step map is derived from `current`,
-    // so it changes exactly when `blocks` does.
-    const neckBand = useMemo(
-        () =>
-            band ??
-            (blocks.length ? legacyBandChart(blocks, runtime.state().arranger.stepMap) : null),
-        [band, blocks],
-    );
-    const neckVoicing = useNeckVoicing(neckBand, neck);
+    const neckShowing = neck && !editing;
+    const neckVoicing = useNeckVoicing(followChart, neckShowing);
     const hasPendingText = buffers.size > 0 || pendingMeasures;
     const text =
         buffers.get(sectionId) ??
@@ -2530,9 +2522,9 @@ export default function Ensemble() {
             setSoundProgress('');
         });
     }
-    /** Into the editor: the one way `editing` turns on, so Neck mode (#1587) always yields. */
+    /** Into the editor: the one way `editing` turns on. It overlays the stand mode (#1587)
+     * without changing it, so leaving the editor by any path returns to Chart or Neck. */
     function showEditor() {
-        setNeck(false);
         setEditing(true);
     }
     function showStand(mode: StandMode) {
@@ -5487,9 +5479,9 @@ export default function Ensemble() {
                         onNotation={(notation) => change(() => runtime.setNotation(notation))}
                     />
                     <div className={`workspace-body ${editing ? 'editing' : ''}`}>
-                        {neck ? (
+                        {neckShowing ? (
                             <NeckView
-                                band={neckBand}
+                                band={followChart}
                                 voiced={neckVoicing.voiced}
                                 active={active}
                                 nextSoon={nextSoon}
@@ -5716,7 +5708,7 @@ export default function Ensemble() {
                          * `:focus-visible`-only outline (not plain `:focus`) is what keeps a
                          * pointer tap from drawing a visible ring around the whole chart.
                          */}
-                        {playbackActive && !following && !neck && (
+                        {playbackActive && !following && !neckShowing && (
                             <button
                                 className="resume-follow-pill"
                                 data-testid="resume-follow"

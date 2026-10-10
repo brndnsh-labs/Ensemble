@@ -1,4 +1,4 @@
-/* The practice view's fretboard (#1586). Colours are the `--d-*` / board tokens on `:root` in
+/* Neck mode's fretboard (#1586). Colours are the `--d-*` / board tokens on `:root` in
    style.css, so Day and Stage both follow from light-dark(). Geometry is in neck.tsx; the one
    inline style is each dot's runtime transform. */
 .neck {

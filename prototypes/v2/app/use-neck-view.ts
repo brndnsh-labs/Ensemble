@@ -2,27 +2,17 @@ import { useMemo } from 'react';
 import type { BandChart, BandChartChord } from '../lib/band-chart';
 import {
     fingerMoves,
-    GUITAR,
     type InstrumentDef,
     inversionOf,
     rootMove,
-    type ShellPrefs,
-    UKULELE,
-    UKULELE_LOW_G,
     type VoicedBandChord,
     voiceBandChart,
-} from '../lib/shells';
-import { useShellPrefs } from './use-shell-prefs';
+} from '../lib/voicings';
+import { useNeckPrefs } from './use-neck-prefs';
 
 // The neck view's follow logic (#1587): which grip sounds on a performed slot, which one comes
 // next, and the headline and finger detail between them. Pure functions over the band's chart
 // (`lib/band-chart.ts`), so the stand's per-frame `active` slot is all the view needs.
-
-export const SHELL_INSTRUMENTS: Record<ShellPrefs['instrument'], InstrumentDef> = {
-    guitar: GUITAR,
-    uke: UKULELE,
-    'uke-low-g': UKULELE_LOW_G,
-};
 
 /** A written event the voicer made a grip for: a chord, never a hold or N.C. */
 function isVoiced(chord: BandChartChord | undefined): boolean {
@@ -204,12 +194,12 @@ export function neckModel(
 }
 
 /**
- * The shell's neck voicing: the per-device prefs, and the whole chart voiced once per loaded
+ * The stand's neck voicing: the per-device prefs, and the whole chart voiced once per loaded
  * chart + prefs — keyed by written index, never per frame. Voices nothing while the neck is not
  * showing.
  */
 export function useNeckVoicing(band: BandChart | null, showing: boolean) {
-    const { prefs, setPrefs } = useShellPrefs();
+    const { prefs, setPrefs } = useNeckPrefs();
     const voiced = useMemo(
         () =>
             band && showing
