@@ -7,7 +7,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { build, GUITAR, type Note, UKULELE, type Voicing } from '../lib/voicings';
+import { allPositions, build, GUITAR, type Note, UKULELE, type Voicing } from '../lib/voicings';
 import { Neck, type NeckProps } from './neck';
 import {
     boardTransform,
@@ -213,6 +213,93 @@ describe('Neck: previewing the next chord (#1592)', () => {
     it('keeps the landing pulse', () => {
         render({ next: g7, preview: 'soft', strike: true });
         expect(host.querySelector('.neck-active')!.classList).toContain('is-strike');
+    });
+});
+
+describe('Neck: a barre (#1594)', () => {
+    const C = { name: 'C', pc: 0, letter: 0 };
+    const at = (id: string, fret: number) =>
+        allPositions(GUITAR, C, 'maj').find((v) => v.shape.id === id && v.rootFret === fret)!;
+    // C/E 9-8-8 on the top three strings: index across the 8s, middle on the 9.
+    const firstInversion = at('T321-1', 8);
+    // C/G 12-13-12: index across all three, middle on the 13.
+    const secondInversion = at('T321-2', 13);
+    const { sy } = neckLayout(GUITAR.strings);
+    const pillOf = (el: Element) =>
+        ['x', 'y', 'width', 'height'].map((a) => Number(el.getAttribute(a)));
+
+    it('is the grip the test means: index barre on the 8s, middle on the 9', () => {
+        expect(firstInversion.notes.map((n) => [n.string, n.fret, n.finger])).toEqual([
+            [3, 9, 2],
+            [2, 8, 1],
+            [1, 8, 1],
+        ]);
+    });
+
+    it('draws one pill behind the barred dots, and every dot still has its own key', () => {
+        render({ active: firstInversion });
+        const pills = [...host.querySelectorAll('.neck-barre')];
+        expect(pills).toHaveLength(1);
+        expect(pills[0].getAttribute('data-barre')).toBe('1');
+        expect(pillOf(pills[0])).toEqual([dx(8) - 19, sy(1) - 19, 38, sy(2) - sy(1) + 38]);
+        // Behind the dots: the pill comes first in the grip's group.
+        expect(host.querySelector('.neck-active')!.firstElementChild).toBe(pills[0]);
+        const keys = dots().map((d) => d.getAttribute('data-dot'));
+        expect(new Set(keys).size).toBe(3);
+        // The lead (the barre's lowest-pitched string) keeps the finger's key, so it slides.
+        expect(keys.sort()).toEqual(['F1', 'F1:1', 'F2']);
+    });
+
+    it('writes the barre finger once, on the lead dot', () => {
+        render({ active: firstInversion, labels: 'finger' });
+        const label = (key: string) =>
+            host.querySelector(`[data-dot="${key}"] .neck-dot-label`)!.textContent;
+        expect([label('F1'), label('F1:1'), label('F2')]).toEqual(['1', '', '2']);
+        render({ active: firstInversion, labels: 'degree' });
+        expect(label('F1:1')).toBe('R');
+        expect(host.querySelector('[role="img"]')!.getAttribute('aria-label')).toContain(
+            '2nd string fret 8, finger 1 barre',
+        );
+    });
+
+    it('draws no pill for a grip without one', () => {
+        render();
+        expect(host.querySelector('.neck-barre')).toBeNull();
+    });
+
+    it('previews the next barre as a ghost pill and, with the fingers, one pill target', () => {
+        render({ active: firstInversion, next: secondInversion, preview: 'strong' });
+        const ghost = host.querySelectorAll('.neck-ghost-barre');
+        expect(ghost).toHaveLength(1);
+        expect(pillOf(ghost[0])).toEqual([dx(12) - 17, sy(1) - 17, 34, sy(3) - sy(1) + 34]);
+        expect(host.querySelector('.neck-target')).toBeNull();
+
+        render({ active: firstInversion, next: secondInversion, preview: 'strong', fingers: true });
+        const targets = [...host.querySelectorAll('.neck-target')];
+        // The index (laying the new barre) and the middle (to the 13).
+        expect(targets).toHaveLength(2);
+        const barreTarget = host.querySelector('.neck-target.is-barre')!;
+        expect(pillOf(barreTarget.querySelector('rect')!)).toEqual([
+            dx(12) - 13,
+            sy(1) - 13,
+            26,
+            sy(3) - sy(1) + 26,
+        ]);
+        expect(barreTarget.textContent).toBe('1');
+    });
+
+    it('rings a barre that stays down, pill and dots together', () => {
+        const next: Voicing = {
+            ...firstInversion,
+            notes: firstInversion.notes.map((n) =>
+                n.string === 3 ? { ...n, fret: 10, finger: 3 } : { ...n },
+            ),
+        };
+        render({ active: firstInversion, next, preview: 'strong', fingers: true });
+        expect(host.querySelector('.neck-barre')!.classList).toContain('is-hold');
+        expect(host.querySelector('[data-dot="F1"]')!.classList).toContain('is-hold');
+        expect(host.querySelector('[data-dot="F1:1"]')!.classList).toContain('is-hold');
+        expect(host.querySelector('[data-dot="F2"]')!.classList).toContain('is-lift');
     });
 });
 

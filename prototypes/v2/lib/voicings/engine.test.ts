@@ -1,5 +1,6 @@
 import { parseChord } from '@band/index';
 import { describe, expect, it } from 'vitest';
+import { assignFingers, barres, fingerOptions } from './fingering';
 import {
     allPositions,
     build,
@@ -22,6 +23,7 @@ import {
     voicingChord,
 } from './index';
 import { keyFamily, keyRoot } from './test/keys';
+import type { Note } from './types';
 
 const tab = (inst: InstrumentDef, v: Voicing) => {
     const m = new Map(v.notes.map((n) => [n.string, n.fret]));
@@ -280,6 +282,127 @@ describe('voiceChart', () => {
         });
         const t = handTravel(GUITAR, v);
         expect(t.highestFret - t.lowestFret).toBeLessThanOrEqual(5);
+    });
+});
+
+describe('barres (#1594): what guitarists and uke players actually do', () => {
+    /**
+     * A grip straight from its tab ('x x x 5 5 3'), lowest-numbered string last; `root` is the
+     * string holding the root (the cost keeps a root off the weak fingers).
+     */
+    const grip = (tabs: string, root: number): Note[] => {
+        const frets = tabs.split(' ');
+        return frets.flatMap((t, i) => {
+            const string = frets.length - i;
+            return t === 'x'
+                ? []
+                : [
+                      {
+                          string,
+                          fret: Number(t),
+                          degree: string === root ? 'R' : '5',
+                          role: string === root ? 'R' : 'F',
+                          finger: null,
+                      } satisfies Note,
+                  ];
+        });
+    };
+    /** The fingers, in tab order (x for a string not played). */
+    const fingered = (tabs: string, root: number, barre = true) => {
+        const notes = grip(tabs, root);
+        assignFingers(notes, { barre });
+        const by = new Map(notes.map((n) => [n.string, n.finger]));
+        return tabs
+            .split(' ')
+            .map((_, i, all) => by.get(all.length - i) ?? 'x')
+            .join(' ');
+    };
+    /**
+     * How much cheaper the best barre is than the best fingering without one (Infinity when the
+     * split is out of the running altogether).
+     */
+    const margin = (tabs: string, root: number) => {
+        const options = fingerOptions(grip(tabs, root), { barre: true });
+        const barred = (p: Array<number | null>) => new Set(p).size < p.length;
+        const split = options.find((o) => !barred(o.p))?.cost ?? Infinity;
+        return split - options.find((o) => barred(o.p))!.cost;
+    };
+
+    it('guitar C 5-5-3: index on the 3, ring across the 5s', () => {
+        expect(fingered('x x x 5 5 3', 3)).toBe('x x x 3 3 1');
+        const notes = grip('x x x 5 5 3', 3);
+        assignFingers(notes, { barre: true });
+        expect(barres(notes)).toEqual([{ finger: 3, fret: 5, strings: [2, 3] }]);
+        // A preference, not a rule: less than re-fingering a held note costs the chart planner.
+        expect(margin('x x x 5 5 3', 3)).toBeGreaterThan(1);
+        expect(margin('x x x 5 5 3', 3)).toBeLessThan(2.5);
+    });
+    it('guitar C/E 9-8-8: index barre on the 8s, middle on the 9', () => {
+        expect(fingered('x x x 9 8 8', 1)).toBe('x x x 2 1 1');
+        expect(margin('x x x 9 8 8', 1)).toBeGreaterThan(2);
+    });
+    it('guitar C/G 12-13-12: index barre across all three, middle on the 13', () => {
+        expect(fingered('x x x 12 13 12', 2)).toBe('x x x 1 2 1');
+        expect(margin('x x x 12 13 12', 2)).toBeGreaterThan(1);
+    });
+    it('the same 2-3-2 shape low on the neck is a finger each (the open D shape is 1-3-2)', () => {
+        expect(fingered('x x x 2 3 2', 2)).toBe('x x x 1 3 2');
+        expect(margin('x x x 2 3 2', 2)).toBeLessThan(-1);
+    });
+    it('three-note A5 x-0-2-2: the index lies across the two 2s', () => {
+        expect(fingered('x 0 2 2 x x', 5)).toBe('x 0 1 1 x x');
+    });
+    it('three-note B5 x-2-4-4: index on the root, ring across the other two', () => {
+        expect(fingered('x 2 4 4 x x', 5)).toBe('x 1 3 3 x x');
+    });
+    it('uke D 2220 is one index barre', () => {
+        expect(fingered('2 2 2 0', 3)).toBe('1 1 1 0');
+    });
+    it('uke E 4442: ring across the 4s, index on the 2', () => {
+        expect(fingered('4 4 4 2', 3)).toBe('3 3 3 1');
+    });
+    it('uke G 0232 and F 2010 are not barred', () => {
+        expect(fingered('0 2 3 2', 4)).toBe('0 1 3 2');
+        expect(margin('0 2 3 2', 4)).toBeLessThan(-1);
+        expect(fingered('2 0 1 0', 2)).toBe('2 0 1 0');
+    });
+    it('never bars over an open string or a lower note inside the run', () => {
+        // Uke A 2100: the open strings sit outside the index's reach; nothing to bar.
+        expect(fingered('2 1 0 0', 4)).toBe('2 1 0 0');
+        // Guitar 5-4-5: the 4 sits inside the run, so the 5s cannot share a finger.
+        expect(barres(grip('x x x 5 4 5', 3))).toEqual([]);
+        const notes = grip('x x x 5 4 5', 3);
+        assignFingers(notes, { barre: true });
+        expect(barres(notes)).toEqual([]);
+    });
+    it('without the barre flag (a shell) every note keeps its own finger', () => {
+        expect(fingered('x x x 9 8 8', 1, false)).toBe('x x x 3 1 2');
+    });
+
+    const chart = (names: string[]) =>
+        names.map((s) => {
+            const p = voicingChord(parseChord(s, { tonic: 0, minor: false })!, 'C', false);
+            return { root: p.root, quality: p.quality };
+        });
+    it('a chart of closed triads takes barres; a shell chart never does', () => {
+        const pop = voiceChart(chart(['C', 'G', 'Am', 'F']), { instrument: GUITAR, home: [2, 7] });
+        expect(pop.some((v) => barres(v.notes).length > 0)).toBe(true);
+        for (const inst of [GUITAR, UKULELE]) {
+            const shells = voiceChart(chart(['Dm7', 'G7', 'Cmaj7']), {
+                instrument: inst,
+                home: [2, 7],
+            });
+            expect(shells.every((v) => barres(v.notes).length === 0)).toBe(true);
+        }
+    });
+    it('narrates a barre as one finger', () => {
+        const pop = voiceChart(chart(['C', 'G', 'Am', 'F']), { instrument: GUITAR, home: [2, 7] });
+        const lines = pop.slice(1).map((v, i) => fingerMoves(GUITAR, pop[i], v).moves);
+        const barred = lines.flat().filter((m) => m.barre);
+        expect(barred.length).toBeGreaterThan(0);
+        for (const m of barred) {
+            expect(m.finger).toBe(m.barre!.finger);
+        }
     });
 });
 

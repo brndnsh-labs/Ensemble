@@ -100,6 +100,15 @@
         opacity: 0;
     }
 }
+/* The next grip's barre, as washed out as its dots. */
+.neck-ghost-barre {
+    fill: var(--string);
+    fill-opacity: 0.18;
+    stroke: var(--string);
+    stroke-opacity: 0.9;
+    stroke-width: 2;
+    stroke-dasharray: 4 3;
+}
 /* A ghost is the next grip's dot in its degree colour, washed out and dashed so it never reads
    as a note to play now. */
 .neck-ghost-dot {
@@ -148,6 +157,13 @@
     stroke-width: 2;
     stroke-dasharray: 3 3;
 }
+/* A barre's target: one dashed pill across the strings it will lie on. */
+.neck-target.is-barre rect {
+    fill: var(--wood);
+    stroke: var(--move);
+    stroke-width: 2;
+    stroke-dasharray: 3 3;
+}
 .neck-target text {
     fill: var(--move);
     font-size: 12.5px;
@@ -175,6 +191,30 @@
     }
 }
 .neck-dot.is-lift {
+    opacity: 0.45;
+}
+/* A barre (#1594): one finger lying flat across the dots it joins, drawn behind them. A finger,
+   not a degree, so it takes the strings' neutral colour, never a degree's. */
+.neck-barre {
+    fill: var(--string);
+    fill-opacity: 0.55;
+    stroke: var(--wood-edge);
+    stroke-width: 1.5;
+    pointer-events: none;
+    transition:
+        opacity 0.3s,
+        stroke 0.3s;
+}
+@starting-style {
+    .neck-barre {
+        opacity: 0;
+    }
+}
+.neck-barre.is-hold {
+    stroke: var(--hold);
+    stroke-width: 3;
+}
+.neck-barre.is-lift {
     opacity: 0.45;
 }
 .neck-ring {
@@ -253,6 +293,7 @@
 
 @media (prefers-reduced-motion: reduce) {
     .neck-dot,
+    .neck-barre,
     .neck-ring,
     .neck-body,
     .neck-active,

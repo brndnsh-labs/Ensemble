@@ -29,6 +29,12 @@ const spanOf = (frets: number[]): number => {
 };
 const MAX_SPAN = 4;
 
+/**
+ * Triad and power grips may take a barre (#1594); a shell is one finger per note, its skipped
+ * string muted by the fretting hand, as jazz comping is taught.
+ */
+const mayBarre = (shape: ShapeDef): boolean => shape.kind !== 'shell';
+
 /** Fret on string `s` for a note `interval` semitones above a root at fret `r` on `rootString`, kept within reach. */
 export function fretFor(
     inst: InstrumentDef,
@@ -168,7 +174,7 @@ export function buildAt(
         }
     }
     notes.sort((a, b) => b.string - a.string);
-    assignFingers(notes);
+    assignFingers(notes, { barre: mayBarre(shape) });
     return { shape, rootFret: r, notes, missing, root, quality, symbol: root.name + q.symbol };
 }
 
@@ -389,7 +395,7 @@ export function voiceChart<C extends ChartChord>(chart: C[], opts: VoiceOptions)
         transCost,
     );
     const out = picked.map((v, i) => stamp(v, chart[i]));
-    fingerSequence(out);
+    fingerSequence(out.map((v) => ({ notes: v.notes, barre: mayBarre(v.shape) })));
     return out;
 }
 
@@ -418,7 +424,7 @@ export function voiceNext<C extends ChartChord>(
         const prevOpt = currentFingering(prev.notes);
         let bo = null,
             bv = Infinity;
-        for (const o of fingerOptions(out.notes)) {
+        for (const o of fingerOptions(out.notes, { barre: mayBarre(out.shape) })) {
             const v = o.cost + fingerTransCost(prevOpt, o);
             if (v < bv) {
                 bv = v;

@@ -2,9 +2,12 @@
 
 import { type KeyboardEvent, type PointerEvent, useRef, useState } from 'react';
 import {
+    type Barre,
+    barres,
     DEGREES,
     type Degree,
     fingerMap,
+    fingerMoves,
     type HomeWindow,
     type InstrumentDef,
     type Note,
@@ -101,12 +104,22 @@ const DEGREE_FILL: Record<Degree, string> = {
 const MAX_START = NF - HOME_W + 1;
 const clampStart = (start: number): number => Math.max(1, Math.min(MAX_START, start));
 
-/** A dot's identity across chords: its finger, so a dot slides to where that finger goes. */
-const dotKey = (n: Note): string => (n.finger ? `F${n.finger}` : `O${n.string}`);
+/**
+ * A dot's identity across chords: its finger, so a dot slides to where that finger goes. A barre
+ * (#1594) is one finger on several strings: its note on the lowest-pitched string (`fingerMap`'s
+ * lead) keeps the finger's key and slides with it; the rest are keyed by string too.
+ */
+function dotKey(n: Note, leads: Record<number, Note>): string {
+    if (!n.finger) {
+        return `O${n.string}`;
+    }
+    return leads[n.finger] === n ? `F${n.finger}` : `F${n.finger}:${n.string}`;
+}
 
-function labelFor(n: Note, root: Voicing['root'], mode: NeckLabels): string {
+function labelFor(n: Note, root: Voicing['root'], mode: NeckLabels, lead: boolean): string {
     if (mode === 'finger') {
-        return n.fret === 0 ? '0' : String(n.finger ?? '');
+        // A barre's finger number is written once, on its lead dot.
+        return n.fret === 0 ? '0' : lead ? String(n.finger ?? '') : '';
     }
     return mode === 'note' ? spellDegree(root, n.degree) : DEGREES[n.degree].label;
 }
@@ -263,33 +276,40 @@ export function Neck({
             ? { from: motion.from, to: motion.to, text: motion.text }
             : null;
 
-    // Finger preview: what each finger does on the way to the next grip.
-    const holds = new Set<string>();
-    const lifts = new Set<string>();
-    const moves: Array<{ finger: number; from: Note | undefined; to: Note }> = [];
+    // Finger preview: what each finger does on the way to the next grip — the narration's own
+    // moves (`fingerMoves`), so a barre holds, lifts and moves as the one finger it is.
+    const holds = new Set<number>();
+    const lifts = new Set<number>();
+    const moves: Array<{ finger: number; from: Note | undefined; to: Note; barre?: Barre }> = [];
     if (showFingers) {
-        const A = fingerMap(active.notes);
-        const B = fingerMap(next.notes);
-        for (let f = 1; f <= 4; f++) {
-            const a = A[f];
-            const b = B[f];
-            if (a && b && a.string === b.string && a.fret === b.fret) {
-                holds.add(`F${f}`);
-            } else if (a && !b) {
-                lifts.add(`F${f}`);
-            } else if (b) {
-                moves.push({ finger: f, from: a, to: b });
+        for (const m of fingerMoves(instrument, active, next).moves) {
+            if (m.kind === 'hold') {
+                holds.add(m.finger);
+            } else if (m.kind === 'lift') {
+                lifts.add(m.finger);
+            } else if (m.to) {
+                moves.push({ finger: m.finger, from: m.from, to: m.to, barre: m.barre });
             }
         }
     }
 
     const point = (note: Note) => ({ x: dx(note.fret), y: sy(note.string) });
+    /** A barre's pill: across its strings at its fret, a little wider than the dots it joins. */
+    const pill = (b: Barre, r: number) => ({
+        x: dx(b.fret) - r,
+        y: sy(b.strings[0]) - r,
+        width: 2 * r,
+        height: sy(b.strings[1]) - sy(b.strings[0]) + 2 * r,
+        rx: r,
+    });
+    const activeBarres = active ? barres(active.notes) : [];
+    const barredFingers = new Set(activeBarres.map((b) => b.finger));
 
     const boardLabel = active
         ? `${active.symbol}: ${active.notes
               .map(
                   (x) =>
-                      `${instrument.strName(x.string)} fret ${x.fret}${x.finger ? `, finger ${x.finger}` : ''}, ${DEGREES[x.degree].name}`,
+                      `${instrument.strName(x.string)} fret ${x.fret}${x.finger ? `, finger ${x.finger}${barredFingers.has(x.finger) ? ' barre' : ''}` : ''}, ${DEGREES[x.degree].name}`,
               )
               .join('; ')}`
         : 'Fretboard showing the current chord';
@@ -316,7 +336,10 @@ export function Neck({
         };
     }
 
-    const dots = active ? [...active.notes].sort((a, b) => dotKey(a).localeCompare(dotKey(b))) : [];
+    const leads = active ? fingerMap(active.notes) : {};
+    const dots = active
+        ? [...active.notes].sort((a, b) => dotKey(a, leads).localeCompare(dotKey(b, leads)))
+        : [];
 
     return (
         <svg
@@ -465,6 +488,14 @@ export function Neck({
                     {outline && <rect className="neck-outline" rx={18} {...outline} />}
                     {ahead && (
                         <g className="neck-ghost">
+                            {barres(next.notes).map((b) => (
+                                <rect
+                                    key={`B${b.finger}`}
+                                    className="neck-ghost-barre"
+                                    data-ghost-barre={b.finger}
+                                    {...pill(b, 17)}
+                                />
+                            ))}
                             {next.notes.map((x) => (
                                 <circle
                                     key={`${x.string}-${x.fret}`}
@@ -488,7 +519,7 @@ export function Neck({
                     )}
                     {showFingers && (
                         <g className="neck-preview">
-                            {moves.map(({ finger, from, to }) => {
+                            {moves.map(({ finger, from, to, barre }) => {
                                 const b = point(to);
                                 const isRootPath =
                                     rootPair !== null &&
@@ -515,13 +546,24 @@ export function Neck({
                                                 markerEnd={`url(#${id}-head)`}
                                             />
                                         )}
-                                        <g
-                                            className="neck-target"
-                                            transform={`translate(${b.x},${b.y})`}
-                                        >
-                                            <circle r={12} />
-                                            <text y={4.5}>{finger}</text>
-                                        </g>
+                                        {barre ? (
+                                            // A barre's target is one pill across its strings,
+                                            // numbered once at the lead (the arrow's end).
+                                            <g className="neck-target is-barre">
+                                                <rect {...pill(barre, 13)} />
+                                                <text x={b.x} y={b.y + 4.5}>
+                                                    {finger}
+                                                </text>
+                                            </g>
+                                        ) : (
+                                            <g
+                                                className="neck-target"
+                                                transform={`translate(${b.x},${b.y})`}
+                                            >
+                                                <circle r={12} />
+                                                <text y={4.5}>{finger}</text>
+                                            </g>
+                                        )}
                                     </g>
                                 );
                             })}
@@ -531,15 +573,30 @@ export function Neck({
                         <g
                             className={`neck-active${dimmed ? ' is-dimmed' : ''}${strike ? ' is-strike' : ''}`}
                         >
+                            {activeBarres.map((b) => (
+                                // Behind the dots: the finger lying flat across them (#1594).
+                                <rect
+                                    key={`B${b.finger}:${b.fret}:${b.strings.join('-')}`}
+                                    className={`neck-barre${holds.has(b.finger) ? ' is-hold' : lifts.has(b.finger) ? ' is-lift' : ''}`}
+                                    data-barre={b.finger}
+                                    {...pill(b, 19)}
+                                />
+                            ))}
                             {dots.map((x) => {
-                                const key = dotKey(x);
+                                const key = dotKey(x, leads);
                                 const root = x.role === 'R';
-                                const label = labelFor(x, active.root, labels);
-                                const state = holds.has(key)
-                                    ? ' is-hold'
-                                    : lifts.has(key)
-                                      ? ' is-lift'
-                                      : '';
+                                const label = labelFor(
+                                    x,
+                                    active.root,
+                                    labels,
+                                    !x.finger || leads[x.finger] === x,
+                                );
+                                const state =
+                                    x.finger && holds.has(x.finger)
+                                        ? ' is-hold'
+                                        : x.finger && lifts.has(x.finger)
+                                          ? ' is-lift'
+                                          : '';
                                 return (
                                     <g
                                         key={key}

@@ -5,10 +5,11 @@
 
 export type { VoicingChord } from './adapter';
 export { spellRoot, voicingChord } from './adapter';
-export { fingerMap } from './fingering';
+export type { Barre } from './fingering';
+export { barres, fingerMap, fingerNotes } from './fingering';
 export { GUITAR, UKULELE, UKULELE_LOW_G } from './instruments';
 export type { FingerMove, FingerMoveKind, RootMove, TravelSummary } from './motion';
-export { fingerMoves, handTravel, rootMove } from './motion';
+export { barreStrings, fingerMoves, handTravel, rootMove } from './motion';
 export { DEGREES, QUALITIES, spellDegree } from './theory';
 export * from './types';
 export type { NeckPrefs, VoicedBandChord } from './voice-chart';

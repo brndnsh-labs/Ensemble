@@ -1,4 +1,4 @@
-import { fingerMap } from './fingering';
+import { type Barre, barres, fingerMap } from './fingering';
 import { mod } from './theory';
 import type { InstrumentDef, Note, Voicing } from './types';
 import { center } from './voicing';
@@ -77,9 +77,41 @@ export interface FingerMove {
     text: string;
     from?: Note;
     to?: Note;
+    /** The barre this finger lays across in b (#1594); `to` is its note on the lowest-pitched string. */
+    barre?: Barre;
 }
 
-/** What each finger does going from a to b ("stays down", "slides up 1 fret", "lifts off"...). */
+const COUNT = ['', 'one', 'two', 'three', 'four', 'five', 'six'];
+
+/**
+ * A barre's strings in words: "the top two strings" when the strings run in pitch order (so
+ * "top" can only mean the highest-pitched), otherwise by name ("the G, C and E strings" on a
+ * re-entrant uke, where the G string is not the lowest).
+ */
+export function barreStrings(inst: InstrumentDef, [lo, hi]: [number, number]): string {
+    const n = hi - lo + 1;
+    if (n === inst.strings) {
+        return `all ${COUNT[n] ?? n} strings`;
+    }
+    let ordered = true;
+    for (let s = 1; s < inst.strings; s++) {
+        ordered &&= inst.open[s] > inst.open[s + 1];
+    }
+    if (ordered && lo === 1) {
+        return `the top ${COUNT[n] ?? n} strings`;
+    }
+    const names = Array.from({ length: n }, (_, i) => inst.strShort(hi - i));
+    return `the ${names.slice(0, -1).join(', ')} and ${names.at(-1)} strings`;
+}
+
+const sameRun = (x: Barre | undefined, y: Barre | undefined): boolean =>
+    !x || !y ? x === y : x.strings[0] === y.strings[0] && x.strings[1] === y.strings[1];
+
+/**
+ * What each finger does going from a to b ("stays down", "slides up 1 fret", "lifts off"...). A
+ * barre is one finger (#1594): it stays down, slides as a whole, or "bars fret 8 on the top two
+ * strings" when it is laid down or changes its strings.
+ */
 export function fingerMoves(
     inst: InstrumentDef,
     a: Voicing,
@@ -87,6 +119,8 @@ export function fingerMoves(
 ): { moves: FingerMove[]; openStrings: number[] } {
     const A = fingerMap(a.notes),
         B = fingerMap(b.notes),
+        barA = barres(a.notes),
+        barB = barres(b.notes),
         moves: FingerMove[] = [];
     for (let f = 1; f <= 4; f++) {
         const x = A[f],
@@ -94,8 +128,22 @@ export function fingerMoves(
         if (!x && !y) {
             continue;
         }
-        if (x && y && x.string === y.string && x.fret === y.fret) {
-            moves.push({ finger: f, kind: 'hold', text: 'stays down', from: x, to: y });
+        const bx = barA.find((r) => r.finger === f),
+            by = barB.find((r) => r.finger === f);
+        // A barre that stays a barre on the same strings moves like one finger; a new or
+        // reshaped one is named. A barre giving way to one note is that finger's note.
+        const sameShape = !by || sameRun(bx, by);
+        if (x && y && x.string === y.string && x.fret === y.fret && sameShape) {
+            moves.push({ finger: f, kind: 'hold', text: 'stays down', from: x, to: y, barre: by });
+        } else if (y && by && !sameShape) {
+            moves.push({
+                finger: f,
+                kind: 'move',
+                text: `bars fret ${by.fret} on ${barreStrings(inst, by.strings)}`,
+                from: x,
+                to: y,
+                barre: by,
+            });
         } else if (x && y && x.string === y.string) {
             const d = y.fret - x.fret;
             moves.push({
@@ -104,6 +152,7 @@ export function fingerMoves(
                 text: `slides ${d > 0 ? 'up' : 'down'} ${Math.abs(d)} fret${Math.abs(d) > 1 ? 's' : ''}`,
                 from: x,
                 to: y,
+                barre: by,
             });
         } else if (x && y) {
             moves.push({

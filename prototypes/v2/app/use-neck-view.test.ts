@@ -202,6 +202,11 @@ describe('neckModel', () => {
         // The hand stays at the 5th fret: C x x 5 5 5 x (G C E), G x 5 5 4 x x (D G B),
         // Am x x x 5 5 5 (C E A), F x x x 5 6 5 (C F A).
         expect(models.map((m) => m.inversion)).toEqual([2, 2, 1, 2]);
+        // A barre is one finger (#1594): laid across its strings, then held into the F.
+        expect(models[1].fingers).toBe('Finger 1 bars fret 5 on the top three strings.');
+        expect(models[2].fingers).toBe(
+            'Finger 1 stays down; finger 2 goes down on the 2nd string, fret 6.',
+        );
     });
 
     it('heads a chart of one chord with its name alone, and says nothing while it plays', () => {
