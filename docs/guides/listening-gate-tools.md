@@ -62,6 +62,43 @@ ids keep their old names so reports, `mix:diff` baselines and `--stems=` filters
 - The `harmony` findings (voice cap, retriggers, sharp edges, top-end air) and the `harmony`
   entry in `--cohesion`'s sample band.
 
+## `npm run render:node` — the same render, in node, no browser
+
+`scripts/render-node.ts` renders a scene's stems through the SAME `renderBand` the page's
+render bridge runs (`prototypes/v2/lib/render-bridge.ts`), on `node-web-audio-api` instead of
+Chromium, with no Next build and no browser. A spike as of 2026-10-09: it writes the stems'
+WAVs and prints each stem's peak and render time; the metric table, event dumps and the tools
+built on `mix:report` still run the Chromium path.
+
+```bash
+npm run render:node -- funk-pocket MIX_AUDIT tmp/node-render           # a default scene
+npm run render:node -- funk-packs ALPHA out --scenes-from=scenes.json  # an external scene
+npm run render:node -- jazz-ride ALPHA out --stems=bass,drums --mute-reverb
+```
+
+`scripts/node-webaudio.ts` is what makes the engine run in node: it installs the Web Audio
+classes as globals, serves `/packs/` from `public/packs/` on disk (decoding each `.m4a` through
+ffmpeg once into `tmp/node-webaudio/`), and works around two `node-web-audio-api` 2.2.0 bugs
+that the parity probes found — its header says which. `tests/scripts/node-webaudio-automation.test.ts`
+holds the workaround to the spec's envelope formulas.
+
+**Measured against Chromium (2026-10-09, `funk-pocket` / `MIX_AUDIT`, and the same scene on
+the sample band).** Every lane's level is within 1.4 dB of Chromium's; `mix:verify`'s checks
+(presence, timing, `vel→peak r`, pitch) give the same verdicts on both renders; a sampled lane
+is sample-identical after a constant 176-sample (4 ms) offset from the master chain's
+compressor and waveshaper latencies (aligned correlation 0.99–1.00, residual −46 to −52 dBFS).
+A synth lane keeps its energy and timing but not its waveform (per-note correlation 0.5–0.98):
+the two engines' compressors shape transients differently (node lets loud hits through about
+2 dB hotter), node's sawtooth and square run 1.4 dB hotter, and the comb-delay reverb differs
+in detail. So: read levels, spectra, presence and timing off a node render; compare node
+against node, never a node render against a Chromium one by subtraction. A node render is
+byte-identical across processes.
+
+**Speed.** The pack scene's six stems render in 9 s; the all-synth scene's take 70 s, against
+86 s for `mix:report --no-build` on the same scene (plus the Next build when the bridge export
+is stale). node-web-audio-api's cost scales with node count: the synth chords build 11
+oscillators per event.
+
 ## `npm run mix:report`
 
 Prints, per scene and seed, a per-stem table (peak/RMS/crest, transients, schedule pressure,
