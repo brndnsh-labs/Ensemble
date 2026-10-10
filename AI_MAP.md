@@ -67,6 +67,7 @@ The ground-up replacement for the generative engine, the default since 2026-09-2
 | `scripts/render-node.ts` | `npm run render:node`: a scene's stem WAVs through the node backend, no report. | — |
 | `scripts/live-capture.ts` | `npm run live:capture`: records the stand's LIVE transport through the bridge build's master-bus tap, then checks Stop silence, a click at Stop, tempo against the grid, and live-vs-offline level on the stand's own sounds. | `runLiveCapture`, `sceneUrl` |
 | `scripts/live-checks.ts` | The pure checks behind `live:capture`: `stopSilence`, `stopClick`, `tempoFit`, `compareLevels`, `denseBandShares`. | — |
+| `scripts/webaudio-parity.ts` | `npm run webaudio:parity`: the same Web Audio graph snippets rendered in node and in Chromium, compared per probe — the method behind the node renderer's fidelity notes. | `compareProbe`, `parseParityArgs` |
 | `prototypes/v2/lib/band-chart.ts` | The chart sheet's view of a score on the band engine, from the score + band timeline: every written event (holds, N.C., fermatas, off-grid lengths), its performed slots, section step bounds, chord names in all three notations. | `bandChart`, `slotAt`, `chordNames` |
 | `prototypes/v2/lib/engine-mode.ts` | `checkPlayable`, the one capability check every open/edit/import path asks: the score is valid and its timeline compiles. | `checkPlayable` |
 
