@@ -3,7 +3,8 @@ import type { Note } from './types';
 /**
  * Fingering: try every assignment of fingers 1-4 where higher frets get higher fingers and equal frets go
  * from the lower-pitched string to the higher one, scored by how compact the hand is. Triad and
- * power grips may also lay one finger across a run of same-fret strings (a barre, #1594); a barre
+ * power grips may also lay one finger across a run of same-fret strings (a barre, #1594), and a
+ * guitar shell the one index barre that frees its root (#1607); a barre
  * is derived from the fingers, never stored — several fretted notes sharing a finger (`barres`).
  * A single chord takes the cheapest option; a chart is planned as a sequence so shared notes keep their finger.
  */
@@ -41,9 +42,16 @@ function perms(k: number): number[][] {
     return out;
 }
 
-/** What a fingering may use: `barre` lets one finger lie across a run of same-fret notes (#1594). */
+/** What a fingering may use. */
 export interface FingerOpts {
+    /** A triad or power grip: any finger but the middle may lie across a run of same-fret notes (#1594). */
     barre?: boolean;
+    /**
+     * A shell whose root sits on a bass string under muted strings (a guitar shell): it is a
+     * finger per note, except for the one small index barre that gets its root off the ring or
+     * little finger (`rootBarreOptions`, #1607).
+     */
+    rootBarre?: boolean;
 }
 
 /**
@@ -187,10 +195,36 @@ function barreOptions(notes: Note[], fr: Note[]): FingerOption[] {
     return out;
 }
 
+/** The finger an option puts on the grip's root; 0 when the root is an open string. */
+const rootFinger = (o: FingerOption): number => o.p[o.fr.findIndex((n) => n.role === 'R')] ?? 0;
+
+/**
+ * The one barre a guitar shell takes (#1607): the index laid across the grip's lowest fret, when
+ * that is the only way to get the root off the ring or little finger. A shell is taught a finger
+ * per note, root under the index or middle finger so that finger can also mute the string the
+ * shape skips. That fails when two of the notes sit a fret under the root: G♯°7 4-x-3-4-3-x is
+ * 3-1-4-2 a finger each, the root under the ring finger and the hand twisted round it, and
+ * players take 2-1-3-1 instead, the index across the 3rd fret; the R–3–6 grip (C6 x-3-2-2-x-x)
+ * is 2-1-1 the same way. So the barre is offered only when no finger-per-note fingering has
+ * the root on finger 1 or 2, and only where it puts it there — which only an index barre can,
+ * since a ring or little-finger barre sits above the root and frees no finger below it. It is
+ * costed like any barre (`BARRE_COST`, `holeCost`; the shell's root-finger cost never applies,
+ * every one of these having the root on finger 1 or 2), so the planner still chooses, and a
+ * grip a finger per note already holds root first (Dm7♭5 x-5-6-5-6-x, 1-3-2-4) keeps the
+ * fingering it is taught with.
+ */
+function rootBarreOptions(notes: Note[], fr: Note[], split: FingerOption[]): FingerOption[] {
+    if (split.some((o) => rootFinger(o) <= 2)) {
+        return [];
+    }
+    return barreOptions(notes, fr).filter((o) => rootFinger(o) <= 2);
+}
+
 /**
  * Every reasonable fingering for a grip, cheapest first. `barre: true` marks a triad or power grip:
  * it is offered barres, and drops the shell's root-finger rule (`handCost`). Without it — a
- * shell — every note has its own finger, the skipped string muted by the fretting hand.
+ * shell — every note has its own finger, the skipped string muted by the fretting hand; a guitar
+ * shell (`rootBarre`) is also offered the index barre that frees its root.
  */
 export function fingerOptions(notes: Note[], opts: FingerOpts = {}): FingerOption[] {
     const fr = notes.filter((n) => n.fret > 0);
@@ -203,6 +237,8 @@ export function fingerOptions(notes: Note[], opts: FingerOpts = {}): FingerOptio
     const out = splitOptions(fr, !opts.barre);
     if (opts.barre) {
         out.push(...barreOptions(notes, fr));
+    } else if (opts.rootBarre) {
+        out.push(...rootBarreOptions(notes, fr, out));
     }
     out.sort((a, b) => a.cost - b.cost);
     return out.length
@@ -316,14 +352,15 @@ export function fingerTransCost(a: FingerOption, b: FingerOption): number {
 }
 
 /**
- * Plan fingers across a sequence of voicings (mutates each voicing's notes). `barre` marks the
- * grips that may take a barre (triad and power grips, never a shell).
+ * Plan fingers across a sequence of voicings (mutates each voicing's notes). Each carries what
+ * its fingering may use (`FingerOpts`): `barre` for triad and power grips, `rootBarre` for a
+ * guitar shell.
  */
-export function fingerSequence(chords: Array<{ notes: Note[]; barre?: boolean }>): void {
+export function fingerSequence(chords: Array<{ notes: Note[] } & FingerOpts>): void {
     if (!chords.length) {
         return;
     }
-    const O = chords.map((b) => fingerOptions(b.notes, { barre: b.barre }));
+    const O = chords.map((b) => fingerOptions(b.notes, { barre: b.barre, rootBarre: b.rootBarre }));
     let cost = O[0].map((o) => o.cost);
     const back: number[][] = [];
     for (let i = 1; i < O.length; i++) {
