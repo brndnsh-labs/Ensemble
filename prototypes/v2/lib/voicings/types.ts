@@ -92,7 +92,11 @@ export interface Voicing {
     /** Fret of the root on its root string. */
     rootFret: number;
     notes: Note[];
-    /** Tones that were requested but don't fit the grip within reach. */
+    /**
+     * The quality's `required` tones this grip has no room for (`buildAt`): with one missing it
+     * is another chord. `allPositions` offers such a grip only when the chord has no complete
+     * one, so a voiced chart holds one only as that last resort.
+     */
     missing: Degree[];
     root: Spelled;
     quality: Quality;

@@ -68,7 +68,15 @@ export interface QualityDef {
     seventh?: Degree;
     /** The F role's degree: the triad's 5th, or what a uke shell's helper note plays. */
     five: Degree;
-    /** Tones that must be added for the chord to be recognizable (m7♭5 needs its ♭5). */
+    /**
+     * Tones beyond root, 3rd and 7th without which the grip is another chord: the ♭5 of an
+     * m7♭5 (else a plain m7) and of a °7 (else the three notes of a m6 — the tritone is what
+     * says "diminished"). A uke shell's helper note already plays it; a guitar shell takes it
+     * on a free string (`buildAt`), and a grip with no room for it is offered only when the
+     * chord has no complete grip at all (`allPositions`). So wherever a complete grip exists,
+     * the chord is voiced with every tone listed here. Triads and power chords list none: all
+     * their tones are in the shape.
+     */
     required: Degree[];
 }
 export const QUALITIES: Record<Quality, QualityDef> = {
@@ -83,7 +91,14 @@ export const QUALITIES: Record<Quality, QualityDef> = {
         five: 'b5',
         required: ['b5'],
     },
-    dim7: { kind: 'shell', symbol: '°7', third: 'b3', seventh: 'bb7', five: 'b5', required: [] },
+    dim7: {
+        kind: 'shell',
+        symbol: '°7',
+        third: 'b3',
+        seventh: 'bb7',
+        five: 'b5',
+        required: ['b5'],
+    },
     six: { kind: 'shell', symbol: '6', third: '3', seventh: '6', five: '5', required: [] },
     // Triads (#1588): three chord tones, all of them played — a pop, rock or country chart writes
     // these, and adding a 7th to them would teach a chord the chart doesn't ask for.
