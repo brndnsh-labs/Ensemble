@@ -88,28 +88,6 @@ export function togglePower(type: string): void {
 
     dispatch(ACTIONS.SET_PARAM, { module: moduleName, param: 'enabled', value: newState });
 
-    // Soloist Phrasing Improvements
-    if (normalizedType === 'soloist') {
-        if (newState) {
-            // Turning ON: Force a clean entry on the next measure
-            dispatch(ACTIONS.SET_PARAM, {
-                module: 'soloist',
-                param: 'isWaitingForEntry',
-                value: true,
-            });
-            dispatch(ACTIONS.SET_PARAM, { module: 'soloist', param: 'isResting', value: true });
-            dispatch(ACTIONS.SET_PARAM, { module: 'soloist', param: 'isYielding', value: false });
-        } else {
-            // Turning OFF: Reset flags
-            dispatch(ACTIONS.SET_PARAM, { module: 'soloist', param: 'isYielding', value: false });
-            dispatch(ACTIONS.SET_PARAM, {
-                module: 'soloist',
-                param: 'isWaitingForEntry',
-                value: false,
-            });
-        }
-    }
-
     // #1313 — chord voicings are baked at parse time and depend on whether a bass
     // line is sounding (rootless shells + a higher floor with it, rooted voicings
     // without). Muting the bass is "I'm playing that part", so the comp has to be

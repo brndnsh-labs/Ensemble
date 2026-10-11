@@ -80,11 +80,7 @@ describe('Instrument Reducer', () => {
     it('drops deprecated soloist payload keys instead of resurrecting them (#866 compat shim)', () => {
         // An old persisted session / share-URL carries the inert legacy fields
         // removed in #866. They must be silently dropped on load — NOT written
-        // back onto state via applySoloistPayload's unknown-key fall-through.
-        // `ACTIONS.UPDATE_SB` (the old multi-key batch form this once went
-        // through) was deleted in #1381 — nothing dispatched it — but
-        // `applySoloistPayload` itself is still live under `SET_PARAM`
-        // (one key per dispatch), which exercises the same per-key filter.
+        // back onto state via the generic SET_PARAM write.
         instrumentReducer({
             type: ACTIONS.SET_PARAM,
             payload: { module: 'soloist', param: 'pinnedProfile', value: 'evans' },
@@ -96,9 +92,9 @@ describe('Instrument Reducer', () => {
         instrumentReducer({
             type: ACTIONS.SET_PARAM,
             // a live key alongside the deprecated ones still applies
-            payload: { module: 'soloist', param: 'tension', value: 0.42 },
+            payload: { module: 'soloist', param: 'volume', value: 0.42 },
         });
-        expect(soloist.session.tension).toBe(0.42);
+        expect(soloist.volume).toBe(0.42);
         expect((soloist as Record<string, unknown>).pinnedProfile).toBeUndefined();
         expect((soloist as Record<string, unknown>).motifTracking).toBeUndefined();
     });

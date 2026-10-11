@@ -91,10 +91,8 @@ export function cloneStateForDetachedGeneration(liveState: EnsembleState): Ensem
                 activeVoices: [],
                 buffer: new Map(),
                 lastFreq: null,
-                lastMidiPlayed: null,
                 lastRenderedFreq: null,
                 lastPlayedFreq: null,
-                lastNoteEnd: 0,
             },
         },
     } satisfies EnsembleState;

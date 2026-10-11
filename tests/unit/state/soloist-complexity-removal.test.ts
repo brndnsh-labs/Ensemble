@@ -1,7 +1,7 @@
 // @ts-nocheck
 /**
  * #1070 — `soloist.complexity` is deleted from state, types and the ownership manifest. The
- * flat-keyed soloist payload path (`applySoloistPayload`, reached via `SET_PARAM` — the
+ * soloist `SET_PARAM` path (the
  * batch-form `UPDATE_SB` action was deleted in #1381, nothing dispatched it) must DROP it
  * rather than let the reducer's unknown-key fall-through resurrect it as a stray top-level
  * field — the same trap `motifTracking` and `pinnedProfile` fell into in #866.

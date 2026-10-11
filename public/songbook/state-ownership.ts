@@ -11,7 +11,7 @@ type StateOwnershipManifest = {
 /**
  * Exhaustive ownership at the live slice boundary. `satisfies` is the guard: a
  * new top-level state field fails typecheck until it is deliberately classified.
- * Nested runtime aggregates (`soloist.session`, audio graphs, buffers) stay one
+ * Nested runtime aggregates (audio graphs, buffers) stay one
  * runtime-owned unit because no codec may project their internals.
  */
 export const STATE_OWNERSHIP_MANIFEST = {
@@ -100,7 +100,6 @@ export const STATE_OWNERSHIP_MANIFEST = {
         tradeWith: 'document',
         tradeBars: 'document',
         tradeChoruses: 'document',
-        session: 'runtime-derived',
         audio: 'runtime-derived',
     },
 } as const satisfies StateOwnershipManifest;

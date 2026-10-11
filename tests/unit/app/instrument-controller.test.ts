@@ -78,7 +78,6 @@ vi.mock('../../../public/state.js', () => {
             lastPlayedFreq: 440,
             volume: 0.5,
             mode: 'auto',
-            sessionSteps: 0,
             buffer: { clear: vi.fn(), set: vi.fn(), size: 0, delete: vi.fn() },
         }),
     };
@@ -139,30 +138,6 @@ describe('Instrument Controller', () => {
             });
             expect(Engine.killAllPianoNotes).toHaveBeenCalled();
             expect(Engine.killChordBus).toHaveBeenCalled();
-        });
-
-        it('should handle soloist specific phrasing resets when turning on', () => {
-            const state = getState();
-            state.soloist.enabled = false;
-
-            InstrumentController.togglePower('soloist');
-
-            expect(dispatch).toHaveBeenCalledWith(
-                ACTIONS.SET_PARAM,
-                expect.objectContaining({
-                    module: 'soloist',
-                    param: 'isWaitingForEntry',
-                    value: true,
-                }),
-            );
-            expect(dispatch).toHaveBeenCalledWith(
-                ACTIONS.SET_PARAM,
-                expect.objectContaining({
-                    module: 'soloist',
-                    param: 'isResting',
-                    value: true,
-                }),
-            );
         });
 
         // #1313 — chord voicings are baked at parse time and depend on whether a bass
