@@ -6,15 +6,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock dependencies
-vi.mock('../../../public/ui.js', () => ({
-    ui: {
-        masterVol: { value: '0.5' },
-        densitySelect: { value: 'standard' },
-        intensitySlider: { value: 0 },
-        intensityValue: { textContent: '' },
-    },
-}));
-
 import { clampFreq, createSoftClipCurve } from '../../../public/engine/audio-graph-utils.js';
 import { initAudio } from '../../../public/engine/engine.js';
 import { getState } from '../../../public/state.js';

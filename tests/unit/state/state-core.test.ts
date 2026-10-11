@@ -42,7 +42,7 @@ describe('State Core Manager', () => {
             const unsubscribe = subscribe(listener);
 
             unsubscribe();
-            dispatch(ACTIONS.FLASH_EXPIRED);
+            dispatch(ACTIONS.PROG_VALIDATED);
 
             expect(listener).not.toHaveBeenCalled();
         });

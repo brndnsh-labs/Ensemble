@@ -22,14 +22,6 @@ vi.mock('../../../public/state.js', () => {
     const mockSoloist = makeSoloistMock({ volume: 1.0, enabled: true, reverb: 0.6 });
     const mockGroove = { volume: 1.0, enabled: true, reverb: 0.2, audioBuffers: { noise: {} } };
     const mockArranger = {};
-    const mockVizState = {};
-    const mockConductor = {
-        targetIntensity: 0.35,
-        stepSize: 0.0005,
-        form: null,
-        loopCount: 0,
-        formIteration: 0,
-    };
 
     const mockStateMap = {
         playback: mockPlayback,
@@ -38,8 +30,6 @@ vi.mock('../../../public/state.js', () => {
         soloist: mockSoloist,
         groove: mockGroove,
         arranger: mockArranger,
-        vizState: mockVizState,
-        conductor: mockConductor,
     };
 
     return {
@@ -49,13 +39,6 @@ vi.mock('../../../public/state.js', () => {
         dispatch: vi.fn(),
     };
 });
-
-// Mock UI
-vi.mock('../../../public/ui.js', () => ({
-    ui: {
-        masterVol: { value: '0.5' },
-    },
-}));
 
 // Mock Config
 vi.mock('../../../public/config.js', () => ({

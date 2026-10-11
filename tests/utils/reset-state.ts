@@ -1,5 +1,4 @@
 import { type ArrangerState, arranger } from '../../public/state/arranger.js';
-import { type ConductorState, conductor } from '../../public/state/conductor.js';
 import { type GrooveState, groove } from '../../public/state/groove.js';
 import {
     bass,
@@ -12,7 +11,6 @@ import {
     type GlobalContext,
     playback,
 } from '../../public/state/playback.js';
-import { type VisualizerState, vizState } from '../../public/state/visualizer.js';
 import type { Mutable } from '../../public/types.js';
 
 /**
@@ -30,22 +28,12 @@ import type { Mutable } from '../../public/types.js';
  * derivation would reintroduce a cross-module coupling only tests need).
  */
 export function resetAllStateForTest(): void {
-    const c = conductor as Mutable<ConductorState>;
-    c.targetIntensity = 0.35;
-    c.stepSize = 0.0005;
-    c.formIteration = 0;
-
     const p = playback as Mutable<GlobalContext>;
     p.bpm = 100;
     p.bandIntensity = DEFAULT_BAND_INTENSITY;
     p.autoIntensity = true;
     p.metronome = false;
     p.countIn = true;
-    p.visualFlash = false;
-    p.qualityColors = true;
-    p.sessionTimer = 5;
-    p.applyPresetSettings = false;
-    p.songMode = true;
     p.masterVolume = 0.4;
 
     const a = arranger as Mutable<ArrangerState>;
@@ -55,8 +43,6 @@ export function resetAllStateForTest(): void {
     a.timeSignature = '4/4';
     a.notation = 'roman';
     a.isMinor = false;
-    a.isDirty = false;
-    a.history = [];
     a.grouping = null;
     a.seed = '';
     a.randomizeSeed = true;
@@ -72,18 +58,10 @@ export function resetAllStateForTest(): void {
     g.genreFeel = 'Rock';
     g.lastSmartGenre = 'Rock';
     g.humanize = 20;
-    g.orchestrationMap = null;
-    g.fillMap = null;
-    g.accentMap = null;
-    g.sectionSeedMap = {};
-    g.seedTimelineStartStep = 0;
     g.lastHatGain = null;
     g.lastSampledHatVoice = null;
     g.lastRideGain = null;
     g.lastCrashGain = null;
-
-    const v = vizState as Mutable<VisualizerState>;
-    v.enabled = false;
 
     const cc = chords as Mutable<typeof chords>;
     cc.enabled = true;

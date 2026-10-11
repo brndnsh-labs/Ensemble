@@ -14,8 +14,6 @@ const groove = state.groove as Mutable<typeof state.groove>;
 import { getChordDetails, validateProgression } from '../../../public/engine/chords-engine.js';
 
 // Mock dependencies
-vi.mock('../../../public/ui.js', () => ({ ui: {} }));
-
 describe('Harmonic Fuzz Testing', () => {
     beforeEach(() => {
         vi.clearAllMocks();

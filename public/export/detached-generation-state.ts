@@ -51,15 +51,10 @@ export function cloneStateForDetachedGeneration(liveState: EnsembleState): Ensem
     const detached = {
         playback: {
             ...liveState.playback,
-            drawQueue: [],
             audio: null,
             audioGraph: null,
-            wakeLock: null,
-            lastActiveDrumElements: null,
             heldNotes: new Set(),
-            suspendTimeout: null,
             isPlaying: false,
-            isScheduling: false,
             nextNoteTime: 0,
             unswungNextNoteTime: 0,
         },
@@ -73,7 +68,6 @@ export function cloneStateForDetachedGeneration(liveState: EnsembleState): Ensem
         groove: {
             ...liveState.groove,
             audioBuffers: {},
-            buffer: new Map(),
             lastHatGain: null,
             lastSampledHatVoice: null,
             lastRideGain: null,
@@ -103,8 +97,6 @@ export function cloneStateForDetachedGeneration(liveState: EnsembleState): Ensem
                 lastNoteEnd: 0,
             },
         },
-        vizState: { ...liveState.vizState, enabled: false },
-        conductor: { ...liveState.conductor },
     } satisfies EnsembleState;
 
     return cloneRaw(detached);

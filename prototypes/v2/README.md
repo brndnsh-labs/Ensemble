@@ -107,10 +107,8 @@ local browser projects and never deploys.
 - Browser-page singleton runtime, explicit authored-content projection, stop/load/rebuild/full
   worker sync/flush lifecycle. Buffer ingestion temporarily mirrors the original bootstrap;
   extract one shared runtime before production adoption rather than maintaining two indefinitely.
-- The preview bundles original TypeScript through `@engine`. A narrow type-only compatibility
-  declaration preserves the non-proxied `lastActiveDrumElements` DOM field when React ambient
-  types are loaded. Other deepsignal declarations and readonly state fields are unchanged.
-  The original app's engine typecheck also runs before every preview build.
+- The preview bundles original TypeScript through `@engine`. The engine's own typecheck also
+  runs before every preview build.
 - Persistence calls are compile-time redirected to a no-op. Neither `ensemble_currentState`
   nor `ensemble_userPresets` is migrated or overwritten. Playwright pins a legacy sentinel.
   The v1 import (#1274, `lib/import-v1.ts`) is a **copy**, not a migration: it is handed a

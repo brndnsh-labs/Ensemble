@@ -14,7 +14,6 @@ import type {
     InstrumentVoice,
 } from '../types.js';
 import { ACTIONS } from '../types.js';
-import { clearToastActions } from '../ui.js';
 
 interface HandleEffectsContext {
     dispatch: Dispatch;
@@ -209,31 +208,6 @@ export function handleEffects(
             // #675 — Auto voices + soloist mode. `setGenre` runs the same helper through
             // reconcileUrlGenreOnBoot instead (the v2 runtime skips this case).
             applyGenreEffects(stateMap, action.payload, dispatch);
-            break;
-        }
-        case ACTIONS.SHOW_TOAST: {
-            const lastToast = stateMap.playback.toasts[stateMap.playback.toasts.length - 1];
-            if (lastToast?.id) {
-                // Actionable toasts linger so the user has time to click; plain
-                // toasts dismiss in 2s as before.
-                const expireMs = lastToast.actions?.length ? 8000 : 2000;
-                setTimeout(() => {
-                    dispatch(ACTIONS.TOAST_EXPIRED, lastToast.id);
-                }, expireMs);
-            }
-            break;
-        }
-        case ACTIONS.TOAST_EXPIRED: {
-            // Free any registered action callbacks for the dismissed toast.
-            if (typeof action.payload === 'string') {
-                clearToastActions(action.payload);
-            }
-            break;
-        }
-        case ACTIONS.TRIGGER_FLASH: {
-            setTimeout(() => {
-                dispatch(ACTIONS.FLASH_EXPIRED);
-            }, 50);
             break;
         }
     }

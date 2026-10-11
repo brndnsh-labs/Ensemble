@@ -18,7 +18,6 @@ vi.mock('../../../public/state.js', () => {
             lastPlayedFreq: null,
         }),
         groove: { enabled: true },
-        vizState: { enabled: true },
         playback: { step: 0 },
     };
     return {

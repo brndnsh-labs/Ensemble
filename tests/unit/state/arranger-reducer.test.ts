@@ -49,15 +49,10 @@ describe('Arranger Reducer', () => {
                 grouping: [3, 2],
                 isMinor: true,
                 notation: 'name',
-                valid: true,
                 totalSteps: 128,
                 stepMap: [{ s: 1 }],
                 measureMap: [{ m: 1 }],
                 sectionMap: [{ id: '1' }],
-                history: ['{}'],
-                lastInteractedSectionId: 's2',
-                mutatedSectionId: 's1',
-                isDirty: true,
             };
 
             for (const [param, value] of Object.entries(params)) {

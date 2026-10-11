@@ -84,7 +84,7 @@ export function sanitizeDisplayString(value: unknown, fallback: string, maxLen =
 
 /**
  * Is `id` usable as a section id (#1266)? Rejects the `Object.prototype` member names:
- * a section id keys per-section lookups (`sectionSeedMap`), and an id of `'constructor'`
+ * a section id keys per-section lookups, and an id of `'constructor'`
  * returns an inherited function from any prototype-bearing map. Safe to reject outright
  * rather than repair: every legitimate id is minted by `generateId()`.
  * `Object.getOwnPropertyNames(Object.prototype)` so the set can't drift.

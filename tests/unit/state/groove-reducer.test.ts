@@ -11,15 +11,6 @@ describe('Groove Reducer', () => {
         resetAllStateForTest();
     });
 
-    it('#791: clears the section-seed memo on SET_SONG_SEED', () => {
-        // sectionSeedMap is a memo of deriveSectionSeed(sectionId, songSeed);
-        // it must be invalidated whenever the song seed changes so stale,
-        // wrong-seed groove markers never linger.
-        (groove as any).sectionSeedMap = { s1: 0.42 };
-        grooveReducer({ type: ACTIONS.SET_SONG_SEED, payload: 'A1B2C3' });
-        expect(groove.sectionSeedMap).toEqual({});
-    });
-
     it('should set swing and subdivision', () => {
         grooveReducer({ type: ACTIONS.SET_SWING, payload: 25 });
         expect(groove.swing).toBe(25);
@@ -84,13 +75,7 @@ describe('Groove Reducer', () => {
                 genreFeel: 'Jazz',
                 lastSmartGenre: 'Jazz',
                 pendingGenreFeel: { feel: 'Funk' },
-                genreSwitchCountdown: 2,
-                fillActive: true,
                 lastHatGain: 0.8,
-                fillStartStep: 32,
-                fillLength: 8,
-                snareMask: 123,
-                pendingCrash: true,
             };
 
             for (const [param, value] of Object.entries(params)) {

@@ -23,9 +23,7 @@ export const chords = deepSignal<ChordState>({
     style: 'smart',
     volume: 1.0,
     reverb: INSTRUMENT_REVERB_DEFAULTS.chords,
-    scheduledChordIndex: null,
     buffer: new Map(),
-    rhythmicMask: 0,
 });
 
 export const bass = deepSignal<BassState>({
@@ -38,8 +36,6 @@ export const bass = deepSignal<BassState>({
     lastPlayedFreq: null,
     buffer: new Map(),
     style: 'smart',
-    busySteps: 0,
-    lastMidiPlayed: null,
     lastBassGain: null,
 });
 

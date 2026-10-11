@@ -11,21 +11,16 @@ describe('Songbook state ownership manifest (#1044)', () => {
             expect(STATE_OWNERSHIP_MANIFEST[lane].volume).toBe('document');
             expect(STATE_OWNERSHIP_MANIFEST[lane].reverb).toBe('document');
         }
-        expect(STATE_OWNERSHIP_MANIFEST.playback.sessionTimer).toBe('preferences');
-        expect(STATE_OWNERSHIP_MANIFEST.playback.songMode).toBe('preferences');
         // A chart's energy (DECISION 2026-09-26): saved with the chart, set only by the user.
         expect(STATE_OWNERSHIP_MANIFEST.playback.bandIntensity).toBe('document');
         expect(STATE_OWNERSHIP_MANIFEST.playback.autoIntensity).toBe('document');
     });
 
-    it('keeps derived maps, transport, buffers, audio handles, undo, and transient UI runtime-owned', () => {
+    it('keeps derived maps, transport and audio handles runtime-owned', () => {
         expect(STATE_OWNERSHIP_MANIFEST.arranger.progression).toBe('runtime-derived');
         expect(STATE_OWNERSHIP_MANIFEST.arranger.stepMap).toBe('runtime-derived');
-        expect(STATE_OWNERSHIP_MANIFEST.arranger.history).toBe('runtime-derived');
         expect(STATE_OWNERSHIP_MANIFEST.playback.step).toBe('runtime-derived');
         expect(STATE_OWNERSHIP_MANIFEST.playback.audioGraph).toBe('runtime-derived');
-        expect(STATE_OWNERSHIP_MANIFEST.groove.sectionSeedMap).toBe('runtime-derived');
-        expect(STATE_OWNERSHIP_MANIFEST.groove.buffer).toBe('runtime-derived');
         expect(STATE_OWNERSHIP_MANIFEST.soloist.session).toBe('runtime-derived');
         expect(STATE_OWNERSHIP_MANIFEST.soloist.audio).toBe('runtime-derived');
     });

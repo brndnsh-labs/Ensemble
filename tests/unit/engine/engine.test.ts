@@ -35,12 +35,6 @@ import { getState } from '../../../public/state.js';
 const { playback } = getState();
 
 // Mock dependencies
-vi.mock('../../../public/ui.js', () => ({
-    ui: {
-        masterVol: { value: '0.5' },
-    },
-}));
-
 describe('Audio Engine & Cross-Browser Heuristics', () => {
     function getMockAudioContextClass(options = {}) {
         return class MockAudioContext {

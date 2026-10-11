@@ -273,9 +273,6 @@ function startBand(freshPlay = false): void {
         );
     }
     bandSeed = String(getState().arranger.seed);
-    if (!playback.chartLocked) {
-        dispatch(ACTIONS.SET_CHART_LOCKED, true);
-    }
     if (playback.audio?.state === 'suspended') {
         void playback.audio.resume();
     }
@@ -972,7 +969,6 @@ function apply(content: DocumentContent): void {
     param('groove', 'humanize', band.groove.humanize);
     applyGenre(chartGenre(band.groove));
     dispatch(ACTIONS.SET_START_STEP, 0);
-    param('arranger', 'history', []);
 }
 
 export function load(document: ChartDocument): void {

@@ -49,16 +49,11 @@ function stateFixture(score: SemanticScore, feel = 'Jazz', bassEnabled = true) {
     const arranger: Mutable<ArrangerState> = {
         ...scoreArrangement(score, scorePlan),
         scorePlan,
-        valid: false,
         progression: [],
         stepMap: [],
         measureMap: [],
         sectionMap: [],
         totalSteps: 0,
-        history: [],
-        lastInteractedSectionId: 'a',
-        mutatedSectionId: null,
-        isDirty: false,
         seed: 'ABC123',
         randomizeSeed: false,
     };

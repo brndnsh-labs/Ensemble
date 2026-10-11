@@ -29,7 +29,7 @@ describe('State Effects Handler', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         stateMap = {
-            playback: { isPlaying: false, toasts: [], theme: 'dark' },
+            playback: { isPlaying: false, theme: 'dark' },
         };
         dispatch = vi.fn();
     });
@@ -189,24 +189,5 @@ describe('State Effects Handler', () => {
             dispatch,
         });
         expect(syncBusVolume).not.toHaveBeenCalled();
-    });
-
-    it('should set toast expiration on SHOW_TOAST', () => {
-        vi.useFakeTimers();
-        stateMap.playback.toasts = [{ id: 'toast1' }];
-        handleEffects({ type: ACTIONS.SHOW_TOAST, payload: 'msg' }, stateMap, { dispatch });
-
-        vi.advanceTimersByTime(2000);
-        expect(dispatch).toHaveBeenCalledWith('TOAST_EXPIRED', 'toast1');
-        vi.useRealTimers();
-    });
-
-    it('should set flash expiration on TRIGGER_FLASH', () => {
-        vi.useFakeTimers();
-        handleEffects({ type: ACTIONS.TRIGGER_FLASH, payload: 0.5 }, stateMap, { dispatch });
-
-        vi.advanceTimersByTime(50);
-        expect(dispatch).toHaveBeenCalledWith('FLASH_EXPIRED');
-        vi.useRealTimers();
     });
 });

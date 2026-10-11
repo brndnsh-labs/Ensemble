@@ -13,7 +13,6 @@ vi.mock('../../../public/state.js', async (importOriginal) => {
     const { arrangerReducer } = await import('../../../public/state/arranger.js');
     const { instrumentReducer } = await import('../../../public/state/instruments.js');
     const { grooveReducer } = await import('../../../public/state/groove.js');
-    const { vizReducer } = await import('../../../public/state/visualizer.js');
     return {
         ...actual,
         // Wrap dispatch to avoid handleEffects during tests
@@ -24,7 +23,6 @@ vi.mock('../../../public/state.js', async (importOriginal) => {
             arrangerReducer(a);
             instrumentReducer(a);
             grooveReducer(a, playback);
-            vizReducer(a);
         }),
     };
 });
