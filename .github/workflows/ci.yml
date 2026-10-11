@@ -195,15 +195,19 @@ jobs:
       fail-fast: false
       matrix:
         # Duration-balanced, not Playwright's count-based `--shard` — see
-        # playwright.config.ts. `V2_SHARD` below is `<shard>/2`: keep its `2` in step
-        # with this list's length.
-        shard: [1, 2]
-        project: [laptop, webkit-phone]
+        # playwright.config.ts. Each leg is `V2_SHARD=<shard>/<of>`, so a project's legs
+        # must count 1..<of> with none missing, or its specs on the missing leg never run.
+        #
+        # WebKit gets three legs to the laptop's two (measured 2026-10-11): the same specs
+        # take it about 1.4x as long on a runner, its slower leg was the whole PR wall
+        # clock (383s against the laptop's 263s), and a third brings its legs level with
+        # the laptop's.
         include:
-          - project: laptop
-            browser: chromium
-          - project: webkit-phone
-            browser: webkit
+          - { project: laptop, browser: chromium, shard: 1, of: 2 }
+          - { project: laptop, browser: chromium, shard: 2, of: 2 }
+          - { project: webkit-phone, browser: webkit, shard: 1, of: 3 }
+          - { project: webkit-phone, browser: webkit, shard: 2, of: 3 }
+          - { project: webkit-phone, browser: webkit, shard: 3, of: 3 }
     steps:
       - uses: actions/checkout@v7
 
@@ -288,7 +292,7 @@ jobs:
       - name: Run the v2 Playwright suite
         run: npm run test:e2e --prefix prototypes/v2 -- --project=${{ matrix.project }}
         env:
-          V2_SHARD: ${{ matrix.shard }}/2
+          V2_SHARD: ${{ matrix.shard }}/${{ matrix.of }}
 
       - uses: actions/upload-artifact@v7
         if: failure()
