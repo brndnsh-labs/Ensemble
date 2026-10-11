@@ -84,8 +84,8 @@ no race to lose.
 - **`section.targetIntensity`** (`songbook/types.ts`, read via `getSectionOverride` in
   `engine/section-overrides.ts`) — a read-only input to the conductor's per-tick `stepSize`
   targeting (`conductor.ts`). The conductor reads a section's authored override to decide how
-  hard to close the gap toward it; it never writes the override back. The only writer is the
-  arranger controller's unlocked-mode slider (`arranger-controller.ts`), i.e. user intent.
+  hard to close the gap toward it; it never writes the override back. Its only UI writer, v1's
+  section-intensity slider, is gone; a value arrives with a loaded chart, i.e. user intent.
 - **`isInstrumentActiveAtStep`** (`engine/section-overrides.ts`) — the single authority the
   generation paths called to decide whether a lane sounds on a given step. It layers a
   per-section override (and, from #1062 until #1424, the soloist trade block's `tradeSilenced`)

@@ -14,33 +14,6 @@ import { dispatch, getState, stateMap } from '../state.js';
 import type { Mutable } from '../types.js';
 import { ACTIONS } from '../types.js';
 
-let tapTimes: number[] = [];
-
-export function handleTap(setBpmRef: (bpm: number) => void): void {
-    const now = performance.now();
-    if (tapTimes.length > 0 && now - tapTimes[tapTimes.length - 1] > 2000) {
-        tapTimes = [];
-    }
-    tapTimes.push(now);
-
-    if (tapTimes.length > 8) {
-        tapTimes.shift();
-    }
-
-    if (tapTimes.length >= 2) {
-        const intervals = [];
-        for (let i = 1; i < tapTimes.length; i++) {
-            intervals.push(tapTimes[i] - tapTimes[i - 1]);
-        }
-        let sum = 0;
-        for (let i = 0; i < intervals.length; i++) {
-            sum += intervals[i];
-        }
-        const avg = sum / intervals.length;
-        setBpmRef(Math.round(60000 / avg));
-    }
-}
-
 export function flushBuffers(): void {
     const { bass, soloist, chords } = getState();
     // 1. Clear local buffers

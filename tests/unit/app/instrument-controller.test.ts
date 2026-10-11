@@ -115,23 +115,6 @@ describe('Instrument Controller', () => {
         state.bass.buffer.size = 0;
     });
 
-    describe('handleTap', () => {
-        it('should calculate BPM based on tap intervals', () => {
-            const setBpmRef = vi.fn();
-
-            // Simulate 4 taps at 500ms intervals (120 BPM)
-            InstrumentController.handleTap(setBpmRef);
-            vi.advanceTimersByTime(500);
-            InstrumentController.handleTap(setBpmRef);
-            vi.advanceTimersByTime(500);
-            InstrumentController.handleTap(setBpmRef);
-            vi.advanceTimersByTime(500);
-            InstrumentController.handleTap(setBpmRef);
-
-            expect(setBpmRef).toHaveBeenCalledWith(120);
-        });
-    });
-
     describe('flushBuffers', () => {
         it('should clear all buffers and silence every lane', () => {
             const state = getState();
