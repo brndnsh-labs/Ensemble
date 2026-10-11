@@ -16,7 +16,6 @@ import { ACTIONS } from '../types.js';
 
 interface HandleEffectsContext {
     dispatch: Dispatch;
-    oldBpm?: number;
 }
 
 /** Lanes that follow the genre when in Auto mode (#675). */

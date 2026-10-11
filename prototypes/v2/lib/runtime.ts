@@ -1300,10 +1300,7 @@ function sound(
     }
     const start = state.playback.audio.currentTime;
     notes.forEach((frequency, i) => {
-        playNote(state, frequency, start + i * stagger, 0.65, {
-            vol: 0.12,
-            ignoreSustain: true,
-        });
+        playNote(state, frequency, start + i * stagger, 0.65, { vol: 0.12 });
     });
 }
 export function audition(index: number): void {

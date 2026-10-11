@@ -44,11 +44,11 @@ let brightWave: PeriodicWave | null = null;
 
 /**
  * The synth chord voices still sounding (or scheduled to), per audio context (#1569) — the
- * synth sibling of `sample-voice.ts`'s registry for #1530. A no-pedal note used to live
- * nowhere Stop could find it: `killAllPianoNotes` released only the sampled voices, and a
- * whole-note piano chord rang to its written end after Stop. A voice joins as it is made and leaves when its fundamental
- * ends, so the set stays as small as what is ringing. Keyed by the context, not the state
- * tree: an offline render's voices are its own.
+ * synth sibling of `sample-voice.ts`'s registry for #1530. A synth note used to live nowhere
+ * Stop could find it: `killAllPianoNotes` released only the sampled voices, and a whole-note
+ * piano chord rang to its written end after Stop. A voice joins as it is made and leaves when
+ * its fundamental ends, so the set stays as small as what is ringing. Keyed by the context,
+ * not the state tree: an offline render's voices are its own.
  */
 const soundingChordVoices = new WeakMap<BaseAudioContext, Set<(when: number) => void>>();
 
@@ -91,8 +91,6 @@ interface PlayNoteOptions {
     index?: number;
     muted?: boolean;
     numVoices?: number;
-    /** Vestigial: the sustain pedal is gone, so every note plays as if it were up. */
-    ignoreSustain?: boolean;
 }
 
 // Trim on the synth chord voice (#649/Epic 6). Brings the synth chords down a
