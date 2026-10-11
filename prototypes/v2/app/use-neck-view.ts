@@ -1,6 +1,8 @@
 import { useMemo } from 'react';
 import type { BandChart, BandChartChord } from '../lib/band-chart';
+import { placeNeckHand } from '../lib/session';
 import {
+    chartHomeKey,
     fingerMoves,
     type InstrumentDef,
     inversionOf,
@@ -71,6 +73,19 @@ export function nextVoicedSlot(band: BandChart, slot: number): number | null {
         }
     }
     return null;
+}
+
+/**
+ * Does the chord sounding at `slot` give way when `slot` ends — is the very next performed slot
+ * (wrapping at the loop, as `nextVoicedSlot` does) the next different chord? False inside a run:
+ * before another bar of the same chord, a hold or an N.C. the hand stays where it is, so the
+ * last beat of such a slot is not the last beat before a change (#1590), and the strong preview
+ * waits for the run's last slot. False too when nothing else is ever played. "Different" is
+ * `nextVoicedSlot`'s own rule, so an unvoiced chord in between is part of the run it rings under.
+ */
+export function endsRun(band: BandChart, slot: number): boolean {
+    const next = nextVoicedSlot(band, slot);
+    return next !== null && (slot + 1) % band.slots.length === next;
 }
 
 /**
@@ -249,12 +264,17 @@ export function neckModel(
 }
 
 /**
- * The stand's neck voicing: the per-device prefs, and the whole chart voiced once per loaded
- * chart + prefs — keyed by written index, never per frame. Voices nothing while the neck is not
- * showing.
+ * The stand's neck voicing: the per-device prefs with the hand placed for this chart's key
+ * (`placeNeckHand`: a window the musician has not chosen follows the key, #1598), and the whole
+ * chart voiced once per loaded chart + prefs — keyed by written index, never per frame. Voices
+ * nothing while the neck is not showing.
  */
 export function useNeckVoicing(band: BandChart | null, showing: boolean) {
-    const { prefs, setPrefs } = useNeckPrefs();
+    const { prefs: stored, setPrefs } = useNeckPrefs();
+    const prefs = useMemo(
+        () => placeNeckHand(stored, band ? chartHomeKey(band) : null),
+        [stored, band],
+    );
     const voiced = useMemo(
         () =>
             band && showing

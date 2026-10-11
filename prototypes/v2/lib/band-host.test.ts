@@ -15,6 +15,7 @@ import {
     type BandSettings,
     compileTimeline,
     DEFAULT_SETTINGS,
+    PPQ,
     performPass,
     secondsAt,
     type Timeline,
@@ -836,5 +837,107 @@ describe('a style change in the last phrase of a counted song (#1482)', () => {
         };
         expect(lastBar('rock')).toEqual(lastBar('jazz'));
         expect(lastBar('rock')).not.toEqual([]);
+    });
+});
+
+describe('BandHost.inLastPulseBefore: the last beat before a chord gives way (#1590)', () => {
+    /** Two bars in `meter`, one chord each: only the timeline's bars and pulses matter here. */
+    const hostIn = (
+        meter: string,
+        barLength: [number, number],
+        grouping: number[] | null = null,
+    ) => {
+        const host = new BandHost({
+            state: () => fakeState(fakeAudioContext(0)),
+            silence: () => {},
+        });
+        const whole = (id: string): ScoreMeasure => bar(id, [chord('C', ...barLength)]);
+        host.setScore({
+            ...song([{ id: 'a', label: 'A', repeat: 1, measures: [whole('m1'), whole('m2')] }]),
+            meter,
+            grouping,
+        });
+        return host;
+    };
+    const EIGHTH = PPQ / 2;
+
+    it('is the beat before a mid-bar change in 4/4, not the bar’s last beat', () => {
+        const host = hostIn('4/4', [4, 1]);
+        // `| Dm7 G7 |`: Dm7 gives way at beat 3.
+        const end = 2 * PPQ;
+        expect(host.inLastPulseBefore(0, end, 0)).toBe(false);
+        expect(host.inLastPulseBefore(PPQ - 1, end, 0)).toBe(false);
+        expect(host.inLastPulseBefore(PPQ, end, 0)).toBe(true);
+        expect(host.inLastPulseBefore(end - 1, end, 0)).toBe(true);
+        // At and past the change it is no longer ahead.
+        expect(host.inLastPulseBefore(end, end, 0)).toBe(false);
+        // The bar's own cue is still quiet there (its real-time lead opens later in the bar).
+        expect(host.inLastPulse(PPQ)).toBe(false);
+    });
+
+    it('is inLastPulse’s own last pulse at a barline', () => {
+        const host = hostIn('4/4', [4, 1]);
+        const barline = 4 * PPQ;
+        for (const tick of [0, 3 * PPQ - 1, 3 * PPQ, barline - 1, barline, 7 * PPQ - 1, 7 * PPQ]) {
+            const end = tick < barline ? barline : 2 * barline;
+            expect(host.inLastPulseBefore(tick, end, 0), `tick ${tick}`).toBe(
+                host.inLastPulse(tick, 0),
+            );
+        }
+    });
+
+    it('answers true all through a chord no longer than one beat', () => {
+        const host = hostIn('4/4', [4, 1]);
+        // Four chords in the bar: the second lasts beat 2 exactly, and is its own last beat.
+        expect(host.inLastPulseBefore(PPQ, 2 * PPQ, 0)).toBe(true);
+        expect(host.inLastPulseBefore(PPQ + 1, 2 * PPQ, 0)).toBe(true);
+        expect(host.inLastPulseBefore(2 * PPQ - 1, 2 * PPQ, 0)).toBe(true);
+    });
+
+    it('counts the felt pulse: a dotted quarter in 6/8', () => {
+        const host = hostIn('6/8', [3, 1]);
+        const barline = 6 * EIGHTH;
+        expect(host.inLastPulseBefore(3 * EIGHTH - 1, barline, 0)).toBe(false);
+        expect(host.inLastPulseBefore(3 * EIGHTH, barline, 0)).toBe(true);
+        // A chord per dotted quarter is one pulse long: in its last beat throughout.
+        expect(host.inLastPulseBefore(0, 3 * EIGHTH, 0)).toBe(true);
+    });
+
+    it('counts the group a change closes in a grouped 7/8', () => {
+        const host = hostIn('7/8', [7, 2], [2, 2, 3]);
+        // A change after the two short groups: the group it closes is two eighths long.
+        expect(host.inLastPulseBefore(2 * EIGHTH - 1, 4 * EIGHTH, 0)).toBe(false);
+        expect(host.inLastPulseBefore(2 * EIGHTH, 4 * EIGHTH, 0)).toBe(true);
+        // The barline closes the group of three.
+        expect(host.inLastPulseBefore(4 * EIGHTH - 1, 7 * EIGHTH, 0)).toBe(false);
+        expect(host.inLastPulseBefore(4 * EIGHTH, 7 * EIGHTH, 0)).toBe(true);
+    });
+
+    it('gives a full beat’s notice of a change off the pulse grid', () => {
+        const host = hostIn('4/4', [4, 1]);
+        // A chord that gives way on the "and" of 2.
+        const end = PPQ + EIGHTH;
+        expect(host.inLastPulseBefore(EIGHTH - 1, end, 0)).toBe(false);
+        expect(host.inLastPulseBefore(EIGHTH, end, 0)).toBe(true);
+    });
+
+    it('gives 600ms of notice when a beat is shorter than that, as inLastPulse does', () => {
+        const host = hostIn('4/4', [4, 1]);
+        // The host's 120 bpm: a beat is 500ms, so the notice is 1.2 beats.
+        const end = 4 * PPQ;
+        const lead = PPQ + PPQ / 5;
+        expect(host.inLastPulseBefore(end - lead - 1, end)).toBe(false);
+        expect(host.inLastPulseBefore(end - lead, end)).toBe(true);
+        expect(host.inLastPulseBefore(end - lead, end)).toBe(host.inLastPulse(end - lead));
+    });
+
+    it('is false with no chart, and for an end outside the timeline', () => {
+        const bare = new BandHost({
+            state: () => fakeState(fakeAudioContext(0)),
+            silence: () => {},
+        });
+        expect(bare.inLastPulseBefore(0, PPQ)).toBe(false);
+        const host = hostIn('4/4', [4, 1]);
+        expect(host.inLastPulseBefore(8 * PPQ, 12 * PPQ, 0)).toBe(false);
     });
 });

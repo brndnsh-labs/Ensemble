@@ -10,14 +10,16 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { type BandChart, bandChart } from '../lib/band-chart';
-import { defaultNeckPreferences } from '../lib/session';
+import { defaultNeckPreferences, placeNeckHand } from '../lib/session';
 import { GUITAR, gripMidis, type VoicedBandChord, voiceBandChart } from '../lib/voicings';
 import { NeckView } from './neck-view';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const chord = (symbol: string): ScoreEvent => ({ kind: 'chord', symbol, duration: [4, 1] });
-function chart(bars: ScoreEvent[]): BandChart {
+const half = (symbol: string): ScoreEvent => ({ kind: 'chord', symbol, duration: [2, 1] });
+/** One entry a bar: a chord for the whole bar, or the bar's chords in order. */
+function chart(bars: (ScoreEvent | ScoreEvent[])[]): BandChart {
     const score: SemanticScore = {
         notation: 'name',
         key: 'C',
@@ -29,16 +31,17 @@ function chart(bars: ScoreEvent[]): BandChart {
                 id: 'a',
                 label: 'A',
                 repeat: 1,
-                measures: bars.map((event, i) => ({
+                measures: bars.map((events, i) => ({
                     id: `m${i}`,
-                    content: { kind: 'events', events: [event] },
+                    content: { kind: 'events', events: [events].flat() },
                 })),
             },
         ],
     };
     return bandChart(score, compileTimeline(score));
 }
-const prefs = defaultNeckPreferences();
+// No key to read, so the hand is on a guitar's keyless default, frets 2–7 (`defaultNeckHome`).
+const prefs = placeNeckHand(defaultNeckPreferences(), null);
 const voice = (band: BandChart): Map<number, VoicedBandChord> =>
     new Map(voiceBandChart(band, prefs).map((v) => [v.globalIndex, v] as const));
 
@@ -61,6 +64,7 @@ interface Props {
     band?: BandChart;
     voiced?: Map<number, VoicedBandChord>;
     active?: number | null;
+    changeSoon?: boolean;
     playing?: boolean;
     onStrum?: (midis: number[]) => void;
 }
@@ -68,6 +72,7 @@ function render({
     band = study,
     voiced = studyGrips,
     active = null,
+    changeSoon = false,
     playing = false,
     onStrum,
 }: Props = {}) {
@@ -77,7 +82,7 @@ function render({
                 band={band}
                 voiced={voiced}
                 active={active}
-                nextSoon={false}
+                changeSoon={changeSoon}
                 playing={playing}
                 onStrum={onStrum}
                 prefs={prefs}
@@ -171,6 +176,54 @@ describe('NeckView: stepping through the chart stopped (#1595)', () => {
         const vamp = chart([chord('G7'), chord('G7')]);
         render({ band: vamp, voiced: voice(vamp) });
         expect($('.neck-step')).toBeNull();
+    });
+});
+
+describe('NeckView: the strong preview while the band plays (#1590)', () => {
+    // `| Dm7 G7 | Cmaj7 |`: the change to G7 is inside the bar.
+    const split = chart([[half('Dm7'), half('G7')], chord('Cmaj7')]);
+    const splitGrips = voice(split);
+    const playing = { band: split, voiced: splitGrips, playing: true };
+
+    it('draws the next grip only once the change is a beat away, mid-bar included', () => {
+        render({ ...playing, active: 0 });
+        expect(text('neck-current')).toBe('Dm7');
+        expect(ghosts()).toBe(0);
+        // The shell's `changeSoon` is the last beat before the ACTIVE slot ends: Dm7's beat 2.
+        render({ ...playing, active: 0, changeSoon: true });
+        expect(ghosts()).toBe(splitGrips.get(1)!.notes.length);
+        expect($('.neck-rootpath')).not.toBeNull();
+        // G7 lands: the grip alone again, then Cmaj7 on its last beat.
+        render({ ...playing, active: 1 });
+        expect(text('neck-current')).toBe('G7');
+        expect(ghosts()).toBe(0);
+        render({ ...playing, active: 1, changeSoon: true });
+        expect(ghosts()).toBe(splitGrips.get(2)!.notes.length);
+    });
+
+    it('waits for the run’s last slot: no preview before the same chord again or a hold', () => {
+        // `| C | C | F |`: bar 1 ends into C again.
+        const run = chart([chord('C'), chord('C'), chord('F')]);
+        const grips = voice(run);
+        const at = (active: number) =>
+            render({ band: run, voiced: grips, playing: true, active, changeSoon: true });
+        at(0);
+        expect(text('neck-current')).toBe('C');
+        expect(ghosts()).toBe(0);
+        at(1);
+        expect(ghosts()).toBe(grips.get(2)!.notes.length);
+        // `| Dm7 | / | G7 |`: the hold rings on, and the change is at its end.
+        const held = chart([chord('Dm7'), { kind: 'hold', duration: [4, 1] }, chord('G7')]);
+        const heldGrips = voice(held);
+        render({ band: held, voiced: heldGrips, playing: true, active: 0, changeSoon: true });
+        expect(ghosts()).toBe(0);
+        render({ band: held, voiced: heldGrips, playing: true, active: 1, changeSoon: true });
+        expect(ghosts()).toBe(heldGrips.get(2)!.notes.length);
+    });
+
+    it('needs a slot under the playhead: a count-in draws no preview', () => {
+        render({ ...playing, active: null, changeSoon: true });
+        expect(ghosts()).toBe(0);
     });
 });
 

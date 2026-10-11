@@ -2,13 +2,15 @@
 // where a dot belongs independently of the component. Real fret spacing: fret n sits at
 // `1 − 2^(−n/12)` of the scale length, scaled so fret 15 lands at the board's right end.
 
+import { HOME_FRETS } from '../lib/voicings';
+
 /** x of the nut and of the board's right end, in the 1000-wide viewBox. */
 export const NUT = 52;
 export const END = 988;
 /** Frets drawn after the nut; both instruments show 0–15. */
 export const NF = 15;
 /** Frets in the home window: the handle moves `[start, start + HOME_W − 1]`. */
-export const HOME_W = 6;
+export const HOME_W = HOME_FRETS;
 /** y of the board's top edge; the strip above it holds the home-window handle. */
 export const BOARD_TOP = 30;
 

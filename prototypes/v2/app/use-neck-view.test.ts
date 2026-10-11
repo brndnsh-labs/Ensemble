@@ -11,6 +11,7 @@ import { GUITAR, voiceBandChart } from '../lib/voicings';
 import {
     changePosition,
     chordChanges,
+    endsRun,
     firstVoicedSlot,
     neckModel,
     nextVoicedSlot,
@@ -120,6 +121,58 @@ describe('nextVoicedSlot', () => {
     it('finds no first grip in a chart of N.C. alone', () => {
         const band = view([{ id: 'a', label: 'A', repeat: 1, measures: [bar('m1', [noChord])] }]);
         expect(firstVoicedSlot(band)).toBeNull();
+    });
+});
+
+describe('endsRun (#1590)', () => {
+    const bars = (...measures: ScoreEvent[][]) =>
+        view([
+            { id: 'a', label: 'A', repeat: 1, measures: measures.map((m, i) => bar(`m${i}`, m)) },
+        ]);
+    const runEnds = (band: ReturnType<typeof view>) => band.slots.map((_, k) => endsRun(band, k));
+
+    it('is the last slot of a chord’s run, not each bar of it', () => {
+        // `| C | C | F |`: the hand moves at the end of bar 2, and from F back to the top.
+        expect(runEnds(bars([chord('C', 4)], [chord('C', 4)], [chord('F', 4)]))).toEqual([
+            false,
+            true,
+            true,
+        ]);
+    });
+
+    it('counts a hold and an N.C. into the run they ring under', () => {
+        expect(runEnds(bars([chord('Dm7', 4)], [hold], [chord('G7', 4)]))).toEqual([
+            false,
+            true,
+            true,
+        ]);
+        expect(runEnds(bars([chord('Dm7', 4)], [noChord], [chord('G7', 4)]))).toEqual([
+            false,
+            true,
+            true,
+        ]);
+    });
+
+    it('carries a run across the loop point when the form ends on its first chord', () => {
+        // `| C | F | C |`: the last bar's C runs on into bar 1, which is where it gives way.
+        expect(runEnds(bars([chord('C', 4)], [chord('F', 4)], [chord('C', 4)]))).toEqual([
+            true,
+            true,
+            false,
+        ]);
+    });
+
+    it('still ends a run inside a bar', () => {
+        expect(runEnds(bars([chord('Dm7', 2), chord('G7', 2)], [chord('C', 4)]))).toEqual([
+            true,
+            true,
+            true,
+        ]);
+    });
+
+    it('is never true when nothing else is played', () => {
+        expect(runEnds(bars([chord('G7', 4)], [chord('G7', 4)]))).toEqual([false, false]);
+        expect(runEnds(bars([chord('G7', 4)]))).toEqual([false]);
     });
 });
 

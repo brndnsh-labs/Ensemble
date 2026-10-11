@@ -566,6 +566,10 @@ export default function Ensemble() {
     // it can still be a tick behind) rather than a new interval — it only flips twice a bar,
     // nowhere near "per frame".
     const [nextSoon, setNextSoon] = useState(false);
+    // #1590 — the neck's own cue: the last felt pulse before the ACTIVE SLOT ends, which in a
+    // two-chord bar is mid-bar, where `nextSoon` (the barline's) never fires. Same poll, same
+    // tick; it flips twice a chord.
+    const [changeSoon, setChangeSoon] = useState(false);
     const { stage, toggleTheme } = useStageTheme();
     const [following, setFollowing] = useState(true);
     const offline = useOfflineInstall();
@@ -1173,6 +1177,9 @@ export default function Ensemble() {
             // playback crosses a barline, so reading the OLD bar's DOM attributes here would still
             // see the bar just left after the engine had already moved on.
             setNextSoon(runtime.inLastBeat(tick));
+            // The slot this same tick is in, never `active`'s committed value, for the reason
+            // above — and off any slot (-1) there is no chord to be leaving.
+            setChangeSoon(runtime.inLastBeatOfSlot(tick, slot));
             if (playingNow) {
                 frame = window.requestAnimationFrame(follow);
             }
@@ -5484,7 +5491,7 @@ export default function Ensemble() {
                                 band={followChart}
                                 voiced={neckVoicing.voiced}
                                 active={active}
-                                nextSoon={nextSoon}
+                                changeSoon={changeSoon}
                                 playing={playbackActive}
                                 onStrum={(midis) => runtime.auditionPitches(midis)}
                                 prefs={neckVoicing.prefs}

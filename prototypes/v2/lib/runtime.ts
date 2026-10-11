@@ -332,7 +332,8 @@ function stopBand(ringOut = false): void {
 
 /**
  * The song tick sounding this instant, or null while stopped, counting in, or between two queued
- * segments. Read it ONCE per paint and hand that one value to `playheadSlot` and `inLastBeat`
+ * segments. Read it ONCE per paint and hand that one value to `playheadSlot`, `inLastBeat` and
+ * `inLastBeatOfSlot`
  * (#1506): the audio clock runs on its own thread and can cross a barline between two reads in
  * the same task, and a stand that asked each question separately once painted the bar just left
  * with the new bar's cue.
@@ -1480,4 +1481,30 @@ export function bandChartView(): BandChart | null {
  */
 export function inLastBeat(tick: number | null): boolean {
     return tick != null && (band?.inLastPulse(tick) ?? false);
+}
+
+/**
+ * Is playback in the last FELT pulse before performed slot `slot` ends — the last beat before
+ * the chord under the playhead gives way (#1590)? Neck mode's strong preview reads this, not
+ * `inLastBeat`: the grip it previews is the next different chord (`nextVoicedSlot`), which can
+ * land inside the bar (`| Dm7 G7 |`), and a cue timed to the barline never fired for that change.
+ * The chart sheet's next-BAR cue stays on `inLastBeat`; it is per bar by design (`nextBarIndex`).
+ *
+ * `tick` and `slot` are the pair the stand already read this paint (`songTick()`, then
+ * `playheadSlot(tick)`, #1506), so this costs one slot lookup and `BandHost.inLastPulseBefore`'s
+ * bar search — no second walk of the slots per frame. The slot's end comes from wherever
+ * `playheadSlot` found the slot: the band chart's `BandSlot.to`, or for a measure-less (v1) chart
+ * the step map's `end` in band ticks, which is the `to` `legacyBandChart` gives the same slot —
+ * so the neck's v1 follow gets the same cue, off the one timeline the band plays either schema
+ * from. The beat itself is the host's (`inLastPulseBefore`), the meter's own pulse or 600ms; a slot no
+ * longer than that is in it throughout. False while stopped, counting in, or off any
+ * slot.
+ */
+export function inLastBeatOfSlot(tick: number | null, slot: number): boolean {
+    if (tick == null || slot < 0 || !band) {
+        return false;
+    }
+    const step = bandView ? undefined : getState().arranger.stepMap[slot];
+    const end = bandView ? bandView.slots[slot]?.to : step && step.end * STEP_TICKS;
+    return end !== undefined && band.inLastPulseBefore(tick, end);
 }

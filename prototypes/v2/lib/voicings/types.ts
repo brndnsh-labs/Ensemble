@@ -122,4 +122,10 @@ export interface VoiceOptions {
      * Defaults to every shape. Triad and power grips ignore it.
      */
     rootStrings?: number[];
+    /**
+     * What keeping one grip per triad symbol may cost a chart, per occurrence that changes grip
+     * (`unifyGrips`). The stand never sets it; 0 turns the rule off, and the tests bracket the
+     * default with it.
+     */
+    sameGripTolerance?: number;
 }

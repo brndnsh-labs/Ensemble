@@ -2,13 +2,14 @@
 
 import { type KeyboardEvent, useEffect, useId, useMemo, useState } from 'react';
 import type { BandChart } from '../lib/band-chart';
-import { defaultNeckHome, type NeckLabels, type NeckPreferences } from '../lib/session';
+import type { NeckLabels, NeckPreferences, PlacedNeckPreferences } from '../lib/session';
 import { gripMidis, NECK_INSTRUMENTS, type VoicedBandChord } from '../lib/voicings';
 import { Neck, type NeckPreview, type NeckZoom } from './neck';
 import { HOME_W } from './neck-geometry';
 import {
     changePosition,
     chordChanges,
+    endsRun,
     firstVoicedSlot,
     neckModel,
     nextVoicedSlot,
@@ -30,8 +31,13 @@ interface NeckViewProps {
     voiced: ReadonlyMap<number, VoicedBandChord> | null;
     /** The performed slot under the playhead, or null while stopped. */
     active: number | null;
-    /** The playing bar's last felt pulse (#1458): the next grip is about to land. */
-    nextSoon: boolean;
+    /**
+     * The last felt pulse before the `active` slot ends (`runtime.inLastBeatOfSlot`, #1590): the
+     * next grip is about to land. The slot's end, not the barline the chart's next-bar cue waits
+     * for — a second chord inside the bar is a change too. Only a slot that ends its chord's run
+     * (`endsRun`) acts on it.
+     */
+    changeSoon: boolean;
     /**
      * The band is playing or about to (a count-in has no `active` slot yet): no stepping, no
      * strum — the band is the sound and the playhead the cursor.
@@ -39,7 +45,8 @@ interface NeckViewProps {
     playing: boolean;
     /** Sound these MIDI pitches as a strum, lowest string first (`runtime.auditionPitches`). */
     onStrum?: (midis: number[]) => void;
-    prefs: NeckPreferences;
+    /** The settings with the hand placed for this chart's key (`placeNeckHand`). */
+    prefs: PlacedNeckPreferences;
     onPrefs: (patch: Partial<NeckPreferences>) => void;
 }
 
@@ -82,7 +89,7 @@ export function NeckView({
     band,
     voiced,
     active,
-    nextSoon,
+    changeSoon,
     playing,
     onStrum,
     prefs,
@@ -107,11 +114,13 @@ export function NeckView({
         () => (band && voiced ? neckModel(band, voiced, shownSlot, instrument) : null),
         [band, voiced, shownSlot, instrument],
     );
-    // The board previews the next grip only on the last beat before the change (#1592): all bar
-    // long it is the grip sounding now. Stopped, the strip names the next chord instead — unless
-    // the learner stepped here, when the change ahead is what they are looking at.
-    const preview: NeckPreview =
-        (active !== null && nextSoon) || (stopped && cursor !== null) ? 'strong' : 'soft';
+    // The board previews the next grip only on the last beat before the change (#1592): until
+    // then it is the grip sounding now. A slot that ends into the same chord again, a hold or an
+    // N.C. is no change (`endsRun`, #1590), so its last beat stays the grip alone. Stopped, the
+    // strip names the next chord instead — unless the learner stepped here, when the change
+    // ahead is what they are looking at.
+    const changing = active !== null && changeSoon && band !== null && endsRun(band, active);
+    const preview: NeckPreview = changing || (stopped && cursor !== null) ? 'strong' : 'soft';
     const canStep = stopped && band !== null && model !== null && changes.length > 1;
     const step = (direction: 1 | -1) => {
         if (!band) {
@@ -252,11 +261,8 @@ export function NeckView({
                     <button
                         type="button"
                         className="btn neck-hand-toggle"
-                        onClick={() =>
-                            onPrefs({
-                                home: prefs.home ? null : defaultNeckHome(prefs.instrument),
-                            })
-                        }
+                        // Locking the hand again hands the window back to the chart's key (#1598).
+                        onClick={() => onPrefs({ home: prefs.home ? null : 'key' })}
                     >
                         {prefs.home ? 'Anywhere' : 'Lock hand'}
                     </button>

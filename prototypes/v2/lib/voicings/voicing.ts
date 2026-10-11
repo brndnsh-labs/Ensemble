@@ -368,19 +368,128 @@ function stamp<C extends ChartChord>(v: Voicing, c: C): VoicedChord<C> {
     } as VoicedChord<C>;
 }
 
+// ---------- one grip per symbol (#1599) ----------
+
+/**
+ * How much more a chart may cost, per occurrence that changes grip, to keep one grip per symbol.
+ * 2.1 is a whole position: the hand moved four frets, a finger per fret, at `triadTransCost`'s
+ * 0.7 a fret beyond the first ((4 − 1) × 0.7). Inside that, the second shape saves less than one
+ * position shift each time it is played, and a player keeps the shape already under the fingers
+ * (the two Cs of G D Em C G D C D differ by 1.5). Past it the other grip is a different place on
+ * the neck, and following the voice leading there is worth a second shape.
+ */
+const SAME_GRIP_TOLERANCE = 2.1;
+/** The cost terms are multiples of 0.025; anything smaller is float noise, never a preference. */
+const COST_NOISE = 1e-9;
+
+/**
+ * The chord as the voicer sees it. `candidates` builds from the root's pitch class and the
+ * quality alone, so that pair is the identity: an enharmonic respelling (C♯ and D♭) is the same
+ * chord here, and a slash bass never reaches the voicer (`voicingChord` leaves it to the bass).
+ */
+const chordKey = (c: ChartChord): string => `${c.root.pc}:${c.quality}`;
+/** One of a chord's candidate grips: the shape and where its root sits. */
+const gripKey = (v: Voicing): string => `${v.shape.id}@${v.rootFret}`;
+
+interface Plan {
+    path: Voicing[];
+    cost: number;
+}
+
+/**
+ * The same written symbol keeps one grip (#1599). `viterbi` voices each chord on its own
+ * neighbours, so a C after an Em and a C after a D can come out as two shapes, and it cannot
+ * see "the same symbol later". So this runs after it. For each symbol the plan voices more than
+ * one way, in chart order: re-plan the chart with that symbol held to each grip the plan already
+ * used, and keep the cheapest when the chart's cost rises by less than `tolerance` for each
+ * occurrence that changed grip. Re-planning, not swapping the grip in place, lets the neighbours
+ * move with it (the Em before that C follows it down the neck). Per occurrence, so a loop
+ * written out four times decides as the loop written once does. A symbol is decided once, and a
+ * grip that is kept stays held while the later symbols are decided.
+ *
+ * Triad and power chords only: a shell chart is pinned to the prototype by the parity suite,
+ * and its jazz comping moves a chord between its two root strings on purpose.
+ */
+function unifyGrips(
+    chart: ChartChord[],
+    states: Voicing[][],
+    plan: (states: Voicing[][]) => Plan,
+    tolerance: number,
+): Voicing[] {
+    const keys = chart.map((c) => (QUALITIES[c.quality].kind === 'shell' ? null : chordKey(c)));
+    const held = new Map<string, string>();
+    const decided = new Set<string>();
+    const holding = () =>
+        states.map((options, i) => {
+            const key = keys[i];
+            const grip = key === null ? undefined : held.get(key);
+            return grip === undefined ? options : options.filter((v) => gripKey(v) === grip);
+        });
+    let best = plan(states);
+    for (;;) {
+        // The grips each undecided symbol is voiced with, and how often, in chart order.
+        const used = new Map<string, Map<string, number>>();
+        best.path.forEach((v, i) => {
+            const key = keys[i];
+            if (key === null || decided.has(key)) {
+                return;
+            }
+            const grips = used.get(key) ?? new Map<string, number>();
+            grips.set(gripKey(v), (grips.get(gripKey(v)) ?? 0) + 1);
+            used.set(key, grips);
+        });
+        const split = [...used].find(([, grips]) => grips.size > 1);
+        if (!split) {
+            return best.path;
+        }
+        const [key, grips] = split;
+        decided.add(key);
+        const occurrences = [...grips.values()].reduce((a, b) => a + b, 0);
+        let pick: (Plan & { grip: string; changed: number }) | null = null;
+        // Most used first, then first played (the sort is stable over the Map's insertion
+        // order): on equal cost the chart keeps the shape it already plays most.
+        for (const [grip, count] of [...grips].sort((a, b) => b[1] - a[1])) {
+            held.set(key, grip);
+            const tried = plan(holding());
+            if (!pick || tried.cost < pick.cost - COST_NOISE) {
+                pick = { ...tried, grip, changed: occurrences - count };
+            }
+        }
+        if (pick && pick.cost - best.cost < tolerance * pick.changed - COST_NOISE) {
+            held.set(key, pick.grip);
+            best = pick;
+        } else {
+            held.delete(key);
+        }
+    }
+}
+
 /**
  * Voice a whole chart at once: one grip per chord, chosen so the hand moves as little as possible
- * and the root takes simple paths, then fingers planned across the chart so held notes stay held.
+ * and the root takes simple paths, a triad symbol kept to one grip where that costs little
+ * (`unifyGrips`), then fingers planned across the chart so held notes stay held.
  * Extra fields on each chart entry (bar, beat, numeral, duration...) are carried through.
  */
 export function voiceChart<C extends ChartChord>(chart: C[], opts: VoiceOptions): VoicedChord<C>[] {
     if (!chart.length) {
         return [];
     }
-    const picked = viterbi(
+    const home = opts.home ?? null;
+    const unary = (v: Voicing) => unaryCost(v, opts);
+    const trans = (a: Voicing, b: Voicing) => transCost(a, b, home);
+    const plan = (states: Voicing[][]): Plan => {
+        const path = viterbi(states, unary, trans);
+        const cost = path.reduce(
+            (sum, v, i) => sum + unary(v) + (i ? trans(path[i - 1], v) : 0),
+            0,
+        );
+        return { path, cost };
+    };
+    const picked = unifyGrips(
+        chart,
         chart.map((c) => candidates(c, opts)),
-        (v) => unaryCost(v, opts),
-        (a, b) => transCost(a, b, opts.home ?? null),
+        plan,
+        opts.sameGripTolerance ?? SAME_GRIP_TOLERANCE,
     );
     const out = picked.map((v, i) => stamp(v, chart[i]));
     fingerSequence(out.map((v) => ({ notes: v.notes, barre: mayBarre(v.shape) })));
