@@ -113,6 +113,18 @@ const grid = (
 // ukulele's open-string credit 11, the barre that frees a root 22, the buried-root rule 38.
 // `engine.test.ts` brackets each from both sides.
 //
+// #1609 moved 68 of the 122 ukulele charts and no guitar chart. A ukulele shell strums every
+// string, so it is now costed as the ukulele triads are (the fretting hand's position and each
+// voice's step, not the root's path), aimed at first position whenever the window starts at
+// the nut, and kept to one grip per symbol (`byHand`, `handFree`, `unifyGrips`, `unaryCost`'s
+// target). So the ukulele charts here also move with `triadUnaryCost`, `triadTransCost` and
+// `SAME_GRIP_TOLERANCE`, which the 410 mutations above never touched: that count is the
+// guitar's now, and the ukulele's share of it has not been measured again. Undoing each part of
+// #1609 by itself turns ukulele charts red, and never a guitar one: the first-position target
+// 12, its pull (0.45 a fret, back to a window's 0.15) 7, the hand's costs 65, the all-open
+// grip's free hand 9, one grip per symbol 21. Letting either rule reach a guitar shell turns
+// guitar charts red instead: one grip per symbol 55, the first-position target 20.
+//
 // So add charts freely, after the ones here, so the fixture's diff is additions only; measure
 // before dropping one (45 of the 436 mutations tried are caught by exactly one chart).
 const CASES: Case[] = [

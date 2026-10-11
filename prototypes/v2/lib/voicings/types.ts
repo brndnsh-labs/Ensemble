@@ -127,9 +127,9 @@ export interface VoiceOptions {
      */
     rootStrings?: number[];
     /**
-     * What keeping one grip per triad symbol may cost a chart, per occurrence that changes grip
-     * (`unifyGrips`). The stand never sets it; 0 turns the rule off, and the tests bracket the
-     * default with it.
+     * What keeping one grip per strummed symbol (a triad, a power chord, a ukulele shell) may
+     * cost a chart, per occurrence that changes grip (`unifyGrips`). The stand never sets it; 0
+     * turns the rule off, and the tests bracket the default with it.
      */
     sameGripTolerance?: number;
 }
