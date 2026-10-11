@@ -1,3 +1,15 @@
+/**
+ * The voicer: every grip a chord can take (`allPositions`), and one chosen per chord of a chart
+ * (`voiceChart`).
+ *
+ * PINNED. `test/shell-characterization.test.ts` holds `voiceChart`'s shell output — shape, root
+ * fret, and every note's string, fret, degree, role and finger — to `test/golden.json`, for the
+ * maj7, 7, m7 and m7♭5 charts it lists (guitar and high-G ukulele, both root-string limits, with
+ * and without a hand window). A change to a shell cost here or in `fingering.ts` (`unaryCost`,
+ * `transCost`, `handCost`, `fingerTransCost`) moves it; so does letting a newer rule reach a
+ * shell, which is why triad rules are gated by `kind`. If the change is meant, regenerate the
+ * fixture in the same commit (the test's header says how) and review its diff.
+ */
 import { assignFingers, fingerSequence } from './fingering';
 import { DEGREES, mod, QUALITIES } from './theory';
 import type {
@@ -407,8 +419,9 @@ interface Plan {
  * written out four times decides as the loop written once does. A symbol is decided once, and a
  * grip that is kept stays held while the later symbols are decided.
  *
- * Triad and power chords only: a shell chart is pinned to the prototype by the parity suite,
- * and its jazz comping moves a chord between its two root strings on purpose.
+ * Triad and power chords only: a shell chart is pinned by the characterization suite
+ * (`test/shell-characterization.test.ts`), and its jazz comping moves a chord between its two
+ * root strings on purpose.
  */
 function unifyGrips(
     chart: ChartChord[],
