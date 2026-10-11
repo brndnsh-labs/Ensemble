@@ -735,6 +735,229 @@ describe('a shell a player would choose (#1607)', () => {
     });
 });
 
+describe('a ukulele chart stays in first position (#1609)', () => {
+    const chart = (names: string) =>
+        names.split(' ').map((s) => {
+            const p = voicingChord(parseChord(s, { tonic: 0, minor: false })!, 'C', false);
+            return { root: p.root, quality: p.quality };
+        });
+    const tabs = (
+        inst: InstrumentDef,
+        names: string,
+        home: [number, number] | null,
+        sameGripTolerance?: number,
+    ) =>
+        voiceChart(chart(names), { instrument: inst, home, sameGripTolerance }).map((v) =>
+            tab(inst, v),
+        );
+    /** The grips each symbol of a chart is voiced with. */
+    const gripsBySymbol = (names: string, home: [number, number] | null) => {
+        const by = new Map<string, Set<string>>();
+        const voiced = tabs(UKULELE, names, home);
+        names.split(' ').forEach((sym, i) => {
+            by.set(sym, (by.get(sym) ?? new Set()).add(voiced[i]));
+        });
+        return by;
+    };
+    /** The first-position grips every ukulele method prints. */
+    const BOOK: Record<string, string> = {
+        G7: '0 2 1 2',
+        C7: '0 0 0 1',
+        D7: '2 2 2 3',
+        A7: '0 1 0 0',
+        E7: '1 2 0 2',
+    };
+    const { G7, C7, D7 } = BOOK;
+    const book = (names: string) => names.split(' ').map((s) => BOOK[s]);
+    const NUT: ([number, number] | null)[] = [[1, 6], null];
+
+    // The charts below are the point of #1609. The describes after them bracket its rules one
+    // at a time; what each of these three brackets is said on it.
+    it('a blues in G is G7 0 2 1 2, C7 0 0 0 1, D7 2 2 2 3 throughout', () => {
+        // The method-book grips. Aimed at the middle of frets 1–6 it was 4 5 3 5 and
+        // 3 4 3 3 for eight bars, then the open grips for the last three. Either rule fixes it
+        // by itself (the hand's costs for a shell, or the aim at first position), so this fails
+        // only with both gone: a regression pin, not a bracket.
+        const blues = 'G7 G7 G7 G7 C7 C7 G7 G7 D7 C7 G7 G7';
+        for (const home of NUT) {
+            for (const inst of [UKULELE, UKULELE_LOW_G]) {
+                expect(tabs(inst, blues, home)).toEqual(book(blues));
+            }
+        }
+    });
+    it('a blues in A is A7 0 1 0 0, D7 2 2 2 3, E7 1 2 0 2 throughout', () => {
+        // It was 2 4 3 4 and 4 4 4 5: wholly up the neck, no string open. This one brackets
+        // the hand's costs for a shell (`byHand`): with the aim at first position left in and a
+        // shell costed by `center` and its root's path again, A7 goes back up the neck.
+        const blues = 'A7 A7 A7 A7 D7 D7 A7 A7 E7 D7 A7 A7';
+        expect(tabs(UKULELE, blues, [1, 6])).toEqual(book(blues));
+    });
+    it('F Dm7 Gm7 C7 is 2 0 1 0, 2 2 1 3, 0 2 1 1, 0 0 0 1', () => {
+        // One triad and three shells, all in first position. It was 5 5 5 3, 5 5 5 5,
+        // 3 5 3 5, 3 4 3 3: the triad aimed at the window's middle, the shells following.
+        // Like the blues in G, a regression pin: it fails only with both rules gone.
+        expect(tabs(UKULELE, 'F Dm7 Gm7 C7', [1, 6])).toEqual([
+            '2 0 1 0',
+            '2 2 1 3',
+            '0 2 1 1',
+            C7,
+        ]);
+    });
+    it('known limit: a jazz blues in A keeps A7 at 2 4 3 4, beside F♯7 3 4 2 4', () => {
+        // Not the book's 0 1 0 0, and pinned so that it is seen rather than stumbled on: F♯7
+        // has to be 3 4 2 4, one finger away from 2 4 3 4, and `unifyGrips` holds the A7 that
+        // is cheaper across the chart. Tracked in #1613; when that lands this
+        // expectation changes with it.
+        const names = 'A7 D7 A7 A7 D7 D7 A7 F♯7 Bm7 E7 A7 F♯7 Bm7 E7';
+        const a7 = tabs(UKULELE, names, [1, 6]).filter((_, i) => names.split(' ')[i] === 'A7');
+        expect(new Set(a7)).toEqual(new Set(['2 4 3 4']));
+    });
+    it('the guitar is not touched: its triads and shells keep their own reckoning', () => {
+        const guitar = (names: string, home: [number, number] | null) => tabs(GUITAR, names, home);
+        // Three open strings of six are not "every string" (`handFree`): were Am x x 0 0 0 x
+        // read as no hand position, this run would leave the 5th-string set for it
+        // (x x 2 0 1 x, x x 0 0 0 x).
+        expect(guitar('C G Am F', [1, 6])).toEqual([
+            'x 3 2 0 x x',
+            'x 2 0 0 x x',
+            'x 3 2 2 x x',
+            'x 3 3 2 x x',
+        ]);
+        // A move between a guitar triad and a guitar shell is the hand's (`transCost`: either
+        // grip read by the hand), as it was before #1609. Two guitar shells keep the root's path.
+        expect(guitar('C Am7 Dm7 G7', null)).toEqual([
+            'x 3 2 0 x x',
+            '5 3 5 x x x',
+            'x 5 3 5 x x',
+            'x x 5 4 6 x',
+        ]);
+    });
+
+    describe('a window from the nut is first position, not a middle to aim for', () => {
+        it('a blues in B♭ takes B♭7 1 2 1 1 and F7 2 3 1 3 beside E♭7 3 3 3 4', () => {
+            // 0.45 a fret, as with no window. At a window's 0.15 the pull to first position is
+            // too weak to bring B♭7 down from 3 5 4 5, beside an E♭7 that has to be at the 3rd.
+            expect(tabs(UKULELE, 'B♭7 E♭7 B♭7 F7', [1, 6])).toEqual([
+                '1 2 1 1',
+                '3 3 3 4',
+                '1 2 1 1',
+                '2 3 1 3',
+            ]);
+        });
+        it('the triads are aimed there too: Am F C G is 2 0 0 0, 2 0 1 0, 0 0 0 3, 0 2 3 2', () => {
+            // Started on Am in frets 1–6 it was 2 4 5 3, 2 5 5 3, then the open C and G.
+            for (const home of NUT) {
+                expect(tabs(UKULELE, 'Am F C G', home)).toEqual([
+                    '2 0 0 0',
+                    '2 0 1 0',
+                    '0 0 0 3',
+                    '0 2 3 2',
+                ]);
+            }
+        });
+        it('a window that starts higher keeps its own middle and takes no open string', () => {
+            for (const home of [
+                [2, 7],
+                [5, 10],
+                [7, 12],
+            ] as [number, number][]) {
+                for (const names of [
+                    'G7 G7 G7 G7 C7 C7 G7 G7 D7 C7 G7 G7',
+                    'C6 C7 Fmaj7 Fm7 C6 Dm7 G7',
+                    'C Am7 Dm7 G7',
+                    'Am F C G',
+                ]) {
+                    const voiced = voiceChart(chart(names), { instrument: UKULELE, home });
+                    for (const v of voiced) {
+                        expect(
+                            v.notes.every((n) => n.fret >= home[0] && n.fret <= home[1]),
+                            `${v.symbol} ${tab(UKULELE, v)} in frets ${home[0]}–${home[1]}`,
+                        ).toBe(true);
+                    }
+                }
+            }
+            // The same blues in frets 5–10: every grip up the neck, around the 7th fret.
+            expect(tabs(UKULELE, 'G7 C7 D7 G7', [5, 10])).toEqual([
+                '7 7 7 8',
+                '9 10 8 10',
+                '7 9 8 9',
+                '7 7 7 8',
+            ]);
+        });
+    });
+
+    describe('a shell is costed as the triad beside it', () => {
+        it('C to Am7 is 0 0 0 3 to 0 0 0 0: lifting every finger is not a shift', () => {
+            // Read as "the hand at fret 0", all-open Am7 was three frets from the C, and the
+            // pair went up the neck instead (5 4 3 3 to 2 4 3 3).
+            for (const home of NUT) {
+                expect(tabs(UKULELE, 'C Am7 Dm7 G7', home)).toEqual([
+                    '0 0 0 3',
+                    '0 0 0 0',
+                    '2 2 1 3',
+                    G7,
+                ]);
+            }
+        });
+        it('off the nut all four strings open is the hand gone to the nut, as before', () => {
+            expect(tabs(UKULELE, 'C Am7', [2, 7])).not.toContain('0 0 0 0');
+        });
+    });
+
+    describe('one grip per symbol', () => {
+        it('holds a ukulele shell: Gm7 Cm7 D7 Gm7 plays one Gm7, 0 2 1 1', () => {
+            expect(tabs(UKULELE, 'Gm7 Cm7 D7 Gm7', [1, 6])).toEqual([
+                '0 2 1 1',
+                '3 3 3 3',
+                D7,
+                '0 2 1 1',
+            ]);
+            // The plan alone starts on 3 5 3 5, level with the Cm7, and ends on the open grip.
+            expect(tabs(UKULELE, 'Gm7 Cm7 D7 Gm7', [1, 6], 0)).toEqual([
+                '3 5 3 5',
+                '3 3 3 3',
+                D7,
+                '0 2 1 1',
+            ]);
+        });
+        it('up the neck too: a blues in G in frets 5–10 plays one C7', () => {
+            const blues = 'G7 G7 G7 G7 C7 C7 G7 G7 D7 C7 G7 D7';
+            expect(
+                new Set(tabs(UKULELE, blues, [5, 10]).filter((_, i) => [4, 5, 9].includes(i))),
+            ).toEqual(new Set(['5 7 6 7']));
+            expect(tabs(UKULELE, blues, [5, 10], 0)[9]).toBe('9 10 8 10');
+        });
+        it('the charts of #1609 voice every symbol one way, in frets 1–6 and unlocked', () => {
+            for (const names of [
+                // F blues with a turnaround: Gm7 and C7 were 0 2 1 1 / 0 0 0 1, then 3 5 3 5 / 3 4 3 3
+                'F7 B♭7 F7 F7 B♭7 B♭7 F7 D7 Gm7 C7 F7 D7 Gm7 C7',
+                // I6 I7 IV iv I6 I°7 ii V in C: C6 was 0 0 0 0, then 2 4 3 3
+                'C6 C7 Fmaj7 Fm7 C6 Cdim7 Dm7 G7',
+                'G7 C7 G7 D7 C7 G7',
+                'G7 G7 G7 G7 C7 C7 G7 G7 D7 C7 G7 D7',
+                'A7 A7 A7 A7 D7 D7 A7 A7 E7 D7 A7 E7',
+            ]) {
+                for (const home of NUT) {
+                    for (const [sym, grips] of gripsBySymbol(names, home)) {
+                        expect([...grips], `${sym} in ${names}`).toHaveLength(1);
+                    }
+                }
+            }
+            expect(tabs(UKULELE, 'G7 C7 G7 D7 C7 G7', [1, 6])).toEqual([G7, C7, G7, D7, C7, G7]);
+            expect(tabs(UKULELE, 'C6 C7 Fmaj7 Fm7 C6 Cdim7 Dm7 G7', [1, 6])).toEqual([
+                '0 0 0 0',
+                C7,
+                '2 4 1 3',
+                '1 3 1 3',
+                '0 0 0 0',
+                '2 3 2 3',
+                '2 2 1 3',
+                G7,
+            ]);
+        });
+    });
+});
+
 describe('voiceChart on triads (#1588): the hand stays put, open chords win first position', () => {
     const chart = (names: string[]) =>
         names.map((s) => {
@@ -875,9 +1098,10 @@ describe('voiceChart on triads (#1588): the hand stays put, open chords win firs
             'x 2 4 4 x x',
         ]);
     });
-    it('off the nut the triad costs never see a shell: uke Dm7 G7 Cmaj7 in frets 2–7', () => {
-        // Frets 2–7: off the nut, where a uke shell shares nothing with the triads. In first
-        // position it takes their open-string credit on purpose (#1607).
+    it('off the nut a ukulele shell is closed and sits in its window: Dm7 G7 Cmaj7 in frets 2–7', () => {
+        // A ukulele shell is costed as its triads are, everywhere (#1609). Off the nut that
+        // gives it nothing first position does: no open-string credit, the window's own middle
+        // as the target. So the grips are the closed ones, as they were before.
         expect(tabs(UKULELE, ['Dm7', 'G7', 'Cmaj7'], [2, 7])).toEqual([
             '5 5 5 5',
             '4 5 3 5',
@@ -908,9 +1132,11 @@ describe('voiceChart', () => {
         const v = voiceChart(chart(['Dm7', 'G7', 'Cmaj7']), { instrument: UKULELE, home: null });
         expect(v.map((x) => tab(UKULELE, x))).toEqual(['2 2 1 3', '0 2 1 2', '0 0 0 2']);
     });
-    it('locked to frets 1–6, the voicer aims for the middle of the window', () => {
+    it('locked to frets 1–6, the ukulele ii–V–I is the same first-position shapes (#1609)', () => {
+        // A window from the nut is first position plus reach, not a middle to aim for.
         const v = voiceChart(chart(['Dm7', 'G7', 'Cmaj7']), { instrument: UKULELE, home: [1, 6] });
         expect(v.every((x) => inHome(x, [1, 6]))).toBe(true);
+        expect(v.map((x) => tab(UKULELE, x))).toEqual(['2 2 1 3', '0 2 1 2', '0 0 0 2']);
     });
     it('respects a root-string limit', () => {
         const v = voiceChart(chart(['Dm7', 'G7', 'Cmaj7', 'Fmaj7']), {

@@ -7,9 +7,11 @@
  * charts it lists: all six shell qualities (maj7, 7, m7, m7♭5, °7 and 6) on guitar (both
  * root-string limits) and ukulele (high G, and two low-G charts), with and without a hand
  * window. A change to a shell cost here or in `fingering.ts` (`unaryCost`,
- * `transCost`, `handCost`, `fingerTransCost`) moves it; so does a change to which grips a
- * chord is offered (`allPositions`, a quality's `required` tones, where `buildAt` puts one,
- * what `candidates` holds back as a last resort), to which barre a shell may take
+ * `transCost`, `handCost`, `fingerTransCost`) moves it — and for a ukulele shell, which is
+ * costed and held to one grip as the ukulele triads are (`byHand`, #1609), a change to
+ * `triadUnaryCost`, `triadTransCost`, `handFree` or `unifyGrips` does too; so does a change to
+ * which grips a chord is offered (`allPositions`, a quality's `required` tones, where `buildAt`
+ * puts one, what `candidates` holds back as a last resort), to which barre a shell may take
  * (`fingerRules`), and so does letting a newer rule reach a shell, which is why triad rules are
  * gated by `kind`. If the change is meant, regenerate the fixture in the same commit (the
  * test's header says how) and review its diff.
@@ -367,12 +369,28 @@ function viterbi<T>(states: T[][], unary: (s: T) => number, trans: (a: T, b: T) 
     return out;
 }
 
-/** Stay near the middle of the home window, avoid wide stretches, and never leave the window if avoidable. */
+/**
+ * Stay near the target fret, avoid wide stretches, and never leave the window if avoidable.
+ *
+ * The target is the middle of the hand window, pulled lightly (0.15 a fret: the window already
+ * keeps the hand close), or with no window the instrument's own home (`defaultTarget`), pulled
+ * at 0.45 a fret. One case is neither (#1609): a grip that strums every string
+ * (`strumsEveryString`: a ukulele's shells, its triads and its four-string power chord, C5
+ * 0-0-3-3; not the three-string one, G5 0-2-3-x, nor any guitar grip) in a window that starts
+ * at the nut. That window is first position plus two frets of reach, not a place to sit in the
+ * middle of: every ukulele method teaches G7 0-2-1-2, C7 0-0-0-1, D7 2-2-2-3, A7 0-1-0-0 and
+ * B♭7 1-2-1-1, and a pull to the 3rd-and-a-half fret voiced a blues in G as 4-5-3-5 / 3-4-3-3
+ * and Am F C G as 2-4-5-3 / 2-5-5-3 instead. So there the grip is aimed exactly as it is with
+ * no window — `defaultTarget`, at 0.45 — and the window only says how far the hand may reach.
+ * A window that starts higher keeps its own middle: the musician put the hand there.
+ */
 function unaryCost(v: Voicing, opts: VoiceOptions): number {
     const home = opts.home ?? null;
-    const target = home ? (home[0] + home[1]) / 2 : opts.instrument.defaultTarget;
-    if (v.shape.kind !== 'shell') {
-        return triadUnaryCost(v, target, home);
+    const windowed = home !== null && !(atTheNut(home) && strumsEveryString(v, opts.instrument));
+    const target = windowed ? (home[0] + home[1]) / 2 : opts.instrument.defaultTarget;
+    const pull = windowed ? 0.15 : 0.45;
+    if (byHand(v, opts.instrument)) {
+        return triadUnaryCost(v, target, pull, home, opts.instrument);
     }
     // The out-of-window term (here and in `triadUnaryCost`) never picks a grip: `candidates` gives
     // a chord its in-window grips, or every grip when it has none, so a chord's grips are all
@@ -381,10 +399,9 @@ function unaryCost(v: Voicing, opts: VoiceOptions): number {
     // open string (`openOneOff`, #1607), and without it none is on offer. It stays for a
     // shape that would be.
     return (
-        Math.abs(center(v) - target) * (home ? 0.15 : 0.45) +
+        Math.abs(center(v) - target) * pull +
         (spanOf(v.notes.map((n) => n.fret)) > 3 ? 0.4 : 0) +
-        (inHome(v, home) ? 0 : 5) -
-        (strumsEveryString(v, opts.instrument) ? openStringCredit(v, home) : 0)
+        (inHome(v, home) ? 0 : 5)
     );
 }
 
@@ -393,7 +410,8 @@ function unaryCost(v: Voicing, opts: VoiceOptions): number {
  * helper 5th across the four strings), never a guitar one (three or four notes of six, the rest
  * muted). It is a strummed chord like the uke triads, and it is taught the same way: first
  * position, open strings ringing — C6 and Am7 are 0-0-0-0, C7 is 0-0-0-1, Cmaj7 0-0-0-2 in
- * every ukulele method. So it earns the triads' open-string credit (`openStringCredit`, #1607).
+ * every ukulele method. So it takes the triads' costs whole (`byHand`, #1609), their
+ * open-string credit among them (`openStringCredit`, #1607).
  *
  * A guitar shell does not. There an open string turns the movable shape being learned into a
  * one-off for one root (Fmaj7 1-0-2-x-x-x, A7 x-0-x-0-2-x), and with the credit a chart at the
@@ -403,10 +421,25 @@ function unaryCost(v: Voicing, opts: VoiceOptions): number {
 const strumsEveryString = (v: { notes: Note[] }, inst: InstrumentDef): boolean =>
     v.notes.length === inst.strings;
 
+/**
+ * A grip costed by the fretting hand (`triadUnaryCost`, `triadTransCost`) and held to one grip
+ * per symbol (`unifyGrips`): every triad and power grip, and a shell that strums every string
+ * (#1609). The other costs — the hand mid-window, the root's path from string to string — are a
+ * jazz comper's, for a shell whose root sits on a bass string under muted ones. A ukulele has
+ * no bass string and mutes nothing: its 7th chord is a strummed four-string chord exactly like
+ * its triad, taught on the same page, so the two are costed alike. That also leaves no seam in
+ * a chart that mixes them: C to Am7 is 0-0-0-3 to 0-0-0-0 by the same reckoning either way,
+ * where a shell read by `center` took the pair up the neck (5-4-3-3 to 2-4-3-3).
+ */
+const byHand = (v: Voicing, inst: InstrumentDef): boolean =>
+    v.shape.kind !== 'shell' || strumsEveryString(v, inst);
+
 /** Keep the hand still and the root's path simple: same string or the neighboring string, few frets. */
-function transCost(a: Voicing, b: Voicing, home: HomeWindow | null): number {
-    if (a.shape.kind !== 'shell' || b.shape.kind !== 'shell') {
-        return triadTransCost(a, b, home);
+function transCost(a: Voicing, b: Voicing, home: HomeWindow | null, inst: InstrumentDef): number {
+    // Either grip read by the hand, and the move is: on a ukulele that is every move, on a
+    // guitar a move to or from a triad or power grip. Two guitar shells keep the root's path.
+    if (byHand(a, inst) || byHand(b, inst)) {
+        return triadTransCost(a, b, home, inst);
     }
     const ra = a.notes.find((n) => n.role === 'R')!,
         rb = b.notes.find((n) => n.role === 'R')!;
@@ -430,6 +463,9 @@ function transCost(a: Voicing, b: Voicing, home: HomeWindow | null): number {
 // move cost follows each voice on its own string and keeps the string set (#1597), and in first position (a window from
 // fret 1, or no window) each open string earns a little: open strings ring, and they are the
 // whole point of the chords a player learns first.
+//
+// A ukulele's shells are costed here too (`byHand`, #1609): strummed across all four strings,
+// they are the same kind of chord.
 
 /** Where the fretting hand is for a triad grip: the fretted notes' centre; at the nut when all open. */
 function handAt(v: Voicing): number {
@@ -441,21 +477,40 @@ function handAt(v: Voicing): number {
 const atTheNut = (home: HomeWindow | null): boolean => home === null || home[0] === 1;
 
 /**
+ * A strummed chord with every string open, in first position (#1609): the ukulele's C6 and
+ * Am7, 0-0-0-0. The fretting hand is not on the neck at all, so the chord has no position: it
+ * is played from wherever the hand is and left for wherever the next chord wants it. Read as
+ * "the hand at fret 0" (`handAt`) it looked two or three frets from the chords around it, and C
+ * to Am7 cost a shift that nobody makes. Only at the nut — up the neck four open strings mean
+ * the hand has left its position, and fret 0 is the honest reading — and only for a grip that
+ * strums every string: a guitar triad on three open strings (Em x-x-x-0-0-0) still has three
+ * strings to keep quiet.
+ */
+const handFree = (v: Voicing, home: HomeWindow | null, inst: InstrumentDef): boolean =>
+    atTheNut(home) && strumsEveryString(v, inst) && v.notes.every((n) => n.fret === 0);
+
+/**
  * What a grip's open strings earn in first position, 0.2 each: they ring, cost no finger, and
  * are the whole point of the chords a player learns first. Against the pull to the target
- * fret, one open string is worth under half a fret with no window (0.45 a fret) and a fret and
- * a third inside one (0.15 a fret, where the window already keeps the hand close): enough that
- * in frets 1–6 the uke's all-open C6 (centre 0, three and a half frets from the middle) beats
- * the closed 2-4-3-3 (centre 3, half a fret from it), never enough to carry a grip across the
+ * fret (`unaryCost`), one open string is worth under half a fret at 0.45 a fret (no window, or
+ * a ukulele at the nut) and a fret and a third at 0.15 (a guitar triad inside its window):
+ * enough to choose the open grip among those near the hand — the uke's G7 0-2-1-2, half a fret
+ * below its target, over 4-5-3-5 two frets above it — never enough to carry a grip across the
  * neck. Up the neck an open string earns nothing.
  */
 function openStringCredit(v: Voicing, home: HomeWindow | null): number {
     return atTheNut(home) ? v.notes.filter((n) => n.fret === 0).length * 0.2 : 0;
 }
 
-function triadUnaryCost(v: Voicing, target: number, home: HomeWindow | null): number {
+function triadUnaryCost(
+    v: Voicing,
+    target: number,
+    pull: number,
+    home: HomeWindow | null,
+    inst: InstrumentDef,
+): number {
     return (
-        Math.abs(handAt(v) - target) * (home ? 0.15 : 0.45) +
+        (handFree(v, home, inst) ? 0 : Math.abs(handAt(v) - target) * pull) +
         (spanOf(v.notes.map((n) => n.fret)) > 3 ? 0.4 : 0) +
         (inHome(v, home) ? 0 : 5) -
         openStringCredit(v, home)
@@ -479,9 +534,15 @@ const lowString = (v: Voicing): number => Math.min(...v.notes.map((n) => n.strin
  *   first position (the finger simply lifts and the string rings, the uke's 0003 → 2000 move);
  *   up the neck it is fret 0, a reach all the way back to the nut.
  * - **Keep the hand where it is.** A shift inside one fret is free — the hand has not moved, a
- *   finger has reached.
+ *   finger has reached. Nor has it moved to or from a chord that is all open strings
+ *   (`handFree`): there is no hand on the neck to shift.
  */
-function triadTransCost(a: Voicing, b: Voicing, home: HomeWindow | null): number {
+function triadTransCost(
+    a: Voicing,
+    b: Voicing,
+    home: HomeWindow | null,
+    inst: InstrumentDef,
+): number {
     const sets = Math.abs(lowString(b) - lowString(a));
     // One string over is a real choice (a player would rather not, 1.2 ≈ an eight-fret slide's
     // worth of finger travel); each further string is a register jump that leaves the comping
@@ -499,8 +560,10 @@ function triadTransCost(a: Voicing, b: Voicing, home: HomeWindow | null): number
         // 0.3 for a fresh string: a new finger placed, about a two-fret slide's worth.
         stepCost += before === undefined ? 0.3 : Math.abs(n.fret - before) * 0.15;
     }
+    const shift =
+        handFree(a, home, inst) || handFree(b, home, inst) ? 0 : Math.abs(handAt(b) - handAt(a));
     // 0.7 a fret beyond the first: moving the whole hand is the costliest thing a grip change does.
-    return Math.max(0, Math.abs(handAt(b) - handAt(a)) - 1) * 0.7 + setCost + stepCost;
+    return Math.max(0, shift - 1) * 0.7 + setCost + stepCost;
 }
 
 /**
@@ -594,17 +657,22 @@ interface Plan {
  * written out four times decides as the loop written once does. A symbol is decided once, and a
  * grip that is kept stays held while the later symbols are decided.
  *
- * Triad and power chords only: a shell chart is pinned by the characterization suite
- * (`test/shell-characterization.test.ts`), and its jazz comping moves a chord between its two
- * root strings on purpose.
+ * For the grips costed by the hand (`byHand`): triads, power chords, and since #1609 a
+ * ukulele's shells, which are strummed chords too. Left to the plan alone, 15 of 140 ukulele
+ * charts in frets 1–6 and 49 in frets 5–10 voiced a 7th chord two ways (Gm7 Cm7 D7 Gm7 opened
+ * on 3-5-3-5 and closed on 0-2-1-1). A guitar shell is left out: its jazz comping moves a chord
+ * between its two root strings on purpose.
  */
 function unifyGrips(
     chart: ChartChord[],
     states: Voicing[][],
     plan: (states: Voicing[][]) => Plan,
     tolerance: number,
+    inst: InstrumentDef,
 ): Voicing[] {
-    const keys = chart.map((c) => (QUALITIES[c.quality].kind === 'shell' ? null : chordKey(c)));
+    const keys = chart.map((c, i) =>
+        states[i].every((v) => byHand(v, inst)) ? chordKey(c) : null,
+    );
     const held = new Map<string, string>();
     const decided = new Set<string>();
     const holding = () =>
@@ -654,8 +722,9 @@ function unifyGrips(
 
 /**
  * Voice a whole chart at once: one grip per chord, chosen so the hand moves as little as possible
- * and the root takes simple paths, a triad symbol kept to one grip where that costs little
- * (`unifyGrips`), then fingers planned across the chart so held notes stay held.
+ * and the root takes simple paths, a strummed symbol (a triad, a ukulele shell) kept to one grip
+ * where that costs little (`unifyGrips`), then fingers planned across the chart so held notes
+ * stay held.
  * Extra fields on each chart entry (bar, beat, numeral, duration...) are carried through.
  */
 export function voiceChart<C extends ChartChord>(chart: C[], opts: VoiceOptions): VoicedChord<C>[] {
@@ -664,7 +733,7 @@ export function voiceChart<C extends ChartChord>(chart: C[], opts: VoiceOptions)
     }
     const home = opts.home ?? null;
     const unary = (v: Voicing) => unaryCost(v, opts);
-    const trans = (a: Voicing, b: Voicing) => transCost(a, b, home);
+    const trans = (a: Voicing, b: Voicing) => transCost(a, b, home, opts.instrument);
     const plan = (states: Voicing[][]): Plan => {
         const path = viterbi(states, unary, trans);
         const cost = path.reduce(
@@ -678,6 +747,7 @@ export function voiceChart<C extends ChartChord>(chart: C[], opts: VoiceOptions)
         chart.map((c) => candidates(c, opts)),
         plan,
         opts.sameGripTolerance ?? SAME_GRIP_TOLERANCE,
+        opts.instrument,
     );
     const out = picked.map((v, i) => stamp(v, chart[i]));
     fingerSequence(
