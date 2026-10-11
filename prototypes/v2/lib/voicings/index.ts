@@ -5,10 +5,12 @@
 
 export type { Barre } from './fingering';
 export { barres, fingerMap } from './fingering';
+export type { HomeKey } from './home-window';
+export { HOME_FRETS, keyHomeWindow } from './home-window';
 export { GUITAR, UKULELE } from './instruments';
 export { fingerMoves, rootMove } from './motion';
 export { DEGREES, spellDegree } from './theory';
 export type { Degree, HomeWindow, InstrumentDef, Note, Voicing } from './types';
 export type { NeckPrefs, VoicedBandChord } from './voice-chart';
-export { NECK_INSTRUMENTS, voiceBandChart } from './voice-chart';
+export { chartHomeKey, NECK_INSTRUMENTS, voiceBandChart } from './voice-chart';
 export { allPositions, build, gripMidis, inHome, inversionOf, voiceChart } from './voicing';

@@ -501,27 +501,76 @@ export class BandHost {
      * (P2-2: the old `!bandView` gate wrongly denied v1 charts this cue and the jump-ahead both).
      */
     inLastPulse(tick: number, leadMs = 600): boolean {
+        const bar = this.barContaining(tick);
+        if (!bar) {
+            return false;
+        }
+        const end = bar.start + bar.meter.barTicks;
+        const lastPulseStart = bar.start + bar.meter.pulses[bar.meter.pulses.length - 1];
+        const leadTicks = ((leadMs / 1000) * PPQ * this.bpm) / 60;
+        return tick >= Math.min(lastPulseStart, end - leadTicks);
+    }
+
+    /**
+     * Is `tick` within one FELT pulse of `end`, a song tick ahead of it — the last beat before a
+     * chord gives way (Neck mode's strong preview, #1590)? `inLastPulse` asks the same of the
+     * barline; this asks it of any tick, because a chord can change inside a bar and the hand
+     * has to move there too.
+     *
+     * The beat is the same one `inLastPulse` counts in, the meter's own `pulses` skeleton: the
+     * pulse `end` closes (a quarter in 4/4, a dotted quarter in 6/8, the group in a grouped
+     * 7/8), measured back from `end`. At a barline that is exactly `inLastPulse`'s last pulse;
+     * for an `end` off the pulse grid (a chord that gives way on the "and" of 2) it is still a
+     * full beat's notice rather than the half beat left of that pulse.
+     *
+     * No lower bound: the caller asks about the span `tick` is already in, so a span no longer
+     * than that one beat (four chords in a 4/4 bar) answers true from its first tick. The
+     * alternative is a change that is never previewed at all, and those are the fast changes a
+     * learner most needs to see coming.
+     *
+     * `leadMs` is `inLastPulse`'s floor for the same reason in other clothes: a beat at a fast
+     * tempo is too short to read. There it buys the chart's scroll time to finish; here it buys
+     * the eye time to find the ghost dots, so above 100 bpm the notice is 600ms, not one beat.
+     */
+    inLastPulseBefore(tick: number, end: number, leadMs = 600): boolean {
+        if (tick >= end) {
+            return false;
+        }
+        // The bar `end` closes a span of: a barline belongs to the bar it ends, not the next one.
+        const bar = this.barContaining(end - 1);
+        if (!bar) {
+            return false;
+        }
+        const { pulses, pulseTicks } = bar.meter;
+        const offset = end - 1 - bar.start;
+        let pulse = pulses.length - 1;
+        while (pulse > 0 && pulses[pulse] > offset) {
+            pulse -= 1;
+        }
+        const leadTicks = ((leadMs / 1000) * PPQ * this.bpm) / 60;
+        return tick >= end - Math.max(pulseTicks[pulse], leadTicks);
+    }
+
+    /** The performed bar `tick` falls in, or null past either end of the timeline. */
+    private barContaining(tick: number): Timeline['bars'][number] | null {
         const bars = this.timeline?.bars;
         if (!bars?.length) {
-            return false;
+            return null;
         }
         let lo = 0;
         let hi = bars.length - 1;
         while (lo <= hi) {
             const mid = (lo + hi) >> 1;
             const bar = bars[mid];
-            const end = bar.start + bar.meter.barTicks;
             if (tick < bar.start) {
                 hi = mid - 1;
-            } else if (tick >= end) {
+            } else if (tick >= bar.start + bar.meter.barTicks) {
                 lo = mid + 1;
             } else {
-                const lastPulseStart = bar.start + bar.meter.pulses[bar.meter.pulses.length - 1];
-                const leadTicks = ((leadMs / 1000) * PPQ * this.bpm) / 60;
-                return tick >= Math.min(lastPulseStart, end - leadTicks);
+                return bar;
             }
         }
-        return false;
+        return null;
     }
 
     /**

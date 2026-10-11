@@ -86,12 +86,12 @@ test('the neck shows the grip, follows the band and is remembered', async ({ pag
         await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
     ).toBe(true);
 
-    // The hand position is the neck's own slider.
+    // The hand position is the neck's own slider; in C it starts in first position (#1598).
     const hand = view.getByRole('slider', { name: 'Hand position' });
-    await expect(hand).toHaveAttribute('aria-valuenow', '2');
+    await expect(hand).toHaveAttribute('aria-valuenow', '1');
     await hand.focus();
     await hand.press('ArrowRight');
-    await expect(hand).toHaveAttribute('aria-valuenow', '3');
+    await expect(hand).toHaveAttribute('aria-valuenow', '2');
 
     // A ukulele has four strings, a guitar six.
     const instrument = view.getByLabel('Instrument', { exact: true });
@@ -213,6 +213,92 @@ test('the preview shows where the next grip is; the fingers on request (#1592)',
     expect(errors).toEqual([]);
 });
 
+/**
+ * Which changes the board drew a strong preview for over `ms` of playback, and which chords it
+ * showed with no preview at all: `Dm7>G7` is a frame with Dm7 sounding and ghost dots up while
+ * the strip names G7 next. Read per frame from one commit of the page, so the chord and its
+ * preview are never from two different paints.
+ */
+function previewedChanges(page: Page, ms: number) {
+    return page.evaluate(
+        (ms) =>
+            new Promise<{ previewed: string[]; plain: string[] }>((resolve) => {
+                const previewed = new Set<string>();
+                const plain = new Set<string>();
+                const end = performance.now() + ms;
+                const read = (testId: string) =>
+                    document
+                        .querySelector(`.neck-view [data-testid="${testId}"]`)
+                        ?.textContent?.replace('→', '')
+                        .trim() ?? '';
+                const frame = () => {
+                    const current = read('neck-current');
+                    if (document.querySelector('.neck-view .neck-ghost-dot')) {
+                        previewed.add(`${current}>${read('neck-next')}`);
+                    } else {
+                        plain.add(current);
+                    }
+                    if (performance.now() < end) {
+                        requestAnimationFrame(frame);
+                    } else {
+                        resolve({ previewed: [...previewed], plain: [...plain] });
+                    }
+                };
+                frame();
+            }),
+        ms,
+    );
+}
+
+test('two chords in a bar: each change is previewed on its own last beat (#1590)', async ({
+    page,
+}) => {
+    test.setTimeout(60_000);
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    await page.goto(appUrl());
+    await page.getByRole('button', { name: '＋ New song', exact: true }).click();
+    await editorRevealed(page);
+    await page.getByLabel('Song title').fill('Two to the bar');
+    // `| Dm7 G7 | Cmaj7 | Cmaj7 | Cmaj7 |`: the change to G7 lands on beat 3, inside the bar.
+    await page.getByLabel('Chords in this bar').fill('Dm7 G7');
+    // A new song is four bars: the other three are all Cmaj7, one run with no change inside it.
+    for (let bar = 0; bar < 3; bar++) {
+        await page.getByRole('button', { name: 'Next bar', exact: true }).click();
+        await page.getByLabel('Chords in this bar').fill('Cmaj7');
+    }
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
+    await page.getByRole('button', { name: 'Chart', exact: true }).click();
+    await expect(page.locator('.chord')).toHaveText(['Dm7', 'G7', 'Cmaj7', 'Cmaj7', 'Cmaj7']);
+    await page.getByRole('button', { name: 'Neck', exact: true }).click();
+    const view = page.getByRole('region', { name: 'Neck' });
+    await expect(view.getByTestId('neck-current')).toHaveText('Dm7');
+
+    // 120, not the 240 the other cases hurry at: the chart's next-bar cue opens a fixed real-time
+    // lead before the barline (`BandHost.inLastPulse`), and at 240 that lead reaches back past
+    // beat 3 — so a neck still timed to the barline would preview G7 over Dm7 there by accident.
+    // At 120 the bar's cue opens after G7 has landed, and only the slot's own last beat can.
+    const tempo = page.getByLabel('Tempo', { exact: true });
+    await tempo.fill('120');
+    await tempo.press('Enter');
+    await page.getByRole('button', { name: 'Start playback', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Stop playback', exact: true })).toBeEnabled();
+    // Once G7 is under the playhead the count-in is over; the form is 8s, so 9s is a full lap.
+    await expect(view.getByTestId('neck-current')).toHaveText('G7', { timeout: 20_000 });
+    const seen = await previewedChanges(page, 9_000);
+    await page.getByRole('button', { name: 'Stop playback', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Start playback', exact: true })).toBeEnabled();
+
+    // The mid-bar change, the barline's, and the loop back to the top.
+    expect(seen.previewed).toContain('Dm7>G7');
+    expect(seen.previewed).toContain('G7>Cmaj7');
+    expect(seen.previewed).toContain('Cmaj7>Dm7');
+    // Until that beat each chord is the grip alone — G7 too, which sits wholly inside the bar.
+    expect(seen.plain).toEqual(expect.arrayContaining(['Dm7', 'G7', 'Cmaj7']));
+    expect(errors).toEqual([]);
+});
+
 test('a phone board follows the hand; a laptop shows the whole neck (#1593)', async ({ page }) => {
     await seedStarters(page);
     await songLink(page, 'Blue pocket', 'Blues').click();
@@ -231,18 +317,43 @@ test('a phone board follows the hand; a laptop shows the whole neck (#1593)', as
     }
     await expect.poll(scale).toBeGreaterThan(1.4);
     const before = await scale();
-    // The board follows a home-window move.
+    // The board follows a home-window move (a C blues starts on frets 1–6, #1598).
     const hand = view.getByRole('slider', { name: 'Hand position' });
     await hand.focus();
     for (let i = 0; i < 4; i++) {
         await hand.press('ArrowRight');
     }
-    await expect(hand).toHaveAttribute('aria-valuenow', '6');
+    await expect(hand).toHaveAttribute('aria-valuenow', '5');
     await expect.poll(scale).not.toBe(before);
     // The zoomed board stays inside the screen.
     expect(
         await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
     ).toBe(true);
+});
+
+test('the hand sits where the key puts it until the musician moves it (#1598)', async ({
+    page,
+}) => {
+    await seedStarters(page);
+    const view = page.getByRole('region', { name: 'Neck' });
+    const hand = view.getByRole('slider', { name: 'Hand position' });
+    const open = (title: string) => songLink(page, title).first().click();
+    // 'Blue pocket' is in C: first position, where F's root is under the first finger.
+    await open('Blue pocket');
+    await page.getByRole('button', { name: 'Neck', exact: true }).click();
+    await expect(hand).toHaveAttribute('aria-valuetext', 'frets 1 to 6');
+    // 'Minor swing sketch' is in A minor, whose E7 is rooted at the 7th fret: frets 2–7. Neck
+    // mode is remembered, so the song opens on the neck.
+    await page.getByRole('button', { name: 'Back to songbook' }).click();
+    await open('Minor swing sketch');
+    await expect(hand).toHaveAttribute('aria-valuetext', 'frets 2 to 7');
+    // A window the musician moved stays put on the next chart.
+    await hand.focus();
+    await hand.press('ArrowRight');
+    await expect(hand).toHaveAttribute('aria-valuetext', 'frets 3 to 8');
+    await page.getByRole('button', { name: 'Back to songbook' }).click();
+    await open('Blue pocket');
+    await expect(hand).toHaveAttribute('aria-valuetext', 'frets 3 to 8');
 });
 
 test('stopped, the neck steps through the changes and the board strums (#1595, #1596)', async ({

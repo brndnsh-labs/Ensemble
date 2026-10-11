@@ -252,6 +252,68 @@ describe('voiceChart on triads (#1588): the hand stays put, open chords win firs
         );
         expect(sets.size).toBe(1);
     });
+    it('guitar G D Em C G D C D in frets 2–7 plays one C (#1599)', () => {
+        // Voiced chord by chord the first C follows the Em (x 7 5 5 x x) and the second follows
+        // the D (x 3 2 0 x x). One C costs the chart 1.5, under a position shift, so it is kept:
+        // the Em comes down with it, and the string set (above) holds.
+        const names = ['G', 'D', 'Em', 'C', 'G', 'D', 'C', 'D'];
+        expect(tabs(GUITAR, names, [2, 7])).toEqual([
+            'x 5 5 4 x x',
+            'x 5 4 2 x x',
+            'x 2 2 0 x x',
+            'x 3 2 0 x x',
+            'x 5 5 4 x x',
+            'x 5 4 2 x x',
+            'x 3 2 0 x x',
+            'x 5 4 2 x x',
+        ]);
+        // The rule off is the planner alone: two Cs.
+        const alone = (tolerance: number) =>
+            voiceChart(chart(names), {
+                instrument: GUITAR,
+                home: [2, 7],
+                sameGripTolerance: tolerance,
+            }).map((v) => tab(GUITAR, v));
+        expect([alone(0)[3], alone(0)[6]]).toEqual(['x 7 5 5 x x', 'x 3 2 0 x x']);
+        // The threshold is exclusive, bracketed on this chart's own 1.5 by one step of the cost
+        // model (every term is a multiple of 0.025).
+        expect(alone(1.5)).toEqual(alone(0));
+        expect(alone(1.525)).toEqual(tabs(GUITAR, names, [2, 7]));
+    });
+    it('one grip per symbol stops at a position shift: 2.075 unifies, 2.125 does not (#1599)', () => {
+        const grips = (names: string[], symbol: string, voiced: string[]) =>
+            new Set(voiced.filter((_, i) => names[i] === symbol));
+        // Just under the default 2.1: one D♭ costs 2.075, so both take the first-position grip.
+        const under = ['Db', 'Ab', 'Ebm', 'B', 'Bbm', 'Fm', 'Db'];
+        const split = voiceChart(chart(under), {
+            instrument: GUITAR,
+            home: null,
+            sameGripTolerance: 0,
+        }).map((v) => tab(GUITAR, v));
+        expect(grips(under, 'Db', split)).toEqual(new Set(['x x x 6 6 4', 'x x x 1 2 1']));
+        expect(grips(under, 'Db', tabs(GUITAR, under, null))).toEqual(new Set(['x x x 1 2 1']));
+        // Just over: one Em would cost 2.125. The first sits between a Dm and an F at the 2nd
+        // and 3rd frets, the last follows a G at the 5th, and each stays where its neighbours are.
+        const over = ['Dm', 'Em', 'F', 'Bb', 'G', 'Em'];
+        expect(grips(over, 'Em', tabs(GUITAR, over, [2, 7]))).toEqual(
+            new Set(['x 2 2 0 x x', 'x 7 5 4 x x']),
+        );
+    });
+    it('a symbol whose two grips are a neck apart keeps both (#1599)', () => {
+        // The A after an F♯ at the 2nd fret is the open-position x x x 2 2 0; the A between an
+        // E and an A♭m at the 4th fret is x x x 6 5 5. One A would cost 3.125, a five-fret leap
+        // there and back, so the voice leading wins and the chart is exactly the planner's.
+        const names = ['E', 'A', 'Abm', 'E', 'Ebm', 'B', 'F#', 'A', 'B', 'Ebm'];
+        const voiced = tabs(GUITAR, names, [2, 7]);
+        expect([voiced[1], voiced[7]]).toEqual(['x x x 6 5 5', 'x x x 2 2 0']);
+        expect(voiced).toEqual(
+            voiceChart(chart(names), {
+                instrument: GUITAR,
+                home: [2, 7],
+                sameGripTolerance: 0,
+            }).map((v) => tab(GUITAR, v)),
+        );
+    });
     it('guitar unlocked C Am F G takes the open-position triads', () => {
         expect(tabs(GUITAR, ['C', 'Am', 'F', 'G'], null)).toEqual([
             'x 3 2 0 x x',
