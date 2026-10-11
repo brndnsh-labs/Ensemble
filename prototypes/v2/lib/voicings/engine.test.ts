@@ -22,7 +22,7 @@ import { UKULELE_LOW_G } from './instruments';
 import { keyRoot } from './test/keys';
 import { QUALITIES } from './theory';
 import type { Quality } from './types';
-import { allowedShapes, buildAt, rootFrets } from './voicing';
+import { allowedShapes, buildAt, inReach, rootFrets } from './voicing';
 
 const tab = (inst: InstrumentDef, v: Voicing) => {
     const m = new Map(v.notes.map((n) => [n.string, n.fret]));
@@ -694,12 +694,17 @@ describe('a shell a player would choose (#1607)', () => {
             expect(tabsOf(v)[1]).toBe('6 x 5 6 5 x');
             expect(v[1].notes.map((n) => n.finger)).toEqual([2, 1, 3, 1]);
         });
-        it('it is still played where the position holds nothing else', () => {
-            // Roots on the 6th and 5th strings, frets 2–7: Em7♭5's other grips start at the 7th
-            // fret and run past the window (x 7 8 7 8 x), so the hand stays and takes this one.
-            const classic = voiced([2, 7], [6, 5], ['E', 'm7b5'], ['A', 'dom7'], ['D', 'm7']);
-            expect(tabsOf(classic)[0]).toBe('x 7 5 7 x 6');
-            // With the 4th string allowed there is a grip to prefer.
+        it('it is still played where the position holds nothing else, in the window or a fret past it', () => {
+            // Roots on the 6th and 5th strings, frets 10–15: Cm7♭5's only other grips are at
+            // the 3rd fret and the 8th (8 x 8 8 7 x, three frets below the window), so the
+            // hand stays and takes this one.
+            const classic = voiced([10, 15], [6, 5], ['C', 'm7b5'], ['F', 'dom7'], ['B♭', 'm7']);
+            expect(tabsOf(classic)[0]).toBe('x 15 13 15 x 14');
+            // In frets 2–7 Em7♭5 is in the same spot (x 7 5 7 x 6), but there the root-first
+            // grip is one fret past the window with its root inside, and it is taken (#1610).
+            const reach = voiced([2, 7], [6, 5], ['E', 'm7b5'], ['A', 'dom7'], ['D', 'm7']);
+            expect(tabsOf(reach)[0]).toBe('x 7 8 7 8 x');
+            // With the 4th string allowed there is a grip to prefer inside the window.
             const all = voiced([2, 7], undefined, ['E', 'm7b5'], ['A', 'dom7'], ['D', 'm7']);
             expect(tabsOf(all)[0]).toBe('x x 2 3 3 3');
         });
@@ -954,6 +959,270 @@ describe('a ukulele chart stays in first position (#1609)', () => {
                 '2 2 1 3',
                 G7,
             ]);
+        });
+    });
+});
+
+describe('the window widens a fret; an open string is not a shape (#1610)', () => {
+    const CLASSIC = [6, 5];
+    const chart = (...chords: [string, Quality][]) =>
+        chords.map(([root, quality]) => ({ root: R(root), quality }));
+    const voiced = (
+        home: [number, number] | null,
+        rootStrings: number[] | undefined,
+        ...c: [string, Quality][]
+    ) => voiceChart(chart(...c), { instrument: GUITAR, home, rootStrings });
+    const tabsOf = (vs: Voicing[]) => vs.map((v) => tab(GUITAR, v));
+    const grip = (id: string, root: string, quality: Quality, r: number) =>
+        buildAt(GUITAR, shape(GUITAR, id), R(root), quality, r)!;
+    const SHELLS = (Object.keys(QUALITIES) as Quality[]).filter(
+        (q) => QUALITIES[q].kind === 'shell',
+    );
+    const rootFinger = (v: Voicing) => v.notes.find((n) => n.role === 'R')?.finger ?? 0;
+
+    describe('one fret past the window, root in it', () => {
+        it('the root-first grip a fret out beats the buried root inside', () => {
+            // Roots on the 6th and 5th strings. Each window holds only the R–3–7 grip, the
+            // root under the ring or little finger; the R–7–3 grip tops out one fret higher.
+            const cases: [[number, number], string, Quality, string][] = [
+                [[1, 6], 'E♭', 'm7b5', 'x 6 7 6 7 x'], // not x 6 4 6 x 5
+                [[1, 6], 'E♭', 'dim7', 'x 6 7 5 7 x'], // not x 6 4 5 x 5
+                [[2, 7], 'E', 'm7b5', 'x 7 8 7 8 x'], // not x 7 5 7 x 6
+                [[2, 7], 'E', 'dim7', 'x 7 8 6 8 x'], // not x 7 5 6 x 6
+            ];
+            for (const [home, root, quality, want] of cases) {
+                const [v] = voiced(home, CLASSIC, [root, quality]);
+                expect(tab(GUITAR, v), `${v.symbol} in frets ${home.join('–')}`).toBe(want);
+                expect(rootFinger(v)).toBeLessThanOrEqual(2);
+            }
+        });
+        it('a window with no grip at all takes the one a fret out, not one across the neck', () => {
+            // F♯m7♭5 in frets 2–7: nothing fits inside. Between two E♭m7 at the 6th fret the
+            // costs alone go up to x 9 10 9 10 x, three frets past the window; 2 x 2 2 1 x has
+            // its root in the window and one note a fret below it.
+            const v = voiced([2, 7], CLASSIC, ['E♭', 'm7'], ['F♯', 'm7b5'], ['E♭', 'm7']);
+            expect(tabsOf(v)[1]).toBe('2 x 2 2 1 x');
+        });
+        it('what counts as in reach: one fret, either end, the root in the window', () => {
+            // One fret past the top, and one below the bottom.
+            expect(inReach(grip('5B', 'E♭', 'maj7', 6), [1, 6])).toBe(true); // x 6 5 7 x x
+            expect(inReach(grip('6A', 'F♯', 'm7b5', 2), [2, 7])).toBe(true); // 2 x 2 2 1 x
+            // Two frets is another position.
+            expect(inReach(grip('5A', 'E♭', 'maj7', 6), [1, 6])).toBe(false); // x 6 x 7 8 x
+            // So is a fretted root outside, though every note is a fret away.
+            expect(inReach(grip('6A', 'B♭', 'maj7', 6), [7, 12])).toBe(false); // 6 x 7 7 x x
+            // An open root is in every window, as an open string is for `inHome`; its fretted
+            // notes are still held to one fret (E7 0 x 0 1 x x is five below frets 6–11).
+            expect(inReach(grip('6A', 'E', 'maj7', 0), [2, 7])).toBe(true); // 0 x 1 1 x x
+            expect(inReach(grip('6A', 'E', 'dom7', 0), [6, 11])).toBe(false);
+            // No window, nothing to widen; a triad has no root that places it.
+            expect(inReach(grip('5B', 'E♭', 'maj7', 6), null)).toBe(false);
+            const triad = allPositions(GUITAR, R('C'), 'maj').find(
+                (v) => Math.max(...v.notes.map((n) => n.fret)) === 7,
+            )!;
+            expect(inReach(triad, [1, 6])).toBe(false);
+        });
+        it('an open root a fret below the window is offered beside the fretted one', () => {
+            // Emaj7 in frets 2–7, roots on the 6th and 5th strings: nothing inside. Both
+            // x 7 6 8 x x and the open 0 x 1 1 x x are a fret out with the root in the window,
+            // and the costs choose: after a ii–V at the 2nd fret the open one, a step away,
+            // not a five-fret jump for one chord; from the 7th fret the fretted one.
+            const low = voiced([2, 7], CLASSIC, ['F♯', 'm7'], ['B', 'dom7'], ['E', 'maj7']);
+            expect(tabsOf(low)).toEqual(['2 x 2 2 x x', 'x 2 x 2 4 x', '0 x 1 1 x x']);
+            const high = voiced([2, 7], CLASSIC, ['B', 'm7'], ['E', 'maj7'], ['B', 'm7']);
+            expect(tabsOf(high)[1]).toBe('x 7 6 8 x x');
+        });
+        it('two frets out is left to the costs: Em7♭5 in frets 1–6 is still x 7 8 7 8 x', () => {
+            // Its root is a fret past the window and its top two (#1607's accepted case), so it
+            // is not a reach; with nothing inside or in reach every grip is offered, as before.
+            const [v] = voiced([1, 6], CLASSIC, ['E', 'm7b5']);
+            expect(tab(GUITAR, v)).toBe('x 7 8 7 8 x');
+        });
+        it('a window that holds a grip a player would take is never left', () => {
+            // Every shell, root, six-fret window and root-string limit, alone and between two
+            // chords that pull it up or down the neck: a grip outside the window means every
+            // grip inside it had the root under the ring or little finger, and then the grip
+            // taken has its root in the window, under the index or middle finger, and is a fret
+            // out at most.
+            let reached = 0;
+            for (const rootStrings of [undefined, CLASSIC]) {
+                for (let w = 1; w <= 10; w++) {
+                    const home: [number, number] = [w, w + 5];
+                    for (const root of ROOTS) {
+                        for (const q of SHELLS) {
+                            const inside = allPositions(GUITAR, root, q, { rootStrings }).filter(
+                                (v) => inHome(v, home),
+                            );
+                            if (!inside.length) {
+                                continue;
+                            }
+                            for (const pull of [null, ROOTS[0], ROOTS[6]]) {
+                                const side = pull ? chart([pull.name, 'dom7']) : [];
+                                const v = voiceChart([...side, { root, quality: q }, ...side], {
+                                    instrument: GUITAR,
+                                    home,
+                                    rootStrings,
+                                })[side.length];
+                                if (inHome(v, home)) {
+                                    continue;
+                                }
+                                reached++;
+                                const where = `${v.symbol} ${tab(GUITAR, v)} in frets ${w}-${w + 5}`;
+                                expect(
+                                    inside.every((g) => rootFinger(g) > 2),
+                                    where,
+                                ).toBe(true);
+                                expect(inReach(v, home), where).toBe(true);
+                                expect(rootFinger(v), where).toBeLessThanOrEqual(2);
+                            }
+                        }
+                    }
+                }
+            }
+            // 18 chords have only a buried root in their window and the other grip a fret out
+            // (m7♭5 and °7 on nine roots), each voiced three ways here.
+            expect(reached).toBe(54);
+        });
+        it('with every root string allowed the window never widens: each holds a grip to take', () => {
+            for (let w = 1; w <= 10; w++) {
+                for (const root of ROOTS) {
+                    for (const q of SHELLS) {
+                        const [v] = voiceChart([{ root, quality: q }], {
+                            instrument: GUITAR,
+                            home: [w, w + 5],
+                        });
+                        expect(inHome(v, [w, w + 5]), `${v.symbol} ${tab(GUITAR, v)}`).toBe(true);
+                    }
+                }
+            }
+        });
+        it('no chord goes unvoiced: one shape, its only grip far from the window', () => {
+            const only: InstrumentDef = { ...GUITAR, shapes: [shape(GUITAR, '5A')] };
+            const [v] = voiceChart(chart(['E', 'maj7']), { instrument: only, home: [1, 4] });
+            expect(tab(only, v)).toBe('x 7 x 8 9 x');
+        });
+    });
+
+    describe('a three-note shell with an open string, where its root has a fretted shell', () => {
+        /** A fretted shell on the same root: same string, same fret, no open string. */
+        const frettedOnItsRoot = (v: Voicing, rootStrings?: number[]) =>
+            allPositions(GUITAR, v.root, v.quality, { rootStrings }).some(
+                (w) =>
+                    w.shape.rootString === v.shape.rootString &&
+                    w.rootFret === v.rootFret &&
+                    w.notes.every((n) => n.fret > 0),
+            );
+
+        it('B♭7 is x 1 x 1 3 x, not x 1 0 1 x x; Bm7 is x 2 x 2 3 x, not x 2 0 2 x x', () => {
+            // The R–3–7 shape at the 1st or 2nd fret drops its 3rd onto an open string; the
+            // R–7–3 shape is fretted on the same root, and is the one the books print.
+            const b7 = voiced([1, 6], CLASSIC, ['F', 'm7'], ['B♭', 'dom7'], ['F', 'm7']);
+            expect(tabsOf(b7)).toEqual(['1 x 1 1 x x', 'x 1 x 1 3 x', '1 x 1 1 x x']);
+            const bm7 = voiced([1, 6], CLASSIC, ['E', 'dom7'], ['B', 'm7'], ['E', 'dom7']);
+            expect(tabsOf(bm7)).toEqual(['0 x 0 1 x x', 'x 2 x 2 3 x', '0 x 0 1 x x']);
+            // The same with no window: F7 beside the open E7 is 1 x 1 2 x x, not 1 0 1 x x.
+            const f7 = voiced(null, CLASSIC, ['E', 'dom7'], ['F', 'dom7'], ['E', 'dom7']);
+            expect(tabsOf(f7)[1]).toBe('1 x 1 2 x x');
+        });
+        it('a root on an open string stays: Am7 x 0 x 0 1 x, Em7 0 x 0 0 x x, E7 0 x 0 1 x x', () => {
+            // The R–7–3 shape at the nut; no fretted shell can sit on an open root.
+            const v = voiced(
+                [1, 6],
+                CLASSIC,
+                ['G', 'dom7'],
+                ['A', 'm7'],
+                ['E', 'm7'],
+                ['F', 'maj7'],
+            );
+            expect(tabsOf(v)).toEqual(['3 2 3 x x x', 'x 0 x 0 1 x', '0 x 0 0 x x', '1 x 2 2 x x']);
+            for (const g of [v[1], v[2]]) {
+                expect(frettedOnItsRoot(g, CLASSIC), g.symbol).toBe(false);
+            }
+        });
+        it('a 6 chord at the 1st fret stays: B♭6 x 1 x 0 3 x has no fretted shell on its root', () => {
+            // Both shapes put the 6th on an open string, so this is the shape at that fret:
+            // into B♭7 only the 3rd string moves, open to the 1st fret.
+            const v = voiced([1, 6], undefined, ['B♭', 'six'], ['B♭', 'dom7'], ['E♭', 'maj7']);
+            expect(tabsOf(v)).toEqual(['x 1 x 0 3 x', 'x 1 x 1 3 x', 'x x 1 x 3 3']);
+            expect(frettedOnItsRoot(v[0])).toBe(false);
+        });
+        it('a grip with an added tone is not asked: Bm7♭5 keeps x 2 0 2 x 1 in first position', () => {
+            // Its open strings were ruled on where the ♭5 was placed (#1607's `openOneOff`).
+            const v = voiced(
+                [1, 6],
+                CLASSIC,
+                ['F', 'maj7'],
+                ['B', 'm7b5'],
+                ['E', 'dom7'],
+                ['A', 'm7'],
+            );
+            expect(tabsOf(v)).toEqual(['1 x 2 2 x x', 'x 2 0 2 x 1', '0 x 0 1 x x', 'x 0 x 0 1 x']);
+        });
+        it('on the whole neck: an open string is voiced only where the root has no fretted shell', () => {
+            // maj7, 7, m7 and 6 on every root, between two chords on every root, with and
+            // without a window and a root-string limit.
+            const THREE_NOTE = SHELLS.filter((q) => !QUALITIES[q].required.length);
+            const kept = new Set<string>();
+            for (const rootStrings of [undefined, CLASSIC]) {
+                for (const home of [null, [1, 6], [2, 7]] as ([number, number] | null)[]) {
+                    for (const root of ROOTS) {
+                        for (const q of THREE_NOTE) {
+                            for (const side of ROOTS) {
+                                const vs = voiceChart(
+                                    [
+                                        { root: side, quality: 'm7' },
+                                        { root, quality: q },
+                                        { root: side, quality: 'm7' },
+                                    ],
+                                    { instrument: GUITAR, home, rootStrings },
+                                );
+                                for (const v of vs) {
+                                    if (!v.notes.some((n) => n.fret === 0)) {
+                                        continue;
+                                    }
+                                    const name = `${v.symbol} ${tab(GUITAR, v)}`;
+                                    expect(frettedOnItsRoot(v, rootStrings), name).toBe(false);
+                                    kept.add(name);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            // The open grips that are voiced: the R–7–3 shape at the nut, and the 6 chords at
+            // the 1st fret.
+            expect([...kept].sort()).toMatchInlineSnapshot(`
+              [
+                "A7 x 0 x 0 2 x",
+                "Am7 x 0 x 0 1 x",
+                "Amaj7 x 0 x 1 2 x",
+                "B♭6 x 1 0 0 x x",
+                "B♭6 x 1 x 0 3 x",
+                "D6 x x 0 x 0 2",
+                "D7 x x 0 x 1 2",
+                "Dm7 x x 0 x 1 1",
+                "Dmaj7 x x 0 x 2 2",
+                "E7 0 x 0 1 x x",
+                "Em7 0 x 0 0 x x",
+                "Emaj7 0 x 1 1 x x",
+                "F6 1 0 0 x x x",
+                "F6 1 x 0 2 x x",
+              ]
+            `);
+        });
+        it('it is still played where the window holds nothing else', () => {
+            // No chord can be left with only such grips (the fretted shell on the same root is
+            // always there), so the last resort is about the window. A hand held to the 1st
+            // fret alone cannot take x 1 x 1 3 x, two frets past it, and plays the open form
+            // rather than leave; given the 2nd fret too, the fretted grip is one fret out.
+            const [held] = voiced([1, 1], CLASSIC, ['B♭', 'dom7']);
+            expect(tab(GUITAR, held)).toBe('x 1 0 1 x x');
+            const [reach] = voiced([1, 2], CLASSIC, ['B♭', 'dom7']);
+            expect(tab(GUITAR, reach)).toBe('x 1 x 1 3 x');
+            // One shape only, so no other shell on the root: the open form is the shape.
+            const only: InstrumentDef = { ...GUITAR, shapes: [shape(GUITAR, '5B')] };
+            const [v] = voiceChart(chart(['B♭', 'dom7']), { instrument: only, home: [1, 6] });
+            expect(tab(only, v)).toBe('x 1 0 1 x x');
         });
     });
 });

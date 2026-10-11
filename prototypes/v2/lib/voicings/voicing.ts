@@ -11,7 +11,8 @@
  * costed and held to one grip as the ukulele triads are (`byHand`, #1609), a change to
  * `triadUnaryCost`, `triadTransCost`, `handFree` or `unifyGrips` does too; so does a change to
  * which grips a chord is offered (`allPositions`, a quality's `required` tones, where `buildAt`
- * puts one, what `candidates` holds back as a last resort), to which barre a shell may take
+ * puts one, what `candidates` holds back as a last resort and how far past the window it
+ * looks, `inReach`), to which barre a shell may take
  * (`fingerRules`), and so does letting a newer rule reach a shell, which is why triad rules are
  * gated by `kind`. If the change is meant, regenerate the fixture in the same commit (the
  * test's header says how) and review its diff.
@@ -205,7 +206,8 @@ export function buildAt(
                 // No room here if the tone is out of reach, or if it would make the grip an
                 // open-string one-off (`openOneOff`). Only a grip with an added tone is asked:
                 // a three-note shell on open strings (Em7 0-x-0-0-x-x) is taken or not on its
-                // costs, and a ukulele shell has no added tone at all.
+                // costs unless its root has a fretted shell too (`openShapeOneOff`), and a
+                // ukulele shell has no added tone at all.
                 if (span > MAX_SPAN || openOneOff(frets)) {
                     continue;
                 }
@@ -393,8 +395,9 @@ function unaryCost(v: Voicing, opts: VoiceOptions): number {
         return triadUnaryCost(v, target, pull, home, opts.instrument);
     }
     // The out-of-window term (here and in `triadUnaryCost`) never picks a grip: `candidates` gives
-    // a chord its in-window grips, or every grip when it has none, so a chord's grips are all
-    // inside or all outside and the term adds the same to each (#1604). Nor does the wide-span
+    // a chord its in-window grips, else its grips a fret's reach past the window (`inReach`),
+    // else every grip, and each of those sets is all inside or all outside, so the term adds
+    // the same to each (#1604, #1610). Nor does the wide-span
     // term pick a shell any more: the one shell wider than three frets was a reach around an
     // open string (`openOneOff`, #1607), and without it none is on offer. It stays for a
     // shape that would be.
@@ -414,9 +417,11 @@ function unaryCost(v: Voicing, opts: VoiceOptions): number {
  * open-string credit among them (`openStringCredit`, #1607).
  *
  * A guitar shell does not. There an open string turns the movable shape being learned into a
- * one-off for one root (Fmaj7 1-0-2-x-x-x, A7 x-0-x-0-2-x), and with the credit a chart at the
- * nut swaps its shells for a different such grip per chord. One is still taken when the costs
- * already favour it (Am7 x-0-x-0-1-x); it is not sought.
+ * one-off for one root (Fmaj7 1-0-2-x-x-x, B♭6 x-1-x-0-3-x), and with the credit a chart at
+ * the nut swaps its shells for a different such grip per chord. Where the same root also holds
+ * a fretted shell the open form is a last resort (`openShapeOneOff`: Fmaj7 is 1-x-2-2-x-x);
+ * otherwise one is still taken when the costs already favour it (Am7 x-0-x-0-1-x, A7
+ * x-0-x-0-2-x); it is not sought.
  */
 const strumsEveryString = (v: { notes: Note[] }, inst: InstrumentDef): boolean =>
     v.notes.length === inst.strings;
@@ -592,17 +597,129 @@ const rootBuried = (v: Voicing, inst: InstrumentDef): boolean => {
 };
 
 /**
- * The grips a chord is voiced from: those inside the hand window, or every grip when none fits
- * — and of those, the ones a player would take. A grip with a buried root (`rootBuried`) stays
- * only when the position offers nothing else: staying in the window comes first, because that
- * is where the musician put the hand, and an awkward grip there is still the right chord.
+ * A three-note guitar shell that is the open-string one-off of a fretted shape (#1610): one of
+ * its notes is an open string, and the same root — same string, same fret — holds another shell
+ * with every note fretted. B♭7 x-1-0-1-x-x is the R–3–7 shape at the 1st fret with its 3rd
+ * fallen on the open D; on that same B♭ sits the R–7–3 shape, x-1-x-1-3-x, which is the grip
+ * every method prints there and the one that moves to B7 and C7. All ten such grips on the
+ * neck are that case: an R–3–7 shape at the 1st or 2nd fret, its 3rd open, with the R–7–3 shape
+ * fretted on the same root (F7 1-0-1-x-x-x, Bm7 x-2-0-2-x-x). The open form is good for
+ * this root only (`openOneOff`'s notion, here for the shape's own notes rather than an added
+ * tone), and taking the fretted one costs the hand nothing: the root stays where it is. So
+ * it is a last resort (`candidates`), as a buried root is.
+ *
+ * Where the root has no fretted shell, the open form IS the shape at that fret and stays on
+ * offer, taken or not on its costs:
+ *
+ * - A root on an open string (E7 0-x-0-1-x-x, Am7 x-0-x-0-1-x, Dm7 x-x-0-x-1-1): the R–7–3
+ *   shape at the nut, the nut holding the root. The R–3–7 shape cannot be built there (its 3rd
+ *   would be behind the nut), so there is no fretted grip on that root, and these ten are the
+ *   open E, A and D chords a learner already knows, less the 5th.
+ * - A 6 chord at the 1st fret (B♭6 x-1-x-0-3-x, F6 1-x-0-2-x-x): both shapes put the 6th on an
+ *   open string, so neither is the fretted one. Between B♭7 x-1-x-1-3-x and B♭maj7 x-1-x-2-3-x
+ *   it is the same grip with the 3rd string moving 0, 1, 2, and sending it to the 6th fret
+ *   instead makes a chart at the nut hop between the two positions.
+ *
+ * Three-note shells only. A grip with an added tone (m7♭5, °7) was placed by `openOneOff`,
+ * which lets one or two open strings ring in first position as the books print it (Bm7♭5
+ * x-2-0-2-x-1), and a ukulele shell is taught on its open strings (`strumsEveryString`).
+ */
+const openShapeOneOff = (v: Voicing, all: Voicing[], inst: InstrumentDef): boolean =>
+    v.shape.kind === 'shell' &&
+    !strumsEveryString(v, inst) &&
+    QUALITIES[v.quality].required.length === 0 &&
+    v.notes.some((n) => n.fret === 0) &&
+    all.some(
+        (w) =>
+            w.shape.rootString === v.shape.rootString &&
+            w.rootFret === v.rootFret &&
+            w.notes.every((n) => n.fret > 0),
+    );
+
+/**
+ * How far the window widens when it holds no grip a player would take: one fret, either end
+ * (`inReach`). One, because past that the grip is in another position, and where the hand goes
+ * then is for the costs to say. Nor would two rescue anything: in no six-fret window of the
+ * guitar does a shell have such a grip two frets out, root in the window, and none one fret out.
+ */
+const REACH = 1;
+
+/**
+ * A grip that belongs to the window's position though a note of it is a fret outside (#1610):
+ * its root in the window, and no note more than `REACH` past either end (E♭m7♭5 x-6-7-6-7-x in
+ * frets 1–6, F♯m7♭5 2-x-2-2-1-x in frets 2–7). The root is what places it: the window is where
+ * the chart's roots fall on the low strings (`keyHomeWindow`), and a shell is built up from its
+ * root, so a grip rooted there is this position's grip for the chord rather than another
+ * position's. An open root is in every window, as an open string is for `inHome` (Emaj7
+ * 0-x-1-1-x-x in frets 2–7, its two fretted notes a fret below).
+ *
+ * It says where the grip is, not how far the hand travels to it: the window is six frets and a
+ * hand covers four, so such a grip may still be a shift from the chord before (x-7-6-8-x-x
+ * after x-2-x-3-4-x). That is the costs' business, and they see it.
+ *
+ * Shells only: a triad's root moves with its inversion, so it places nothing.
+ */
+export const inReach = (v: Voicing, home: HomeWindow | null): boolean => {
+    const root = v.notes.find((n) => n.role === 'R');
+    if (v.shape.kind !== 'shell' || !home || !root) {
+        return false;
+    }
+    return (
+        (root.fret === 0 || (root.fret >= home[0] && root.fret <= home[1])) &&
+        v.notes.every(
+            (n) => n.fret === 0 || (n.fret >= home[0] - REACH && n.fret <= home[1] + REACH),
+        )
+    );
+};
+
+/**
+ * The grips a chord is voiced from: the first of these that holds any.
+ *
+ * 1. Grips inside the hand window that a player would take: every one but those with a buried
+ *    root (`rootBuried`) and the open-string one-offs of a fretted shape (`openShapeOneOff`).
+ *    Where the window has one, nothing below is looked at.
+ * 2. Such grips with the window widened by a fret, root in it (`inReach`, #1610). They are
+ *    this position's grips for the chord, so they come before the awkward one inside and
+ *    before a grip somewhere else on the neck (in frets 1–6, roots on the 6th and 5th strings,
+ *    E♭m7♭5 is x-6-7-6-7-x, not x-6-4-6-x-5; E♭maj7, which has no grip inside at all, is
+ *    x-6-5-7-x-x and not the 11th fret).
+ * 3. Any grip inside the window, those two kinds included: an awkward grip in the place the
+ *    musician put the hand is still the right chord, and it beats leaving.
+ * 4. Nothing near: every grip on the neck, those two kinds last, and the costs pick (they keep
+ *    it close: Em7♭5 in frets 1–6 is x-7-8-7-8-x, its root one fret out and its top two).
+ *
+ * So no chord goes unvoiced, and a chord whose window already holds a grip a player would take
+ * is voiced exactly as if the wider window were not there. Of the shells, only a guitar's with roots
+ * kept to the 6th and 5th strings ever get past the first step: with the 4th string's shapes
+ * every chord has such a grip in every six-fret window, as every ukulele shell does. A triad
+ * or power chord has neither a buried root nor a reach (`inReach`), so for it this is what it
+ * always was: the grips inside the window, or every grip when none fits.
+ *
+ * Each step's grips are all inside the window or all outside it (step 2 is only looked at for
+ * what step 1 did not find inside, and step 4 when nothing is inside at all), which is why
+ * `unaryCost`'s out-of-window term never picks between them.
  */
 function candidates(c: ChartChord, opts: VoiceOptions): Voicing[] {
+    const home = opts.home ?? null;
     const all = allPositions(opts.instrument, c.root, c.quality, { rootStrings: opts.rootStrings });
-    const inside = all.filter((v) => inHome(v, opts.home));
-    const reachable = inside.length ? inside : all;
-    const clear = reachable.filter((v) => !rootBuried(v, opts.instrument));
-    return clear.length ? clear : reachable;
+    const clear = (grips: Voicing[]) =>
+        grips.filter(
+            (v) => !rootBuried(v, opts.instrument) && !openShapeOneOff(v, all, opts.instrument),
+        );
+    const inside = all.filter((v) => inHome(v, home));
+    const tiers = [
+        () => clear(inside),
+        () => clear(all.filter((v) => inReach(v, home))),
+        () => inside,
+        () => clear(all),
+    ];
+    for (const tier of tiers) {
+        const grips = tier();
+        if (grips.length) {
+            return grips;
+        }
+    }
+    return all;
 }
 
 function stamp<C extends ChartChord>(v: Voicing, c: C): VoicedChord<C> {
