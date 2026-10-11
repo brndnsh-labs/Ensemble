@@ -137,6 +137,29 @@ export const SONG_SHAPES: Record<string, SongShape> = {
             4,
         ],
     },
+    // I6–I7–IV–iv–I6–I°7–ii–V: the 6 and dim7 shells, and three chords that change quality on
+    // one root (I6→I7, IV→iv, I6→I°7), which is what `transCost`'s same-root term prices
+    plagal: {
+        mode: 'major',
+        bars: [
+            v(0, 0, 'six', 'I6'),
+            v(0, 0, 'dom7', 'I7'),
+            3,
+            v(5, 3, 'm7', 'iv'),
+            v(0, 0, 'six', 'I6'),
+            v(0, 0, 'dim7', 'I°7'),
+            1,
+            4,
+        ],
+    },
+    // i–I7–iv–♯iv°7–V–i–iiø–V: the tonic turns dominant to reach iv, and a dim7 passes up to V
+    minorDim: {
+        mode: 'minor',
+        bars: [0, v(0, 0, 'dom7', 'I7'), 3, v(6, 3, 'dim7', '♯iv°7'), 4, 0, 1, 4],
+    },
+    // vi–viiø–I–ii–I–viiø–vi: the scale walked up and back. In F its viiø is Em7♭5, whose
+    // x-x-2-0-3-6 is the one shell grip wider than three frets (`unaryCost`, `MAX_SPAN`)
+    walk: { mode: 'major', bars: [5, 6, 0, 1, 0, 6, 5] },
 };
 
 export const songChart = (key: Spelled, shape: SongShape): KeyChord[] =>

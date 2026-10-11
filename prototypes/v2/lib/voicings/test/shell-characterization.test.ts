@@ -15,10 +15,16 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { GUITAR, UKULELE, voiceChart } from '../index';
+import { UKULELE_LOW_G } from '../instruments';
+import type { InstrumentDef } from '../types';
 import { keyRoot, SONG_SHAPES, songChart } from './keys';
 
+const INSTRUMENTS = { guitar: GUITAR, uke: UKULELE, 'uke-low-g': UKULELE_LOW_G } satisfies Record<
+    string,
+    InstrumentDef
+>;
 interface Setup {
-    ins: 'guitar' | 'uke';
+    ins: keyof typeof INSTRUMENTS;
     /** `classic` keeps a guitar shell's root on the 6th and 5th strings. */
     rootSet: 'all' | 'classic';
 }
@@ -55,27 +61,56 @@ const WINDOWS = [null, 2, 7];
 const SONGS = ['pop', 'fifties', 'canon', 'autumn', 'blues', 'bridge', 'minorLoop', 'bossa'];
 const KEYS = ['C', 'F♯', 'B♭'];
 
-// 216 charts, trimmed from the 360 the fixture began with (#1591) by measurement: 410 mutations,
-// one at a time, of the shell costs (`unaryCost`, `transCost`, `handCost`, `fingerTransCost`, the
-// instruments' `defaultTarget`), each caught or not by each chart. The 360 caught 333; the key of
-// A and two songs (the major and minor ii–V–I, which Autumn Leaves and Blue Bossa contain) were
-// the sole catcher of none, and this set catches the same 333. Nothing else comes out free:
-// every other setup, window, song and key is the only catcher of some mutation, and 18 of the
-// 333 are caught by exactly one chart. So add charts freely; measure before dropping one.
-const CASES: Case[] = SETUPS.flatMap((setup) =>
-    WINDOWS.flatMap((win) =>
-        SONGS.flatMap((song) =>
-            KEYS.map((key) => ({ ...setup, win, song, key, mode: SONG_SHAPES[song].mode })),
+const grid = (
+    setups: Setup[],
+    windows: (number | null)[],
+    songs: string[],
+    keys: string[],
+): Case[] =>
+    setups.flatMap((setup) =>
+        windows.flatMap((win) =>
+            songs.flatMap((song) =>
+                keys.map((key) => ({ ...setup, win, song, key, mode: SONG_SHAPES[song].mode })),
+            ),
         ),
-    ),
-);
+    );
+
+// The first 216 charts were trimmed from the 360 the fixture began with (#1591) by measurement:
+// 410 mutations, one at a time, of the shell costs (`unaryCost`, `transCost`, `handCost`,
+// `fingerTransCost`, the instruments' `defaultTarget`), each caught or not by each chart. The 360
+// caught 333; the key of A and two songs (the major and minor ii–V–I, which Autumn Leaves and
+// Blue Bossa contain) were the sole catcher of none, and those 216 catch the same 333. Nothing
+// else comes out free: every other setup, window, song and key is the only catcher of some
+// mutation.
+//
+// The other 57 are for what those 216 could not see (#1604), and raise the 333 to 381:
+// - `plagal` and `minorDim` bring the °7 and 6 shells to every setup, window and key. They also
+//   make `transCost`'s same-root cost decide: the 216 moved only when it was removed, these
+//   move when it drops a twentieth or rises a tenth.
+// - Two low-G ukulele charts. It voices as the high-G one does (strings an octave apart are the
+//   same string to the voicer), so two charts pin that, on all four uke shell shapes.
+// - `walk` in F on the 1–6 window holds the one shell grip wider than three frets, Em7♭5's
+//   x-x-2-0-3-6, played once and passed over once. It alone moves with `unaryCost`'s wide-span
+//   cost (nudged 3% either way) and with `MAX_SPAN` lowered.
+// Three things no chart can catch, because no shell reaches them: `unaryCost`'s out-of-window
+// cost and `fretFor`'s reach (each says why where it is written), and `MAX_SPAN` one fret higher
+// (5 allows no grip that 4 refuses).
+//
+// So add charts freely, after the ones here, so the fixture's diff is additions only; measure
+// before dropping one (45 of the 436 mutations tried are caught by exactly one chart).
+const CASES: Case[] = [
+    ...grid(SETUPS, WINDOWS, SONGS, KEYS),
+    ...grid(SETUPS, WINDOWS, ['plagal', 'minorDim'], KEYS),
+    ...grid([{ ins: 'uke-low-g', rootSet: 'all' }], [null], ['plagal', 'minorDim'], ['C']),
+    ...grid([{ ins: 'guitar', rootSet: 'all' }], [1], ['walk'], ['F']),
+];
 
 const label = (c: Case): string =>
     `${c.ins} ${c.rootSet} win=${c.win ?? 'any'} ${c.song} in ${c.key}`;
 
 function voice(c: Case): GoldenChord[] {
     const voiced = voiceChart(songChart(keyRoot(c.key), SONG_SHAPES[c.song]), {
-        instrument: c.ins === 'guitar' ? GUITAR : UKULELE,
+        instrument: INSTRUMENTS[c.ins],
         home: c.win === null ? null : [c.win, c.win + 5],
         rootStrings: c.ins === 'guitar' && c.rootSet === 'classic' ? [6, 5] : undefined,
     });

@@ -4,8 +4,9 @@
  *
  * PINNED. `test/shell-characterization.test.ts` holds `voiceChart`'s shell output — shape, root
  * fret, and every note's string, fret, degree, role and finger — to `test/golden.json`, for the
- * maj7, 7, m7 and m7♭5 charts it lists (guitar and high-G ukulele, both root-string limits, with
- * and without a hand window). A change to a shell cost here or in `fingering.ts` (`unaryCost`,
+ * charts it lists: all six shell qualities (maj7, 7, m7, m7♭5, °7 and 6) on guitar (both
+ * root-string limits) and ukulele (high G, and two low-G charts), with and without a hand
+ * window. A change to a shell cost here or in `fingering.ts` (`unaryCost`,
  * `transCost`, `handCost`, `fingerTransCost`) moves it; so does letting a newer rule reach a
  * shell, which is why triad rules are gated by `kind`. If the change is meant, regenerate the
  * fixture in the same commit (the test's header says how) and review its diff.
@@ -39,7 +40,11 @@ const MAX_SPAN = 4;
  */
 const mayBarre = (shape: ShapeDef): boolean => shape.kind !== 'shell';
 
-/** Fret on string `s` for a note `interval` semitones above a root at fret `r` on `rootString`, kept within reach. */
+/**
+ * Fret on string `s` for a note `interval` semitones above a root at fret `r` on `rootString`,
+ * kept within reach. Only a triad's note ever comes near the limit: a shell's sit from two frets
+ * below its root to three above, so moving the limit a fret or two changes no shell (#1604).
+ */
 export function fretFor(
     inst: InstrumentDef,
     s: number,
@@ -266,6 +271,9 @@ function unaryCost(v: Voicing, opts: VoiceOptions): number {
     if (v.shape.kind !== 'shell') {
         return triadUnaryCost(v, target, home);
     }
+    // The out-of-window term (here and in `triadUnaryCost`) never picks a grip: `candidates` gives
+    // a chord its in-window grips, or every grip when it has none, so a chord's grips are all
+    // inside or all outside and the term adds the same to each (#1604).
     return (
         Math.abs(center(v) - target) * (home ? 0.15 : 0.45) +
         (spanOf(v.notes.map((n) => n.fret)) > 3 ? 0.4 : 0) +
