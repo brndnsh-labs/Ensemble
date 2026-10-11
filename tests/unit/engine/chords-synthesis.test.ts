@@ -81,7 +81,6 @@ vi.mock('../../../public/state.js', () => {
         arranger: {},
         bass: {},
         soloist: makeSoloistMock({}),
-        vizState: {},
         storage: {},
         dispatch: vi.fn(),
     };

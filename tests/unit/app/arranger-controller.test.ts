@@ -57,7 +57,6 @@ describe('Arranger Controller', () => {
                 ],
                 isMinor: false,
                 key: 'C',
-                isDirty: false,
             },
         };
         Object.assign(getState(), state);
@@ -111,6 +110,5 @@ describe('Arranger Controller', () => {
         expect(validateProgression).toHaveBeenCalledWith(stateMap);
         expect(flushBuffers).toHaveBeenCalled();
         expect(restoreGains).toHaveBeenCalledWith(stateMap);
-        expect(state.arranger.isDirty).toBe(true);
     });
 });

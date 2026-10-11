@@ -121,7 +121,7 @@ One runtime per page, independent of React mounts. `initialize()` seeds the inst
 
 ### State (`public/state.ts`, `public/state/`)
 
-- Domain slices: `playback`, `arranger`, `groove`, `chords`, `bass`, `soloist`, `vizState`, `conductor` — each a `deepSignal`.
+- Domain slices: `playback`, `arranger`, `groove`, `chords`, `bass`, `soloist` — each a `deepSignal`. A field nothing reads gets removed, not kept as a leftover: the old engine's `conductor` and `vizState` slices, its toast/flash state and its scheduler scratch fields went that way on 2026-10-11. That cleanup is not finished — `soloist.session`, `arranger.scorePlan`/`measureMap` and a few fields the audio path reads but nothing sets are still to go — so don't assume a field is live because it is declared.
 - **All writes go through `dispatch(ACTIONS.TYPE, payload)`.** Never mutate state directly in components or controllers.
 - Hosts read with `getState()` and listen with `subscribe()` (`public/state.ts`). In v2 only `lib/runtime.ts` does either; React state lives in the shell, not in the slices.
 - `public/state/state-effects.ts` owns cross-module side effects kept deliberately outside reducers.
@@ -166,7 +166,7 @@ change to how a score becomes time still does: `--refreeze`). If you meant to ch
 the sound, run `npm run golden -- --update` and commit the fingerprints with the change — it
 is evidence for the `Needs-ear` stop, never a substitute for it.
 
-There is no visualizer. `vizState` and `public/visualizer/visualizer-events.ts`'s types survive only as leftovers of the old engine's scheduler; nothing turns `vizState` on.
+There is no visualizer, and no state for one.
 
 ### UI (`prototypes/v2/app/`)
 
@@ -278,7 +278,7 @@ Canonicalization* above, and decisions are dated entries in `docs/design/`. See
 - Atomic state changes: batch related updates in a single `dispatch` where possible.
 - Semantic prop names: name props after their domain (`isTransportVisible`) rather than visual state (`isBlue`).
 - Cross-reference comments name a symbol (a function/`const`/interface like `isDepartureCategory`), never a `file.ts:NNNN` line number — line numbers rot on every edit above them, but a symbol name is easy to `grep` and survives.
-- **Prototype guard on `TABLE[untrusted]` (Forgejo-era #1266 — archive provenance, *not* GitHub #1266, which is an unrelated v2 story; code comments citing `#1266` mean this rule) — pick by consumer count, not taste.** A lookup table indexed by a persisted/share-URL value must not be a plain literal: `TABLE['constructor']` returns the `Object` constructor, a truthy hit that sails past `|| fallback` and is then read as config. **Null-prototype the declaration** (`Object.assign(Object.create(null), {…})`, or `Object.create(null)` as a `reduce` seed) when the table has many `|| fallback` consumers — `TIME_SIGNATURES`, `STYLE_CONFIG`, the `smart-genres.ts` feel tables. **`Object.hasOwn` at the guard** when the table is read in one place — the runtime's `STYLE_FOR_GENRE` lookup. (Don't add new `Object.prototype.hasOwnProperty.call` guards.) **A null prototype on a STATE SLICE field is not available** — a reducer that re-creates the field (`groove.ts`'s `sectionSeedMap = {}`) drops it too; deepsignal also refuses to proxy a null-prototype object (`SUPPORTED.has(value.constructor)`), silently costing nested reactivity. For slice data, reject the bad KEY at the reader and type-check the VALUE at each read instead. Best of all, validate at the reader so nothing downstream is untrusted — for v1's saved data that is v2's v1 import, which applies `state-hydration.ts`'s rules; every reader of one value must use the *same* predicate.
+- **Prototype guard on `TABLE[untrusted]` (Forgejo-era #1266 — archive provenance, *not* GitHub #1266, which is an unrelated v2 story; code comments citing `#1266` mean this rule) — pick by consumer count, not taste.** A lookup table indexed by a persisted/share-URL value must not be a plain literal: `TABLE['constructor']` returns the `Object` constructor, a truthy hit that sails past `|| fallback` and is then read as config. **Null-prototype the declaration** (`Object.assign(Object.create(null), {…})`, or `Object.create(null)` as a `reduce` seed) when the table has many `|| fallback` consumers — `TIME_SIGNATURES`, `STYLE_CONFIG`, the `smart-genres.ts` feel tables. **`Object.hasOwn` at the guard** when the table is read in one place — the runtime's `STYLE_FOR_GENRE` lookup. (Don't add new `Object.prototype.hasOwnProperty.call` guards.) **A null prototype on a STATE SLICE field is not available** — a reducer that re-creates the field with a plain `{}` drops it too; deepsignal also refuses to proxy a null-prototype object (`SUPPORTED.has(value.constructor)`), silently costing nested reactivity. For slice data, reject the bad KEY at the reader and type-check the VALUE at each read instead. Best of all, validate at the reader so nothing downstream is untrusted — for v1's saved data that is v2's v1 import, which applies `state-hydration.ts`'s rules; every reader of one value must use the *same* predicate.
 
 ## Active Product Direction
 

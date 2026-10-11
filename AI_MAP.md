@@ -96,8 +96,6 @@ The ground-up replacement for the generative engine, the default since 2026-09-2
 | `public/state/arranger.ts` | Chords, sections, time signature, and key. | `arranger` |
 | `public/state/groove.ts` | Genre, swing, humanize and the drum lane's mix. | `groove` |
 | `public/state/instruments.ts` | Per-instrument synthesis parameters. | `bass`, `soloist`, `chords` |
-| `public/state/visualizer.ts` | `vizState.enabled`: whether the scheduler queues visualizer note events (no visualizer ships; only the old engine's scheduler reads it, and the app no longer runs it). | `vizState` |
-| `public/state/conductor.ts` | Macro-arc, intensity drift, and form iteration state. | `conductor` |
 | `public/state/share-codec.ts` | Share-URL / preset wire format: Unicode-safe Base64 + the minified section payload, plus the section-id generator deserialization mints. Main thread only. | `compressSections`, `tryDecompressSections`, `encodeBase64Unicode`, `generateId` |
 | `public/state/state-effects.ts` | Cross-module state side effects (Inversion of Control). | `handleEffects` |
 | `public/state/state-hydration.ts` | v1's reading rules, kept for v2's v1 import (#1274); v1's own load/save layer went in #1424. | `validateSections`, `sanitizeDisplayString`, `clamp` |
@@ -200,13 +198,11 @@ account sync. Per-surface ownership is the navigation table in `prototypes/v2/CL
 | `public/platform.ts` | Browser hacks (WakeLock, Audio Unlock). |
 | `public/utils.ts` | Pure musical/math primitives: pitch conversion + the step/meter timing core. No DOM, no Web Audio, no persistence. | `getFrequency`, `getStepInfo` |
 | `public/sanitize.ts` | Main-thread string sanitization (HTML escaping, dangerous-char stripping, song-seed normalizing). | `escapeHTML`, `stripDangerousChars`, `normalizeSongSeed` |
-| `public/visualizer/visualizer-events.ts` | Note-event contract the scheduler queues when `vizState.enabled`; kept only because the old engine's scheduler, which the app no longer runs, queues through it. | `queueVisualizerNoteEvent`, `VisualizerQueuedEvent` |
 
 ## Infrastructure & Lifecycle (Internal)
 
 | Path | Responsibility |
 | :--- | :--- |
-| `public/ui.ts` | Toast and flash dispatch helpers (`showToast`, `triggerFlash`) plus the toast-action registry. |
 | `public/config.ts` | Global timing and musical constants. |
 | `public/meter.ts` | Validated effective-meter resolution for authored rhythmic grouping. |
 | `public/constants.ts` | Global visual and UI state constants. |

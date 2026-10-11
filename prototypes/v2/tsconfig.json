@@ -11,8 +11,7 @@
         "moduleResolution": "bundler",
         "paths": {
             "@engine/*": ["../../public/*"],
-            "@band/*": ["../../band/*"],
-            "deepsignal/core": ["./lib/deepsignal-compat.d.ts"]
+            "@band/*": ["../../band/*"]
         },
         "resolveJsonModule": true,
         "isolatedModules": true,

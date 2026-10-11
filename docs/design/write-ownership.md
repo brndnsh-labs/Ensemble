@@ -19,6 +19,13 @@ conductor's `playback.conductorDensity`. So the persistence hazard in §2 now ap
 Save (`prototypes/v2/lib/runtime.ts`'s `captureContent`), and two of the precedents below (the
 trade layer, the density mirror) survive only as history in §5. The law itself is unchanged.
 
+**Amended 2026-10-11:** the remaining v1 scratch state nothing read is gone from the tree — the
+`conductor` and `vizState` slices, `playback`'s toast/flash/session-timer fields, and the
+arranger/groove/chords/bass scheduler scratch fields (`history` and `isDirty` on `arranger`,
+`sectionSeedMap` and `buffer` on `groove`, …) — so the manifest is down from 131
+fields to 76. Not every one of those has a reader yet (`soloist.session`, `arranger.scorePlan`).
+The law is unchanged.
+
 **Amended 2026-10-05 (#1437):** `playback.conductorVelocity`, the last paired `runtime-derived`
 field, is gone as well: its writer (`applyConductor`) and its readers (the old scheduler) went
 with the old engine in #1404, and nothing touched it after. So **no runtime system modulates a

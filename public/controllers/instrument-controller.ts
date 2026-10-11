@@ -68,7 +68,7 @@ function flushBuffer(...types: string[]): void {
 }
 
 export function togglePower(type: string): void {
-    const { groove, vizState, chords, bass, soloist } = getState();
+    const { groove, chords, bass, soloist } = getState();
     const normalizedType = type === 'chords' ? 'chord' : type;
 
     const stateMap = {
@@ -76,7 +76,6 @@ export function togglePower(type: string): void {
         bass: bass,
         soloist: soloist,
         groove: groove,
-        viz: vizState,
     };
 
     const state = (stateMap as any)[normalizedType];
@@ -85,12 +84,7 @@ export function togglePower(type: string): void {
     }
 
     const newState = !state.enabled;
-    const moduleName =
-        normalizedType === 'chord'
-            ? 'chords'
-            : normalizedType === 'viz'
-              ? 'vizState'
-              : normalizedType;
+    const moduleName = normalizedType === 'chord' ? 'chords' : normalizedType;
 
     dispatch(ACTIONS.SET_PARAM, { module: moduleName, param: 'enabled', value: newState });
 
@@ -115,8 +109,6 @@ export function togglePower(type: string): void {
             });
         }
     }
-
-    // Viz cleanup is now handled by the component's unmount/disable effect
 
     // #1313 — chord voicings are baked at parse time and depend on whether a bass
     // line is sounding (rootless shells + a higher floor with it, rooted voicings

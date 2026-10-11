@@ -13,30 +13,14 @@ export const groove = deepSignal<GrooveState>({
     humanize: 20,
     swing: 0,
     swingSub: '8th',
-    seed: '',
     audioBuffers: {},
     genreFeel: 'Rock',
     lastSmartGenre: 'Rock',
     pendingGenreFeel: null,
-    genreSwitchCountdown: null,
-    orchestrationMap: null,
-    fillMap: null,
-    accentMap: null,
-    seedTimelineStartStep: 0,
-    fillActive: false,
-    fillSteps: {},
-    buffer: new Map(),
     lastHatGain: null,
     lastSampledHatVoice: null,
     lastRideGain: null,
     lastCrashGain: null,
-    fillStartStep: 0,
-    fillLength: 0,
-    snareMask: 0,
-    pendingCrash: false,
-    // why: generative fills/variations/entropy default ON (drum audit 2026-05-29).
-    sectionSeedMap: {},
-    variations: null,
 });
 
 /**
@@ -101,17 +85,6 @@ export function grooveReducer(action: Action, playback: GlobalContext): boolean 
                 return true;
             }
             return false;
-        case ACTIONS.SET_SONG_SEED:
-            // #791: sectionSeedMap is a memo of deriveSectionSeed(sectionId,
-            // songSeed). When the song seed changes (re-roll on play, the seed
-            // control, a shared-URL load) the memo is stale — invalidate it so
-            // every section re-derives from the new seed. Without this, a
-            // re-rolled take keeps the old groove for already-seeded sections
-            // (the "incoherent partial re-randomization" of finding #791). A
-            // PINNED seed never dispatches SET_SONG_SEED on replay, so its memo
-            // survives and the groove reproduces exactly.
-            g.sectionSeedMap = {};
-            return true;
         case ACTIONS.SET_GENRE_FEEL:
             if (playback.isPlaying) {
                 g.pendingGenreFeel = action.payload;

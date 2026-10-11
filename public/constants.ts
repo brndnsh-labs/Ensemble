@@ -1,10 +1,8 @@
 export const MODULES = {
     BASS: 'bass',
     SOLOIST: 'soloist',
-    DRUMS_VIS: 'drums_vis',
     CHORDS: 'chords',
     PLAYBACK: 'playback',
     GROOVE: 'groove',
     ARRANGER: 'arranger',
-    VIZ: 'vizState',
 } as const;

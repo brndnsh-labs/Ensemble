@@ -1,5 +1,4 @@
 import type { SoloistTradeBars, SoloistTradeChoruses, SoloistTradeWith } from './songbook/types.js';
-import type { VisualizerQueuedEvent } from './visualizer/visualizer-events.js';
 
 /**
  * Centralized Action Types for the Ensemble State Manager.
@@ -184,13 +183,6 @@ export interface Chord {
     repeatIndex?: number;
 }
 
-export interface PlaybackIntent {
-    /** 0-1 */
-    anticipation: number;
-    /** Dilla feel; 0-1 */
-    layBack: number;
-}
-
 // ---------------------------------------------------------------------------
 // State-slice interfaces (lifted here from `state/*.ts` to break the
 // state ↔ types cycle the circular-import gate was flagging — dependency-cruiser
@@ -246,8 +238,6 @@ export interface ArrangerState {
     readonly isMinor: boolean;
     /** Notation style ('roman', 'nns', 'name'). */
     readonly notation: string;
-    /** Whether the current progression is valid. */
-    readonly valid: boolean;
     /** Total number of 16th note steps in the song. */
     readonly totalSteps: number;
     /** Map of steps to chord objects. */
@@ -261,41 +251,12 @@ export interface ArrangerState {
     }>;
     /** Map of sections to step ranges. */
     readonly sectionMap: Array<{ id: string; start: number; end: number; label: string }>;
-    /** Undo history stack (JSON strings). */
-    readonly history: string[];
-    /** ID of the last edited section. */
-    readonly lastInteractedSectionId: string;
-    /** ID of a section that was programmatically mutated. */
-    readonly mutatedSectionId: string | null;
-    /** Whether the arrangement has been manually modified. */
-    readonly isDirty: boolean;
     /** Custom rhythmic grouping array (e.g. [3, 2]). */
     readonly grouping: number[] | null;
     /** 6-char hex PRNG seed driving soloist + drum generation for this song. */
     readonly seed: string;
     /** When true, re-roll the seed on every playback instead of reusing a fixed one. */
     readonly randomizeSeed: boolean;
-}
-
-export interface ConductorState {
-    /** Target intensity level for auto-intensity drift. */
-    readonly targetIntensity: number;
-    /** Internal step size for auto-intensity. */
-    readonly stepSize: number;
-    /** Structural analysis of the song arrangement. */
-    readonly form: object | null;
-    /**
-     * Number of times the entire song form has looped. Incremented at
-     * `isLoopEnd` in `applyConductor`, never at a section boundary.
-     *
-     * #1171 collapsed a duplicate `loopCount` field into this one. That field
-     * was documented as "times the current SECTION has looped", but the only
-     * writer incremented it in the same dispatch as `formIteration`, at the end
-     * of the whole arrangement — so its doc was wrong and the two were provably
-     * always equal. If per-section loop counting is ever wanted, it needs a real
-     * writer at a section boundary, not this field back.
-     */
-    readonly formIteration: number;
 }
 
 /**
@@ -328,16 +289,10 @@ export interface GrooveState {
     readonly swing: number;
     /** Swing subdivision ('8th' or '16th'). */
     readonly swingSub: SwingSub;
-    /** Thematic seed for deterministic generation. */
-    readonly seed: string;
     /** Cache for decoded drum samples. */
     readonly audioBuffers: any;
     /** Active genre for procedural nuances ('Rock', 'Jazz', 'Funk'). */
     readonly genreFeel: string;
-    /** Whether a drum fill is currently being played. */
-    readonly fillActive: boolean;
-    /** Transient storage for the generated fill pattern. */
-    readonly fillSteps: object;
     /** Last gain node for the hi-hat. */
     readonly lastHatGain: GainNode | null;
     /**
@@ -352,34 +307,10 @@ export interface GrooveState {
     readonly lastRideGain: GainNode | null;
     /** Last gain node for the crash cymbal. */
     readonly lastCrashGain: GainNode | null;
-    /** Step index where the current fill began. */
-    readonly fillStartStep: number;
-    /** Length of the current fill in steps. */
-    readonly fillLength: number;
-    /** 16-bit mask of the current snare pattern. */
-    readonly snareMask: number;
-    /** Whether a crash cymbal is queued for the next downbeat. */
-    readonly pendingCrash: boolean;
-    /** Random seeds for each song section, keyed by section id. */
-    readonly sectionSeedMap: Record<string, number>;
     /** Last selected smart genre. */
     readonly lastSmartGenre: string;
     /** Genre queued for the next measure. */
     readonly pendingGenreFeel: { genreName?: string; feel?: string } | null;
-    /** Beats until genre switch. */
-    readonly genreSwitchCountdown: number | null;
-    /** Pre-calculated section orchestration map. */
-    readonly orchestrationMap: any[] | null;
-    /** Pre-calculated song-wide fill map. */
-    readonly fillMap: Record<number, any> | null;
-    /** Pre-calculated soloist accent catching map. */
-    readonly accentMap: Record<number, any> | null;
-    /** Absolute playback step when the current seed maps were generated. */
-    readonly seedTimelineStartStep: number;
-    /** Pre-calculated pattern variations for the current preset. */
-    readonly variations: any[] | null;
-    /** Map of scheduled drum events. */
-    readonly buffer: Map<number, any>;
 }
 
 export interface ChordState {
@@ -395,12 +326,8 @@ export interface ChordState {
     readonly volume: number;
     /** Reverb send amount. */
     readonly reverb: number;
-    /** Index of the last scheduled chord (Internal). */
-    readonly scheduledChordIndex: number | null;
     /** Scheduled notes buffer. */
     readonly buffer: Map<number, any>;
-    /** 16-bit mask of the current comping pattern. */
-    readonly rhythmicMask: number;
 }
 
 export interface BassState {
@@ -422,10 +349,6 @@ export interface BassState {
     readonly buffer: Map<number, any>;
     /** Playing style ID (e.g., 'walking', 'funk'). */
     readonly style: string;
-    /** Counter for "busy" playing periods. */
-    readonly busySteps: number;
-    /** Last MIDI note value played. */
-    readonly lastMidiPlayed: number | null;
     /** Last gain node for dynamic continuity. */
     readonly lastBassGain: GainNode | null;
 }
@@ -981,17 +904,8 @@ export interface GlobalContext {
     readonly nextNoteTime: number;
     /** The scheduler time for the next note (straight/quantized). */
     readonly unswungNextNoteTime: number;
-    /** Lookahead time for scheduling (in seconds). */
-    readonly scheduleAheadTime: number;
     /** The global step counter. */
     readonly step: number;
-    /**
-     * #981 — the id of the section the playhead currently sits in, written by
-     * the scheduler only when it actually changes (never per-step). Lets
-     * reactive readers (e.g. the instrument rail's section-override lookup)
-     * update on section transitions instead of every 16th note.
-     */
-    readonly currentSectionId: string | null;
     /**
      * Section-practice ("drill") — the absolute step at which the next play
      * should begin. Normally 0; set to a section's first step by "start from
@@ -999,98 +913,29 @@ export interface GlobalContext {
      * completion seed `step` from this, then it resets to 0 on stop.
      */
     readonly startStep: number;
-    /** Queue of normalized visual events waiting to be rendered. */
-    readonly drawQueue: VisualizerQueuedEvent[];
-    /** Whether the visualizer loop is active. */
-    readonly isDrawing: boolean;
-    /** The screen wake lock object. */
-    readonly wakeLock: WakeLockSentinel | null;
     /** Global band intensity/energy level (0.0 - 1.0). */
     readonly bandIntensity: number;
-    /**
-     * #842: the bar-DOWNBEAT `bandIntensity` a drum motif should be selected from,
-     * latched on the CONDUCTOR-LESS paths (MIDI export + logic worker). Those paths
-     * carry a stale default `state.conductor`, so instead of reconstructing the
-     * downbeat from a live ramp (the main-thread audio path) they set
-     * `noLiveConductor` in `runDrumTick`, which snapshots `bandIntensity` at each
-     * bar downbeat here; `motifSelectionIntensity` reads it as authoritative —
-     * keeping the motif skeleton bar-stable (a real drummer changes patterns only
-     * at a bar line). Worker-scratch: written per-tick with `@worker-mutation`,
-     * never synced or persisted (recomputed every bar), so the live-conductor paths
-     * never see it.
-     */
-    readonly motifBarIntensity?: number;
     /** Whether the intensity automatically drifts over time. */
     readonly autoIntensity: boolean;
     /** Whether the metronome is active. */
     readonly metronome: boolean;
-    /** Whether to apply BPM/Style from presets. */
-    readonly applyPresetSettings: boolean;
     /** Whether the global sustain pedal is "pressed". */
     readonly sustainActive: boolean;
-    /** Whether "Song Mode" (intelligent evolution and endings) is active. */
-    readonly songMode: boolean;
-    /** Session timer in minutes (0 = infinite). */
-    readonly sessionTimer: number;
     /** Whether debug logging for the soloist is active. */
     readonly debugSoloist: boolean;
-    /** The performance.now() timestamp when playback started. */
-    readonly sessionStartTime: number;
-    /** Whether to stop at the end of the current progression/loop. */
-    /** Whether the resolution sequence is about to trigger. */
-    readonly isEndingPending: boolean;
-    /** Current rhythmic intent (syncopation, anticipation, etc). */
-    readonly intent: PlaybackIntent;
-    /** Cache of currently animating drum UI elements. */
-    readonly lastActiveDrumElements: HTMLElement[] | null;
     /** Currently sustaining piano notes. */
     readonly heldNotes: Set<any>;
-    /** The last step index processed by the UI loop. */
-    readonly lastPlayingStep: number;
-    /** Whether to log messages from the audio worker. */
-    readonly workerLogging: boolean;
-    /** ID of the timeout for audio context suspension. */
-    readonly suspendTimeout: ReturnType<typeof setTimeout> | null;
-    /** The current musical key being tracked by playback. */
-    readonly currentKey: string | null;
     /** Master output volume. */
     readonly masterVolume: number;
     /** Whether the metronome count-in is enabled. */
     readonly countIn: boolean;
-    /** Whether visual flashing is enabled. */
-    readonly visualFlash: boolean;
-    /** Whether chord symbols are tinted by harmonic quality on the chart. */
-    readonly qualityColors: boolean;
-    /** List of active toast notifications. */
-    readonly toasts: Array<{ id: string; message: string; actions?: string[] }>;
-    /** Current intensity of the screen flash effect. */
-    readonly flashIntensity: number;
-    /** Whether the resolution ending sequence has been triggered. */
-    readonly resolutionTriggered: boolean;
-    /** Whether the scheduler is currently active. */
-    readonly isScheduling: boolean;
-    /** Number of loops before stopping (0 = infinite). */
-    readonly loopLimit: number;
-    /** Current loop iteration counter. */
-    readonly currentLoopCount: number;
-    /**
-     * Whether the chord chart is read-only ("locked"). Defaults true so the
-     * chart behaves like sheet music on a stand; unlocking pauses playback
-     * and reveals the inline editor. Auto-locks on play.
-     */
-    readonly chartLocked: boolean;
-}
-
-export interface VisualizerState {
-    /** Whether the advanced visualizer is active. */
-    readonly enabled: boolean;
 }
 
 /**
  * Strips `readonly` from every field of T. Use sparingly at write sites:
  *
- * - Reducers: alias once at function top — `const v = vizState as Mutable<typeof vizState>;`
- * - @direct-mutation engine sites: inline — `(vizState as Mutable<typeof vizState>).enabled = true;`
+ * - Reducers: alias once at function top — `const g = groove as Mutable<typeof groove>;`
+ * - @direct-mutation engine sites: inline — `(groove as Mutable<typeof groove>).lastHatGain = gain;`
  *
  * Dynamic-key writes (`slice[key] = value`) inside reducers may still use
  * `(slice as any)[key]` — those are unchecked by intent.
@@ -1104,8 +949,6 @@ export interface EnsembleState {
     bass: BassState;
     soloist: SoloistState;
     chords: ChordState;
-    conductor: ConductorState;
-    vizState: VisualizerState;
 }
 
 export interface StepInfo {
@@ -1179,22 +1022,10 @@ export interface ActionPayloadSetGenreFeel {
     soloist?: string;
 }
 
-export interface ActionPayloadShowToast {
-    id?: string;
-    message?: string;
-    type?: string;
-    /** Optional action button labels. Callbacks are looked up in the toast
-     *  action registry (see public/ui.ts) so functions never enter state. */
-    actions?: string[];
-}
-
 export interface ActionPayloadMap {
     SET_PARAM: ActionPayloadSetParam;
     SET_BAND_INTENSITY: number;
     SET_AUTO_INTENSITY: boolean;
-    SHOW_TOAST: ActionPayloadShowToast | string;
-    TRIGGER_FLASH?: number;
-    SET_CHART_LOCKED: boolean;
     SET_BPM: number | string;
     SET_VOLUME: ActionPayloadSetVolume;
     SET_REVERB: ActionPayloadSetReverb;
@@ -1209,8 +1040,6 @@ export interface ActionPayloadMap {
     SET_NOTATION: string;
     /** Section-practice: seed the step the next play begins from (#1016). */
     SET_START_STEP: number;
-    TOAST_EXPIRED: string;
-    FLASH_EXPIRED?: undefined;
     PROG_VALIDATED?: undefined;
 }
 
@@ -1240,9 +1069,6 @@ export const ACTIONS = {
     SET_PARAM: 'SET_PARAM',
     SET_BAND_INTENSITY: 'SET_BAND_INTENSITY',
     SET_AUTO_INTENSITY: 'SET_AUTO_INTENSITY',
-    SHOW_TOAST: 'SHOW_TOAST',
-    TRIGGER_FLASH: 'TRIGGER_FLASH',
-    SET_CHART_LOCKED: 'SET_CHART_LOCKED',
     SET_BPM: 'SET_BPM',
 
     // --- Instrument Settings ---
@@ -1264,7 +1090,5 @@ export const ACTIONS = {
     SET_START_STEP: 'SET_START_STEP',
 
     // --- Signal-only / Lifecycle (payload-less notifications) ---
-    TOAST_EXPIRED: 'TOAST_EXPIRED',
-    FLASH_EXPIRED: 'FLASH_EXPIRED',
     PROG_VALIDATED: 'PROG_VALIDATED',
 } as const satisfies { readonly [K in keyof ActionPayloadMap]-?: K };

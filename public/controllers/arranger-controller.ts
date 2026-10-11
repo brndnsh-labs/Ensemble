@@ -13,7 +13,7 @@ function validateAndAnalyze(): void {
 }
 
 function clearChordPresetHighlight(): void {
-    // DOM manipulation is no longer needed; PresetLibrary.jsx tracks isDirty state
+    // DOM manipulation is no longer needed; there is no preset library to highlight
     // Keeping this function as a no-op to maintain API compatibility
 }
 
@@ -59,7 +59,6 @@ export function transposeKey(delta: number): void {
         value: [...arranger.sections],
     });
 
-    dispatch(ACTIONS.SET_PARAM, { module: 'arranger', param: 'isDirty', value: true });
     clearChordPresetHighlight();
     refreshArrangerUI();
 }

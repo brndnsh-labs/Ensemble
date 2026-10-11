@@ -54,26 +54,6 @@ describe('Playback Reducer', () => {
         expect(result).toBe(false);
     });
 
-    it('should show toasts and auto-remove them', () => {
-        playbackReducer({
-            type: ACTIONS.SHOW_TOAST,
-            payload: { id: 'test-id', message: 'Hello World' },
-        });
-        expect(playback.toasts.length).toBe(1);
-        expect(playback.toasts[0].message).toBe('Hello World');
-
-        playbackReducer({ type: ACTIONS.TOAST_EXPIRED, payload: 'test-id' });
-        expect(playback.toasts.length).toBe(0);
-    });
-
-    it('should trigger flash and auto-reset', () => {
-        playbackReducer({ type: ACTIONS.TRIGGER_FLASH, payload: 0.5 });
-        expect(playback.flashIntensity).toBe(0.5);
-
-        playbackReducer({ type: ACTIONS.FLASH_EXPIRED, payload: undefined });
-        expect(playback.flashIntensity).toBe(0);
-    });
-
     describe('setPlaybackParam via reducer', () => {
         it('should update ALL supported parameters', () => {
             const allParams = {
@@ -96,39 +76,18 @@ describe('Playback Reducer', () => {
                 bpm: 120,
                 nextNoteTime: 1.0,
                 unswungNextNoteTime: 1.0,
-                scheduleAheadTime: 0.3,
                 step: 16,
-                drawQueue: [{ event: 'test' }],
-                isDrawing: true,
                 theme: 'light',
-                wakeLock: { lock: true },
                 bandIntensity: 0.8,
                 autoIntensity: false,
                 metronome: true,
-                applyPresetSettings: true,
                 sustainActive: true,
-                songMode: false,
-                sessionTimer: 15,
                 debugSoloist: true,
-                loopLimit: 10,
-                currentLoopCount: 5,
-                sessionStartTime: 1000,
-                isEndingPending: true,
-                intent: { density: 0.9 },
-                lastActiveDrumElements: [],
-                lastPlayingStep: 8,
-                workerLogging: true,
                 viz: { v: 1 },
-                suspendTimeout: 123,
                 lyricalBias: 0.2,
                 masterLimiter: { l: 1 },
                 masterVolume: 0.7,
                 countIn: false,
-                visualFlash: true,
-                toasts: [],
-                flashIntensity: 0.1,
-                resolutionTriggered: true,
-                isScheduling: true,
                 soloistEQ: { eq: 1 },
                 harmoniesGain: { g: 1 },
                 harmoniesEQ: { eq: 1 },

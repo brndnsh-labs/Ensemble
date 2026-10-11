@@ -69,8 +69,8 @@ interface ChartDocument {
 ```
 
 The envelope fields are storage concerns; `chart` is the lossless content also written to a
-portable `.ensemble` file. Derived state—including progression maps and `sectionSeedMap`, which
-is a memo of `(sectionId, songSeed)`—is rebuilt, never serialized.
+portable `.ensemble` file. Derived state—including progression maps—is rebuilt, never
+serialized.
 
 ### `WorkspacePreferences`
 
@@ -86,8 +86,8 @@ its compatibility payload unchanged without making the new codecs depend on that
 | Owner | Canonical fields |
 | :--- | :--- |
 | `ChartDocument` | Sections and overrides; key/mode; meter/grouping; **notation**; tempo; song seed and policy; **genre, stored once by name**; **energy (`'auto'` or a level)**; the soloist's phrasing mode and trading; swing, swing grid and humanize; lane enablement, source choice, **volume, and reverb**. |
-| `WorkspacePreferences` | Palette/mode; visual aids; count-in and practice defaults; output master volume; **session timer and song mode**; MIDI device IDs, latency, local audio muting, octave offsets, velocity sensitivity, and **channel mappings**. |
-| `RuntimeState` / derived | Transport and practice progress; the metronome; `sectionSeedMap`; generated arranger/worker maps; audio handles; undo and transient UI. |
+| `WorkspacePreferences` | Palette/mode; visual aids; count-in and practice defaults; output master volume; MIDI device IDs, latency, local audio muting, octave offsets, velocity sensitivity, and **channel mappings**. |
+| `RuntimeState` / derived | Transport and practice progress; the metronome; generated arranger/worker maps; audio handles; undo and transient UI. |
 
 **Amended 2026-09-26 (#1381).** The `WorkspacePreferences` codec (`validate`/`decode`/`encode` and
 its `WorkspaceAppearancePreferences`/`WorkspacePracticePreferences`/`WorkspaceMidiPreferences`
@@ -100,6 +100,11 @@ still live (master volume, count-in, MIDI settings, etc.) — only this section'
 palette/mode are gone. If workspace preferences ever need their own persisted record again, it
 needs a live reader in hand first (`public/CLAUDE.md`'s retired-key pattern), not a resurrection
 of this shape from history.
+
+**Amended 2026-10-11.** `playback.sessionTimer` and `playback.songMode` (listed above as
+preferences) are gone from state, along with `groove.sectionSeedMap` and the other fields nothing
+read. The row above is the shape a
+future preferences record would take, not a description of live fields.
 
 **Amended 2026-09-26 (#1404, chart format).** A chart holds the music plus the settings the band
 honours. The old engine's fields — complexity; per-lane style, octave, density and instrument;

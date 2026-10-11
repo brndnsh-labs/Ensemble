@@ -81,7 +81,6 @@ vi.mock('../../../public/state.js', () => {
             sessionSteps: 0,
             buffer: { clear: vi.fn(), set: vi.fn(), size: 0, delete: vi.fn() },
         }),
-        vizState: { enabled: true },
     };
 
     return {
@@ -109,7 +108,6 @@ describe('Instrument Controller', () => {
         state.bass.enabled = true;
         state.soloist.enabled = true;
         state.groove.enabled = true;
-        state.vizState.enabled = true;
 
         // Reset buffers
         state.bass.buffer.size = 0;
@@ -195,15 +193,6 @@ describe('Instrument Controller', () => {
         it('does not re-voice the progression for a non-bass lane', () => {
             InstrumentController.togglePower('chords');
             expect(ChordsEngine.validateProgression).not.toHaveBeenCalled();
-        });
-
-        it('should toggle viz state', () => {
-            InstrumentController.togglePower('viz');
-            expect(dispatch).toHaveBeenCalledWith(ACTIONS.SET_PARAM, {
-                module: 'vizState',
-                param: 'enabled',
-                value: false,
-            });
         });
 
         it('should handle the chords alias name', () => {
