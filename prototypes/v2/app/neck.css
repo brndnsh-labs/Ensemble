@@ -53,6 +53,15 @@
     stroke-width: 2;
     stroke-opacity: 0.7;
 }
+/* A board that strums its grip (#1596): the wood rings when it has the keyboard. */
+.neck-strum {
+    cursor: pointer;
+    outline: none;
+}
+.neck-strum:focus-visible .neck-wood {
+    stroke: var(--ink);
+    stroke-width: 3;
+}
 .neck-handle {
     cursor: grab;
     touch-action: none;

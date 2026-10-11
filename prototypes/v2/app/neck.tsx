@@ -70,6 +70,11 @@ export interface NeckProps {
     dimmed?: boolean;
     /** Pulse the dots once (a chord just landed). */
     strike?: boolean;
+    /**
+     * Sound the grip (#1596): a tap on the board (not the home-window handle) or Enter/Space on
+     * it, focused. Set, the board is a button; unset, it is a picture of the grip.
+     */
+    onStrum?: () => void;
     /** Unique per instance, for SVG marker ids. */
     id: string;
 }
@@ -170,6 +175,7 @@ export function Neck({
     dimmed = false,
     strike = false,
     zoom = 'board',
+    onStrum,
     id,
 }: NeckProps) {
     const svgRef = useRef<SVGSVGElement>(null);
@@ -312,6 +318,25 @@ export function Neck({
               .join('; ')}`
         : 'Fretboard showing the current chord';
 
+    // The board as a button (#1596). A click lands here only when the press and the release are
+    // both on the board: the handle is a sibling, and its drag captures the pointer on the svg,
+    // so a drag released over the board clicks their common ancestor, never the board.
+    const strum = onStrum
+        ? {
+              role: 'button',
+              tabIndex: 0,
+              'aria-label': `Hear ${boardLabel}`,
+              className: 'neck-strum',
+              onClick: () => onStrum(),
+              onKeyDown: (e: KeyboardEvent<SVGGElement>) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      onStrum();
+                  }
+              },
+          }
+        : { role: 'img', 'aria-label': boardLabel };
+
     let outline: { x: number; y: number; width: number; height: number } | null = null;
     if (active && active.notes.length > 0) {
         const xs = active.notes.map((x) => dx(x.fret));
@@ -381,7 +406,7 @@ export function Neck({
                         : undefined
                 }
             >
-                <g role="img" aria-label={boardLabel}>
+                <g {...strum}>
                     <g className="neck-board">
                         <rect
                             className="neck-wood"

@@ -487,3 +487,49 @@ describe('Neck: zoomed onto the hand (#1593)', () => {
         }
     });
 });
+
+describe('Neck: the board strums its grip (#1596)', () => {
+    const board = () => host.querySelector<SVGGElement>('.neck-strum');
+    const click = (el: Element) =>
+        act(() => {
+            el.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+    const key = (el: Element, k: string) =>
+        act(() => {
+            el.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true }));
+        });
+
+    it('is a picture of the grip without onStrum, a button with it', () => {
+        render();
+        expect(board()).toBeNull();
+        expect(host.querySelector('[role="img"]')).not.toBeNull();
+        render({ onStrum: vi.fn() });
+        expect(host.querySelector('[role="img"]')).toBeNull();
+        expect(board()!.getAttribute('role')).toBe('button');
+        expect(board()!.getAttribute('tabindex')).toBe('0');
+        expect(board()!.getAttribute('aria-label')).toMatch(/^Hear Gmaj7: 6th string fret 3/);
+    });
+
+    it('strums on a tap anywhere on the board, and on Enter or Space', () => {
+        const onStrum = vi.fn();
+        render({ onStrum, home: [2, 7] });
+        click(host.querySelector('.neck-wood')!);
+        click(host.querySelector('.neck-dot')!);
+        expect(onStrum).toHaveBeenCalledTimes(2);
+        key(board()!, 'Enter');
+        key(board()!, ' ');
+        key(board()!, 'ArrowRight');
+        expect(onStrum).toHaveBeenCalledTimes(4);
+    });
+
+    it("never strums from the hand's handle, or the click a handle drag leaves on the svg", () => {
+        const onStrum = vi.fn();
+        render({ onStrum, home: [2, 7] });
+        const handle = host.querySelector('[role="slider"]')!;
+        click(handle);
+        key(handle, 'Enter');
+        // A drag captures the pointer on the svg: its click lands there, above the board.
+        click(host.querySelector('svg')!);
+        expect(onStrum).not.toHaveBeenCalled();
+    });
+});

@@ -11,4 +11,4 @@ export { DEGREES, spellDegree } from './theory';
 export type { Degree, HomeWindow, InstrumentDef, Note, Voicing } from './types';
 export type { NeckPrefs, VoicedBandChord } from './voice-chart';
 export { NECK_INSTRUMENTS, voiceBandChart } from './voice-chart';
-export { allPositions, build, inHome, inversionOf, voiceChart } from './voicing';
+export { allPositions, build, gripMidis, inHome, inversionOf, voiceChart } from './voicing';

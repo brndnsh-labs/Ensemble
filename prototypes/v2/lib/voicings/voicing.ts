@@ -165,6 +165,18 @@ export function inversionOf(inst: InstrumentDef, v: Voicing): 0 | 1 | 2 {
     return lowest.degree === q.third ? 1 : lowest.degree === q.five ? 2 : 0;
 }
 
+/**
+ * The MIDI pitches a grip sounds, for a strum (#1596): `open[string] + fret` per note, in STRING
+ * order from the lowest string (the highest string number) up — the order a downstroke hits them.
+ * That is not always pitch order: a re-entrant uke's high G (string 4) comes first though it is
+ * pitched above the C string beside it, as it does under the thumb.
+ */
+export function gripMidis(inst: InstrumentDef, v: Voicing): number[] {
+    return [...v.notes]
+        .sort((a, b) => b.string - a.string)
+        .map((n) => inst.open[n.string] + n.fret);
+}
+
 /** Lowest-fret playable version of a grip. */
 export function build(
     inst: InstrumentDef,

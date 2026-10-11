@@ -7,6 +7,7 @@ import {
     build,
     fingerMoves,
     GUITAR,
+    gripMidis,
     type InstrumentDef,
     inHome,
     inversionOf,
@@ -76,6 +77,19 @@ describe('triad grips (#1588)', () => {
         expect(inversionOf(UKULELE_LOW_G, c)).toBe(2);
         // A shell always reads as root position.
         expect(inversionOf(GUITAR, build(GUITAR, shape(GUITAR, '6A'), R('G'), 'maj7')!)).toBe(0);
+    });
+    it('sounds a grip low string first, by string not pitch (#1596)', () => {
+        const at = (id: string, fret: number) =>
+            allPositions(GUITAR, R('C'), 'maj').find(
+                (v) => v.shape.id === id && v.rootFret === fret,
+            )!;
+        // x x x 5 5 3 over open G3 B3 E4 (55 59 64): C4 E4 G4.
+        expect(gripMidis(GUITAR, at('T321-0', 5))).toEqual([60, 64, 67]);
+        // Uke C 0003: the open strings sound their open pitch. The re-entrant G (string 4) is
+        // strummed first though it is pitched above the C string; with a low G it is the bass.
+        const c = build(UKULELE, shape(UKULELE, 'UTC'), R('C'), 'maj')!;
+        expect(gripMidis(UKULELE, c)).toEqual([67, 60, 64, 72]);
+        expect(gripMidis(UKULELE_LOW_G, c)).toEqual([55, 60, 64, 72]);
     });
     it('the ukulele triads are the standard first-position chords', () => {
         const uke = (id: string, root: string, quality: Quality) =>

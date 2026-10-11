@@ -244,3 +244,79 @@ test('a phone board follows the hand; a laptop shows the whole neck (#1593)', as
         await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
     ).toBe(true);
 });
+
+test('stopped, the neck steps through the changes and the board strums (#1595, #1596)', async ({
+    page,
+}) => {
+    test.setTimeout(60_000);
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    page.on('console', (message) => {
+        if (message.type() === 'error') {
+            errors.push(message.text());
+        }
+    });
+    await seedStarters(page);
+    await songLink(page, 'Blue pocket', 'Blues').click();
+    await page.getByRole('button', { name: 'Neck', exact: true }).click();
+    const view = page.getByRole('region', { name: 'Neck' });
+    const current = view.getByTestId('neck-current');
+    const position = view.getByTestId('neck-position');
+    const headline = view.locator('.neck-headline');
+    await expect(current).toHaveText('C7');
+    await expect(position).toHaveText(/^1 \/ \d+$/);
+    const count = Number((await position.textContent())!.split('/')[1]);
+    expect(count).toBeGreaterThan(2);
+    await expect(headline).toContainText('Starts on C7');
+
+    // Next: the second grip, previewing the third, in the playing form's words.
+    await view.getByRole('button', { name: 'Next chord', exact: true }).click();
+    await expect(current).toHaveText('F7');
+    await expect(position).toHaveText(`2 / ${count}`);
+    await expect(headline).toContainText('Next:');
+    await expect(view.locator('.neck-ghost-dot').first()).toBeVisible();
+    await expect(view.locator('.neck-rootpath')).toHaveCount(1);
+    // Prev twice: back to the top, then wrapped to the form's last change.
+    await view.getByRole('button', { name: 'Previous chord', exact: true }).click();
+    await expect(current).toHaveText('C7');
+    await view.getByRole('button', { name: 'Previous chord', exact: true }).click();
+    await expect(position).toHaveText(`${count} / ${count}`);
+    // The arrows step too, with the neck focused.
+    await view.focus();
+    await page.keyboard.press('ArrowLeft');
+    await expect(position).toHaveText(`${count - 1} / ${count}`);
+    await page.keyboard.press('ArrowRight');
+    await expect(position).toHaveText(`${count} / ${count}`);
+    await view.getByRole('button', { name: 'Next chord', exact: true }).click();
+    await expect(current).toHaveText('C7');
+    await page.keyboard.press('ArrowRight');
+    await expect(current).toHaveText('F7');
+
+    // The board is a button stopped: a tap (or Enter) strums the grip shown. It is heard, not
+    // seen, so this checks the plumbing: focusable, a pointer, and nothing breaks.
+    const board = view.locator('.neck-strum');
+    await expect(board).toHaveAttribute('role', 'button');
+    await expect(board).toHaveAttribute('aria-label', /^Hear F7: /);
+    expect(await board.evaluate((el) => getComputedStyle(el).cursor)).toBe('pointer');
+    await view.locator('.neck-wood').click();
+    await board.focus();
+    await page.keyboard.press('Enter');
+    await expect(current).toHaveText('F7');
+
+    // Play hands the neck back to the band: no steps, no strum, and it follows.
+    const tempo = page.getByLabel('Tempo', { exact: true });
+    await tempo.fill('240');
+    await tempo.press('Enter');
+    await page.getByRole('button', { name: 'Start playback', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Stop playback', exact: true })).toBeEnabled();
+    await expect(view.getByRole('button', { name: 'Next chord', exact: true })).toHaveCount(0);
+    await expect(view.locator('.neck-strum')).toHaveCount(0);
+    await expect(headline).toContainText('Next:', { timeout: 20_000 });
+    await page.getByRole('button', { name: 'Stop playback', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Start playback', exact: true })).toBeEnabled();
+    // Stopped again: back to the top.
+    await expect(current).toHaveText('C7');
+    await expect(position).toHaveText(`1 / ${count}`);
+    await expect(headline).toContainText('Starts on C7');
+    expect(errors).toEqual([]);
+});

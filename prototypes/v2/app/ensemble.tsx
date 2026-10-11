@@ -5485,6 +5485,8 @@ export default function Ensemble() {
                                 voiced={neckVoicing.voiced}
                                 active={active}
                                 nextSoon={nextSoon}
+                                playing={playbackActive}
+                                onStrum={(midis) => runtime.auditionPitches(midis)}
                                 prefs={neckVoicing.prefs}
                                 onPrefs={neckVoicing.setPrefs}
                             />

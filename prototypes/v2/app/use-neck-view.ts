@@ -73,6 +73,70 @@ export function nextVoicedSlot(band: BandChart, slot: number): number | null {
     return null;
 }
 
+/**
+ * The previous performed slot whose chord differs from the one sounding at `slot`, at the START
+ * of that chord's run: `nextVoicedSlot` walked backwards, so stepping back and then forward lands
+ * where it began. Performance order with wrapping (the top steps back to the form's last change);
+ * holds, N.C. and the same chord again are part of the run they ring under. Null when nothing
+ * else is ever played.
+ */
+export function prevVoicedSlot(band: BandChart, slot: number): number | null {
+    const n = band.slots.length;
+    const sounding = soundingSlot(band, slot);
+    if (sounding === null) {
+        return null;
+    }
+    const heldName = slotChord(band, sounding)!.absName;
+    let found: number | null = null;
+    for (let step = 1; step < n; step += 1) {
+        const k = (slot - step + n) % n;
+        const chord = slotChord(band, k);
+        if (!isVoiced(chord)) {
+            continue;
+        }
+        if (found === null) {
+            if (chord!.absName !== heldName) {
+                found = k;
+            }
+        } else if (chord!.absName === slotChord(band, found)!.absName) {
+            // Still the previous chord: its run started earlier.
+            found = k;
+        } else {
+            break;
+        }
+    }
+    return found;
+}
+
+/**
+ * Every chord change in performance order, read straight through the form once: the first grip,
+ * then each slot whose chord differs from the last one played. The stopped neck's position
+ * readout (#1595) counts along it. Stepping itself goes by `nextVoicedSlot`/`prevVoicedSlot`, the
+ * band's own loop — so when the form ends on the chord it starts on, the step past the end lands
+ * on the second change (the band never changes chord at the top), and position 1 is the
+ * "Starts on" grip alone.
+ */
+export function chordChanges(band: BandChart): number[] {
+    const changes: number[] = [];
+    let last: string | null = null;
+    band.slots.forEach((_, k) => {
+        const chord = slotChord(band, k);
+        if (isVoiced(chord) && chord!.absName !== last) {
+            changes.push(k);
+            last = chord!.absName;
+        }
+    });
+    return changes;
+}
+
+/** `slot`'s 1-based place among `changes` (`chordChanges`): the change whose run it sits in. */
+export function changePosition(changes: readonly number[], slot: number): number {
+    const after = changes.findIndex((k) => k > slot);
+    // Past the last change, or before the first (an N.C. intro, still ringing from the form's
+    // last chord): the last.
+    return after <= 0 ? changes.length : after;
+}
+
 const holdsPhrase = (fingers: number[]): string =>
     fingers.length === 1
         ? `Finger ${fingers[0]} stays down`

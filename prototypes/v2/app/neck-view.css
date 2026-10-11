@@ -60,6 +60,32 @@
     line-height: 1.45;
     color: var(--muted);
 }
+.neck-view:focus {
+    outline: none;
+}
+.neck-view:focus-visible {
+    outline: 2px solid var(--ink);
+    outline-offset: -2px;
+}
+/* The stopped step-through (#1595): ← 3 / 12 →, under the names. */
+.neck-step {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.neck-step-button {
+    min-width: 40px;
+    padding: 5px 10px;
+    font-size: 16px;
+    line-height: 1;
+}
+.neck-step-position {
+    min-width: 4.5em;
+    text-align: center;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+    color: var(--muted);
+}
 .neck-check input {
     margin: 0;
     accent-color: var(--green);
@@ -99,6 +125,7 @@
 /* Focus chart: the neck keeps its names and grips and loses its words and settings, like the
    header's controls. */
 .performance-focus .neck-settings,
+.performance-focus .neck-step,
 .performance-focus .neck-headline,
 .performance-focus .neck-fingers {
     display: none;

@@ -8,7 +8,15 @@ import type { ScoreEvent, ScoreMeasure, SemanticScore } from '@engine/songbook/s
 import { describe, expect, it } from 'vitest';
 import { bandChart } from '../lib/band-chart';
 import { GUITAR, voiceBandChart } from '../lib/voicings';
-import { firstVoicedSlot, neckModel, nextVoicedSlot, soundingSlot } from './use-neck-view';
+import {
+    changePosition,
+    chordChanges,
+    firstVoicedSlot,
+    neckModel,
+    nextVoicedSlot,
+    prevVoicedSlot,
+    soundingSlot,
+} from './use-neck-view';
 
 const chord = (symbol: string, n: number): ScoreEvent => ({
     kind: 'chord',
@@ -112,6 +120,110 @@ describe('nextVoicedSlot', () => {
     it('finds no first grip in a chart of N.C. alone', () => {
         const band = view([{ id: 'a', label: 'A', repeat: 1, measures: [bar('m1', [noChord])] }]);
         expect(firstVoicedSlot(band)).toBeNull();
+    });
+});
+
+describe('prevVoicedSlot (#1595)', () => {
+    it('steps back to the start of the previous chord, wrapping the top to the last change', () => {
+        const band = view([
+            {
+                id: 'a',
+                label: 'A',
+                repeat: 1,
+                measures: [
+                    bar('m1', [chord('Dm7', 2), chord('G7', 2)]),
+                    bar('m2', [chord('C', 4)]),
+                    bar('m3', [hold]),
+                    bar('m4', [noChord]),
+                    bar('m5', [chord('A7', 4)]),
+                ],
+            },
+        ]);
+        expect(prevVoicedSlot(band, 1)).toBe(0);
+        expect(prevVoicedSlot(band, 2)).toBe(1);
+        // A7's previous chord is the C under the hold and the N.C., at its own slot.
+        expect(prevVoicedSlot(band, 5)).toBe(2);
+        // Under the hold the C is still sounding: back from there is the G7.
+        expect(prevVoicedSlot(band, 3)).toBe(1);
+        // The top wraps to the form's last change.
+        expect(prevVoicedSlot(band, 0)).toBe(5);
+    });
+
+    it('undoes nextVoicedSlot around the whole loop, repeats and all', () => {
+        const band = view([
+            {
+                id: 'a',
+                label: 'A',
+                repeat: 2,
+                measures: [bar('m1', [chord('C', 4)]), bar('m2', [chord('F', 4)])],
+            },
+            {
+                id: 'b',
+                label: 'B',
+                repeat: 1,
+                measures: [bar('m3', [chord('G7', 4)]), bar('m4', [chord('G7', 4)])],
+            },
+        ]);
+        let slot = firstVoicedSlot(band)!;
+        const seen: number[] = [];
+        for (let i = 0; i < 6; i += 1) {
+            const next = nextVoicedSlot(band, slot)!;
+            expect(prevVoicedSlot(band, next)).toBe(slot);
+            seen.push(next);
+            slot = next;
+        }
+        expect(seen).toEqual([1, 2, 3, 4, 0, 1]);
+    });
+
+    it('a form that ends on the chord it starts on: the run wraps through the top', () => {
+        const band = view([
+            {
+                id: 'a',
+                label: 'A',
+                repeat: 1,
+                measures: ['C', 'F', 'G7', 'C'].map((name, i) => bar(`m${i}`, [chord(name, 4)])),
+            },
+        ]);
+        // The last C rings into the top: the band's next change after it is the F.
+        expect(nextVoicedSlot(band, 3)).toBe(1);
+        expect(prevVoicedSlot(band, 1)).toBe(3);
+        expect(prevVoicedSlot(band, 0)).toBe(2);
+        // The readout counts the form straight through: the top is 1, the last C is 4.
+        const changes = chordChanges(band);
+        expect(changes).toEqual([0, 1, 2, 3]);
+        expect([0, 1, 2, 3].map((k) => changePosition(changes, k))).toEqual([1, 2, 3, 4]);
+    });
+
+    it('finds nothing to step to in a one-chord vamp', () => {
+        const vamp = view([
+            { id: 'a', label: 'A', repeat: 4, measures: [bar('m1', [chord('F7', 4)])] },
+        ]);
+        expect(prevVoicedSlot(vamp, 2)).toBeNull();
+        expect(chordChanges(vamp)).toEqual([0]);
+    });
+});
+
+describe('chordChanges (#1595)', () => {
+    it('lists each change once, in performance order, skipping holds, N.C. and repeats of a chord', () => {
+        const band = view([
+            {
+                id: 'a',
+                label: 'A',
+                repeat: 2,
+                measures: [
+                    bar('m1', [chord('Dm7', 4)]),
+                    bar('m2', [hold]),
+                    bar('m3', [chord('Dm7', 4)]),
+                    bar('m4', [noChord]),
+                    bar('m5', [chord('G7', 4)]),
+                ],
+            },
+        ]);
+        const changes = chordChanges(band);
+        expect(changes).toEqual([0, 4, 5, 9]);
+        // A slot inside a run counts as that run's change.
+        expect(changePosition(changes, 2)).toBe(1);
+        expect(changePosition(changes, 7)).toBe(3);
     });
 });
 

@@ -1285,30 +1285,51 @@ export function editSections(sections: ChartContent['arrangement']['sections']):
         loading = false;
     }
 }
-export function audition(index: number): void {
+/**
+ * Sound `freqs` once on the chord voice, stopped only (while the band plays, the band is the
+ * sound). `stagger` seconds between successive notes: 0 is a block chord, more is a strum. The
+ * one body behind `audition` and `auditionPitches`, so the two can't drift in voice or gain.
+ */
+function sound(
+    freqs: (state: ReturnType<typeof getState>) => number[] | undefined,
+    stagger: number,
+) {
     if (getState().playback.isPlaying) {
         return;
     }
     initAudio(getState());
     const state = getState();
-    let freqs: number[] | undefined;
-    if (bandView) {
-        // Band-engine chords are named and voiced by the band's chord authority; a hold or
-        // N.C. has nothing of its own to sound.
-        const chord = bandView.chords[index]?.chord;
-        freqs = chord ? auditionMidis(chord).map(getFrequency) : undefined;
-    } else {
-        freqs = state.arranger.progression[index]?.freqs;
-    }
-    if (!freqs || !state.playback.audio) {
+    const notes = freqs(state);
+    if (!notes || !state.playback.audio) {
         return;
     }
-    for (const frequency of freqs) {
-        playNote(state, frequency, state.playback.audio.currentTime, 0.65, {
+    const start = state.playback.audio.currentTime;
+    notes.forEach((frequency, i) => {
+        playNote(state, frequency, start + i * stagger, 0.65, {
             vol: 0.12,
             ignoreSustain: true,
         });
-    }
+    });
+}
+export function audition(index: number): void {
+    sound((state) => {
+        if (bandView) {
+            // Band-engine chords are named and voiced by the band's chord authority; a hold or
+            // N.C. has nothing of its own to sound.
+            const chord = bandView.chords[index]?.chord;
+            return chord ? auditionMidis(chord).map(getFrequency) : undefined;
+        }
+        return state.arranger.progression[index]?.freqs;
+    }, 0);
+}
+/**
+ * Strum the neck's grip (#1596): `midis` in the order the strings are struck (the caller's
+ * `gripMidis`, lowest string first), each 25ms after the last — a quick downstroke, slow enough
+ * to hear the strings one by one, quick enough to stay one chord. Stopped only, like `audition`.
+ */
+const STRUM_GAP = 0.025;
+export function auditionPitches(midis: number[]): void {
+    sound(() => (midis.length ? midis.map(getFrequency) : undefined), STRUM_GAP);
 }
 /**
  * The settings an export renders with: the live band's, on the open chart's own seed. A Play

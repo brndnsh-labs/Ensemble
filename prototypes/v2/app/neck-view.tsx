@@ -1,19 +1,27 @@
 'use client';
 
-import { useEffect, useId, useMemo, useState } from 'react';
+import { type KeyboardEvent, useEffect, useId, useMemo, useState } from 'react';
 import type { BandChart } from '../lib/band-chart';
 import { defaultNeckHome, type NeckLabels, type NeckPreferences } from '../lib/session';
-import { NECK_INSTRUMENTS, type VoicedBandChord } from '../lib/voicings';
+import { gripMidis, NECK_INSTRUMENTS, type VoicedBandChord } from '../lib/voicings';
 import { Neck, type NeckPreview, type NeckZoom } from './neck';
 import { HOME_W } from './neck-geometry';
-import { neckModel } from './use-neck-view';
+import {
+    changePosition,
+    chordChanges,
+    firstVoicedSlot,
+    neckModel,
+    nextVoicedSlot,
+    prevVoicedSlot,
+} from './use-neck-view';
 import './neck-view.css';
 
 // The stand's Neck mode (#1587): the grip for the chord sounding now, a preview of the next one
 // and a one-line headline of the root's move there (the finger-by-finger detail on request),
-// following the band. Presentational: the shell
-// hands it the band's chart, the voiced grips and the playhead; settings go back through
-// `onPrefs`. The fretboard itself is `<Neck>` (#1586).
+// following the band. Stopped, the learner steps through the changes at their own pace (#1595)
+// and taps the board to hear the grip (#1596). Presentational: the shell hands it the band's
+// chart, the voiced grips and the playhead; settings go back through `onPrefs`, a strum through
+// `onStrum`. The fretboard itself is `<Neck>` (#1586).
 
 interface NeckViewProps {
     /** The band's chart (`legacyBandChart` for a measure-less one), or null for an empty chart. */
@@ -24,6 +32,13 @@ interface NeckViewProps {
     active: number | null;
     /** The playing bar's last felt pulse (#1458): the next grip is about to land. */
     nextSoon: boolean;
+    /**
+     * The band is playing or about to (a count-in has no `active` slot yet): no stepping, no
+     * strum — the band is the sound and the playhead the cursor.
+     */
+    playing: boolean;
+    /** Sound these MIDI pitches as a strum, lowest string first (`runtime.auditionPitches`). */
+    onStrum?: (midis: number[]) => void;
     prefs: NeckPreferences;
     onPrefs: (patch: Partial<NeckPreferences>) => void;
 }
@@ -56,20 +71,79 @@ function useNeckZoom(): NeckZoom {
 /** The grip's symbol in the chart's own ASCII accidentals, so the notice reads as one chart. */
 const ascii = (symbol: string): string => symbol.replaceAll('♭', 'b').replaceAll('♯', '#');
 
-export function NeckView({ band, voiced, active, nextSoon, prefs, onPrefs }: NeckViewProps) {
+/**
+ * Whether ← / → belong to what has focus rather than to the stepping: a settings field (a select
+ * changes its value on them) or the home-window handle (its arrows move the hand).
+ */
+const ownsArrows = (target: EventTarget): boolean =>
+    target instanceof Element && target.closest('input, select, textarea, .neck-handle') !== null;
+
+export function NeckView({
+    band,
+    voiced,
+    active,
+    nextSoon,
+    playing,
+    onStrum,
+    prefs,
+    onPrefs,
+}: NeckViewProps) {
     const id = useId();
     const instrument = NECK_INSTRUMENTS[prefs.instrument];
     const zoom = useNeckZoom();
+    const stopped = active === null && !playing;
+    // The stopped step-through (#1595): a performed slot the learner moved to, or null for the
+    // "Starts on" view. Session-only; Play hands the neck back to the band and another chart
+    // starts over, so both clear it (adjusting state on a prop change, not in an effect).
+    const [cursor, setCursor] = useState<number | null>(null);
+    const [cursorFor, setCursorFor] = useState({ band, stopped });
+    if (cursorFor.band !== band || cursorFor.stopped !== stopped) {
+        setCursorFor({ band, stopped });
+        setCursor(null);
+    }
+    const shownSlot = stopped ? cursor : active;
+    const changes = useMemo(() => (band ? chordChanges(band) : []), [band]);
     const model = useMemo(
-        () => (band && voiced ? neckModel(band, voiced, active, instrument) : null),
-        [band, voiced, active, instrument],
+        () => (band && voiced ? neckModel(band, voiced, shownSlot, instrument) : null),
+        [band, voiced, shownSlot, instrument],
     );
     // The board previews the next grip only on the last beat before the change (#1592): all bar
-    // long it is the grip sounding now. Stopped, the strip names the next chord instead.
-    const preview: NeckPreview = active !== null && nextSoon ? 'strong' : 'soft';
+    // long it is the grip sounding now. Stopped, the strip names the next chord instead — unless
+    // the learner stepped here, when the change ahead is what they are looking at.
+    const preview: NeckPreview =
+        (active !== null && nextSoon) || (stopped && cursor !== null) ? 'strong' : 'soft';
+    const canStep = stopped && band !== null && model !== null && changes.length > 1;
+    const step = (direction: 1 | -1) => {
+        if (!band) {
+            return;
+        }
+        const from = cursor ?? firstVoicedSlot(band);
+        if (from === null) {
+            return;
+        }
+        const to = direction === 1 ? nextVoicedSlot(band, from) : prevVoicedSlot(band, from);
+        if (to !== null) {
+            setCursor(to);
+        }
+    };
+    const onKeyDown = (e: KeyboardEvent<HTMLElement>) => {
+        if (!canStep || ownsArrows(e.target) || e.altKey || e.ctrlKey || e.metaKey) {
+            return;
+        }
+        if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+            e.preventDefault();
+            step(e.key === 'ArrowRight' ? 1 : -1);
+        }
+    };
+    const position =
+        canStep && band ? changePosition(changes, cursor ?? firstVoicedSlot(band) ?? 0) : 0;
+    // The SOUNDING grip: under a hold or N.C., the one held over, once.
+    const grip = model?.grip ?? null;
+    const strum =
+        stopped && onStrum && grip ? () => onStrum(gripMidis(instrument, grip)) : undefined;
 
     return (
-        <section className="neck-view" aria-label="Neck">
+        <section className="neck-view" aria-label="Neck" tabIndex={0} onKeyDown={onKeyDown}>
             <div className="neck-view-inner">
                 {!model ? (
                     <p className="neck-view-empty">This chart has no chords to finger.</p>
@@ -104,6 +178,32 @@ export function NeckView({ band, voiced, active, nextSoon, prefs, onPrefs }: Nec
                                     </span>
                                 )}
                             </div>
+                            {canStep && (
+                                <div className="neck-step">
+                                    <button
+                                        type="button"
+                                        className="btn neck-step-button"
+                                        aria-label="Previous chord"
+                                        onClick={() => step(-1)}
+                                    >
+                                        ←
+                                    </button>
+                                    <span
+                                        className="neck-step-position"
+                                        data-testid="neck-position"
+                                    >
+                                        {position} / {changes.length}
+                                    </span>
+                                    <button
+                                        type="button"
+                                        className="btn neck-step-button"
+                                        aria-label="Next chord"
+                                        onClick={() => step(1)}
+                                    >
+                                        →
+                                    </button>
+                                </div>
+                            )}
                             {model.headline && <p className="neck-headline">{model.headline}</p>}
                             {prefs.fingers && model.fingers && (
                                 <p className="neck-fingers">{model.fingers}</p>
@@ -125,6 +225,7 @@ export function NeckView({ band, voiced, active, nextSoon, prefs, onPrefs }: Nec
                             // The neck re-runs the strike per voicing object, so a steady `true`
                             // while playing pulses each chord as it lands, and nothing while stopped.
                             strike={active !== null}
+                            onStrum={strum}
                         />
                     </>
                 )}
