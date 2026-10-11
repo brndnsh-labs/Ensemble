@@ -14,10 +14,14 @@ import {
     forgetOpened,
     hasDeclinedV1Import,
     legacyStarredIds,
+    type NeckPreferences,
+    neckPreferences,
     openedAtMap,
+    patchNeckPreferences,
     recordOpened,
     rememberAllSongsSort,
     rememberCountIn,
+    rememberNeckPreferences,
     rememberV1Import,
     rememberV1ImportDecline,
     rememberV1SessionMark,
@@ -269,5 +273,68 @@ describe('the All songs sort preference (#1440)', () => {
     it('rejects a hand-edited value instead of trusting it', () => {
         store.set('ensemble-v2-preview:all-songs-sort', 'nonsense');
         expect(allSongsSortPreference()).toBeNull();
+    });
+});
+
+describe('the neck preferences (#1586)', () => {
+    const KEY = 'ensemble-v2-preview:neck-prefs';
+    const defaults: NeckPreferences = {
+        instrument: 'guitar',
+        home: [2, 7],
+        rootStrings: 'all',
+        labels: 'finger',
+        fingers: false,
+    };
+
+    it('defaults to guitar, frets 2–7, all root strings, finger labels and no finger detail', () => {
+        expect(neckPreferences()).toEqual(defaults);
+    });
+
+    it('round-trips a full set, including no home window', () => {
+        const uke: NeckPreferences = {
+            instrument: 'uke-low-g',
+            home: [4, 9],
+            rootStrings: 'classic',
+            labels: 'note',
+            fingers: true,
+        };
+        rememberNeckPreferences(uke);
+        expect(neckPreferences()).toEqual(uke);
+        rememberNeckPreferences({ ...uke, home: null });
+        expect(neckPreferences().home).toBeNull();
+    });
+
+    it('falls back to the defaults for a blob that is not a preferences object', () => {
+        for (const bad of ['not json', '[1,2]', 'null', '"guitar"', '42']) {
+            store.set(KEY, bad);
+            expect(neckPreferences()).toEqual(defaults);
+        }
+    });
+
+    it('rejects each unknown field on its own and keeps the rest', () => {
+        store.set(
+            KEY,
+            JSON.stringify({
+                instrument: 'banjo',
+                home: [0, 99],
+                rootStrings: 'classic',
+                labels: 'colour',
+                fingers: 'yes',
+            }),
+        );
+        expect(neckPreferences()).toEqual({ ...defaults, rootStrings: 'classic' });
+        // A uke with a broken window gets the uke's default window, not the guitar's.
+        store.set(KEY, JSON.stringify({ instrument: 'uke', home: [7, 2] }));
+        expect(neckPreferences()).toEqual({ ...defaults, instrument: 'uke', home: [1, 6] });
+    });
+
+    it('swaps a default home window with the instrument, and keeps one the musician moved', () => {
+        const uke = patchNeckPreferences(defaults, { instrument: 'uke' });
+        expect(uke.home).toEqual([1, 6]);
+        expect(patchNeckPreferences(uke, { instrument: 'guitar' }).home).toEqual([2, 7]);
+        expect(patchNeckPreferences(uke, { instrument: 'uke-low-g' }).home).toEqual([1, 6]);
+        const moved = { ...defaults, home: [5, 10] as [number, number] };
+        expect(patchNeckPreferences(moved, { instrument: 'uke' }).home).toEqual([5, 10]);
+        expect(patchNeckPreferences(defaults, { instrument: 'uke', home: null }).home).toBeNull();
     });
 });

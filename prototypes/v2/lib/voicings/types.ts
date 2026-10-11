@@ -1,0 +1,125 @@
+// Shared types for the shell-voicing engine. No DOM, no audio, no framework.
+
+/** A note name with its spelling: `letter` is 0-6 for C D E F G A B, `pc` is the pitch class 0-11. */
+export interface Spelled {
+    name: string; // e.g. "B♭", "F♯"
+    pc: number;
+    letter: number;
+}
+
+/**
+ * Chord qualities the engine can voice: six 7th-chord shells, six triads (#1588) and the power
+ * chord (`five`).
+ */
+export type Quality =
+    | 'maj7'
+    | 'dom7'
+    | 'm7'
+    | 'm7b5'
+    | 'dim7'
+    | 'six'
+    | 'maj'
+    | 'min'
+    | 'dim'
+    | 'aug'
+    | 'sus4'
+    | 'sus2'
+    | 'five';
+
+/**
+ * What family of grip voices a quality, and so which shapes it may use: a 7th-chord `shell`
+ * (R/3/7), a closed `triad`, or a `power` chord (root, 5th, octave).
+ */
+export type GripKind = 'shell' | 'triad' | 'power';
+
+/**
+ * Chord degrees used in voicings. `bb7` is the diminished 7th (same fret as a 6th); `2` and `4`
+ * are a sus chord's suspensions, `#5` an augmented triad's 5th.
+ */
+export type Degree = 'R' | '2' | '3' | 'b3' | '4' | '7' | 'b7' | 'bb7' | '6' | '5' | 'b5' | '#5';
+
+/**
+ * Role of a shape's note.
+ * R root, T third (a sus chord's 4th or 2nd), S seventh (or 6th), F the 5th (on ukulele shells a
+ * helper so all strings can be strummed), O the root an octave up (a power chord's top note),
+ * R2/T2/F2 the same degree again (a ukulele chord doubles one tone to fill its four strings).
+ */
+export type ShapeRole = 'R' | 'T' | 'S' | 'F' | 'O' | 'R2' | 'T2' | 'F2';
+
+/** Role of a note inside a grip: a shape role, or X<degree> for an added tone on a free string. */
+export type Role = ShapeRole | `X${string}`;
+
+export interface ShapeDef {
+    id: string;
+    /** Which qualities may use this shape: those whose `QualityDef.kind` matches. */
+    kind: GripKind;
+    /** String the root sits on (1 = highest-pitched string); the grip is built from it. */
+    rootString: number;
+    /** Short display name, e.g. "R–7–3". */
+    name: string;
+    /** [string, role] pairs that make up the grip. */
+    voices: Array<[number, ShapeRole]>;
+}
+
+export interface InstrumentDef {
+    id: string;
+    name: string;
+    strings: number;
+    maxFret: number;
+    /** Open-string MIDI notes keyed by string number (1 = highest-pitched string). */
+    open: Record<number, number>;
+    /** One-letter string names indexed by string number - 1. */
+    letters: string;
+    /** Fret the voicer aims for when the hand isn't locked to a window. */
+    defaultTarget: number;
+    shapes: ShapeDef[];
+    /** Human-readable string name, e.g. "6th string" or "G string". */
+    strName(s: number): string;
+    strShort(s: number): string;
+}
+
+export interface Note {
+    string: number;
+    fret: number;
+    degree: Degree;
+    role: Role;
+    /** 1-4 for fretted notes, 0 for open strings, null if no fingering could be assigned. */
+    finger: number | null;
+}
+
+export interface Voicing {
+    shape: ShapeDef;
+    /** Fret of the root on its root string. */
+    rootFret: number;
+    notes: Note[];
+    /** Tones that were requested but don't fit the grip within reach. */
+    missing: Degree[];
+    root: Spelled;
+    quality: Quality;
+    /** e.g. "Dm7", "B♭maj7", "F♯m7♭5" */
+    symbol: string;
+}
+
+/** A chord in a chart. Extra fields (bar, beat, duration, numeral...) are carried through untouched. */
+export interface ChartChord {
+    root: Spelled;
+    quality: Quality;
+    [extra: string]: unknown;
+}
+
+/** A voiced chart entry: the voicing plus every field from the input chord. */
+export type VoicedChord<C extends ChartChord = ChartChord> = Voicing & Omit<C, 'root' | 'quality'>;
+
+/** Inclusive fret range the hand should stay inside, e.g. [2, 7]. */
+export type HomeWindow = [number, number];
+
+export interface VoiceOptions {
+    instrument: InstrumentDef;
+    /** Keep every grip inside this fret window (open strings always allowed). null = anywhere. */
+    home?: HomeWindow | null;
+    /**
+     * Limit which strings can hold a shell's root, e.g. [6, 5] for classic guitar shells.
+     * Defaults to every shape. Triad and power grips ignore it.
+     */
+    rootStrings?: number[];
+}

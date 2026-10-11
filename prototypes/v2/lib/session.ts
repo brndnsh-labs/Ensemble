@@ -1,4 +1,5 @@
 import type { V1SessionMark } from './import-v1';
+import { type HomeWindow, NECK_INSTRUMENTS, type NeckPrefs } from './voicings';
 
 const LAST_OPENED = 'ensemble-v2-preview:last-opened';
 
@@ -170,6 +171,141 @@ export function rememberTheme(choice: ThemeChoice): void {
     } catch {
         // The stand still switches for this page; only the memory is lost.
     }
+}
+
+const STAND_MODE = 'ensemble-v2-preview:stand-mode';
+export type StandMode = 'chart' | 'neck';
+
+/** Which view the stand shows a song in (#1587): the chart sheet or the neck. Editing is never remembered. */
+export function standMode(): StandMode {
+    try {
+        return localStorage.getItem(STAND_MODE) === 'neck' ? 'neck' : 'chart';
+    } catch {
+        return 'chart';
+    }
+}
+
+export function rememberStandMode(mode: StandMode): void {
+    try {
+        localStorage.setItem(STAND_MODE, mode);
+    } catch {
+        // The stand still switches for this page; only the memory is lost.
+    }
+}
+
+const NECK_PREFS = 'ensemble-v2-preview:neck-prefs';
+
+export type NeckLabels = 'finger' | 'degree' | 'note';
+/**
+ * The neck's per-device settings (#1586): the voicer's `NeckPrefs` plus what the dots show and
+ * whether the finger-by-finger detail is spoken under the headline (#1587, off by default).
+ */
+export interface NeckPreferences extends NeckPrefs {
+    labels: NeckLabels;
+    fingers: boolean;
+}
+
+// A stored id is checked against the one instrument table's keys before anything indexes it.
+const NECK_INSTRUMENT_IDS = Object.keys(NECK_INSTRUMENTS) as NeckPrefs['instrument'][];
+const NECK_ROOT_STRINGS: readonly NeckPrefs['rootStrings'][] = ['all', 'classic'];
+const NECK_LABELS: readonly NeckLabels[] = ['finger', 'degree', 'note'];
+
+/** A guitar's hand starts on frets 2–7; a uke's (either tuning) on 1–6. */
+export function defaultNeckHome(instrument: NeckPrefs['instrument']): HomeWindow {
+    return instrument === 'guitar' ? [2, 7] : [1, 6];
+}
+
+export function defaultNeckPreferences(): NeckPreferences {
+    return {
+        instrument: 'guitar',
+        home: defaultNeckHome('guitar'),
+        rootStrings: 'all',
+        labels: 'finger',
+        fingers: false,
+    };
+}
+
+/** A home window lives on the instrument's fretted frets, 1 to its `maxFret`. */
+const isHomeWindow = (value: unknown, instrument: NeckPrefs['instrument']): value is HomeWindow =>
+    Array.isArray(value) &&
+    value.length === 2 &&
+    value.every(
+        (f) => Number.isInteger(f) && f >= 1 && f <= NECK_INSTRUMENTS[instrument].maxFret,
+    ) &&
+    value[0] <= value[1];
+
+const pick = <T>(allowed: readonly T[], value: unknown, fallback: T): T =>
+    allowed.includes(value as T) ? (value as T) : fallback;
+
+/**
+ * Device-local neck preferences — never document fields: which instrument, where the hand
+ * lives, which strings may hold a root, what the dots say and whether the fingers are spoken.
+ * Each field is validated on its own, so one unknown value falls back to its default without
+ * losing the rest; anything that is not a JSON object is all defaults.
+ */
+export function neckPreferences(): NeckPreferences {
+    const defaults = defaultNeckPreferences();
+    let raw: unknown;
+    try {
+        const stored = localStorage.getItem(NECK_PREFS);
+        if (stored === null) {
+            return defaults;
+        }
+        raw = JSON.parse(stored);
+    } catch {
+        return defaults;
+    }
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+        return defaults;
+    }
+    const stored = raw as Record<string, unknown>;
+    const instrument = pick(NECK_INSTRUMENT_IDS, stored.instrument, defaults.instrument);
+    let home: HomeWindow | null = defaultNeckHome(instrument);
+    if (stored.home === null) {
+        home = null;
+    } else if (isHomeWindow(stored.home, instrument)) {
+        home = [stored.home[0], stored.home[1]];
+    }
+    return {
+        instrument,
+        home,
+        rootStrings: pick(NECK_ROOT_STRINGS, stored.rootStrings, defaults.rootStrings),
+        labels: pick(NECK_LABELS, stored.labels, defaults.labels),
+        fingers: typeof stored.fingers === 'boolean' ? stored.fingers : defaults.fingers,
+    };
+}
+
+export function rememberNeckPreferences(prefs: NeckPreferences): void {
+    try {
+        const { instrument, home, rootStrings, labels, fingers } = prefs;
+        localStorage.setItem(
+            NECK_PREFS,
+            JSON.stringify({ instrument, home, rootStrings, labels, fingers }),
+        );
+    } catch {
+        // The neck still follows the change for this page; only the memory is lost.
+    }
+}
+
+/**
+ * Apply a change. Switching between guitar and uke carries the home window along only when the
+ * musician moved it: a window still on the old instrument's default becomes the new one's.
+ */
+export function patchNeckPreferences(
+    prev: NeckPreferences,
+    patch: Partial<NeckPreferences>,
+): NeckPreferences {
+    const next = { ...prev, ...patch };
+    const sameWindow = (a: HomeWindow | null, b: HomeWindow) =>
+        a !== null && a[0] === b[0] && a[1] === b[1];
+    if (
+        patch.home === undefined &&
+        next.instrument !== prev.instrument &&
+        sameWindow(prev.home, defaultNeckHome(prev.instrument))
+    ) {
+        next.home = defaultNeckHome(next.instrument);
+    }
+    return next;
 }
 
 const MASTER_VOLUME = 'ensemble-v2-preview:master-volume';
