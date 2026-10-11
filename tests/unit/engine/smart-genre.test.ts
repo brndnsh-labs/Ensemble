@@ -31,11 +31,6 @@ vi.mock('../../../public/controllers/instrument-controller.js', () => ({
     togglePower: vi.fn(),
 }));
 
-vi.mock('../../../public/controllers/app-controller.js', () => ({
-    setBpm: vi.fn(),
-    applyTheme: vi.fn(),
-}));
-
 describe('Smart Genre System', () => {
     let playback, chords, bass, soloist, groove;
 

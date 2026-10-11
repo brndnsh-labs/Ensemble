@@ -14,11 +14,9 @@ vi.mock('../../../public/state.js', () => {
         bass: { enabled: true },
         soloist: makeSoloistMock({
             enabled: false,
-            buffer: new Map(),
-            lastPlayedFreq: null,
         }),
         groove: { enabled: true },
-        playback: { step: 0 },
+        playback: {},
     };
     return {
         stateMap: mockState,

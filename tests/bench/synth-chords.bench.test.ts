@@ -48,7 +48,6 @@ vi.mock('../../public/state.js', () => {
             createPeriodicWave: vi.fn(() => ({})),
         },
         chordsGain: { connect: vi.fn() },
-        sustainActive: false,
         bandIntensity: 0.5,
     };
     const mockGroove = { audioBuffers: { noise: {} } };

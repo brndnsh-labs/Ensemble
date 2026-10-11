@@ -1,5 +1,5 @@
 import { gainForPack, packSustains, toneTiltForPack } from '../data/sound-packs.js';
-import type { EnsembleState, Mutable } from '../types.js';
+import type { EnsembleState } from '../types.js';
 import { getMidi } from '../utils.js';
 import { safeDisconnect } from './audio-graph-utils.js';
 import { HUMANIZE_PROFILES, humanizePlacement, humanizeScale } from './humanize.js';
@@ -42,34 +42,13 @@ function createBrightWave(audioCtx: AudioContext): PeriodicWave {
 
 let brightWave: PeriodicWave | null = null;
 
-export function updateSustain(
-    state: EnsembleState,
-    active: boolean,
-    time: number | null = null,
-): void {
-    const { playback } = state;
-    if (!playback.audio) {
-        return;
-    }
-    const scheduleTime = time !== null ? time : playback.audio.currentTime;
-    (playback as Mutable<typeof playback>).sustainActive = active; // @direct-mutation
-
-    if (!active && playback.heldNotes) {
-        playback.heldNotes.forEach((note: any) => {
-            note.stop(scheduleTime);
-        });
-        playback.heldNotes.clear();
-    }
-}
-
 /**
  * The synth chord voices still sounding (or scheduled to), per audio context (#1569) — the
- * synth sibling of `sample-voice.ts`'s registry for #1530. A no-pedal note used to live
- * nowhere Stop could find it: `heldNotes` holds pedal-held notes only, so `killAllPianoNotes`
- * released the sampled voices and whatever the pedal held, and a whole-note piano chord rang
- * to its written end after Stop. A voice joins as it is made and leaves when its fundamental
- * ends, so the set stays as small as what is ringing. Keyed by the context, not the state
- * tree: an offline render's voices are its own.
+ * synth sibling of `sample-voice.ts`'s registry for #1530. A synth note used to live nowhere
+ * Stop could find it: `killAllPianoNotes` released only the sampled voices, and a whole-note
+ * piano chord rang to its written end after Stop. A voice joins as it is made and leaves when
+ * its fundamental ends, so the set stays as small as what is ringing. Keyed by the context,
+ * not the state tree: an offline render's voices are its own.
  */
 const soundingChordVoices = new WeakMap<BaseAudioContext, Set<(when: number) => void>>();
 
@@ -98,23 +77,13 @@ function releaseSynthChordVoices(audio: BaseAudioContext, when: number): void {
 export function killAllPianoNotes(state: EnsembleState): void {
     const { playback } = state;
     const now = playback.audio?.currentTime || 0;
-    if (playback.heldNotes) {
-        playback.heldNotes.forEach((note: any) => {
-            if (typeof note.stop === 'function') {
-                note.stop(now, true);
-            }
-        });
-        playback.heldNotes.clear();
-    }
-    // Sampled chord voices aren't in `heldNotes`: each registers itself with its lane as it
-    // is made (#1530), so a stop, restart or voice switch silences them too. An organ holds
-    // for bars; unreleased, it rang on under whatever came next.
+    // Each sampled chord voice registers itself with its lane as it is made (#1530), so a
+    // stop, restart or voice switch silences it. An organ holds for bars; unreleased, it rang
+    // on under whatever came next.
     if (playback.audio) {
         releaseSampledVoices(playback.audio, 'chords', now);
         releaseSynthChordVoices(playback.audio, now);
     }
-    const mutPlayback = playback as Mutable<typeof playback>;
-    mutPlayback.sustainActive = false; // @direct-mutation
 }
 
 interface PlayNoteOptions {
@@ -122,16 +91,6 @@ interface PlayNoteOptions {
     index?: number;
     muted?: boolean;
     numVoices?: number;
-    /**
-     * Play this note as if the sustain pedal were up, without touching the
-     * global `playback.sustainActive` flag (#1180). One caller needs it: the
-     * chord-chart preview in `main.ts`, which must not leave a preview note
-     * ringing under a held pedal. It used to force the global flag false and
-     * restore it afterwards — a direct state mutation, and one that made the
-     * transient globally observable mid-preview. Defaults false, so every
-     * other call site is byte-identical.
-     */
-    ignoreSustain?: boolean;
 }
 
 // Trim on the synth chord voice (#649/Epic 6). Brings the synth chords down a
@@ -263,7 +222,7 @@ function chordStrumJitter(index: number, freq: number, humanize: number | undefi
 /** The synth chord voice: the synth-audit additive piano (the only one since #649 and #1424). */
 function playSynthNote(...args: PlayNoteArgs): ChordVoiceHandle | null {
     const [state, freq, time, duration, opts = {}] = args;
-    const { vol = 0.1, index = 0, muted = false, numVoices = 1, ignoreSustain = false } = opts;
+    const { vol = 0.1, index = 0, muted = false, numVoices = 1 } = opts;
     const { playback, groove } = state;
 
     // Nothing to schedule on an unusable context or a non-finite pitch.
@@ -341,8 +300,7 @@ function playSynthNote(...args: PlayNoteArgs): ChordVoiceHandle | null {
             brightOsc.frequency.setValueAtTime(freq, startTime);
             // Upper partials die first: a fast attack then an immediate decay
             // (time-constant 0.18 s) makes this an attack-brightness bloom,
-            // not a sustained ring — which also sidesteps sustain-pedal
-            // coordination, since the layer is gone long before pedal-up.
+            // not a sustained ring.
             brightGain.gain.setValueAtTime(0, startTime);
             brightGain.gain.setTargetAtTime(finalVol * brightness * 0.45, startTime, 0.004);
             rampGain(brightGain.gain, 0, startTime + 0.03, 0.18);
@@ -384,7 +342,7 @@ function playSynthNote(...args: PlayNoteArgs): ChordVoiceHandle | null {
     // throw here would abort every later note in the chord, not just this
     // one.
     try {
-        return playAdditiveBody(state, freq, startTime, duration, finalVol, muted, ignoreSustain);
+        return playAdditiveBody(state, freq, startTime, duration, finalVol, muted);
     } catch (err) {
         console.error('playNote (new) additive-body error:', err);
         return null;
@@ -406,7 +364,6 @@ function playAdditiveBody(
     duration: number,
     finalVol: number,
     muted: boolean,
-    ignoreSustain = false,
 ): ChordVoiceHandle | null {
     const { playback } = state;
     if (!playback.audio || !playback.audioGraph) {
@@ -414,10 +371,6 @@ function playAdditiveBody(
     }
     const audio = playback.audio;
     const preset = PIANO_BODY;
-
-    if (!playback.heldNotes) {
-        (playback as Mutable<typeof playback>).heldNotes = new Set(); // @direct-mutation
-    }
 
     // Master body level — velocity gain + the note's release envelope.
     const bodyGain = audio.createGain();
@@ -517,7 +470,7 @@ function playAdditiveBody(
     }
 
     // Release / panic stop — mirrors the legacy voice's `stopNote` semantics
-    // so `heldNotes` eviction and `killAllPianoNotes` keep working.
+    // so `killAllPianoNotes` keeps working.
     const stopBody = (t: number, isPanic = false): void => {
         const damping = isPanic ? 0.005 : duration < 0.2 ? 0.02 : 0.12;
         rampGain(bodyGain.gain, 0, t, damping);
@@ -530,28 +483,16 @@ function playAdditiveBody(
         }
     };
 
-    // No-pedal natural end — hoisted so the release handle below can clamp its
+    // Natural end — hoisted so the release handle below can clamp its
     // early stop into the voice's live window (never push the stop later).
     const effectiveDuration = muted ? 0.015 : duration;
     const naturalStop = startTime + effectiveDuration + 0.6;
 
-    if (playback.sustainActive && !muted && !ignoreSustain) {
-        // Pedal down: the note rings on the per-partial decay, bounded only
-        // by pedal-up or the 64-note cap — exactly the legacy behavior.
-        const noteRef = { stop: stopBody };
-        playback.heldNotes.add(noteRef);
-        if (playback.heldNotes.size > 64) {
-            const firstNote = playback.heldNotes.values().next().value;
-            firstNote.stop(audio.currentTime);
-            playback.heldNotes.delete(firstNote);
-        }
-    } else {
-        // No pedal: the damper falls at note-end — release, then stop the
-        // oscillators with enough tail for the release ramp to reach silence.
-        rampGain(bodyGain.gain, 0, startTime + effectiveDuration, 0.03);
-        for (const o of oscs) {
-            o.stop(naturalStop);
-        }
+    // The damper falls at note-end — release, then stop the
+    // oscillators with enough tail for the release ramp to reach silence.
+    rampGain(bodyGain.gain, 0, startTime + effectiveDuration, 0.03);
+    for (const o of oscs) {
+        o.stop(naturalStop);
     }
 
     // #707/#691 — release handle so the scheduler can cut this synth voicing on
@@ -584,9 +525,8 @@ function playAdditiveBody(
     // Stop's handle (#1569). A voice scheduled ahead of the clock but not yet sounding must
     // never sound: cancelling its attack from its own start would leave the gain at the
     // default 1 for a few milliseconds — a click — so its oscillators are stopped at their
-    // start instead and the gain pinned to 0 now. A sounding voice takes the panic stop the
-    // pedal path takes (`stopBody`), not `release`: that one clamps into the written window,
-    // and a pedal-held note past its written end would be cut at its live gain.
+    // start instead and the gain pinned to 0 now. A sounding voice takes the panic stop
+    // (`stopBody`), not `release`: that one clamps into the written window.
     untrack = trackChordVoice(audio, (when) => {
         if (when <= startTime) {
             try {

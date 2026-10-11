@@ -28,15 +28,13 @@ export function getState(): EnsembleState {
 type StateListener = (
     action: Action,
     state: EnsembleState,
-    meta: { oldBpm: number; dispatch: typeof dispatch },
+    meta: { dispatch: typeof dispatch },
 ) => void;
 
 const listeners = new Set<StateListener>();
 
 export const dispatch: Dispatch = (action, ...args) => {
     const payload = args[0] as ActionPayloadMap[typeof action];
-    // Accessing deepSignal property directly works like a getter
-    const oldBpm = playback.bpm;
 
     // Bundle into a discriminated Action; reducers switch on action.type.
     const a = { type: action, payload } as Action;
@@ -48,7 +46,7 @@ export const dispatch: Dispatch = (action, ...args) => {
     grooveReducer(a, playback);
 
     // Notify listeners with the same discriminated Action reducers already switch on.
-    listeners.forEach((listener) => listener(a, stateMap, { oldBpm, dispatch }));
+    listeners.forEach((listener) => listener(a, stateMap, { dispatch }));
 };
 
 /**

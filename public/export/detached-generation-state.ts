@@ -43,7 +43,7 @@ function cloneRaw<T>(value: T): T {
  * Creates a detached generation state for worker or offline-render ownership.
  *
  * Musical settings and precomputed arrangement maps are preserved, while live
- * Web Audio/DOM handles and every scheduled-note buffer start empty. The final
+ * Web Audio/DOM handles start empty. The final
  * cloneRaw pass is load-bearing for Web Worker postMessage: deepSignal proxies
  * cannot cross a structured-clone boundary.
  */
@@ -53,10 +53,7 @@ export function cloneStateForDetachedGeneration(liveState: EnsembleState): Ensem
             ...liveState.playback,
             audio: null,
             audioGraph: null,
-            heldNotes: new Set(),
             isPlaying: false,
-            nextNoteTime: 0,
-            unswungNextNoteTime: 0,
         },
         arranger: {
             ...liveState.arranger,
@@ -75,13 +72,9 @@ export function cloneStateForDetachedGeneration(liveState: EnsembleState): Ensem
         },
         chords: {
             ...liveState.chords,
-            buffer: new Map(),
         },
         bass: {
             ...liveState.bass,
-            buffer: new Map(),
-            lastFreq: null,
-            lastPlayedFreq: null,
             lastBassGain: null,
         },
         soloist: {
@@ -89,10 +82,7 @@ export function cloneStateForDetachedGeneration(liveState: EnsembleState): Ensem
             audio: {
                 ...liveState.soloist.audio,
                 activeVoices: [],
-                buffer: new Map(),
-                lastFreq: null,
                 lastRenderedFreq: null,
-                lastPlayedFreq: null,
             },
         },
     } satisfies EnsembleState;

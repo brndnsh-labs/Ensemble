@@ -5,7 +5,7 @@ through the `@engine/*` alias, and `prototypes/v2/lib/runtime.ts` is its one mai
 The main-thread plumbing layer: `state.ts` + the `state/*.ts` family — the `deepSignal`
 slices plus the non-slice plumbing that sits beside them (`state/state-effects.ts`,
 `state/state-hydration.ts`, `state/share-codec.ts`) — the `controllers/*.ts` family
-(`controllers/app-controller.ts`, `controllers/arranger-controller.ts`,
+(`controllers/arranger-controller.ts`,
 `controllers/instrument-controller.ts`, …), and
 `config.ts`. Only the slice files are exempt from `npm run check-mutations`; the
 plumbing dispatches like any other consumer. For the voices and the audio graph, see
@@ -47,7 +47,7 @@ that touches an existing document field from an engine/conductor path.
     `export/detached-generation-state.ts`'s `cloneStateForDetachedGeneration`, which the band's
     WAV export and the listening-gate tools render from (`prototypes/v2/lib/band-export.ts`). It
     spreads the whole slice then explicitly nulls the known handle fields
-    (`lastHatGain`/`lastRideGain`/`lastCrashGain` on `groove`; `heldNotes` on `playback`).
+    (`lastHatGain`/`lastRideGain`/`lastCrashGain` on `groove`; `audio`/`audioGraph` on `playback`).
     Sampled voices are not on a slice at all: `sample-voice.ts` keeps them per audio context
     (#1530), so an offline render's are its own. A new handle rides through the spread un-nulled and its first
     choke/ramp during an offline render pokes a **live-context** node — usually silent (the
@@ -76,7 +76,7 @@ that touches an existing document field from an engine/conductor path.
 13. **Ensemble is "a fancy metronome at its core"** — stable, predictable time is a load-bearing
     product promise (the practicing-musician persona mutes their own instrument and plays along;
     it cannot lock to a reference that moves). Any change that destabilizes tempo/timing by
-    default — anywhere in this layer's transport/BPM path (`app-controller.ts` `setBpm`,
+    default — anywhere in this layer's transport/BPM path (the `SET_BPM` reducer,
     `playback` slice) — needs to ship **opt-in**, not default-on, even when it makes the band
     sound more human. Tempo breathing (#1010) is the standing design in this space and is
     **still parked** — if it ships it must be opt-in and off during practice. No

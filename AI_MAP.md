@@ -34,7 +34,6 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `prototypes/v2/lib/first-bars.ts` | The Continue card's preview: a chart's own first written bars as chord text, `%` repeats resolved. | `firstBars` |
 | `public/state.ts` | Central Redux-like state store. | `getState`, `dispatch`, `subscribe` |
 | `public/types.ts` | Global Action constants and shared types. | `ACTIONS` |
-| `public/controllers/app-controller.ts` | BPM updates with in-flight scheduler rescheduling (called from `state-effects.ts`). v1's palette/mode setters (no app caller since #1358) were deleted in #1381 — v2's Day/Stage theme is its own device preference (`app/use-stage-theme.ts`). | `setBpm` |
 
 ## Band Engine (`band/`, the engine the app plays)
 

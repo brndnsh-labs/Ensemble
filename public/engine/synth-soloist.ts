@@ -288,13 +288,6 @@ function playSoloNoteCurrent(
     const now = ctx.currentTime;
     const playTime = Math.max(time, now);
 
-    if (playback.debugSoloist) {
-        // biome-ignore lint/suspicious/noConsole: deliberate diagnostic, gated behind playback.debugSoloist
-        console.log(
-            `[Soloist Debug] playSoloNote: freq=${freq.toFixed(2)}, vol=${vol.toFixed(2)}, duration=${duration.toFixed(2)}s, vibrato=${vibrato}, legato=${isLegato}`,
-        );
-    }
-
     // Voice Management
     manageVoices(playTime, soloist.audio, soloist.mode);
 
@@ -820,13 +813,6 @@ function createVibrato(
         depthFactor = 0.012;
     } else if (style === 'neo') {
         depthFactor = 0.015;
-    }
-
-    const profile: string = 'srv';
-    if (profile === 'gilmour') {
-        depthFactor *= 1.3;
-    } else if (profile === 'slash') {
-        depthFactor *= 1.4;
     }
 
     if (config.vibratoIntensity !== undefined) {
