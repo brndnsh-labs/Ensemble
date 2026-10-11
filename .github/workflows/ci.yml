@@ -183,8 +183,63 @@ jobs:
   #
   # The REQUIRED context is the `v2-checks` aggregate below, not these legs, so
   # the matrix can change without touching branch protection.
+  #
+  # SKIPPED on a pull request that cannot reach the app (2026-10-11): the suite drives the
+  # built export, so a PR whose every file is outside what the export compiles and what the
+  # suite itself runs has nothing for it to find, and it is the slowest thing a PR waits on.
+  # `changes` decides, from a short list of paths that provably cannot reach either. Anything
+  # not on the list runs the suite, and so does every push to `main`: a merge is a release.
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pull-requests: read
+    outputs:
+      app: ${{ steps.decide.outputs.app }}
+    steps:
+      - name: Decide whether this change can reach the app
+        id: decide
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          # `true` unless EVERY changed file is on the list. A path the list does not name,
+          # a file list that cannot be read, an empty one: all `true`.
+          #   docs/, *.md   prose; the build reads none of it
+          #   tests/        the root Vitest suites and their fixtures (`checks`, `e2e-tests`)
+          #   band/test/, band/**/*.test.ts   the band's own tests; nothing shipped imports them
+          #   .claude/      agent skills and settings
+          # NOT on it, on purpose: anything under prototypes/v2/ but its prose (a unit test
+          # there is typechecked only by the v2 build), scripts/, the workflows, and every
+          # manifest and config.
+          cannot_reach_app() {
+            case "$1" in
+              prototypes/v2/*.md | prototypes/v2-api/*.md) return 0 ;;
+              prototypes/* | .github/* | scripts/* | public/*.ts | public/*.tsx) return 1 ;;
+              docs/* | tests/* | band/test/* | .claude/* | *.md) return 0 ;;
+              band/*.test.ts) return 0 ;;
+              *) return 1 ;;
+            esac
+          }
+          app=true
+          if [ -n "$PR" ] && files=$(gh api "repos/${{ github.repository }}/pulls/$PR/files" \
+              --paginate --jq '.[] | .filename, (.previous_filename // empty)') && [ -n "$files" ]; then
+            app=false
+            while IFS= read -r file; do
+              if ! cannot_reach_app "$file"; then
+                echo "reaches the app: $file"
+                app=true
+                break
+              fi
+            done <<< "$files"
+          fi
+          echo "app=$app"
+          echo "app=$app" >> "$GITHUB_OUTPUT"
+
   v2-suite:
     name: v2-suite (${{ matrix.shard }}, ${{ matrix.project }})
+    needs: changes
+    if: needs.changes.outputs.app == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
@@ -318,17 +373,25 @@ jobs:
   # SKIP this job, the required context would never report, and the PR would
   # block forever instead of going red.
   v2-checks:
-    needs: v2-suite
+    needs: [changes, v2-suite]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - name: Require every v2 shard to have passed
         # A matrix `needs` result is 'success' only when EVERY leg succeeded, so
-        # this one comparison covers a failed, cancelled or skipped shard.
+        # this one comparison covers a failed, cancelled or skipped shard. The one
+        # other way through is the suite skipped because `changes` itself succeeded
+        # and said the change cannot reach the app; a failed or cancelled `changes`
+        # skips the suite too, and that is red.
+        env:
+          CHANGES: ${{ needs.changes.result }}
+          APP: ${{ needs.changes.outputs.app }}
+          SUITE: ${{ needs.v2-suite.result }}
         run: |
-          echo "v2-suite matrix result: ${{ needs.v2-suite.result }}"
-          test "${{ needs.v2-suite.result }}" = success
+          echo "changes: $CHANGES (app=$APP); v2-suite matrix result: $SUITE"
+          if [ "$SUITE" = success ]; then exit 0; fi
+          test "$CHANGES" = success && test "$APP" = false && test "$SUITE" = skipped
 
   # Publish the v2 account API as an immutable image on every merge to main —
   # decision 1 of docs/design/ensemble-v2-rollout.md (#1216). The API suite itself
