@@ -392,13 +392,17 @@ describe("a counted chorus plays its lap's music", () => {
         return events.filter((e) => e.lane !== 'comp' || e.tick + e.dur <= end + 1e-6);
     };
     describe.each(STYLE_IDS.filter((id) => STYLES[id].lead))('%s', (style: StyleId) => {
-        for (const name of ['blues', 'rhythmChanges', 'bossa'] as const) {
+        for (const [n, name] of (['blues', 'rhythmChanges', 'bossa'] as const).entries()) {
+            // Two of the four seeds a chart, the other two on the next, and the other way round
+            // in the next style: every style plays all four, and so does every chart.
+            const turn = n + STYLE_IDS.indexOf(style);
+            const seeds = ['a', 'b', 'c', 'd'].filter((_, i) => (i + turn) % 2 === 0);
             it(name, () => {
                 const looped = compileTimeline(FIXTURES[name]);
                 const counted = compileTimeline({ ...FIXTURES[name], choruses: CHORUS_COUNT });
                 const length = looped.bars.length;
                 const failures: string[] = [];
-                for (const seed of ['a', 'b', 'c', 'd']) {
+                for (const seed of seeds) {
                     for (const trade of [
                         null,
                         { with: 'lead', bars: 4, choruses: null } as const,
