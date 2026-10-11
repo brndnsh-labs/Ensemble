@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { appUrl, expect, seedStarters, songLink, test } from './fixtures';
 
 // #1275 — per-instrument volume/reverb controls (and, on the old engine, style) in
-// the Sounds panel. Mirrors `foundation.spec.ts`'s Sounds helpers and
+// the Sounds panel. Mirrors `foundation-helpers.ts`'s Sounds helpers and
 // `share-link.spec.ts`'s clipboard-less fallback pattern rather than
 // reinventing either.
 

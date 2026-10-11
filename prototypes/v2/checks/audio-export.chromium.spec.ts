@@ -205,7 +205,7 @@ test('A pack that fails to install surfaces an error, never a silent synth fallb
     await page.getByRole('button', { name: 'Close sounds' }).click();
 
     // Evict the just-installed pack and break its re-fetch route, matching
-    // `checks/foundation.spec.ts`'s "partial cache eviction" scenario — a
+    // `checks/foundation-sounds.spec.ts`'s "partial cache eviction" scenario — a
     // pack the chart genuinely selects but can no longer install, not merely
     // one that was never tried.
     await page.evaluate(async () => {
