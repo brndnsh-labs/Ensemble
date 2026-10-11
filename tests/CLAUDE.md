@@ -128,5 +128,5 @@ quality, and the notes each symbol rules out (`chord-clash.ts`).
   timeout at the tightest scope, per-test `it(name, { timeout: 60_000 }, fn)`, never globally and
   never by shrinking the sample). Distinguish class 1 from class 2 by running the repro both
   standalone and in-batch; class 4 announces itself as "test timed out" with no failed assertion.
-  If a pre-commit hook's `vitest related` fails on a critique test unrelated to your diff, suspect
-  a flake and re-run standalone before assuming a regression.
+  If a critique test unrelated to your diff fails in a batch run, suspect a flake and re-run
+  standalone before assuming a regression.

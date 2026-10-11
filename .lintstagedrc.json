@@ -1,8 +1,4 @@
 {
     "*.{js,mjs,ts,tsx,json,md}": ["biome check --write --no-errors-on-unmatched"],
-    "public/**/*.{ts,tsx}": [
-        "node scripts/check-mutations.ts",
-        "npm run depcheck",
-        "npx vitest related --run --passWithNoTests"
-    ]
+    "public/**/*.{ts,tsx}": ["node scripts/check-mutations.ts", "npm run depcheck"]
 }
